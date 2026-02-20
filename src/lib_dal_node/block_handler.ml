@@ -339,8 +339,8 @@ let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     attestations ;
   count_per_slot
 
-let check_attesters_attested node_ctxt committee slot_to_committee parameters
-    ~block_level attestations is_attested tb_slot_to_int =
+let check_attesters_attested cctxt node_ctxt committee slot_to_committee
+    parameters ~block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let tracked_attesters =
     match
@@ -355,24 +355,76 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
     let published_level = Int32.(sub block_level (of_int max_lag)) in
     if published_level < 1l then return_unit
     else
-      let attested_shards_per_slot =
-        attested_shards_per_slot
-          attestations
-          slot_to_committee
-          ~number_of_slots:parameters.Types.number_of_slots
-          is_attested
-          tb_slot_to_int
+      let cache = Node_context.get_attestation_ops_cache node_ctxt in
+      let get_cached_ops attested_level =
+        match Attestation_ops_cache.find cache ~level:attested_level with
+        | Some cached_ops -> return cached_ops
+        | None ->
+            let* attestations =
+              Plugin.get_attestations ~block_level:attested_level cctxt
+            in
+            return
+            @@ List.map
+                 (fun (tb_slot, _op, dal_att_opt) ->
+                   ( Plugin.tb_slot_to_int tb_slot,
+                     Option.map
+                       (fun dal_att
+                            ~number_of_slots
+                            ~number_of_lags
+                            ~lag_index
+                            slot_index
+                          ->
+                         Plugin.is_baker_attested
+                           dal_att
+                           ~number_of_slots
+                           ~number_of_lags
+                           ~lag_index
+                           slot_index)
+                       dal_att_opt ))
+                 attestations
       in
+      let* attestations_per_lag =
+        List.mapi_es
+          (fun lag_index lag ->
+            let attested_level = Int32.(add published_level (of_int lag)) in
+            if attested_level <= block_level then
+              let* cached_ops = get_cached_ops attested_level in
+              return_some (lag_index, lag, attested_level, cached_ops)
+            else return_none)
+          parameters.Types.attestation_lags
+      in
+      let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
+      let number_of_slots = parameters.number_of_slots in
+      let number_of_lags = List.length parameters.Types.attestation_lags in
       let threshold =
         parameters.cryptobox_parameters.number_of_shards
         / parameters.cryptobox_parameters.redundancy_factor
       in
       let are_slots_protocol_attested =
-        Array.map
-          (fun num_attested_shards -> num_attested_shards >= threshold)
-          attested_shards_per_slot
+        let total_attested_shards = Array.make number_of_slots 0 in
+        List.iter
+          (fun (lag_index, _lag, _attested_level, cached_ops) ->
+            let shards =
+              attested_shards_per_slot
+                (List.map
+                   (fun (tb_int, fn_opt) -> (tb_int, (), fn_opt))
+                   cached_ops)
+                slot_to_committee
+                ~number_of_slots
+                (fun f slot ->
+                  f ~number_of_slots ~number_of_lags ~lag_index slot)
+                Fun.id
+            in
+            Array.iteri
+              (fun i n ->
+                total_attested_shards.(i) <- total_attested_shards.(i) + n)
+              shards)
+          attestations_per_lag ;
+        Array.map (fun n -> n >= threshold) total_attested_shards
       in
-      let should_be_attested index = are_slots_protocol_attested.(index) in
+      let should_be_attested ~slot_index =
+        are_slots_protocol_attested.(slot_index)
+      in
       let number_of_attested_slots =
         Array.fold_left
           (fun counter is_attested ->
@@ -390,87 +442,100 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
                  && Signature.Public_key_hash.equal delegate pkh)
       in
       let check_attester attester proto_tb_slot =
-        let attestation_opt =
-          List.find
-            (fun (tb_slot, _attestation_op, _dal_attestation_opt) ->
-              tb_slot_to_int tb_slot = proto_tb_slot)
-            attestations
+        (* Find the attester's attestation operations across all lag levels *)
+        let attestation_ops_per_lag =
+          List.filter_map
+            (fun (lag_index, _lag, attested_level, cached_ops) ->
+              match
+                List.find_opt
+                  (fun (tb_int, _fn_opt) -> tb_int = proto_tb_slot)
+                  cached_ops
+              with
+              | None -> None
+              | Some entry -> Some (lag_index, attested_level, entry))
+            attestations_per_lag
         in
-        match attestation_opt with
-        | None ->
+        if attestation_ops_per_lag = [] then (
+          Dal_metrics.attested_slots_for_baker_per_level_ratio
+            ~delegate:attester
+            0. ;
+          Event.emit_warn_no_attestation ~attester ~attested_level:block_level)
+        else
+          let has_dal_payload =
+            List.exists
+              (fun (_lag_index, _level, (_tb_int, fn_opt)) ->
+                Option.is_some fn_opt)
+              attestation_ops_per_lag
+          in
+          if not has_dal_payload then (
             Dal_metrics.attested_slots_for_baker_per_level_ratio
               ~delegate:attester
               0. ;
-            Event.emit_warn_no_attestation ~attester ~attested_level:block_level
-        | Some (_tb_slot, _attestation_op, dal_attestation_opt) -> (
-            match dal_attestation_opt with
-            | None ->
-                Dal_metrics.attested_slots_for_baker_per_level_ratio
-                  ~delegate:attester
-                  0. ;
-                Event.emit_warn_attester_not_dal_attesting
+            Event.emit_warn_attester_not_dal_attesting
+              ~attester
+              ~attested_level:block_level)
+          else
+            let attested = ref [] in
+            let not_attested = ref [] in
+            let not_attested_with_traps = ref [] in
+            for slot_index = 0 to number_of_slots - 1 do
+              if should_be_attested ~slot_index then
+                let baker_attested_slot =
+                  List.exists
+                    (fun (lag_index, _level, (_tb_int, fn_opt)) ->
+                      match fn_opt with
+                      | None -> false
+                      | Some is_attested ->
+                          is_attested
+                            ~number_of_slots
+                            ~number_of_lags
+                            ~lag_index
+                            slot_index)
+                    attestation_ops_per_lag
+                in
+                if baker_attested_slot then attested := slot_index :: !attested
+                else if
+                  parameters.incentives_enable
+                  && contains_traps attester slot_index
+                then
+                  not_attested_with_traps :=
+                    slot_index :: !not_attested_with_traps
+                else not_attested := slot_index :: !not_attested
+            done ;
+            let baker_attested_slot =
+              List.length !attested + List.length !not_attested_with_traps
+            in
+            let ratio =
+              try
+                float_of_int baker_attested_slot
+                /. float_of_int number_of_attested_slots
+              with _ -> 1.
+            in
+            Dal_metrics.attested_slots_for_baker_per_level_ratio
+              ~delegate:attester
+              ratio ;
+            let*! () =
+              if !attested <> [] then
+                Event.emit_attester_attested
                   ~attester
                   ~attested_level:block_level
-            | Some bitset ->
-                let attested, not_attested, not_attested_with_traps =
-                  List.fold_left
-                    (fun (attested, not_attested, not_attested_with_traps)
-                         index
-                       ->
-                      if should_be_attested index then
-                        if is_attested bitset index then
-                          ( index :: attested,
-                            not_attested,
-                            not_attested_with_traps )
-                        else if
-                          parameters.incentives_enable
-                          && contains_traps attester index
-                        then
-                          ( attested,
-                            not_attested,
-                            index :: not_attested_with_traps )
-                        else
-                          ( attested,
-                            index :: not_attested,
-                            not_attested_with_traps )
-                      else (attested, not_attested, not_attested_with_traps))
-                    ([], [], [])
-                    (parameters.number_of_slots - 1 --- 0)
-                in
-                let baker_attested_slot =
-                  List.length attested + List.length not_attested_with_traps
-                in
-                let ratio =
-                  try
-                    float_of_int baker_attested_slot
-                    /. float_of_int number_of_attested_slots
-                  with _ -> 1.
-                in
-                Dal_metrics.attested_slots_for_baker_per_level_ratio
-                  ~delegate:attester
-                  ratio ;
-                let*! () =
-                  if attested <> [] then
-                    Event.emit_attester_attested
-                      ~attester
-                      ~attested_level:block_level
-                      ~slot_indexes:attested
-                  else Lwt.return_unit
-                in
-                let*! () =
-                  if not_attested <> [] then
-                    Event.emit_warn_attester_did_not_attest
-                      ~attester
-                      ~attested_level:block_level
-                      ~slot_indexes:not_attested
-                  else Lwt.return_unit
-                in
-                if not_attested_with_traps <> [] then
-                  Event.emit_attester_did_not_attest_because_of_traps
-                    ~attester
-                    ~attested_level:block_level
-                    ~slot_indexes:not_attested_with_traps
-                else Lwt.return_unit)
+                  ~slot_indexes:(List.rev !attested)
+              else Lwt.return_unit
+            in
+            let*! () =
+              if !not_attested <> [] then
+                Event.emit_warn_attester_did_not_attest
+                  ~attester
+                  ~attested_level:block_level
+                  ~slot_indexes:(List.rev !not_attested)
+              else Lwt.return_unit
+            in
+            if !not_attested_with_traps <> [] then
+              Event.emit_attester_did_not_attest_because_of_traps
+                ~attester
+                ~attested_level:block_level
+                ~slot_indexes:(List.rev !not_attested_with_traps)
+            else Lwt.return_unit
       in
       let*! () =
         Signature.Public_key_hash.Set.iter_s
@@ -574,7 +639,6 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
         ~level:(`Level (Int32.sub block_level 2l))
     else Result_syntax.return prev_proto_parameters
   in
-  let number_of_lags = List.length proto_parameters.Types.attestation_lags in
   let* () =
     (remove_unattested_slots_and_shards
        ~prev_prev_proto_parameters
@@ -626,21 +690,15 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       []
   in
   let* () =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
-       Generalize for multiple lags *)
     let*? () = Node_context.assert_single_lag ctxt in
     (check_attesters_attested
+       cctxt
        ctxt
        committees
        slot_to_committee
        proto_parameters
        ~block_level
-       attestations
-       (Plugin.is_baker_attested
-          ~number_of_slots:proto_parameters.Types.number_of_slots
-          ~number_of_lags
-          ~lag_index:(number_of_lags - 1))
-       Plugin.tb_slot_to_int
+       (module Plugin)
      [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
   in
   let* () =
