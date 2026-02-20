@@ -901,3 +901,8 @@ let retrieve_pending_operations cctxt state =
 let get_current_operations state = state.operation_pool
 
 let get_quorum_event_stream state = state.qc_event_stream.stream
+
+module Internal_for_tests = struct
+  (* State creation *)
+  let make_initial_state = make_initial_state
+end
