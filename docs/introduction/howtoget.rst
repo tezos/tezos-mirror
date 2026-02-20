@@ -141,8 +141,8 @@ Then, to install the binaries, run the following command to install the octez-ba
 
   sudo apt install octez-baker
 
-Once the Octez binary packages are installed, they can be set up as services
-as explained in :doc:`./services`.
+Once the Octez binary packages are installed, you may want to :ref:`start a node <quickstart_node>`, and then perhaps :ref:`start a baker <quickstart_baker>`.
+Alternatively, they can be set up as services as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
@@ -542,7 +542,7 @@ Install OPAM
 ~~~~~~~~~~~~
 
 First, you need to install the `OPAM <https://opam.ocaml.org/>`__
-package manager, at least version 2.1, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
+package manager, at least version 2.3, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
 
 After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in

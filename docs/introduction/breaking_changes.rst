@@ -36,6 +36,16 @@ versions, see :doc:`past_breaking_changes`.
 
    past_breaking_changes
 
+.. _v25_breaking_changes:
+
+Octez Version 25
+----------------
+
+Octez v25 will deprecate Octez packages, and Octez v26 will remove them.
+Instead, the new ``octez-manager`` tool included in the Octez suite (see https://octez-manager.tezos.com) will handle installation, configuration, and running of static binaries in a more user-friendly way than source or binary packages.
+
+Thus, in Octez v25, installing packages would display a warning about the deprecation and would link to ``octez-manager``.
+
 .. _v24_breaking_changes:
 
 Octez Version 24
