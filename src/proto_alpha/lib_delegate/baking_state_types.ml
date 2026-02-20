@@ -246,3 +246,17 @@ type delegate_info = {
   attestation_slot : Slot.t;
   attesting_power : int64;
 }
+
+(** Internal module exposed for testing purposes only.
+    Do not use outside of tests. *)
+module Internal_for_tests = struct
+  (** Create a Delegate.t from a Key.t for testing purposes.
+      Uses the key as both manager and consensus key. *)
+  let make_delegate_from_key key =
+    Delegate.
+      {
+        manager_key = Maybe_known_key.Known_key key;
+        consensus_key = key;
+        companion_key = None;
+      }
+end
