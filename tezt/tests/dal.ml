@@ -11837,7 +11837,7 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
       cryptobox
       client
   in
-  let* publish_level =
+  let* published_level =
     let* op_level = Node.get_level l1_node in
     return @@ (op_level + 1)
   in
@@ -11846,31 +11846,29 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
   let* () = Agnostic_baker.run baker in
 
   (* +2 blocks for the attested block to be final, +1 for some slack *)
-  let* _ = Node.wait_for_level l1_node (publish_level + attestation_lag + 3) in
+  let* _ =
+    Node.wait_for_level l1_node (published_level + attestation_lag + 3)
+  in
   let* () = Agnostic_baker.terminate baker in
   let () = Dal_node.Mockup_for_baker.stop dal_node_mockup in
 
-  let attested_level = publish_level + attestation_lag in
   Log.info
-    "Check that the slot published at level %d was attested at level %d"
-    publish_level
-    attested_level ;
-  let* {dal_attestation; _} =
-    Node.RPC.(
-      call l1_node
-      @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
+    "Check that the slot published at level %d was attested"
+    published_level ;
+  let* current_level = Node.get_level l1_node in
+  let attested_levels = published_level --> current_level in
+  let* all_slot_availabilities =
+    Dal.collect_slot_availabilities l1_node ~attested_levels
   in
-  let number_of_lags = List.length dal_parameters.attestation_lags in
-  let dal_attestation =
-    Option.map
-      (fun str ->
-        (Dal.Slot_availability.decode protocol dal_parameters str).(number_of_lags
-                                                                    - 1))
-      dal_attestation
-  in
-  let expected_attestation = expected_attestation dal_parameters [0] in
-  Check.((Some expected_attestation = dal_attestation) (option (array bool)))
-    ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
+
+  Check.is_true
+    (Dal.is_slot_attested
+       ~published_level
+       ~slot_index:0
+       ~to_attested_levels:(Dal.to_attested_levels ~protocol ~dal_parameters)
+       all_slot_availabilities)
+    ~error_msg:"Expected slot 0 from published_level to be attested" ;
+
   unit
 
 let test_disable_shard_validation_wrong_cli _protocol _parameters _cryptobox
