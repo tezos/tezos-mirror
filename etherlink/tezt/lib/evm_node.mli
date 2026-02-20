@@ -761,6 +761,16 @@ val list_events :
 (** Switch history mode of an EVM node with command switch history. *)
 val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
 
+(** [trace_block evm_node block_number] traces all transactions in the block at
+    the given [block_number] using the CLI and returns the parsed JSON list. *)
+val trace_block : t -> int -> (Process.t, JSON.t list) runnable
+
+(** [trace_transaction ?tracer evm_node tx_hash] traces a single transaction
+    identified by [tx_hash] using the CLI. [tracer] selects the tracer
+    (defaults to [callTracer]). *)
+val trace_transaction :
+  ?tracer:string -> t -> string -> (Process.t, JSON.t) runnable
+
 val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t
 
 val daemon_default_colors : Log.Color.t array
