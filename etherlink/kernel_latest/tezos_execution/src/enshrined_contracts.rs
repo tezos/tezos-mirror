@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::{BinWriter, ByteReprTrait};
+use mir::lexer::Prim;
 use mir::{
     ast::{Entrypoint, Micheline},
     context::CtxTrait,
 };
 use primitive_types::U256;
+use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
@@ -56,17 +58,148 @@ fn extract_destination<'a>(value: Micheline<'a>) -> Result<String, TransferError
 
 pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
     contract: EnshrinedContracts,
-    _entrypoint: &Entrypoint,
+    entrypoint: &Entrypoint,
     value: Micheline<'a>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
     registry: &impl Registry,
 ) -> Result<(), TransferError> {
     match contract {
         EnshrinedContracts::TezosXGateway => {
-            let dest = extract_destination(value)?;
-
-            tezosx_transfer_tez(registry, ctx, dest.as_str())
+            if entrypoint.is_default() {
+                let dest = extract_destination(value)?;
+                tezosx_cross_runtime_call(registry, ctx, dest.as_str(), &[])
+            } else if entrypoint.as_str() == "call" {
+                let (dest, method_sig, abi_params) = extract_call_params(value)?;
+                let selector = compute_selector(&method_sig);
+                let mut calldata = Vec::with_capacity(4 + abi_params.len());
+                calldata.extend_from_slice(&selector);
+                calldata.extend_from_slice(&abi_params);
+                tezosx_cross_runtime_call(registry, ctx, &dest, &calldata)
+            } else {
+                Err(TransferError::GatewayError(format!(
+                    "Unknown entrypoint: {entrypoint}"
+                )))
+            }
         }
+    }
+}
+
+/// Extract (destination, method_signature, abi_parameters) from a Micheline
+/// Pair(String(destination), Pair(String(method_sig), Bytes(abi_params))).
+fn extract_call_params(
+    value: Micheline<'_>,
+) -> Result<(String, String, Vec<u8>), TransferError> {
+    match value {
+        Micheline::App(Prim::Pair, args, _) if args.len() == 2 => {
+            let dest = match &args[0] {
+                Micheline::String(s) => s.clone(),
+                _ => {
+                    return Err(TransferError::GatewayError(
+                        "Expected string destination in call parameters".into(),
+                    ))
+                }
+            };
+            match &args[1] {
+                Micheline::App(Prim::Pair, inner_args, _) if inner_args.len() == 2 => {
+                    let method_sig = match &inner_args[0] {
+                        Micheline::String(s) => s.clone(),
+                        _ => {
+                            return Err(TransferError::GatewayError(
+                                "Expected string method signature".into(),
+                            ))
+                        }
+                    };
+                    let abi_params = match &inner_args[1] {
+                        Micheline::Bytes(b) => b.clone(),
+                        _ => {
+                            return Err(TransferError::GatewayError(
+                                "Expected bytes for ABI parameters".into(),
+                            ))
+                        }
+                    };
+                    Ok((dest, method_sig, abi_params))
+                }
+                _ => Err(TransferError::GatewayError(
+                    "Expected Pair(string, bytes) for method signature and parameters"
+                        .into(),
+                )),
+            }
+        }
+        _ => Err(TransferError::GatewayError(
+            "Expected Pair(string, Pair(string, bytes)) for call parameters".into(),
+        )),
+    }
+}
+
+/// Compute the 4-byte Keccak256 function selector from a method signature.
+fn compute_selector(method_signature: &str) -> [u8; 4] {
+    let hash = Keccak256::digest(method_signature.as_bytes());
+    [hash[0], hash[1], hash[2], hash[3]]
+}
+
+fn tezosx_cross_runtime_call<'a, Host: Runtime>(
+    registry: &impl Registry,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    dest: &str,
+    data: &[u8],
+) -> Result<(), TransferError> {
+    let source = ctx.sender();
+    let amount = ctx.amount();
+    let block_number = ctx.level();
+    let timestamp = ctx.now();
+    let host = ctx.host();
+
+    if amount < 0 {
+        return Err(TransferError::GatewayError("Negative amount".into()));
+    }
+
+    let context = CrossRuntimeContext {
+        gas_limit: u64::MAX,
+        timestamp: bigint_to_u256(&timestamp)?,
+        block_number: biguint_to_u256(block_number)?,
+    };
+
+    let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
+        Some(alias) => alias,
+        None => {
+            let source_b58 = source.to_base58_check();
+            let alias = registry
+                .generate_alias(
+                    host,
+                    source_b58.as_bytes(),
+                    RuntimeId::Ethereum,
+                    context.clone(),
+                )
+                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+            store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
+            alias
+        }
+    };
+    let destination_contract = registry
+        .address_from_string(dest, RuntimeId::Ethereum)
+        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+
+    let result = registry
+        .bridge(
+            host,
+            RuntimeId::Ethereum,
+            &destination_contract,
+            &alias,
+            U256::from(amount as u64),
+            data,
+            context,
+        )
+        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+    match result {
+        CrossCallResult::Success(_) => Ok(()),
+        CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
+            "Cross-runtime call reverted: {}",
+            hex::encode(&data)
+        ))),
+        CrossCallResult::Halt(data) => Err(TransferError::GatewayError(format!(
+            "Cross-runtime call halted: {}",
+            hex::encode(&data)
+        ))),
     }
 }
 
@@ -88,72 +221,6 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
         ));
     }
     Ok(U256::from_little_endian(&bytes))
-}
-
-fn tezosx_transfer_tez<'a, Host: Runtime>(
-    registry: &impl Registry,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
-    dest: &str,
-) -> Result<(), TransferError> {
-    let source = ctx.sender();
-    let amount = ctx.amount();
-    let block_number = ctx.level();
-
-    let timestamp = ctx.now();
-    let host = ctx.host();
-
-    if amount < 0 {
-        return Err(TransferError::GatewayError("Negative amount".into()));
-    }
-
-    let context = CrossRuntimeContext {
-        gas_limit: u64::MAX, // TODO: L2-869 this should have a proper bound
-        timestamp: bigint_to_u256(&timestamp)?,
-        block_number: biguint_to_u256(block_number)?,
-    };
-
-    // the sender has been debited before the execution of the contract
-    let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
-        Some(alias) => alias,
-        None => {
-            let source_b58 = source.to_base58_check();
-            let alias = registry
-                .generate_alias(
-                    host,
-                    source_b58.as_bytes(),
-                    RuntimeId::Ethereum,
-                    context.clone(),
-                )
-                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-            store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
-            alias
-        }
-    };
-    let destination_contract = registry
-        .address_from_string(dest, RuntimeId::Ethereum)
-        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    let result = registry
-        .bridge(
-            host,
-            RuntimeId::Ethereum,
-            &destination_contract,
-            &alias,
-            U256::from(amount as u64),
-            &[0u8; 0],
-            context,
-        )
-        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    match result {
-        CrossCallResult::Success(_) => Ok(()),
-        CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
-            "Cross-runtime call reverted: {}",
-            hex::encode(&data)
-        ))),
-        CrossCallResult::Halt(data) => Err(TransferError::GatewayError(format!(
-            "Cross-runtime call halted: {}",
-            hex::encode(&data)
-        ))),
-    }
 }
 
 pub(crate) fn get_enshrined_contract_entrypoint(
@@ -186,6 +253,44 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_selector() {
+        // keccak256("transfer(address,uint256)") starts with 0xa9059cbb
+        let selector = compute_selector("transfer(address,uint256)");
+        assert_eq!(selector, [0xa9, 0x05, 0x9c, 0xbb]);
+    }
+
+    #[test]
+    fn test_tezosx_cross_runtime_call_passes_calldata() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias.clone());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let method_sig = "transfer(address,uint256)";
+        let abi_params = vec![0xAA, 0xBB, 0xCC, 0xDD];
+        let amount = 500i64;
+
+        let selector = compute_selector(method_sig);
+        let mut calldata = Vec::with_capacity(4 + abi_params.len());
+        calldata.extend_from_slice(&selector);
+        calldata.extend_from_slice(&abi_params);
+
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &calldata);
+        assert!(result.is_ok());
+
+        let bridge_calls = registry.bridge_calls.borrow();
+        assert_eq!(bridge_calls.len(), 1);
+        assert_eq!(bridge_calls[0].0, RuntimeId::Ethereum);
+        assert_eq!(bridge_calls[0].4, calldata);
+    }
+
+    #[test]
     fn test_tezosx_transfer_creates_alias_when_absent() {
         let mut host = MockKernelHost::default();
         let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
@@ -201,7 +306,7 @@ mod tests {
         let amount = 1000i64;
 
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        let result = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
         assert!(result.is_ok());
 
         // Verify generate_alias was called
@@ -235,11 +340,11 @@ mod tests {
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First transfer creates alias
-        let result1 = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        let result1 = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
         assert!(result1.is_ok());
 
         // Second transfer should reuse alias
-        let result2 = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        let result2 = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
         assert!(result2.is_ok());
 
         // generate_alias should only have been called once

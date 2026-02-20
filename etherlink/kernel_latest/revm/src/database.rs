@@ -96,11 +96,12 @@ pub trait DatabasePrecompileStateChanges {
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
     fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
-    fn tezosx_transfer_tez(
+    fn tezosx_call_michelson(
         &mut self,
         source: Address,
         destination: &str,
         amount: U256,
+        data: &[u8],
     ) -> Result<(), CustomPrecompileError>;
 }
 
@@ -257,11 +258,12 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         }
     }
 
-    fn tezosx_transfer_tez(
+    fn tezosx_call_michelson(
         &mut self,
         source: Address,
         destination: &str,
         amount: U256,
+        data: &[u8],
     ) -> Result<(), CustomPrecompileError> {
         let context = CrossRuntimeContext {
             gas_limit: self.block.gas_limit,
@@ -310,13 +312,11 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                         ))
                     })?,
                 ),
-                &[],
+                data,
                 context,
             )
             .map_err(|e| {
-                CustomPrecompileError::Revert(format!(
-                    "Failed to transfer tez to destination contract: {e:?}"
-                ))
+                CustomPrecompileError::Revert(format!("Cross-runtime call failed: {e:?}"))
             })?;
         match result {
             CrossCallResult::Success(_) => Ok(()),

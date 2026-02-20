@@ -318,11 +318,12 @@ mod tests {
             Ok(false)
         }
 
-        fn tezosx_transfer_tez(
+        fn tezosx_call_michelson(
             &mut self,
             _source: Address,
             _destination: &str,
             _amount: U256,
+            _data: &[u8],
         ) -> Result<(), CustomPrecompileError> {
             Ok(())
         }
