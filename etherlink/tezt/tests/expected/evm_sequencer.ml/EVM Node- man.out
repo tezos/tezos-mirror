@@ -1087,6 +1087,68 @@ Debug commands:
     --disable-da-fees: Disable DA fees for this replay.
     -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
   
+  trace block <level> [--data-dir <data-dir>] [--config-file <path>]
+      [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
+      [-n --native-execution-policy <policy>] [--kernel <evm_kernel.wasm>]
+      [--kernel-verbosity <info>] [--profile [minimal|flamegraph]] [--disable-da-fees]
+      [-I --simulate-instant-confirmation] [--tracer <tracer>]
+    Trace all transactions in a specific block level.
+    <level>: Level to trace.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory.
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the
+      rollup. Missing pre-images will be downloaded remotely if they are not already present
+      on disk.
+    -n --native-execution-policy <policy>: Policy regarding the use of native execution for
+      supported kernels. Can be `never`, `rpcs_only` or `always`.
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be
+      loaded from storage afterward.
+    --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`,
+      `info`, `debug`.
+    --profile [minimal|flamegraph]: Profile the execution of the WASM PVM; 'minimal' provides
+      a file to which it streamlines tick and gas consumption, 'flamegraph' creates a
+      flamegraph indexed on tick consumption
+      Defaults to `flamegraph`.
+    --disable-da-fees: Disable DA fees for this replay.
+    -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
+    --tracer <tracer>: Tracer to use (callTracer or structLogger). Default: callTracer.
+  
+  trace transaction <hash> [--data-dir <data-dir>] [--config-file <path>]
+      [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
+      [-n --native-execution-policy <policy>] [--kernel <evm_kernel.wasm>]
+      [--kernel-verbosity <info>] [--profile [minimal|flamegraph]] [--disable-da-fees]
+      [-I --simulate-instant-confirmation] [--tracer <tracer>]
+    Trace a specific transaction.
+    <hash>: Transaction hash to trace.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --preimages-dir <_evm_installer_preimages>: Path to the preimages directory.
+    --preimages-endpoint <url>: The address of a service which provides pre-images for the
+      rollup. Missing pre-images will be downloaded remotely if they are not already present
+      on disk.
+    -n --native-execution-policy <policy>: Policy regarding the use of native execution for
+      supported kernels. Can be `never`, `rpcs_only` or `always`.
+    --kernel <evm_kernel.wasm>: Path to the EVM kernel used to launch the PVM, it will be
+      loaded from storage afterward.
+    --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`,
+      `info`, `debug`.
+    --profile [minimal|flamegraph]: Profile the execution of the WASM PVM; 'minimal' provides
+      a file to which it streamlines tick and gas consumption, 'flamegraph' creates a
+      flamegraph indexed on tick consumption
+      Defaults to `flamegraph`.
+    --disable-da-fees: Disable DA fees for this replay.
+    -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
+    --tracer <tracer>: Tracer to use (callTracer or structLogger). Default: callTracer.
+  
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
     Transforms the JSON list of instructions to a RLP list.
     <dump.json>: Description.

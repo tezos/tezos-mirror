@@ -15,6 +15,10 @@
 
 ### Command-line interface changes
 
+- Add `trace block <level>` and `trace transaction <hash>` subcommands to
+  `octez-evm-node`. These commands trace blocks and transactions offline against
+  the node's local store, without requiring the RPC server. Both default to
+  `callTracer` and support `--tracer structLogger`. (!20851)
 - Add `--dal-publishers-whitelist` argument to `octez-evm-node make kernel
   installer config` command. Accepts a comma-separated list of Tezos public key
   hashes (e.g., `tz1abc...,tz1def...`) to configure which DAL publishers
