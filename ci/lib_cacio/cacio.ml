@@ -780,7 +780,10 @@ module type COMPONENT_API = sig
     unit
 
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -1354,7 +1357,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline ?tag_rex =
+  let register_dedicated_test_release_pipeline ?tag_rex ?(legacy_jobs = []) =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1362,7 +1365,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
