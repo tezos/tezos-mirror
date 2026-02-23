@@ -846,9 +846,9 @@ let global_test_publish_release_page_jobs = ref []
 let get_global_test_publish_release_page_jobs () =
   convert_jobs ~with_condition:false !global_test_publish_release_page_jobs
 
-let release_tag_rexes = ref []
+let release_tag_rexes = ref String_set.empty
 
-let get_release_tag_rexes () = !release_tag_rexes
+let get_release_tag_rexes () = String_set.elements !release_tag_rexes
 
 (* [job_select_tezts] will be initialized further down. *)
 let job_select_tezts = ref None
@@ -1308,18 +1308,15 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   (* Use this function to get the release tag regular expression,
      as it makes sure that it is registered only once. *)
-  let get_release_tag_rex =
-    let tag = ref None in
-    fun component_name ->
-      match !tag with
-      | Some tag -> tag
-      | None ->
-          let result =
-            "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
-          in
-          tag := Some result ;
-          release_tag_rexes := result :: !release_tag_rexes ;
-          result
+  let get_release_tag_rex component_name requested_tag_rex =
+    let result =
+      match requested_tag_rex with
+      | None -> "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
+      | Some tag_rex -> tag_rex
+    in
+    if not (String_set.mem result !release_tag_rexes) then
+      release_tag_rexes := String_set.add result !release_tag_rexes ;
+    result
 
   (* Wrap a function with this function to make sure
      the component is an actual component, not [Shared]. *)
@@ -1345,9 +1342,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex =
-      Option.value ~default:(get_release_tag_rex component_name) tag_rex
-    in
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
@@ -1360,9 +1355,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex =
-      Option.value ~default:(get_release_tag_rex component_name) tag_rex
-    in
+    let release_tag_rex = get_release_tag_rex component_name tag_rex in
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
