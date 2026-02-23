@@ -896,6 +896,7 @@ Kernel commands:
       [--set-code <0x...,0x....>] [-r --with-runtime <RUNTIME>]
       [--tez-bootstrap-balance <3800000>] [--tez-bootstrap-account <edp...>]
       [--tez-bootstrap-contract <KT1...,0x...,0x....>]
+      [--michelson-runtime-chain-id <NetXH12DFfBVHi4>]
     Create a configuration for the kernel installer.
     <kernel config file>: File path where the config will be written to.
     --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
@@ -959,6 +960,8 @@ Kernel commands:
     --tez-bootstrap-contract <KT1...,0x...,0x....>: Add a tezlink bootstrap contract in the
       installer config passing the address to be used, the script and initial storage comma
       separated.
+    --michelson-runtime-chain-id <NetXH12DFfBVHi4>: Chain id used for the Michelson runtime,
+      in the usual base58 format
   
   make l2 kernel installer config <kernel config file> [--minimum-base-fee-per-gas <111...>]
       [--da-fee-per-byte <111...>] [--sequencer-pool-address <0x...>]
