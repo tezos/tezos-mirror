@@ -17,7 +17,7 @@ use revm_etherlink::{
     storage::{
         code::CodeStorage, version::read_evm_version, world_state_handler::StorageAccount,
     },
-    GasData,
+    ExecutionOutcome, GasData,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime::Runtime;
@@ -229,44 +229,30 @@ impl RuntimeInterface for EthereumRuntime {
         // TODO: L2-869
         let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
 
-        // TODO: L2-870 — pass the real amount to the EVM without debiting the
-        // caller. For now we credit the destination manually and pass zero
-        // value to the EVM.
-        let transfer_amount = u256_to_alloy(&amount);
-        if transfer_amount > AlloyU256::ZERO {
-            let mut to_account = StorageAccount::from_address(&destination)?;
-            let mut to_info = to_account.info(host)?;
-            to_info.balance =
-                to_info
-                    .balance
-                    .checked_add(transfer_amount)
-                    .ok_or_else(|| {
-                        TezosXRuntimeError::Custom("Balance overflow".to_string())
-                    })?;
-            to_account.set_info(host, to_info)?;
-        }
-        let value = AlloyU256::ZERO;
+        let value = u256_to_alloy(&amount);
         let call_data = Bytes::from(data.to_vec());
 
-        // Run the EVM transaction
-        let outcome = run_transaction(
-            host,
-            registry,
-            evm_version.into(),
-            &block_constants,
-            None, // no transaction hash for cross-runtime transactions
-            caller,
-            Some(destination),
-            call_data,
-            gas_data,
-            value,
-            revm::context::transaction::AccessList(vec![]),
-            None,  // no authorization list
-            None,  // no tracer
-            false, // not a simulation
-        )
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+        // TODO: L2-885 this should be done using the revm journal.
+        let outcome = with_temporary_credit(caller, host, value, |host| {
+            run_transaction(
+                host,
+                registry,
+                evm_version.into(),
+                &block_constants,
+                None, // no transaction hash for cross-runtime transactions
+                caller,
+                Some(destination),
+                call_data,
+                gas_data,
+                value,
+                revm::context::transaction::AccessList(vec![]),
+                None,  // no authorization list
+                None,  // no tracer
+                false, // not a simulation
+            )
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+            })
         })?;
 
         match outcome.result {
@@ -275,37 +261,11 @@ impl RuntimeInterface for EthereumRuntime {
                 Output::Create(bytes, _) => Ok(CrossCallResult::Success(bytes.to_vec())),
             },
             ExecutionResult::Revert { output, .. } => {
-                // TODO: L2-870 — That revert should be part of run_transaction.
-                if transfer_amount > AlloyU256::ZERO {
-                    let mut to_account = StorageAccount::from_address(&destination)?;
-                    let mut to_info = to_account.info(host)?;
-                    to_info.balance = to_info
-                        .balance
-                        .checked_sub(transfer_amount)
-                        .ok_or_else(|| {
-                            TezosXRuntimeError::Custom("Balance underflow".to_string())
-                        })?;
-                    to_account.set_info(host, to_info)?;
-                }
                 Ok(CrossCallResult::Revert(output.to_vec()))
             }
-            ExecutionResult::Halt { reason, .. } => {
-                // TODO: L2-870 — That revert should be part of run_transaction.
-                if transfer_amount > AlloyU256::ZERO {
-                    let mut to_account = StorageAccount::from_address(&destination)?;
-                    let mut to_info = to_account.info(host)?;
-                    to_info.balance = to_info
-                        .balance
-                        .checked_sub(transfer_amount)
-                        .ok_or_else(|| {
-                            TezosXRuntimeError::Custom("Balance underflow".to_string())
-                        })?;
-                    to_account.set_info(host, to_info)?;
-                }
-                Ok(CrossCallResult::Halt(
-                    format!("EVM call halted: {reason:?}").into_bytes(),
-                ))
-            }
+            ExecutionResult::Halt { reason, .. } => Ok(CrossCallResult::Halt(
+                format!("EVM call halted: {reason:?}").into_bytes(),
+            )),
         }
     }
 
@@ -334,6 +294,74 @@ impl RuntimeInterface for EthereumRuntime {
     fn string_from_address(&self, _address: &[u8]) -> Result<String, TezosXRuntimeError> {
         unimplemented!("Use mocks if you are in tests")
     }
+}
+
+/// Credits the caller alias with `value` so revm can debit it normally during
+/// execution (the real debit already happened on the source runtime), then
+/// runs `f`.
+///
+/// - On success: verifies that revm fully debited the alias — if not,
+///   resets the balance to zero and returns an error.
+/// - On revert/halt: revm reverted the debit so the temporary credit is
+///   still present — reset the balance to zero and return the outcome.
+/// - On error: resets the alias balance to zero.
+///
+/// TODO: L2-885 this should be done using the revm journal.
+fn with_temporary_credit<Host: Runtime>(
+    caller: Address,
+    host: &mut Host,
+    value: AlloyU256,
+    f: impl FnOnce(&mut Host) -> Result<ExecutionOutcome, TezosXRuntimeError>,
+) -> Result<ExecutionOutcome, TezosXRuntimeError> {
+    if value == AlloyU256::ZERO {
+        return f(host);
+    }
+
+    // value > zero
+    let mut caller_account = StorageAccount::from_address(&caller)?;
+    let mut caller_info = caller_account.info(host)?;
+    caller_info.balance = caller_info
+        .balance
+        .checked_add(value)
+        .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
+    caller_account.set_info(host, caller_info)?;
+
+    let outcome = f(host);
+
+    if matches!(
+        &outcome,
+        Ok(ExecutionOutcome {
+            result: ExecutionResult::Success { .. },
+            ..
+        })
+    ) {
+        // On success revm debited the alias — verify it's fully spent.
+        let caller_account = StorageAccount::from_address(&caller)?;
+        let caller_info = caller_account.info(host)?;
+        if caller_info.balance != AlloyU256::ZERO {
+            let remaining = caller_info.balance;
+            reset_balance(host, &caller)?;
+            return Err(TezosXRuntimeError::Custom(format!(
+                "Caller alias balance not zero after EVM execution: {remaining}"
+            )));
+        }
+    } else {
+        // On revert/halt revm reverted the debit, on error we just clean up.
+        reset_balance(host, &caller)?;
+    }
+
+    outcome
+}
+
+fn reset_balance<Host: Runtime>(
+    host: &mut Host,
+    address: &Address,
+) -> Result<(), TezosXRuntimeError> {
+    let mut account = StorageAccount::from_address(address)?;
+    let mut info = account.info(host)?;
+    info.balance = AlloyU256::ZERO;
+    account.set_info(host, info)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -401,20 +429,9 @@ mod tests {
         let destination = Address::from_slice(&[0x22; 20]);
         let value = U256::from(5);
 
-        // Set up caller with sufficient balance
-        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-        caller_account
-            .set_info_without_code(
-                &mut host,
-                AccountInfo {
-                    balance: revm::primitives::U256::from(1000),
-                    nonce: 0,
-                    code_hash: Default::default(),
-                    account_id: None,
-                    code: None,
-                },
-            )
-            .unwrap();
+        // The caller alias has no pre-existing balance: the calling runtime
+        // already debited the real account, and `call` handles the temporary
+        // alias funding.
 
         let context = CrossRuntimeContext {
             gas_limit: u64::MAX,
@@ -449,20 +466,9 @@ mod tests {
         let caller = Address::from_slice(&[0x11; 20]);
         let contract = Address::from_slice(&[0x22; 20]);
 
-        // Set up caller with balance
-        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
-        caller_account
-            .set_info_without_code(
-                &mut host,
-                AccountInfo {
-                    balance: revm::primitives::U256::from(1000),
-                    nonce: 0,
-                    code_hash: Default::default(),
-                    account_id: None,
-                    code: None,
-                },
-            )
-            .unwrap();
+        // The caller alias has no pre-existing balance: the calling runtime
+        // already debited the real account, and `call` handles the temporary
+        // alias funding.
 
         // Deploy a tiny contract:
         //   PUSH1 0x42   (value to store)
@@ -509,6 +515,93 @@ mod tests {
             .get_storage(&host, &revm::primitives::U256::from(1))
             .unwrap();
         assert_eq!(slot_value, revm::primitives::U256::from(0x42));
+    }
+
+    /// Test the cross-runtime scenario: caller alias starts with zero balance,
+    /// sends value to a contract that reads CALLVALUE and stores it. Verifies:
+    /// - the call succeeds despite zero initial caller balance
+    /// - the contract sees the correct msg.value (CALLVALUE)
+    /// - the caller alias balance is reset to 0 after execution
+    #[test]
+    fn test_call_with_zero_balance_caller_sets_correct_msg_value() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let caller = Address::from_slice(&[0x11; 20]);
+        let contract = Address::from_slice(&[0x22; 20]);
+        let transfer_value = U256::from(42);
+
+        // Caller starts with zero balance — this is the cross-runtime alias scenario.
+        // No set_info call: the alias has no EVM funds.
+
+        // Deploy a contract that stores CALLVALUE to slot 0:
+        //   CALLVALUE    (0x34)
+        //   PUSH1 0x00   (0x6000)
+        //   SSTORE       (0x55)
+        let bytecode_raw = Bytes::from_hex("34600055").unwrap();
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
+        contract_account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::ZERO,
+                    nonce: 0,
+                    code_hash,
+                    account_id: None,
+                    code: Some(Bytecode::new_raw(bytecode_raw.clone())),
+                },
+            )
+            .unwrap();
+        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+
+        let context = CrossRuntimeContext {
+            gas_limit: u64::MAX,
+            timestamp: U256::from(1),
+            block_number: U256::from(1),
+        };
+
+        let result = runtime.call(
+            &registry,
+            &mut host,
+            &caller.0 .0,
+            &contract.0 .0,
+            transfer_value,
+            &[],
+            context,
+        );
+        assert!(
+            matches!(result, Ok(CrossCallResult::Success(_))),
+            "EVM call should succeed: {result:?}"
+        );
+
+        // Contract stored CALLVALUE at slot 0 — verify it saw the real value
+        let stored_value = contract_account
+            .get_storage(&host, &revm::primitives::U256::ZERO)
+            .unwrap();
+        assert_eq!(
+            stored_value,
+            revm::primitives::U256::from(42),
+            "Contract should see msg.value = 42"
+        );
+
+        // Contract received the transfer
+        let contract_info = contract_account.info(&mut host).unwrap();
+        assert_eq!(
+            contract_info.balance,
+            revm::primitives::U256::from(42),
+            "Contract should hold the transferred value"
+        );
+
+        // Caller alias balance is reset to 0
+        let caller_account = StorageAccount::from_address(&caller).unwrap();
+        let caller_info = caller_account.info(&mut host).unwrap();
+        assert_eq!(
+            caller_info.balance,
+            revm::primitives::U256::ZERO,
+            "Caller alias balance should be 0 after execution"
+        );
     }
 
     /// Test that alias addresses are computed deterministically from native addresses.
