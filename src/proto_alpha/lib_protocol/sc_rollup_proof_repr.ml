@@ -234,13 +234,9 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
 module Dal_helpers = struct
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-     The current DAL refutation integration is not resilient to DAL parameters
-     changes when upgrading the protocol. The code needs to be adapted. *)
-  let import_level_is_valid ~dal_activation_level ~dal_attestation_lag
-      ~origination_level ~import_inbox_level ~published_level
-      ~dal_attested_slots_validity_lag =
-    (* [dal_attestation_lag] is supposed to be positive. *)
+  let import_level_is_valid ~dal_activation_level
+      ~(lag_check : Dal_slot_repr.History.lag_check) ~origination_level
+      ~import_inbox_level ~published_level ~dal_attested_slots_validity_lag =
     let open Raw_level_repr in
     let dal_was_activated =
       match dal_activation_level with
@@ -250,14 +246,27 @@ module Dal_helpers = struct
     let slot_published_after_origination =
       published_level > origination_level
     in
-    let attested_level = add published_level dal_attestation_lag in
-    let not_too_recent = attested_level <= import_inbox_level in
-    (* An attested slot is not expired if its attested level (equal to
-       [published_level + dal_attestation_lag]) is not further than
-       [dal_attested_slots_validity_lag] from the given inbox level. *)
+    (* The lag-dependent checks differ by [lag_check]:
+       - [Exact_lag lag]: straightforward, both conditions use [lag].
+       - [Lag_interval (min_lag, max_lag)]: we check whether there exists a lag
+         in [[min_lag, max_lag]] satisfying both conditions. *)
+    let not_too_recent =
+      let lag =
+        match lag_check with
+        | Exact_lag lag -> lag
+        | Lag_interval (min_lag, _) -> min_lag
+      in
+      add published_level lag <= import_inbox_level
+    in
     let ttl_not_expired =
+      let lag =
+        match lag_check with
+        | Exact_lag lag -> lag
+        | Lag_interval (_, max_lag) -> max_lag
+      in
       Raw_level_repr.(
-        add attested_level dal_attested_slots_validity_lag >= import_inbox_level)
+        add (add published_level lag) dal_attested_slots_validity_lag
+        >= import_inbox_level)
     in
     dal_was_activated && slot_published_after_origination && not_too_recent
     && ttl_not_expired
@@ -270,9 +279,8 @@ module Dal_helpers = struct
 
      In both cases a function `find_parameters` is provided. That function
      basically inspects the protocol's table via an RPC. *)
-  let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
-      ~dal_attestation_lag ~origination_level ~import_inbox_level
-      cryptobox_parameters
+  let page_id_is_valid ~dal_number_of_slots ~dal_activation_level ~lag_check
+      ~origination_level ~import_inbox_level cryptobox_parameters
       Dal_slot_repr.Page.{slot_id = {published_level; index}; page_index}
       ~dal_attested_slots_validity_lag =
     let open Dal_slot_repr in
@@ -286,22 +294,20 @@ module Dal_helpers = struct
             index)
     && import_level_is_valid
          ~dal_activation_level
-         ~dal_attestation_lag
+         ~lag_check
          ~origination_level
          ~import_inbox_level
          ~published_level
          ~dal_attested_slots_validity_lag
 
-  let verify ~metadata ~dal_activation_level ~dal_number_of_slots
+  let verify ~metadata ~dal_activation_level ~dal_number_of_slots ~precheck_lag
       ~import_inbox_level dal_parameters page_id dal_snapshot proof
       ~dal_attested_slots_validity_lag =
     let open Result_syntax in
     let* input_opt =
       Dal_slot_repr.History.verify_proof
         dal_parameters
-        page_id
-        dal_snapshot
-        proof
+        ~precheck_lag
         ~page_id_is_valid:
           (page_id_is_valid
              dal_parameters
@@ -311,10 +317,13 @@ module Dal_helpers = struct
              ~import_inbox_level
              ~dal_number_of_slots
              ~dal_attested_slots_validity_lag)
+        page_id
+        dal_snapshot
+        proof
     in
     return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
 
-  let produce ~metadata ~dal_activation_level ~dal_number_of_slots
+  let produce ~metadata ~dal_activation_level ~dal_number_of_slots ~precheck_lag
       ~import_inbox_level dal_parameters ~attestation_threshold_percent
       ~restricted_commitments_publishers page_id ~page_info ~get_history
       confirmed_slots_history ~dal_attested_slots_validity_lag =
@@ -322,12 +331,7 @@ module Dal_helpers = struct
     let* proof, content_opt =
       Dal_slot_repr.History.produce_proof
         dal_parameters
-        ~attestation_threshold_percent
-        ~restricted_commitments_publishers
-        page_id
-        ~page_info
-        ~get_history
-        confirmed_slots_history
+        ~precheck_lag
         ~page_id_is_valid:
           (page_id_is_valid
              dal_parameters
@@ -337,6 +341,12 @@ module Dal_helpers = struct
                metadata.Sc_rollup_metadata_repr.origination_level
              ~import_inbox_level
              ~dal_attested_slots_validity_lag)
+        ~attestation_threshold_percent
+        ~restricted_commitments_publishers
+        page_id
+        ~page_info
+        ~get_history
+        confirmed_slots_history
     in
     return
       ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
@@ -417,10 +427,15 @@ let valid (type state proof output)
         let* dal_parameters : Constants_parametric_repr.dal =
           find_dal_parameters page_id.slot_id.published_level
         in
+        let precheck_lag =
+          Dal_slot_repr.History.interval_lag_check
+            ~attestation_lags:dal_parameters.attestation_lags
+        in
         Dal_helpers.verify
           ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
+          ~precheck_lag
           ~dal_attested_slots_validity_lag
           dal_parameters.cryptobox_parameters
           ~import_inbox_level
@@ -615,6 +630,10 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
         let* dal_parameters : Constants_parametric_repr.dal =
           find_dal_parameters page_id.slot_id.published_level
         in
+        let precheck_lag =
+          Dal_slot_repr.History.interval_lag_check
+            ~attestation_lags:dal_parameters.attestation_lags
+        in
         let*! disputed_level = P.get_current_level P.state in
         let import_inbox_level =
           Option.value ~default:metadata.origination_level disputed_level
@@ -623,6 +642,7 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
+          ~precheck_lag
           dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent:None
@@ -643,6 +663,10 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
         let* dal_parameters : Constants_parametric_repr.dal =
           find_dal_parameters page_id.slot_id.published_level
         in
+        let precheck_lag =
+          Dal_slot_repr.History.interval_lag_check
+            ~attestation_lags:dal_parameters.attestation_lags
+        in
         let attestation_threshold_percent =
           Some attestation_threshold_percent
         in
@@ -654,6 +678,7 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
+          ~precheck_lag
           dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent

@@ -325,9 +325,8 @@ let get_page node_ctxt ~inbox_level page_id =
   in
   Lwt.return @@ Environment.wrap_tzresult res
 
-let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
-    ~dal_activation_level ~origination_level ~inbox_level slot_id
-    ~dal_attested_slots_validity_lag =
+let slot_id_is_valid chain_id ~lag_check ~number_of_slots ~dal_activation_level
+    ~origination_level ~inbox_level slot_id ~dal_attested_slots_validity_lag =
   let open Alpha_context in
   let dal_activation_level =
     if Chain_id.(chain_id = Constants_repr.shadownet_id) then
@@ -349,15 +348,15 @@ let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
   | Ok origination_level, Ok import_inbox_level ->
       Alpha_context.Sc_rollup.Proof.Dal_helpers.import_level_is_valid
         ~dal_activation_level
-        ~dal_attestation_lag
+        ~lag_check
         ~origination_level
         ~import_inbox_level
         ~dal_attested_slots_validity_lag
         ~published_level:slot_id.published_level
   | _ -> false
 
-let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
-    ~number_of_pages ~dal_activation_level ~origination_level ~inbox_level
+let page_id_is_valid chain_id ~lag_check ~number_of_slots ~number_of_pages
+    ~dal_activation_level ~origination_level ~inbox_level
     Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
   (* The number_of_slots and number_of_pages used here are fetched from the
      publication level extracted from the page_id. This computation is done in
@@ -365,7 +364,7 @@ let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
   Result.is_ok (Dal.Page.Index.check_is_in_range ~number_of_pages page_index)
   && slot_id_is_valid
        chain_id
-       ~dal_attestation_lag
+       ~lag_check
        ~number_of_slots
        ~dal_activation_level
        ~origination_level
@@ -380,66 +379,6 @@ let get_dal_node cctxt_opt =
   | None ->
       let*! err = tzfail No_dal_node_provided in
       Environment.wrap_tzresult err |> Lwt.return
-
-(* Check whether [page_id] could be valid for at least one admissible DAL
-   attestation lag.
-
-   This function mirrors the pre-check done in DAL refutations'
-   [produce_proof_repr]. At this point we do not know the exact DAL
-   attestation lag, so we over-approximate the admissible range by the whole
-   interval [0, legacy_attestation_lag] and reuse [page_id_is_valid] on both
-   extremal values:
-
-     - If [page_id_is_valid] is [false] for both lags (0 and
-       [legacy_attestation_lag]), then [page_id] is definitely invalid for any
-       admissible lag. In that case, any import of the corresponding slot/page
-       is known to be invalid and we can reject it immediately, without ever
-       querying the DAL node.
-
-     - Otherwise, there exists at least one admissible lag for which
-       [page_id] may still be valid, and the DAL node must be consulted to
-       decide.
-
-   This early check protects the rollup node from pathological situations
-   where the DAL node cannot answer about a slot/page whose published level is
-   very far in the past or future: when the result is [false], we already know
-   that no import could be valid.  *)
-let may_be_valid_in_our_range_of_lags chain_id ~number_of_slots ~number_of_pages
-    ~dal_activation_level ~origination_level ~inbox_level page_id
-    ~dal_attested_slots_validity_lag =
-  let page_id_is_valid =
-    page_id_is_valid
-      chain_id
-      ~number_of_slots
-      ~number_of_pages
-      ~dal_activation_level
-      ~origination_level
-      ~inbox_level
-      ~dal_attested_slots_validity_lag
-      page_id
-  in
-  (* It is important to check that both [dal_attestation_lag = 0] and
-     [dal_attestation_lag = max_dal_attestation_lag] below in order
-     to be sure that the page id is not invalid.
-
-     In addition to the checks that do not depend on the lag value:
-
-     - The test with [dal_attestation_lag = 0] checks that the import level is
-       not before the slot's published level (however, it does not guarantee
-       that enough blocks have elapsed since publication).
-
-     - The test with [dal_attestation_lag = max_dal_attestation_lag] checks that
-       the import level is not beyond the [dal_attested_slots_validity_lag]
-       validity window.
-
-     Overall, this function returns an over-approximation: if it returns [true]
-     only because the import level is close to the validity boundaries, a more
-     precise check will be performed later using the exact attestation lag. The
-     exact lag will be fetched from DAL (either already indexed, or indexed
-     within at most [max_dal_attestation_lag] L1 blocks). *)
-  let max_dal_attestation_lag = Dal.Slots_history.legacy_attestation_lag in
-  page_id_is_valid ~dal_attestation_lag:0
-  || page_id_is_valid ~dal_attestation_lag:max_dal_attestation_lag
 
 let page_content_int ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
@@ -458,10 +397,15 @@ let page_content_int ~dal_activation_level ~inbox_level node_ctxt page_id
       Protocol_plugins.get_constants_of_level node_ctxt published_level_int32
     in
     let dal_constants = constants.Rollup_constants.dal in
+    let lag_check =
+      Dal.Slots_history.interval_lag_check
+        ~attestation_lags:dal_constants.attestation_lags
+    in
     let* chain_id = Layer1.get_chain_id l1_ctxt in
     let may_be_valid_id =
-      may_be_valid_in_our_range_of_lags
+      page_id_is_valid
         chain_id
+        ~lag_check
         ~number_of_slots:dal_constants.number_of_slots
         ~number_of_pages:
           (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
@@ -490,7 +434,7 @@ let page_content_int ~dal_activation_level ~inbox_level node_ctxt page_id
             not
             @@ page_id_is_valid
                  chain_id
-                 ~dal_attestation_lag:attestation_lag
+                 ~lag_check:(Exact_lag attestation_lag)
                  ~number_of_slots:dal_constants.number_of_slots
                  ~number_of_pages:
                    (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
