@@ -6,7 +6,7 @@ for the :doc:`Logging subsystem <../user/logging>`.
 
 In the Octez code base, logging is instrumented using an asynchronous event
 system, where log events are emitted in various part of the code and consumed by
-the so called sinks.  This is done by using the :opam:`tezos-event-logging` library.
+the so called sinks.  This is done by using the :package-api:`Tezos_event_logging <octez-libs/Tezos_event_logging/index.html>` library.
 
 We use two levels of abstraction to define these events. Heavy events are
 defined using the most generic API and have the full expressive power and

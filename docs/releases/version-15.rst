@@ -21,7 +21,7 @@ block without prechecking it first, when the active protocol is Lima.
 
   The nature of this bug would prevent the correct operation of the Lima protocol
   (due to activate on Tezos Mainnet on block
-  `#2,981,889 <https://tzstats.com/2981889>`__)
+  `#2,981,889 <https://tzkt.io/2981889>`__)
   with earlier Octez versions, including Octez v15.0.
 
   As a result, we **strongly recommend** to upgrade to Octez v15.1 or later instead.
