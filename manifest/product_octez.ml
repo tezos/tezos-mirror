@@ -3163,10 +3163,21 @@ let octez_scoru_wasm =
         tree_encoding;
         lazy_containers;
         octez_webassembly_interpreter;
-        octez_context_sigs;
-        octez_context_memory;
         octez_lwt_result_stdlib;
         data_encoding;
+      ]
+
+let octez_smart_rollup_wasm_in_memory =
+  octez_lib
+    "smart-rollup-wasm-in-memory"
+    ~internal_name:"tezos_smart_rollup_wasm_in_memory"
+    ~path:"src/lib_smart_rollup_wasm_in_memory"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_scoru_wasm;
+        octez_context_memory;
+        octez_merkle_proof_encoding;
       ]
 
 let octez_scoru_wasm_fast =
@@ -3849,6 +3860,7 @@ let octez_protocol_environment =
         octez_context_memory;
         octez_context_brassaia_memory;
         octez_scoru_wasm;
+        octez_smart_rollup_wasm_in_memory;
         octez_riscv_pvm;
         octez_event_logging;
         octez_profiler |> open_;
@@ -5845,6 +5857,7 @@ let octez_scoru_wasm_helpers =
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
+        octez_context_memory;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
         octez_scoru_wasm_helpers_intf |> open_;
@@ -6742,6 +6755,7 @@ end = struct
               octez_stdlib |> if_ N.(number >= 013) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_scoru_wasm;
+              octez_smart_rollup_wasm_in_memory |> if_ N.(number >= 025);
               octez_webassembly_interpreter_extra
               |> if_ N.(number >= 016)
               |> open_;
@@ -7322,7 +7336,12 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
         ~path:(path // "lib_sc_rollup")
         ~synopsis:
           "Protocol specific library of helpers for `tezos-smart-rollup`"
-        ~deps:[octez_base |> open_ ~m:"TzPervasives"; main |> open_]
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            main |> open_;
+            octez_smart_rollup_wasm_in_memory |> if_ N.(number >= 025);
+          ]
         ~inline_tests:ppx_expect
         ~inline_tests_libraries:[bls12_381_archive]
         ~inline_tests_link_flags:["-cclib"; "-lblst"]
@@ -8200,6 +8219,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             client |> if_some |> open_;
             plugin |> if_some |> open_;
             octez_protocol_environment;
+            octez_smart_rollup_wasm_in_memory |> if_ N.(number >= 025);
           ]
         ~linkall:true
         ~dune:[dune_signatures_version_rule]

@@ -285,7 +285,7 @@ module Sc_rollup_verify_output_proof_benchmark = struct
   open Pvm_state_generator
 
   module Full_Wasm = Sc_rollup_wasm.V2_0_0.Make_pvm (struct
-    include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
+    include Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory
 
     let compute_step =
       compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
@@ -504,7 +504,7 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
   open Benchmarks_proto
 
   module Full_Wasm = Sc_rollup_wasm.V2_0_0.Make_pvm (struct
-    include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
+    include Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory
 
     let compute_step =
       compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint

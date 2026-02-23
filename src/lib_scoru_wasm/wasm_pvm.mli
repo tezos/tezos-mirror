@@ -38,11 +38,3 @@ module Make_pvm_machine (State : Wasm_pvm_sig.STATE_PROOF) :
 
 module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
     module type of Make_pvm_machine
-
-module Wasm_pvm_in_memory :
-  Wasm_pvm_sig.S
-    with type context = Tezos_context_memory.Context_binary.context
-     and type state = Tezos_context_memory.Context_binary.tree
-     and type proof =
-      Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t

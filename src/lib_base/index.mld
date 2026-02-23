@@ -58,6 +58,7 @@ It contains the following libraries:
 - {{!module-Tezos_rpc_http_server}Tezos_rpc_http_server}: Library of auto-documented RPCs (http server)
 - {{!module-Tezos_sapling}Tezos_sapling}
 - {{!module-Tezos_scoru_wasm}Tezos_scoru_wasm}
+- {{!module-Tezos_smart_rollup_wasm_in_memory}Tezos_smart_rollup_wasm_in_memory}
 - {{!module-Tezos_stdlib}Tezos_stdlib}: Yet-another local-extension of the OCaml standard library
 - {{!module-Tezos_stdlib_unix}Tezos_stdlib_unix}: Yet-another local-extension of the OCaml standard library (unix-specific fragment)
 - {{!module-Tezos_test_helpers}Tezos_test_helpers}

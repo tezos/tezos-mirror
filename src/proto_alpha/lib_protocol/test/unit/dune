@@ -23,6 +23,7 @@
   octez-libs.stdlib
   octez-libs.crypto-dal
   octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
   octez-l2-libs.webassembly-interpreter-extra)
  (library_flags (:standard -linkall))
  (flags
