@@ -40,13 +40,22 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         compute_offset current_block_number offset
     | `Level l -> return l
 
-  let on_head_block (block : block_param) k =
+  let shell_block_param_to_eth_block_param =
     let open Lwt_result_syntax in
-    match block with
+    function
     | `Head 0l ->
-        let* state = Backend.get_state ~block:(Block_parameter Latest) () in
-        k state
-    | _ -> failwith "Only `head` is supported"
+        return
+        @@ Ethereum_types.Block_parameter.Block_parameter
+             Ethereum_types.Block_parameter.Latest
+    | `Hash (hash, 0l) ->
+        return
+        @@ Ethereum_types.Block_parameter.Block_hash
+             {hash; require_canonical = false}
+    | block ->
+        let* num = shell_block_param_to_block_number block in
+        return
+        @@ Ethereum_types.Block_parameter.Block_parameter
+             (Number (Ethereum_types.quantity_of_z (Z.of_int32 num)))
 
   let on_implicit_account (c : Tezos_types.Contract.t) k =
     match c with
@@ -91,7 +100,8 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let balance _chain block contract =
     let open Lwt_result_syntax in
-    on_head_block block @@ fun state ->
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
     match (contract : Tezos_types.Contract.t) with
     | Implicit pkh -> (
         let* read_result =
@@ -121,7 +131,10 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         | None -> return Tezos_types.Tez.zero)
 
   let subkeys ~block p =
-    on_head_block block @@ fun state -> Backend.subkeys state p
+    let open Lwt_result_syntax in
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
+    Backend.subkeys state p
 
   let list_contracts chain block =
     let open Lwt_result_syntax in
@@ -160,10 +173,12 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
       accounts
 
   let get_storage chain block c =
+    let open Lwt_result_syntax in
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
-    on_head_block block @@ fun state ->
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
     Lwt_result.map (Option.value ~default:None)
     @@ Durable_storage.inspect_durable_and_decode_opt
          (Backend.read state)
@@ -172,10 +187,12 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
             Tezlink_imports.Imported_context.Script.expr_encoding)
 
   let get_code chain block c =
+    let open Lwt_result_syntax in
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
-    on_head_block block @@ fun state ->
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
     Lwt_result.map (Option.value ~default:None)
     @@ Durable_storage.inspect_durable_and_decode_opt
          (Backend.read state)
@@ -200,7 +217,8 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let manager_key _chain block contract =
     let open Lwt_result_syntax in
-    on_head_block block @@ fun state ->
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
     on_implicit_account contract @@ fun pkh ->
     let* read_result =
       Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
@@ -213,7 +231,8 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let counter _chain block (contract : Tezos_types.Contract.t) =
     let open Lwt_result_syntax in
-    on_head_block block @@ fun state ->
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
     match contract with
     | Originated _ -> return_none
     | Implicit pkh -> (
