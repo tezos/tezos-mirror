@@ -116,7 +116,7 @@ module Delegate_infos = struct
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
     all_delegate_voting_power : int64 SlotMap.t;
-        (* This is a map having as keys the attestation slot of all delegates, and as
+    (* This is a map having as keys the attestation slot of all delegates, and as
            values their attesting power.
            Without all bakers attest, this map contains just the first slot for a delegate, because it is
            only used in [slot_voting_power] which is about (pre)attestations,
@@ -126,6 +126,12 @@ module Delegate_infos = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
+    slot_to_delegate_pkh : Signature.Public_key_hash.t SlotMap.t;
+        (* This is a map from attestation slot to the delegate public key hash
+           that owns that slot. It contains the first attestation slot for each
+           delegate. This map is used by the DAL attestation cache to resolve
+           attestation operations to delegate identities without requiring
+           operation receipts. *)
     consensus_threshold : int64;
     consensus_committee : int64;
   }
@@ -156,6 +162,8 @@ module Delegate_infos = struct
   let consensus_threshold {consensus_threshold; _} = consensus_threshold
 
   let consensus_committee {consensus_committee; _} = consensus_committee
+
+  let slot_owner t ~slot = SlotMap.find_opt slot t.slot_to_delegate_pkh
 end
 
 type delegate_infos = Delegate_infos.t
@@ -512,6 +520,7 @@ type global_state = {
   delegates : Baking_state_types.Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
+  dal_included_attestations_cache : Dal_included_attestations_cache.t;
 }
 
 type state = {
@@ -945,13 +954,15 @@ let delegate_infos attesting_rights delegates =
   ] ->
       let* ( own_delegate_first_slots,
              own_delegate_rounds,
-             all_delegate_voting_power ) =
+             all_delegate_voting_power,
+             slot_to_delegate_pkh ) =
         Lwt_list.fold_left_s
-          (fun (own_list, own_map, all_map) validator ->
+          (fun (own_list, own_map, all_map, slot_map) validator ->
             let {
               Plugin.RPC.Validators.rounds;
               attesting_power;
               attestation_slot;
+              delegate;
               _;
             } =
               validator
@@ -959,6 +970,7 @@ let delegate_infos attesting_rights delegates =
             let all_map =
               SlotMap.add attestation_slot attesting_power all_map
             in
+            let slot_map = SlotMap.add attestation_slot delegate slot_map in
             let* own_list, own_map =
               let* delegate_opt = Delegate.of_validator ~known_keys validator in
               match delegate_opt with
@@ -975,8 +987,8 @@ let delegate_infos attesting_rights delegates =
                         own_map
                         rounds )
             in
-            return (own_list, own_map, all_map))
-          ([], RoundMap.empty, SlotMap.empty)
+            return (own_list, own_map, all_map, slot_map))
+          ([], RoundMap.empty, SlotMap.empty, SlotMap.empty)
           attesting_rights
       in
       return
@@ -984,6 +996,7 @@ let delegate_infos attesting_rights delegates =
           Delegate_infos.own_delegates = own_delegate_first_slots;
           own_delegate_rounds;
           all_delegate_voting_power;
+          slot_to_delegate_pkh;
           consensus_threshold;
           consensus_committee;
         }

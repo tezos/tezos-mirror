@@ -1279,6 +1279,17 @@ let update_to_level state level_update =
        ~chain
      [@profiler.record_s {verbosity = Debug} "compute current delegate slots"])
   in
+  let () =
+    Dal_included_attestations_cache.set_committee
+      state.global_state.dal_included_attestations_cache
+      ~level:new_level
+      (fun slot -> Baking_state.Delegate_infos.slot_owner delegate_infos ~slot) ;
+    Dal_included_attestations_cache.set_committee
+      state.global_state.dal_included_attestations_cache
+      ~level:(Int32.succ new_level)
+      (fun slot ->
+        Baking_state.Delegate_infos.slot_owner next_level_delegate_infos ~slot)
+  in
   let*! () =
     notice_delegates_without_slots delegates delegate_infos new_level
   in

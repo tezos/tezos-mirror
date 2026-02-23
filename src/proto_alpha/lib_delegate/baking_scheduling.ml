@@ -638,6 +638,12 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       | ContextIndex index -> return (Local index))
   in
   let cache = Baking_state.create_cache () in
+
+  let dal_included_attestations_cache =
+    Dal_included_attestations_cache.create
+      ~attestation_lags:constants.parametric.dal.attestation_lags
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   let global_state =
     {
       cctxt;
@@ -657,6 +663,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       delegates;
       cache;
       dal_node_rpc_ctxt;
+      dal_included_attestations_cache;
     }
   in
   (* Trick to provide the global state to the forge worker without
@@ -685,6 +692,17 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       delegates
       ~level:(Int32.succ current_level)
       ~chain
+  in
+  let () =
+    Dal_included_attestations_cache.set_committee
+      dal_included_attestations_cache
+      ~level:current_level
+      (fun slot -> Baking_state.Delegate_infos.slot_owner delegate_infos ~slot) ;
+    Dal_included_attestations_cache.set_committee
+      dal_included_attestations_cache
+      ~level:(Int32.succ current_level)
+      (fun slot ->
+        Baking_state.Delegate_infos.slot_owner next_level_delegate_infos ~slot)
   in
   let elected_block =
     if Baking_state.is_first_block_in_protocol current_proposal then

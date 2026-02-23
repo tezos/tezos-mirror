@@ -1688,6 +1688,11 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
   in
   (* Create global state - same structure as Baking_scheduling.create_initial_state *)
   let cache = Baking_state.create_cache () in
+  let dal_included_attestations_cache =
+    Dal_included_attestations_cache.create
+      ~attestation_lags:constants.parametric.dal.attestation_lags
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   let global_state =
     Baking_state.
       {
@@ -1713,6 +1718,7 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
         delegates;
         cache;
         dal_node_rpc_ctxt = None;
+        dal_included_attestations_cache;
       }
   in
   (* Extract genesis block info *)
