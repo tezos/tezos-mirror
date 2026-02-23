@@ -308,26 +308,6 @@ let make ~version ~reveal_builtins ~write_debug state =
         in
         return result)
   in
-  let ec_pairing_check_bls12_381 =
-    fn
-      (i32 @-> i32 @-> i32 @-> i32 @-> returning1 i32)
-      (fun point1_addr point2_addr point3_addr point4_addr ->
-        Lwt.map (Result.fold ~ok:Fun.id ~error:Fun.id)
-        @@ with_mem
-        @@ fun memory ->
-        let open Lwt_result_syntax in
-        let*! is_pairing_valid =
-          Host_funcs.Aux.ec_pairing_check_bls12_381
-            ~memory
-            point1_addr
-            point2_addr
-            point3_addr
-            point4_addr
-        in
-
-        return is_pairing_valid)
-  in
-
   let base =
     [
       ("read_input", read_input);
@@ -357,7 +337,7 @@ let make ~version ~reveal_builtins ~write_debug state =
   let v3 = v2 @ [("reveal", reveal_raw)] in
   let v4 = v3 in
   let v5 = v4 in
-  let v6 = v5 @ [("ec_pairing_check_bls12_381", ec_pairing_check_bls12_381)] in
+  let v6 = v5 in
   let v_experimental = v6 in
   let extra =
     match version with

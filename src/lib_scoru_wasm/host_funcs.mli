@@ -306,12 +306,6 @@ module Aux : sig
       src:int32 ->
       num_bytes:int32 ->
       unit Lwt.t
-
-    (** [ec_pairing_check_bls12_381 point1 point2 point3 point4]
-        returns 0 if any points is incorrectly encoded, otherwise returns
-        [pairing (point1, point2) * pairing (point3, point4) == 1]. *)
-    val ec_pairing_check_bls12_381 :
-      memory:memory -> int32 -> int32 -> int32 -> int32 -> int32 Lwt.t
   end
 
   module Make (Memory_access : Memory_access) :
@@ -403,7 +397,4 @@ module Internal_for_tests : sig
   val store_get_hash : Tezos_webassembly_interpreter.Instance.func_inst
 
   val write_debug : Tezos_webassembly_interpreter.Instance.func_inst
-
-  val ec_pairing_check_bls12_381 :
-    Tezos_webassembly_interpreter.Instance.func_inst
 end
