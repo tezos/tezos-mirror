@@ -1,0 +1,23 @@
+# Calls the TezosXGateway enshrined contract's %call entrypoint.
+# Storage: pair address (pair string (pair string bytes))
+#   address     = gateway KT1
+#   1st string  = EVM destination address
+#   2nd string  = EVM method signature
+#   bytes       = ABI-encoded parameters
+parameter unit;
+storage (pair address (pair string (pair string bytes)));
+code {
+       CDR;
+       DUP;
+       UNPAIR;
+       CONTRACT %call (pair string (pair string bytes));
+       ASSERT_SOME;
+       SWAP;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       PAIR
+     };
