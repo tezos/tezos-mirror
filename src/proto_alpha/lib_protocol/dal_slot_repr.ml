@@ -777,9 +777,10 @@ module History = struct
 
     (* When the attestation lag of the target slot is unknown, try all
        admissible interpretations of the target position in the skip-list
-       ordering: [Legacy] then [Dynamic 1..max_lag] (here max_lag =
-       legacy_attestation_lag = 8).  Return the first result whose [last_cell]
-       is [Found _]; otherwise return the last obtained search result.
+       ordering: [Legacy] then [Dynamic lag], with [lag] from [0] to
+       [legacy_attestation_lag] (i.e. 8).  Return the first result whose
+       [last_cell] is [Found _]; otherwise return the last obtained search
+       result.
 
        This function allows to plug the search function above, adapted to the
        dynamic_lag-compatible ordering, while keeping the interface unchanged on
@@ -806,7 +807,7 @@ module History = struct
       in
       match res_legacy.last_cell with
       | Found _ -> return res_legacy
-      | _ -> loop res_legacy 1
+      | _ -> loop res_legacy 0
   end
 
   module V2 = struct
