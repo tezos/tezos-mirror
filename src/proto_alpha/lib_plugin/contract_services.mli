@@ -197,6 +197,9 @@ val clst_balance :
   Contract.t ->
   Script_int.n Script_int.num shell_tzresult Lwt.t
 
+val clst_ticket_balance :
+  'a #RPC_context.simple -> 'a -> Contract.t -> Z.t shell_tzresult Lwt.t
+
 val clst_total_supply :
   'a #RPC_context.simple ->
   'a ->

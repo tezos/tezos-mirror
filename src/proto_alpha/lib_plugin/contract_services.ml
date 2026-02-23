@@ -406,6 +406,15 @@ module S = struct
         ~output:Script_int.n_encoding
         RPC_path.(custom_root /: Contract.rpc_arg / "clst_balance")
 
+    let ticket_balance_service =
+      RPC_service.get_service
+        ~description:
+          "Returns the CLST ticket balance of a contract. Returns 0 if the \
+           contract does not hold any CLST ticket."
+        ~query:RPC_query.empty
+        ~output:n
+        RPC_path.(custom_root /: Contract.rpc_arg / "clst_ticket_balance")
+
     let total_supply_service =
       RPC_service.get_service
         ~description:"Returns the total supply of CLST tokens."
@@ -468,6 +477,21 @@ module S = struct
           let open Lwt_result_syntax in
           let* balance, _ = Clst_contract_storage.get_balance ctxt contract in
           return balance) ;
+      register1
+        ~chunked:false
+        ticket_balance_service
+        (fun ctxt contract () () ->
+          let open Lwt_result_syntax in
+          let* clst_hash = Contract.get_clst_contract_hash ctxt in
+          let* ticket_token = Clst_contract_storage.ticket_token ~clst_hash in
+          let* ticket_hash, ctxt =
+            Ticket_balance_key.of_ex_token
+              ctxt
+              ~owner:(Contract contract)
+              ticket_token
+          in
+          let+ amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
+          Option.value amount ~default:Z.zero) ;
       register0 ~chunked:false total_supply_service (fun ctxt () () ->
           let open Lwt_result_syntax in
           let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
@@ -1004,6 +1028,9 @@ let clst_contract_hash ctxt block =
 
 let clst_balance ctxt block contract =
   RPC_context.make_call1 S.CLST.balance_service ctxt block contract () ()
+
+let clst_ticket_balance ctxt block contract =
+  RPC_context.make_call1 S.CLST.ticket_balance_service ctxt block contract () ()
 
 let clst_total_supply ctxt block =
   RPC_context.make_call0 S.CLST.total_supply_service ctxt block () ()

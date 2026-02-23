@@ -32,6 +32,11 @@ val to_clst_storage : t -> CLST_types.storage
     single asset contracts. *)
 val token_id : CLST_types.nat
 
+(** [ticket_token] returns a ticket-token of CLST with the [(token_id,
+    (None : bytes option))] contents. *)
+val ticket_token :
+  clst_hash:Contract_hash.t -> Ticket_token.ex_token tzresult Lwt.t
+
 (** [get_storage ctxt] returns the storage retrieved and parsed from the
     context. It doesn't fail if the storage didn't exist in the context, i.e.
     the CLST contract has not been originated. *)
