@@ -693,6 +693,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
       Evm_store.use ctxt.store @@ fun conn ->
       Evm_store.Blocks.find_hash_of_number conn (Qty level)
 
+    let nth_tez_block_hash level =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
+
     (* Overwrite Etherlink_block_storage module *)
     module Etherlink_block_storage = struct
       (* Current block number is kept in durable storage. *)
@@ -811,7 +815,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
         | Some block -> return block
 
-      let nth_block_hash = nth_block_hash
+      let nth_block_hash = nth_tez_block_hash
     end
 
     (* Overwrites Tezos using the store instead of the durable_storage *)
