@@ -1853,6 +1853,36 @@ let switch_history_mode evm_node history =
   let process = spawn_command evm_node args in
   {Runnable.value = process; run}
 
+let trace_block evm_node block_number =
+  let process =
+    spawn_command
+      evm_node
+      (["trace"; "block"; string_of_int block_number]
+      @ ["--data-dir"; data_dir evm_node])
+  in
+  let parse process =
+    let* stdout = Process.check_and_read_stdout process in
+    return (JSON.parse ~origin:"trace block CLI" stdout |> JSON.as_list)
+  in
+  Runnable.{value = process; run = parse}
+
+let trace_transaction ?tracer evm_node tx_hash =
+  let tracer_args =
+    match tracer with Some t -> ["--tracer"; t] | None -> []
+  in
+  let process =
+    spawn_command
+      evm_node
+      (["trace"; "transaction"; tx_hash]
+      @ tracer_args
+      @ ["--data-dir"; data_dir evm_node])
+  in
+  let parse process =
+    let* stdout = Process.check_and_read_stdout process in
+    return (JSON.parse ~origin:"trace transaction CLI" stdout)
+  in
+  Runnable.{value = process; run = parse}
+
 let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
   let rollup_node_endpoint =
     match mode old_sequencer with

@@ -314,6 +314,11 @@ module Params = struct
         Lwt.return_ok
         @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s))
 
+  let tx_hash =
+    Tezos_clic.parameter (fun () s ->
+        Lwt.return_ok
+        @@ Evm_node_lib_dev_encoding.Ethereum_types.hash_of_string s)
+
   let snapshot_file_or_url next =
     Tezos_clic.param
       ~name:"snapshot"
@@ -2118,6 +2123,24 @@ let replay_args =
     disable_da_fees_arg
     simulate_instant_confirmation_arg
 
+let tracer_arg =
+  Tezos_clic.arg
+    ~long:"tracer"
+    ~placeholder:"tracer"
+    ~doc:"Tracer to use (callTracer or structLogger). Default: callTracer."
+    (Tezos_clic.parameter (fun () s ->
+         match
+           Data_encoding.Json.destruct
+             Evm_node_lib_dev_encoding.Tracer_types.tracer_kind_encoding
+             (`String s)
+         with
+         | v -> Lwt.return_ok v
+         | exception _ ->
+             failwith "Unknown tracer %S, expected callTracer or structLogger" s))
+
+let trace_args =
+  Tezos_clic.merge_options replay_args (Tezos_clic.args1 tracer_arg)
+
 let replay_many_command =
   let open Tezos_clic in
   command
@@ -2154,7 +2177,7 @@ let replay_many_command =
       in
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
-      Evm_node_lib_dev.Replay.main
+      Evm_node_lib_dev.Replay.replay_blueprint
         ~strategy:
           (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
@@ -2209,7 +2232,7 @@ let replay_command =
       in
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
-      Evm_node_lib_dev.Replay.main
+      Evm_node_lib_dev.Replay.replay_blueprint
         ~strategy:
           (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
@@ -2218,6 +2241,111 @@ let replay_command =
         ~number:l2_level
         ?profile
         ~upto
+        configuration)
+
+let trace_block_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Trace all transactions in a specific block level."
+    trace_args
+    (prefixes ["trace"; "block"]
+    @@ Tezos_clic.param ~name:"level" ~desc:"Level to trace." Params.l2_level
+    @@ stop)
+    (fun ( ( data_dir,
+             config_file,
+             preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             kernel,
+             kernel_verbosity,
+             profile,
+             disable_da_fees,
+             _simulate_instant_confirmation ),
+           tracer_kind )
+         l2_level
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          ?native_execution_policy
+          config_file
+      in
+      let*! () = init_logs ~daily_logs:false configuration in
+      let*! () = set_gc_parameters configuration in
+      let tracer_kind =
+        Option.value
+          ~default:Evm_node_lib_dev_encoding.Tracer_types.CallTracer
+          tracer_kind
+      in
+      Evm_node_lib_dev.Replay.trace_block
+        ~tracer_kind
+        ~disable_da_fees
+        ?kernel
+        ?kernel_verbosity
+        ~number:l2_level
+        ?profile
+        configuration)
+
+let trace_transaction_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Trace a specific transaction."
+    trace_args
+    (prefixes ["trace"; "transaction"]
+    @@ Tezos_clic.param
+         ~name:"hash"
+         ~desc:"Transaction hash to trace."
+         Params.tx_hash
+    @@ stop)
+    (fun ( ( data_dir,
+             config_file,
+             preimages,
+             preimages_endpoint,
+             native_execution_policy,
+             kernel,
+             kernel_verbosity,
+             profile,
+             disable_da_fees,
+             _simulate_instant_confirmation ),
+           tracer_kind )
+         tx_hash
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* configuration =
+        Cli.create_or_read_config
+          ~data_dir
+          ?preimages
+          ?preimages_endpoint
+          ?native_execution_policy
+          config_file
+      in
+      let*! () = init_logs ~daily_logs:false configuration in
+      let*! () = set_gc_parameters configuration in
+      let tracer_kind =
+        Option.value
+          ~default:Evm_node_lib_dev_encoding.Tracer_types.CallTracer
+          tracer_kind
+      in
+      Evm_node_lib_dev.Replay.trace_transaction
+        ~tracer_kind
+        ~disable_da_fees
+        ?kernel
+        ?kernel_verbosity
+        ~tx_hash
+        ?profile
         configuration)
 
 let patch_kernel_command =
@@ -4033,6 +4161,8 @@ let commands =
     reset_command;
     replay_command;
     replay_many_command;
+    trace_block_command;
+    trace_transaction_command;
     patch_kernel_command;
     check_config_command;
     describe_config_command;

@@ -37,7 +37,8 @@
   gc
   tezlink
   preconfirmation
-  tezosx))
+  tezosx
+  dev_commands))
 
 (executable
  (name main)
