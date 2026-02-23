@@ -206,7 +206,8 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    image:Tezos_ci.Image.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
     ?force_if_label:string list ->
@@ -219,6 +220,7 @@ module type COMPONENT_API = sig
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
@@ -293,9 +295,11 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -403,9 +407,16 @@ module type COMPONENT_API = sig
       [tag_rex] allows to specify a custom tag regular expression.
       It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component. *)
+      Not implemented for the [Shared] component.
+
+      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
+      Cacio does not add them automatically for you even if they are dependencies
+      of Cacio jobs. *)
   val register_dedicated_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 
   (** Register jobs to be included in the test release pipeline of the current component.
 
@@ -417,9 +428,16 @@ module type COMPONENT_API = sig
       [tag_rex] allows to specify a custom tag regular expression.
       It is registered to be returned by {!get_release_tag_rexes}.
 
-      Not implemented for the [Shared] component. *)
+      Not implemented for the [Shared] component.
+
+      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
+      Cacio does not add them automatically for you even if they are dependencies
+      of Cacio jobs. *)
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 (** The main functor of Cacio. *)

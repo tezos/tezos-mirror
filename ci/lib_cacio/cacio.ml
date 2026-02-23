@@ -191,7 +191,8 @@ type job = {
   arch : Tezos_ci.Runner.Arch.t option;
   cpu : Tezos_ci.Runner.CPU.t option;
   storage : Tezos_ci.Runner.Storage.t option;
-  image : Tezos_ci.Image.t;
+  tag : Tezos_ci.Runner.Tag.t option;
+  image : Tezos_ci.Image.t option;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
@@ -203,6 +204,7 @@ type job = {
   cargo_cache : bool;
   sccache : sccache_config option;
   dune_cache : bool;
+  disable_datadog : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   timeout : Gitlab_ci.Types.time_interval option;
@@ -532,6 +534,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     arch;
                     cpu;
                     storage;
+                    tag;
                     image;
                     needs;
                     needs_legacy;
@@ -544,6 +547,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     cargo_cache;
                     sccache;
                     dune_cache;
+                    disable_datadog;
                     allow_failure;
                     retry;
                     timeout;
@@ -621,7 +625,8 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?arch
                 ?cpu
                 ?storage
-                ~image
+                ?tag
+                ?image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?parallel
@@ -638,6 +643,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?timeout
                 ?variables
                 ?artifacts
+                ~datadog:(not disable_datadog)
                 ?allow_failure
                 ?cache
                 script
@@ -695,7 +701,8 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    image:Tezos_ci.Image.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
     ?force_if_label:string list ->
@@ -708,6 +715,7 @@ module type COMPONENT_API = sig
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
@@ -727,9 +735,11 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -774,10 +784,16 @@ module type COMPONENT_API = sig
     (trigger * job) list -> unit
 
   val register_dedicated_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 
   val register_dedicated_test_release_pipeline :
-    ?tag_rex:string -> (trigger * job) list -> unit
+    ?tag_rex:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    (trigger * job) list ->
+    unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -929,10 +945,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ~image ?only_if_changed ?(force = false) ?(force_if_label = [])
-      ?(needs = []) ?(needs_legacy = []) ?parallel ?variables ?artifacts ?cache
-      ?(cargo_cache = false) ?sccache ?(dune_cache = false) ?allow_failure
-      ?retry ?timeout ?(image_dependencies = []) ?services name script =
+      ?storage ?tag ?image ?only_if_changed ?(force = false)
+      ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
+      ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?(image_dependencies = []) ?services name script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -956,6 +973,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       arch;
       cpu;
       storage;
+      tag;
       image;
       needs;
       needs_legacy;
@@ -976,6 +994,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       cargo_cache;
       sccache;
       dune_cache;
+      disable_datadog;
       allow_failure;
       retry;
       timeout;
@@ -1008,11 +1027,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?only_if_changed ?(needs = [])
-      ?needs_legacy ?allow_failure ?tezt_exe ?(global_timeout = Minutes 30)
-      ?(test_timeout = Minutes 9) ?(parallel_jobs = 1) ?(parallel_tests = 1)
-      ?retry_jobs ?(retry_tests = 0) ?(test_selection = Tezt_core.TSL_AST.True)
-      ?(before_script = []) variant =
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
+      ?(needs = []) ?needs_legacy ?disable_datadog ?allow_failure ?tezt_exe
+      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
+      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
+      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
@@ -1197,6 +1216,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?arch
       ~cpu
       ?storage
+      ?tag
       ~image:Tezos_ci.Images.CI.e2etest
       ?only_if_changed
       ~needs
@@ -1216,6 +1236,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
            ]
            ~expire_in:(Duration (Days 7))
            ~when_:Always)
+      ?disable_datadog
       ?allow_failure
       ?retry:
         (match retry_jobs with
@@ -1338,7 +1359,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       already_called := true ;
       f x
 
-  let register_dedicated_release_pipeline ?tag_rex =
+  let register_dedicated_release_pipeline ?tag_rex ?(legacy_jobs = []) =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1346,12 +1367,12 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline ?tag_rex =
+  let register_dedicated_test_release_pipeline ?tag_rex ?(legacy_jobs = []) =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
@@ -1359,7 +1380,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
