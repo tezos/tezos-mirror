@@ -489,7 +489,7 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn init_registry(&self) -> RegistryImpl {
-        RegistryImpl::new(self.chain_id)
+        RegistryImpl::new(self.chain_id, self.michelson_chain_config.chain_id.clone())
     }
 
     fn get_chain_family(&self) -> ChainFamily {
@@ -847,7 +847,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     }
 
     fn init_registry(&self) -> RegistryImpl {
-        RegistryImpl::new(self.get_chain_id())
+        RegistryImpl::new(self.get_chain_id(), self.chain_id.clone())
     }
 
     fn get_chain_family(&self) -> ChainFamily {

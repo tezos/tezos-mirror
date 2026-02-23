@@ -6,7 +6,7 @@ use mir::ast::big_map::BigMapId;
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
-    blake2b, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
+    blake2b, hash::ChainId, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
 };
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
@@ -33,7 +33,7 @@ use crate::{
     context::TezosRuntimeContext,
 };
 
-pub struct TezosRuntime;
+pub struct TezosRuntime(pub ChainId);
 
 pub mod account;
 pub mod context;
@@ -256,6 +256,10 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
 }
 
 impl TezosRuntime {
+    pub fn new(chain_id: ChainId) -> Self {
+        Self(chain_id)
+    }
+
     pub fn add_balance(
         host: &mut impl Runtime,
         pub_key_hash: &PublicKeyHash,

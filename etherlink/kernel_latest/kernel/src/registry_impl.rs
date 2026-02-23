@@ -5,24 +5,26 @@ pub struct RegistryImpl {
 
 impl Default for RegistryImpl {
     fn default() -> Self {
-        Self::new(U256::from(1337))
+        Self::new(U256::from(1337), ChainId::from([1, 3, 3, 7]))
     }
 }
 
 impl RegistryImpl {
-    pub fn new(eth_chain_id: U256) -> Self {
+    pub fn new(eth_chain_id: U256, tez_chain_id: ChainId) -> Self {
         Self {
             ethereum: EthereumRuntime::new(eth_chain_id),
-            tezos: TezosRuntime {},
+            tezos: TezosRuntime::new(tez_chain_id),
         }
     }
 }
 
 use primitive_types::U256;
+use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_runtime::runtime::Runtime;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{CrossCallResult, Registry, RuntimeInterface};
 use tezosx_tezos_runtime::TezosRuntime;
+
 impl Registry for RegistryImpl {
     fn bridge<Host: Runtime>(
         &self,
