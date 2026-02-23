@@ -961,6 +961,10 @@ DO UPDATE SET value = excluded.value
       (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
+    let select_number_of_tez_hash =
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT level FROM blocks WHERE tez_hash = ?|eos}
+
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM blocks WHERE level > ?|}
@@ -1946,6 +1950,10 @@ module Blocks = struct
   let find_number_of_hash store hash =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Blocks.select_number_of_hash hash
+
+  let find_number_of_tez_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_number_of_tez_hash hash
 
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level

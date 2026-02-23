@@ -221,6 +221,11 @@ module Blocks : sig
     Ethereum_types.block_hash ->
     Ethereum_types.quantity option tzresult Lwt.t
 
+  val find_number_of_tez_hash :
+    conn ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
   (** [tezosx_find_tez_block_with_level conn level] returns the Tezos block
