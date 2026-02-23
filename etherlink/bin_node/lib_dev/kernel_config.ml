@@ -303,6 +303,51 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
     tez_bootstrap_accounts
   |> List.flatten
 
+let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
+  contracts
+  |> List.map (fun (address, script, storage) ->
+         let encode_len (s : string) =
+           s |> String.length |> Z.of_int
+           |> Data_encoding.Binary.to_string_exn Data_encoding.n
+         in
+
+         let encode_hexa_with_len x =
+           let encoded = encode_hexa x in
+           let encoded_len = encode_len encoded in
+           (encoded, encoded_len)
+         in
+
+         let path_prefix =
+           Durable_storage_path.etherlink_root ^ "/contracts/index/"
+           ^ Tezlink_durable_storage.Path.to_path
+               Tezos_types.Contract.encoding
+               address
+           |> String.split_on_char '/' |> clean_path
+         in
+
+         let encoded_balance =
+           Data_encoding.Binary.to_string_exn
+             Tezos_types.Tez.encoding
+             tez_bootstrap_balance
+         in
+
+         let encoded_script, encoded_script_len = encode_hexa_with_len script in
+         let encoded_storage, encoded_storage_len =
+           encode_hexa_with_len storage
+         in
+
+         let instr key value = make_instr ~path_prefix (Some (key, value)) in
+
+         [
+           ("balance", encoded_balance);
+           ("data/code", encoded_script);
+           ("len/code", encoded_script_len);
+           ("data/storage", encoded_storage);
+           ("len/storage", encoded_storage_len);
+         ]
+         |> List.concat_map (fun (k, v) -> instr k v))
+  |> List.flatten
+
 let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
     ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
@@ -314,7 +359,8 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?disable_legacy_dal_signals ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
     ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
-    ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output () =
+    ?tez_bootstrap_accounts ~tez_bootstrap_balance ?tez_bootstrap_contracts
+    ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -334,6 +380,14 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     | None -> []
     | Some tez_bootstrap_accounts ->
         make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts
+  in
+  let tez_bootstrap_contracts =
+    match tez_bootstrap_contracts with
+    | None -> []
+    | Some tez_bootstrap_contracts ->
+        make_tezos_bootstrap_contracts_instr
+          tez_bootstrap_balance
+          tez_bootstrap_contracts
   in
 
   let set_account_code =
@@ -428,7 +482,8 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
+    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
+    @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr

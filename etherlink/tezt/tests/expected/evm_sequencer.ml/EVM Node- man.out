@@ -895,6 +895,7 @@ Kernel commands:
       [--enable-fast-fa-withdrawal] [--evm-version <cancun|shanghai|prague|osaka>]
       [--set-code <0x...,0x....>] [-r --with-runtime <RUNTIME>]
       [--tez-bootstrap-balance <3800000>] [--tez-bootstrap-account <edp...>]
+      [--tez-bootstrap-contract <KT1...,0x...,0x....>]
     Create a configuration for the kernel installer.
     <kernel config file>: File path where the config will be written to.
     --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
@@ -955,6 +956,9 @@ Kernel commands:
       accounts
       Defaults to `3800000`.
     --tez-bootstrap-account <edp...>: Add a tezlink bootstrap account in the installer config.
+    --tez-bootstrap-contract <KT1...,0x...,0x....>: Add a tezlink bootstrap contract in the
+      installer config passing the address to be used, the script and initial storage comma
+      separated.
   
   make l2 kernel installer config <kernel config file> [--minimum-base-fee-per-gas <111...>]
       [--da-fee-per-byte <111...>] [--sequencer-pool-address <0x...>]
