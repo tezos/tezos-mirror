@@ -120,7 +120,30 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
                   e)
         | None -> return Tezos_types.Tez.zero)
 
-  let list_contracts _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
+  let subkeys ~block p =
+    on_head_block block @@ fun state -> Backend.subkeys state p
+
+  let list_contracts chain block =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let* contracts_keys =
+      subkeys ~block (Durable_storage_path.etherlink_root ^ "/contracts/index")
+    in
+    let contracts =
+      List.filter_map
+        (fun k ->
+          let open Option_syntax in
+          let* bytes = Hex.to_string (`Hex k) in
+          Data_encoding.Binary.of_string_opt Tezos_types.Contract.encoding bytes)
+        contracts_keys
+    in
+    let* accounts_keys = subkeys ~block "/evm/world_state/eth_accounts/tezos" in
+    let accounts =
+      List.filter_map
+        (fun k -> Result.to_option @@ Tezos_types.Contract.of_b58check k)
+        accounts_keys
+    in
+    return (accounts @ contracts)
 
   let bootstrap_accounts () = failwith "Not Implemented Yet (%s)" __LOC__
 
