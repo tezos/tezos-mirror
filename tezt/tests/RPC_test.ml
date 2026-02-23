@@ -486,6 +486,10 @@ let test_clst ~contracts ?endpoint client =
     Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contract_clst_balance ~id:bootstrap ()
   in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_clst_ticket_balance ~id:bootstrap ()
+  in
   unit
 
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =

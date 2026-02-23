@@ -2160,6 +2160,22 @@ let get_chain_block_context_contract_clst_balance ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_contract_clst_ticket_balance ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "clst_ticket_balance";
+    ]
+    Fun.id
+
 let get_chain_block_context_address_registry ?(chain = "main") ?(block = "head")
     () =
   make
