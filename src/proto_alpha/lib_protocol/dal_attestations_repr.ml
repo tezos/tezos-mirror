@@ -16,7 +16,7 @@ let is_empty = Bitset.is_empty
 
 let to_z = Bitset.to_z
 
-(* Erros when reading/writing the [dal_content] of an attestation. *)
+(* Errors when reading/writing the [dal_content] of an attestation. *)
 type dal_indices = Lag_index of int | Slot_index of int
 
 let dal_indices_encoding =
@@ -39,7 +39,7 @@ let dal_indices_encoding =
 
 type error +=
   | Dal_invalid_attestation_bitset of Bitset.t
-  | Dal_invalid_read_of_attestaion_bitset of dal_indices
+  | Dal_invalid_read_of_attestation_bitset of dal_indices
 
 let () =
   register_error_kind
@@ -60,8 +60,8 @@ let () =
     (fun bitset -> Dal_invalid_attestation_bitset bitset) ;
   register_error_kind
     `Permanent
-    ~id:"dal_invalid_read_of_attestaion_bitset"
-    ~title:"Dal invalid read of attestaion bitset"
+    ~id:"dal_invalid_read_of_attestation_bitset"
+    ~title:"Dal invalid read of attestation bitset"
     ~description:"The DAL attestation bitset was read with invalid indices"
     ~pp:(fun ppf dal_index ->
       match dal_index with
@@ -77,9 +77,9 @@ let () =
             i)
     Data_encoding.(obj1 (req "index" dal_indices_encoding))
     (function
-      | Dal_invalid_read_of_attestaion_bitset dal_index -> Some dal_index
+      | Dal_invalid_read_of_attestation_bitset dal_index -> Some dal_index
       | _ -> None)
-    (fun dal_index -> Dal_invalid_read_of_attestaion_bitset dal_index)
+    (fun dal_index -> Dal_invalid_read_of_attestation_bitset dal_index)
 
 (* A DAL attestation is made of chunks with 1 bit [is_last] followed by
    [slots_per_chunk] bits to state which slots are attested. *)
@@ -207,13 +207,13 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
     let* () =
       error_unless
         Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
-        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+        (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
     in
     let slot = Dal_slot_index_repr.to_int slot_index in
     let* () =
       error_unless
         Compare.Int.(slot >= 0 && slot < number_of_slots)
-        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot))
+        (Dal_invalid_read_of_attestation_bitset (Slot_index slot))
     in
     let* data_bit_pos =
       compute_data_bit_position
@@ -266,12 +266,12 @@ let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
     let* () =
       error_unless
         Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
-        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+        (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
     in
     let* () =
       error_unless
         Compare.Int.(slot_idx >= 0 && slot_idx < number_of_slots)
-        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot_idx))
+        (Dal_invalid_read_of_attestation_bitset (Slot_index slot_idx))
     in
     if is_non_empty_at lag_index then
       let* lag_data =
@@ -279,7 +279,7 @@ let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
       in
       match lag_data with
       | None ->
-          tzfail (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+          tzfail (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
       | Some {offset_start; nb_chunks; offset_after} ->
           if Compare.Int.(chunk_index < nb_chunks) then
             (* Fast path: slot is within existing chunks. *)
