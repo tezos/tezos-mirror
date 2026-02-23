@@ -1312,12 +1312,6 @@ struct
       val verify_proof :
         proof -> (state -> (state * 'a) Lwt.t) -> (state * 'a) option Lwt.t
 
-      val produce_proof :
-        context ->
-        state ->
-        (state -> (state * 'a) Lwt.t) ->
-        (proof * 'a) option Lwt.t
-
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end

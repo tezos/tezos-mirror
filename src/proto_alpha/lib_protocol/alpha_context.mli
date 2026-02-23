@@ -4129,14 +4129,24 @@ module Sc_rollup : sig
       val get_outbox : Raw_level.t -> state -> output list Lwt.t
     end
 
-    module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+    module type WASM_PVM_MACHINE = sig
+      include Wasm_2_0_0.WASM_PVM_MACHINE
+
+      val produce_proof :
+        context ->
+        state ->
+        (state -> (state * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
+    end
+
+    module Make_pvm (WASM_machine : WASM_PVM_MACHINE) :
       S
         with type context = WASM_machine.context
          and type state = WASM_machine.state
          and type proof = WASM_machine.proof
 
     module Protocol_implementation :
-      S
+      PVM.PROTO_VERIFICATION
         with type context = Wasm_2_0_0.Wasm_pvm_machine.context
          and type state = Wasm_2_0_0.Wasm_pvm_machine.state
          and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof

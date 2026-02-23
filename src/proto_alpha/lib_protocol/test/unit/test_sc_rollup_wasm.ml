@@ -88,7 +88,12 @@ module Wasm_context = struct
   let proof_encoding = Proof_encoding.V2.Tree2.tree_proof_encoding
 end
 
-module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
+module Full_Wasm = Sc_rollup_wasm.V2_0_0.Make_pvm (struct
+  include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end)
 
 let test_metadata_size () =
   let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in

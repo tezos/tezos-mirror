@@ -158,7 +158,17 @@ module V2_0_0 = struct
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module Make_pvm (WASM_pvm_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+  module type WASM_PVM_MACHINE = sig
+    include Wasm_2_0_0.WASM_PVM_MACHINE
+
+    val produce_proof :
+      context ->
+      state ->
+      (state -> (state * 'a) Lwt.t) ->
+      (proof * 'a) option Lwt.t
+  end
+
+  module Make_pvm (WASM_pvm_machine : WASM_PVM_MACHINE) :
     S
       with type context = WASM_pvm_machine.context
        and type state = WASM_pvm_machine.state
@@ -630,5 +640,10 @@ module V2_0_0 = struct
     let get_current_level = get_current_level
   end
 
-  module Protocol_implementation = Make_pvm (Wasm_2_0_0.Wasm_pvm_machine)
+  module Protocol_implementation = Make_pvm (struct
+    include Wasm_2_0_0.Wasm_pvm_machine
+
+    (* TODO: L2-908 - Refactor Make_pvm to not require produce_proof *)
+    let produce_proof _ctx _state _step = Lwt.return_none
+  end)
 end
