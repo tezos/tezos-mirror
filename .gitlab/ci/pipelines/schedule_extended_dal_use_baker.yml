@@ -46,6 +46,8 @@ oc.build_kernels:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   interruptible: false
   before_script:
@@ -417,6 +419,8 @@ oc.build_x86_64-released:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   interruptible: false
   before_script:
@@ -465,6 +469,8 @@ oc.build_amd64-extra-dev:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   interruptible: false
   before_script:
@@ -521,6 +527,8 @@ oc.build_amd64-exp:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   interruptible: false
   before_script:

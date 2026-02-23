@@ -1546,7 +1546,20 @@ module Cache = struct
     |> append_cache
          (cache
             ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-            [cargo_home // "registry/cache"])
+            [
+              (* The cache folder contains the .crate (tar.gz) files. *)
+              cargo_home // "registry/cache";
+              (* The index folder contains the database of all
+                 available crates on crates.io. *)
+              cargo_home // "registry/index";
+              (* The src folder contains the unzipped source code
+                 ready for compilation. *)
+              cargo_home // "registry/src";
+              (* cargo_home // "git/db";
+                 These are "bare" git repositories. They contain all
+                 the compressed git history and objects. We might
+                 agree to add them later *)
+            ])
     (* Allow Cargo to access the network *)
     |> enable_networked_cargo
 end
