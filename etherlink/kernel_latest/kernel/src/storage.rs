@@ -16,6 +16,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
+use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
@@ -29,8 +30,8 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_storage::{
-    read_b58_kt1, read_u256_le, read_u64_le, store_read_slice, write_u256_le,
-    write_u64_le,
+    read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le, store_bin,
+    store_read_slice, write_u256_le, write_u64_le,
 };
 
 use crate::error::{Error, StorageError};
@@ -134,6 +135,8 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
+
+const MICHELSON_RUNTIME_CHAIN_ID: RefPath = RefPath::assert_from(b"/tezlink/chain_id");
 
 // Path to the Multichain feature flag. If there is nothing at this path,
 // a single chain is used.
@@ -477,6 +480,19 @@ pub fn store_chain_id<Host: Runtime>(
 
 pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
+}
+
+pub fn store_michelson_runtime_chain_id<Host: Runtime>(
+    host: &mut Host,
+    chain_id: &ChainId,
+) -> Result<(), Error> {
+    store_bin(chain_id, host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
+}
+
+pub fn read_michelson_runtime_chain_id<Host: Runtime>(
+    host: &Host,
+) -> Result<Option<ChainId>, Error> {
+    read_optional_nom_value(host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
 }
 
 pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
