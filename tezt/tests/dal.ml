@@ -12409,23 +12409,29 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
   let* () = Agnostic_baker.terminate baker in
   let () = Dal_node.Mockup_for_baker.stop dal_node_mockup in
 
+  let attested_level = published_level + attestation_lag in
   Log.info
-    "Check that the slot published at level %d was attested"
-    published_level ;
-  let* current_level = Node.get_level l1_node in
-  let attested_levels = published_level --> current_level in
-  let* all_slot_availabilities =
-    Dal.collect_slot_availabilities l1_node ~attested_levels
+    "Check that the slot published at level %d was attested at level %d"
+    published_level
+    attested_level ;
+  let* {dal_attestation; _} =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
   in
-
-  Check.is_true
-    (Dal.is_slot_attested
-       ~published_level
-       ~slot_index:0
-       ~to_attested_levels:(Dal.to_attested_levels ~protocol ~dal_parameters)
-       all_slot_availabilities)
-    ~error_msg:"Expected slot 0 from published_level to be attested" ;
-
+  let dal_attestation =
+    Option.map
+      (fun str ->
+        let per_lag =
+          Dal.Slot_availability.decode protocol dal_parameters str
+        in
+        Array.init number_of_slots (fun slot_index ->
+            Array.exists (fun lag_array -> lag_array.(slot_index)) per_lag))
+      dal_attestation
+  in
+  let expected_attestation = expected_attestation dal_parameters [0] in
+  Check.((Some expected_attestation = dal_attestation) (option (array bool)))
+    ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
   unit
 
 let test_disable_shard_validation_wrong_cli _protocol _parameters _cryptobox
