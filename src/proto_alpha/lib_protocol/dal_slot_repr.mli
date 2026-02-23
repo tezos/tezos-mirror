@@ -553,8 +553,8 @@ module History : sig
   (** [verify_proof dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
 
-      - the page identified by [page_id] belongs to a confirmed slot stored in
-      the skip list whose head is [snapshot], or
+      - the page identified by [page_id] is valid and belongs to a confirmed
+      slot stored in the skip list whose head is [snapshot], or
 
       - there is not confirmed slot in the skip list (whose head is) [snapshot]
       that could contain the page identified by [page_id].

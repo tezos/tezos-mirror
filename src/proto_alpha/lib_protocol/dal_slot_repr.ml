@@ -1835,16 +1835,29 @@ module History = struct
                       target slot."
             | Page_confirmed {page_data; page_proof; _}, Some commitment ->
                 (* We check that the page indeed belongs to the target slot at the
-             given page index. *)
-                let* () =
-                  check_page_proof
-                    dal_params
-                    page_proof
-                    page_data
-                    page_id
-                    commitment
+                   given page index. *)
+                let dal_attestation_lag =
+                  attestation_lag_value attestation_lag
                 in
-                return_some page_data
+                if
+                  not
+                  @@ page_id_is_valid
+                       ~lag_check:(Exact_lag dal_attestation_lag)
+                       page_id
+                then
+                  (* This probably means that the page was imported before its
+                     attestation status was known.  *)
+                  return None
+                else
+                  let* () =
+                    check_page_proof
+                      dal_params
+                      page_proof
+                      page_data
+                      page_id
+                      commitment
+                  in
+                  return_some page_data
             | Invalid_page_id _, _ ->
                 let dal_attestation_lag =
                   attestation_lag_value attestation_lag
