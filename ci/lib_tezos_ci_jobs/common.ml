@@ -370,12 +370,26 @@ module Docker = struct
       | Test_manual -> Stages.manual
       | _ -> Stages.build
     in
+    let retry =
+      match docker_build_type with
+      | Test_manual -> None
+      | _ ->
+          (* Set retry to 1 because the job is a bit flaky.
+             The runner sometimes dies, causing the job to fail with EOF.
+             Perhaps surprisingly, this surfaces as a [Script_failure]. *)
+          Some
+            {
+              Gitlab_ci.Types.max = 1;
+              when_ = [Script_failure; Runner_system_failure];
+            }
+    in
     let name = "oc.docker:" ^ arch_string in
     job_docker_authenticated
       ?rules
       ?dependencies
       ~image_dependencies
       ~ci_docker_hub
+      ?retry
       ~__POS__
       ~stage
       ~arch
