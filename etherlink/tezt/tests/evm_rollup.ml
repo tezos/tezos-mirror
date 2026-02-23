@@ -309,7 +309,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
     ?dal_slots ?(enable_multichain = false) ?websockets
-    ?(enable_fast_withdrawal = false) protocol =
+    ?(enable_fa_bridge = false) ?(enable_fast_withdrawal = false) protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -384,6 +384,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~output:output_config
         ~enable_dal
         ~enable_multichain
+        ~enable_fa_bridge
         ~enable_fast_withdrawal
         ?dal_slots
         ?evm_version
@@ -3229,13 +3230,15 @@ type storage_migration_results = {
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
 let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
-    ?(admin = Constant.bootstrap5) ~scenario_prior ~scenario_after protocol =
+    ?(admin = Constant.bootstrap5) ?enable_fa_bridge ~scenario_prior
+    ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
       ?chain_id
       ?eth_bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
+      ?enable_fa_bridge
       ~kernel:from
       ~setup_mode:
         (Setup_sequencer
@@ -3387,6 +3390,140 @@ let test_mainnet_latest_kernel_migration =
     ~scenario_prior
     ~scenario_after
     protocol
+
+let test_latest_fa_bridge_non_regression_migration protocols =
+  let latest_kernel_migration ~from =
+    let from_tag, from_use = Kernel.to_uses_and_tags from in
+    Protocol.register_test
+      ~__FILE__
+      ~tags:["evm"; "migration"; "upgrade"; from_tag; "fa_bridge"]
+      ~uses:(fun _protocol ->
+        [
+          Constant.octez_smart_rollup_node;
+          Constant.octez_evm_node;
+          Constant.smart_rollup_installer;
+          Constant.WASM.evm_kernel;
+          from_use;
+        ])
+      ~title:
+        Format.(
+          sprintf
+            "Ensures FA bridge deposit works after potential migration(s) (%s \
+             -> latest)."
+            from_tag)
+    @@ fun protocol ->
+    let scenario_prior ~evm_setup =
+      (* We produce a block to make sure the fa_bridge.sol contract is deployed *)
+      let* _ = evm_setup.produce_block () in
+      unit
+    in
+    let scenario_after ~evm_setup ~sanity_check:() =
+      (* We now test that the FA bridge still works for deposits *)
+      let amount = 42 in
+      let depositor = Constant.bootstrap5 in
+      let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+      (* Originates the FA deposit contract. *)
+      let* ticket_router_tester =
+        Client.originate_contract
+          ~alias:"ticket-router-tester"
+          ~amount:Tez.zero
+          ~src:Constant.bootstrap4.public_key_hash
+          ~init:
+            "Pair (Pair 0x01000000000000000000000000000000000000000000 (Pair \
+             (Left Unit) 0)) {}"
+          ~prg:(ticket_router_tester_path ())
+          ~burn_cap:Tez.one
+          evm_setup.client
+      in
+      let* () = Client.bake_for_and_wait ~keys:[] evm_setup.client in
+      let* () =
+        Client.transfer
+          ~entrypoint:"set"
+          ~arg:
+            (sf
+               "Pair %S (Pair (Right (Right %s%s)) 0)"
+               evm_setup.sc_rollup_address
+               receiver
+               "")
+          ~amount:Tez.zero
+          ~giver:depositor.Account.public_key_hash
+          ~receiver:ticket_router_tester
+          ~burn_cap:Tez.one
+          evm_setup.client
+      in
+      let* () = Client.bake_for_and_wait ~keys:[] evm_setup.client in
+      let* () =
+        Client.transfer
+          ~entrypoint:"mint"
+          ~arg:(sf "Pair (Pair 0 None) %d" amount)
+          ~amount:Tez.zero
+          ~giver:depositor.Account.public_key_hash
+          ~receiver:ticket_router_tester
+          ~burn_cap:Tez.one
+          evm_setup.client
+      in
+      let* () =
+        repeat 3 (fun () ->
+            let* _ =
+              Rollup.next_rollup_node_level
+                ~sc_rollup_node:evm_setup.sc_rollup_node
+                ~client:evm_setup.client
+            in
+            unit)
+      in
+      let* _ = evm_setup.produce_block () in
+      let*@ block =
+        Rpc.get_block_by_number
+          ~full_tx_objects:false
+          ~block:"latest"
+          evm_setup.evm_node
+      in
+      let tx_hash =
+        match block.transactions with
+        | Block.Hash [hash] -> hash
+        | _ -> Test.fail "Unexpected block result"
+      in
+      let*@ deposit = Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node in
+      let* () =
+        match deposit with
+        | Some txn ->
+            Check.(
+              (txn.status = true)
+                bool
+                ~error_msg:"Should be a success, we have a regression"
+                ~__LOC__) ;
+            (* Check that logs are present and from the FA bridge contract *)
+            let fa_bridge_address = Solidity_contracts.Precompile.fa_bridge in
+            Check.(
+              (List.length txn.logs >= 1)
+                int
+                ~error_msg:"Expected at least one log in the deposit receipt"
+                ~__LOC__) ;
+            let log_addresses =
+              List.map (fun (log : Transaction.tx_log) -> log.address) txn.logs
+            in
+            Check.(
+              (List.mem fa_bridge_address log_addresses = true)
+                bool
+                ~error_msg:
+                  (Format.sprintf
+                     "Expected a log from FA bridge address %s"
+                     fa_bridge_address)
+                ~__LOC__) ;
+            unit
+        | None -> Test.fail "Missing FA deposit"
+      in
+      unit
+    in
+    gen_kernel_migration_test
+      ~enable_fa_bridge:true
+      ~from
+      ~to_:Latest
+      ~scenario_prior
+      ~scenario_after
+      protocol
+  in
+  latest_kernel_migration ~from:Mainnet protocols
 
 let test_latest_kernel_migration protocols =
   let latest_kernel_migration ~from =
@@ -3794,6 +3931,7 @@ let test_kernel_root_hash_after_upgrade =
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_latest_kernel_migration protocols ;
+  test_latest_fa_bridge_non_regression_migration protocols ;
   test_deposit_before_and_after_migration protocols
 
 let block_transaction_count_by ~by arg =
