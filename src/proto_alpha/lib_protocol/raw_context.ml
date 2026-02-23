@@ -1378,10 +1378,10 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           {
             Constants_parametric_repr.feature_enable;
             incentives_enable;
-            dynamic_lag_enable = false;
+            dynamic_lag_enable = true;
             number_of_slots = 160;
             attestation_lag = 5;
-            attestation_lags = [5];
+            attestation_lags = [1; 2; 3; 4; 5];
             attestation_threshold;
             cryptobox_parameters =
               {

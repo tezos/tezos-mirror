@@ -1164,10 +1164,12 @@ let test_create_mockup_config_show_init_roundtrip protocols =
               "[distinct_sample] is not implemented for empty arrays (value: \
                %s)"
               (JSON.encode value)
-        | first :: rest ->
+        | _ ->
             let items_schema = JSON.(schema |-> "items") in
-            let modified_first = distinct_sample first items_schema in
-            `A (modified_first :: List.map JSON.unannotate rest))
+            `A
+              (List.map
+                 (fun item -> distinct_sample item items_schema)
+                 array_items))
     | typ ->
         Test.fail
           "[distinct_sample] is not implemented for types [%s] (value: %s)"

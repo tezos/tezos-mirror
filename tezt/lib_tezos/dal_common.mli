@@ -76,6 +76,47 @@ module Slot_availability : sig
   val decode : Protocol.t -> Parameters.t -> string -> bool array array
 end
 
+module IntMap : Map.S with type key = int
+
+(** [collect_slot_availabilities node ~attested_levels] collect DAL attestation
+    metadata for a list of [~attested_levels]. Returns an [IntMap] mapping each
+    attested level to its optional [dal_attestation] value. *)
+val collect_slot_availabilities :
+  Node.t -> attested_levels:int list -> string option IntMap.t Lwt.t
+
+(** Maps each lag to (attested_level, lag_index, dal_params, protocol). *)
+val to_attested_levels :
+  protocol:Protocol.t ->
+  dal_parameters:Parameters.t ->
+  published_level:int ->
+  (int * int * Parameters.t * Protocol.t) list
+
+(** [is_slot_attested ~published_level ~slot_index ~to_attested_levels slot_availabilities]
+    checks if a slot published at [~published_level] with [~slot_index] was attested
+    at any valid attestation level.
+    
+    Uses [to_attested_levels ~published_level] to compute all possible
+    (attested_level, lag_index, dal_params, protocol) tuples where the slot
+    could have been attested. For each tuple:
+    - [attested_level]: The level at which to check for the attestation
+    - [lag_index]: Which lag position to check at that level (since each lag 
+      position corresponds to a different published level)
+    - [dal_params]: DAL parameters at [attested_level]
+    - [protocol]: Protocol at [attested_level]
+    
+    The [slot_availabilities] map should contain metadata for all relevant levels
+    (typically obtained via {!collect_slot_availabilities}).
+    
+    Returns wether the slot is found attested at ANY of the checked
+    (level, lag_index) pairs. *)
+val is_slot_attested :
+  published_level:int ->
+  slot_index:int ->
+  to_attested_levels:
+    (published_level:int -> (int * int * Parameters.t * Protocol.t) list) ->
+  string option IntMap.t ->
+  bool
+
 (** Encoding/decoding of the DAL content included in attestation operations. *)
 module Attestations : sig
   (** [encode_for_one_lag protocol ?lag_index dal_parameters slot_array] encodes
@@ -319,13 +360,16 @@ module RPC : sig
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
 
   (** Call RPC "GET
-        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
-        get the slots currently attestable by the given public key hash at the
+        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+        to get the slots currently attestable by the given public key hash at the
         given attested level. The result is either a [Not_in_committee] or a
         [Attestable_slots flags], where [flags] is a boolean list of length
         [num_slots]. A slot is attestable if it is published at level [level -
         attestation_lag]) and all the shards assigned to the given attester at
-        level [level] are available in the DAL node's store. *)
+        level [level] are available in the DAL node's store. Please note that with
+        the introduction of [attestation_lags] list the result is only for
+        the published level corresponding to the maximum lag, so there is not an
+        equivalence between this RPC and the DAL attestation from the chain. *)
   val get_attestable_slots :
     attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 

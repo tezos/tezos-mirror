@@ -296,13 +296,12 @@ module Attestations = struct
     else encode_multiple_lags_after_025 attestations_per_lag
 
   (* Decode before 025 format: simple bitset where bit[i] = slot i is attested *)
-  let decode_before_025 str =
+  let decode_before_025 ~number_of_slots str =
     let attestation = Z.of_string str in
-    let length = Z.numbits attestation in
-    let array = Array.make length false in
+    let array = Array.make number_of_slots false in
     List.iter
       (fun i -> if Z.testbit attestation i then array.(i) <- true)
-      (range 0 (length - 1)) ;
+      (range 0 (number_of_slots - 1)) ;
     array
 
   (* Decode post-025 compact multi-lag format into per-lag arrays.
@@ -358,10 +357,11 @@ module Attestations = struct
     result
 
   let decode protocol parameters str =
-    if Protocol.number protocol < 025 then [|decode_before_025 str|]
+    let number_of_slots = parameters.Parameters.number_of_slots in
+    if Protocol.number protocol < 025 then
+      [|decode_before_025 ~number_of_slots str|]
     else
       let number_of_lags = List.length parameters.Parameters.attestation_lags in
-      let number_of_slots = parameters.number_of_slots in
       decode_after_025 ~number_of_lags ~number_of_slots str
 end
 
@@ -370,6 +370,66 @@ end
 module Slot_availability = struct
   let decode = Attestations.decode
 end
+
+module IntMap = Map.Make (Int)
+
+let collect_slot_availabilities node ~attested_levels =
+  Lwt_list.fold_left_s
+    (fun map attested_level ->
+      let* metadata =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
+      in
+      return (IntMap.add attested_level metadata.RPC.dal_attestation map))
+    IntMap.empty
+    attested_levels
+
+let to_attested_levels ~protocol ~dal_parameters ~published_level =
+  List.mapi
+    (fun lag_index lag ->
+      (published_level + lag, lag_index, dal_parameters, protocol))
+    dal_parameters.Parameters.attestation_lags
+
+let is_slot_attested ~published_level ~slot_index ~to_attested_levels
+    slot_availabilities =
+  let attested_levels = to_attested_levels ~published_level in
+  let is_attested_at (attested_level, lag_index, dal_params, protocol) =
+    match IntMap.find attested_level slot_availabilities with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Metadata not found for attested level %d"
+          attested_level
+    | Some slot_availability ->
+        let attestation_array =
+          Slot_availability.decode protocol dal_params slot_availability
+        in
+        let number_of_lags = List.length dal_params.attestation_lags in
+        let attestations_at_lag =
+          if lag_index >= number_of_lags then
+            Test.fail
+              ~__LOC__
+              "Unexpected lag_index %d for attested level %d, number_of_lags = \
+               %d"
+              lag_index
+              attested_level
+              number_of_lags
+          else
+            let len = Array.length attestation_array in
+            if lag_index >= len then
+              Test.fail
+                ~__LOC__
+                "Unexpected array length %d, when lag_index is %d for attested \
+                 level %d"
+                len
+                lag_index
+                attested_level
+            else attestation_array.(lag_index)
+        in
+        Array.length attestations_at_lag > slot_index
+        && attestations_at_lag.(slot_index)
+  in
+  List.exists is_attested_at attested_levels
 
 module Committee = struct
   type member = {attester : string; indexes : int list}

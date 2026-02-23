@@ -696,7 +696,7 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
          (["allow_tz4_delegate_enable"], `Bool true);
          (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
        ]
        @ abaab_threshold ~abaab ~protocol
@@ -728,9 +728,9 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
   (* Expected attestations that should be found non-aggregated *)
   let expected_attestations = [bootstrap4; bootstrap5] in
   (* Testing the "bake for" command *)
-  log_step 4 "Bake for until level 8" ;
-  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
-  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 4 "Bake for until level 10" ;
+  (* Baking until level 10 ensures that the BLS consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:9 ~keys:delegates client in
   log_step 5 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -739,7 +739,7 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
       client
   in
   (* Testing the "bake for" command with minimal timestamp *)
-  log_step 6 "Bake for with minimal timestamp until level 10" ;
+  log_step 6 "Bake for with minimal timestamp until level 12" ;
   let* () =
     Client.bake_for_and_wait
       ~minimal_timestamp:true
@@ -755,9 +755,9 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
       client
   in
   (* Testing the baker automaton *)
-  log_step 8 "Start a baker and wait until level 12" ;
+  log_step 8 "Start a baker and wait until level 14" ;
   let* _baker = Agnostic_baker.init ~remote_mode ~delegates node client in
-  let* _ = Node.wait_for_level node 12 in
+  let* _ = Node.wait_for_level node 14 in
   log_step 9 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -929,7 +929,7 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
            and make round durations as small as possible *)
          (["minimal_block_delay"], `String "4");
          (["delay_increment_per_round"], `String "0");
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
        ]
        @ abaab_threshold ~abaab ~protocol
@@ -983,7 +983,7 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     Client.update_fresh_companion_key ~algo:"bls" bootstrap3 client
   in
   Log.info "Bake until BLS consensus keys are activated" ;
-  let* _ = Client.bake_for_and_wait ~keys ~count:6 client in
+  let* _ = Client.bake_for_and_wait ~keys ~count:8 client in
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)
@@ -996,7 +996,7 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       client
   in
   let* _ = Client.bake_for_and_wait ~keys client in
-  let base_level = 9 in
+  let base_level = 11 in
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at [base_level + 1]. *)
   let* round = fetch_round client in
@@ -1242,7 +1242,7 @@ let aggregated_operations_retrival_from_block_content ~abaab =
          (["allow_tz4_delegate_enable"], `Bool true);
          (["aggregate_attestation"], `Bool true);
          (* Diminish some constants to activate consensus keys faster *)
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
        ]
        @ abaab_threshold ~abaab ~protocol
@@ -1268,9 +1268,9 @@ let aggregated_operations_retrival_from_block_content ~abaab =
   let expected_aggregated_committee = [bootstrap1; bootstrap2; bootstrap3] in
   (* Expected delegates that should be found non-aggregated *)
   let expected_non_aggregated = [bootstrap4; bootstrap5] in
-  log_step 4 "Bake for until level 8" ;
-  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
-  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 4 "Bake for until level 10" ;
+  (* Baking until level 10 ensures that the BLS consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:9 ~keys:delegates client in
   log_step 5 "Check consensus operations" ;
   let* () =
     check_consensus_operations
@@ -1482,7 +1482,7 @@ let test_reproposal_at_abaab_activation_level =
            and make round durations as small as possible *)
          (["minimal_block_delay"], `String "4");
          (["delay_increment_per_round"], `String "0");
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (* [blocks_per_cycle] is too short in this testing scenario,
            so we increase [tolerated_inactivity_period] *)
          (["tolerated_inactivity_period"], `Int 99);
@@ -1545,16 +1545,16 @@ let test_reproposal_at_abaab_activation_level =
         bootstrap4;
       ]
   in
-  let* () = Client.bake_for_and_wait ~keys client in
+  let* () = Client.bake_for_and_wait ~keys ~count:5 client in
   (* Check abaab activation_level
-     Activation of last tz4 at beginning of cycle 2: level 5  *)
+     Activation of last tz4 at beginning of cycle 2: level 9 *)
   let* ctxt =
     Client.RPC.call client @@ RPC.get_chain_block_context_raw ~value_path:[] ()
   in
   let activation_level =
     JSON.(ctxt |-> "all_bakers_attest_first_level" |-> "level" |> as_int)
   in
-  assert (activation_level = 5) ;
+  assert (activation_level = 9) ;
   (* Bootstrap5 does not have enough voting power to progress independently. We
      manually inject consensus operations to control the progression of
      consensus. *)

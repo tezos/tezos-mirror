@@ -256,9 +256,6 @@ val get_attestation_lag : t -> level:int32 -> int32 tzresult
     at [~level] using protocol parameters using [ctxt]. *)
 val get_attestation_lags : t -> level:int32 -> int32 list tzresult
 
-(** Assert that [attestation_lags] parameter is a singleton list. *)
-val assert_single_lag : t -> unit tzresult
-
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point

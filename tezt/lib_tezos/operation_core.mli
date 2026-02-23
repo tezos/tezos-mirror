@@ -827,3 +827,9 @@ val dal_entrapment_wrong_commitment : rex
     [src/proto_<proto>/lib_protocol/validate_errors.ml]
 *)
 val dal_entrapment_of_not_published_commitment : Protocol.t -> rex
+
+(** Matches the message [The given lag index <lag_index> is out of range of
+    representable lag indices [0, <max_bound>]], from
+    [src/proto_<proto>/lib_protocol/validate_errors.ml]
+*)
+val dal_entrapment_invalid_lag_index : lag_index:int -> max_bound:int -> rex

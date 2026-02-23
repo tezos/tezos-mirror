@@ -680,7 +680,6 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       []
   in
   let* () =
-    let*? () = Node_context.assert_single_lag ctxt in
     (check_attesters_attested
        cctxt
        ctxt

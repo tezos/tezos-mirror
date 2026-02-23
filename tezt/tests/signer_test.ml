@@ -290,7 +290,7 @@ let signer_highwatermark_test =
          (["consensus_threshold_size"], `Int 200);
          (["minimal_block_delay"], `String "2");
          (["delay_increment_per_round"], `String "0");
-         (["blocks_per_cycle"], `Int 2);
+         (["blocks_per_cycle"], `Int 4);
          (["nonce_revelation_threshold"], `Int 1);
        ]
       |> Protocol.parameters_with_custom_consensus_rights_delay
@@ -357,7 +357,7 @@ let signer_highwatermark_test =
       ]
   in
   Log.info "Bake until BLS consensus keys are activated" ;
-  let* _ = Client.bake_for_and_wait ~keys ~count:8 client in
+  let* _ = Client.bake_for_and_wait ~keys ~count:10 client in
 
   Log.info "Preattest with all the keys to update the highwatermarks" ;
   let* _ = Client.preattest_for ~key:keys client in

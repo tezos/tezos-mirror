@@ -512,24 +512,27 @@ let only_if_dal_feature_enabled state ~default_value f =
       state.global_state.dal_node_rpc_ctxt
   else return default_value
 
-let process_dal_rpc_result state ~number_of_lags = function
-  | None -> Dal.Attestations.empty
+(** [process_and_accumulate_dal_rpc_result state acc slots] processes
+    attestable [slots] and adds them to the accumulator [acc]. *)
+let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc =
+  function
+  | None -> acc
   | Some slots ->
       let number_of_slots =
         state.global_state.constants.parametric.dal.number_of_slots
       in
       List.fold_left_i
-        (fun i acc flag ->
+        (fun i acc' flag ->
           match Dal.Slot_index.of_int_opt ~number_of_slots i with
           | Some index when flag ->
               Dal.Attestations.commit
-                acc
+                acc'
                 ~number_of_slots
                 ~number_of_lags
-                ~lag_index:(number_of_lags - 1)
+                ~lag_index
                 index
-          | None | Some _ -> acc)
-        Dal.Attestations.empty
+          | None | Some _ -> acc')
+        acc
         slots
 
 let may_get_dal_content state consensus_vote =
@@ -547,48 +550,58 @@ let may_get_dal_content state consensus_vote =
     state
     ~default_value:None
     (fun _dal_node_rpc_ctxt ->
-      let published_level =
-        Int32.(
-          sub
-            (succ level)
-            (of_int state.global_state.constants.parametric.dal.attestation_lag))
-      in
-      let number_of_lags =
-        List.length state.global_state.constants.parametric.dal.attestation_lags
-      in
-      let* dal_attestations =
+      let* () =
+        (* Only emit this message for the maximum attestation lag. *)
         if
           Dal_attestable_slots_worker.is_not_in_committee
             dal_attestable_slots_worker
             ~delegate_id
             ~committee_level:level
-        then
-          let* () = Events.(emit not_in_dal_committee (delegate_id, level)) in
-          return Dal.Attestations.empty
-        else
-          let* dal_attestable_slots =
-            (Dal_attestable_slots_worker.get_dal_attestable_slots
-               dal_attestable_slots_worker
-               ~delegate_id
-               ~published_level
-             [@profiler.record_s
-               {verbosity = Debug}
-                 (Format.asprintf
-                    "get_dal_attestable_slots - delegate_id : %a"
-                    Delegate_id.pp
-                    delegate_id)])
-          in
-          let dal_attestation =
-            process_dal_rpc_result state ~number_of_lags dal_attestable_slots
-          in
-          return dal_attestation
+        then Events.(emit not_in_dal_committee (delegate_id, level))
+        else return_unit
+      in
+      let attestation_lags =
+        state.global_state.constants.parametric.dal.attestation_lags
+      in
+      let published_levels =
+        List.map
+          (fun attestation_lag ->
+            Int32.(sub (succ level) (of_int attestation_lag)))
+          attestation_lags
+      in
+      let number_of_lags = List.length attestation_lags in
+      let* dal_attestations =
+        List.fold_left_i_s
+          (fun lag_index acc published_level ->
+            let+ dal_attestable_slots =
+              (Dal_attestable_slots_worker.get_dal_attestable_slots
+                 dal_attestable_slots_worker
+                 ~delegate_id
+                 ~published_level
+               [@profiler.record_s
+                 {verbosity = Debug}
+                   (Format.asprintf
+                      "get_dal_attestable_slots - delegate_id : %a, lag_index \
+                       : %d"
+                      Delegate_id.pp
+                      delegate_id
+                      lag_index)])
+            in
+            process_and_accumulate_dal_rpc_result
+              state
+              acc
+              ~number_of_lags
+              ~lag_index
+              dal_attestable_slots)
+          Dal.Attestations.empty
+          published_levels
       in
       let dal_content = {attestations = dal_attestations} in
       let* () =
         Events.(
           emit
             attach_dal_attestation
-            (delegate_id, dal_content, published_level, level, round))
+            (delegate_id, dal_content, published_levels, level, round))
       in
       return_some dal_content)
 

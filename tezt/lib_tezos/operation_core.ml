@@ -1260,3 +1260,11 @@ let dal_entrapment_of_not_published_commitment protocol =
   else
     rex
       {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+
+let dal_entrapment_invalid_lag_index ~lag_index ~max_bound =
+  rex
+    (sf
+       "The given lag index %d is out of range of representable lag indices \
+        \\[0, %d\\]"
+       lag_index
+       max_bound)
