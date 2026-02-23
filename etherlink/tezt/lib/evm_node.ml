@@ -51,6 +51,7 @@ type l2_setup = {
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
+  michelson_runtime_chain_id : string option;
 }
 
 let eth_default_bootstrap_accounts =
@@ -72,6 +73,7 @@ let default_l2_setup ~l2_chain_id =
     minimum_base_fee_per_gas = None;
     da_fee_per_byte = None;
     maximum_gas_per_transaction = None;
+    michelson_runtime_chain_id = None;
   }
 
 type mode =
