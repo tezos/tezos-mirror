@@ -30,6 +30,16 @@ open Block_validator_errors
 
 module Profiler = (val Profiler.wrap Shell_profiling.block_validator_profiler)
 
+(* [Lwt.Canceled] can appear in error traces in two forms:
+   - [Exn Lwt.Canceled] when caught on the node side
+   - [Exn (Failure "Lwt.Resolution_loop.Canceled")] when caught on the
+     external validator side and round-tripped through Data_encoding
+     (the exception identity is lost during serialization) *)
+let is_canceled_error = function
+  | Canceled | Exn Lwt.Canceled -> true
+  | Exn (Failure msg) -> String.equal msg (Printexc.to_string Lwt.Canceled)
+  | _ -> false
+
 type validation_result =
   | Already_committed
   | Already_known_invalid of error trace
@@ -454,11 +464,7 @@ let on_validation_request w
                   in
                   match r with
                   | Application_error errs ->
-                      if
-                        List.exists
-                          (function
-                            | Exn Lwt.Canceled | Canceled -> false | _ -> true)
-                          errs
+                      if List.exists (fun e -> not (is_canceled_error e)) errs
                       then
                         (* If an error occurs at application that is not a
                            cancellation of the request, the block_hash is
@@ -659,7 +665,7 @@ let on_completion : type a b.
       match Request.view request with
       | Validation v -> (
           match errs with
-          | [Canceled] ->
+          | errs when List.for_all is_canceled_error errs ->
               (* Ignore requests cancellation *)
               Events.(emit validation_canceled) (v.block, st)
           | errs ->
@@ -676,7 +682,7 @@ let on_completion : type a b.
       match Request.view request with
       | Validation v -> (
           match errs with
-          | [Canceled] ->
+          | errs when List.for_all is_canceled_error errs ->
               (* Ignore requests cancellation *)
               Events.(emit validation_canceled) (v.block, st)
           | errs ->
@@ -690,7 +696,7 @@ let on_completion : type a b.
       match Request.view request with
       | Validation v -> (
           match errs with
-          | [Canceled] ->
+          | errs when List.for_all is_canceled_error errs ->
               (* Ignore requests cancellation *)
               Events.(emit validation_canceled) (v.block, st)
           | errs ->
