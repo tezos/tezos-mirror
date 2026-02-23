@@ -61,6 +61,8 @@ let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
 
 let chain_id = EVM.make "/chain_id"
 
+let michelson_runtime_chain_id = "/tezlink/chain_id"
+
 let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
 
 let backlog = World_state.make "/fees/backlog"

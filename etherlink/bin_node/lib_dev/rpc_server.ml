@@ -224,11 +224,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
             @@ Evm_directory.empty config.experimental_features.rpc_server
         | Ok runtimes ->
             let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
-            let* l2_chain_id =
-              match l2_chain_id with
-              | Some l2_chain_id -> return l2_chain_id
-              | None -> Backend.chain_id ()
-            in
+            let* l2_chain_id = Backend.michelson_runtime_chain_id () in
             let* () =
               (* we use Resto for some runtimes, so we can _only_ use resto. *)
               if config.experimental_features.rpc_server = Dream then
