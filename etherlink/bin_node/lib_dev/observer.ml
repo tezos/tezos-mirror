@@ -232,7 +232,11 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
 
   let* () =
     when_ sandbox @@ fun () ->
-    let*! {next_blueprint_number; storage_version; _} =
+    let*! {
+            next_blueprint_number = Qty next_blueprint_number;
+            storage_version;
+            _;
+          } =
       Evm_context.head_info ()
     in
     let* pk =
@@ -241,7 +245,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~keep_alive:config.keep_alive
         (module Rpc_encodings.Sequencer)
         ~evm_node_endpoint
-        (Block_parameter (Number next_blueprint_number))
+        (Block_parameter (Number (Qty (Z.pred next_blueprint_number))))
     in
     Evm_context.patch_state
       ~key:(Durable_storage_path.sequencer_key ~storage_version)
