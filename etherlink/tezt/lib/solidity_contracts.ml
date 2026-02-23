@@ -449,6 +449,12 @@ let eip7702_fallback =
     ~label:"eip7702fallbackcontract"
     ~contract:"EIP7702FallbackContract"
 
+let gateway_catch_revert =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gateway_catch_revert.sol")
+    ~label:"gateway_catch_revert"
+    ~contract:"GatewayCatchRevert"
+
 let nested_delegatecalls_A =
   compile_contract
     ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
