@@ -176,18 +176,22 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         return info.public_key
     | None -> failwith "Account not found"
 
-  let counter _chain block contract =
+  let counter _chain block (contract : Tezos_types.Contract.t) =
     let open Lwt_result_syntax in
     on_head_block block @@ fun state ->
-    on_implicit_account contract @@ fun pkh ->
-    let* read_result =
-      Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
-    in
-    match read_result with
-    | Some bytes ->
-        let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-        return_some (Z.of_int64 info.nonce)
-    | None -> return_none
+    match contract with
+    | Originated _ -> return_none
+    | Implicit pkh -> (
+        let* read_result =
+          Backend.read
+            state
+            (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+        in
+        match read_result with
+        | Some bytes ->
+            let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+            return_some (Z.of_int64 info.nonce)
+        | None -> return_none)
 
   let big_map_get _chain _block _id _key_hash =
     failwith "Not Implemented Yet (%s)" __LOC__
