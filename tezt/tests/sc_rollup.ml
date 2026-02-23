@@ -42,7 +42,9 @@ open Sc_rollup_helpers
 
 *)
 
-let default_wasm_pvm_revision = function _ -> "2.0.0-r5"
+let default_wasm_pvm_revision = function
+  | Protocol.T024 | S023 -> "2.0.0-r5"
+  | Alpha -> "2.0.0-r6"
 
 let max_nb_ticks = 50_000_000_000_000
 

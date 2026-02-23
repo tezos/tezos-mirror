@@ -93,7 +93,7 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V5, V5, Proto_alpha);
+      (V5, V6, Proto_alpha);
       (V5, V5, T024);
       (V5, V5, S023);
       (V5, V5, R022);
