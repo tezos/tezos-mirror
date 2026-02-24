@@ -970,7 +970,7 @@ test_sdk_rust:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.install_opam_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
   stage: test
   tags:
   - gcp_very_high_cpu
