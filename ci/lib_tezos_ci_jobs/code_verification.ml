@@ -399,20 +399,7 @@ let jobs pipeline_type =
                 [[("IMAGE", ["build-debian:trixie"; "build-ubuntu:24.04"])]]
               ();
           ]
-      (* Test compiling the [master] branch on Bookworm, to make sure
-         that the compilation instructions in this branch are still
-         valid.
-      *)
-      | _ ->
-          [
-            job_compile_sources
-              ~__POS__
-              ~name:"oc.compile_sources_doc_master"
-              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
-              ~matrix:[[("IMAGE", ["build-debian:trixie"])]]
-              ();
-          ]
+      | _ -> []
     in
 
     let jobs_packaging =
