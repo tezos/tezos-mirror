@@ -140,7 +140,7 @@ let get_infos_per_level t ~level ~metadata =
     |> Hashtbl.of_seq
   in
   let consensus_operations = JSON.(operations |=> 0 |> as_list) in
-  let get_dal_attestations operation =
+  let get_dal_status operation =
     let contents = JSON.(operation |-> "contents" |=> 0) in
     let kind = JSON.(contents |-> "kind" |> as_string) in
     match kind with
@@ -199,11 +199,9 @@ let get_infos_per_level t ~level ~metadata =
   let () =
     consensus_operations
     |> List.iter (fun operation ->
-           let dal_attestations = get_dal_attestations operation in
-           List.iter
-             (fun (pkh, dal_status) ->
-               Hashtbl.replace baker_dal_statuses pkh dal_status)
-             dal_attestations)
+           get_dal_status operation
+           |> List.iter (fun (pkh, dal_status) ->
+                  Hashtbl.replace baker_dal_statuses pkh dal_status))
   in
   let* etherlink_operator_balance_sum =
     Etherlink_helpers.total_operator_balance
