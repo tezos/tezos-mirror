@@ -26,6 +26,12 @@
 
 (** This module is the main entry point to valide blocks and protocols. *)
 
+(** Returns [true] if the error represents a cancellation, handling
+    all forms: [Canceled], [Exn Lwt.Canceled], and
+    [Exn (Failure "Lwt.Resolution_loop.Canceled")] (the latter
+    resulting from Data_encoding round-trips through IPC). *)
+val is_canceled_error : error -> bool
+
 type t
 
 (** Type of a validated block *)

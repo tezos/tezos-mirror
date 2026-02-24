@@ -361,9 +361,9 @@ let headers_fetch_worker_loop pipeline =
       in
       Lwt_pipe.Bounded.close pipeline.fetched_headers ;
       Lwt.return_unit
-  | Error (Exn Lwt.Canceled :: _)
-  | Error (Canceled :: _)
-  | Error (Exn Lwt_pipe.Closed :: _) ->
+  | Error (first :: _)
+    when Block_validator.is_canceled_error first || first = Exn Lwt_pipe.Closed
+    ->
       (* Explicit cancellation or pipe closed *)
       Lwt.return_unit
   | Error
@@ -458,9 +458,9 @@ let rec operations_fetch_worker_loop pipeline =
   in
   match r with
   | Ok () -> operations_fetch_worker_loop pipeline
-  | Error (Exn Lwt.Canceled :: _)
-  | Error (Canceled :: _)
-  | Error (Exn Lwt_pipe.Closed :: _) ->
+  | Error (first :: _)
+    when Block_validator.is_canceled_error first || first = Exn Lwt_pipe.Closed
+    ->
       (* Explicit cancellation or pipe closed *)
       Lwt_pipe.Bounded.close pipeline.fetched_blocks ;
       Lwt.return_unit
@@ -533,7 +533,9 @@ let rec validation_worker_loop pipeline =
   in
   match r with
   | Ok () -> validation_worker_loop pipeline
-  | Error ((Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed) :: _) ->
+  | Error (first :: _)
+    when Block_validator.is_canceled_error first || first = Exn Lwt_pipe.Closed
+    ->
       (* Explicit cancellation or pipe closed *)
       Lwt.return_unit
   | Error
