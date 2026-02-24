@@ -247,11 +247,90 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
             return_some (Z.of_int64 info.nonce)
         | None -> return_none)
 
-  let big_map_get _chain _block _id _key_hash =
-    failwith "Not Implemented Yet (%s)" __LOC__
+  let big_map_get chain block id key_hash =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
+    let raw_hash =
+      Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
+    in
+    let (`Hex key_hex) = Hex.of_bytes raw_hash in
+    let path =
+      "/evm/world_state/big_map/"
+      ^ Z.to_string
+          (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+      ^ "/" ^ key_hex
+    in
+    let decode =
+      Data_encoding.Binary.of_bytes_opt
+        Tezlink_imports.Imported_context.Script.expr_encoding
+    in
+    let+ result =
+      Durable_storage.inspect_durable_and_decode_opt
+        (Backend.read state)
+        path
+        decode
+    in
+    Option.join result
 
-  let big_map_raw_info _chain _block _id =
-    failwith "Not Implemented Yet (%s)" __LOC__
+  let big_map_key_type state id =
+    let open Lwt_result_syntax in
+    let path =
+      "/evm/world_state/big_map/"
+      ^ Z.to_string
+          (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+      ^ "/key_type"
+    in
+    let decode =
+      Data_encoding.Binary.of_bytes_opt
+        Tezlink_imports.Imported_context.Script.expr_encoding
+    in
+    let+ result =
+      Durable_storage.inspect_durable_and_decode_opt
+        (Backend.read state)
+        path
+        decode
+    in
+    Option.join result
+
+  let big_map_value_type state id =
+    let open Lwt_result_syntax in
+    let path =
+      "/evm/world_state/big_map/"
+      ^ Z.to_string
+          (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
+      ^ "/value_type"
+    in
+    let decode =
+      Data_encoding.Binary.of_bytes_opt
+        Tezlink_imports.Imported_context.Script.expr_encoding
+    in
+    let+ result =
+      Durable_storage.inspect_durable_and_decode_opt
+        (Backend.read state)
+        path
+        decode
+    in
+    Option.join result
+
+  let big_map_raw_info chain block id =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
+    let* key_type = big_map_key_type state id in
+    let* value_type = big_map_value_type state id in
+    match (key_type, value_type) with
+    | Some kt, Some vt ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8229
+           - total_bytes:
+             Not yet implemented, requires kernel-side tracking
+             (L1 stores this at /big_maps/index/<id>/total_bytes)
+           - contents: intentionally empty, consistent with L1 raw context
+             behavior (L1 never returns big_map contents in this RPC) *)
+        return_some (kt, vt, Z.zero, [])
+    | _ -> return_none
 
   let block _chain block =
     let open Lwt_result_syntax in
