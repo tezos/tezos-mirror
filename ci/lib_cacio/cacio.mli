@@ -421,7 +421,7 @@ module type COMPONENT_API = sig
   (** Register jobs to be included in the test release pipeline of the current component.
 
       This pipeline is for testing the release of this component separately.
-      It runs in [tezos/tezos].
+      It runs in namespaces other than [tezos].
 
       This function must be called only once per component.
 
