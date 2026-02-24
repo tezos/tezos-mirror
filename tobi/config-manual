@@ -22,7 +22,7 @@ __pervasive: rust-toolchain
 octez-rust-deps: src/rustzcash_deps, src/riscv, src/kernel_sdk, sdk/rust
 
 # Information present in the "copy_files" stanza of "src/lib_riscv/api/dune".
-octez-riscv-api: src/riscv/lib
+octez-riscv-api: src/riscv/api
 
 # Headers declared as (deps) in the (ctypes) stanza of src/lib_wasmer/dune.
 # The manifest does not include (ctypes (deps)) in tobi/config yet.
@@ -30,5 +30,9 @@ octez-l2-libs: src/rust_deps/wasmer-3.3.0/lib/c-api/wasmer.h
 octez-l2-libs: src/rust_deps/wasmer-3.3.0/lib/c-api/wasm.h
 # wasm.h is actually a symbolic link to the following file:
 octez-l2-libs: src/rust_deps/wasmer-3.3.0/lib/c-api/tests/wasm-c-api/include
+
+# The dune file in src/rust_libcrux/src references ../Cargo.toml, ../Cargo.lock
+# and ../.cargo which are in the parent directory.
+octez-libcrux-ml-dsa: src/rust_libcrux
 
 ### END OF tobi/config-manual
