@@ -5656,7 +5656,7 @@ mod tests {
             100,     // storage_limit
             src.clone(),
             50_u64.into(), // amount to transfer
-            Contract::Originated(gateway_kt1),
+            Contract::Originated(gateway_kt1.clone()),
             Parameters {
                 entrypoint: Entrypoint::default(),
                 value: params_micheline.encode(),
@@ -5706,6 +5706,17 @@ mod tests {
             bridge_calls[0].3, // amount is the 4th field in the tuple
             primitive_types::U256::from(50),
             "Bridge should have been called with transfer amount of 50"
+        );
+
+        // Verify that the gateway balance is 0 (funds were forwarded, not locked)
+        let context = context::TezlinkContext::init_context();
+        let gateway_account = context
+            .originated_from_kt1(&gateway_kt1)
+            .expect("Gateway account should exist");
+        assert_eq!(
+            gateway_account.balance(&host).unwrap(),
+            0_u64.into(),
+            "Gateway balance should be 0 after successful bridge call"
         );
     }
 }
