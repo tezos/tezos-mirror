@@ -86,6 +86,7 @@ module Internal_for_tests : sig
       baking_state : global_state;
       push_event : Baking_state.forge_event option -> unit;
       event_stream : Baking_state.forge_event Lwt_stream.t;
+      forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
     }
   end
 
@@ -102,4 +103,15 @@ module Internal_for_tests : sig
 
   (** Check if a queue exists for a given delegate. *)
   val has_queue : Types.state -> Baking_state_types.Delegate.t -> bool
+
+  (** Start a forge worker with optional test hook.
+      The [forge_consensus_vote_hook] function will be called inside the consensus vote forging task
+      before forge_and_sign_consensus_vote is executed. This allows tests to inject custom behavior
+      such as delays, logging, or error simulation.
+      
+      In production code, use the main [start] function which has no hook (None). *)
+  val start :
+    ?forge_consensus_vote_hook:(unit -> unit Lwt.t) ->
+    global_state ->
+    (worker, tztrace) result Lwt.t
 end
