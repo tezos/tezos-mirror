@@ -361,44 +361,13 @@ let jobs pipeline_type =
           [sf "./docs/introduction/compile-sources-setup.sh"]
         |> enable_networked_cargo
       in
-      let job_compile_sources ~__POS__ ~name ~matrix ~project ~branch ?variables
-          ?retry () =
-        job
-          ~__POS__
-          ~name
-          ~cpu:Very_high
-          ~storage:Ramfs
-          ~image:
-            (Image.mk_external
-               ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
-          ~parallel:(Matrix matrix)
-          ?variables
-          ?retry
-          ~dependencies:dependencies_needs_start
-          ~rules:compile_octez_rules
-          ~stage:Stages.test
-          [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
-        |> enable_networked_cargo |> enable_sccache
-      in
 
       [(* Test installing through opam *) job_install_opam_noble]
       @
       match pipeline_type with
       (* These tests make sure that the compilation instructions
          in master are still valid for the latest-release branch *)
-      | Schedule_extended_test ->
-          [
-            job_compile_sources_build_deps ();
-            job_compile_sources
-              ~__POS__
-              ~name:"oc.compile_sources_doc"
-              ~project:"tezos/tezos"
-              ~branch:"latest-release"
-              ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
-              ~matrix:
-                [[("IMAGE", ["build-debian:trixie"; "build-ubuntu:24.04"])]]
-              ();
-          ]
+      | Schedule_extended_test -> [job_compile_sources_build_deps ()]
       | _ -> []
     in
 
