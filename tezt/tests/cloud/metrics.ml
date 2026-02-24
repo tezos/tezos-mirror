@@ -267,14 +267,12 @@ let push ~versions ~cloud
     (fun (PKH public_key_hash)
          {attested_slots; attestable_slots; in_committee; attestation_with_dal}
        ->
+      let labels = get_labels public_key_hash in
       if in_committee then (
-        let labels = get_labels public_key_hash in
         push_attested ~labels attested_slots ;
         push_attestable ~labels attestable_slots ;
         push_dal_attestation_sent ~labels attestation_with_dal)
-      else
-        let labels = get_labels public_key_hash in
-        push_metric_out_attestation_sent ~labels ())
+      else push_metric_out_attestation_sent ~labels ())
     ratio_attested_commitments_per_baker ;
   Hashtbl.iter
     (fun slot_index value ->
