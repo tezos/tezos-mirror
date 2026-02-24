@@ -13,74 +13,54 @@
 
 module CI = Cacio.Shared
 
-let job_compile_sources_doc_trixie =
+let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
   CI.job
-    "oc.compile_sources_doc_trixie"
+    ("oc.compile_sources_doc" ^ name_suffix)
     ~__POS__
     ~description:
-      "Compile Octez from source (branch latest-release) according to the \
-       instructions in the documentation, to check that those instructions \
-       still work."
+      (sf
+         "Compile Octez from source (branch %s) according to the instructions \
+          in the documentation, to check that those instructions still work \
+          (on image %s)."
+         branch
+         image_name)
     ~stage:Test
     ~cpu:Very_high
     ~storage:Ramfs
     ~only_if_changed:["docs/introduction/compile-sources.sh"]
     ~image:
       (Tezos_ci.Image.mk_external
-         ~image_path:
-           (Tezos_ci.Images.Base_images.path_prefix ^ "/build-debian:trixie"))
+         ~image_path:(Tezos_ci.Images.Base_images.path_prefix ^ "/" ^ image_name))
     ~variables:[("DUNE_BUILD_JOBS", "-j 12"); ("CARGO_NET_OFFLINE", "false")]
     ~sccache:(Cacio.sccache ())
-    ["./docs/introduction/compile-sources.sh tezos/tezos latest-release"]
+    [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
 
-let job_compile_sources_doc_noble =
-  CI.job
-    "oc.compile_sources_doc_noble"
-    ~__POS__
-    ~description:
-      "Compile Octez from source (branch latest-release) according to the \
-       instructions in the documentation, to check that those instructions \
-       still work."
-    ~stage:Test
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ~only_if_changed:["docs/introduction/compile-sources.sh"]
-    ~image:
-      (Tezos_ci.Image.mk_external
-         ~image_path:
-           (Tezos_ci.Images.Base_images.path_prefix ^ "/build-ubuntu:24.04"))
-    ~variables:[("DUNE_BUILD_JOBS", "-j 12"); ("CARGO_NET_OFFLINE", "false")]
-    ~sccache:(Cacio.sccache ())
-    ["./docs/introduction/compile-sources.sh tezos/tezos latest-release"]
+let job_compile_sources_doc_latest_trixie =
+  compile_sources_doc_job
+    ~name_suffix:"_trixie"
+    ~project:"tezos/tezos"
+    ~branch:"latest-release"
+    ~image_name:"build-debian:trixie"
 
-let job_compile_sources_doc_master =
-  CI.job
-    "oc.compile_sources_doc_master"
-    ~__POS__
-    ~description:
-      "Compile Octez from source (branch master) according to the instructions \
-       in the documentation, to check that those instructions still work."
-    ~stage:Test
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ~only_if_changed:["docs/introduction/compile-sources.sh"]
-    ~image:
-      (Tezos_ci.Image.mk_external
-         ~image_path:
-           (Tezos_ci.Images.Base_images.path_prefix ^ "/build-debian:trixie"))
-    ~variables:[("CARGO_NET_OFFLINE", "false")]
-    ~sccache:(Cacio.sccache ())
-    [
-      "./docs/introduction/compile-sources.sh \
-       ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} \
-       ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
-    ]
+let job_compile_sources_doc_latest_noble =
+  compile_sources_doc_job
+    ~name_suffix:"_noble"
+    ~project:"tezos/tezos"
+    ~branch:"latest-release"
+    ~image_name:"build-ubuntu:24.04"
+
+let job_compile_sources_doc =
+  compile_sources_doc_job
+    ~name_suffix:""
+    ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+    ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
+    ~image_name:"build-debian:trixie"
 
 let register () =
-  CI.register_merge_request_jobs [(Auto, job_compile_sources_doc_master)] ;
+  CI.register_merge_request_jobs [(Auto, job_compile_sources_doc)] ;
   CI.register_schedule_extended_test_jobs
     [
-      (Auto, job_compile_sources_doc_trixie);
-      (Auto, job_compile_sources_doc_noble);
+      (Auto, job_compile_sources_doc_latest_trixie);
+      (Auto, job_compile_sources_doc_latest_noble);
     ] ;
   ()
