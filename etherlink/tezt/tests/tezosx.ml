@@ -2036,6 +2036,8 @@ let test_tx_queue_mixed_transaction_types ~runtime () =
     (eth_receiver_balance = eth_amount)
       Wei.typ
       ~error_msg:"Expected %R mutez but got %L") ;
+  unit
+
 (** Test cross-runtime call from a Michelson contract to EVM via the gateway.
 
     Unlike [test_cross_runtime_call_from_michelson_to_evm] which calls the
@@ -2135,6 +2137,103 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
       ~error_msg:"Expected storage slot 0 = %R but got %L") ;
   unit
 
+(** Test cross-runtime call from a Michelson contract to a reverting EVM
+    contract via the gateway.
+
+    Same setup as [test_cross_runtime_call_from_michelson_contract_to_evm]
+    but the EVM contract always reverts. We verify the Michelson transaction
+    is fully rolled back: the source loses only the fee (1 000 mutez) and
+    the gateway balance is unchanged. *)
+let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime call from Michelson contract to reverting EVM"
+    ~tags:["cross_runtime"; "call"; "revert"; "internal"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  (* Step 1: Deploy an EVM contract that always reverts.
+     Runtime: 60006000fd = PUSH1 0, PUSH1 0, REVERT *)
+  let init_code = "600580600b6000396000f360006000fd" in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address =
+    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+  in
+  (* Step 2: Originate gateway_caller.tz with storage pointing to the
+     reverting contract. The method signature and arg are arbitrary since
+     the contract reverts unconditionally. *)
+  let source = Constant.bootstrap5 in
+  let abi_encoded_arg =
+    "0000000000000000000000000000000000000000000000000000000000000000"
+  in
+  let init_storage_data =
+    sf
+      {|Pair "%s" (Pair "%s" (Pair "foo()" 0x%s))|}
+      gateway_address
+      contract_address
+      abi_encoded_arg
+  in
+  let* _contract_hex, caller_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "gateway_caller"]
+      ~init_storage_data
+      protocol
+  in
+  (* Read balances before the call. *)
+  let* tez_client = tezos_client sequencer in
+  let* source_balance_before =
+    Client.get_balance_for ~account:source.public_key_hash tez_client
+  in
+  let* gateway_balance_before =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  (* Step 3: Call the Michelson contract with Unit and some amount. *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~dest:caller_kt1
+      ~arg_data:"Unit"
+      ~amount:1_000_000
+      ()
+  in
+  (* Step 4a: Source loses only the fee (1 000 mutez), amount is refunded. *)
+  let* source_balance_after =
+    Client.get_balance_for ~account:source.public_key_hash tez_client
+  in
+  let consumed =
+    Tez.to_mutez source_balance_before - Tez.to_mutez source_balance_after
+  in
+  Check.(
+    (consumed = 1000)
+      int
+      ~error_msg:
+        "Expected source to consume %R mutez (fee only) but consumed %L") ;
+  (* Step 4b: Gateway balance unchanged. *)
+  let* gateway_balance_after =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance_after = Tez.to_mutez gateway_balance_before)
+      int
+      ~error_msg:
+        "Expected gateway balance unchanged (%R) but got %L after revert") ;
+  unit
+
 (** Test cross-runtime transfer from a Michelson contract to an EVM EOA
     via the gateway's default entrypoint.
 
@@ -2210,6 +2309,7 @@ let () =
   test_cross_runtime_call_from_michelson_to_evm [Alpha] ;
   test_michelson_gateway_evm_revert [Alpha] ;
   test_cross_runtime_call_from_michelson_contract_to_evm [Alpha] ;
+  test_cross_runtime_call_from_michelson_contract_to_evm_revert [Alpha] ;
   test_cross_runtime_transfer_from_michelson_contract_to_evm [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
