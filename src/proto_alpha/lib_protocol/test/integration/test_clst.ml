@@ -1047,3 +1047,50 @@ let () =
   match b with
   | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
   | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
+
+let () =
+  register_test ~title:"Test import_ticket via export_ticket entrypoint"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst) = Context.init2 ~consensus_threshold_size:0 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let clst_import_ticket_entrypoint =
+    Contract.to_b58check (Contract.Originated clst_hash) ^ "%import_ticket"
+  in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_op = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_op b in
+
+  let ticket_amount = 30_000_000L in
+  let* op =
+    Op.clst_export_ticket
+      ~destination_contract:(Some clst_import_ticket_entrypoint)
+      (B b)
+      ~src
+      ~dst
+      ticket_amount
+  in
+  let* b = Block.bake ~operation:op b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg ticket_amount)
+      b
+      src
+  in
+  let* clst_balance =
+    Plugin.Contract_services.clst_balance Block.rpc_ctxt b dst
+  in
+  let clst_balance =
+    Option.value_f
+      ~default:(fun () -> assert false)
+      (Script_int.to_int64 clst_balance)
+  in
+  let* () = Assert.equal_int64 ~loc:__LOC__ clst_balance ticket_amount in
+
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  Assert.equal_int64 ~loc:__LOC__ (Z.to_int64 clst_ticket_balance) 0L

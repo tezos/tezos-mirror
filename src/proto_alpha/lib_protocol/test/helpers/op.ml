@@ -1715,8 +1715,8 @@ let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     Tez.zero
 
 let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) ~(src : Contract.t) ~(dst : Contract.t) (amount : int64)
-    =
+    ?(destination_contract = None) (ctxt : Context.t) ~(src : Contract.t)
+    ~(dst : Contract.t) (amount : int64) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
@@ -1742,11 +1742,21 @@ let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
         ],
         [] )
   in
+  let destination_contract =
+    match destination_contract with
+    | None -> Prim (dummy_location, Script.D_None, [], [])
+    | Some contract ->
+        Prim
+          ( dummy_location,
+            Script.D_Some,
+            [String (dummy_location, contract)],
+            [] )
+  in
   let elm =
     Prim
       ( dummy_location,
         Script.D_Pair,
-        [Prim (dummy_location, D_None, [], []); Seq (dummy_location, [tx])],
+        [destination_contract; Seq (dummy_location, [tx])],
         [] )
   in
   let parameters =
