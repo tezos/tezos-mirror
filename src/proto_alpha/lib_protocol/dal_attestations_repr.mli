@@ -105,6 +105,21 @@ val is_attested :
   Dal_slot_index_repr.t ->
   bool
 
+(** The decoded representation of the slots attested for a given lag_index. *)
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+(** [decode t ~number_of_slots ~number_of_lags] decodes the attestation bitset
+    [t] into an explicit representation. Returns a list of
+    [unfolded_lag_attestation], one entry per non-empty lag, in increasing lag
+    order. [slot_indices] contains the attested slot indices for that lag, in
+    increasing order. Empty lags are omitted from the result.
+    Fails with [Dal_invalid_attestation_bitset] if [t] is malformed. *)
+val decode :
+  t ->
+  number_of_slots:int ->
+  number_of_lags:int ->
+  unfolded_lag_attestation list tzresult
+
 (** [commit t ~number_of_slots ~number_of_lags ~lag_index slot_index] commits into
     the attestation at [lag_index] that the slot [slot_index] is available.
     [lag_index] must satisfy [0 <= lag_index < number_of_lags], and [slot_index]

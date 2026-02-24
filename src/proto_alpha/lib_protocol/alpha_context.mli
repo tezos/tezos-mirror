@@ -3006,6 +3006,14 @@ module Dal : sig
       Slot_index.t ->
       bool
 
+    type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+    val decode :
+      t ->
+      number_of_slots:int ->
+      number_of_lags:int ->
+      unfolded_lag_attestation list tzresult
+
     val occupied_size_in_bits : t -> int
 
     val expected_max_size_in_bits :

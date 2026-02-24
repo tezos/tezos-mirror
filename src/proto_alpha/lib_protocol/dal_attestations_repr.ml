@@ -85,6 +85,9 @@ let () =
    [slots_per_chunk] bits to state which slots are attested. *)
 let slots_per_chunk = 7
 
+(* In a chunk there are [slots_per_chunk] data bits, starting at index 1. *)
+let slots_per_chunk_list = Misc.(1 --> slots_per_chunk)
+
 let bits_per_chunk = slots_per_chunk + 1
 
 let max_chunks ~number_of_slots =
@@ -228,6 +231,52 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
     | Some data_bit_pos -> return (bitset_mem t data_bit_pos)
   in
   match read_attested with Ok is_attested -> is_attested | Error _ -> false
+
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+let decode t ~number_of_slots ~number_of_lags =
+  let open Result_syntax in
+  let max_chunks = max_chunks ~number_of_slots in
+  let rec decode_chunks ~offset ~chunk_index ~slots_rev =
+    let* () =
+      error_unless
+        Compare.Int.(chunk_index < max_chunks)
+        (Dal_invalid_attestation_bitset t)
+    in
+    let is_last = bitset_mem t offset in
+    let slots_rev =
+      List.fold_left
+        (fun acc bit ->
+          let slot_idx = (chunk_index * slots_per_chunk) + (bit - 1) in
+          if
+            Compare.Int.(slot_idx < number_of_slots)
+            && bitset_mem t (offset + bit)
+          then slot_idx :: acc
+          else acc)
+        slots_rev
+        slots_per_chunk_list
+    in
+    let next_offset = offset + bits_per_chunk in
+    if is_last then return (slots_rev, next_offset)
+    else
+      decode_chunks
+        ~offset:next_offset
+        ~chunk_index:(chunk_index + 1)
+        ~slots_rev
+  in
+  let rec decode_lags lag_index offset acc_rev =
+    if Compare.Int.(lag_index >= number_of_lags) then return (List.rev acc_rev)
+    else if bitset_mem t lag_index then
+      let* slots_rev, next_offset =
+        decode_chunks ~offset ~chunk_index:0 ~slots_rev:[]
+      in
+      decode_lags
+        (lag_index + 1)
+        next_offset
+        ({lag_index; slot_indices = List.rev slots_rev} :: acc_rev)
+    else decode_lags (lag_index + 1) offset acc_rev
+  in
+  decode_lags 0 number_of_lags []
 
 (* Set a slot bit at a given lag in the encoded bitset.
    [bitset] is the full attestations bitset.
