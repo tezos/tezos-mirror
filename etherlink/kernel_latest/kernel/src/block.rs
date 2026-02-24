@@ -522,7 +522,8 @@ mod tests {
     use crate::chains::{
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
         TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
-        TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+        ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
+        TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -581,6 +582,7 @@ mod tests {
     use tezos_tezlink::operation::RevealContent;
     use tezos_tezlink::operation::Script;
     use tezos_tezlink::operation::TransferContent;
+    use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     #[derive(Clone)]
     struct Bootstrap {
@@ -1809,8 +1811,8 @@ mod tests {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),
-                context: context::TezlinkContext::from_root(
-                    &TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                context: TezosRuntimeContext::from_root(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 )
                 .unwrap(),
             },

@@ -15,7 +15,7 @@ use crate::{
     block_storage,
     chains::{
         ChainConfigTrait, EvmChainConfig, TezlinkBlockConstants, TezosXBlockConstants,
-        ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
+        ETHERLINK_SAFE_STORAGE_ROOT_PATH,
     },
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
@@ -39,11 +39,12 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_execution::context::{Context, TezlinkContext};
+use tezos_execution::context::Context;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
+use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
@@ -158,7 +159,7 @@ fn block_constants<Host: Runtime>(
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
-        context: TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?,
+        context: TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?,
     };
     Ok(TezosXBlockConstants {
         evm_runtime_block_constants: BlockConstants {
