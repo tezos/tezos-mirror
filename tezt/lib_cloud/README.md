@@ -88,6 +88,7 @@ variable but avoid values which are prefixes of each other. For instance use
 `<username>-test`, and `<username>-prod`; otherwise destroying the machines
 (with the `CLOUD terraform destroy` command) of the `<username>` namespace
 would also destroy the machines of the `<username>-test` and `<username>-prod` namespaces.
+
 # Docker
 
 The library relies mainly on docker. Each VM that will be deployed
