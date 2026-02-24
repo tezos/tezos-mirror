@@ -9,6 +9,18 @@ open Tezos_types
 
 let root = Durable_storage_path.tezlink_root
 
+type implicit_account_data_model =
+  | Rlp
+      (** One entry per account, the value is RLP-encoded and contains
+          three fields: balance, nonce (aka. counter), and optional
+          pkh.
+
+          This data model is used to reduce the number of IOs in the
+          kernel at the cost of Tezos compatibility. *)
+  | Path
+      (** One directory per account, the balance, counter, and manager
+          are stored at distinct subpaths. *)
+
 module Path = struct
   (** [to_path encoding value] uses [encoding] to encode [value] in
       hexadecimal *)
@@ -55,29 +67,95 @@ end
 
 let contract_of_path = Contract.of_hex
 
-let balance read c =
-  Durable_storage.inspect_durable_and_decode_default
-    ~default:Tezos_types.Tez.zero
-    read
-    (Path.balance c)
-    (Data_encoding.Binary.of_bytes_exn Tez.encoding)
-
-let balance_z read c =
+let balance read ~data_model (c : Contract.t) =
   let open Lwt_result_syntax in
-  let* b = balance read c in
+  match data_model with
+  | Rlp -> (
+      match c with
+      | Originated _ -> (
+          let path =
+            Durable_storage_path.etherlink_root ^ "/contracts/index/"
+            ^ Path.to_path Tezos_types.Contract.encoding c
+            ^ "balance"
+          in
+          let* bytes_opt = read path in
+          match bytes_opt with
+          | Some bytes -> (
+              match
+                Data_encoding.Binary.of_bytes Tezos_types.Tez.encoding bytes
+              with
+              | Ok balance -> return balance
+              | Error e ->
+                  failwith
+                    "Cannot decode KT1 balance: %a"
+                    Data_encoding.Binary.pp_read_error
+                    e)
+          | None -> return Tez.zero)
+      | Implicit pkh -> (
+          let* bytes_opt =
+            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+          in
+          match bytes_opt with
+          | None -> return Tez.zero
+          | Some bytes ->
+              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+              return info.balance))
+  | Path ->
+      Durable_storage.inspect_durable_and_decode_default
+        ~default:Tezos_types.Tez.zero
+        read
+        (Path.balance c)
+        (Data_encoding.Binary.of_bytes_exn Tez.encoding)
+
+let balance_z read ~data_model c =
+  let open Lwt_result_syntax in
+  let* b = balance read ~data_model c in
   return @@ Tezos_types.Tez.to_mutez_z b
 
-let manager read c =
-  Durable_storage.inspect_durable_and_decode_opt
-    read
-    (Path.manager c)
-    (Data_encoding.Binary.of_bytes_exn Manager.encoding)
+let manager read ~data_model (c : Contract.t) =
+  let open Lwt_result_syntax in
+  match data_model with
+  | Rlp -> (
+      match c with
+      | Originated _ -> return_none
+      | Implicit pkh -> (
+          let* bytes_opt =
+            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+          in
+          match bytes_opt with
+          | None -> return_none
+          | Some bytes -> (
+              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+              match info.public_key with
+              | None -> return_none
+              | Some public_key -> return_some (Manager.Public_key public_key)))
+      )
+  | Path ->
+      Durable_storage.inspect_durable_and_decode_opt
+        read
+        (Path.manager c)
+        (Data_encoding.Binary.of_bytes_exn Manager.encoding)
 
-let counter read c =
-  Durable_storage.inspect_durable_and_decode_opt
-    read
-    (Path.counter c)
-    (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
+let counter read ~data_model (c : Contract.t) =
+  let open Lwt_result_syntax in
+  match data_model with
+  | Rlp -> (
+      match c with
+      | Originated _ -> return_none
+      | Implicit pkh -> (
+          let* bytes_opt =
+            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+          in
+          match bytes_opt with
+          | None -> return_none
+          | Some bytes ->
+              let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+              return_some (Z.of_int64 info.nonce)))
+  | Path ->
+      Durable_storage.inspect_durable_and_decode_opt
+        read
+        (Path.counter c)
+        (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
 
 let big_map_get read id key_hash =
   let open Lwt_result_syntax in

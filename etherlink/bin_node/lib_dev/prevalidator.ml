@@ -701,7 +701,8 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid (type state) _ctxt session raw_transaction :
+  let is_tezlink_tx_valid (type state) ~data_model _ctxt session raw_transaction
+      :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
@@ -714,7 +715,10 @@ module Handlers = struct
     in
     let read = Backend_rpc.Reader.read session.state in
     let** op =
-      Tezlink_prevalidation.parse_and_validate_for_queue ~read raw_transaction
+      Tezlink_prevalidation.parse_and_validate_for_queue
+        ~read
+        ~data_model
+        raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
 
@@ -728,7 +732,12 @@ module Handlers = struct
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
     | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
-        is_tezlink_tx_valid ctxt session raw_transaction
+        let data_model =
+          match ctxt.chain_family with
+          | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
+          | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
+        in
+        is_tezlink_tx_valid ctxt session raw_transaction ~data_model
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =

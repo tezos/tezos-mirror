@@ -130,12 +130,15 @@ let () =
 (** Search for the manager info (public key, counter), and checks that it is
     valid: the public key must be already revealed, or be the reveal must be
     the first operation of the batch. *)
-let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
+let validate_manager_info ~read ~data_model ~error_clue
+    (Contents op : packed_contents) =
   let open Lwt_result_syntax in
   match op with
   | Manager_operation {source; operation; counter; _} -> (
       let contract = Tezos_types.Contract.of_implicit source in
-      let* manager = Tezlink_durable_storage.manager read contract in
+      let* manager =
+        Tezlink_durable_storage.manager ~data_model read contract
+      in
       match (manager, operation) with
       | Some (Public_key _), Reveal _ ->
           tzfail_p
@@ -398,10 +401,10 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
-let validate_first_counter ~read ~source ~first_counter =
+let validate_first_counter ~read ~data_model ~source ~first_counter =
   let open Lwt_result_syntax in
   let* counter =
-    Tezlink_durable_storage.counter read
+    Tezlink_durable_storage.counter read ~data_model
     @@ Tezos_types.Contract.of_implicit source
   in
   let counter = Option.value ~default:Z.zero counter in
@@ -481,7 +484,8 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
+let parse_and_validate_for_queue ?(check_signature = true) ~read ~data_model raw
+    =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
@@ -500,14 +504,14 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
   in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
-    validate_manager_info ~read ~error_clue first
+    validate_manager_info ~read ~data_model ~error_clue first
   in
   let signature_check_cost = signature_cost pk op in
   let* balance_left =
-    Tezlink_durable_storage.balance read
+    Tezlink_durable_storage.balance read ~data_model
     @@ Tezos_types.Contract.of_implicit source
   in
-  let** () = validate_first_counter ~read ~source ~first_counter in
+  let** () = validate_first_counter ~read ~data_model ~source ~first_counter in
   let initial_context =
     {
       source;
@@ -546,9 +550,9 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
   in
   return (Ok operation)
 
-let init_blueprint_validation read () =
-  let get_counter = Tezlink_durable_storage.counter read in
-  let get_balance = Tezlink_durable_storage.balance_z read in
+let init_blueprint_validation read ~data_model () =
+  let get_counter = Tezlink_durable_storage.counter read ~data_model in
+  let get_balance = Tezlink_durable_storage.balance_z read ~data_model in
   let michelson_config = {get_balance; get_counter} in
   empty_validation_state
     ~michelson_config

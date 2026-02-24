@@ -12,6 +12,8 @@ module type Backend = sig
     Ethereum_types.quantity tzresult Lwt.t
 end
 
+let data_model = Tezlink_durable_storage.Path
+
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
   include Simulator.MakeTezlink (Backend)
@@ -101,7 +103,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let balance chain block c =
     let `Main = chain in
-    Tezlink_durable_storage.balance (read ~block) c
+    Tezlink_durable_storage.balance (read ~block) ~data_model c
 
   let list_contracts chain block =
     let open Lwt_result_syntax in
@@ -178,7 +180,9 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     (* TODO: #7831 !17664
        Support non-default chain and block parameters. *)
     let `Main = chain in
-    let* manager_opt = Tezlink_durable_storage.manager (read ~block) c in
+    let* manager_opt =
+      Tezlink_durable_storage.manager (read ~block) ~data_model c
+    in
     match manager_opt with
     | Some (Public_key k) -> return_some k
     | _ -> return_none
@@ -187,7 +191,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     (* TODO: #7831 !17664
        Support non-default chain and block parameters. *)
     let `Main = chain in
-    Tezlink_durable_storage.counter (read ~block) c
+    Tezlink_durable_storage.counter (read ~block) ~data_model c
 
   let big_map_get chain block id key_hash =
     let `Main = chain in
@@ -278,5 +282,5 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let open Lwt_result_syntax in
     let read = read ~block in
     let* block = shell_block_param_to_eth_block_param block in
-    simulate_operation ~read ~chain_id ~skip_signature op hash block
+    simulate_operation ~read ~data_model ~chain_id ~skip_signature op hash block
 end
