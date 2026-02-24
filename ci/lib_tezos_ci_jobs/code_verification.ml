@@ -242,9 +242,9 @@ let jobs pipeline_type =
       ~cpu:Very_high
       ~storage:Ramfs
         (* Even though not many tests depend on static executables, some
-           of those that do are limiting factors in the total duration
-           of pipelines. So we start this job as early as possible,
-           without waiting for sanity_ci. *)
+         of those that do are limiting factors in the total duration
+         of pipelines. So we start this job as early as possible,
+         without waiting for sanity_ci. *)
       ~dependencies:dependencies_needs_start
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
@@ -307,39 +307,10 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    (* The set of installation test jobs *)
-    let jobs_install_octez : tezos_job list =
-      let job_install_opam_noble : tezos_job =
-        job
-          ~__POS__
-          ~name:"oc.install_opam_noble"
-          ~cpu:Very_high
-          ~image:
-            (Image.mk_external
-               ~image_path:
-                 (* this is not a base image, but the dependency image
-                    from the packages pipelines *)
-                 (Images.Base_images.path_prefix ^ "/build-ubuntu:24.04"))
-          ~rules:(make_rules ~manual:Yes ())
-          ~allow_failure:Yes
-          ~stage:Stages.test
-            (* As this job is long, we override the default timeout to
-               2 hours. *)
-          ~timeout:(Hours 2)
-          ~before_script:["apt update"; "apt install -y sudo"]
-          ["./docs/introduction/install-opam.sh"]
-        |> enable_networked_cargo
-      in
-      [(* Test installing through opam *) job_install_opam_noble]
-    in
-
-    let jobs_packaging =
-      match pipeline_type with
-      | Before_merging | Merge_train ->
-          [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
-      | Schedule_extended_test -> []
-    in
-    jobs_packaging @ jobs_install_octez
+    match pipeline_type with
+    | Before_merging | Merge_train ->
+        [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
+    | Schedule_extended_test -> []
   in
 
   (* Manual jobs *)
@@ -392,13 +363,13 @@ let jobs pipeline_type =
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
-           stage) in [Before_merging] pipelines should be [Dependent]
-           by default, and in particular [Dependent []] if they have
-           no need for artifacts from other jobs. Making these
-           dependent on [job_start] is redundant since they are
-           already manual, and what's more, puts the pipeline in a
-           confusing "pending state" with a yellow "pause" icon on the
-           [manual] stage. *)
+             stage) in [Before_merging] pipelines should be [Dependent]
+             by default, and in particular [Dependent []] if they have
+             no need for artifacts from other jobs. Making these
+             dependent on [job_start] is redundant since they are
+             already manual, and what's more, puts the pipeline in a
+             confusing "pending state" with a yellow "pause" icon on the
+             [manual] stage. *)
         let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
           job_docker_build
             ~__POS__
@@ -461,11 +432,11 @@ let jobs pipeline_type =
   (* base image build jobs. *)
   match pipeline_type with
   (* In [before_merging] parent pipeline, base image jobs should start only
-     if [trigger] is started and if the changesets are touched. *)
+       if [trigger] is started and if the changesets are touched. *)
   | Before_merging -> Base_images.jobs ~start_job:job_start ~changeset:true ()
   (* In [merge_train] pipeline, base image jobs should start as early as
-     as possible, but only if the changesets are touched. *)
+       as possible, but only if the changesets are touched. *)
   | Merge_train -> Base_images.jobs ~changeset:true ()
   (* Not added in [schedule_extended_test]
-     as they run nightly in [base_images.daily]. *)
+       as they run nightly in [base_images.daily]. *)
   | Schedule_extended_test -> []

@@ -13,6 +13,26 @@
 
 module CI = Cacio.Shared
 
+let job_install_opam_noble =
+  CI.job
+    "oc.install_opam_noble"
+    ~__POS__
+    ~description:"Check that Octez can be installed via opam."
+    ~stage:Test
+    ~cpu:Very_high
+    ~image:
+      (Tezos_ci.Image.mk_external
+         ~image_path:
+           (* this is not a base image, but the dependency image
+              from the packages pipelines *)
+           (Tezos_ci.Images.Base_images.path_prefix ^ "/build-ubuntu:24.04"))
+    ~allow_failure:Yes
+      (* As this job is long, we override the default timeout to 2 hours. *)
+    ~timeout:(Hours 2)
+    ~variables:[("CARGO_NET_OFFLINE", "false")]
+    ~force:true
+    ["apt update"; "apt install -y sudo"; "./docs/introduction/install-opam.sh"]
+
 let compile_sources_doc_deps_job ~name_suffix ~image_name =
   CI.job
     ("oc.compile_sources_doc_deps" ^ name_suffix)
@@ -85,9 +105,11 @@ let job_compile_sources_doc =
     ~image_name:"build-debian:trixie"
 
 let register () =
-  CI.register_merge_request_jobs [(Auto, job_compile_sources_doc)] ;
+  CI.register_merge_request_jobs
+    [(Manual, job_install_opam_noble); (Auto, job_compile_sources_doc)] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_install_opam_noble);
       (Auto, job_compile_sources_doc_deps_trixie);
       (Auto, job_compile_sources_doc_deps_noble);
       (Auto, job_compile_sources_doc_latest_trixie);
