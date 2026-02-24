@@ -109,12 +109,16 @@ val arg :
     double dashes. The [?short] argument is the optional one letter
     shortcut. If the argument is not provided, [None] is
     returned. Multiple occurrence of the argument is allowed in the
-    command. *)
+    command. [?env] is the optional environment variable name that can
+    be used to override the default values, and [env_separator] can be
+    used to specify the character used to variable into a list. *)
 val multiple_arg :
   doc:string ->
   ?short:char ->
   long:string ->
   placeholder:string ->
+  ?env:string ->
+  ?env_separator:char ->
   ('a, 'ctx) parameter ->
   ('a list option, 'ctx) arg
 
