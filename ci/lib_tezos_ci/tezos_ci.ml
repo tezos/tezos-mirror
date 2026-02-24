@@ -1408,11 +1408,6 @@ module Images_external = struct
      external image below and the internal image [e2etest]. *)
   let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v4.1.0"
 
-  let ci_release =
-    Image.mk_external
-      ~image_path:
-        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
-
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
@@ -1624,6 +1619,13 @@ module Images = struct
 
     let rust_toolchain_trixie =
       make_img "debian-rust:trixie" rust_toolchain_version
+
+    let _ci_release_version = common_version
+
+    let ci_release =
+      Image.mk_external
+        ~image_path:
+          "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
 
     let pp = Image.pp
   end

@@ -376,7 +376,7 @@ let job_gitlab_release =
   CI.job
     ~__POS__
     "gitlab:octez-evm-node-release"
-    ~image:Images.ci_release
+    ~image:Images.Base_images.ci_release
     ~stage:Publish
     ~needs:
       [

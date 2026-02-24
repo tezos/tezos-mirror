@@ -159,7 +159,7 @@ let job_gitlab_release =
   CI.job
     "gitlab:octez-smart-rollup-node-release"
     ~__POS__
-    ~image:Images.ci_release
+    ~image:Images.Base_images.ci_release
     ~stage:Publish
     ~needs:
       [

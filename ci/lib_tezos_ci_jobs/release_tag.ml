@@ -202,7 +202,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
       ~__POS__
-      ~image:Images.ci_release
+      ~image:Images.Base_images.ci_release
       ~stage:Stages.publish
       ~interruptible:false
       ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
@@ -224,7 +224,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     in
     job
       ~__POS__
-      ~image:Images.ci_release
+      ~image:Images.Base_images.ci_release
       ~stage:Stages.publish
       ~interruptible:false
       ~dependencies:(Dependent dependencies)
