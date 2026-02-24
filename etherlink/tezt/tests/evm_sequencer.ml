@@ -1949,7 +1949,7 @@ let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
 let test_fa_withdrawal_is_included =
   register_all
     ~__FILE__
-    ~da_fee:Wei.one
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
     ~tags:
       [
         "evm";
@@ -2096,7 +2096,7 @@ let test_fa_withdrawal_is_included =
 let test_fa_reentrant_deposit_reverts =
   register_all
     ~__FILE__
-    ~da_fee:Wei.one
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
     ~tags:
       [
         "evm";
@@ -3083,7 +3083,7 @@ let test_sequencer_is_reimbursed =
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   register_all
     ~__FILE__
-    ~da_fee:Wei.one
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
     ~time_between_blocks:(Time_between_blocks tbb)
     ~sequencer_pool_address
     ~tags:["evm"; "sequencer"; "transaction"; "reimbursed"]

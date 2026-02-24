@@ -155,9 +155,12 @@ fn block_constants<Host: Runtime>(
     let base_fee_per_gas = base_fee_per_gas(host, timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
+    let da_fee_per_byte_mutez = tezos_ethereum::wei::mutez_from_wei(da_fee_per_byte)
+        .map_err(|_| Error::InvalidConversion)?;
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
         context: TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?,
+        da_fee_per_byte_mutez,
     };
     Ok(TezosXBlockConstants {
         evm_runtime_block_constants: BlockConstants {

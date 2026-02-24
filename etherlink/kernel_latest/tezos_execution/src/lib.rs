@@ -1014,6 +1014,7 @@ fn execute_smart_contract<'a, Host: Runtime>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
     registry: &impl Registry,
@@ -1022,6 +1023,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
+    da_fee_per_byte_in_mutez: Option<u64>,
 ) -> Result<Vec<OperationWithMetadata>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
@@ -1037,6 +1039,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
         context,
         operation,
         skip_signature_check,
+        da_fee_per_byte_in_mutez,
     ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
@@ -1842,6 +1845,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         );
 
         let expected_error =
@@ -1876,6 +1880,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         );
 
         let expected_error =
@@ -1910,6 +1915,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         );
 
         let expected_error =
@@ -1958,6 +1964,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2024,6 +2031,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2085,6 +2093,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -2128,6 +2137,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2204,6 +2214,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2284,6 +2295,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2377,6 +2389,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2495,6 +2508,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0);
@@ -2630,6 +2644,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2746,6 +2761,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2828,6 +2844,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2895,6 +2912,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2979,6 +2997,7 @@ mod tests {
             batch.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .unwrap();
 
@@ -3162,6 +3181,7 @@ mod tests {
             batch,
             &block_ctx!(),
             false,
+            None,
         );
 
         let expected_error =
@@ -3257,6 +3277,7 @@ mod tests {
             batch,
             &block_ctx!(),
             false,
+            None,
         )
         .unwrap();
 
@@ -3372,6 +3393,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3594,6 +3616,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3758,6 +3781,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3822,6 +3846,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3890,6 +3915,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3969,6 +3995,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4166,6 +4193,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4393,6 +4421,7 @@ mod tests {
             batch.clone(),
             &block_ctx!(),
             false,
+            None,
         )
         .unwrap();
 
@@ -4670,6 +4699,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4746,6 +4776,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4788,6 +4819,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4831,6 +4863,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4882,6 +4915,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4976,6 +5010,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5079,6 +5114,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5377,6 +5413,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5623,6 +5660,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5688,6 +5726,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -5733,6 +5772,194 @@ mod tests {
             gateway_account.balance(&host).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after successful bridge call"
+        );
+    }
+
+    // DA fee enforcement: delayed inbox operations (da_fee_check = None) skip the
+    // DA fee check entirely, so zero-fee operations are accepted.
+    #[test]
+    fn da_fee_delayed_inbox_zero_fees_accepted() {
+        let mut host = MockKernelHost::default();
+        let source = bootstrap1();
+        let dest = bootstrap2();
+        let _src_account = init_account(&mut host, &source.pkh, 1_000_000);
+        let _dst_account = init_account(&mut host, &dest.pkh, 0);
+        reveal_account(&mut host, &source);
+
+        // Transfer with fee = 0 mutez.
+        let operation = make_transfer_operation(
+            0,     // fee
+            1,     // counter
+            21000, // gas_limit
+            0,     // storage_limit
+            source,
+            10_u64.into(), // amount
+            Contract::Implicit(dest.pkh),
+            Parameters::default(),
+        );
+
+        // None = delayed inbox: DA fee check is skipped.
+        let result = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Delayed inbox operation with zero fees should succeed"
+        );
+    }
+
+    // DA fee enforcement: batch with reveal + transfer whose combined fee covers DA cost.
+    #[test]
+    fn da_fee_batch_sufficient_fees_accepted() {
+        let mut host = MockKernelHost::default();
+        let source = bootstrap1();
+        let dest = bootstrap2();
+        let src_account = init_account(&mut host, &source.pkh, 1_000_000);
+        let dst_account = init_account(&mut host, &dest.pkh, 0);
+
+        let reveal_content = OperationContent::Reveal(RevealContent {
+            pk: source.pk.clone(),
+            proof: None,
+        });
+
+        let transfer_content = OperationContent::Transfer(TransferContent {
+            amount: 10_u64.into(),
+            destination: Contract::Implicit(dest.pkh),
+            parameters: Parameters::default(),
+        });
+
+        // Single batch fee of 10_000 mutez shared across both operations.
+        let batch = make_operation(
+            10_000, // fee
+            1,      // counter
+            22000,  // gas_limit
+            0,      // storage_limit
+            source,
+            vec![reveal_content, transfer_content],
+        );
+
+        // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let result = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            batch,
+            &block_ctx!(),
+            false,
+            Some(4),
+        );
+
+        assert!(result.is_ok(), "Batch with sufficient fees should succeed");
+
+        // Initial: 1_000_000, fee: 10_000 per op × 2 ops = 20_000, transfer: 10
+        assert_eq!(
+            src_account.balance(&host).unwrap(),
+            979_990_u64.into(),
+            "Source balance should be 1_000_000 - 20_000 (fees) - 10 (amount)"
+        );
+        assert_eq!(
+            dst_account.balance(&host).unwrap(),
+            10_u64.into(),
+            "Destination should have received 10 mutez"
+        );
+    }
+
+    // DA fee enforcement: operation with sufficient fees is accepted.
+    #[test]
+    fn da_fee_sufficient_fees_accepted() {
+        let mut host = MockKernelHost::default();
+        let source = bootstrap1();
+        let dest = bootstrap2();
+        let src_account = init_account(&mut host, &source.pkh, 1_000_000);
+        let dst_account = init_account(&mut host, &dest.pkh, 0);
+        reveal_account(&mut host, &source);
+
+        // Transfer with fee = 10_000 mutez, well above DA cost for any reasonable op size.
+        let operation = make_transfer_operation(
+            10_000, // fee
+            1,      // counter
+            21000,  // gas_limit
+            0,      // storage_limit
+            source,
+            10_u64.into(), // amount
+            Contract::Implicit(dest.pkh),
+            Parameters::default(),
+        );
+
+        // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let result = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            Some(4),
+        );
+
+        assert!(
+            result.is_ok(),
+            "Operation with sufficient fees should succeed"
+        );
+
+        // Initial: 1_000_000, fee: 10_000, transfer: 10
+        assert_eq!(
+            src_account.balance(&host).unwrap(),
+            989_990_u64.into(),
+            "Source balance should be 1_000_000 - 10_000 (fee) - 10 (amount)"
+        );
+        assert_eq!(
+            dst_account.balance(&host).unwrap(),
+            10_u64.into(),
+            "Destination should have received 10 mutez"
+        );
+    }
+
+    // DA fee enforcement: operation fees below DA cost are rejected.
+    #[test]
+    fn da_fee_insufficient_fees_rejected() {
+        let mut host = MockKernelHost::default();
+        let source = bootstrap1();
+        let _src_account = init_account(&mut host, &source.pkh, 1_000_000);
+        reveal_account(&mut host, &source);
+
+        // Transfer with fee = 1 mutez, well below DA cost.
+        let operation = make_transfer_operation(
+            1,     // fee
+            1,     // counter
+            21000, // gas_limit
+            0,     // storage_limit
+            source,
+            10_u64.into(), // amount
+            Contract::Implicit(bootstrap2().pkh),
+            Parameters::default(),
+        );
+
+        // DA fee = 4 mutez/byte: for any operation > 0 bytes, 1 mutez is insufficient.
+        let result = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            Some(4),
+        );
+
+        assert_eq!(
+            result,
+            Err(OperationError::Validation(ValidityError::InsufficientFee))
         );
     }
 }

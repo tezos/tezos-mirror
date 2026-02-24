@@ -434,7 +434,7 @@ let test_validate_pay_for_fees =
 
 let test_validate_pay_for_fees_max_fee_per_gas =
   register
-    ~da_fee_per_byte:(Wei.of_string "4_000_00_000")
+    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
     ~minimum_base_fee_per_gas:(Wei.of_string "2_000")
     ~title:"DA fees computation with max fee per gas"
     ~tags:["pay_for_fees"; "da_fees"]
