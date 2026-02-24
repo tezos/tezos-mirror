@@ -1044,7 +1044,7 @@ oc.compile_sources_doc_master:
   parallel:
     matrix:
     - IMAGE:
-      - build-debian-trixie:master
+      - build-debian:trixie
 
 trigger:homebrew:
   stage: manual

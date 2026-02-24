@@ -759,8 +759,8 @@ oc.compile_sources_doc:
   parallel:
     matrix:
     - IMAGE:
-      - build-debian-trixie:master
-      - build-ubuntu-noble:master
+      - build-debian:trixie
+      - build-ubuntu:24.04
 
 sdk_bindings.test:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}

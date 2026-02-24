@@ -396,14 +396,7 @@ let jobs pipeline_type =
               ~branch:"latest-release"
               ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
               ~matrix:
-                [
-                  [
-                    ( "IMAGE",
-                      [
-                        "build-debian-trixie:master"; "build-ubuntu-noble:master";
-                      ] );
-                  ];
-                ]
+                [[("IMAGE", ["build-debian:trixie"; "build-ubuntu:24.04"])]]
               ();
           ]
       (* Test compiling the [master] branch on Bookworm, to make sure
@@ -417,7 +410,7 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_master"
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
-              ~matrix:[[("IMAGE", ["build-debian-trixie:master"])]]
+              ~matrix:[[("IMAGE", ["build-debian:trixie"])]]
               ();
           ]
     in
