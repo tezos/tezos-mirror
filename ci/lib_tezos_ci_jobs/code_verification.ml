@@ -309,12 +309,6 @@ let jobs pipeline_type =
 
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
-      let compile_octez_rules =
-        make_rules
-          ~changes:(Changeset.make ["docs/introduction/compile-sources.sh"])
-          ~manual:Yes
-          ()
-      in
       let job_install_opam_noble : tezos_job =
         job
           ~__POS__
@@ -336,39 +330,7 @@ let jobs pipeline_type =
           ["./docs/introduction/install-opam.sh"]
         |> enable_networked_cargo
       in
-      let job_compile_sources_build_deps () =
-        job
-          ~__POS__
-          ~name:"oc.compile_sources_doc_deps"
-          ~cpu:Very_high
-          ~image:
-            (Image.mk_external
-               ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
-          ~parallel:
-            (Matrix
-               [
-                 [
-                   ( "IMAGE",
-                     [
-                       "debian:trixie-" ^ Images.Base_images.debian_version;
-                       "ubuntu:24.04-" ^ Images.Base_images.debian_version;
-                     ] );
-                 ];
-               ])
-          ~dependencies:dependencies_needs_start
-          ~rules:compile_octez_rules
-          ~stage:Stages.test
-          [sf "./docs/introduction/compile-sources-setup.sh"]
-        |> enable_networked_cargo
-      in
-
       [(* Test installing through opam *) job_install_opam_noble]
-      @
-      match pipeline_type with
-      (* These tests make sure that the compilation instructions
-         in master are still valid for the latest-release branch *)
-      | Schedule_extended_test -> [job_compile_sources_build_deps ()]
-      | _ -> []
     in
 
     let jobs_packaging =

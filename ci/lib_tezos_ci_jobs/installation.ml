@@ -13,6 +13,34 @@
 
 module CI = Cacio.Shared
 
+let compile_sources_doc_deps_job ~name_suffix ~image_name =
+  CI.job
+    ("oc.compile_sources_doc_deps" ^ name_suffix)
+    ~__POS__
+    ~description:
+      (sf
+         "Check that the instructions to install dependencies, from the \
+          documentation, still work (on image %s)."
+         image_name)
+    ~stage:Test
+    ~cpu:Very_high
+    ~image:
+      (Tezos_ci.Image.mk_external
+         ~image_path:(Tezos_ci.Images.Base_images.path_prefix ^ "/" ^ image_name))
+    ~variables:[("CARGO_NET_OFFLINE", "false")]
+    ~only_if_changed:["docs/introduction/compile-sources-setup.sh"]
+    [sf "./docs/introduction/compile-sources-setup.sh"]
+
+let job_compile_sources_doc_deps_trixie =
+  compile_sources_doc_deps_job
+    ~name_suffix:"_trixie"
+    ~image_name:("debian:trixie-" ^ Tezos_ci.Images.Base_images.debian_version)
+
+let job_compile_sources_doc_deps_noble =
+  compile_sources_doc_deps_job
+    ~name_suffix:"_noble"
+    ~image_name:("ubuntu:24.04-" ^ Tezos_ci.Images.Base_images.debian_version)
+
 let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
   CI.job
     ("oc.compile_sources_doc" ^ name_suffix)
@@ -60,6 +88,8 @@ let register () =
   CI.register_merge_request_jobs [(Auto, job_compile_sources_doc)] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_compile_sources_doc_deps_trixie);
+      (Auto, job_compile_sources_doc_deps_noble);
       (Auto, job_compile_sources_doc_latest_trixie);
       (Auto, job_compile_sources_doc_latest_noble);
     ] ;
