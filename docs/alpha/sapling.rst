@@ -174,8 +174,7 @@ To decorrelate the two transfers it is important to change the
 amounts, let some time pass between the two and perform the
 transactions when there is traffic in the set.
 Similar problems exist in Zcash and they are illustrated in this
-introductory `blog post
-<https://electriccoin.co/blog/transaction-linkability/>`_.
+`paper <https://arxiv.org/pdf/1712.01210>`_.
 
 There are a number of more sophisticated techniques to deanonymise
 users using timing of operations, network monitoring, side-channels on

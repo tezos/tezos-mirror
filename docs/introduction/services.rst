@@ -69,6 +69,7 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
 
 .. code:: shell
 
+   sudo systemctl enable octez-node
    sudo systemctl start octez-node
 
 If configured to do so during package installation, this will automatically download a snapshot

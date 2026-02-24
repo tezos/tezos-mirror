@@ -141,8 +141,8 @@ Then, to install the binaries, run the following command to install the octez-ba
 
   sudo apt install octez-baker
 
-Once the Octez binary packages are installed, they can be set up as services
-as explained in :doc:`./services`.
+Once the Octez binary packages are installed, you may want to :ref:`start a node <quickstart_node>`, and then perhaps :ref:`start a baker <quickstart_baker>`.
+Alternatively, they can be set up as services as explained in :doc:`./services`.
 
 To remove the Octez packages you can simply run the following command.
 
@@ -271,9 +271,14 @@ For ``RC`` versions, do rather::
 
     curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
 
-Install Octez using the downloaded formula with the following command::
+Install Octez using the downloaded formula, creating a new tap if necessary, with the following commands::
 
-    brew install -v ./octez.rb
+	# Create a local tap if not having one already:
+	brew tap-new octez-user/octeztap
+	# Move formula to the newly created tap:
+	mv octez.rb $(brew --repository)/Library/Taps/octez-user/homebrew-octeztap/Formula/
+	# Install formula from tap
+	brew install octez-user/octeztap/octez
 
 Depending on the speed of your system, the build can take more than 10
 minutes. We regularly test the build in our CI using macOS 14 (Sonoma) with Xcode 15 on an ARM-based Mac.
@@ -303,7 +308,7 @@ To make sure you use the most recent version of Octez, run::
 
     docker pull tezos/tezos-bare:latest
 
-For instance, to run a node on the ``currentnet`` :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
+For instance, to run a node on :ref:`currentnet <network_aliases>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
     mkdir $HOME/rolling-data-directory
     docker run -it --rm \
@@ -399,7 +404,7 @@ and in the shell do::
     octez-client gen keys mybaker
     octez-client show address mybaker
     # Note down the address of mybaker
-    # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
 
@@ -537,7 +542,7 @@ Install OPAM
 ~~~~~~~~~~~~
 
 First, you need to install the `OPAM <https://opam.ocaml.org/>`__
-package manager, at least version 2.1, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
+package manager, at least version 2.3, that you can get by following the `install instructions <https://opam.ocaml.org/doc/Install.html>`__.
 
 After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in

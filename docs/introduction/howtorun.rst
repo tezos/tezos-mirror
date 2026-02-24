@@ -238,6 +238,8 @@ Note that:
 - starting with version 22.0 it is recommended to run the Octez node with a DAL node (opting out requires the explicit option ``--without-dal``).
 - starting with version 23.0, and the activation of protocol S, when running a baker with the DAL activated, and a tz4 consensus key, it is required to have also a tz4 :ref:`companion key <companion_key>` registered for the delegate to produce DAL attestations. Otherwise the baker will only produce regular attestations, without any DAL information, and the baker will be seen as not participating in the DAL.
 
+.. _quickstart_baker:
+
 Quickstart baker
 ~~~~~~~~~~~~~~~~
 
