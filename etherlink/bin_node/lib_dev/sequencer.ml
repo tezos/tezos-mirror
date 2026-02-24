@@ -74,14 +74,14 @@ let validate_and_add_tezlink_operation raw_tx =
       let*! () = Events.replicate_operation_dropped hash reason in
       return_unit
 
-let validate_and_add_tx (type f) ~(chain_family : f L2_types.chain_family) :
-    string -> unit tzresult Lwt.t =
-  match chain_family with
-  | EVM -> validate_and_add_etherlink_tx
-  | Michelson -> validate_and_add_tezlink_operation
+let validate_and_add_tx (tx : Broadcast.common_transaction) :
+    unit tzresult Lwt.t =
+  match tx with
+  | Evm raw -> validate_and_add_etherlink_tx raw
+  | Michelson raw -> validate_and_add_tezlink_operation raw
 
-let loop_sequencer (type f) ~(chain_family : f L2_types.chain_family) multichain
-    ?sandbox_config ~rpc_timeout ~instant_confirmations time_between_blocks =
+let loop_sequencer multichain ?sandbox_config ~rpc_timeout
+    ~instant_confirmations time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
@@ -109,7 +109,7 @@ let loop_sequencer (type f) ~(chain_family : f L2_types.chain_family) multichain
               Blueprint_decoder.transactions blueprint.blueprint.payload
             in
             let txns = List.filter_map snd all_txns in
-            let* () = List.iter_es (validate_and_add_tx ~chain_family) txns in
+            let* () = List.iter_es validate_and_add_tx txns in
             let* _ =
               Block_producer.produce_block
                 ~force:(With_timestamp blueprint.blueprint.timestamp)
@@ -559,7 +559,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         ~evm_node_endpoint:block_producer_endpoint
         ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)) ;
   loop_sequencer
-    ~chain_family
     enable_multichain
     ~rpc_timeout:configuration.rpc_timeout
     ~instant_confirmations:

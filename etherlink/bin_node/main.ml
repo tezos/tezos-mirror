@@ -1738,7 +1738,8 @@ let make_dev_messages ~kind ~smart_rollup_address data =
               version = Option.value ~default:Sequencer_blueprint.Legacy version;
               parent_hash = Ethereum_types.block_hash_of_string parent_hash;
               delayed_transactions = [];
-              transactions;
+              transactions =
+                List.map (fun raw -> Broadcast.Evm raw) transactions;
               timestamp;
             }
         in

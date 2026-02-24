@@ -508,7 +508,7 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
     let* txns =
       List.map_es
         (function
-          | hash, Some txn -> return (hash, Broadcast.Common (Evm txn))
+          | hash, Some txn -> return (hash, Broadcast.Common txn)
           | hash, None -> (
               let* sql_res =
                 Evm_store.(
