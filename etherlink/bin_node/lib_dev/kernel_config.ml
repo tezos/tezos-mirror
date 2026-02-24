@@ -441,6 +441,18 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Osaka -> Z.of_int 3 ))
       evm_version
   in
+  (* We initialize the big map id counter to 4 because Liquidity Baking bootstrap contracts use 4 big maps. *)
+  let first_big_map_id = Z.of_int 4 in
+  let set_first_big_map_id =
+    if List.mem ~equal:( = ) Tezosx.Tezos with_runtimes then
+      make_instr
+        ~path_prefix:["evm"; "world_state"; "big_map"]
+        (Some
+           ( "next_id",
+             Data_encoding.Binary.to_string_exn Data_encoding.z first_big_map_id
+           ))
+    else []
+  in
   let with_runtimes =
     List.map
       (fun runtime ->
@@ -492,7 +504,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
-    @ set_account_code
+    @ set_first_big_map_id @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr
