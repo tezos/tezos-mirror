@@ -227,7 +227,7 @@ impl TezosImplicitAccount for TezlinkImplicitAccount {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TezlinkOriginatedAccount {
     pub path: OwnedPath,
     pub kt1: ContractKt1Hash,
@@ -248,7 +248,7 @@ pub enum Code {
     Enshrined(EnshrinedContracts),
 }
 
-pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
+pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
     fn code(&self, host: &impl Runtime) -> Result<Code, tezos_storage::error::Error> {

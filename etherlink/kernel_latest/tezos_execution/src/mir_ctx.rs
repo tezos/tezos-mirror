@@ -5,7 +5,8 @@
 use std::collections::BTreeMap;
 
 use crate::account_storage::{
-    Code, TezlinkAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    Code, TezlinkAccount, TezlinkOriginatedAccount, TezosImplicitAccount,
+    TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
@@ -65,6 +66,7 @@ pub struct ExecCtx {
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
+    pub contract_account: TezlinkOriginatedAccount,
 }
 
 pub struct Ctx<'a, 'operation, Host: Runtime, C: Context> {
@@ -108,11 +110,16 @@ impl ExecCtx {
                 TransferError::MirAmountToNarithError(err.to_string())
             },
         )?;
+        let contract_account = TezlinkOriginatedAccount {
+            path: dest_account.path().clone(),
+            kt1: dest_account.kt1().clone(),
+        };
         Ok(Self {
             sender,
             amount,
             self_address,
             balance,
+            contract_account,
         })
     }
 }
@@ -284,6 +291,20 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
 
 pub trait HasHost<Host: Runtime> {
     fn host(&mut self) -> &mut Host;
+}
+
+pub trait HasContractAccount {
+    type Account: TezosOriginatedAccount;
+    fn contract_account(&self) -> &Self::Account;
+}
+
+impl<'a, 'operation, Host: Runtime, C: Context> HasContractAccount
+    for Ctx<'a, 'operation, Host, C>
+{
+    type Account = TezlinkOriginatedAccount;
+    fn contract_account(&self) -> &Self::Account {
+        &self.exec_ctx.contract_account
+    }
 }
 
 impl<'a, 'operation, Host: Runtime, C: Context> HasHost<Host>
@@ -1041,6 +1062,7 @@ pub(crate) mod mock {
     use num_bigint::BigInt;
     use std::collections::HashMap;
     use tezos_crypto_rs::hash::HashTrait;
+    use tezos_smart_rollup_host::path::RefPath;
 
     /// Mock execution context for testing enshrined contracts.
     /// Implements CtxTrait and HasHost with configurable values.
@@ -1052,6 +1074,7 @@ pub(crate) mod mock {
         pub now: BigInt,
         pub operation_group_hash: OperationHash,
         pub gas: mir::gas::Gas,
+        pub contract_account: TezlinkOriginatedAccount,
     }
 
     impl<'a, Host: Runtime> MockCtx<'a, Host> {
@@ -1064,6 +1087,10 @@ pub(crate) mod mock {
                 now: 0.into(),
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 gas: mir::gas::Gas::default(),
+                contract_account: TezlinkOriginatedAccount {
+                    path: RefPath::assert_from(b"/mock").into(),
+                    kt1: ContractKt1Hash::from([0u8; 20]),
+                },
             }
         }
     }
@@ -1071,6 +1098,13 @@ pub(crate) mod mock {
     impl<'a, Host: Runtime> HasHost<Host> for MockCtx<'a, Host> {
         fn host(&mut self) -> &mut Host {
             self.host
+        }
+    }
+
+    impl<'a, Host: Runtime> HasContractAccount for MockCtx<'a, Host> {
+        type Account = TezlinkOriginatedAccount;
+        fn contract_account(&self) -> &Self::Account {
+            &self.contract_account
         }
     }
 
