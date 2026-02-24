@@ -144,13 +144,13 @@ opam:all_6:
   parallel:
     matrix:
     - package:
-      - tezt-tezos
       - tezt-migration-registry
       - tezos-protocol-genesis
       - tezos-protocol-demo-noops
       - tezos-openapi
       - tezos-dal-node-services
       - tezos-benchmark
+      - octez-tar-helpers
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
@@ -777,6 +777,7 @@ opam:all_7:
   parallel:
     matrix:
     - package:
+      - tezt-tezos
       - octez-rustzcash-deps
       - octez-rust-tezos-context
       - octez-rust-deps

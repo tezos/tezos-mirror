@@ -4366,6 +4366,21 @@ let octez_store_shared =
         "block_level";
       ]
 
+let octez_tar =
+  public_lib
+    "octez-tar-helpers"
+    ~synopsis:"Wrappers around tar library meant for snapshot exports"
+    ~path:"src/lib_tar"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        tar;
+        tar_unix;
+      ]
+
 let octez_store_unix =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_shell_lib
@@ -4393,8 +4408,7 @@ let octez_store_unix =
         aches;
         aches_lwt;
         camlzip;
-        tar;
-        tar_unix;
+        octez_tar |> open_;
         prometheus;
       ]
     ~modules:
