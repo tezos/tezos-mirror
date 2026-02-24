@@ -103,6 +103,16 @@ module Files = struct
       (* job script *)
       "scripts/ci/docker-merge-base-images.sh";
     ]
+
+  let alpine_docker_ci =
+    [
+      "images/base-images/Dockerfile.alpine-docker-ci";
+      "images/scripts/install-gcloud-apk.sh";
+      "scripts/ci/docker_initialize.sh";
+      "images/ci/datadog/package.json";
+      "images/ci/datadog/package-lock.json";
+    ]
+    @ build_script
 end
 
 module Distribution = struct
@@ -147,8 +157,9 @@ let jobs ?start_job ?(changeset = false) () =
 
      [name] is the name of the job.
 
-     [matrix] is a parallel/matrix gitlab construct. Here we use it with the RELEASE
-     variable to build multiple images for the same distribution, but different releases.
+     [matrix] is a parallel/matrix gitlab construct. Here we use it with the
+     RELEASE variable to build multiple images for the same distribution, but
+     different releases. This parameter is optional: Some images do no need this.
 
      [image_name] is the name of the final docker image.
 
@@ -166,7 +177,7 @@ let jobs ?start_job ?(changeset = false) () =
      If [compilation] is set to [Native] we build for both architectures using
      a native runner. In this case we also must add a merge manifest job.
      *)
-  let make_job_base_images ~__POS__ ~matrix ~image_name
+  let make_job_base_images ~__POS__ ?(matrix = []) ~image_name
       ?(base_name = Upstream image_name) ?(changes = Changeset.make [])
       ?(compilation = Emulated) ?dependencies dockerfile =
     let script =
@@ -342,6 +353,52 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
       "images/base-images/Dockerfile.debian-homebrew"
   in
+  (* this base image is different from the others as we initialize the
+     docker-ci image starting from scratch. It is the only job using
+     Images_external.docker . All other jobs will user
+     Images.Base_images.docker as default.
+     The changeset is also different to ensure this image is always up-to-date *)
+  let job_docker_ci_based_images =
+    (* use docker/docker image to bootstrap docker-ci base images. This is
+       the upstream image for this image *)
+    let docker_version = "28.5.1" in
+    let variables =
+      [
+        ("RELEASE", docker_version);
+        ("DISTRIBUTION", "alpine-docker-ci");
+        ("IMAGE_PATH", "");
+        ("GCLOUD_VERSION", "543.0.0");
+        ("HADOLINT_VERSION", "2.10.0");
+        ("DOCKER_VERSION", docker_version);
+        ("REGCTL_VERSION", "v0.4.3");
+        ("PLATFORM", "linux/amd64,linux/arm64");
+        ("CI_DOCKER_HUB", "false");
+      ]
+    in
+    job
+      ~rules:
+        [
+          job_rule
+            ~changes:Changeset.(encode (make Files.alpine_docker_ci))
+            ~when_:On_success
+            ();
+        ]
+      ~tag:Gcp_very_high_cpu
+      ~__POS__
+      ~image:Images_external.docker
+      ~variables
+      ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+      ~stage:Stages.build
+      ~name:"images.alpine-docker-ci"
+      [
+        (* minimal set of tools needed to bootstrap the docker-ci image *)
+        "images/scripts/install-gcloud-apk.sh";
+        "export PATH=$PATH:/google-cloud-sdk/bin";
+        "scripts/ci/docker_initialize.sh";
+        "scripts/ci/build-base-images.sh \
+         images/base-images/Dockerfile.alpine-docker-ci";
+      ]
+  in
   [
     job_debian_based_images;
     job_ubuntu_based_images;
@@ -350,6 +407,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_rust_based_images;
     job_rust_based_images_merge;
     job_debian_homebrew_base_images;
+    job_docker_ci_based_images;
   ]
 
 let child_pipeline =

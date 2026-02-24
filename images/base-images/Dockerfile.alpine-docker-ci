@@ -1,0 +1,62 @@
+ARG DOCKER_VERSION=null
+ARG HADOLINT_VERSION=null
+ARG GCLOUD_VERSION=null
+ARG REGCTL_VERSION=null
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:${GCLOUD_VERSION}-alpine AS gcloud
+FROM hadolint/hadolint:${HADOLINT_VERSION}-alpine AS hadolint
+FROM ghcr.io/regclient/regctl:${REGCTL_VERSION} AS regctl
+
+ARG DOCKER_VERSION=null
+FROM docker:${DOCKER_VERSION}
+
+SHELL ["/bin/sh", "-eu", "-c"]
+
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+# Upgrade base image and install tools
+# py3-crcmod is needed to run gcloud
+# hadolint ignore=DL3018,DL3019
+RUN apk update && \
+    apk add --no-cache \
+    bash \
+    ca-certificates \
+    curl \
+    git \
+    jq \
+    moreutils \
+    python3 \
+    libc6-compat \
+    openssh-client \
+    gnupg \
+    npm \
+    py3-crcmod \
+    docker-credential-ecr-login \
+ && rm -rf /var/cache/apk/*
+
+COPY --from=hadolint /bin/hadolint /usr/local/bin/hadolint
+COPY --from=regctl /regctl /usr/local/bin/regctl
+
+# Set NPM registry
+# NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
+ARG NPM_REGISTRY_DOMAIN
+ARG NPM_REGISTRY
+COPY images/ci/datadog/package.json \
+     images/ci/datadog/package-lock.json /usr/local/lib/datadog/
+# hadolint ignore=DL3003
+RUN --mount=type=secret,id=npm_token \
+    if [ -n "$NPM_REGISTRY" ] ; then \
+      npm set registry "$NPM_REGISTRY" && \
+      npm set //"${NPM_REGISTRY_DOMAIN}":_authToken="$(cat /run/secrets/npm_token)"; \
+    fi \
+    && cd /usr/local/lib/datadog && npm ci
+ENV PATH=/usr/local/lib/datadog/node_modules/.bin:$PATH
+
+ARG GCLOUD_VERSION
+
+# install gcloud to setup GOOGLE_APPLICATION_CREDENTIALS easily
+# hadolint ignore=DL3022
+COPY --from=gcloud /google-cloud-sdk/ /usr/local/gcloud/google-cloud-sdk/
+ENV PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
+
+# Initialize the Google Cloud SDK
+RUN gcloud components install --quiet core gsutil kubectl
