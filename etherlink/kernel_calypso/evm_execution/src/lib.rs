@@ -296,6 +296,21 @@ where
         None
     };
 
+    // Save the current call trace count so we can truncate on
+    // retriable OutOfTicks (sub-call traces are written eagerly
+    // during execution and must be discarded when the transaction
+    // will be retried).
+    let trace_length_before = match tracer {
+        Some(CallTracer(input)) => {
+            let hash = input.transaction_hash;
+            Some((
+                hash,
+                tracer::call_trace_length(handler.borrow_host(), &hash)?,
+            ))
+        }
+        _ => None,
+    };
+
     if (!pay_for_gas)
         || handler.pre_pay_transactions(caller, gas_limit, effective_gas_price)?
     {
@@ -347,36 +362,55 @@ where
                     }
                 }
 
-                if let Some(call_data) = call_data_for_tracing {
-                    if let Some(StructLogger(StructLoggerInput {
-                        transaction_hash,
-                        ..
-                    })) = tracer
-                    {
-                        trace_outcome(
-                            handler,
-                            result.is_success(),
-                            result.output(),
-                            result.gas_used,
-                            transaction_hash,
-                        )?
-                    } else if let Some(CallTracer(CallTracerInput {
-                        transaction_hash,
-                        config: CallTracerConfig { with_logs, .. },
-                    })) = tracer
-                    {
-                        call_trace_outcome(
-                            handler,
-                            base_call_type,
-                            call_data,
-                            caller,
-                            address,
-                            Some(value),
-                            gas_limit,
-                            with_logs,
-                            &result,
-                            transaction_hash,
+                // When the transaction is retriable after OutOfTicks,
+                // it will be re-executed from scratch. Discard all
+                // traces (including sub-call traces written during
+                // execution) so the retry starts with a clean slate.
+                let is_retriable_out_of_ticks =
+                    result.result == ExecutionResult::OutOfTicks && retriable;
+
+                if is_retriable_out_of_ticks {
+                    if let Some((hash, len_before)) = trace_length_before {
+                        tracer::set_call_trace_length(
+                            handler.borrow_host(),
+                            &hash,
+                            len_before,
                         )?;
+                    }
+                }
+
+                if !is_retriable_out_of_ticks {
+                    if let Some(call_data) = call_data_for_tracing {
+                        if let Some(StructLogger(StructLoggerInput {
+                            transaction_hash,
+                            ..
+                        })) = tracer
+                        {
+                            trace_outcome(
+                                handler,
+                                result.is_success(),
+                                result.output(),
+                                result.gas_used,
+                                transaction_hash,
+                            )?
+                        } else if let Some(CallTracer(CallTracerInput {
+                            transaction_hash,
+                            config: CallTracerConfig { with_logs, .. },
+                        })) = tracer
+                        {
+                            call_trace_outcome(
+                                handler,
+                                base_call_type,
+                                call_data,
+                                caller,
+                                address,
+                                Some(value),
+                                gas_limit,
+                                with_logs,
+                                &result,
+                                transaction_hash,
+                            )?;
+                        }
                     }
                 }
 
