@@ -17,12 +17,10 @@ depends: [
   "octez-shell-libs" { = version }
 ]
 depopts: [
-  "tezos-injector-023-PtSeouLo"
   "tezos-injector-024-PtTALLiN"
   "tezos-injector-alpha"
 ]
 conflicts: [
-  "tezos-injector-023-PtSeouLo" { != version }
   "tezos-injector-024-PtTALLiN" { != version }
   "tezos-injector-alpha" { != version }
 ]

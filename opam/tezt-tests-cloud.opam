@@ -19,7 +19,6 @@ depends: [
   "tezt-etherlink"
   "octez-protocol-alpha-libs"
   "octez-protocol-024-PtTALLiN-libs"
-  "octez-protocol-023-PtSeouLo-libs"
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

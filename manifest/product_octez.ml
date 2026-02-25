@@ -7432,8 +7432,11 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
              [dune_client_keys_version_rule; dune_signatures_version_rule]
            else [])
     in
+    (* Seoul (023) test_helpers is kept even when frozen because
+       Etherlink's tezlink uses it at runtime (tezlink_mock.ml).
+       Remove this exception when Etherlink migrates to TALLiN. *)
     let test_helpers =
-      only_if active @@ fun () ->
+      only_if (active || N.(number == 023)) @@ fun () ->
       octez_protocol_lib
         "test-helpers"
         ~path:(path // "lib_protocol/test/helpers")
@@ -8370,7 +8373,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
 
   let _022_PsRiotum = frozen (Name.v "PsRiotum" 022)
 
-  let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
+  let _023_PtSeouLo = frozen (Name.v "PtSeouLo" 023)
 
   let _024_PtTALLiN = active (Name.v "PtTALLiN" 024)
 
