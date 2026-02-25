@@ -2765,3 +2765,32 @@ let () =
   (* Allocation should be the same (idempotent) *)
   let* alloc_after_2 = clst_allocated_tez (B b) delegate_pkh in
   Assert.equal_tez ~loc:__LOC__ alloc_after alloc_after_2
+
+let () =
+  register_test ~title:"Test allocation when limit of direct staking is zero"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  (* limit_of_staking_over_baking = 0 means no direct external staking.
+     However, CLST allocation uses the global limit, so the delegate should
+     still receive an allocation. *)
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~limit_of_staking_over_baking:Q.zero
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* total_before = total_amount_of_tez (B b) in
+  let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
+  (* Bake past activation — rebalance runs using global limit *)
+  let* b = Block.bake_until_cycle_end b in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* CLST allocation is non-zero (global limit allows it) *)
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
+  let expected_power_after = Int64.add power_before (Tez.to_mutez alloc) in
+  Assert.is_true ~loc:__LOC__ Compare.Int64.(power_after = expected_power_after)
