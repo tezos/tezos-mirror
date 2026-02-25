@@ -4,6 +4,11 @@
 
 ### Breaking changes
 
+- Replace `--mainnet-compat` switch with `--kernel-compat <kernel_name>` in
+  `octez-evm-node make kernel installer config`. The new argument accepts a
+  named kernel version (e.g., `mainnet-beta`, `bifrost`, `latest`) to generate
+  a compatible installer configuration. (!20894)
+
 ### Configuration changes
 
 ### RPCs changes

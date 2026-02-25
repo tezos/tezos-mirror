@@ -704,7 +704,7 @@ val make_l2_kernel_installer_config :
 val make_kernel_installer_config :
   ?l2_chain_ids:int list ->
   ?max_delayed_inbox_blueprint_length:int ->
-  ?mainnet_compat:bool ->
+  ?kernel_compat:string ->
   ?remove_whitelist:bool ->
   ?kernel_root_hash:string ->
   ?chain_id:int ->

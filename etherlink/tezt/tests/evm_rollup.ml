@@ -365,7 +365,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let*! () =
       Evm_node.make_kernel_installer_config
         ?chain_id
-        ~mainnet_compat:false
         ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
         ~eth_bootstrap_accounts

@@ -12,7 +12,7 @@ type evm_version = Shanghai | Cancun | Prague | Osaka
     generates a configuration file located at [output], where
     [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make :
-  mainnet_compat:bool ->
+  ?kernel_compat:Constants.kernel ->
   eth_bootstrap_balance:Z.t ->
   ?l2_chain_ids:L2_types.chain_id list ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->

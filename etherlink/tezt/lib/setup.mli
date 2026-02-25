@@ -258,7 +258,7 @@ val setup_sequencer :
   ?next_wasm_runtime:bool ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->
-  mainnet_compat:bool ->
+  ?kernel_compat:string ->
   ?genesis_timestamp:Client.timestamp ->
   ?time_between_blocks:Evm_node.time_between_blocks ->
   ?max_blueprints_lag:int ->
