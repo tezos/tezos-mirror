@@ -55,7 +55,7 @@ oc.docker-systemd_tests_debian:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-3bb7eddc
   parallel:
     matrix:
     - RELEASE:
@@ -91,7 +91,7 @@ oc.docker-systemd_tests_ubuntu:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-3bb7eddc
   parallel:
     matrix:
     - RELEASE:
@@ -199,7 +199,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-3bb7eddc
   parallel:
     matrix:
     - RELEASE:
@@ -324,7 +324,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-3bb7eddc
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -381,7 +381,7 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-3bb7eddc
   parallel:
     matrix:
     - RELEASE:
@@ -473,7 +473,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -506,7 +506,7 @@ apt_repo_ubuntu:
   retry: 0
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-3bb7eddc
   stage: publishing_tests
   tags:
   - gcp
@@ -532,7 +532,7 @@ oc.lintian_debian:
   variables: {}
 
 oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-3bb7eddc
   stage: publishing_tests
   tags:
   - gcp
@@ -618,7 +618,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
     RELEASE: bookworm
 
 oc.lintian_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
   stage: publishing_tests
   tags:
   - gcp
@@ -644,7 +644,7 @@ oc.lintian_ubuntu:
   variables: {}
 
 oc.install_bin_ubuntu_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-3bb7eddc
   stage: publishing_tests
   tags:
   - gcp
@@ -666,7 +666,7 @@ oc.install_bin_ubuntu_22_04:
     PREFIX: ""
 
 oc.install_bin_ubuntu_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
   stage: publishing_tests
   tags:
   - gcp
