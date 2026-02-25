@@ -812,10 +812,20 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
      initialization. This is necessary to start answering to RPC only
      when the node is fully initialized. *)
   let* rpc_servers = init_rpc config node internal_events in
-  let rpc_downer =
+  (* Shutdown node BEFORE RPC servers to avoid EPIPE errors.
+     When RPC servers (especially external ones using Eio) shut down first,
+     they tear down sockets while validators are still running, causing
+     broken pipe errors and slow shutdown due to cascading failures. *)
+  let node_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[log_node_downer]
+      (fun _ -> Node.shutdown node)
+  in
+  let rpc_downer =
+    Lwt_exit.register_clean_up_callback
+      ~loc:__LOC__
+      ~after:[node_downer]
       (fun _ ->
         let*! () = Event.(emit shutting_down_local_rpc_server) () in
         List.iter_s
@@ -864,16 +874,10 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
                 List.iter_p RPC_server.shutdown rpc_server)
           rpc_servers)
   in
-  let node_downer =
-    Lwt_exit.register_clean_up_callback
-      ~loc:__LOC__
-      ~after:[rpc_downer]
-      (fun _ -> Node.shutdown node)
-  in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      ~after:[node_downer]
+      ~after:[rpc_downer]
       (fun exit_status ->
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())

@@ -574,16 +574,29 @@ let on_launch _ _ (limits, start_testchain, db, validation_process) :
       inapplicable_blocks_after_validation;
     }
 
-let on_error (type a b) (_w : t) st (r : (a, b) Request.t) (errs : b) =
+let on_error (type a b) (w : t) st (r : (a, b) Request.t) (errs : b) =
   let open Lwt_syntax in
   Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
   match r with
   | Request_validation v ->
       let view = Request.validation_view v in
+      (* Check if we're shutting down: either the worker or the requester *)
+      let is_shutting_down =
+        Worker.is_shutting_down w
+        || Option.fold ~none:false ~some:Lwt_canceler.canceling v.canceler
+      in
       let* () =
         match errs with
         | [Canceled] ->
-            (* Ignore requests cancelation *)
+            (* Always ignore explicit cancellation *)
+            Events.(emit validation_canceled) (view.block, st)
+        | [
+         Exn
+           (Unix.Unix_error
+              ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _));
+        ]
+          when is_shutting_down ->
+            (* Only suppress socket errors during shutdown *)
             Events.(emit validation_canceled) (view.block, st)
         | errs -> Events.(emit validation_failure) (view.block, st, errs)
       in
