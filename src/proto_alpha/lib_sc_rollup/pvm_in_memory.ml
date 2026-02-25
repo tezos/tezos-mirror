@@ -52,4 +52,9 @@ end
 
 module Arith : S = Extend (Sc_rollup.ArithPVM.Make (Context_helpers.In_memory))
 
-module Wasm : S = Extend (Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation)
+module Wasm : S = Extend (Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
+  include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end))

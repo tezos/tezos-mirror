@@ -64,7 +64,17 @@ module V2_0_0 : sig
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+  module type WASM_PVM_MACHINE = sig
+    include Wasm_2_0_0.WASM_PVM_MACHINE
+
+    val produce_proof :
+      context ->
+      state ->
+      (state -> (state * 'a) Lwt.t) ->
+      (proof * 'a) option Lwt.t
+  end
+
+  module Make_pvm (WASM_machine : WASM_PVM_MACHINE) :
     S
       with type context = WASM_machine.context
        and type state = WASM_machine.state
@@ -72,7 +82,7 @@ module V2_0_0 : sig
 
   (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
   module Protocol_implementation :
-    S
+    Sc_rollup_PVM_sig.PROTO_VERIFICATION
       with type context = Wasm_2_0_0.Wasm_pvm_machine.context
        and type state = Wasm_2_0_0.Wasm_pvm_machine.state
        and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
