@@ -1513,48 +1513,20 @@ let register () =
   commit "tezt: generate regression test"
 }
 
-# TEZT COMMIT 01: Update alcotezt protocol tag
+# TEZT COMMIT 02: Adapt lib_tezos/protocol.ml and protocol.mli
 #
-# MODE: snapshot (replace), stabilise/copy (add)
-# MODIFIES: tezt/lib_alcotezt/alcotezt_utils.ml
+# MODE: snapshot (replace), stabilise (add + increment), copy (add + duplicate)
+# MODIFIES: tezt/lib_tezos/protocol.ml, tezt/lib_tezos/protocol.mli
 #
 # DESCRIPTION:
-#   Updates the protocol tag in alcotezt utilities.
-#   Snapshot: replaces the source protocol tag with the new label.
-#   Stabilise/copy: appends a new protocol tag entry before the catch-all.
+#   Updates the protocol type definition, hash mapping, number mapping,
+#   tag mapping, and predecessor chain in tezt protocol files.
+#   Snapshot: replaces all source references with new label.
+#   Stabilise: adds new variant before Alpha, increments Alpha number.
+#   Copy: adds new variant duplicating source's number.
 #
-# CREATES: 1 commit — "tezt: update protocol tag in alcotezt" (snapshot)
-#          or "tezt: add new protocol tag to alcotezt" (stabilise/copy)
-function tezt_commit_01_update_alcotezt() {
-  if [[ ${is_snapshot} == true ]]; then
-    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: update protocol tag in alcotezt"
-  else
-    temp_file=$(mktemp)
-    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
-    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
-    echo "  | Some _ -> assert false" >> "${temp_file}"
-    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: add new protocol tag to alcotezt"
-  fi
-}
-
-function update_tezt_tests() {
-
-  if [[ $skip_update_tezt_tests ]]; then
-    echo "Skipping tezt tests update"
-    return 0
-  fi
-
-  # ensure protocols compile and parameter files are generated
-  make
-
-  # Update tezt tests
-
-  tezt_commit_01_update_alcotezt
-
-  cd "${script_dir}"/..
-
+# CREATES: 1 commit — "tezt: adapt lib_tezos/protocol.ml"
+function tezt_commit_02_adapt_lib_tezos_protocol() {
   log_blue "Adapt tezt/lib_tezos/protocol.ml"
 
   if [[ ${is_snapshot} == true ]]; then
@@ -1597,6 +1569,51 @@ function update_tezt_tests() {
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit "tezt: adapt lib_tezos/protocol.ml"
+}
+
+# TEZT COMMIT 01: Update alcotezt protocol tag
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: tezt/lib_alcotezt/alcotezt_utils.ml
+#
+# DESCRIPTION:
+#   Updates the protocol tag in alcotezt utilities.
+#   Snapshot: replaces the source protocol tag with the new label.
+#   Stabilise/copy: appends a new protocol tag entry before the catch-all.
+#
+# CREATES: 1 commit — "tezt: update protocol tag in alcotezt" (snapshot)
+#          or "tezt: add new protocol tag to alcotezt" (stabilise/copy)
+function tezt_commit_01_update_alcotezt() {
+  if [[ ${is_snapshot} == true ]]; then
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: update protocol tag in alcotezt"
+  else
+    temp_file=$(mktemp)
+    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
+    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
+    echo "  | Some _ -> assert false" >> "${temp_file}"
+    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: add new protocol tag to alcotezt"
+  fi
+}
+
+function update_tezt_tests() {
+
+  if [[ $skip_update_tezt_tests ]]; then
+    echo "Skipping tezt tests update"
+    return 0
+  fi
+
+  # ensure protocols compile and parameter files are generated
+  make
+
+  # Update tezt tests
+
+  tezt_commit_01_update_alcotezt
+
+  cd "${script_dir}"/..
+
+  tezt_commit_02_adapt_lib_tezos_protocol
 
   # TODO: fix and reintroduce this test
   #generate_regression_test
