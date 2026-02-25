@@ -1532,7 +1532,6 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
     node client _bootstrap_key =
   (* Some helpers *)
   let attestation_lag = parameters.Dal.Parameters.attestation_lag in
-  let number_of_lags = List.length parameters.attestation_lags in
   assert (attestation_lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
     let* _op, op_hash =
@@ -1555,26 +1554,6 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
         Mempool.classified_typ
         ~error_msg:(__LOC__ ^ " : Bad mempool !!!. Got %L")) ;
     unit
-  in
-  let check_slots_availability ~__LOC__ ~attested =
-    let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-    let dal_attestation =
-      (* Field is part of the encoding when the feature flag is true *)
-      (Option.get metadata.dal_attestation
-      |> Dal.Slot_availability.decode protocol parameters).(number_of_lags - 1)
-    in
-    List.iter
-      (fun i ->
-        Check.(
-          (Array.get dal_attestation i = true)
-            bool
-            ~error_msg:
-              (Format.sprintf
-                 "%s : Slot %d is expected to be confirmed."
-                 __LOC__
-                 i)))
-      attested
-    |> return
   in
   (* Just bake some blocks before starting attesting. *)
   let* () = bake_for ~count:4 client in
@@ -1642,7 +1621,25 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
   let* () =
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated = [h4; h4']}
   in
-  check_slots_availability ~__LOC__ ~attested:[]
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
+  match metadata.dal_attestation with
+  | None -> unit
+  | Some dal_attestation_bitset ->
+      let attestation_array =
+        Dal.Slot_availability.decode protocol parameters dal_attestation_bitset
+      in
+      (* Check that no slots are attested at any lag *)
+      let some_slot_attested =
+        Array.exists
+          (fun lag_attestations ->
+            Array.exists (fun attested -> attested) lag_attestations)
+          attestation_array
+      in
+      Check.is_false
+        some_slot_attested
+        ~error_msg:"%s: Expected no slots to be attested, but some were"
+        ~__LOC__ ;
+      unit
 
 let test_all_available_slots _protocol parameters cryptobox node client
     _bootstrap_key =
@@ -12645,7 +12642,6 @@ let register ~protocols =
     ~blocks_per_cycle:16
     ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
   scenario_with_layer1_node
-    ~attestation_lag:5
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
     protocols ;
