@@ -141,6 +141,11 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
 
 oc.docker:arm64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -170,6 +175,11 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
 
 docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
