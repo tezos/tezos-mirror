@@ -2055,13 +2055,27 @@ function misc_updates() {
 
 }
 
-function generate_doc() {
+# =============================================================================
+# DOCS COMMIT FUNCTIONS
+# =============================================================================
+# Extracted from generate_doc(). Each function produces exactly one commit.
+# Functions are listed in execution order.
+# =============================================================================
 
-  if [[ $skip_generate_doc ]]; then
-    echo "Skipping doc generation"
-    return 0
-  fi
-
+# DOCS COMMIT 01: Move or copy docs directory
+#
+# MODE: snapshot (git mv), stabilise/copy (archive + extract)
+# MODIFIES: docs/<label>/ directory
+#
+# DESCRIPTION:
+#   Moves or copies the protocol documentation directory.
+#   Snapshot: git mv from docs/<source> to docs/<label>.
+#   Stabilise/copy: archives and extracts docs/<source> to docs/<label>.
+#
+# CREATES: 1 commit — "docs: move from docs/<source>"
+#          (snapshot) or "docs: copy from docs/<source>"
+#          (stabilise/copy)
+function docs_commit_01_move_or_copy_docs_dir() {
   if [[ ${command} == "copy" ]]; then
     doc_path="${source_label}"
   else
@@ -2081,6 +2095,22 @@ function generate_doc() {
     rm -rf /tmp/tezos_proto_doc_snapshot
     commit "docs: copy from docs/${doc_path}"
   fi
+}
+
+# DOCS COMMIT 02: Fix versioned links
+#
+# MODE: copy (sed on source_label refs), snapshot/stabilise (sed on
+#       protocol_source refs)
+# MODIFIES: docs/<label>/*.rst
+#
+# DESCRIPTION:
+#   Fixes versioned links in labels, references, and paths within
+#   the protocol documentation rst files.
+#   Copy: replaces source_label-based references with new label.
+#   Snapshot/stabilise: replaces protocol_source-based references.
+#
+# CREATES: 1 commit — "docs: fix versioned links"
+function docs_commit_02_fix_versioned_links() {
   # fix versioned links (in labels, references, and paths) in docs
   echo "Fixing versioned links in docs"
   cd "docs/${label}"
@@ -2110,7 +2140,15 @@ function generate_doc() {
   commit "docs: fix versioned links"
 
   cd ../..
+}
 
+# DOCS HELPER: Adjust protocol_source for copy mode
+#
+# DESCRIPTION:
+#   In copy mode, adjusts protocol_source to use source_label for
+#   the protocols index operations. Saves original value for later
+#   restoration.
+function docs_helper_adjust_protocol_source_for_copy() {
   if [[ ${command} == "copy" ]]; then
     protocol_source_original="${protocol_source}"
     #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
@@ -2118,6 +2156,22 @@ function generate_doc() {
     protocol_source="${protocol_source}_${source_label}"
     log_blue "protocol_source is now ${protocol_source}"
   fi
+}
+
+# DOCS COMMIT 03: Move or copy protocols index
+#
+# MODE: snapshot (git mv), stabilise/copy (cp)
+# MODIFIES: docs/protocols/<name>.rst
+#
+# DESCRIPTION:
+#   Moves or copies the protocol index rst file.
+#   Snapshot: git mv from protocol_source.rst to new_versioned_name.rst.
+#   Stabilise/copy: cp from protocol_source.rst to new_versioned_name.rst.
+#
+# CREATES: 1 commit — "docs: move docs/protocols/..." (snapshot) or
+#          "docs: copy docs/protocols/..." (stabilise/copy)
+function docs_commit_03_move_or_copy_protocols_index() {
+  docs_helper_adjust_protocol_source_for_copy
 
   # generate docs/protocols/${new_versioned_name}.rst from docs/protocols/${protocol_source}.rst
   echo "Copying docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
@@ -2128,6 +2182,23 @@ function generate_doc() {
     cp "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
     commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   fi
+}
+
+# DOCS COMMIT 04: Fix protocols rst
+#
+# MODE: copy (additional sed on source_label), all modes (sed on
+#       capitalized_source + label-length padding)
+# MODIFIES: docs/protocols/<new_versioned_name>.rst
+#
+# DESCRIPTION:
+#   Fixes protocol rst content: replaces protocol names, capitalizations,
+#   and paths. In copy mode, also replaces source_label references and
+#   restores protocol_source. Handles label-length padding for rst
+#   underlines when label > 5 chars.
+#
+# CREATES: 0-1 commits — "docs: fix docs/protocols/<name>.rst"
+#          (conditional)
+function docs_commit_04_fix_protocols_rst() {
   if [[ ${command} == "copy" ]]; then
     sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
       -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
@@ -2154,10 +2225,36 @@ function generate_doc() {
   fi
 
   commit_if_changes "docs: fix docs/protocols/${new_protocol_name}.rst"
+}
 
+# DOCS COMMIT 05: Reset alpha.rst
+#
+# MODE: all modes (no mode checks)
+# MODIFIES: docs/protocols/alpha.rst
+#
+# DESCRIPTION:
+#   Regenerates docs/protocols/alpha.rst using the alpha_rst function
+#   with the new capitalized label.
+#
+# CREATES: 1 commit — "docs: reset docs/protocols/alpha.rst"
+function docs_commit_05_reset_alpha_rst() {
   alpha_rst "${capitalized_label}" > "docs/protocols/alpha.rst"
   commit "docs: reset docs/protocols/alpha.rst"
+}
 
+# DOCS COMMIT 06: Update doc index
+#
+# MODE: snapshot (sed replace), stabilise/copy (awk insert)
+# MODIFIES: docs/index.rst
+#
+# DESCRIPTION:
+#   Adds entries in the doc index for the snapshotted protocol.
+#   Snapshot: replaces protocol_source references with new label.
+#   Stabilise/copy: inserts new entries before existing alpha entries
+#   using awk pattern matching.
+#
+# CREATES: 1 commit — "docs: add entries in the doc index"
+function docs_commit_06_update_doc_index() {
   # add entries in the doc index for the snaptshotted protocol by
   # pattern-matching some existing lines and inserting variations thereof
   echo "Add entries in the doc index"
@@ -2190,7 +2287,22 @@ function generate_doc() {
     mv "${doc_index}.tmp" "${doc_index}"
   fi
   commit "docs: add entries in the doc index"
+}
 
+# DOCS COMMIT 07: Update docs Makefile
+#
+# MODE: snapshot (sed replace), stabilise/copy (sed insert)
+# MODIFIES: docs/Makefile
+#
+# DESCRIPTION:
+#   Updates the docs Makefile with new protocol entries.
+#   Snapshot: replaces protocol_source references with new label,
+#   updates NAMED_PROTOS, PROTOCOLS, short hash, and rpc paths.
+#   Stabilise/copy: inserts new entries for xrefscheck, PROTOCOLS,
+#   long/short hashes, and rpc paths.
+#
+# CREATES: 1 commit — "docs: update docs Makefile"
+function docs_commit_07_update_docs_makefile() {
   # update docs Makefile
   if [[ ${is_snapshot} == true ]]; then
     sed -i.old -r "s/(NAMED_PROTOS .*)/\1 ${label}/" docs/Makefile
@@ -2213,10 +2325,39 @@ function generate_doc() {
     sed -i.old -r "s/alpha\/octez-\*\.html/alpha\/octez-*.html ${label}\/octez-*.html/g" docs/Makefile
   fi
   commit "docs: update docs Makefile"
+}
 
+# DOCS COMMIT 08: Generate rpc.rst
+#
+# MODE: all modes (no mode checks)
+# MODIFIES: docs/<label>/rpc.rst
+#
+# DESCRIPTION:
+#   Generates the rpc.rst file for the new protocol by running
+#   make in the docs directory.
+#
+# CREATES: 1 commit — "docs: generate <label>/rpc.rst"
+function docs_commit_08_generate_rpc_rst() {
   rm -f "docs/${label}/rpc.rst"
   make -C docs "${label}"/rpc.rst
   commit "docs: generate ${label}/rpc.rst"
+}
+
+function generate_doc() {
+
+  if [[ $skip_generate_doc ]]; then
+    echo "Skipping doc generation"
+    return 0
+  fi
+
+  docs_commit_01_move_or_copy_docs_dir
+  docs_commit_02_fix_versioned_links
+  docs_commit_03_move_or_copy_protocols_index
+  docs_commit_04_fix_protocols_rst
+  docs_commit_05_reset_alpha_rst
+  docs_commit_06_update_doc_index
+  docs_commit_07_update_docs_makefile
+  docs_commit_08_generate_rpc_rst
 
 }
 
