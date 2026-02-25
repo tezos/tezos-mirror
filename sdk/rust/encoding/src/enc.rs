@@ -511,15 +511,18 @@ pub fn n_bignum(n: &BigUint, out: &mut Vec<u8>) -> BinResult {
     let mut acc = 0;
     for c in 0..bytes.len() {
         let i = bytes.len() - c - 1;
-        let mut byte = acc | (bytes[i] << d) & 0x7f;
+        // When d == 7 the accumulator already holds a full 7-bit chunk.
+        // Flush it *before* we touch bytes[i]; otherwise bytes[i] would
+        // be silently discarded (because (x << 7) & 0x7f == 0 for any x).
         if d == 7 {
+            out.push(acc | 0x80);
             acc = 0;
             d = 0;
-        } else {
-            let acc_d = 7 - d;
-            acc = bytes[i] >> acc_d;
-            d = 8 - acc_d;
         }
+        let mut byte = acc | (bytes[i] << d) & 0x7f;
+        let acc_d = 7 - d;
+        acc = bytes[i] >> acc_d;
+        d = 8 - acc_d;
         if !(i == 0 && acc == 0) {
             byte |= 0x80;
         }

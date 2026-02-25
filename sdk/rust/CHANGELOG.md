@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - Fix `short_dynamic` function in `encoding` - was incorrectly using `dynamic` internally.
+- Fix `n_bignum` encoder - would silently drop all parts of a value above `2^56`.
 
 ### Security
 
