@@ -12369,33 +12369,36 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
     | Some true -> incr count_attestable_slots
     | _ -> ()) ;
 
-    match (expected_dal_attestable_slots, actual_dal_attestable_slots_opt) with
-    | Not_in_committee, None ->
-        log_step "Level %d: Not_in_committee" attested_level ;
-        unit
-    | Not_in_committee, Some dal_attestation ->
-        (* Delegate not in committee but included DAL attestation.
-           Check if they attested the slot from published_level. *)
-        if
+    (* Check if delegate actually attested our slot when they included DAL content *)
+    let actual_bit_opt =
+      Option.map
+        (fun dal_attestation ->
           Dal.is_slot_attested_in_bitset
             ~protocol
             ~dal_parameters
             ~attested_level
             ~published_level
             ~slot_index
-            ~dal_attestation
-        then
-          Test.fail
-            "Level %d: Not_in_committee but delegate attested slot %d from \
-             published_level=%d"
-            attested_level
-            slot_index
-            published_level
-        else (
-          log_step
-            "Level %d: Not_in_committee (attestation for other lags/levels)"
-            attested_level ;
-          unit)
+            ~dal_attestation)
+        actual_dal_attestable_slots_opt
+    in
+
+    match (expected_dal_attestable_slots, actual_bit_opt) with
+    | Not_in_committee, None ->
+        log_step "Level %d: Not_in_committee" attested_level ;
+        unit
+    | Not_in_committee, Some true ->
+        Test.fail
+          "Level %d: Not_in_committee but delegate attested slot %d from \
+           published_level=%d"
+          attested_level
+          slot_index
+          published_level
+    | Not_in_committee, Some false ->
+        log_step
+          "Level %d: Not_in_committee (attestation for other lags/levels)"
+          attested_level ;
+        unit
     | Attestable_slots _slots, None ->
         if published_level > first_level then
           Test.fail
@@ -12403,16 +12406,7 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
             attested_level
             new_account.public_key_hash
         else unit
-    | Attestable_slots _slots, Some dal_attestation ->
-        let actual_bit =
-          Dal.is_slot_attested_in_bitset
-            ~protocol
-            ~dal_parameters
-            ~attested_level
-            ~published_level
-            ~slot_index
-            ~dal_attestation
-        in
+    | Attestable_slots _slots, Some actual_bit ->
         let expected_bit =
           match expected_bit_opt with Some b -> b | None -> false
         in
