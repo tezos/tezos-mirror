@@ -2794,3 +2794,32 @@ let () =
   let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
   let expected_power_after = Int64.add power_before (Tez.to_mutez alloc) in
   Assert.is_true ~loc:__LOC__ Compare.Int64.(power_after = expected_power_after)
+
+let () =
+  register_test ~title:"Test allocation is capped" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Use a small CLST ratio (0.1%) so the ratio cap is much smaller than the
+     global-limit cap and also smaller than the deposit. *)
+  let ratio = 1_000_000l in
+  let deposit_mutez = 10_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  (* Bootstrap accounts have 200_000 own frozen. With a ratio cap of 0.1% and
+     the global limit to 9, the cap is 200_000 * 9 * 0.001 = 1800. *)
+  let expected_cap =
+    Tez.of_mutez 1_800_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  (* Bake past activation — rebalance runs with cap < deposit *)
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  (* Allocation matches the exact computed cap *)
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
