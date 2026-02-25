@@ -1735,9 +1735,15 @@ function tezt_commit_03_fix_testnets_scenarios() {
 # CREATES: 1 commit — "tezt: fix other tests"
 function tezt_commit_04_fix_other_tests() {
   if [[ ${is_snapshot} == true ]]; then
-    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i tezt/tests/*.ml
+    # Handle both qualified (Protocol.Alpha) and bare (| Alpha ->) variant names
+    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
+      -e "s/| ${capitalized_source} ->/| ${capitalized_label} ->/g" \
+      -i tezt/tests/*.ml
   else
+    # Handle qualified variant names (e.g., Protocol.Alpha -> ...)
     sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i tezt/tests/*.ml
+    # Handle bare variant names in match expressions (e.g., | Alpha -> ...)
+    sed -r "s/(\|) ${capitalized_source} -> (.*)/\1 ${capitalized_source} -> \2 | ${capitalized_label} -> \2/g" -i tezt/tests/*.ml
   fi
   ocamlformat -i tezt/tests/*.ml
   commit "tezt: fix other tests"
