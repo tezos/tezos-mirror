@@ -1597,28 +1597,18 @@ function tezt_commit_01_update_alcotezt() {
   fi
 }
 
-function update_tezt_tests() {
-
-  if [[ $skip_update_tezt_tests ]]; then
-    echo "Skipping tezt tests update"
-    return 0
-  fi
-
-  # ensure protocols compile and parameter files are generated
-  make
-
-  # Update tezt tests
-
-  tezt_commit_01_update_alcotezt
-
-  cd "${script_dir}"/..
-
-  tezt_commit_02_adapt_lib_tezos_protocol
-
-  # TODO: fix and reintroduce this test
-  #generate_regression_test
-
-  #fix testnets_scenarios:
+# TEZT COMMIT 03: Fix testnets_scenarios
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: src/bin_testnet_scenarios/*.ml
+#
+# DESCRIPTION:
+#   Updates protocol references in testnet scenario files.
+#   Snapshot: replaces source protocol with new label.
+#   Stabilise/copy: adds new label as alternative match.
+#
+# CREATES: 0-1 commits — "tezt: fix testnets_scenarios" (conditional)
+function tezt_commit_03_fix_testnets_scenarios() {
   if [[ ${is_snapshot} == true ]]; then
     sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i src/bin_testnet_scenarios/*.ml
   else
@@ -1626,8 +1616,20 @@ function update_tezt_tests() {
   fi
   ocamlformat -i src/bin_testnet_scenarios/*.ml
   commit_if_changes "tezt: fix testnets_scenarios"
+}
 
-  #fix other tests:
+# TEZT COMMIT 04: Fix other tests
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: tezt/tests/*.ml
+#
+# DESCRIPTION:
+#   Updates protocol references in tezt test files.
+#   Snapshot: replaces source protocol with new label.
+#   Stabilise/copy: adds new label as alternative match.
+#
+# CREATES: 1 commit — "tezt: fix other tests"
+function tezt_commit_04_fix_other_tests() {
   if [[ ${is_snapshot} == true ]]; then
     sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i tezt/tests/*.ml
   else
@@ -1635,7 +1637,21 @@ function update_tezt_tests() {
   fi
   ocamlformat -i tezt/tests/*.ml
   commit "tezt: fix other tests"
+}
 
+# TEZT COMMIT 05: Handle encoding samples
+#
+# MODE: snapshot (git mv), copy (cp from source_label), stabilise (cp from protocol_source)
+# MODIFIES: tezt/tests/encoding_samples/ directory
+#
+# DESCRIPTION:
+#   Moves or copies encoding sample files to the new protocol label directory.
+#   Snapshot: git mv from protocol_source.
+#   Copy: cp from source_label.
+#   Stabilise: cp from protocol_source.
+#
+# CREATES: 1 commit — "tezt: move/copy encoding samples"
+function tezt_commit_05_handle_encoding_samples() {
   mkdir -p "tezt/tests/encoding_samples/${label}"
   if [[ ${is_snapshot} == true ]]; then
     git mv tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
@@ -1647,7 +1663,20 @@ function update_tezt_tests() {
     cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
     commit "tezt: copy ${protocol_source} encoding samples to ${label}"
   fi
+}
 
+# TEZT COMMIT 06: Handle regression files
+#
+# MODE: snapshot (git mv + sed), stabilise/copy (cp + sed)
+# MODIFIES: tezt/tests/encoding_samples/*/*.out regression files
+#
+# DESCRIPTION:
+#   Moves or copies regression .out files, renaming them with the new
+#   protocol name and updating their content (protocol references, hashes).
+#   Handles 80-char filename limit. Largest extraction block (~77 lines).
+#
+# CREATES: 1 commit — "tezt: move/copy regression files"
+function tezt_commit_06_handle_regression_files() {
   regression_protocol_name="${capitalized_label}-"
   regression_source_name="${capitalized_source}-"
   alpha_regression="Alpha-"
@@ -1726,7 +1755,20 @@ function update_tezt_tests() {
   else
     commit "tezt: copy ${protocol_source} regression files"
   fi
+}
 
+# TEZT COMMIT 07: Add unused baker
+#
+# MODE: stabilise/copy (awk insert), snapshot (awk rename)
+# MODIFIES: tezt/lib_tezos/constant.ml
+#
+# DESCRIPTION:
+#   Adds or renames the unused baker constant for the new protocol.
+#   Stabilise/copy: duplicates the source baker entry with new target name.
+#   Snapshot: renames the source baker entry to use the short hash.
+#
+# CREATES: 0-1 commits — "tezt: add unused ${protocol_target} baker" (conditional)
+function tezt_commit_07_add_unused_baker() {
   # add new protocol baker
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
   if [[ ${is_snapshot} == false ]]; then
@@ -1763,7 +1805,20 @@ $0 ~ "let _octez_baker_" source " =" {
 
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} baker"
+}
 
+# TEZT COMMIT 08: Add unused accuser
+#
+# MODE: stabilise/copy (awk insert), snapshot (awk rename)
+# MODIFIES: tezt/lib_tezos/constant.ml
+#
+# DESCRIPTION:
+#   Adds or renames the unused accuser constant for the new protocol.
+#   Stabilise/copy: duplicates the source accuser entry with new target name.
+#   Snapshot: renames the source accuser entry to use the short hash.
+#
+# CREATES: 0-1 commits — "tezt: add unused ${protocol_target} accuser" (conditional)
+function tezt_commit_08_add_unused_accuser() {
   # add new protocol accuser
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
   if [[ ${is_snapshot} == false ]]; then
@@ -1800,29 +1855,86 @@ $0 ~ "let _octez_accuser_" source " =" {
 
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} accuser"
+}
 
-  # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
-  # rm -rf /tmp/tezos_proto_snapshot
-  # mkdir -p /tmp/tezos_proto_snapshot
-  # git archive HEAD "src/proto_${new_protocol_name}/" | tar -x -C /tmp/tezos_proto_snapshot
-  # find /tmp/tezos_proto_snapshot -type f -exec md5sum {} \; | sort -k 2 | md5sum >"tezt/tests/expected/check_proto_${label}_changes.ml/Check that the ${label} protocol has not changed.out"
-  # rm -rf /tmp/tezos_proto_snapshot
-  # if [[ -n ${git} ]]; then
-  #   git add "tezt/tests/expected/check_proto_${label}_changes.ml"
-  # fi
-  # commit "tezt: add expected output for stabilisation regression test"
-
+# TEZT COMMIT 09: Delete unknown regression files
+#
+# MODE: all modes
+# MODIFIES: regression output files (via dune exec)
+#
+# DESCRIPTION:
+#   Runs the tezt test suite with --on-unknown-regression-files delete
+#   to clean up regression files that no longer match any test.
+#
+# CREATES: 0-1 commits — "tezt: delete unknown regression files" (conditional)
+function tezt_commit_09_delete_unknown_regression_files() {
   dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
   commit_if_changes "tezt: delete unknown regression files"
+}
 
+# TEZT COMMIT 10: Reset runtime dependencies regressions
+#
+# MODE: all modes
+# MODIFIES: regression output files (via dune exec)
+#
+# DESCRIPTION:
+#   Resets the runtime dependencies regression test output.
+#
+# CREATES: 1 commit — "tezt: reset runtime dependencies regressions"
+function tezt_commit_10_reset_runtime_deps_regressions() {
   dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
   commit "tezt: reset runtime dependencies regressions"
+}
 
+# TEZT COMMIT 11: Reset weeklynet regression test
+#
+# MODE: stabilise/copy only (not snapshot)
+# MODIFIES: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json,
+#           regression files (via dune exec)
+#
+# DESCRIPTION:
+#   Copies alpha weeklynet config to last_snapshotted_protocol.json and
+#   resets the weeklynet regression test. Only runs for non-snapshot modes.
+#
+# CREATES: 0-1 commits — "tezt: reset weeklynet regression test" (conditional)
+function tezt_commit_11_reset_weeklynet_regression() {
   if [[ ${is_snapshot} != true ]]; then
     cp tezt/tests/weeklynet_configs/alpha.json tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
     dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
     commit_if_changes "tezt: reset weeklynet regression test"
   fi
+}
+
+function update_tezt_tests() {
+
+  if [[ $skip_update_tezt_tests ]]; then
+    echo "Skipping tezt tests update"
+    return 0
+  fi
+
+  # ensure protocols compile and parameter files are generated
+  make
+
+  # Update tezt tests
+
+  tezt_commit_01_update_alcotezt
+
+  cd "${script_dir}"/..
+
+  tezt_commit_02_adapt_lib_tezos_protocol
+
+  # TODO: fix and reintroduce this test
+  #generate_regression_test
+
+  tezt_commit_03_fix_testnets_scenarios
+  tezt_commit_04_fix_other_tests
+  tezt_commit_05_handle_encoding_samples
+  tezt_commit_06_handle_regression_files
+  tezt_commit_07_add_unused_baker
+  tezt_commit_08_add_unused_accuser
+  tezt_commit_09_delete_unknown_regression_files
+  tezt_commit_10_reset_runtime_deps_regressions
+  tezt_commit_11_reset_weeklynet_regression
 
 }
 
