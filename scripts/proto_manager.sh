@@ -1269,6 +1269,109 @@ function source_helper_update_alpha_constants_previous() {
   ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
 }
 
+# SOURCE HELPER: Fix DAL storage migration after constants_previous update
+#
+# DESCRIPTION:
+#   After source_helper_update_alpha_constants_previous() makes
+#   Constants_parametric_previous_repr identical to Constants_parametric_repr,
+#   the migration code in dal_storage.ml and its test file must be updated
+#   to reflect the new field set.
+#   Dynamically extracts DAL field names from constants_parametric_repr.mli
+#   and generates identity migration code (destructure all fields, reconstruct
+#   with same fields, no hardcoded defaults).
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_fix_dal_storage_migration() {
+  local dal_storage="src/proto_alpha/lib_protocol/dal_storage.ml"
+  local dal_test="src/proto_alpha/lib_protocol/test/unit/test_dal_past_parameters_storage.ml"
+  local mli="src/proto_alpha/lib_protocol/constants_parametric_repr.mli"
+
+  log_blue "fix DAL storage migration after constants_previous update"
+
+  # Extract DAL field names from type dal = { ... } in constants_parametric_repr.mli
+  local dal_fields
+  dal_fields=$(awk '/^type dal = \{/,/^\}/' "$mli" | sed -n 's/^[[:space:]]*\([a-z_]*\)[[:space:]]*:.*/\1/p')
+
+  # Build the destructure pattern: "feature_enable; incentives_enable; ..."
+  local field_list
+  field_list=$(echo "$dal_fields" | tr '\n' ';' | sed 's/;$//' | sed 's/;/; /g')
+
+  # === Fix dal_storage.ml ===
+  # Replace the migration let-binding with an identity pass-through.
+  # Write replacement to temp file to avoid shell escaping issues with perl.
+  local tmp_migration="/tmp/dal_migration_replacement.txt"
+  cat > "$tmp_migration" << OCAML
+let previous_parameters : Constants_parametric_repr.dal =
+    let Constants_parametric_previous_repr.{${field_list}} =
+      previous_parameters
+    in
+    {${field_list}}
+  in
+OCAML
+
+  perl -0777 -e '
+    my $replacement = do { local $/; open my $fh, $ARGV[0]; <$fh> };
+    chomp $replacement;
+    my $file = do { local $/; open my $fh, $ARGV[1]; <$fh> };
+    $file =~ s/let previous_parameters : Constants_parametric_repr\.dal =.*?\n  in\n/$replacement\n/s;
+    open my $out, ">", $ARGV[1];
+    print $out $file;
+  ' "$tmp_migration" "$dal_storage"
+  ocamlformat -i "$dal_storage"
+
+  # === Fix test file ===
+  if [[ -f "$dal_test" ]]; then
+    # Build new record literal with test default values
+    local new_record_fields=""
+    for field in $dal_fields; do
+      case "$field" in
+      feature_enable) new_record_fields="${new_record_fields}        ${field} = true;\n" ;;
+      incentives_enable) new_record_fields="${new_record_fields}        ${field} = true;\n" ;;
+      dynamic_lag_enable) new_record_fields="${new_record_fields}        ${field} = false;\n" ;;
+      number_of_slots) new_record_fields="${new_record_fields}        ${field} = 1;\n" ;;
+      attestation_lag) new_record_fields="${new_record_fields}        ${field} = n;\n" ;;
+      attestation_lags) new_record_fields="${new_record_fields}        ${field} = [n];\n" ;;
+      attestation_threshold) new_record_fields="${new_record_fields}        ${field} = 1;\n" ;;
+      cryptobox_parameters)
+        new_record_fields="${new_record_fields}        ${field} =\n          Cryptobox.\n            {\n              redundancy_factor = 1;\n              page_size = 1;\n              slot_size = 1;\n              number_of_shards = 1;\n            };\n"
+        ;;
+      minimal_participation_ratio) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      rewards_ratio) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      traps_fraction) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      *) new_record_fields="${new_record_fields}        ${field} = Obj.magic ();\n" ;;
+      esac
+    done
+
+    # Write record and conversion replacements to temp files
+    local tmp_record="/tmp/dal_test_record.txt"
+    printf "Constants_parametric_previous_repr.\n      {\n%b      }" "$new_record_fields" > "$tmp_record"
+
+    local tmp_conversion="/tmp/dal_test_conversion.txt"
+    cat > "$tmp_conversion" << OCAML
+let previous_parameters_to_current previous_parameters =
+    let Constants_parametric_previous_repr.{${field_list}} =
+      previous_parameters
+    in
+    Constants_parametric_repr.{${field_list}}
+  in
+OCAML
+
+    perl -0777 -e '
+      my $record = do { local $/; open my $fh, $ARGV[0]; <$fh> };
+      my $conversion = do { local $/; open my $fh, $ARGV[1]; <$fh> };
+      chomp $conversion;
+      my $file = do { local $/; open my $fh, $ARGV[2]; <$fh> };
+      $file =~ s/Constants_parametric_previous_repr\.\s*\{[^}]*cryptobox_parameters\s*=\s*\n\s*Cryptobox\.\s*\{[^}]*\}[^}]*\}/$record/s;
+      $file =~ s/let previous_parameters_to_current previous_parameters =.*?\n  in\n/$conversion\n/s;
+      open my $out, ">", $ARGV[2];
+      print $out $file;
+    ' "$tmp_record" "$tmp_conversion" "$dal_test"
+    ocamlformat -i "$dal_test"
+
+    rm -f "$tmp_migration" "$tmp_record" "$tmp_conversion"
+  fi
+}
+
 # SOURCE HELPER: Define stitching markers
 #
 # MODE: both (used by snapshot/copy and stabilise)
@@ -1382,6 +1485,7 @@ function source_commit_02_fix_alpha_raw_context_snapshot() {
 function source_commit_03_fix_alpha_raw_context_stabilise() {
   # Call helper to update alpha constants (needed for stabilise mode)
   source_helper_update_alpha_constants_previous
+  source_helper_fix_dal_storage_migration
 
   source_helper_define_stitching_markers
   # === Process raw_context.ml ===
