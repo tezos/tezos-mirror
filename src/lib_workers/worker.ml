@@ -196,6 +196,9 @@ module type T = sig
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
+  (** Returns true if the worker is shutting down. *)
+  val is_shutting_down : _ t -> bool
+
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
@@ -577,6 +580,8 @@ struct
 
   let canceler {canceler; _} = canceler
 
+  let is_shutting_down w = Lwt_canceler.canceling w.canceler
+
   module type HANDLERS = sig
     type self
 
@@ -721,6 +726,14 @@ struct
     match r with
     | Ok () -> Lwt.return_unit
     | Error (Lwt.Canceled | Lwt_pipe.Closed | Lwt_dropbox.Closed) ->
+        (* Explicit cancellation or closed buffer *)
+        let* () = Worker_events.(emit terminated) () in
+        close handlers w None
+    | Error
+        (Unix.Unix_error
+           ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _))
+      when is_shutting_down w ->
+        (* Only suppress socket errors during shutdown *)
         let* () = Worker_events.(emit terminated) () in
         close handlers w None
     | Error exn ->
