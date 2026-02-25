@@ -376,9 +376,12 @@ type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
 val register_sandbox_with_observer :
   __FILE__:string ->
+  ?uses_client:bool ->
   ?kernel:Kernel.t ->
   ?tx_queue_tx_per_addr_limit:int ->
   title:string ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
@@ -388,5 +391,6 @@ val register_sandbox_with_observer :
   ?websockets:bool ->
   ?genesis_timestamp:Client.timestamp ->
   ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (sandbox_test -> unit Lwt.t) ->
   unit

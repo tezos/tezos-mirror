@@ -764,10 +764,12 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
 
 type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
-let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
-    ~title ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?fail_on_divergence ?websockets ?genesis_timestamp
-    ?(sequencer_keys = [Constant.bootstrap1]) body =
+let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
+    ?tx_queue_tx_per_addr_limit ~title ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts ?set_account_code ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ~tags ?patch_config ?fail_on_divergence
+    ?websockets ?genesis_timestamp ?(sequencer_keys = [Constant.bootstrap1])
+    ?with_runtimes body =
   Test.register
     ~__FILE__
     ~title
@@ -775,8 +777,10 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
       (tags
       @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
         |> Option.to_list))
-    ~uses_admin_client:false
-    ~uses_client:false
+    ~uses_admin_client:
+      (* using the client requires to use the admin client *)
+      uses_client
+    ~uses_client
     ~uses_node:false
     ~uses:
       [
@@ -795,6 +799,9 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
       ?patch_config
       ?websockets
       ?genesis_timestamp
+      ?with_runtimes
+      ?eth_bootstrap_accounts
+      ?tez_bootstrap_accounts
       ~sequencer_keys
       ()
   in

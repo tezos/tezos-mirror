@@ -36,6 +36,18 @@ module Setup = struct
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
 
+  let register_sandbox_with_oberver_test ?uses_client ~title ~tags
+      ~with_runtimes ?eth_bootstrap_accounts ?tez_bootstrap_accounts =
+    Test_helpers.register_sandbox_with_observer
+      ~__FILE__
+      ?uses_client
+      ?eth_bootstrap_accounts
+      ?tez_bootstrap_accounts
+      ~kernel:Latest
+      ~title
+      ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
+      ~with_runtimes
+
   let register_fullstack_test ~title ~tags ~with_runtimes
       ?tez_bootstrap_accounts =
     Setup.register_test
@@ -1935,6 +1947,97 @@ let test_michelson_gateway_evm_revert =
       ~error_msg:"Expected reverter balance 0 but got %L") ;
   unit
 
+let test_tx_queue_mixed_transaction_types ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:
+      "Tx queue accepts Ethereum transactions and Tezos operations together"
+    ~tags:["observer"; "tx_queue"; "mixed_types"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer} ->
+  let tez_amount = Tez.one in
+  let eth_amount = Wei.one in
+  let fee = Tez.one in
+  let wait_for_eth_add = Evm_node.wait_for_tx_queue_add_transaction sandbox in
+  let* raw_eth_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~value:eth_amount
+      ()
+  in
+  let* eth_hash =
+    let*@ hash = Rpc.send_raw_transaction ~raw_tx:raw_eth_tx observer in
+    return hash
+  and* eth_hash_added = wait_for_eth_add in
+  Check.((eth_hash = eth_hash_added) string)
+    ~error_msg:"Expected Ethereum transaction hash %R to be added, but got %L" ;
+  let wait_for_tezos_add = Evm_node.wait_for_tx_queue_add_transaction sandbox in
+  let* tezos_client = tezos_client sandbox in
+  let* () =
+    Client.transfer
+      ~amount:tez_amount
+      ~fee
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      tezos_client
+  in
+  let* tezos_hash_added = wait_for_tezos_add in
+  Check.((tezos_hash_added <> eth_hash) string)
+    ~error_msg:
+      "Expected distinct hashes for Ethereum and Tezos queue additions, but \
+       both were %L" ;
+  let wait_for_eth_confirmed =
+    Evm_node.wait_for_tx_queue_transaction_confirmed
+      ~hash:eth_hash
+      ~timeout:1.
+      sandbox
+  in
+  let wait_for_tezos_confirmed =
+    Evm_node.wait_for_tx_queue_transaction_confirmed
+      ~hash:tezos_hash_added
+      ~timeout:1.
+      sandbox
+  in
+  let* nb_txs =
+    let*@ n = Rpc.produce_block sandbox in
+    return n
+  and* _ = wait_for_eth_confirmed
+  and* _ = wait_for_tezos_confirmed in
+  Check.(
+    (nb_txs = 2)
+      int
+      ~error_msg:"Expected %R transactions in the block but got %L") ;
+
+  let* tezos_receiver_balance =
+    Client.get_balance_for
+      ~account:Constant.bootstrap2.public_key_hash
+      tezos_client
+  in
+  Check.(
+    (Tez.to_mutez tezos_receiver_balance = Tez.to_mutez tez_amount)
+      int
+      ~error_msg:"Expected %R mutez but got %L") ;
+
+  let* eth_receiver_balance =
+    Eth_cli.balance
+      ~account:Eth_account.bootstrap_accounts.(1).address
+      ~endpoint:(Evm_node.endpoint sandbox)
+      ()
+  in
+  Check.(
+    (eth_receiver_balance = eth_amount)
+      Wei.typ
+      ~error_msg:"Expected %R mutez but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -1961,4 +2064,5 @@ let () =
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
-  test_get_ethereum_tezos_address_rpc ~runtime:Tezos ()
+  test_get_ethereum_tezos_address_rpc ~runtime:Tezos () ;
+  test_tx_queue_mixed_transaction_types ~runtime:Tezos ()
