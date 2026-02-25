@@ -828,14 +828,19 @@ module CLST_contract = struct
     let total_supply : storage ex_view tzresult =
       let open Result_syntax in
       let* name = Script_string.of_string "get_total_supply" in
-      let implementation (ctxt, _step_constants) (() : unit) (storage : storage)
-          =
+      let implementation (ctxt, _step_constants) (token_id : nat)
+          (storage : storage) =
         let open Lwt_result_syntax in
-        let total_supply =
-          Clst_contract_storage.(
-            get_total_supply_from_storage (from_clst_storage storage))
-        in
-        return (total_supply, ctxt)
+        if
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
+        then
+          let total_supply =
+            Clst_contract_storage.(
+              get_total_supply_from_storage (from_clst_storage storage))
+          in
+          return (total_supply, ctxt)
+        else return (Script_int.zero_n, ctxt)
       in
       return
         (Ex_view {name; ty = CLST_types.total_supply_view_ty; implementation})
