@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use mir::ast::Type;
 use mir::ast::{BinWriter, ByteReprTrait};
 use mir::lexer::Prim;
 use mir::{
@@ -10,6 +11,7 @@ use mir::{
 };
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
+use std::collections::HashMap;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
@@ -224,10 +226,22 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
 }
 
 pub(crate) fn get_enshrined_contract_entrypoint(
-    _contract: EnshrinedContracts,
-) -> Option<std::collections::HashMap<Entrypoint, mir::ast::Type>> {
-    // TODO L2-819
-    None
+    contract: EnshrinedContracts,
+) -> Option<HashMap<Entrypoint, Type>> {
+    match contract {
+        EnshrinedContracts::TezosXGateway => {
+            let mut entrypoints = HashMap::new();
+            // default %default: string (destination address for simple transfers)
+            entrypoints.insert(Entrypoint::default(), Type::String);
+            // %call: pair string (pair string bytes)
+            //   (destination, (method_signature, abi_parameters))
+            entrypoints.insert(
+                Entrypoint::try_from("call").ok()?,
+                Type::new_pair(Type::String, Type::new_pair(Type::String, Type::Bytes)),
+            );
+            Some(entrypoints)
+        }
+    }
 }
 
 #[cfg(test)]
