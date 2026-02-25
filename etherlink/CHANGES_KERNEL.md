@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 48.
+Its storage version is 49.
 
 ### Features
 
@@ -24,6 +24,8 @@ Its storage version is 48.
 ### Internal
 
 ### Tezos X Experimental Features
+
+- Produce Tezos blocks in Etherlink (!20737). Storage version is 49.
 
 ## Version 6 (Farfadet)
 
