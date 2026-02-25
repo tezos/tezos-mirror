@@ -2903,13 +2903,9 @@ let expected_attestation dal_parameters attested_slots =
    - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>". *)
 let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
     sc_rollup_node _sc_rollup_address node client pvm_name =
-  Log.info "Assert attestation_lag value." ;
-  Check.(
-    (parameters.Dal.Parameters.attestation_lag = 4)
-      int
-      ~error_msg:
-        "The kernel used in the test assumes attestation_lag of %R, got %L") ;
-  let slot_size = parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let attestation_lag = parameters.attestation_lag in
+  let min_lag = List.hd parameters.attestation_lags in
   Check.(
     (slot_size = 32768)
       int
@@ -2942,6 +2938,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
   let slot_content = generate_dummy_slot slot_size in
+  let* level = Node.get_level node in
   let* () =
     publish_store_and_attest_slot
       ~protocol
@@ -2953,30 +2950,41 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       ~content:(Helpers.make_slot ~slot_size slot_content)
       parameters
   in
-  let* level = Node.get_level node in
+  let published_level = level + 1 in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Slot published at level %d, currently at level %d"
+    published_level
+    current_level ;
   Log.info "Assert that the slot was attested." ;
-  let* {dal_attestation; _} =
-    Node.RPC.(call node @@ get_chain_block_metadata ())
+  let attested_levels =
+    published_level + min_lag
+    --> min (published_level + attestation_lag) current_level
   in
-  let number_of_lags = List.length parameters.attestation_lags in
-  let dal_attestation =
-    Option.map
-      (fun str ->
-        (Dal.Slot_availability.decode protocol parameters str).(number_of_lags
-                                                                - 1))
-      dal_attestation
+  let* all_slot_availabilities =
+    Dal.collect_slot_availabilities node ~attested_levels
   in
-  let expected_attestation = expected_attestation parameters [0] in
-  Check.((Some expected_attestation = dal_attestation) (option (array bool)))
-    ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
+  let to_attested_levels =
+    Dal.to_attested_levels ~protocol ~dal_parameters:parameters
+  in
+  Check.is_true
+    (Dal.is_slot_attested
+       ~published_level
+       ~slot_index:0
+       ~to_attested_levels
+       all_slot_availabilities)
+    ~error_msg:"Expected slot 0 from published_level to be attested" ;
+
   Log.info "Wait for the rollup node to catch up to the latest level." ;
 
   (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
-       node processing *)
+     node processing *)
   let* () = bake_for ~count:3 client in
   let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
 
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node published_level
+  in
   Log.info "Read and assert against value written in durable storage." ;
   let key = "/output/slot-0" in
   let* value_written =
@@ -13054,7 +13062,6 @@ let register ~protocols =
     ~number_of_shards:256
     ~slot_size:(1 lsl 15)
     ~redundancy_factor:8
-    ~attestation_lag:4
     ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
