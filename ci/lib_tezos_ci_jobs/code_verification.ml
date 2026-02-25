@@ -325,7 +325,7 @@ let jobs pipeline_type =
                ~image_path:
                  (* this is not a base image, but the dependency image
                     from the packages pipelines *)
-                 (Images.Base_images.path_prefix ^ "/build-ubuntu-noble:master"))
+                 (Images.Base_images.path_prefix ^ "/build-ubuntu:24.04"))
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
           ~stage:Stages.test
@@ -396,14 +396,7 @@ let jobs pipeline_type =
               ~branch:"latest-release"
               ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
               ~matrix:
-                [
-                  [
-                    ( "IMAGE",
-                      [
-                        "build-debian-trixie:master"; "build-ubuntu-noble:master";
-                      ] );
-                  ];
-                ]
+                [[("IMAGE", ["build-debian:trixie"; "build-ubuntu:24.04"])]]
               ();
           ]
       (* Test compiling the [master] branch on Bookworm, to make sure
@@ -417,7 +410,7 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_master"
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
-              ~matrix:[[("IMAGE", ["build-debian-trixie:master"])]]
+              ~matrix:[[("IMAGE", ["build-debian:trixie"])]]
               ();
           ]
     in
