@@ -103,7 +103,7 @@ let () =
     (fun () -> WASM_invalid_dissection_distribution)
 
 module V2_0_0 = struct
-  let current_version = Wasm_2_0_0.v5
+  let current_version = Wasm_2_0_0.v6
 
   let ticks_per_snapshot = Z.of_int64 50_000_000_000_000L
 

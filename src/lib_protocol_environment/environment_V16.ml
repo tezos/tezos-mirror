@@ -1265,7 +1265,7 @@ struct
 
     type version = Tezos_scoru_wasm.Wasm_pvm_state.version
 
-    let v5 = Tezos_scoru_wasm.Wasm_pvm_state.V5
+    let v6 = Tezos_scoru_wasm.Wasm_pvm_state.V6
 
     module type WASM_PVM_MACHINE = sig
       type state

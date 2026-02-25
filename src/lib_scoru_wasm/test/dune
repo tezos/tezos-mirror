@@ -49,8 +49,7 @@
   test_wasm_encoding
   test_wasm_pvm_encodings
   test_wasm_pvm
-  test_wasm_vm
-  test_crypto))
+  test_wasm_vm))
 
 (executable
  (name main)

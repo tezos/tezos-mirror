@@ -5944,7 +5944,6 @@ let _octez_scoru_wasm_tests =
       "test_wasm_pvm_encodings";
       "test_wasm_pvm";
       "test_wasm_vm";
-      "test_crypto";
     ]
     ~path:"src/lib_scoru_wasm/test"
     ~opam:"octez-l2-libs"

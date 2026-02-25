@@ -282,9 +282,6 @@ module Aux = struct
       src:int32 ->
       num_bytes:int32 ->
       unit Lwt.t
-
-    val ec_pairing_check_bls12_381 :
-      memory:memory -> int32 -> int32 -> int32 -> int32 -> int32 Lwt.t
   end
 
   module Make (M : Memory_access) : S with type memory = M.t = struct
@@ -679,37 +676,6 @@ module Aux = struct
       match implem with
       | Builtins.Noop -> write_debug_impl
       | Printer f -> alternate_write_debug_impl ~f
-
-    let ec_pairing_check_bls12_381 ~memory point1_addr point2_addr point3_addr
-        point4_addr =
-      let open Lwt_syntax in
-      let* point1_bytes = M.load_bytes memory point1_addr 48 in
-      let* point2_bytes = M.load_bytes memory point2_addr 96 in
-      let* point3_bytes = M.load_bytes memory point3_addr 48 in
-      let* point4_bytes = M.load_bytes memory point4_addr 96 in
-
-      match (point1_bytes, point2_bytes, point3_bytes, point4_bytes) with
-      | Ok point1_bytes, Ok point2_bytes, Ok point3_bytes, Ok point4_bytes -> (
-          let point1_opt =
-            Bls12_381.G1.of_compressed_bytes_opt (Bytes.of_string point1_bytes)
-          in
-          let point2_opt =
-            Bls12_381.G2.of_compressed_bytes_opt (Bytes.of_string point2_bytes)
-          in
-          let point3_opt =
-            Bls12_381.G1.of_compressed_bytes_opt (Bytes.of_string point3_bytes)
-          in
-          let point4_opt =
-            Bls12_381.G2.of_compressed_bytes_opt (Bytes.of_string point4_bytes)
-          in
-
-          match (point1_opt, point2_opt, point3_opt, point4_opt) with
-          | Some point1, Some point2, Some point3, Some point4 ->
-              Lwt.return @@ Int32.of_int @@ Bool.to_int
-              @@ Bls12_381.Pairing.pairing_check
-                   [(point1, point2); (point3, point4)]
-          | _ -> Lwt.return Int32.zero)
-      | _ -> Lwt.return Int32.zero
   end
 
   include Make (Memory_access_interpreter)
@@ -1413,45 +1379,6 @@ let store_write =
             store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
-let ec_pairing_check_bls12_381 =
-  Host_funcs.Host_func
-    (fun _input_buffer _output_buffer durable memories inputs ->
-      match inputs with
-      | [
-       Values.(Num (I32 point1_addr));
-       Values.(Num (I32 point2_addr));
-       Values.(Num (I32 point3_addr));
-       Values.(Num (I32 point4_addr));
-      ] ->
-          let open Lwt.Syntax in
-          let* memory = retrieve_memory memories in
-          let durable = Durable.of_storage_exn durable in
-
-          let* is_pairing_valid =
-            Aux.ec_pairing_check_bls12_381
-              ~memory
-              point1_addr
-              point2_addr
-              point3_addr
-              point4_addr
-          in
-
-          Lwt.return
-            ( Durable.to_storage durable,
-              [value is_pairing_valid],
-              Z.of_int 120_000_000 )
-      | _ -> raise Bad_input)
-
-let ec_pairing_check_bls12_381_type =
-  let input_types =
-    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
-    |> Vector.of_list
-  in
-  let output_types = Vector.of_list Types.[NumType I32Type] in
-  Types.FuncType (input_types, output_types)
-
-let ec_pairing_check_bls12_381_name = "tezos_ec_pairing_check_bls12_381"
-
 let lookup_opt ~version name =
   let v1_and_above ty name =
     match version with
@@ -1470,11 +1397,6 @@ let lookup_opt ~version name =
     | Wasm_pvm_state.V0 | V1 | V2 -> None
     | V3 | V4 | V5 | V6 | VExperimental ->
         Some (ExternFunc (HostFunc (ty, name)))
-  in
-  let v6_and_above ty name =
-    match version with
-    | Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 -> None
-    | V6 | VExperimental -> Some (ExternFunc (HostFunc (ty, name)))
   in
   match name with
   | "read_input" ->
@@ -1513,10 +1435,6 @@ let lookup_opt ~version name =
   | "store_create" -> v1_and_above store_create_type store_create_name
   | "store_exists" -> v2_and_above store_exists_type store_exists_name
   | "reveal" -> v3_and_above reveal_raw_type reveal_raw_name
-  | "ec_pairing_check_bls12_381" ->
-      v6_and_above
-        ec_pairing_check_bls12_381_type
-        ec_pairing_check_bls12_381_name
   | _ -> None
 
 let lookup ~version name =
@@ -1541,7 +1459,6 @@ let base =
       (reveal_metadata_name, reveal_metadata);
       (store_read_name, store_read);
       (store_write_name, store_write);
-      (ec_pairing_check_bls12_381_name, ec_pairing_check_bls12_381);
     ]
 
 let with_write_debug ~write_debug:implem builder =
@@ -1678,8 +1595,4 @@ module Internal_for_tests = struct
   let store_get_hash = Func.HostFunc (store_get_hash_type, store_get_hash_name)
 
   let write_debug = Func.HostFunc (write_debug_type, write_debug_name)
-
-  let ec_pairing_check_bls12_381 =
-    Func.HostFunc
-      (ec_pairing_check_bls12_381_type, ec_pairing_check_bls12_381_name)
 end

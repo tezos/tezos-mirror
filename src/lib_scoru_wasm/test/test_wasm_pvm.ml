@@ -486,26 +486,6 @@ let try_availability_above_v1_only ~version import_name import_params
   assert (predicate state) ;
   Lwt_result_syntax.return_unit
 
-let try_availability_above_v6_only ~version import_name import_params
-    import_results () =
-  let open Lwt_syntax in
-  let* tree =
-    initial_state
-      ~version
-      ~from_binary:false
-      (nop_module import_name import_params import_results)
-  in
-  let* tree = set_empty_inbox_step 0l tree in
-  let* tree = eval_until_input_or_reveal_requested tree in
-  let* state = Wasm.Internal_for_tests.get_tick_state tree in
-  let predicate state =
-    match version with
-    | V0 | V1 | V2 | V3 | V4 | V5 -> is_stuck state
-    | V6 | VExperimental -> not (is_stuck state)
-  in
-  assert (predicate state) ;
-  Lwt_result_syntax.return_unit
-
 let try_run_store_get_hash ~version =
   try_availability_above_v1_only
     ~version
@@ -525,13 +505,6 @@ let try_run_store_create ~version =
     ~version
     "store_create"
     ["i32"; "i32"; "i32"]
-    ["i32"]
-
-let try_run_ec_pairing_check ~version =
-  try_availability_above_v6_only
-    ~version
-    "ec_pairing_check_bls12_381"
-    ["i32"; "i32"; "i32"; "i32"]
     ["i32"]
 
 let test_modify_read_only_storage_kernel ~version () =
@@ -1842,7 +1815,6 @@ let tests =
         try_run_store_get_hash );
       ("Test store_delete_value available", `Quick, try_run_store_delete_value);
       ("Test store_create available", `Quick, try_run_store_create);
-      ("Test ec_pairing_check available", `Quick, try_run_ec_pairing_check);
       ( "Test unreachable kernel (tick per tick)",
         `Quick,
         fun ~version ->
