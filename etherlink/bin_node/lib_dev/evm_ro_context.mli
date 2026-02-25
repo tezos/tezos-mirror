@@ -69,6 +69,7 @@ type replay_result =
       diverged : bool;
       process_time : Ptime.span;
       execution_gas : Ethereum_types.quantity;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Replay_failure
 

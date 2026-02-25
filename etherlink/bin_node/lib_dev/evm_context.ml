@@ -1373,7 +1373,7 @@ module State = struct
     in
 
     match try_apply with
-    | Apply_success {evm_state; block} -> (
+    | Apply_success {evm_state; block; tezos_block} -> (
         let block_hash = L2_types.block_hash block in
         match (ctxt.session.future_block_info, sequencer_block_hash) with
         (* When IC is executing and sequencer hash is present:
@@ -1417,6 +1417,7 @@ module State = struct
               ( evm_state,
                 context,
                 block,
+                tezos_block,
                 applied_kernel_upgrade,
                 applied_sequencer_upgrade,
                 split_info,
@@ -1542,15 +1543,16 @@ module State = struct
 
   let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
       timestamp chunks payload delayed_transactions :
-      'a L2_types.block tzresult Lwt.t =
+      ('a L2_types.block * L2_types.Tezos_block.t option) tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let+ current_block, _execution_gas =
-      Misc.with_timing_f_e (fun (block, execution_gas) ->
+    let+ current_block, current_tezos_block, _execution_gas =
+      Misc.with_timing_f_e (fun (block, _tezos_block, execution_gas) ->
           Blueprint_events.blueprint_applied block execution_gas)
       @@ fun () ->
       let* ( evm_state,
              context,
              current_block,
+             current_tezos_block,
              applied_kernel_upgrade,
              applied_sequencer_upgrade,
              split_info,
@@ -1610,9 +1612,9 @@ module State = struct
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
       in
-      return (current_block, execution_gas)
+      return (current_block, current_tezos_block, execution_gas)
     in
-    current_block
+    (current_block, current_tezos_block)
 
   and apply_evm_event_unsafe ctxt conn event =
     let open Lwt_result_syntax in
@@ -2510,9 +2512,9 @@ module Handlers = struct
           State.Transaction.run ctxt @@ fun ctxt conn ->
           apply_blueprint ?expected_block_hash ctxt conn
         in
-        let* block =
+        let* block, tezos_block =
           match result with
-          | Ok block -> return block
+          | Ok (block, tezos_block) -> return (block, tezos_block)
           | Error trace -> (
               match State.find_divergence_or_unsync trace with
               | Some (`Divergence (level, block_hash, expected_block_hash)) ->
@@ -2539,7 +2541,28 @@ module Handlers = struct
                   List.to_seq tx_objects |> Seq.map Transaction_object.hash)
           | Tez _ -> Seq.empty
         in
-        return tx_hashes
+        let* tezos_tx_hashes =
+          match tezos_block with
+          | None -> return Seq.empty
+          | Some block ->
+              let open Tezos_services in
+              let ( (module Proto : Tezlink_protocol),
+                    (module Next_proto : Tezlink_protocol) ) =
+                Tezlink_directory.protocol_for_block_or_level (Ok block)
+              in
+              let module Block_services =
+                Make_block_service (Proto) (Next_proto)
+              in
+              let*? op_headers =
+                Block_services.deserialize_operations_header block.operations
+              in
+              op_headers |> List.to_seq
+              |> Seq.map (fun (hash, _header, _op_and_receipt) ->
+                     hash |> Operation_hash.to_bytes
+                     |> Ethereum_types.decode_hash)
+              |> return
+        in
+        return (Seq.append tx_hashes tezos_tx_hashes)
     | Last_known_L1_level -> (
         protect @@ fun () ->
         let ctxt = Worker.state self in

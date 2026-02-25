@@ -347,6 +347,7 @@ type apply_result =
   | Apply_success of {
       evm_state : t;
       block : Ethereum_types.legacy_transaction_object L2_types.block;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Apply_failure
 
@@ -432,9 +433,40 @@ let retrieve_block_at_root ~chain_family ~root evm_state =
     in
     return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
 
+(** [retrieve_block ~chain_family evm_state] returns 0, 1, or 2 blocks
+    as a (first_block * second_block option) option as follows:
+
+    - The first block's kind and the path at which it is read depends
+      on the [chain_family] argument; if the chain family is Michelson,
+      the block is read at the Tezlink root path and expected to be a
+      Tezos block, if the chain family is EVM, the block is read at the
+      Etherlink root path and expected to be an Ethereum block.
+
+    - The second block is attempted to be read at the Tezos X Michelson
+      runtime's path, if something is found at that path, it is always
+      expected to be a Tezos block.
+
+    - If the fist block cannot be read or deserialized, the second read
+      is ignored and this function returns [None].
+
+*)
 let retrieve_block ~chain_family evm_state =
+  let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
-  retrieve_block_at_root ~chain_family ~root evm_state
+  let* block_opt = retrieve_block_at_root ~chain_family ~root evm_state in
+  let* tezos_block_opt =
+    retrieve_block_at_root
+      ~chain_family:Michelson
+      ~root:Durable_storage_path.tezosx_tezos_blocks_root
+      evm_state
+  in
+  let tezos_block =
+    match tezos_block_opt with
+    | Some (L2_types.Tez block) -> Some block
+    | Some (L2_types.Eth _) -> None
+    | None -> None
+  in
+  return (Option.map (fun block -> (block, tezos_block)) block_opt)
 
 let assemble_block (type f) ~pool ~data_dir
     ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
@@ -473,10 +505,10 @@ let assemble_block (type f) ~pool ~data_dir
   let before_height = Z.pred height in
   let* block = retrieve_block ~chain_family evm_state in
   match block with
-  | Some block ->
+  | Some (block, tezos_block) ->
       let (Qty after_height) = L2_types.block_number block in
       if Z.(equal (succ before_height) after_height) then
-        return (Apply_success {evm_state; block})
+        return (Apply_success {evm_state; block; tezos_block})
       else return Apply_failure
   | None -> return Apply_failure
 
@@ -519,7 +551,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   in
   let* block = retrieve_block ~chain_family evm_state in
   match block with
-  | Some block ->
+  | Some (block, tezos_block) ->
       let (Qty after_height) = L2_types.block_number block in
       let*! () =
         match (profile, log_file) with
@@ -528,7 +560,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
         | _ -> Lwt_syntax.return_unit
       in
       if Z.(equal (succ before_height) after_height) then
-        return (Apply_success {evm_state; block})
+        return (Apply_success {evm_state; block; tezos_block})
       else return Apply_failure
   | _ -> return Apply_failure
 

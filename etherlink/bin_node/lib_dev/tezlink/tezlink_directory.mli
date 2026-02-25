@@ -13,3 +13,8 @@ val register_tezlink_services :
   add_operation:(bytes -> Ethereum_types.hash tzresult Lwt.t) ->
   (module Tezlink_backend_sig.S) ->
   unit Tezos_rpc.Directory.t
+
+val protocol_for_block_or_level :
+  L2_types.Tezos_block.t tzresult ->
+  (module Tezos_services.Tezlink_protocol)
+  * (module Tezos_services.Tezlink_protocol)

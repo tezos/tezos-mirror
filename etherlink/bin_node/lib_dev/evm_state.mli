@@ -106,6 +106,7 @@ type apply_result =
   | Apply_success of {
       evm_state : t;
       block : Ethereum_types.legacy_transaction_object L2_types.block;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Apply_failure
 
