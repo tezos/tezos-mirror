@@ -7,137 +7,70 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let install_finalizer ~(tx_container : _ Services_backend_sig.tx_container)
-    server_finalizer =
+let install_finalizer server_finalizer =
   let open Lwt_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_finalizer () in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_container.shutdown () in
+  let* () = Tx_queue.shutdown () in
   Evm_context.shutdown ()
 
-let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~evm_node_endpoint ~keep_alive ~timeout :
-    f Services_backend_sig.tx_container tzresult =
-  let (module Tx_container) =
-    (module struct
-      type address = Ethereum_types.address
-
-      type transaction_object = Transaction_object.t
-
-      let nonce ~next_nonce _address = Lwt_result.return next_nonce
-
-      let add_pending_callback _ ~callback:_ = Lwt_result_syntax.return_unit
-
-      let add ?callback:_ ~next_nonce:_ _tx_object ~raw_tx =
-        match evm_node_endpoint with
-        | Some evm_node_endpoint ->
-            Injector.send_raw_transaction
-              ~keep_alive
-              ~timeout
-              ~base:evm_node_endpoint
-              ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-        | None ->
-            Lwt.return_ok
-            @@ Error
-                 "the node is in read-only mode, it doesn't accept transactions"
-
-      let find _hash = Lwt_result.return None
-
-      let content () =
-        Lwt_result.return
-          Transaction_object.
-            {
-              pending = Ethereum_types.AddressMap.empty;
-              queued = Ethereum_types.AddressMap.empty;
-            }
-
-      let shutdown () = Lwt_result_syntax.return_unit
-
-      let clear () = Lwt_result_syntax.return_unit
-
-      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
-
-      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-        Lwt_result_syntax.return_unit
-
-      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-          ~initial_validation_state:_ =
-        Lwt_result_syntax.return_nil
-
-      let size_info () =
-        Lwt_result.return
-          Metrics.Tx_pool.{number_of_addresses = 0; number_of_transactions = 0}
-
-      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-        Lwt_result_syntax.return_unit
-
-      let dropped_transaction ~dropped_tx:_ ~reason:_ =
-        Lwt_result_syntax.return_unit
-    end : Services_backend_sig.Tx_container
-      with type address = Ethereum_types.address
-       and type transaction_object = Transaction_object.t)
-  in
-  let open Result_syntax in
-  match chain_family with
-  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
-  | Michelson ->
-      error_with "Proxy.container_forward_tx not implemented for Tezlink"
-
-let tx_queue_pop_and_inject (type f)
-    (module Rollup_node_rpc : Services_backend_sig.S)
-    ~(tx_container : f Services_backend_sig.tx_container) ~smart_rollup_address
-    =
+let tx_queue_pop_and_inject (module Rollup_node_rpc : Services_backend_sig.S)
+    ~smart_rollup_address =
   let open Lwt_result_syntax in
-  match tx_container with
-  | Evm_tx_container m -> (
-      let (module Tx_container) = m in
-      let maximum_cumulative_size =
-        Sequencer_blueprint.maximum_usable_space_in_blueprint
-          Sequencer_blueprint.maximum_chunks_per_l1_level
-      in
-      let initial_validation_state = 0 in
-      let validate_tx current_size raw_tx _tx_object =
-        let new_size = current_size + String.length raw_tx in
-        if new_size >= maximum_cumulative_size then return `Stop
-        else return (`Keep new_size)
-      in
-      let* popped_txs =
-        Tx_container.pop_transactions
-          ~maximum_cumulative_size
-          ~initial_validation_state
-          ~validate_tx
-      in
-      let*! hashes =
-        Rollup_node_rpc.Etherlink.inject_transactions
-        (* The timestamp is ignored in observer and proxy mode, it's just for
+  let maximum_cumulative_size =
+    Sequencer_blueprint.maximum_usable_space_in_blueprint
+      Sequencer_blueprint.maximum_chunks_per_l1_level
+  in
+  let initial_validation_state = 0 in
+  let validate_tx current_size raw_tx _tx_object =
+    let new_size = current_size + String.length raw_tx in
+    if new_size >= maximum_cumulative_size then return `Stop
+    else return (`Keep new_size)
+  in
+  let* popped_txs =
+    Tx_queue.pop_transactions
+      ~maximum_cumulative_size
+      ~initial_validation_state
+      ~validate_tx
+  in
+  (* The rollup-node injection endpoint only accepts Etherlink transactions. *)
+  let popped_txs =
+    List.filter_map
+      (fun (raw_tx, tx_object) ->
+        match tx_object with
+        | Tx_queue_types.Evm tx_object -> Some (raw_tx, tx_object)
+        | Tx_queue_types.Michelson _ -> None)
+      popped_txs
+  in
+  if List.is_empty popped_txs then return_unit
+  else
+    let*! hashes =
+      Rollup_node_rpc.Etherlink.inject_transactions
+      (* The timestamp is ignored in observer and proxy mode, it's just for
        compatibility with sequencer mode. *)
-          ~timestamp:(Misc.now ())
-          ~smart_rollup_address
-          ~transactions:popped_txs
-      in
-      match hashes with
-      | Error trace ->
-          let*! () = Tx_pool_events.transaction_injection_failed trace in
-          return_unit
-      | Ok hashes ->
-          let* () =
-            Tx_container.confirm_transactions
-              ~clear_pending_queue_after:true
-              ~confirmed_txs:(List.to_seq hashes)
-          in
-          let*! () =
-            List.iter_s
-              (fun hash -> Tx_pool_events.transaction_injected ~hash)
-              hashes
-          in
-          return_unit)
-  | Michelson_tx_container _ -> return_unit
+        ~timestamp:(Misc.now ())
+        ~smart_rollup_address
+        ~transactions:popped_txs
+    in
+    match hashes with
+    | Error trace ->
+        let*! () = Tx_pool_events.transaction_injection_failed trace in
+        return_unit
+    | Ok hashes ->
+        let* () =
+          Tx_queue.confirm_transactions
+            ~clear_pending_queue_after:true
+            ~confirmed_txs:(List.to_seq hashes)
+        in
+        let*! () =
+          List.iter_s
+            (fun hash -> Tx_pool_events.transaction_injected ~hash)
+            hashes
+        in
+        return_unit
 
 let main
     ({
@@ -203,41 +136,23 @@ let main
       let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
       Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain
   in
-  let* on_new_head, tx_container =
-    match
-      ( config.experimental_features.enable_send_raw_transaction,
-        config.proxy.evm_node_endpoint )
-    with
-    | true, None ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family in
-        let* () =
-          start
-            ~config:config.tx_queue
-            ~keep_alive:config.keep_alive
-            ~timeout:config.rpc_timeout
-            ~start_injector_worker:true
-            ()
-        in
-        return
-        @@ ( Some
-               (fun () ->
-                 tx_queue_pop_and_inject
-                   (module Rollup_node_rpc)
-                   ~tx_container
-                   ~smart_rollup_address),
-             tx_container )
-    | enable_send_raw_transaction, evm_node_endpoint ->
-        let evm_node_endpoint =
-          if enable_send_raw_transaction then evm_node_endpoint else None
-        in
-        let*? tx_container =
-          container_forward_tx
-            ~chain_family
-            ~evm_node_endpoint
-            ~keep_alive
-            ~timeout:config.rpc_timeout
-        in
-        return (None, tx_container)
+  let* () =
+    Tx_queue.start
+      ~config:config.tx_queue
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~start_injector_worker:true
+      ()
+  in
+  (* Two forwarding strategies:
+     - no [proxy.evm_node_endpoint]: flush queued txs on each new rollup head,
+     - with [proxy.evm_node_endpoint]: forward queued txs periodically via beacon. *)
+  let on_new_head =
+    if Option.is_none config.proxy.evm_node_endpoint then
+      Some
+        (fun () ->
+          tx_queue_pop_and_inject (module Rollup_node_rpc) ~smart_rollup_address)
+    else None
   in
   let* () =
     Prevalidator.start ~chain_family validation_mode (module Rollup_node_rpc)
@@ -250,10 +165,19 @@ let main
       ~rollup_node_endpoint_timeout:rpc_timeout
       ()
   in
+  let () =
+    match config.proxy.evm_node_endpoint with
+    | Some evm_node_endpoint ->
+        Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+            Tx_queue.tx_queue_beacon
+              ~evm_node_endpoint:(Rpc evm_node_endpoint)
+              ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s))
+    | _ -> ()
+  in
 
   let* server_finalizer =
     Rpc_server.start_public_server
-      ~mode:(Proxy tx_container)
+      ~mode:Proxy
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
       ~tick:(fun () -> Lwt_result_syntax.return_unit)
@@ -261,7 +185,7 @@ let main
       ((module Rollup_node_rpc), smart_rollup_address)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
-    install_finalizer server_finalizer ~tx_container
+    install_finalizer server_finalizer
   in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in

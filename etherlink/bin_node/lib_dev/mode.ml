@@ -14,7 +14,7 @@ type local_node_info = {
 
 (** Available modes. *)
 type 'f t =
-  | Sequencer : 'a Services_backend_sig.tx_container -> 'a t
-  | Observer : 'a Services_backend_sig.tx_container -> 'a t
-  | Proxy : 'a Services_backend_sig.tx_container -> 'a t
+  | Sequencer : 'a t
+  | Observer : 'a t
+  | Proxy : 'a t
   | Rpc : local_node_info -> 'a t

@@ -10,18 +10,6 @@
     [eth_sendRawTransaction] at a regular interval. It provides a non-blocking
     interface based on the use of callbacks. *)
 
-(** Backward-compatible typed container wrapper around the unified queue API.
-    This is removed once all callers switch to direct [Tx_queue] functions. *)
-val tx_container :
-  chain_family:'f L2_types.chain_family ->
-  (config:Configuration.tx_queue ->
-  keep_alive:bool ->
-  timeout:float ->
-  start_injector_worker:bool ->
-  unit ->
-  unit tzresult Lwt.t)
-  * 'f Services_backend_sig.tx_container
-
 (** [nonce ~next_nonce address] must returns the next gap nonce
     available. *)
 val nonce :

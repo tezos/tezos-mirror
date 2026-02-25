@@ -63,9 +63,6 @@ end
 module Tx_queue = struct
   include Tx_queue
 
-  let start, Services_backend_sig.Evm_tx_container tx_container =
-    tx_container ~chain_family:EVM
-
   let ( let**? ) v f =
     let open Lwt_result_syntax in
     match v with Ok v -> f v | Error err -> return (Error err)
@@ -73,12 +70,13 @@ module Tx_queue = struct
   (* as found in etherlink/bin_floodgate/tx_queue.ml *)
   let transfer ctx ?to_ ?(value = Z.zero) ~data () =
     let open Lwt_result_syntax in
-    let (module Tx_container) = tx_container in
     let (Ethereum_types.Qty nonce as qnonce) = ctx.nonce in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
     let*? tx_object = Transaction_object.decode tx_raw in
-    let+ res = Tx_container.add tx_object ~raw_tx:txn ~next_nonce:qnonce in
+    let+ res =
+      add (Tx_queue_types.Evm tx_object) ~raw_tx:txn ~next_nonce:qnonce
+    in
     match res with
     | Ok _hash ->
         ctx.nonce <- Ethereum_types.Qty.next ctx.nonce ;
@@ -901,9 +899,8 @@ let handle_confirmed_txs {db; ws_client; rpc_timeout; _} number =
                  (nonce, exec.transactionHash, exec.blockNumber)
              in
              let* () = Db.Deposits.set_claimed db nonce exec in
-             let (module Tx_container) = Tx_queue.tx_container in
              let* () =
-               Tx_container.confirm_transactions
+               Tx_queue.confirm_transactions
                  ~clear_pending_queue_after:false
                  ~confirmed_txs:(Seq.cons tx_hash Seq.empty)
              in
@@ -937,8 +934,7 @@ let claim_deposits ctx =
       in
       ctx.nonce <- nonce ;
       (* Clear queue because we reinject all missing claims. *)
-      let (module Tx_container) = Tx_queue.tx_container in
-      let* () = Tx_container.clear () in
+      let* () = Tx_queue.clear () in
       let handle_deposits deposit =
         let is_native = Db.(deposit.token = XTZ) in
         let deposit_id_qty = deposit.nonce in
@@ -1181,10 +1177,9 @@ let start db ~config ~notify_ws_change ~first_block =
   in
   let rec tx_queue_beacon () =
     let open Lwt_syntax in
-    let (module Tx_container) = Tx_queue.tx_container in
     let* res =
       protect @@ fun () ->
-      Tx_container.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
+      Tx_queue.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
     in
     let* () =
       match res with

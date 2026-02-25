@@ -33,45 +33,43 @@ type preconfirmed_transactions_result = {
           many transaction. *)
 }
 
-module L2_transaction : sig
-  type t = transaction_object_t
+type t = transaction_object_t
 
-  type address
+type address
 
-  type nonce
+type nonce
 
-  val address_encoding : address Data_encoding.t
+val address_encoding : address Data_encoding.t
 
-  val hash_of_tx_object : t -> Ethereum_types.hash
+val hash_of_tx_object : t -> Ethereum_types.hash
 
-  val address_to_string : address -> string
+val address_to_string : address -> string
 
-  val address_of_string : string -> address
+val address_of_string : string -> address
 
-  val from_address_of_tx_object : t -> address
+val from_address_of_tx_object : t -> address
 
-  val bitset_add_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+val bitset_add_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
 
-  val bitset_remove_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+val bitset_remove_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
 
-  val next_nonce : nonce -> Z.t
+val next_nonce : nonce -> Z.t
 
-  (* Used only for the [Content] request. *)
-  val nonce_to_z_opt : nonce -> Z.t option
+(* Used only for the [Content] request. *)
+val nonce_to_z_opt : nonce -> Z.t option
 
-  val nonce_of_tx_object : t -> nonce
+val nonce_of_tx_object : t -> nonce
 
-  val to_transaction_object_t : t -> transaction_object_t
+val to_transaction_object_t : t -> transaction_object_t
 
-  module AddressMap : Map.S with type key = address
+module AddressMap : Map.S with type key = address
 
-  val forward_batch_method : t -> string
+val forward_batch_method : t -> string
 
-  val make_txpool :
-    pending:t Ethereum_types.NonceMap.t AddressMap.t ->
-    queued:t Ethereum_types.NonceMap.t AddressMap.t ->
-    Transaction_object.txqueue_content
-end
+val make_txpool :
+  pending:t Ethereum_types.NonceMap.t AddressMap.t ->
+  queued:t Ethereum_types.NonceMap.t AddressMap.t ->
+  Transaction_object.txqueue_content
 
 type tezlink_batch_nonces = {first : Z.t; length : int}
 

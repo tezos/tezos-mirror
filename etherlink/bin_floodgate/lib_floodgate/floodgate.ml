@@ -23,16 +23,9 @@ type ic_data = {ic_bench : ic_bench; oc : out_channel}
 
 let ic_bench_size = 100
 
-let start_container, container =
-  Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-
 let raw_transfer ?(callback = fun _ -> Lwt.return_unit) ~raw_tx
     ~transaction_object ~infos ~from () =
   let open Lwt_result_syntax in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let (Qty gas_limit) = Transaction_object.gas transaction_object in
   let (Qty value) = Transaction_object.value transaction_object in
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
@@ -46,7 +39,11 @@ let raw_transfer ?(callback = fun _ -> Lwt.return_unit) ~raw_tx
   in
   let next_nonce = Ethereum_types.quantity_of_z from.nonce in
   let* add_res =
-    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
   in
   match add_res with
   | Ok (_ : Ethereum_types.hash) -> return_unit
@@ -71,10 +68,6 @@ let transfer ?callback ?to_ ?(value = Z.zero) ?nonce ?data ~gas_limit ~infos
 
 let send_raw_transaction ~relay_endpoint txn =
   let open Lwt_result_syntax in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let module Srt = Rpc_encodings.Send_raw_transaction in
   let uuid_seed = Random.get_state () in
   let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
@@ -385,13 +378,13 @@ let wait_for_receipt ~rpc_endpoint ?to_ ?(value = Z.zero) ?data ?nonce
         Lwt.wakeup waiter result ;
         return_unit
   in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let next_nonce = Ethereum_types.quantity_of_z from.nonce in
   let* add_res =
-    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
   in
   let* () =
     match add_res with
@@ -564,10 +557,6 @@ let start_new_head_monitor ~ws_uri =
   in
   let* () = Websocket_client.connect ws_client in
   let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   lwt_stream_iter_es
     (fun head ->
       let*? block = head in
@@ -577,7 +566,7 @@ let start_new_head_monitor ~ws_uri =
       match block.Ethereum_types.transactions with
       | TxHash hashes ->
           State.incr_transactions_count (List.length hashes) ;
-          Tx_container.confirm_transactions
+          Evm_node_lib_dev.Tx_queue.confirm_transactions
             ~clear_pending_queue_after:false
             ~confirmed_txs:(List.to_seq hashes)
       | TxFull _ -> return_unit)
@@ -672,10 +661,6 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data () =
       ~timeout:Network_info.timeout
       ()
   in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let instant_confirmations = Option.is_some ic_data in
   Blueprints_follower.start
     ~multichain:false
@@ -690,7 +675,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data () =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
             State.incr_transactions_count (List.length hashes) ;
-            Tx_container.confirm_transactions
+            Evm_node_lib_dev.Tx_queue.confirm_transactions
               ~clear_pending_queue_after:false
               ~confirmed_txs:(List.to_seq hashes)
         | Error _ -> return_unit
@@ -755,15 +740,11 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
       controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let config : Configuration.tx_queue =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
   let* () =
-    start_container
+    Evm_node_lib_dev.Tx_queue.start
       ~config
       ~keep_alive:true
       ~timeout:10.
@@ -785,7 +766,7 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
           start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ()) ;
 
   Misc.background_task ~name:"tx_queue_beacon" (fun () ->
-      Tx_container.tx_queue_beacon
+      Evm_node_lib_dev.Tx_queue.tx_queue_beacon
         ~evm_node_endpoint:(Rpc relay_endpoint)
         ~tick_interval) ;
 

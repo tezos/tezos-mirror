@@ -8,7 +8,6 @@
 type parameters = {
   signer : Signer.map;
   maximum_number_of_chunks : int;
-  tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
   preconfirmation_stream_enabled : bool;
 }

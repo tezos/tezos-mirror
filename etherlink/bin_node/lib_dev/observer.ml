@@ -206,17 +206,13 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~l2_chains:config.experimental_features.l2_chains
   in
 
-  let* tx_container =
-    let start, tx_container = Tx_queue.tx_container ~chain_family in
-    let* () =
-      start
-        ~config:config.tx_queue
-        ~keep_alive:config.keep_alive
-        ~timeout:config.rpc_timeout
-        ~start_injector_worker:true
-        ()
-    in
-    return tx_container
+  let* () =
+    Tx_queue.start
+      ~config:config.tx_queue
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~start_injector_worker:true
+      ()
   in
 
   let* _loaded =
@@ -228,7 +224,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
            smart_rollup_address)
       ~store_perm:Read_write
       ?snapshot_source
-      ~tx_container
       ()
   in
 
@@ -284,7 +279,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~mode:(Observer tx_container)
+      ~mode:Observer
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
@@ -295,7 +290,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~mode:(Observer tx_container)
+      ~mode:Observer
       ~rpc_server_family
       ~tick
       config

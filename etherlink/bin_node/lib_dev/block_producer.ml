@@ -8,7 +8,6 @@
 type parameters = {
   signer : Signer.map;
   maximum_number_of_chunks : int;
-  tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
   preconfirmation_stream_enabled : bool;
 }
@@ -84,7 +83,6 @@ module Types = struct
   type state = {
     signer : Signer.map;
     maximum_number_of_chunks : int;
-    tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
     mutable locked : bool;
@@ -452,10 +450,8 @@ let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
 
 (** Produces a block if we find at least one valid transaction in the
     transaction pool. *)
-let produce_block_if_needed (type f) ~signer ~timestamp ~delayed_hashes
-    ~transactions_and_objects
-    ~(tx_container : f Services_backend_sig.tx_container)
-    ~clear_pending_queue_after head_info =
+let produce_block_if_needed ~signer ~timestamp ~delayed_hashes
+    ~transactions_and_objects ~clear_pending_queue_after head_info =
   let open Lwt_result_syntax in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if n > 0 then
@@ -467,13 +463,8 @@ let produce_block_if_needed (type f) ~signer ~timestamp ~delayed_hashes
         ~delayed_hashes
         head_info
     in
-    let (module Tx_container) =
-      Services_backend_sig.tx_container_module tx_container
-    in
     let* () =
-      Tx_container.confirm_transactions
-        ~clear_pending_queue_after
-        ~confirmed_txs
+      Tx_queue.confirm_transactions ~clear_pending_queue_after ~confirmed_txs
     in
     return (`Block_produced n)
   else return `No_block
@@ -653,10 +644,6 @@ let choose_block_timestamp preconfirmation_state (force : force) =
 
 let produce_block (state : Types.state) ~force ~with_delayed_transactions =
   let open Lwt_result_syntax in
-  let (Ex_tx_container tx_container) = state.tx_container in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   (* now and timestamp serve distinct but complementary purposes:
      - now: taken at the start of the request, used to predict the next timestamp
        and keep it aligned with real time.
@@ -751,7 +738,6 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
           ~timestamp
           ~transactions_and_objects
           ~delayed_hashes
-          ~tx_container
           ~clear_pending_queue_after:
             (not (preconfirmation_stream_enabled state))
           head_info
@@ -963,7 +949,6 @@ module Handlers = struct
       ({
          signer;
          maximum_number_of_chunks;
-         tx_container;
          sequencer_sunset_sec;
          preconfirmation_stream_enabled;
        } :
@@ -975,7 +960,6 @@ module Handlers = struct
           locked = false;
           signer;
           maximum_number_of_chunks;
-          tx_container;
           sequencer_sunset_sec;
           preconfirmation_state =
             (if preconfirmation_stream_enabled then Awaiting_first_timestamp
