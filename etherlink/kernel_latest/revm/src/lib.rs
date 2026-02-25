@@ -970,6 +970,15 @@ mod test {
             .get_balance(&mut host, &alias, tezosx_interfaces::RuntimeId::Tezos)
             .unwrap();
         assert_eq!(balance, primitive_types::U256::from(5));
+
+        let precompile_account =
+            StorageAccount::from_address(&RUNTIME_GATEWAY_PRECOMPILE_ADDRESS).unwrap();
+        let precompile_info = precompile_account.info(&mut host).unwrap();
+        assert_eq!(
+            precompile_info.balance,
+            U256::ZERO,
+            "Gateway precompile should have zero balance after bridge"
+        );
     }
 
     #[test]
