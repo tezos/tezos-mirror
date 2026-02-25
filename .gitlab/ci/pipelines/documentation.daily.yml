@@ -388,7 +388,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-3bb7eddc
   stage: test
   tags:
   - gcp
@@ -407,7 +407,7 @@ documentation.install_python_bookworm:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_24_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-3bb7eddc
   stage: test
   tags:
   - gcp
@@ -426,7 +426,7 @@ documentation.install_python_24_04:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_22_04:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
   stage: test
   tags:
   - gcp
