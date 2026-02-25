@@ -607,11 +607,18 @@ module Make (P : External_process_parameters.S) = struct
           let*! () = Events.(emit request_result (prequest, timespan)) in
           Lwt.return res)
         (fun exn ->
-          if retried then fail_with_exn exn
-          else
-            (* The hypervisee appears to be down, we restart it. *)
-            let* () = restart_hypervisee ~stop_hypervisee:false p in
-            send_request_aux ~retried:true)
+          match exn with
+          | Lwt.Canceled ->
+              (* The request was canceled (e.g. the bootstrap pipeline
+                 was canceled due to a peer disconnection). The external
+                 process is still healthy, do not restart it. *)
+              fail_with_exn exn
+          | _ ->
+              if retried then fail_with_exn exn
+              else
+                (* The hypervisee appears to be down, we restart it. *)
+                let* () = restart_hypervisee ~stop_hypervisee:false p in
+                send_request_aux ~retried:true)
     in
     send_request_aux ~retried:false
 

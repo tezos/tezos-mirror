@@ -515,7 +515,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Prometheus.Counter.inc_one
               metrics.operations_fetching_canceled_new_branch ;
             Lwt.return_error err)
-    | Canceled :: _ ->
+    | first :: _ when Block_validator.is_canceled_error first ->
         let* () =
           Events.(emit terminating_worker)
             (pv.peer_id, Format.asprintf "canceled")
