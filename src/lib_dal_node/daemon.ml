@@ -675,7 +675,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       ~cctxt
       ~header
       ~config
-      ~current_head_proto_parameters:proto_parameters
       ~first_seen_level:(Option.value first_seen_level ~default:head_level)
       profile_ctxt
       proto_plugins

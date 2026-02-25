@@ -19,7 +19,6 @@ val init :
   cctxt:Rpc_context.t ->
   header:Block_header.t ->
   config:Configuration_file.t ->
-  current_head_proto_parameters:Types.proto_parameters ->
   first_seen_level:int32 ->
   Profile_manager.t ->
   Proto_plugins.t ->

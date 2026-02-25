@@ -238,7 +238,6 @@ module Merge = struct
         ~cctxt
         ~header
         ~config
-        ~current_head_proto_parameters:proto_parameters
         ~first_seen_level
         profile_ctxt
         proto_plugins
