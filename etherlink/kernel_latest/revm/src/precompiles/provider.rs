@@ -11,7 +11,7 @@ use revm::{
 };
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
+    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
     journal::Journal,
     precompiles::{
         change_sequencer_key::change_sequencer_key_precompile,
@@ -56,7 +56,9 @@ impl EtherlinkPrecompiles {
         inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, Error>
     where
-        DB: DatabasePrecompileStateChanges,
+        DB: DatabasePrecompileStateChanges
+            + DatabaseCommitPrecompileStateChanges
+            + revm::Database,
         CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
@@ -107,7 +109,9 @@ impl EtherlinkPrecompiles {
 
 impl<CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    DB: DatabasePrecompileStateChanges,
+    DB: DatabasePrecompileStateChanges
+        + DatabaseCommitPrecompileStateChanges
+        + revm::Database,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
     type Output = InterpreterResult;

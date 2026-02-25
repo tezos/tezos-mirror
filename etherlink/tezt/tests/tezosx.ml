@@ -294,6 +294,12 @@ let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
     See [revm/src/precompiles/constants.rs:RUNTIME_GATEWAY_PRECOMPILE_ADDRESS]. *)
 let evm_gateway_address = "0xff00000000000000000000000000000000000007"
 
+let assert_evm_balance_zero ~address sequencer =
+  let*@ balance = Rpc.get_balance ~address sequencer in
+  Check.(
+    (balance = Wei.zero) Wei.typ ~error_msg:"Expected balance 0 but got %L") ;
+  unit
+
 (** [craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
     ~abi_signature ~arguments ()] crafts an EVM transaction, sends it, produces
     a block, asserts the receipt status matches [expected_status] (default
@@ -1281,6 +1287,7 @@ let check_evm_to_michelson_transfer ~sequencer ~sender ~nonce ~tezos_destination
     (evm_balance_after = Wei.(evm_balance_before - value - gas_fees))
       Wei.typ
       ~error_msg:"Expected EVM sender balance %R but got %L") ;
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
   unit
 
 let test_cross_runtime_transfer_from_evm_to_tz =
@@ -1581,6 +1588,7 @@ let test_cross_runtime_call_failwith =
     (Tez.to_mutez kt1_balance_after = Tez.to_mutez kt1_balance_before)
       int
       ~error_msg:"Expected KT1 balance %R but got %L") ;
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
   unit
 
 (** Test cross-runtime call from EVM to Michelson with calldata.
@@ -1639,11 +1647,15 @@ let test_cross_runtime_call_from_evm_to_michelson =
   let* () =
     Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
-  check_michelson_storage_value
-    ~sc_rollup_node
-    ~contract_hex
-    ~expected:(`O [("string", `String "Hello from EVM")])
-    ()
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex
+      ~expected:(`O [("string", `String "Hello from EVM")])
+      ()
+  in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  unit
 
 (** Test cross-runtime call from Michelson to EVM with calldata.
 
@@ -1847,6 +1859,7 @@ let test_evm_gateway_catch_revert =
     (Tez.to_mutez fails_balance = 0)
       int
       ~error_msg:"Expected failing contract balance 0 but got %L") ;
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
   unit
 
 (** Test that EVM REVERT in cross-runtime calls from Michelson properly
