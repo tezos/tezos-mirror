@@ -1513,6 +1513,32 @@ let register () =
   commit "tezt: generate regression test"
 }
 
+# TEZT COMMIT 01: Update alcotezt protocol tag
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: tezt/lib_alcotezt/alcotezt_utils.ml
+#
+# DESCRIPTION:
+#   Updates the protocol tag in alcotezt utilities.
+#   Snapshot: replaces the source protocol tag with the new label.
+#   Stabilise/copy: appends a new protocol tag entry before the catch-all.
+#
+# CREATES: 1 commit — "tezt: update protocol tag in alcotezt" (snapshot)
+#          or "tezt: add new protocol tag to alcotezt" (stabilise/copy)
+function tezt_commit_01_update_alcotezt() {
+  if [[ ${is_snapshot} == true ]]; then
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: update protocol tag in alcotezt"
+  else
+    temp_file=$(mktemp)
+    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
+    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
+    echo "  | Some _ -> assert false" >> "${temp_file}"
+    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: add new protocol tag to alcotezt"
+  fi
+}
+
 function update_tezt_tests() {
 
   if [[ $skip_update_tezt_tests ]]; then
@@ -1525,19 +1551,7 @@ function update_tezt_tests() {
 
   # Update tezt tests
 
-  # automatically add the new protocol tag to alcotezt
-
-  if [[ ${is_snapshot} == true ]]; then
-    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: update protocol tag in alcotezt"
-  else
-    temp_file=$(mktemp)
-    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
-    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
-    echo "  | Some _ -> assert false" >> "${temp_file}"
-    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: add new protocol tag to alcotezt"
-  fi
+  tezt_commit_01_update_alcotezt
 
   cd "${script_dir}"/..
 
