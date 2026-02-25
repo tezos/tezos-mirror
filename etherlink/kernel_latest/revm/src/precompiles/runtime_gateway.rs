@@ -1,12 +1,13 @@
 use alloy_sol_types::{sol, SolInterface};
 use revm::{
-    context::ContextTr,
+    context::{ContextTr, JournalTr},
+    context_interface::journaled_state::account::JournaledAccountTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
-    primitives::{alloy_primitives::IntoLogData, Bytes, Log},
+    primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
+    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
     journal::Journal,
     precompiles::{
         constants::{
@@ -49,7 +50,9 @@ pub(crate) fn runtime_gateway_precompile<CTX, DB>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    DB: DatabasePrecompileStateChanges,
+    DB: DatabasePrecompileStateChanges
+        + DatabaseCommitPrecompileStateChanges
+        + revm::Database,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
     // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
@@ -132,6 +135,19 @@ where
             };
             context.journal_mut().log(log);
         }
+    }
+
+    if !inputs.value.get().is_zero() {
+        // The value was bridged to Tezos — erase it from the precompile's
+        // EVM balance. set_balance records a BalanceChange journal entry so
+        // this is properly reverted if the enclosing call frame reverts.
+        let mut account_load = context
+            .journal_mut()
+            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
+            .map_err(|_| {
+                CustomPrecompileError::Revert("failed to load precompile account".into())
+            })?;
+        account_load.data.set_balance(U256::ZERO);
     }
 
     Ok(InterpreterResult {
