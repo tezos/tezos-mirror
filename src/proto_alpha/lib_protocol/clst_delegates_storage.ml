@@ -52,9 +52,9 @@ let activate_parameters ctxt ~new_cycle =
       (ctxt, new_cycle)
       ~order:`Undefined
       ~init:ctxt
-      ~f:(fun delegate t ctxt ->
+      ~f:(fun contract t ctxt ->
         match t with
-        | Update t -> Storage.Clst.Registered_delegates.add ctxt delegate t
-        | Unregister -> Storage.Clst.Registered_delegates.remove ctxt delegate)
+        | Update t -> Storage.Clst.Registered_delegates.add ctxt contract t
+        | Unregister -> Storage.Clst.Registered_delegates.remove ctxt contract)
   in
   Storage.Clst.Pending_delegate_parameters.clear (ctxt, new_cycle)

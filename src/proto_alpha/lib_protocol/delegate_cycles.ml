@@ -256,6 +256,9 @@ let cycle_end ctxt last_cycle =
         deactivated_delegates
     else return ctxt
   in
+  (* Reallocate CLST deposits before computing future staking rights,
+     so allocations are included. *)
+  let* ctxt = Clst_stake_allocation.rebalance_at_cycle_end ctxt ~new_cycle in
   (* Computing future staking rights *)
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
