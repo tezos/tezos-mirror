@@ -117,6 +117,19 @@ val is_slot_attested :
   string option IntMap.t ->
   bool
 
+(** [is_slot_attested_in_bitset ~protocol ~dal_parameters ~attested_level
+    ~published_level ~slot_index ~dal_attestation] checks if a delegate's
+    [~dal_attestation] at [attested_level] is attested for [slot_index]
+    from [published_level]. *)
+val is_slot_attested_in_bitset :
+  protocol:Protocol.t ->
+  dal_parameters:Parameters.t ->
+  attested_level:int ->
+  published_level:int ->
+  slot_index:int ->
+  dal_attestation:string ->
+  bool
+
 (** Encoding/decoding of the DAL content included in attestation operations. *)
 module Attestations : sig
   (** [encode_for_one_lag protocol ?lag_index dal_parameters slot_array] encodes
