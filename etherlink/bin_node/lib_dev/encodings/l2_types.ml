@@ -338,6 +338,8 @@ module Tezos_block = struct
   end
 end
 
+type single_tx_receipt = Ethereum of Transaction_receipt.t | Tezos
+
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
 
 let block_hash block =

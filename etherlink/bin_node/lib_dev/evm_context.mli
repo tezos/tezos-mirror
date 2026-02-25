@@ -185,14 +185,14 @@ val next_block_info :
 
 (** [execute_single_transaction transaction hash] executes
     a single Ethereum transaction within the current future block state.
-    Returns the execution outcome as [Transaction_receipt.t].
+    Returns the execution outcome as [Evm_state.single_tx_receipt].
     Returns [None] if instant confirmation is disabled.
     Returns an error if called while awaiting block info, as this indicates
     a bug in the caller. *)
 val execute_single_transaction :
   Broadcast.transaction ->
   Ethereum_types.hash ->
-  (Transaction_receipt.t option, tztrace) result Lwt.t
+  (L2_types.single_tx_receipt option, tztrace) result Lwt.t
 
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :
