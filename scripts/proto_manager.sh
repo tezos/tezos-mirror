@@ -1938,15 +1938,17 @@ function update_tezt_tests() {
 
 }
 
-function misc_updates() {
-
-  if [[ $skip_misc_updates ]]; then
-    echo "Skipping miscellaneous updates"
-    return 0
-  fi
-
-  # Misc. updates
-
+# MISC COMMIT 01: Update kaitai structs
+#
+# MODE: all modes; snapshot also removes source files
+# MODIFIES: client-libs/kaitai-struct-files/files/
+#
+# DESCRIPTION:
+#   Regenerates kaitai struct files for the new protocol.
+#   Snapshot: also removes source protocol kaitai files.
+#
+# CREATES: 0-1 commits — "kaitai: update structs" (conditional)
+function misc_commit_01_update_kaitai_structs() {
   log_blue "Update kaitai structs"
   make check-kaitai-struct-files || log_blue "updated kaitai files"
   make kaitai-struct-files-update
@@ -1954,7 +1956,20 @@ function misc_updates() {
     rm -rf "client-libs/kaitai-struct-files/files/${protocol_source}*"
   fi
   commit_if_changes "kaitai: update structs"
+}
 
+# MISC COMMIT 02: Update testnet_experiment_tools
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+#
+# DESCRIPTION:
+#   Updates the testnet experiment tools with the new protocol parameters.
+#   Snapshot: removes source protocol template, replaces references.
+#   Stabilise/copy: adds new protocol template and match case.
+#
+# CREATES: 1 commit — "devtools: update testnet_experiment_tools"
+function misc_commit_02_update_testnet_experiment_tools() {
   log_blue "add octez-activate-${label} command to client sandbox"
 
   if [[ ${is_snapshot} == true ]]; then
@@ -1968,7 +1983,19 @@ function misc_updates() {
   fi
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit "devtools: update testnet_experiment_tools"
+}
 
+# MISC COMMIT 03: Update linter
+#
+# MODE: snapshot (remove rule), stabilise/copy (add rule)
+# MODIFIES: scripts/lint.sh
+#
+# DESCRIPTION:
+#   Snapshot: removes the special formatting exclusion for the source protocol.
+#   Stabilise/copy: adds the new protocol to the formatting exclusion list.
+#
+# CREATES: 1 commit — "scripts: update linter to remove/add rule"
+function misc_commit_03_update_linter() {
   if [[ ${is_snapshot} == true ]]; then
     # update linter to remove special rule for stabilised protocol
     sed -i.old -e "s/ -not -name \"proto_${protocol_source}\"//" scripts/lint.sh
@@ -1978,15 +2005,53 @@ function misc_updates() {
     sed -i.old -e "s/-not -name \"proto_alpha\"/-not -name \"proto_${label}\" -not -name \"proto_alpha\"/" scripts/lint.sh
     commit "scripts: update linter to allow reformating of ${label} protocol"
   fi
+}
 
+# MISC COMMIT 04: Run linting
+#
+# MODE: all modes
+# MODIFIES: OCaml files (via scripts/lint.sh)
+#
+# DESCRIPTION:
+#   Cleans up .old files, then runs ocamlformat update and check.
+#
+# CREATES: 0-1 commits — "scripts: lint" (conditional)
+function misc_commit_04_run_linting() {
   find . -name '*.old' -exec rm {} \;
   scripts/lint.sh --update-ocamlformat || echo "updating ocamlformat files"
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
+}
 
+# MISC COMMIT 05: Regenerate CI
+#
+# MODE: all modes
+# MODIFIES: CI configuration files (via make -C ci)
+#
+# DESCRIPTION:
+#   Regenerates CI configuration after all protocol changes.
+#
+# CREATES: 1 commit — "ci: regenerate ci"
+function misc_commit_05_regenerate_ci() {
   log_blue "Update ci"
   make -C ci
   commit "ci: regenerate ci"
+}
+
+function misc_updates() {
+
+  if [[ $skip_misc_updates ]]; then
+    echo "Skipping miscellaneous updates"
+    return 0
+  fi
+
+  # Misc. updates
+
+  misc_commit_01_update_kaitai_structs
+  misc_commit_02_update_testnet_experiment_tools
+  misc_commit_03_update_linter
+  misc_commit_04_run_linting
+  misc_commit_05_regenerate_ci
 
 }
 
