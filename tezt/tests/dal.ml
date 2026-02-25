@@ -12327,12 +12327,6 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
     return dal_attestation_opt
   in
 
-  let number_of_lags = List.length dal_parameters.attestation_lags in
-  let is_max_lag_empty str =
-    let decoded = Dal.Attestations.decode protocol dal_parameters str in
-    Array.for_all not decoded.(number_of_lags - 1)
-  in
-
   let count_not_in_committee = ref 0 in
   let count_attestable_slots = ref 0 in
   let count_traps = ref 0 in
@@ -12380,50 +12374,56 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
         log_step "Level %d: Not_in_committee" attested_level ;
         unit
     | Not_in_committee, Some dal_attestation ->
-        (* With multi-lag, the delegate might be in committee for earlier lags
-           but not for max lag. Since get_attestable_slots only checks max lag,
-           we verify that the max lag portion of the attestation is empty. *)
-        if is_max_lag_empty dal_attestation then (
+        (* Delegate not in committee but included DAL attestation.
+           Check if they attested the slot from published_level. *)
+        if
+          Dal.is_slot_attested_in_bitset
+            ~protocol
+            ~dal_parameters
+            ~attested_level
+            ~published_level
+            ~slot_index
+            ~dal_attestation
+        then
+          Test.fail
+            "Level %d: Not_in_committee but delegate attested slot %d from \
+             published_level=%d"
+            attested_level
+            slot_index
+            published_level
+        else (
           log_step
-            "Level %d: Not_in_committee for max lag (attestation may contain \
-             data for other lags)"
+            "Level %d: Not_in_committee (attestation for other lags/levels)"
             attested_level ;
           unit)
-        else
-          Test.fail
-            "Level %d: Not_in_committee for max lag, but max lag portion of \
-             attestation is non-empty. dal_attestation=%s for %s"
-            attested_level
-            dal_attestation
-            new_account.public_key_hash
     | Attestable_slots _slots, None ->
         if published_level > first_level then
           Test.fail
-            "Level %d: delegate %s is in the DAL committee (attestable slots \
-             available) but no DAL attestation operation was found in the \
-             block. This is invalid: when in committee, the baker must include \
-             DAL content."
+            "Level %d: delegate %s is in committee but no DAL attestation found"
             attested_level
             new_account.public_key_hash
         else unit
-    | Attestable_slots _slots, Some actual_dal_attestable_slots ->
+    | Attestable_slots _slots, Some dal_attestation ->
+        let actual_bit =
+          Dal.is_slot_attested_in_bitset
+            ~protocol
+            ~dal_parameters
+            ~attested_level
+            ~published_level
+            ~slot_index
+            ~dal_attestation
+        in
         let expected_bit =
           match expected_bit_opt with Some b -> b | None -> false
         in
-        let actual_bit =
-          (Dal.Attestations.decode
-             protocol
-             dal_parameters
-             actual_dal_attestable_slots).(number_of_lags - 1).(slot_index)
-        in
         if actual_bit <> expected_bit then
           Test.fail
-            "Level %d: DAL node says bit(%d)=%b for max lag, but chain \
-             dal_attestation=%s (bit=%b)"
+            "Level %d: DAL node says bit(%d)=%b for published_level=%d, but \
+             delegate's attestation shows bit=%b"
             attested_level
             slot_index
             expected_bit
-            actual_dal_attestable_slots
+            published_level
             actual_bit
         else
           let* has_traps =
@@ -12439,19 +12439,19 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
           in
           if has_traps then incr count_traps ;
           if published_level <= first_level then (
-            let prefix_msg = sf "Level %d: " attested_level in
             Check.(
               (actual_bit = false)
                 ~__LOC__
                 bool
-                ~error_msg:(prefix_msg ^ "Expected false, got true")) ;
+                ~error_msg:
+                  (sf "Level %d: Expected false, got true" attested_level)) ;
             unit)
           else if actual_bit <> not has_traps then
             Test.fail
-              "Level %d, slot %d: chain dal_attestation max lag bit is [%b], \
-               but has_traps = %b"
+              "Level %d, slot %d, published_level %d: bit=[%b], has_traps=%b"
               attested_level
               slot_index
+              published_level
               actual_bit
               has_traps
           else unit
