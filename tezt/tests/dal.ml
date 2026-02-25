@@ -9569,6 +9569,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
     Node.RPC.call node
     @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
   in
+  let* attested_level = Client.level client in
   let dal_attestation_opt =
     List.find_map
       (fun json ->
@@ -9584,20 +9585,26 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
         else None)
       (JSON.as_list json)
   in
-  let number_of_lags = List.length dal_parameters.attestation_lags in
-  let dal_attestation_opt =
-    Option.map
-      (fun str ->
-        let a = Dal.Attestations.decode protocol dal_parameters str in
-        a.(number_of_lags - 1).(slot_index))
-      dal_attestation_opt
+  let new_attester_attested_slot =
+    match dal_attestation_opt with
+    | None -> false
+    | Some dal_attestation ->
+        Dal.is_slot_attested_in_bitset
+          ~protocol
+          ~dal_parameters
+          ~attested_level
+          ~published_level
+          ~slot_index
+          ~dal_attestation
   in
-  Check.(
-    (dal_attestation_opt = Some true)
-      (option bool)
-      ~error_msg:
-        "Expected a DAL attestation for slot 0 for the new attester: got %L, \
-         expected %R") ;
+  Check.is_true
+    ~__LOC__
+    new_attester_attested_slot
+    ~error_msg:
+      (Format.sprintf
+         "Expected new attester to attest slot %d from published_level %d"
+         slot_index
+         published_level) ;
   unit
 
 let pair_up ~error_msg =
