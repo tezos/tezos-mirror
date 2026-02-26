@@ -723,7 +723,7 @@ oc.compile_sources_doc_deps:
     matrix:
     - IMAGE:
       - debian:trixie-master-3bb7eddc
-      - ubuntu:noble-master-3bb7eddc
+      - ubuntu:24.04-master-3bb7eddc
 
 oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
