@@ -774,6 +774,13 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
+  let execute_lambda_export
+      (_ctxt, (_step_constants : Script_typed_ir.step_constants))
+      ((_tickets_to_export, _action) : lambda_export)
+      (_storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    tzfail (standard_error ~mnemonic:"FA2.1 lambda_export is not implemented")
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
@@ -792,6 +799,8 @@ module CLST_contract = struct
         execute_export_ticket (ctxt, step_constants) txs storage
     | Import_ticket tickets ->
         execute_import_ticket (ctxt, step_constants) tickets storage
+    | Lambda_export lambda_export ->
+        execute_lambda_export (ctxt, step_constants) lambda_export storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in

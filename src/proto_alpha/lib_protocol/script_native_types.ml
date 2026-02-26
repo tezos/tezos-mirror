@@ -134,6 +134,17 @@ module Helpers = struct
     let+ typed = Script_typed_ir.ticket_t loc ty in
     {untyped = prim Script.T_ticket [untyped]; typed = Ty_ex_c typed}
 
+  let operation_ty : operation ty_node =
+    {untyped = prim Script.T_operation []; typed = Ty_ex_c operation_t}
+
+  let lambda_ty (type a b)
+      ({untyped = unty_arg; typed = Ty_ex_c ty_arg; _} : a ty_node)
+      ({untyped = unty_ret; typed = Ty_ex_c ty_ret; _} : b ty_node) :
+      (a, b) lambda ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.lambda_t loc ty_arg ty_ret in
+    {untyped = prim Script.T_lambda [unty_arg; unty_ret]; typed = Ty_ex_c typed}
+
   (** Entrypoints combinator *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
@@ -279,9 +290,17 @@ module CLST_types = struct
   type import_ticket =
     (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
 
+  type lambda_export =
+    ( (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+    (* tickets_to_export *),
+      (ticket_with_token_id s_list, operation s_list) lambda
+    (* action *) )
+    pair
+
   type allowance_entrypoints = (approve, update_operators) or_
 
-  type tickets_entrypoints = (export_ticket, import_ticket) or_
+  type tickets_entrypoints =
+    ((export_ticket, import_ticket) or_, lambda_export) or_
 
   type fa21_entrypoints =
     ( (transfer, balance_of) or_,
@@ -314,6 +333,7 @@ module CLST_types = struct
     | Update_operators of update_operators
     | Export_ticket of export_ticket
     | Import_ticket of import_ticket
+    | Lambda_export of lambda_export
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L p)) -> Deposit p
@@ -323,8 +343,9 @@ module CLST_types = struct
     | R (L (R p)) -> Balance_of p
     | R (R (L (L p))) -> Approve p
     | R (R (L (R p))) -> Update_operators p
-    | R (R (R (L p))) -> Export_ticket p
-    | R (R (R (R p))) -> Import_ticket p
+    | R (R (R (L (L p)))) -> Export_ticket p
+    | R (R (R (L (R p)))) -> Import_ticket p
+    | R (R (R (R p))) -> Lambda_export p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L p))
@@ -334,8 +355,9 @@ module CLST_types = struct
     | Balance_of p -> R (L (R p))
     | Approve p -> R (R (L (L p)))
     | Update_operators p -> R (R (L (R p)))
-    | Export_ticket p -> R (R (R (L p)))
-    | Import_ticket p -> R (R (R (R p)))
+    | Export_ticket p -> R (R (R (L (L p))))
+    | Import_ticket p -> R (R (R (L (R p))))
+    | Lambda_export p -> R (R (R (R p)))
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -472,6 +494,27 @@ module CLST_types = struct
     let* import_tickets_ty = list_ty import_ticket_ty in
     make_entrypoint_leaf "import_ticket" import_tickets_ty
 
+  let lambda_export_type :
+      (lambda_export ty_node * lambda_export entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_to_export_ty =
+      tup3_ty
+        (add_name "from_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    let* tickets_to_export_ty = list_ty ticket_to_export_ty in
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* operations_ty = list_ty operation_ty in
+    let* action_ty = lambda_ty tickets_ty operations_ty in
+    let* lambda_export_ty =
+      pair_ty
+        (add_name "tickets_to_export" tickets_to_export_ty)
+        (add_name "action" action_ty)
+    in
+    make_entrypoint_leaf "lambda_export" lambda_export_ty
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
@@ -483,6 +526,7 @@ module CLST_types = struct
     let* update_operators_type in
     let* export_ticket_type in
     let* import_ticket_type in
+    let* lambda_export_type in
     let* clst_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
@@ -495,8 +539,11 @@ module CLST_types = struct
     let* allowance_entrypoints_type =
       make_entrypoint_node approve_type update_operators_type
     in
-    let* tickets_entrypoints_type =
+    let* tickets_entrypoints_type_l =
       make_entrypoint_node export_ticket_type import_ticket_type
+    in
+    let* tickets_entrypoints_type =
+      make_entrypoint_node tickets_entrypoints_type_l lambda_export_type
     in
     let* fa21_entrypoints_type_r =
       make_entrypoint_node allowance_entrypoints_type tickets_entrypoints_type
