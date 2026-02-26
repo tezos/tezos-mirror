@@ -2258,6 +2258,17 @@ module State = struct
           else return block_number
     in
     let*! () = Events.patched_state key (Qty Z.(succ number)) in
+    (* Refresh tezosx_runtimes from the current evm_state so that the
+       session reflects any feature flag changes made by this patch. *)
+    let* () =
+      if commit then (
+        let* tezosx_runtimes =
+          Evm_state.tezosx_runtimes ctxt.session.evm_state
+        in
+        ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
+        return_unit)
+      else return_unit
+    in
     return_unit
 
   let observer_apply_reorg ctxt conn blueprint_with_events pred_number =
