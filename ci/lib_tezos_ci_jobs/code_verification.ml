@@ -351,7 +351,7 @@ let jobs pipeline_type =
                    ( "IMAGE",
                      [
                        "debian:trixie-" ^ Images.Base_images.debian_version;
-                       "ubuntu:noble-" ^ Images.Base_images.debian_version;
+                       "ubuntu:24.04-" ^ Images.Base_images.debian_version;
                      ] );
                  ];
                ])
