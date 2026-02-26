@@ -276,6 +276,7 @@ let _octez_stdlib_test_unix =
       "test_circular_buffer_fuzzy";
       "test_hash_queue_lwt";
       "test_lwt_utils";
+      "test_lwt_rwlock";
     ]
     ~path:"src/lib_stdlib/test-unix"
     ~opam:"octez-libs"
