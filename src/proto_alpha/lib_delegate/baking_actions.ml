@@ -514,26 +514,24 @@ let only_if_dal_feature_enabled state ~default_value f =
 
 (** [process_and_accumulate_dal_rpc_result state acc slots] processes
     attestable [slots] and adds them to the accumulator [acc]. *)
-let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc =
-  function
-  | None -> acc
-  | Some slots ->
-      let number_of_slots =
-        state.global_state.constants.parametric.dal.number_of_slots
-      in
-      List.fold_left_i
-        (fun i acc' flag ->
-          match Dal.Slot_index.of_int_opt ~number_of_slots i with
-          | Some index when flag ->
-              Dal.Attestations.commit
-                acc'
-                ~number_of_slots
-                ~number_of_lags
-                ~lag_index
-                index
-          | None | Some _ -> acc')
-        acc
-        slots
+let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
+    slots =
+  let number_of_slots =
+    state.global_state.constants.parametric.dal.number_of_slots
+  in
+  List.fold_left_i
+    (fun i acc' flag ->
+      match Dal.Slot_index.of_int_opt ~number_of_slots i with
+      | Some index when flag ->
+          Dal.Attestations.commit
+            acc'
+            ~number_of_slots
+            ~number_of_lags
+            ~lag_index
+            index
+      | None | Some _ -> acc')
+    acc
+    slots
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_syntax in
@@ -563,16 +561,17 @@ let may_get_dal_content state consensus_vote =
       let attestation_lags =
         state.global_state.constants.parametric.dal.attestation_lags
       in
+      let attested_level = Int32.succ level in
       let published_levels =
         List.map
           (fun attestation_lag ->
-            Int32.(sub (succ level) (of_int attestation_lag)))
+            Int32.(sub attested_level (of_int attestation_lag)))
           attestation_lags
       in
       let number_of_lags = List.length attestation_lags in
-      let* dal_attestations =
+      let* dal_attestations, no_dal_attestations_levels =
         List.fold_left_i_s
-          (fun lag_index acc published_level ->
+          (fun lag_index (acc, missing_levels) published_level ->
             let+ dal_attestable_slots =
               (Dal_attestable_slots_worker.get_dal_attestable_slots
                  dal_attestable_slots_worker
@@ -581,20 +580,35 @@ let may_get_dal_content state consensus_vote =
                [@profiler.record_s
                  {verbosity = Debug}
                    (Format.asprintf
-                      "get_dal_attestable_slots - delegate_id : %a, lag_index \
-                       : %d"
+                      "DAL att. slots (%a, PL : %ld)"
                       Delegate_id.pp
                       delegate_id
-                      lag_index)])
+                      published_level)])
             in
-            process_and_accumulate_dal_rpc_result
-              state
-              acc
-              ~number_of_lags
-              ~lag_index
-              dal_attestable_slots)
-          Dal.Attestations.empty
+            match dal_attestable_slots with
+            | None -> (acc, published_level :: missing_levels)
+            | Some slots ->
+                ( process_and_accumulate_dal_rpc_result
+                    state
+                    acc
+                    ~number_of_lags
+                    ~lag_index
+                    slots,
+                  missing_levels ))
+          (Dal.Attestations.empty, [])
           published_levels
+      in
+      let* () =
+        if no_dal_attestations_levels <> [] then
+          let published_levels_str =
+            no_dal_attestations_levels |> List.map Int32.to_string
+            |> String.concat ", "
+          in
+          Events.(
+            emit
+              no_attestable_dal_slots_for_levels
+              (delegate_id, attested_level, published_levels_str))
+        else return_unit
       in
       let dal_content = {attestations = dal_attestations} in
       let* () =

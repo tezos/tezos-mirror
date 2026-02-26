@@ -4007,7 +4007,8 @@ let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
   in
   let wait_for_attestation_event =
     let attestation_event =
-      if Protocol.number protocol >= 025 then "no_attestable_slot_at_level.v0"
+      if Protocol.number protocol >= 025 then
+        "no_attestable_dal_slots_for_levels.v0"
       else "failed_to_get_attestations.v0"
     in
     Agnostic_baker.wait_for baker attestation_event (fun _json -> Some ())

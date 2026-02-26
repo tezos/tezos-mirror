@@ -24,27 +24,6 @@ module Events = struct
       ~msg:"Consumed backfill stream for {delegate_id}"
       ("delegate_id", Delegate_id.encoding)
 
-  let no_attestable_slot_at_level =
-    declare_1
-      ~section
-      ~name:"no_attestable_slot_at_level"
-      ~level:Warning
-      ~msg:
-        "No attestable slots found for published level {published_level} in \
-         cache"
-      ("published_level", Data_encoding.int32)
-
-  let no_attestable_slot_at_level_for_delegate =
-    declare_2
-      ~section
-      ~name:"no_attestable_slot_at_level_for_delegate"
-      ~level:Warning
-      ~msg:
-        "No attestable slots found for published level {published_level} and \
-         {delegate_id} in cache"
-      ("published_level", Data_encoding.int32)
-      ("delegate_id", Delegate_id.encoding)
-
   let monitor_attestable_slots_failed =
     declare_2
       ~section
@@ -327,19 +306,10 @@ let get_dal_attestable_slots state ~delegate_id ~published_level =
     {verbosity = Notice}
       (Format.sprintf "published_level : %ld" published_level)] ;
   match Level_map.find_opt state.slots_cache published_level with
-  | None ->
-      let* () = Events.(emit no_attestable_slot_at_level published_level) in
-      return_none
+  | None -> return_none
   | Some slots_by_delegate -> (
       match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
-      | None ->
-          let* () =
-            Events.(
-              emit
-                no_attestable_slot_at_level_for_delegate
-                (published_level, delegate_id))
-          in
-          return_none
+      | None -> return_none
       | Some slots -> return_some @@ Array.to_list slots)
 
 let is_not_in_committee state ~delegate_id ~committee_level =
