@@ -284,7 +284,12 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Initialize custom precompile
-    init_precompile_bytecodes(host).map_err(|_| Error::RevmPrecompileInitError)?;
+    let tezosx_enabled = match &chain_configuration {
+        chains::ChainConfig::Evm(config) => config.enable_tezos_runtime(),
+        chains::ChainConfig::Michelson(_) => false,
+    };
+    init_precompile_bytecodes(host, tezosx_enabled)
+        .map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not

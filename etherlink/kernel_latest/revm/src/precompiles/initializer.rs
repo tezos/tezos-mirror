@@ -13,8 +13,9 @@ use crate::{
     custom,
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
-        FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        XTZ_BRIDGE_SOL_ADDR, XTZ_BRIDGE_SOL_CONTRACT,
+        FA12_WRAPPER_SOL_ADDR, FA12_WRAPPER_SOL_CONTRACT, FA_BRIDGE_SOL_ADDR,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_ADDR,
+        XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
     Error,
@@ -22,15 +23,26 @@ use crate::{
 
 use super::constants::PredeployedContract;
 
-pub fn init_precompile_bytecodes<Host: Runtime>(host: &'_ mut Host) -> Result<(), Error> {
+pub fn init_precompile_bytecodes<Host: Runtime>(
+    host: &'_ mut Host,
+    tezosx_enabled: bool,
+) -> Result<(), Error> {
     init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
     init_precompile_bytecode(host, &XTZ_BRIDGE_SOL_ADDR, &XTZ_BRIDGE_SOL_CONTRACT)?;
     init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)?;
-    init_precompile_bytecode(
-        host,
-        &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
-        &ALIAS_FORWARDER_SOL_CONTRACT,
-    )
+    if tezosx_enabled {
+        init_precompile_bytecode(
+            host,
+            &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
+            &ALIAS_FORWARDER_SOL_CONTRACT,
+        )?;
+        init_precompile_bytecode(
+            host,
+            &FA12_WRAPPER_SOL_ADDR,
+            &FA12_WRAPPER_SOL_CONTRACT,
+        )?;
+    }
+    Ok(())
 }
 
 fn init_precompile_bytecode<Host: Runtime>(
