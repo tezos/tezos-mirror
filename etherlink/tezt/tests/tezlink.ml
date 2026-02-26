@@ -29,11 +29,12 @@ let check_kernel_version ~evm_node ~equal expected =
       ~error_msg:"Expected kernelVersion to be different than %R" ;
   return kernel_version
 
-let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
-    ?genesis_timestamp ?(time_between_blocks = Evm_node.Nothing)
-    ?additional_uses ?max_blueprints_catchup ?max_blueprints_lag
-    ?catchup_cooldown ?(kernels = [Kernel.Latest])
-    ?(wait_for_valid_block = true) scenario protocols =
+let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
+    ?bootstrap_contracts ?genesis_timestamp
+    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
+    ?max_blueprints_catchup ?max_blueprints_lag ?catchup_cooldown
+    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) scenario
+    protocols =
   (* Most of the RPCs tezt tests are RPC that are enable on a real Tezos protocol.
        Now that block 0 and 1 are set on protocol Zero and Genesis, we produce two
        blocks to skip the two first blocks. *)
@@ -76,7 +77,82 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     scenario
     protocols
 
-let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
+let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
+    ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
+    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
+    ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
+    ?catchup_cooldown scenario =
+  let scenario setup protocol =
+    let* () =
+      if wait_for_valid_block then
+        match time_between_blocks with
+        | Evm_node.Nothing ->
+            (* Blocks are not produced automatically *)
+            let* () = produce_block_and_wait_for ~sequencer:setup.sequencer 1 in
+            produce_block_and_wait_for ~sequencer:setup.sequencer 2
+        | Time_between_blocks _ ->
+            Evm_node.wait_for_blueprint_applied setup.sequencer 2
+      else return ()
+    in
+    scenario setup protocol
+  in
+  assert (bootstrap_contracts = None) ;
+  Setup.register_test
+    ~__FILE__
+    ~rpc_server:Evm_node.Resto
+    ?tez_bootstrap_accounts:bootstrap_accounts
+    ?genesis_timestamp
+    ?max_blueprints_lag
+    ?max_blueprints_catchup
+    ?catchup_cooldown
+    ~time_between_blocks
+    ?additional_uses
+    ~kernel
+    ~title
+    ~tags:("tezlink" :: "tezosx" :: tags)
+    ~with_runtimes:[Tezos]
+    ~enable_dal:false
+    ~enable_multichain:false
+    ~instant_confirmations:false
+    scenario
+
+let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
+    ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
+    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
+    ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
+    ?catchup_cooldown scenario protocols =
+  register_tezlink_only_test
+    ~title:(title ^ " (tezlink)")
+    ~tags
+    ~kernels:[kernel]
+    ?bootstrap_accounts
+    ?bootstrap_contracts
+    ?genesis_timestamp
+    ~time_between_blocks
+    ?max_blueprints_lag
+    ?max_blueprints_catchup
+    ?catchup_cooldown
+    ?additional_uses
+    ~wait_for_valid_block
+    scenario
+    protocols ;
+  register_tezosx_test
+    ~title:(title ^ " (michelson runtime)")
+    ~tags
+    ~kernel
+    ?bootstrap_accounts
+    ?bootstrap_contracts
+    ?genesis_timestamp
+    ~time_between_blocks
+    ?max_blueprints_lag
+    ?max_blueprints_catchup
+    ?catchup_cooldown
+    ?additional_uses
+    ~wait_for_valid_block
+    scenario
+    protocols
+
+let register_tezlink_only_upgrade_test ~title ~tags ~genesis_timestamp
     ?(kernels = Kernel.tezlink_all) ?(upgrade_to = Kernel.upgrade_to)
     ?(additional_uses = []) scenario protocols =
   List.iter
@@ -84,7 +160,7 @@ let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
       let from_tag, _ = Kernel.to_uses_and_tags from in
       let to_ = upgrade_to from in
       let to_tag, to_use = Kernel.to_uses_and_tags to_ in
-      register_tezlink_test
+      register_tezlink_only_test
         ~kernels:[from]
         ~genesis_timestamp
         ~time_between_blocks:Nothing
@@ -186,7 +262,7 @@ let test_observer_starts =
   unit
 
 let test_tezlink_current_level =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the current_level rpc"
     ~tags:["rpc"; "current_level"]
   @@ fun {sequencer; _} _protocol ->
@@ -333,7 +409,7 @@ let test_tezlink_genesis_block_arg =
   unit
 
 let test_tezlink_expected_issuance =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test the mocked expected issuance rpc"
     ~tags:["rpc"; "issuance"; "mock"]
   @@ fun {sequencer; _} _protocol ->
@@ -396,7 +472,7 @@ let test_tezlink_balance =
 
 let test_tezlink_storage_via_client =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the storage rpc via client"
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -431,7 +507,7 @@ let account_rpc sequencer account key =
   account_str_rpc sequencer account.Account.public_key_hash key
 
 let test_tezlink_contract_info =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -447,7 +523,7 @@ let test_tezlink_contract_info =
 
 let test_tezlink_list_entrypoints =
   let contract = Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the contract entrypoint list"
     ~tags:["rpc"; "contract"; "info"; "list_entrypoints"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -465,7 +541,7 @@ let test_tezlink_list_entrypoints =
 
 let test_tezlink_contract_info_script =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the contract info rpc on smart contracts"
     ~tags:["rpc"; "contract"; "info"; "script"]
     ~bootstrap_contracts:[contract]
@@ -510,7 +586,7 @@ let test_tezlink_manager_key =
   unit
 
 let test_tezlink_counter =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the counter rpc"
     ~tags:["evm"; "rpc"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -532,7 +608,7 @@ let test_tezlink_counter =
   unit
 
 let test_tezlink_contract_info_on_liquidity_baking =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the contract info rpc on liquidity baking addresses"
     ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
   @@ fun {sequencer; _} _protocol ->
@@ -636,7 +712,7 @@ let test_tezlink_constants =
   unit
 
 let test_tezlink_storage_rpc =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the /storage rpc"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -721,7 +797,7 @@ let test_tezlink_chain_id =
   unit
 
 let test_tezlink_contracts_rpc =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the contracts rpc"
     ~tags:["rpc"; "contracts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -867,7 +943,7 @@ let test_tezlink_header =
        ~current_timestamp:(Some current_timestamp)
 
 let test_tezlink_block_metadata =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the metadata rpc"
     ~tags:["rpc"; "metadata"; "offset"]
   @@ fun {sequencer; client; _} _protocol ->
@@ -904,7 +980,7 @@ let test_tezlink_block_metadata =
   check_current_block_metadata ()
 
 let test_tezlink_block_info =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the block_info rpc"
     ~tags:["rpc"; "block_info"]
   @@ fun {sequencer; client; l2_chains; _} _protocol ->
@@ -989,7 +1065,7 @@ let test_tezlink_bootstrapped =
   unit
 
 let test_tezlink_monitor_heads =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the monitor/heads RPC"
     ~tags:["evm"; "rpc"; "monitor_heads"]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1076,7 +1152,7 @@ let test_tezlink_monitor_heads =
   unit
 
 let test_tezlink_produceBlock =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink production block"
     ~tags:["kernel"; "produce_block"]
   @@ fun {sequencer; _} _protocol ->
@@ -1140,7 +1216,7 @@ let test_tezlink_hash_rpc =
   unit
 
 let test_tezlink_script_rpc =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the script rpc"
     ~tags:["rpc"; "script"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1220,7 +1296,7 @@ let test_tezlink_script_rpc =
 
 let test_contract_storage_normalization =
   let contract = Michelson_contracts.storage_normalization () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the storage rpc with normalization"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1266,7 +1342,7 @@ let test_contract_storage_normalization =
 
 let test_contract_counter =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test that smart contracts don't have any counter"
     ~tags:["rpc"; "counter"]
     ~bootstrap_contracts:[contract]
@@ -1349,7 +1425,7 @@ let test_tezlink_transfer =
 
 let test_tezlink_observer_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink transfer via an observer"
     ~tags:["observer"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1396,7 +1472,7 @@ let test_tezlink_observer_transfer =
 
 let test_tezlink_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink transfer and wait for inclusion"
     ~tags:["kernel"; "transfer"; "wait"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1485,7 +1561,7 @@ let test_tezlink_bootstrap_block_info =
      catastrophically. We check block 4 in particular because at this level
      we mock information to index bootstrap accounts. *)
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of tezlink block info on block 4"
     ~tags:["bootstrap"; "block_info"]
     ~bootstrap_contracts:[contract]
@@ -1511,7 +1587,7 @@ let test_tezlink_bootstrap_block_info =
 
 let test_tezlink_execution =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of tezlink execution"
     ~tags:["execution"; "hello"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -1545,7 +1621,7 @@ let test_tezlink_execution =
 
 let test_tezlink_bigmap_option =
   let option_contract = Michelson_contracts.big_map_option () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test which syntax is used for big maps in contract storages"
     ~tags:["syntax"; "big_map"; "option"; "storage"]
     ~bootstrap_contracts:[option_contract]
@@ -1578,7 +1654,7 @@ let test_tezlink_bigmap_option =
 
 let test_tezlink_bigmap_counter =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of tezlink big_map persistency"
     ~tags:["persistency"; "big_map"; "counter"; "storage"]
     ~bootstrap_contracts:[counter_contract]
@@ -1632,7 +1708,7 @@ let test_tezlink_bigmap_counter =
 
 let test_tezlink_bigmap_rpcs =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test of the big_map RPCs"
     ~tags:["rpc"; "big_map"]
     ~bootstrap_contracts:[counter_contract]
@@ -2105,7 +2181,7 @@ let test_tezlink_sandbox () =
 let test_tezlink_internal_operation =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Internal operation"
     ~tags:["internal"; "operation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2141,7 +2217,7 @@ let test_tezlink_internal_operation =
 
 let test_tezlink_internal_receipts =
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Internal receipts"
     ~tags:["internal"; "operation"; "receipts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2403,7 +2479,7 @@ let test_event =
   let emit_events_contract =
     Tezt_etherlink.Michelson_contracts.emit_events_contract ()
   in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Contract emits an event"
     ~tags:["operation"; "event"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2967,7 +3043,7 @@ let test_tezlink_prevalidation =
   unit
 
 let test_tezlink_prevalidation_gas_limit_lower_bound =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink prevalidation of operation gas limit lower bound"
     ~tags:["kernel"; "prevalidation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3125,7 +3201,7 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
   unit
 
 let test_tezlink_validation_gas_limit =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink validation of block gas limit"
     ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3195,7 +3271,7 @@ let test_tezlink_validation_gas_limit =
   unit
 
 let test_tezlink_validation_counter =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink validation of counters"
     ~tags:["kernel"; "validation"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3246,7 +3322,7 @@ let test_tezlink_validation_counter =
   unit
 
 let test_tezlink_validation_balance =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Test Tezlink validation of balance"
     ~tags:["kernel"; "validation"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3415,7 +3491,7 @@ let test_node_catchup_on_multichain =
   let max_blueprints_lag = 10 in
   let max_blueprints_catchup = 10 in
   let catchup_cooldown = 4 in
-  register_tezlink_test
+  register_tezlink_only_test
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -3579,7 +3655,7 @@ let test_node_catchup_on_multichain =
   unit
 
 let test_delayed_deposit_is_included =
-  register_tezlink_test
+  register_tezlink_only_test
     ~time_between_blocks:Nothing
     ~tags:["sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Tezlink Delayed deposit is included"
@@ -3644,7 +3720,7 @@ let test_delayed_deposit_is_included =
   unit
 
 let test_bridged_tez_transfer =
-  register_tezlink_test
+  register_tezlink_only_test
     ~time_between_blocks:Nothing
     ~tags:["deposit"; "transfer"]
     ~title:"A Tezlink account that has only bridged tez can make a transfer"
@@ -3841,7 +3917,7 @@ let test_tezlink_upgrade_kernel_auto_sync =
   in
   let timestamp = "2020-01-01T00:00:05Z" in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_tezlink_upgrade_test
+  register_tezlink_only_upgrade_test
     ~genesis_timestamp
     ~tags:["sequencer"; "upgrade"; "auto"; "sync"]
     ~title:
