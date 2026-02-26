@@ -138,6 +138,9 @@ module type T = sig
     pkh:Signature.Public_key_hash.t ->
     bool tzresult Lwt.t
 
+  val is_migration_pending :
+    Tezos_rpc.Context.generic -> (bool * int32) tzresult Lwt.t
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list : sig

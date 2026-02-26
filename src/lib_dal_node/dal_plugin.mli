@@ -189,6 +189,12 @@ module type T = sig
     pkh:Signature.Public_key_hash.t ->
     bool tzresult Lwt.t
 
+  (** [is_migration_pending cctxt] queries the current voting period and returns
+      a tuple containing whether the migration is pending (we are in adoption) and
+      the level at which the current period ends. *)
+  val is_migration_pending :
+    Tezos_rpc.Context.generic -> (bool * int32) tzresult Lwt.t
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list : sig
