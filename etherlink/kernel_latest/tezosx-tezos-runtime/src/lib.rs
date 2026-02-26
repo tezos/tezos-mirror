@@ -2,29 +2,39 @@
 //
 // SPDX-License-Identifier: MIT
 
+use http::StatusCode;
 use mir::ast::big_map::BigMapId;
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
     blake2b, hash::ChainId, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
 };
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::{
+    enc::BinWriter,
+    nom::NomReader,
+    types::{Narith, Zarith},
+};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{
     account_storage::TezlinkAccount,
     context::Context,
+    cross_runtime_transfer,
     mir_ctx::{OperationCtx, TcCtx},
     OriginationNonce, TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
-use tezos_smart_rollup::types::PublicKeyHash;
+use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
 // `Parameters` could come from `tezos_protocol::operation`, but we also need
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
 // to be moved to a shared crate.
 use tezos_protocol::entrypoint::Entrypoint;
-use tezos_tezlink::operation::Parameters;
-use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, TezosXRuntimeError};
+use tezos_tezlink::{
+    enc_wrappers::BlockNumber, operation::Parameters, operation_result::TransferSuccess,
+};
+use tezosx_interfaces::{
+    CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
+};
 
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
@@ -70,10 +80,141 @@ fn decode_cross_runtime_parameters(
     Ok(Parameters { entrypoint, value })
 }
 
-impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
+/// Build an HTTP response from the result of [`execute_request`].
+///
+/// Request-level errors are turned into HTTP error responses:
+/// - `Ok` → 200
+/// - `BadRequest` → 400
+/// - `NotFound` → 404
+///
+/// All other errors propagate as `Err` — they indicate infrastructure
+/// problems that cannot be meaningfully represented as HTTP responses.
+///
+// TODO: Review `Custom` errors in `execute_request` to extract more
+// structured variants (and corresponding HTTP status codes) where
+// possible.
+fn build_response(
+    result: Result<TransferSuccess, TezosXRuntimeError>,
+) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+    let builder_result = match result {
+        Ok(response) =>
+        // TODO: Do something meaningful with the response
+        {
+            http::Response::builder()
+                .status(StatusCode::OK)
+                .body(response.storage.unwrap_or(vec![]))
+        }
+        Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(msg.into_bytes()),
+        Err(TezosXRuntimeError::NotFound(msg)) => http::Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(msg.into_bytes()),
+        Err(e) => return Err(e),
+    };
+    builder_result.or_else(|_| {
+        http::Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(b"internal server error".to_vec())
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to build response: {e}"))
+            })
+    })
+}
+
+/// Execute a cross-runtime request: parse the URL, extract parameters,
+/// and call the Michelson VM. Returns the response body on success.
+///
+/// This is the core logic behind [`TezosRuntime::serve`], separated so
+/// that `serve` only handles the error-to-HTTP-status mapping.
+fn execute_request<Host: Runtime>(
+    registry: &impl Registry,
+    host: &mut Host,
+    request: http::Request<Vec<u8>>,
+) -> Result<TransferSuccess, TezosXRuntimeError> {
+    let parsed = url::parse_tezos_url(request.uri())?;
+
+    let parameters = Parameters {
+        entrypoint: parsed.entrypoint,
+        value: request.into_body(),
+    };
+
+    // TODO: Extract from X-Tezos-* headers.
+    let amount_u64: u64 = 0;
+    let gas_limit = TezlinkOperationGas::MAX_LIMIT / 1000;
+    let timestamp: i64 = 0;
+    let block_number: u32 = 0;
+
+    let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+
+    // FIXME: Sender and source are hardcoded to the null address.
+    // Will be extracted from X-Tezos-Sender / X-Tezos-Source headers.
+    let null_pkh = PublicKeyHash::from_b58check("tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
+        .map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!("Failed to parse zero address: {e}"))
+    })?;
+    let sender_account = context
+        .originated_from_contract(&Contract::Originated(ContractKt1Hash::from(
+            blake2b::digest_160(null_pkh.to_string().as_bytes()),
+        )))
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to fetch sender originated account: {e:?}"
+            ))
+        })?;
+    let source_account =
+        context
+            .implicit_from_public_key_hash(&null_pkh)
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("Failed to fetch zero account: {e:?}"))
+            })?;
+
+    let mut gas = TezlinkOperationGas::start(&Narith(gas_limit.into()))
+        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
+    let mut next_temp_id = BigMapId {
+        value: Zarith(0.into()),
+    };
+    let mut tc_ctx = TcCtx {
+        host,
+        context: &context,
+        operation_gas: &mut gas,
+        big_map_diff: BTreeMap::new(),
+        next_temporary_id: &mut next_temp_id,
+    };
+    let level = BlockNumber { block_number };
+    let now = Timestamp::from(timestamp);
+    let chain_id = ChainId::try_from_bytes(&[0u8; 4]).unwrap();
+    let mut nonce = OriginationNonce::initial(OperationHash::default());
+    let mut counter = 0u128;
+    let mut operation_ctx = OperationCtx {
+        source: &source_account,
+        origination_nonce: &mut nonce,
+        counter: &mut counter,
+        level: &level,
+        now: &now,
+        chain_id: &chain_id,
+    };
+    let parser = mir::parser::Parser::new();
+    let amount = Narith(amount_u64.into());
+
+    cross_runtime_transfer(
+        &mut tc_ctx,
+        &mut operation_ctx,
+        registry,
+        &sender_account,
+        &amount,
+        &parsed.destination,
+        &parameters,
+        &parser,
+    )
+    .map(|s| s.into())
+    .map_err(|e| TezosXRuntimeError::Custom(format!("{e}")))
+}
+
+impl RuntimeInterface for TezosRuntime {
     fn generate_alias<Host: Runtime>(
         &self,
-        _registry: &impl tezosx_interfaces::Registry,
+        _registry: &impl Registry,
         _host: &mut Host,
         native_address: &[u8],
         _context: CrossRuntimeContext,
@@ -95,7 +236,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
     /// and internal operations.
     fn call<Host: Runtime>(
         &self,
-        registry: &impl tezosx_interfaces::Registry,
+        registry: &impl Registry,
         host: &mut Host,
         from: &[u8],
         to: &[u8],
@@ -162,7 +303,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         ))
         .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
         let mut next_temp_id = BigMapId {
-            value: tezos_data_encoding::types::Zarith(0.into()),
+            value: Zarith(0.into()),
         };
         let mut tc_ctx = TcCtx {
             host,
@@ -171,21 +312,17 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
             big_map_diff: BTreeMap::new(),
             next_temporary_id: &mut next_temp_id,
         };
-        let level = tezos_tezlink::enc_wrappers::BlockNumber {
+        let level = BlockNumber {
             block_number: cross_ctx.block_number.try_into().map_err(|_| {
                 TezosXRuntimeError::ConversionError(
                     "block_number exceeds u32::MAX".to_string(),
                 )
             })?,
         };
-        let now = tezos_smart_rollup::types::Timestamp::from(
-            i64::try_from(cross_ctx.timestamp).map_err(|_| {
-                TezosXRuntimeError::ConversionError(
-                    "timestamp exceeds i64::MAX".to_string(),
-                )
-            })?,
-        );
-        let chain_id = tezos_crypto_rs::hash::ChainId::try_from_bytes(&[0u8; 4]).unwrap();
+        let now = Timestamp::from(i64::try_from(cross_ctx.timestamp).map_err(|_| {
+            TezosXRuntimeError::ConversionError("timestamp exceeds i64::MAX".to_string())
+        })?);
+        let chain_id = ChainId::try_from_bytes(&[0u8; 4]).unwrap();
         let mut nonce = OriginationNonce::initial(OperationHash::default());
         let mut counter = 0u128;
         let mut operation_ctx = OperationCtx {
@@ -199,7 +336,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         let parser = mir::parser::Parser::new();
         let parameters = decode_cross_runtime_parameters(data)?;
         let amount = Narith(amount_u64.into());
-        match tezos_execution::cross_runtime_transfer(
+        match cross_runtime_transfer(
             &mut tc_ctx,
             &mut operation_ctx,
             registry,
@@ -216,11 +353,11 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
 
     fn serve<Host: Runtime>(
         &self,
-        _registry: &impl tezosx_interfaces::Registry,
-        _host: &mut Host,
-        _request: http::Request<Vec<u8>>,
+        registry: &impl Registry,
+        host: &mut Host,
+        request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
-        todo!("TezosRuntime::serve — will be implemented in follow-up PRs")
+        build_response(execute_request(registry, host, request))
     }
 
     fn host(&self) -> &'static str {
@@ -287,5 +424,56 @@ impl TezosRuntime {
         let originated_account = context.originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;
         narith_to_u256(&balance)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_success(storage: Option<Vec<u8>>) -> TransferSuccess {
+        TransferSuccess {
+            storage,
+            balance_updates: vec![],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_milligas: Narith(0u64.into()),
+            storage_size: Zarith(0.into()),
+            paid_storage_size_diff: Zarith(0.into()),
+            allocated_destination_contract: false,
+            lazy_storage_diff: None,
+        }
+    }
+
+    #[test]
+    fn build_response_success() {
+        let resp = build_response(Ok(make_success(Some(b"hello".to_vec())))).unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), b"hello");
+    }
+
+    #[test]
+    fn build_response_success_empty_body() {
+        let resp = build_response(Ok(make_success(None))).unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.body().is_empty());
+    }
+
+    #[test]
+    fn build_response_bad_request() {
+        let resp =
+            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())))
+                .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
+    }
+
+    #[test]
+    fn build_response_not_found() {
+        let resp =
+            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())))
+                .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(String::from_utf8_lossy(resp.body()).contains("KT1 not found"));
     }
 }
