@@ -70,7 +70,9 @@ module Name = struct
 
   let encoding = Chain_id.encoding
 
-  let base = ["forge"; "worker"]
+  (* The base needs to contain the protocol name as it is used to derive events.
+     Without it, the events will be duplicated between different protocols. *)
+  let base = [Protocol.name; "forge"; "worker"]
 
   let pp = Chain_id.pp_short
 
