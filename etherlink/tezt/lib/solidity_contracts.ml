@@ -485,6 +485,18 @@ let transfer_crac =
     ~label:"crac_caller"
     ~contract:"CracCaller"
 
+let multi_run_caller =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/multi_run_caller.sol")
+    ~label:"multi_run_caller"
+    ~contract:"MultiRunCaller"
+
+let cross_runtime_run_tez =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/cross_runtime_run_tez.sol")
+    ~label:"cross_runtime_run_tez"
+    ~contract:"CrossRuntimeRunTez"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
