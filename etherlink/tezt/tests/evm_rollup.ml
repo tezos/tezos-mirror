@@ -68,7 +68,7 @@ type full_evm_setup = {
   produce_block : unit -> (int, Rpc.error) result Lwt.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
-  kernel : string;
+  kernel : Kernel.t;
   evm_version : Evm_version.t;
   kernel_root_hash : string;
 }
@@ -523,7 +523,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       produce_block;
       endpoint;
       l1_contracts;
-      kernel = output;
+      kernel;
       evm_version;
       kernel_root_hash = root_hash;
     }

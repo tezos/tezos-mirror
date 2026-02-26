@@ -49,7 +49,7 @@ let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
               ?set_account_code
               ?da_fee_per_byte
               ?minimum_base_fee_per_gas
-              ~kernel:use_kernel
+              ~kernel
               ~patch_config
               ()
           in

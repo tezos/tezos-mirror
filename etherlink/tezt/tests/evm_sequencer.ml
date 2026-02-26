@@ -214,13 +214,12 @@ let test_make_l2_kernel_installer_config chain_family =
   in
 
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let kernel = Constant.WASM.evm_kernel in
   let* {output = kernel; _} =
     prepare_installer_kernel_with_multiple_setup_file
       ~output:(Temp.file "kernel.hex")
       ~preimages_dir
       ~configs:[rollup_config; l2_config_1; l2_config_2]
-      (Uses.path kernel)
+      (Kernel.path Latest)
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -1812,7 +1811,7 @@ let test_delayed_transaction_peeked =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp:"0"
   in
   (* Produce a block. The sequencer will include the deposit, but won't upgrade.
@@ -3177,7 +3176,7 @@ let test_self_upgrade_kernel =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
 
@@ -3267,7 +3266,7 @@ let test_empty_block_on_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp:"2077-01-01T00:00:00Z"
   in
 
@@ -4571,7 +4570,7 @@ let test_upgrade_injected_before_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -4717,7 +4716,7 @@ let test_upgrade_activated_after_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   (* Produces 2 valid blocks and wait until they are synchronized. *)
@@ -4884,7 +4883,7 @@ let test_upgrade_injected_after_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   let* _ =
@@ -5031,7 +5030,7 @@ let test_flushed_blueprint_reorg_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
 
@@ -9839,9 +9838,7 @@ let test_patch_kernel =
       Constant.WASM.mainnet_commit
   in
   let* () = Evm_node.terminate sequencer in
-  let* () =
-    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.mainnet_kernel)
-  in
+  let* () = Evm_node.patch_kernel sequencer (Kernel.path Mainnet) in
   let* () = Evm_node.run sequencer in
   (* Produce a block so that the migration code is executed *)
   let* _ = produce_block sequencer in

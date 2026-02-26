@@ -298,7 +298,7 @@ val init_sequencer_sandbox :
   ?history_mode:Evm_node.history_mode ->
   ?patch_config:(JSON.t -> JSON.t) ->
   ?websockets:bool ->
-  ?kernel:Uses.t ->
+  ?kernel:Kernel.t ->
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
