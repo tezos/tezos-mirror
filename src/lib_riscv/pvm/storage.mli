@@ -12,11 +12,19 @@ end
 module State : sig
   type t = Octez_riscv_api.state
 
+  val get_live_count : unit -> int
+
+  val track : t -> t
+
   val equal : t -> t -> bool
 end
 
 module Mutable_state : sig
   type t = Octez_riscv_api.mut_state
+
+  val get_live_count : unit -> int
+
+  val track : t -> t
 
   val equal : t -> t -> bool
 end

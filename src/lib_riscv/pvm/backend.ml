@@ -92,9 +92,10 @@ let with_hooks printer f =
 module Mutable_state = struct
   type t = Api.mut_state
 
-  let from_imm = Api.octez_riscv_from_imm
+  let from_imm state =
+    Storage.Mutable_state.track (Api.octez_riscv_from_imm state)
 
-  let to_imm = Api.octez_riscv_to_imm
+  let to_imm state = Storage.State.track (Api.octez_riscv_to_imm state)
 
   let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
       ~max_steps state =
@@ -135,20 +136,27 @@ end
 
 let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
     ~max_steps state =
+  let track_result (s, n) = (Storage.State.track s, n) in
   match write_debug with
-  | None -> Lwt.return (Api.octez_riscv_compute_step_many max_steps state)
+  | None ->
+      Lwt.return
+        (track_result (Api.octez_riscv_compute_step_many max_steps state))
   | Some printer ->
-      with_hooks
-        printer
-        (Api.octez_riscv_compute_step_many_with_debug max_steps state)
+      with_hooks printer (fun debug ->
+          track_result
+            (Api.octez_riscv_compute_step_many_with_debug max_steps state debug))
 
-let compute_step state = Lwt.return (Api.octez_riscv_compute_step state)
+let compute_step state =
+  Lwt.return (Storage.State.track (Api.octez_riscv_compute_step state))
 
 let compute_step_with_debug ?write_debug state =
   match write_debug with
-  | None -> Lwt.return (Api.octez_riscv_compute_step state)
+  | None ->
+      Lwt.return (Storage.State.track (Api.octez_riscv_compute_step state))
   | Some printer ->
-      with_hooks printer (Api.octez_riscv_compute_step_with_debug state)
+      with_hooks printer (fun debug ->
+          Storage.State.track
+            (Api.octez_riscv_compute_step_with_debug state debug))
 
 let get_tick state = Lwt.return (Z.of_int64 (Api.octez_riscv_get_tick state))
 
@@ -161,7 +169,8 @@ let string_of_status status = Api.octez_riscv_string_of_status status
 
 let install_boot_sector state boot_sector =
   Lwt.return
-    (Api.octez_riscv_install_boot_sector state (Bytes.of_string boot_sector))
+    (Storage.State.track
+       (Api.octez_riscv_install_boot_sector state (Bytes.of_string boot_sector)))
 
 let get_current_level state = Lwt.return (Api.octez_riscv_get_level state)
 
@@ -169,7 +178,8 @@ let state_hash state =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_state_hash state
 
 let set_input state input =
-  Lwt.return (Api.octez_riscv_set_input state (to_api_input input))
+  Lwt.return
+    (Storage.State.track (Api.octez_riscv_set_input state (to_api_input input)))
 
 let proof_start_state proof =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_start_state proof
@@ -211,4 +221,5 @@ let deserialise_output_proof bytes =
 let get_reveal_request state =
   Lwt.return (String.of_bytes @@ Api.octez_riscv_get_reveal_request state)
 
-let insert_failure state = Lwt.return @@ Api.octez_riscv_insert_failure state
+let insert_failure state =
+  Lwt.return @@ Storage.State.track (Api.octez_riscv_insert_failure state)

@@ -70,6 +70,8 @@
 #TYPE octez_sc_rollup_node_number_of_conflicts gauge
 #HELP octez_sc_rollup_node_protocol Rollup node current protocol
 #TYPE octez_sc_rollup_node_protocol counter
+#HELP octez_sc_rollup_node_riscv_states Number of live RISC-V PVM states
+#TYPE octez_sc_rollup_node_riscv_states gauge
 #HELP octez_sc_rollup_node_rollup_node_info Rollup node info
 #TYPE octez_sc_rollup_node_rollup_node_info counter
 #HELP octez_sc_rollup_node_state_of_refutation_game State of refutation game

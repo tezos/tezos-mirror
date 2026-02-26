@@ -411,6 +411,37 @@ module DAL_batcher = struct
       Int.to_float
 end
 
+module Riscv = struct
+  let live_states_metric =
+    MetricInfo.v
+      ~metric_type:Gauge
+      ~namespace
+      ~subsystem
+      ~label_names:[LabelName.v "kind"]
+      ~help:"Number of live RISC-V PVM states"
+      "riscv_states"
+
+  let live_states_collector () =
+    let immutable =
+      Octez_riscv_pvm.Storage.State.get_live_count () |> float_of_int
+    in
+    let mutable_ =
+      Octez_riscv_pvm.Storage.Mutable_state.get_live_count () |> float_of_int
+    in
+    LabelSetMap.of_list
+      [
+        (["immutable"], [Sample_set.sample immutable]);
+        (["mutable"], [Sample_set.sample mutable_]);
+      ]
+
+  (* Register collector: values are sampled fresh on each /metrics scrape *)
+  let () =
+    CollectorRegistry.register
+      sc_rollup_node_registry
+      live_states_metric
+      live_states_collector
+end
+
 module Performance_metrics_config = struct
   open Octez_performance_metrics
 
