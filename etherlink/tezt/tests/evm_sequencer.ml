@@ -214,13 +214,12 @@ let test_make_l2_kernel_installer_config chain_family =
   in
 
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let kernel = Constant.WASM.evm_kernel in
   let* {output = kernel; _} =
     prepare_installer_kernel_with_multiple_setup_file
       ~output:(Temp.file "kernel.hex")
       ~preimages_dir
       ~configs:[rollup_config; l2_config_1; l2_config_2]
-      (Uses.path kernel)
+      (Kernel.path Latest)
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -660,9 +659,12 @@ let test_patch_state =
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; sc_rollup_node; sc_rollup_address; client; _} _protocol ->
+  @@
+  fun {sequencer; sc_rollup_node; sc_rollup_address; client; kernel; _}
+      _protocol
+    ->
   (* Test patch state for the evm-node. *)
-  let path = Durable_storage_path.sequencer in
+  let path = Durable_storage_path.sequencer kernel in
   let*@! before_patch = Rpc.state_value sequencer path in
   let* () = Evm_node.terminate sequencer in
   let* () = Evm_node.patch_state sequencer ~key:path ~value:"00" in
@@ -1812,7 +1814,7 @@ let test_delayed_transaction_peeked =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp:"0"
   in
   (* Produce a block. The sequencer will include the deposit, but won't upgrade.
@@ -3177,7 +3179,7 @@ let test_self_upgrade_kernel =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
 
@@ -3267,7 +3269,7 @@ let test_empty_block_on_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp:"2077-01-01T00:00:00Z"
   in
 
@@ -4571,7 +4573,7 @@ let test_upgrade_injected_before_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -4717,7 +4719,7 @@ let test_upgrade_activated_after_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   (* Produces 2 valid blocks and wait until they are synchronized. *)
@@ -4884,7 +4886,7 @@ let test_upgrade_injected_after_flush_level =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
   let* _ =
@@ -5031,7 +5033,7 @@ let test_flushed_blueprint_reorg_upgrade =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:kernel
+      ~upgrade_to:(Kernel.to_uses kernel)
       ~activation_timestamp
   in
 
@@ -5878,9 +5880,9 @@ let test_sequencer_sunset =
     must upgrade as well, even the one that is not connected to a
     rollup node. *)
 let test_sequencer_upgrade =
-  let check_sequencer ~evm_node ~expected_sequencer =
+  let check_sequencer ~evm_node ~expected_sequencer kernel =
     let*@! current_sequencer =
-      Rpc.state_value evm_node Durable_storage_path.sequencer
+      Rpc.state_value evm_node (Durable_storage_path.sequencer kernel)
     in
     Check.(
       (Hex.to_string (`Hex current_sequencer) = expected_sequencer)
@@ -5919,6 +5921,7 @@ let test_sequencer_upgrade =
         client;
         sequencer;
         observer;
+        kernel;
         _;
       }
       _protocol
@@ -5957,11 +5960,13 @@ let test_sequencer_upgrade =
     check_sequencer
       ~evm_node:sequencer
       ~expected_sequencer:sequencer_key.public_key
+      kernel
   in
   let* () =
     check_sequencer
       ~evm_node:observer
       ~expected_sequencer:sequencer_key.public_key
+      kernel
   in
 
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
@@ -6030,7 +6035,7 @@ let test_sequencer_upgrade =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
            ~operation:Sc_rollup_rpc.Value
-           ~key:Durable_storage_path.sequencer
+           ~key:(Durable_storage_path.sequencer kernel)
            ()
     in
     let current_sequencer_in_rollup =
@@ -6058,11 +6063,13 @@ let test_sequencer_upgrade =
     check_sequencer
       ~evm_node:sequencer
       ~expected_sequencer:sequencer_key.public_key
+      kernel
   in
   let* () =
     check_sequencer
       ~evm_node:observer
       ~expected_sequencer:sequencer_key.public_key
+      kernel
   in
 
   Log.info
@@ -6284,6 +6291,7 @@ let test_duplicate_sequencer_upgrade =
         client;
         sequencer;
         observer;
+        kernel;
         _;
       }
       _protocol
@@ -6318,7 +6326,7 @@ let test_duplicate_sequencer_upgrade =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
            ~operation:Sc_rollup_rpc.Value
-           ~key:Durable_storage_path.sequencer
+           ~key:(Durable_storage_path.sequencer kernel)
            ()
     in
     let current_sequencer_in_rollup =
@@ -9839,9 +9847,7 @@ let test_patch_kernel =
       Constant.WASM.mainnet_commit
   in
   let* () = Evm_node.terminate sequencer in
-  let* () =
-    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.mainnet_kernel)
-  in
+  let* () = Evm_node.patch_kernel sequencer (Kernel.path Mainnet) in
   let* () = Evm_node.run sequencer in
   (* Produce a block so that the migration code is executed *)
   let* _ = produce_block sequencer in
@@ -13800,7 +13806,7 @@ let test_sequencer_key_change =
     ~additional_sequencer_keys:[new_sequencer_owner]
     ~genesis_timestamp
     ~instant_confirmations:true
-  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; kernel; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let new_key = new_sequencer_owner.public_key in
   let*@ () =
@@ -13824,7 +13830,9 @@ let test_sequencer_key_change =
   let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
-  let*@! value = Rpc.state_value sequencer Durable_storage_path.sequencer in
+  let*@! value =
+    Rpc.state_value sequencer (Durable_storage_path.sequencer kernel)
+  in
   let expected_key = Hex.of_string new_key |> Hex.show in
   Check.(
     (value = expected_key)
@@ -13837,7 +13845,7 @@ let test_sequencer_key_change =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:Durable_storage_path.sequencer
+         ~key:(Durable_storage_path.sequencer kernel)
          ()
   in
   Check.(

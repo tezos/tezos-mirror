@@ -303,8 +303,8 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
     tez_bootstrap_accounts
   |> List.flatten
 
-let make ?kernel_compat ~eth_bootstrap_balance ?l2_chain_ids
-    ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
+let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
+    ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
     ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
     ?kernel_security_governance ?minimum_base_fee_per_gas ?da_fee_per_byte
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
@@ -394,16 +394,17 @@ let make ?kernel_compat ~eth_bootstrap_balance ?l2_chain_ids
       with_runtimes
   in
   let instrs =
-    (match kernel_compat with
-    | Some Constants.Mainnet_beta -> make_instr ticketer
-    | Some _ | None ->
-        (* For compatibility with post-Beta kernels and Shadownet *)
-        make_instr ~path_prefix:["evm"; "world_state"] ticketer)
+    (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
+       make_instr ~path_prefix:["evm"; "world_state"] ticketer
+     else make_instr ticketer)
+    @ (if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then
+         make_instr ~path_prefix:["evm"; "world_state"] sequencer
+       else make_instr sequencer)
     @ make_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
-    @ make_instr sequencer @ make_instr delayed_bridge @ make_instr admin
+    @ make_instr delayed_bridge @ make_instr admin
     @ make_instr sequencer_governance
     @ make_instr kernel_governance
     @ make_instr kernel_security_governance

@@ -30,7 +30,7 @@ type multichain_sequencer_setup = {
   proxies : Evm_node.t list;
   l1_contracts : l1_contracts;
   boot_sector : string;
-  kernel : Uses.t;
+  kernel : Kernel.t;
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
@@ -47,7 +47,7 @@ type sequencer_setup = {
   proxy : Evm_node.t;
   l1_contracts : l1_contracts;
   boot_sector : string;
-  kernel : Uses.t;
+  kernel : Kernel.t;
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
@@ -342,7 +342,10 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ()
   in
   let* {output; _} =
-    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
+    prepare_installer_kernel
+      ~preimages_dir
+      ~config:(`Path output_config)
+      (Kernel.to_uses kernel)
   in
   return output
 
@@ -487,7 +490,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     prepare_installer_kernel_with_multiple_setup_file
       ~preimages_dir
       ~configs:(rollup_config :: l2_configs)
-      (Uses.path kernel)
+      (Uses.path (Kernel.to_uses kernel))
   in
   return output
 
@@ -558,10 +561,9 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks ?commitment_period
     ?challenge_window ?(sequencer = Constant.bootstrap1)
-    ?(additional_sequencer_keys = []) ?(kernel = Constant.WASM.evm_kernel)
-    ?evm_version ?preimages_dir ?maximum_allowed_ticks
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?(additional_sequencer_keys = []) ?(kernel = Kernel.Latest) ?evm_version
+    ?preimages_dir ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ?dal_publishers_whitelist ~enable_multichain
@@ -627,9 +629,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     else none
   in
   let client = Client.with_dal_node client ?dal_node in
-  let* l1_contracts =
-    setup_l1_contracts ~kernel:(Kernel.of_tag_use kernel) client
-  in
+  let* l1_contracts = setup_l1_contracts ~kernel client in
   let sc_rollup_node =
     Sc_rollup_node.create
       ~default_operator:Constant.bootstrap1.public_key_hash
@@ -646,7 +646,11 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-
+  let kernel_compat =
+    match kernel_compat with
+    | None -> Kernel.name_of kernel
+    | kernel_compat -> kernel_compat
+  in
   let* output =
     setup_kernel
       ~l1_contracts
@@ -708,8 +712,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?periodic_snapshot_path
       ~preconfirmation_stream_enabled:
         (Option.value
-           ~default:
-             ((not enable_multichain) && kernel = Constant.WASM.evm_kernel)
+           ~default:((not enable_multichain) && kernel = Kernel.Latest)
            instant_confirmations)
       ()
   in
@@ -798,9 +801,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
           ())
       l2_chains
   in
-  let evm_version =
-    Kernel.select_evm_version (Kernel.of_tag_use kernel) ?evm_version
-  in
+  let evm_version = Kernel.select_evm_version kernel ?evm_version in
   return
     {
       node;
@@ -968,7 +969,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_number_of_chunks
         ?sequencer
         ?additional_sequencer_keys
-        ~kernel:kernel_use
+        ~kernel
         ?preimages_dir
         ?maximum_allowed_ticks
         ?max_blueprint_lookahead_in_seconds

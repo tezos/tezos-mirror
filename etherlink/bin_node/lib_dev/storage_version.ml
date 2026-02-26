@@ -29,3 +29,6 @@ let sub_block_latency_entrypoints_disabled ~storage_version =
   storage_version < 42
 
 let tezosx_tezos_blocks ~storage_version = storage_version >= 49
+
+let sequencer_key_storage_migrated_to_world_state ~storage_version =
+  storage_version >= 50

@@ -27,7 +27,7 @@ type multichain_sequencer_setup = {
   proxies : Evm_node.t list;
   l1_contracts : l1_contracts;
   boot_sector : string;
-  kernel : Uses.t;
+  kernel : Kernel.t;
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
@@ -44,7 +44,7 @@ type sequencer_setup = {
   proxy : Evm_node.t;
   l1_contracts : l1_contracts;
   boot_sector : string;
-  kernel : Uses.t;
+  kernel : Kernel.t;
   enable_dal : bool;
   evm_version : Evm_version.t;
   enable_multichain : bool;
@@ -275,7 +275,7 @@ val setup_sequencer :
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
-  ?kernel:Uses.t ->
+  ?kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
   ?preimages_dir:string ->

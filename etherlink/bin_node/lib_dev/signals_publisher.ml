@@ -169,7 +169,9 @@ module Worker = struct
         let signals = List.map snd ready_injections in
         let*! head_info = Evm_context.head_info () in
         let* expected_sequencer =
-          Durable_storage.sequencer (fun path ->
+          Durable_storage.sequencer
+            ~storage_version:head_info.storage_version
+            (fun path ->
               let open Lwt_result_syntax in
               let*! res = Evm_state.inspect head_info.evm_state path in
               return res)

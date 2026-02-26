@@ -555,7 +555,7 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
 let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?history_mode
-    ?patch_config ?websockets ?(kernel = Constant.WASM.evm_kernel) ?evm_version
+    ?patch_config ?websockets ?(kernel = Kernel.Latest) ?evm_version
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -591,16 +591,18 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ~tez_bootstrap_accounts
       ?evm_version
       ?with_runtimes
+      ?kernel_compat:(Kernel.name_of kernel)
       ?sequencer:
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)
       ()
   in
+  let _tag, uses = Kernel.to_uses_and_tags kernel in
   let* {output; _} =
     Sc_rollup_helpers.prepare_installer_kernel
       ~preimages_dir
       ~config:(`Path output_config)
-      kernel
+      uses
   in
   let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
   let sequencer_config : Evm_node.sequencer_config =
@@ -748,7 +750,7 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
   @@ fun () ->
   let* sequencer =
     init_sequencer_sandbox
-      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?kernel
       ?tx_queue_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
@@ -791,7 +793,7 @@ let register_sandbox_with_observer ~__FILE__ ?(uses_client = false) ?kernel
   @@ fun () ->
   let* sandbox =
     init_sequencer_sandbox
-      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?kernel
       ?tx_queue_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte

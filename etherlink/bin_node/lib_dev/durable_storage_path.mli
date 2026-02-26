@@ -46,13 +46,17 @@ val kernel_root_hash : path
 
 val kernel_upgrade : path
 
-val sequencer_upgrade : path
+val sequencer_upgrade : storage_version:int -> path
 
 val delayed_inbox : path
 
 val sequencer_pool_address : path
 
-val sequencer_key : path
+val sequencer_key_legacy : path
+
+val sequencer_key_world_state : path
+
+val sequencer_key : storage_version:int -> path
 
 val maximum_gas_per_transaction : path
 

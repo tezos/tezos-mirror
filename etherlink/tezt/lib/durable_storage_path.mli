@@ -78,8 +78,9 @@ val sequencer_governance : path
 (** [ticketer] is the path to the ticketer contract. *)
 val ticketer : path
 
-(** [sequencer] is the path to the sequencer flag. *)
-val sequencer : path
+(** [sequencer kernel] is the path to the sequencer key,
+    in world state for [Latest], in the legacy EVM path otherwise. *)
+val sequencer : Kernel.t -> path
 
 (** [sequencer_pool_address] is the path to the L2 address credited with DA fees. *)
 val sequencer_pool_address : path

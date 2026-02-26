@@ -68,7 +68,7 @@ type full_evm_setup = {
   produce_block : unit -> (int, Rpc.error) result Lwt.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
-  kernel : string;
+  kernel : Kernel.t;
   evm_version : Evm_version.t;
   kernel_root_hash : string;
 }
@@ -387,6 +387,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~enable_fast_withdrawal
         ?dal_slots
         ?evm_version
+        ?kernel_compat:(Kernel.name_of kernel)
         ()
     in
     match additional_config with
@@ -523,7 +524,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       produce_block;
       endpoint;
       l1_contracts;
-      kernel = output;
+      kernel;
       evm_version;
       kernel_root_hash = root_hash;
     }
@@ -6035,7 +6036,9 @@ let test_rpc_state_value_and_subkeys =
     ~tags:["evm"; "rpc"; "state_value"; "state_subkeys"]
     ~title:"RPC methods stateValue and stateSubkeys"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; sc_rollup_node; client; produce_block; _} = evm_setup in
+  let {evm_node; sc_rollup_node; client; produce_block; kernel; _} =
+    evm_setup
+  in
   let* _ = produce_block () in
   let* () =
     repeat 3 (fun () ->
@@ -6048,8 +6051,12 @@ let test_rpc_state_value_and_subkeys =
       string
       ~error_msg:"Kernel version is %L, but should be %R") ;
   let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
+
   let expected_subkeys =
-    ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
+    let keys = ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"] in
+    match kernel with
+    | Latest -> keys @ ["sequencer"]
+    | Mainnet | Tezlink_shadownet -> keys
   in
   Check.(
     (List.sort String.compare world_state_subkeys

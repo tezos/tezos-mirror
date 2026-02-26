@@ -76,18 +76,27 @@ let world_state read chain_id =
     (Durable_storage_path.Chain_configuration.world_state chain_id)
     Bytes.to_string
 
-let sequencer read =
-  inspect_durable_and_decode
-    read
-    Durable_storage_path.sequencer_key
-    (fun bytes -> Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
-
 let storage_version read =
   inspect_durable_and_decode_default
     ~default:0
     read
     Durable_storage_path.storage_version
     (fun bytes -> Helpers.decode_z_le bytes |> Z.to_int)
+
+let sequencer =
+  let read_storage_version = storage_version in
+  fun ?storage_version read ->
+    let open Lwt_result_syntax in
+    let* sequencer_path =
+      let* storage_version =
+        match storage_version with
+        | Some storage_version -> return storage_version
+        | None -> read_storage_version read
+      in
+      return (Durable_storage_path.sequencer_key ~storage_version)
+    in
+    inspect_durable_and_decode read sequencer_path (fun bytes ->
+        Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
 
 let kernel_version read =
   inspect_durable_and_decode

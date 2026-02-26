@@ -77,13 +77,27 @@ let kernel_root_hash = EVM.make "/kernel_root_hash"
 
 let kernel_upgrade = EVM.make "/kernel_upgrade"
 
-let sequencer_upgrade = EVM.make "/sequencer_upgrade"
+let sequencer_upgrade ~storage_version =
+  if
+    Storage_version.sequencer_key_storage_migrated_to_world_state
+      ~storage_version
+  then World_state.make "/sequencer_upgrade"
+  else EVM.make "/sequencer_upgrade"
 
 let delayed_inbox = EVM.make "/delayed-inbox"
 
 let sequencer_pool_address = EVM.make "/sequencer_pool_address"
 
-let sequencer_key = EVM.make "/sequencer"
+let sequencer_key_legacy = EVM.make "/sequencer"
+
+let sequencer_key_world_state = World_state.make "/sequencer"
+
+let sequencer_key ~storage_version =
+  if
+    Storage_version.sequencer_key_storage_migrated_to_world_state
+      ~storage_version
+  then sequencer_key_world_state
+  else sequencer_key_legacy
 
 let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 
