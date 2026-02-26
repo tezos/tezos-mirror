@@ -71,7 +71,9 @@ let sequencer_governance = evm "/sequencer_governance"
 
 let ticketer = evm "/ticketer"
 
-let sequencer = world_state "/sequencer"
+let sequencer = function
+  | Kernel.Latest -> world_state "/sequencer"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/sequencer"
 
 let sequencer_pool_address = evm "/sequencer_pool_address"
 

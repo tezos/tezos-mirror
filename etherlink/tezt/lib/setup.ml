@@ -501,11 +501,6 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?dal_publishers_whitelist ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ~preimages_dir ~kernel ?evm_version ?with_runtimes ~client
     protocol () =
-  let kernel_compat =
-    match kernel_compat with
-    | None -> Kernel.name_of kernel
-    | kernel_compat -> kernel_compat
-  in
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -651,7 +646,11 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-
+  let kernel_compat =
+    match kernel_compat with
+    | None -> Kernel.name_of kernel
+    | kernel_compat -> kernel_compat
+  in
   let* output =
     setup_kernel
       ~l1_contracts

@@ -265,6 +265,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
+  let*! head = Evm_context.head_info () in
   let* () =
     match sandbox_config with
     | Some
@@ -279,7 +280,9 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         let*? pk, _ = Signer.first_lexicographic_signer signer in
         let* () =
           Evm_context.patch_state
-            ~key:Durable_storage_path.sequencer_key
+            ~key:
+              (Durable_storage_path.sequencer_key
+                 ~storage_version:head.storage_version)
             ~value:(Signature.Public_key.to_b58check pk)
             ()
         in
@@ -389,8 +392,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         return_unit
     | None -> return_unit
   in
-
-  let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
   let* () =
     Option.iter_es

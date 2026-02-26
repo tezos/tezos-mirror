@@ -43,6 +43,12 @@
 
 ### Storage changes
 
+- The node now reads and writes the sequencer key and sequencer upgrade from
+  their world state paths (`/evm/world_state/sequencer` and
+  `/evm/world_state/sequencer_upgrade`) for kernels >= V50, falling back to
+  legacy paths (`/evm/sequencer` and `/evm/sequencer_upgrade`) for older
+  kernels.
+
 ### Documentation changes
 
 ### Experimental features changes

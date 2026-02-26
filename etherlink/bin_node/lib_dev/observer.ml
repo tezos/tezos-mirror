@@ -229,7 +229,9 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
 
   let* () =
     when_ sandbox @@ fun () ->
-    let*! {next_blueprint_number; _} = Evm_context.head_info () in
+    let*! {next_blueprint_number; storage_version; _} =
+      Evm_context.head_info ()
+    in
     let* pk =
       Batch.call
         ~timeout:config.rpc_timeout
@@ -239,7 +241,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         (Block_parameter (Number next_blueprint_number))
     in
     Evm_context.patch_state
-      ~key:Durable_storage_path.sequencer_key
+      ~key:(Durable_storage_path.sequencer_key ~storage_version)
       ~value:(Signature.Public_key.to_b58check pk)
       ()
   in

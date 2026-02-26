@@ -750,32 +750,24 @@ module State = struct
   let check_sequencer_upgrade ctxt
       Evm_events.Sequencer_upgrade.{sequencer = new_sequencer; _} =
     let open Lwt_result_syntax in
-    let*! bytes =
-      Evm_state.inspect
-        ctxt.session.evm_state
-        Durable_storage_path.sequencer_key
+    let* current_sequencer =
+      Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
     in
-    let*? current_sequencer =
-      Option.map_e
-        (fun b -> Signature.Public_key.of_b58check (String.of_bytes b))
-        bytes
-    in
-    match current_sequencer with
-    | Some current_sequencer when new_sequencer = current_sequencer ->
-        let*! () =
-          Events.applied_sequencer_upgrade
-            new_sequencer
-            ctxt.session.next_blueprint_number
-        in
-        return_true
-    | _ ->
-        let*! () =
-          Events.failed_sequencer_upgrade
-            ~new_sequencer
-            ~found_sequencer:current_sequencer
-            ctxt.session.next_blueprint_number
-        in
-        return_false
+    if new_sequencer = current_sequencer then
+      let*! () =
+        Events.applied_sequencer_upgrade
+          new_sequencer
+          ctxt.session.next_blueprint_number
+      in
+      return_true
+    else
+      let*! () =
+        Events.failed_sequencer_upgrade
+          ~new_sequencer
+          ~found_sequencer:(Some current_sequencer)
+          ctxt.session.next_blueprint_number
+      in
+      return_false
 
   let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
     let da_fees =
@@ -1520,7 +1512,9 @@ module State = struct
     in
 
     let* sequencer =
-      Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+      Durable_storage.sequencer
+        ~storage_version:ctxt.session.storage_version
+        (read_from_state ctxt.session.evm_state)
     in
     let*? signer = Signer.get_signer signer sequencer in
     return (chunks, sign ~signer chunks)
@@ -1649,7 +1643,9 @@ module State = struct
         let*! () =
           modify_in_place
             ctxt
-            ~key:Durable_storage_path.sequencer_upgrade
+            ~key:
+              (Durable_storage_path.sequencer_upgrade
+                 ~storage_version:ctxt.session.storage_version)
             ~value:payload
         in
         let* () =
@@ -2044,7 +2040,7 @@ module State = struct
     in
     let*! () = Evm_context_events.start_history_mode history_mode in
 
-    let* evm_state, context =
+    let* evm_state, context, storage_version =
       match kernel_path with
       | Some kernel ->
           if init_status = Loaded then
@@ -2053,7 +2049,8 @@ module State = struct
               Lwt_result.ok (Events.ignored_kernel_arg ())
             in
             let*! evm_state = Pvm.State.get context in
-            return (evm_state, context)
+            let* storage_version = Evm_state.storage_version evm_state in
+            return (evm_state, context, storage_version)
           else
             let* evm_state = Evm_state.init ~kernel in
             (* By executing the kernel with a minimal inbox, we preemptively
@@ -2069,22 +2066,36 @@ module State = struct
                 ~destination:smart_rollup_address
                 ()
             in
-            (* We write the expected sequencer in the state ahead of time.
-               This is necessary to support the sandbox mode, which is
-               typically not set up with an installer and therefore would
-               execute this first call in proxy mode (leading to an unwanted
-               block creation).
+            (* Pre-write the sequencer public key into durable storage before
+               the first kernel execution. Without it, the kernel has no
+               sequencer configured and immediately falls back to proxy mode,
+               which causes an unwanted block to be produced on the very first
+               run.
 
-               For production setup, the installer will rewrite this value. *)
+               This is only useful for manual sandbox tests without an
+               installer. In production the installer has already written the
+               key, so this write is a no-op.
+            *)
             let* evm_state =
               match signer with
               | Some signer ->
                   let*? pk, _ = Signer.first_lexicographic_signer signer in
-                  Lwt_result.ok
-                  @@ Evm_state.modify
-                       ~key:Durable_storage_path.sequencer_key
-                       ~value:(Signature.Public_key.to_b58check pk)
-                       evm_state
+                  (* The storage version is not yet known at this point (it is
+                     determined by the first execution), so we write the key
+                     under both possible paths to cover either layout. *)
+                  let*! evm_state =
+                    Evm_state.modify
+                      ~key:Durable_storage_path.sequencer_key_legacy
+                      ~value:(Signature.Public_key.to_b58check pk)
+                      evm_state
+                  in
+                  let*! evm_state =
+                    Evm_state.modify
+                      ~key:Durable_storage_path.sequencer_key_world_state
+                      ~value:(Signature.Public_key.to_b58check pk)
+                      evm_state
+                  in
+                  return evm_state
               | None -> return evm_state
             in
             let* evm_state =
@@ -2096,20 +2107,39 @@ module State = struct
                 evm_state
                 (`Inbox [])
             in
+            let* storage_version = Evm_state.storage_version evm_state in
+            (* Now that the storage version is known, remove whichever key path
+               is not canonical for this version, so no stale entry is left
+               in the state. *)
+            let*! evm_state =
+              if
+                String.equal
+                  Durable_storage_path.sequencer_key_world_state
+                  (Durable_storage_path.sequencer_key ~storage_version)
+              then
+                Evm_state.delete
+                  ~kind:Value
+                  evm_state
+                  Durable_storage_path.sequencer_key_legacy
+              else
+                Evm_state.delete
+                  ~kind:Value
+                  evm_state
+                  Durable_storage_path.sequencer_key_world_state
+            in
             let (Qty next) = next_blueprint_number in
             let* context = commit conn context evm_state (Qty Z.(pred next)) in
-            return (evm_state, context)
+            return (evm_state, context, storage_version)
       | None ->
           if init_status = Loaded then
             let*! evm_state = Pvm.State.get context in
-            return (evm_state, context)
+            let* storage_version = Evm_state.storage_version evm_state in
+            return (evm_state, context, storage_version)
           else
             failwith
               "Cannot compute the initial EVM state without the path to the \
                initial kernel"
     in
-
-    let* storage_version = Evm_state.storage_version evm_state in
 
     let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
 
@@ -2288,7 +2318,9 @@ module State = struct
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* sequencer =
-          Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+          Durable_storage.sequencer
+            ~storage_version:ctxt.session.storage_version
+            (read_from_state ctxt.session.evm_state)
         in
         let*? chunks =
           Sequencer_blueprint.chunks_of_external_messages
@@ -2358,7 +2390,9 @@ module State = struct
          if we agree with it.
       *)
       let* sequencer =
-        Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+        Durable_storage.sequencer
+          ~storage_version:ctxt.session.storage_version
+          (read_from_state ctxt.session.evm_state)
       in
       let*? blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
@@ -2863,8 +2897,11 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   in
 
   let* sequencer_upgrade =
+    let* storage_version = Evm_state.storage_version evm_state in
     let*! sequencer_upgrade_payload =
-      Evm_state.inspect evm_state Durable_storage_path.sequencer_upgrade
+      Evm_state.inspect
+        evm_state
+        (Durable_storage_path.sequencer_upgrade ~storage_version)
     in
     Option.bind sequencer_upgrade_payload Evm_events.Sequencer_upgrade.of_bytes
     |> Option.map (fun e -> Evm_events.Sequencer_upgrade_event e)
@@ -2955,7 +2992,10 @@ let apply_blueprint ?events ?expected_block_hash timestamp payload
     | Some {sequencer; timestamp = upgrade_timestamp; _}
       when Time.Protocol.(timestamp >= upgrade_timestamp) ->
         return sequencer
-    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+    | _ ->
+        Durable_storage.sequencer
+          ~storage_version:head.storage_version
+          (State.read_from_state head.evm_state)
   in
   let*? chunks = Sequencer_blueprint.chunks_of_external_messages payload in
   let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
@@ -2980,7 +3020,10 @@ let apply_chunks ~signer timestamp chunks delayed_transactions =
         (* If we are this is the first block after the sequencer upgrade, the sequencer key in the state will still be the previous one. before applying the chunks, the sequencer key will change for the new one.
 In order to still be able to sign the chunks, we need to use the next sequencer key instead of the one in the state. *)
         return sequencer
-    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+    | _ ->
+        Durable_storage.sequencer
+          ~storage_version:head.storage_version
+          (State.read_from_state head.evm_state)
   in
   let*? signer = Signer.get_signer signer expected_sequencer in
   let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
