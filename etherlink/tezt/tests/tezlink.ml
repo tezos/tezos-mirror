@@ -1342,7 +1342,7 @@ let test_contract_storage_normalization =
 
 let test_contract_counter =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test that smart contracts don't have any counter"
     ~tags:["rpc"; "counter"]
     ~bootstrap_contracts:[contract]
@@ -2181,7 +2181,7 @@ let test_tezlink_sandbox () =
 let test_tezlink_internal_operation =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Internal operation"
     ~tags:["internal"; "operation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
