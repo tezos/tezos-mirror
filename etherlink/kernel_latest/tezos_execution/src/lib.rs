@@ -5704,7 +5704,7 @@ mod tests {
         assert_eq!(bridge_calls.len(), 1, "Bridge should have been called once");
         assert_eq!(
             bridge_calls[0].3, // amount is the 4th field in the tuple
-            primitive_types::U256::from(50),
+            tezos_ethereum::wei::eth_from_mutez(50u64),
             "Bridge should have been called with transfer amount of 50"
         );
 
