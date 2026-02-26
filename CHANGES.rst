@@ -49,6 +49,15 @@ Node
   not, the ``helpers/scripts/typecheck_data`` Michelson RPC can still
   be used. (MR :gl:`!20297`)
 
+- Fixed the external validator process being unnecessarily restarted when a
+  bootstrap pipeline is canceled (e.g. due to peer disconnection). Also improved
+  canceled error matching to handle all forms of ``Lwt.Canceled`` errors,
+  including serialized forms from IPC round-trips. (MR :gl:`!20903`)
+
+- Fixed node shutdown ordering so the node shuts down before RPC servers,
+  avoiding EPIPE errors and slow shutdown when many external RPC processes are
+  running. (MR :gl:`!20476`)
+
 Client
 ------
 
