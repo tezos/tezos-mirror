@@ -29,6 +29,33 @@ let slot_index_of_int i =
 let assert_equal_bool ~loc msg expected actual =
   Assert.equal ~loc Bool.equal msg Format.pp_print_bool expected actual
 
+let assert_equal_decoded_attestations ~loc msg expected actual =
+  let open Dal_attestations_repr in
+  let pp_unfolded_lag_attestation fmt {lag_index; slot_indices} =
+    Format.fprintf
+      fmt
+      "{lag = %d; slots = %a}"
+      lag_index
+      Format.(
+        pp_print_list
+          ~pp_sep:Format.(fun fmt () -> fprintf fmt "%a" pp_print_string ",")
+          pp_print_int)
+      slot_indices
+  in
+  Assert.equal
+    ~loc
+    (List.equal
+       (fun
+         {lag_index = lag_idx_a; slot_indices = slot_idx_a}
+         {lag_index = lag_idx_b; slot_indices = slot_idx_b}
+       ->
+         Int.equal lag_idx_a lag_idx_b
+         && List.equal Int.equal slot_idx_a slot_idx_b))
+    msg
+    (Format.pp_print_list pp_unfolded_lag_attestation)
+    expected
+    actual
+
 (** Helper for is_attested with pre-filled number_of_slots and number_of_lags *)
 let is_attested t ~lag_index slot_index =
   Dal_attestations_repr.is_attested
@@ -515,7 +542,21 @@ let test_complex_pattern () =
   let* () = check_slot 3 31 true in
   let* () = check_slot 3 1 false in
 
-  return_unit
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  match decoded with
+  | Error _ -> Alcotest.fail "Cannot decode DAL attestation"
+  | Ok decoded ->
+      assert_equal_decoded_attestations
+        ~loc:__LOC__
+        ""
+        [
+          {lag_index = 0; slot_indices = [1; 3; 5]};
+          {lag_index = 1; slot_indices = [10]};
+          {lag_index = 3; slot_indices = [0; 15; 31]};
+        ]
+        decoded
 
 let tests =
   [
