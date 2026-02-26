@@ -55,6 +55,15 @@ Node
 
 - Brassaia context backend is no longer experimental. (MR :gl:`!20079`)
 
+- Fixed the external validator process being unnecessarily restarted when a
+  bootstrap pipeline is canceled (e.g. due to peer disconnection). Also improved
+  canceled error matching to handle all forms of ``Lwt.Canceled`` errors,
+  including serialized forms from IPC round-trips. (MR :gl:`!20903`)
+
+- Fixed node shutdown ordering so the node shuts down before RPC servers,
+  avoiding EPIPE errors and slow shutdown when many external RPC processes are
+  running. (MR :gl:`!20476`)
+
 - A new store version (v3.3) is introduced. At node startup, an existing
   ``data_dir`` containing a store with a supported version (v3.1 and v3.2) is
   automatically upgraded to v3.3. (MR :gl:`!19967`)
