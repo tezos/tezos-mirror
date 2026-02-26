@@ -431,6 +431,29 @@ let is_slot_attested ~published_level ~slot_index ~to_attested_levels
   in
   List.exists is_attested_at attested_levels
 
+let is_slot_attested_in_bitset ~protocol ~dal_parameters ~attested_level
+    ~published_level ~slot_index ~dal_attestation =
+  let attestation_array =
+    Attestations.decode protocol dal_parameters dal_attestation
+  in
+  let lag = attested_level - published_level in
+  let lag_index_opt =
+    List.find_index
+      (fun l -> l = lag)
+      dal_parameters.Parameters.attestation_lags
+  in
+  match lag_index_opt with
+  | None ->
+      Test.fail
+        "The attested level %d is not in the attestation window for published \
+         level %d"
+        attested_level
+        published_level
+  | Some lag_index ->
+      let attestations_at_lag = attestation_array.(lag_index) in
+      Array.length attestations_at_lag > slot_index
+      && attestations_at_lag.(slot_index)
+
 module Committee = struct
   type member = {attester : string; indexes : int list}
 

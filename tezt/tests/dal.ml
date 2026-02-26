@@ -1532,7 +1532,6 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
     node client _bootstrap_key =
   (* Some helpers *)
   let attestation_lag = parameters.Dal.Parameters.attestation_lag in
-  let number_of_lags = List.length parameters.attestation_lags in
   assert (attestation_lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
     let* _op, op_hash =
@@ -1555,26 +1554,6 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
         Mempool.classified_typ
         ~error_msg:(__LOC__ ^ " : Bad mempool !!!. Got %L")) ;
     unit
-  in
-  let check_slots_availability ~__LOC__ ~attested =
-    let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-    let dal_attestation =
-      (* Field is part of the encoding when the feature flag is true *)
-      (Option.get metadata.dal_attestation
-      |> Dal.Slot_availability.decode protocol parameters).(number_of_lags - 1)
-    in
-    List.iter
-      (fun i ->
-        Check.(
-          (Array.get dal_attestation i = true)
-            bool
-            ~error_msg:
-              (Format.sprintf
-                 "%s : Slot %d is expected to be confirmed."
-                 __LOC__
-                 i)))
-      attested
-    |> return
   in
   (* Just bake some blocks before starting attesting. *)
   let* () = bake_for ~count:4 client in
@@ -1642,7 +1621,25 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
   let* () =
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated = [h4; h4']}
   in
-  check_slots_availability ~__LOC__ ~attested:[]
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
+  match metadata.dal_attestation with
+  | None -> unit
+  | Some dal_attestation_bitset ->
+      let attestation_array =
+        Dal.Slot_availability.decode protocol parameters dal_attestation_bitset
+      in
+      (* Check that no slots are attested at any lag *)
+      let some_slot_attested =
+        Array.exists
+          (fun lag_attestations ->
+            Array.exists (fun attested -> attested) lag_attestations)
+          attestation_array
+      in
+      Check.is_false
+        some_slot_attested
+        ~error_msg:"%s: Expected no slots to be attested, but some were"
+        ~__LOC__ ;
+      unit
 
 let test_all_available_slots _protocol parameters cryptobox node client
     _bootstrap_key =
@@ -2906,13 +2903,9 @@ let expected_attestation dal_parameters attested_slots =
    - Confirm that the kernel downloaded the slot and wrote the content to "/output/slot-<index>". *)
 let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
     sc_rollup_node _sc_rollup_address node client pvm_name =
-  Log.info "Assert attestation_lag value." ;
-  Check.(
-    (parameters.Dal.Parameters.attestation_lag = 4)
-      int
-      ~error_msg:
-        "The kernel used in the test assumes attestation_lag of %R, got %L") ;
-  let slot_size = parameters.cryptobox.slot_size in
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let attestation_lag = parameters.attestation_lag in
+  let min_lag = List.hd parameters.attestation_lags in
   Check.(
     (slot_size = 32768)
       int
@@ -2945,6 +2938,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let slot_size = parameters.cryptobox.slot_size in
   Log.info "Store slot content to DAL node and submit header." ;
   let slot_content = generate_dummy_slot slot_size in
+  let* level = Node.get_level node in
   let* () =
     publish_store_and_attest_slot
       ~protocol
@@ -2956,30 +2950,41 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       ~content:(Helpers.make_slot ~slot_size slot_content)
       parameters
   in
-  let* level = Node.get_level node in
+  let published_level = level + 1 in
+  let* current_level = Node.get_level node in
+  Log.info
+    "Slot published at level %d, currently at level %d"
+    published_level
+    current_level ;
   Log.info "Assert that the slot was attested." ;
-  let* {dal_attestation; _} =
-    Node.RPC.(call node @@ get_chain_block_metadata ())
+  let attested_levels =
+    published_level + min_lag
+    --> min (published_level + attestation_lag) current_level
   in
-  let number_of_lags = List.length parameters.attestation_lags in
-  let dal_attestation =
-    Option.map
-      (fun str ->
-        (Dal.Slot_availability.decode protocol parameters str).(number_of_lags
-                                                                - 1))
-      dal_attestation
+  let* all_slot_availabilities =
+    Dal.collect_slot_availabilities node ~attested_levels
   in
-  let expected_attestation = expected_attestation parameters [0] in
-  Check.((Some expected_attestation = dal_attestation) (option (array bool)))
-    ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
+  let to_attested_levels =
+    Dal.to_attested_levels ~protocol ~dal_parameters:parameters
+  in
+  Check.is_true
+    (Dal.is_slot_attested
+       ~published_level
+       ~slot_index:0
+       ~to_attested_levels
+       all_slot_availabilities)
+    ~error_msg:"Expected slot 0 from published_level to be attested" ;
+
   Log.info "Wait for the rollup node to catch up to the latest level." ;
 
   (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
-       node processing *)
+     node processing *)
   let* () = bake_for ~count:3 client in
   let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
 
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node published_level
+  in
   Log.info "Read and assert against value written in durable storage." ;
   let key = "/output/slot-0" in
   let* value_written =
@@ -9564,6 +9569,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
     Node.RPC.call node
     @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
   in
+  let* attested_level = Client.level client in
   let dal_attestation_opt =
     List.find_map
       (fun json ->
@@ -9579,20 +9585,26 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
         else None)
       (JSON.as_list json)
   in
-  let number_of_lags = List.length dal_parameters.attestation_lags in
-  let dal_attestation_opt =
-    Option.map
-      (fun str ->
-        let a = Dal.Attestations.decode protocol dal_parameters str in
-        a.(number_of_lags - 1).(slot_index))
-      dal_attestation_opt
+  let new_attester_attested_slot =
+    match dal_attestation_opt with
+    | None -> false
+    | Some dal_attestation ->
+        Dal.is_slot_attested_in_bitset
+          ~protocol
+          ~dal_parameters
+          ~attested_level
+          ~published_level
+          ~slot_index
+          ~dal_attestation
   in
-  Check.(
-    (dal_attestation_opt = Some true)
-      (option bool)
-      ~error_msg:
-        "Expected a DAL attestation for slot 0 for the new attester: got %L, \
-         expected %R") ;
+  Check.is_true
+    ~__LOC__
+    new_attester_attested_slot
+    ~error_msg:
+      (Format.sprintf
+         "Expected new attester to attest slot %d from published_level %d"
+         slot_index
+         published_level) ;
   unit
 
 let pair_up ~error_msg =
@@ -12315,12 +12327,6 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
     return dal_attestation_opt
   in
 
-  let number_of_lags = List.length dal_parameters.attestation_lags in
-  let is_max_lag_empty str =
-    let decoded = Dal.Attestations.decode protocol dal_parameters str in
-    Array.for_all not decoded.(number_of_lags - 1)
-  in
-
   let count_not_in_committee = ref 0 in
   let count_attestable_slots = ref 0 in
   let count_traps = ref 0 in
@@ -12363,55 +12369,55 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
     | Some true -> incr count_attestable_slots
     | _ -> ()) ;
 
-    match (expected_dal_attestable_slots, actual_dal_attestable_slots_opt) with
+    (* Check if delegate actually attested our slot when they included DAL content *)
+    let actual_bit_opt =
+      Option.map
+        (fun dal_attestation ->
+          Dal.is_slot_attested_in_bitset
+            ~protocol
+            ~dal_parameters
+            ~attested_level
+            ~published_level
+            ~slot_index
+            ~dal_attestation)
+        actual_dal_attestable_slots_opt
+    in
+
+    match (expected_dal_attestable_slots, actual_bit_opt) with
     | Not_in_committee, None ->
         log_step "Level %d: Not_in_committee" attested_level ;
         unit
-    | Not_in_committee, Some dal_attestation ->
-        (* With multi-lag, the delegate might be in committee for earlier lags
-           but not for max lag. Since get_attestable_slots only checks max lag,
-           we verify that the max lag portion of the attestation is empty. *)
-        if is_max_lag_empty dal_attestation then (
-          log_step
-            "Level %d: Not_in_committee for max lag (attestation may contain \
-             data for other lags)"
-            attested_level ;
-          unit)
-        else
-          Test.fail
-            "Level %d: Not_in_committee for max lag, but max lag portion of \
-             attestation is non-empty. dal_attestation=%s for %s"
-            attested_level
-            dal_attestation
-            new_account.public_key_hash
+    | Not_in_committee, Some true ->
+        Test.fail
+          "Level %d: Not_in_committee but delegate attested slot %d from \
+           published_level=%d"
+          attested_level
+          slot_index
+          published_level
+    | Not_in_committee, Some false ->
+        log_step
+          "Level %d: Not_in_committee (attestation for other lags/levels)"
+          attested_level ;
+        unit
     | Attestable_slots _slots, None ->
         if published_level > first_level then
           Test.fail
-            "Level %d: delegate %s is in the DAL committee (attestable slots \
-             available) but no DAL attestation operation was found in the \
-             block. This is invalid: when in committee, the baker must include \
-             DAL content."
+            "Level %d: delegate %s is in committee but no DAL attestation found"
             attested_level
             new_account.public_key_hash
         else unit
-    | Attestable_slots _slots, Some actual_dal_attestable_slots ->
+    | Attestable_slots _slots, Some actual_bit ->
         let expected_bit =
           match expected_bit_opt with Some b -> b | None -> false
         in
-        let actual_bit =
-          (Dal.Attestations.decode
-             protocol
-             dal_parameters
-             actual_dal_attestable_slots).(number_of_lags - 1).(slot_index)
-        in
         if actual_bit <> expected_bit then
           Test.fail
-            "Level %d: DAL node says bit(%d)=%b for max lag, but chain \
-             dal_attestation=%s (bit=%b)"
+            "Level %d: DAL node says bit(%d)=%b for published_level=%d, but \
+             delegate's attestation shows bit=%b"
             attested_level
             slot_index
             expected_bit
-            actual_dal_attestable_slots
+            published_level
             actual_bit
         else
           let* has_traps =
@@ -12427,19 +12433,19 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
           in
           if has_traps then incr count_traps ;
           if published_level <= first_level then (
-            let prefix_msg = sf "Level %d: " attested_level in
             Check.(
               (actual_bit = false)
                 ~__LOC__
                 bool
-                ~error_msg:(prefix_msg ^ "Expected false, got true")) ;
+                ~error_msg:
+                  (sf "Level %d: Expected false, got true" attested_level)) ;
             unit)
           else if actual_bit <> not has_traps then
             Test.fail
-              "Level %d, slot %d: chain dal_attestation max lag bit is [%b], \
-               but has_traps = %b"
+              "Level %d, slot %d, published_level %d: bit=[%b], has_traps=%b"
               attested_level
               slot_index
+              published_level
               actual_bit
               has_traps
           else unit
@@ -12645,7 +12651,6 @@ let register ~protocols =
     ~blocks_per_cycle:16
     ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
   scenario_with_layer1_node
-    ~attestation_lag:5
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
     protocols ;
@@ -13058,7 +13063,6 @@ let register ~protocols =
     ~number_of_shards:256
     ~slot_size:(1 lsl 15)
     ~redundancy_factor:8
-    ~attestation_lag:4
     ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
