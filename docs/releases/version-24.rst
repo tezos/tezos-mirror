@@ -1,4 +1,4 @@
-Version 24.1
+Version 24.2
 ============
 
 Changes
@@ -23,6 +23,13 @@ Octez v24.1 addresses two issues in v24.0:
 - A downstream ``opam`` dependency issue that can prevent bakers and operators from building v24.0 from sources in certain setups. v24.1 makes the opam cache the default archive provider when building Octez from sources. This ensures operators can build Octez without disruptions to their deployment infrastructure.
 
 - A regression in the snapshot import mechanism in v24.0, which made the process slower than usual. v24.1 restores the usual performance of the snapshot import mechanism.
+
+Octez v24.2
+~~~~~~~~~~~
+
+Octez v24.2 fixes two minor bugs in Octez node. Notably, it addresses an issue where the node can, in some scenarios, stop processing new blocks after a peer disconnects, hence being unable to follow the chain unless restarted.
+
+If you deploy Octez v24.1 (or earlier) infrastructure, and notice your octez-node to be falling behind, we recommend upgrading to v24.2 at your earliest convenience.
 
 .. _protocol_support_v24:
 
@@ -97,19 +104,20 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v24.1
+  git checkout octez-v24.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v24.1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v24.2`` Docker images of Octez.
 
 Changelog
 ---------
 
-- `Version 24.1 <../CHANGES.html#version-24-0>`_
+- `Version 24.2 <../CHANGES.html#version-24-2>`_
+- `Version 24.1 <../CHANGES.html#version-24-1>`_
 - `Version 24.0 <../CHANGES.html#version-24-0>`_
 - `Version 24.0~rc2 <../CHANGES.html#version-24-0-rc2>`_
 - `Version 24.0~rc1 <../CHANGES.html#version-24-0-rc1>`_
