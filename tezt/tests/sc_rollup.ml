@@ -3608,6 +3608,91 @@ let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
   in
   Lwt.return_some dal_node
 
+(* Like [with_dal_ready_for_echo_dal_reveal_pages], but attests the slot at a
+   specific lag (identified by [lag_index] into [attestation_lags]) rather than
+   at the max lag. This is used to test refutation scenarios where the actual
+   attestation lag differs from the max. *)
+let with_dal_ready_for_echo_dal_reveal_pages_at_lag ~operator_profiles
+    ~kernel_imported_publish_level ~published_level ~slot_index ~target_lag
+    ~target_lag_index =
+ fun protocol tezos_node tezos_client ->
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* () = Dal_node.init_config ~operator_profiles dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* curr_level = Node.get_level tezos_node in
+  if curr_level > published_level then
+    Test.fail
+      "publish level (%d) smaller than current level (%d)@."
+      published_level
+      curr_level ;
+  let* () =
+    Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
+  in
+  let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
+  let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+  Check.(
+    (target_lag = List.nth dal_parameters.attestation_lags target_lag_index)
+      int
+      ~__LOC__
+      ~error_msg:
+        "target_lag and target_lag_index don't match: got %L, expected %R") ;
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let* () =
+    Dal.publish_store_and_attest_slot_at_lag
+      ~protocol
+      ~lag_index:target_lag_index
+      ~lag:target_lag
+      tezos_client
+      tezos_node
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      ~content:
+        (Dal_common.Helpers.make_slot ~slot_size (String.make slot_size 'T'))
+      dal_parameters
+  in
+  let target_final_l1_level =
+    kernel_imported_publish_level + dal_parameters.attestation_lag
+  in
+  let* curr_level = Node.get_level tezos_node in
+  let block_finality = 2 in
+  let num_blocks_to_bake =
+    target_final_l1_level + block_finality - curr_level
+  in
+  let* () =
+    if num_blocks_to_bake <= 0 then unit
+    else
+      let wait_for_target_final_l1_level =
+        Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
+            if JSON.(e |-> "level" |> as_int) = target_final_l1_level then
+              Some ()
+            else None)
+      in
+      let* () =
+        repeat num_blocks_to_bake (fun () -> Client.bake_for tezos_client)
+      in
+      wait_for_target_final_l1_level
+  in
+  let open Dal_common.RPC in
+  let open Dal_common.RPC.Local in
+  let* slot_status =
+    call dal_node
+    @@ get_level_slot_status ~slot_level:published_level ~slot_index
+  in
+  Check.(slot_status = Attested target_lag)
+    ~__LOC__
+    Dal_common.Check.slot_id_status_typ
+    ~error_msg:
+      "The value of the fetched status should match the expected one (current \
+       = %L, expected = %R)" ;
+  Log.info
+    "Slot published at level %d and index %d is attested at lag %d as \
+     expected@."
+    published_level
+    slot_index
+    target_lag ;
+  Lwt.return_some dal_node
+
 type case = {
   inbox_level : int;
   player_priority : [`Priority_loser | `Priority_honest];
@@ -3834,6 +3919,189 @@ let test_refutation_with_dal_page_import_id_far_in_the_future protocols =
             ~suffix:""
             (Uses.path
                Constant.WASM.echo_dal_reveal_pages_high_target_pub_level))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
+(* Honest rollup imports the page at the actual attestation lag (the first
+   in the protocol's [attestation_lags]). The refutation game runs and the
+   honest wins when the loser flips page content — the protocol uses the
+   cell's lag in proofs, not the max lag.
+
+   Contrast with [test_refutation_with_dal_import_too_early], where the
+   faulty imports before the slot is attested.
+
+   Also, in contrast to [test_refutation_with_dal_page_import], in which the
+   slot is attested at the maximum lag, in this test the slot is attested at the
+   minimal lag. *)
+let test_refutation_with_dal_honest_at_actual_lag protocols =
+  let published_level = 15 in
+  let slot_index = 1 in
+  let dal_ttl = 50 in
+  let actual_lag = 1 in
+  let actual_lag_index = 0 in
+
+  let all_cases =
+    List.concat_map
+      (fun inbox_level ->
+        List.map
+          (fun player_priority ->
+            {inbox_level; player_priority; attestation_status = `Attested})
+          [`Priority_loser; `Priority_honest])
+      [published_level + actual_lag; published_level + actual_lag + 2]
+  in
+
+  List.iter
+    (fun {inbox_level; player_priority; attestation_status = _} ->
+      let variant =
+        Format.sprintf
+          "dal_honest_at_actual_lag_attested_at_%d_flipped_at_%d_%s"
+          actual_lag
+          inbox_level
+          (player_priority_to_string player_priority)
+      in
+      let loser_modes =
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            slot_index
+            inbox_level;
+        ]
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages_at_lag
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:published_level
+          ~published_level
+          ~slot_index
+          ~target_lag:actual_lag
+          ~target_lag_index:actual_lag_index
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
+(* Faulty rollup "imports" the page at an inbox level where the slot is not
+   yet attested (level + lag1), while the slot is attested at a larger lag
+   (lag2). The faulty cannot win: the post-check uses the cell's Exact_lag
+   (lag2) and rejects the too-early import level. *)
+let test_refutation_with_dal_import_too_early protocols =
+  let published_level = 15 in
+  let slot_index = 1 in
+  let dal_ttl = 50 in
+  (* Must match lag1 so that too_early_inbox_level is correct; asserted in
+     [with_dal]. *)
+  let lag1_value = 1 in
+  let too_early_inbox_level = published_level + lag1_value in
+
+  let all_cases =
+    List.map
+      (fun player_priority ->
+        {
+          inbox_level = too_early_inbox_level;
+          player_priority;
+          attestation_status = `Attested;
+        })
+      [`Priority_loser; `Priority_honest]
+  in
+
+  List.iter
+    (fun {inbox_level; player_priority; attestation_status = _} ->
+      let variant =
+        Format.sprintf
+          "dal_import_too_early_1st_2nd_lag_flipped_at_%d_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+      in
+      let loser_modes =
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            slot_index
+            inbox_level;
+        ]
+      in
+      let with_dal protocol tezos_node tezos_client =
+        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let attestation_lags = dal_parameters.attestation_lags in
+        if List.length attestation_lags < 2 then
+          Test.fail
+            "This test needs at least 2 attestation lags; got %d"
+            (List.length attestation_lags)
+        else
+          let lag1 = List.hd attestation_lags in
+          let lag2_index = 1 in
+          let lag2 = List.nth attestation_lags lag2_index in
+          if lag1 <> lag1_value then
+            Test.fail
+              "This test uses too_early_inbox_level = published_level + \
+               lag1_value; first lag must be %d, got %d"
+              lag1_value
+              lag1
+          else
+            with_dal_ready_for_echo_dal_reveal_pages_at_lag
+              ~operator_profiles:[slot_index]
+              ~kernel_imported_publish_level:published_level
+              ~published_level
+              ~slot_index
+              ~target_lag:lag2
+              ~target_lag_index:lag2_index
+              protocol
+              tezos_node
+              tezos_client
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:(fun () ->
+          read_kernel
+            ~base:""
+            ~suffix:""
+            (Uses.path Constant.WASM.echo_dal_reveal_pages))
         (refutation_scenario_parameters
            ~loser_modes
            (inputs_for 10)
@@ -8077,6 +8345,8 @@ let register_protocol_independent () =
   test_invalid_dal_parameters protocols ;
   test_refutation_with_dal_page_import protocols ;
   test_refutation_with_dal_page_import_id_far_in_the_future protocols ;
+  test_refutation_with_dal_honest_at_actual_lag protocols ;
+  test_refutation_with_dal_import_too_early protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;

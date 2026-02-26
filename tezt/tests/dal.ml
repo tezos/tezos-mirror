@@ -2038,6 +2038,20 @@ let publish_store_and_attest_slot ~protocol ?counter ?force ?fee client node
     (Slots [index])
     dal_parameters
 
+let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
+    dal_node source ~index ~content dal_parameters =
+  let* _commitment =
+    Helpers.publish_and_store_slot client dal_node source ~index content
+  in
+  let* () = repeat lag (fun () -> bake_for client) in
+  inject_dal_attestations_and_bake
+    ~protocol
+    ~lag_index
+    node
+    client
+    (Slots [index])
+    dal_parameters
+
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
     (fun (slot_index, commitment') ->
