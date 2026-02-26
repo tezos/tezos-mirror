@@ -15,6 +15,7 @@ tezos-smart-rollup-host.workspace = true
 tezos-storage.workspace = true
 primitive-types.workspace = true
 thiserror.workspace = true
+http.workspace = true
 
 [dev-dependencies]
 

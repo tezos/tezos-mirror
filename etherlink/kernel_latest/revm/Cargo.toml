@@ -45,6 +45,7 @@ tracing = { workspace = true, optional = true }
 [dev-dependencies]
 tezosx-interfaces = { workspace = true, features = ["testing"] }
 tezosx-ethereum-runtime = { workspace = true, features = ["testing"] }
+http.workspace = true
 
 [features]
 tracing = ["dep:tracing", "tezos-evm-logging/tracing"]

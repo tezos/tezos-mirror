@@ -698,6 +698,15 @@ mod test {
                 Ok(CrossCallResult::Success(vec![]))
             }
 
+            fn serve<Host: Runtime>(
+                &self,
+                _registry: &impl RegistryTrait,
+                _host: &mut Host,
+                _request: http::Request<Vec<u8>>,
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+                todo!("MockTezosRuntime::serve")
+            }
+
             fn address_from_string(
                 &self,
                 address_str: &str,

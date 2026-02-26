@@ -269,6 +269,15 @@ impl RuntimeInterface for EthereumRuntime {
         }
     }
 
+    fn serve<Host: Runtime>(
+        &self,
+        _registry: &impl Registry,
+        _host: &mut Host,
+        _request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+        todo!("EthereumRuntime::serve — will be implemented in a future issue")
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,

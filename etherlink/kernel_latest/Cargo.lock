@@ -1484,6 +1484,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "http"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+dependencies = [
+ "bytes",
+ "itoa",
+]
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2528,6 +2538,7 @@ dependencies = [
  "ethereum",
  "format_no_std",
  "hex",
+ "http",
  "nom",
  "num-bigint",
  "primitive-types",
@@ -3507,6 +3518,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "hex",
+ "http",
  "nom",
  "primitive-types",
  "revm",
@@ -3523,6 +3535,7 @@ dependencies = [
 name = "tezosx-interfaces"
 version = "0.1.0"
 dependencies = [
+ "http",
  "primitive-types",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
@@ -3534,6 +3547,7 @@ dependencies = [
 name = "tezosx-tezos-runtime"
 version = "0.1.0"
 dependencies = [
+ "http",
  "mir",
  "num-bigint",
  "primitive-types",
