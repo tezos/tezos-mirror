@@ -396,18 +396,86 @@ let octez_packaging_revision_jobs ?(test = false) () =
       ~dependencies:(Dependent [Job job_docker_merge])
       ~stage:Stages.publish
       ~name:"oc.docker:promote_revision_to_version"
+      ~description:
+        "Promote the Docker image from the packaging revision tag to the \
+         canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
       ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
       ~ci_docker_hub:(not test)
       ["./scripts/ci/docker_promote_to_version.sh"]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~tag:Gcp_not_interruptible
   in
+  (* We want to be able to trigger each "batch" of jobs manually.
+     There are two batches: one with the static jobs, and one that publishes.
+     The static jobs are independent so they are both manual,
+     but [job_update_gitlab_release] depends on [job_create_gitlab_package]
+     so it does not have to be manual, only [job_create_gitlab_package] does. *)
+  let job_static_arm64 =
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      ~release:true
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ()
+  in
+  let job_static_x86_64 =
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Amd64
+      ~cpu:Very_high
+      ~storage:Ramfs
+      ~release:true
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ()
+  in
+  let job_create_gitlab_package =
+    job
+      ~__POS__
+      ~image:Images.Base_images.ci_release
+      ~stage:Stages.publish
+      ~name:"gitlab:create_package"
+      ~description:
+        "Create GitLab packages with static binaries from this packaging \
+         revision"
+      ~dependencies:
+        (Dependent [Artifacts job_static_x86_64; Artifacts job_static_arm64])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ~id_tokens:Tezos_ci.id_tokens
+      ["./scripts/ci/create_gitlab_package.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
+  in
+  let job_update_gitlab_release =
+    job
+      ~__POS__
+      ~image:Images.Base_images.ci_release
+      ~stage:Stages.publish
+      ~name:"gitlab:update_release"
+      ~description:
+        "Update existing GitLab release with new static binaries from this \
+         packaging revision"
+      ~dependencies:(Dependent [Job job_create_gitlab_package])
+      ~id_tokens:Tezos_ci.id_tokens
+      ["./scripts/releases/update_gitlab_release.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
+  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
+    (* Docker images *)
     job_docker_amd64;
     job_docker_arm64;
     job_docker_merge;
     job_docker_promote_to_version;
+    (* Static binaries *)
+    job_static_x86_64;
+    job_static_arm64;
+    (* Release update *)
+    job_create_gitlab_package;
+    job_update_gitlab_release;
   ]
   @ jobs_debian_repository
