@@ -1385,6 +1385,15 @@ let test_cross_runtime_transfer_to_evm =
   let expected_balance = Wei.of_string (string_of_int transfer_amount_mutez) in
   Check.(
     (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  (* Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
 let test_cross_runtime_call_executes_evm_bytecode =
@@ -1456,6 +1465,15 @@ let test_cross_runtime_call_executes_evm_bytecode =
     (storage = expected_storage)
       string
       ~error_msg:"Expected storage slot 1 = %R but got %L") ;
+  (* Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
 let test_cross_runtime_transfer_from_evm_to_kt1 =
@@ -1720,6 +1738,15 @@ let test_cross_runtime_call_from_michelson_to_evm =
     (storage = expected_storage)
       string
       ~error_msg:"Expected storage slot 0 = %R but got %L") ;
+  (* Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
 (** Test that a Michelson FAILWITH in a cross-runtime subcall does not
@@ -2077,23 +2104,24 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
       protocol
     ->
   (* Step 1: Deploy EVM contract that stores calldataload(4) in slot 0. *)
-  let init_code = "600780600b6000396000f360043560005500" in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address =
-    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~init_code:evm_storer_init_code
+      ()
   in
   (* Step 2: Originate gateway_caller.tz with storage =
      Pair "<gateway_kt1>" (Pair "<evm_addr>" (Pair "store(uint256)" <abi_42>)) *)
   let source = Constant.bootstrap5 in
-  let abi_encoded_42 =
-    "000000000000000000000000000000000000000000000000000000000000002a"
-  in
   let init_storage_data =
     sf
       {|Pair "%s" (Pair "%s" (Pair "store(uint256)" 0x%s))|}
       gateway_address
       contract_address
-      abi_encoded_42
+      abi_encoded_uint256_42
   in
   let* _contract_hex, caller_kt1 =
     originate_michelson_contract_via_delayed_inbox
@@ -2114,6 +2142,7 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
     Client.get_balance_for ~account:source.public_key_hash tez_client
   in
   (* Step 3: Call the Michelson contract with Unit and some amount. *)
+  let amount = 1_000_000 in
   let* () =
     call_michelson_contract_via_delayed_inbox
       ~sc_rollup_address
@@ -2125,7 +2154,7 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
       ~counter:2
       ~dest:caller_kt1
       ~arg_data:"Unit"
-      ~amount:1_000_000
+      ~amount
       ()
   in
   (* Step 4a: Check source balance decreased by amount + fee. *)
@@ -2136,14 +2165,22 @@ let test_cross_runtime_call_from_michelson_contract_to_evm =
     Tez.to_mutez source_balance_before - Tez.to_mutez source_balance_after
   in
   Check.(
-    (consumed = 1_000_000 + 1000)
+    (consumed = amount + 1000)
       int
       ~error_msg:"Expected source to consume %R mutez but consumed %L") ;
-  (* Step 4b: Verify EVM storage slot 0 = 42. *)
+  (* Step 4b: Check that the gateway did not retain any funds. *)
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  (* Step 4c: Verify EVM storage slot 0 = 42. *)
   let*@ storage =
     Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
   in
-  let expected_storage = "0x" ^ abi_encoded_42 in
+  let expected_storage = "0x" ^ abi_encoded_uint256_42 in
   Check.(
     (storage = expected_storage)
       string
@@ -2206,9 +2243,6 @@ let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
   let* source_balance_before =
     Client.get_balance_for ~account:source.public_key_hash tez_client
   in
-  let* gateway_balance_before =
-    Client.get_balance_for ~account:gateway_address tez_client
-  in
   (* Step 3: Call the Michelson contract with Unit and some amount. *)
   let* () =
     call_michelson_contract_via_delayed_inbox
@@ -2236,15 +2270,14 @@ let test_cross_runtime_call_from_michelson_contract_to_evm_revert =
       int
       ~error_msg:
         "Expected source to consume %R mutez (fee only) but consumed %L") ;
-  (* Step 4b: Gateway balance unchanged. *)
-  let* gateway_balance_after =
+  (* Step 4b: Gateway balance is 0. *)
+  let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
   Check.(
-    (Tez.to_mutez gateway_balance_after = Tez.to_mutez gateway_balance_before)
+    (Tez.to_mutez gateway_balance = 0)
       int
-      ~error_msg:
-        "Expected gateway balance unchanged (%R) but got %L after revert") ;
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
 (** Test cross-runtime transfer from a Michelson contract to an EVM EOA
@@ -2306,6 +2339,15 @@ let test_cross_runtime_transfer_from_michelson_contract_to_evm =
   let expected_balance = Wei.of_string (string_of_int transfer_amount_mutez) in
   Check.(
     (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  (* Step 4: Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
 let () =

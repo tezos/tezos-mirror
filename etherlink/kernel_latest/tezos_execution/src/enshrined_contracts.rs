@@ -19,7 +19,8 @@ use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeI
 
 use crate::alias::{get_alias, store_alias};
 
-use crate::mir_ctx::HasHost;
+use crate::account_storage::TezlinkAccount;
+use crate::mir_ctx::{HasContractAccount, HasHost};
 
 #[derive(Debug, PartialEq)]
 pub enum EnshrinedContracts {
@@ -62,7 +63,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     registry: &impl Registry,
 ) -> Result<(), TransferError> {
     match contract {
@@ -141,7 +142,7 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
 
 fn tezosx_cross_runtime_call<'a, Host: Runtime>(
     registry: &impl Registry,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     dest: &str,
     data: &[u8],
 ) -> Result<(), TransferError> {
@@ -193,7 +194,16 @@ fn tezosx_cross_runtime_call<'a, Host: Runtime>(
         )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
     match result {
-        CrossCallResult::Success(_) => Ok(()),
+        CrossCallResult::Success(_) => {
+            // Debit the gateway: after a successful bridge call, the gateway
+            // forwarded the funds to EVM so its balance should be reset to 0.
+            let account = ctx.contract_account().clone();
+            let host = ctx.host();
+            account
+                .set_balance(host, &0u64.into())
+                .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+            Ok(())
+        }
         CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
             "Cross-runtime call reverted: {}",
             hex::encode(&data)
