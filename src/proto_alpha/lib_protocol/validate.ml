@@ -2501,6 +2501,10 @@ module Anonymous = struct
            Trap denunciation cross dynamic lag activation.
            Should be removed after protocol U. *)
         let attestation_with_dynamic_lag = dal_params.dynamic_lag_enable in
+        (* The parameters at attestation time are used to compute the committee level. *)
+        let committee_level =
+          Raw_level.(add published_level (dal_params.attestation_lag - 1))
+        in
         let* dal_params =
           Dal.Past_parameters.parameters vi.ctxt published_level
         in
@@ -2596,7 +2600,11 @@ module Anonymous = struct
         in
         let* _ctxt, _, shard_owner =
           let*? tb_round = Round.of_int shard_index in
-          Stake_distribution.baking_rights_owner vi.ctxt level ~round:tb_round
+          let committee_level = Level.from_raw vi.ctxt committee_level in
+          Stake_distribution.baking_rights_owner
+            vi.ctxt
+            committee_level
+            ~round:tb_round
         in
         let*? () =
           error_unless
