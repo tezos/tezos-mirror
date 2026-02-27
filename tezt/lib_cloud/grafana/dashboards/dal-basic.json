@@ -2044,6 +2044,126 @@
             "x": 16,
             "y": 140
          }
+      },
+      {
+         "id": 29,
+         "type": "row",
+         "title": "Attestation lag",
+         "collapse": false,
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 148
+         },
+         "panels": [ ],
+         "repeat": "",
+         "repeatIteration": null,
+         "repeatRowId": null,
+         "showTitle": true,
+         "titleSize": "h6"
+      },
+      {
+         "id": 30,
+         "type": "timeseries",
+         "title": "Average attestation lag per slot (in levels)",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 149
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "A",
+               "expr": "rate(dal_node_attestation_lag_sum{app=\"$node_instance\"}[$__rate_interval]) / rate(dal_node_attestation_lag_count{app=\"$node_instance\"}[$__rate_interval])",
+               "range": true,
+               "instant": false,
+               "legendFormat": "Slot {{ slot_index }}",
+               "format": "time_series"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "multi",
+               "sort": "desc"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short",
+               "custom": {
+                  "drawStyle": "line",
+                  "lineInterpolation": "linear",
+                  "fillOpacity": 10
+               }
+            }
+         }
+      },
+      {
+         "id": 31,
+         "type": "timeseries",
+         "title": "Attestation lag distribution across all slots (histogram quantiles, in levels)",
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 149
+         },
+         "datasource": "Prometheus",
+         "targets": [
+            {
+               "refId": "A",
+               "expr": "histogram_quantile(0.5, sum by (le) (rate(dal_node_attestation_lag_bucket{app=\"$node_instance\"}[$__rate_interval])))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "p50 (median)"
+            },
+            {
+               "refId": "B",
+               "expr": "histogram_quantile(0.95, sum by (le) (rate(dal_node_attestation_lag_bucket{app=\"$node_instance\"}[$__rate_interval])))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "p95"
+            },
+            {
+               "refId": "C",
+               "expr": "histogram_quantile(0.99, sum by (le) (rate(dal_node_attestation_lag_bucket{app=\"$node_instance\"}[$__rate_interval])))",
+               "range": true,
+               "instant": false,
+               "legendFormat": "p99"
+            }
+         ],
+         "options": {
+            "tooltip": {
+               "mode": "multi",
+               "sort": "desc"
+            },
+            "legend": {
+               "showLegend": true,
+               "displayMode": "list",
+               "placement": "bottom",
+               "calcs": []
+            }
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short",
+               "custom": {
+                  "drawStyle": "line",
+                  "lineInterpolation": "linear",
+                  "fillOpacity": 10
+               }
+            }
+         }
       }
    ],
    "refresh": "",
