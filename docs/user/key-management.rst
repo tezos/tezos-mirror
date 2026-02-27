@@ -485,9 +485,68 @@ It is even possible to register both a consensus key and a companion key, with t
 
    octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
 
-Please do (re)start the baker and provide the the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
+Please do (re)start the baker and provide the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
 
    octez-baker run with local node ~/.tezos-node <consensus_key> <companion_key> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+
+.. _consensus_companion_example:
+
+End-to-End Example: Setting Up Consensus and Companion Keys
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example walks through a complete setup with a tz4 (BLS) consensus key
+and a companion key for DAL participation.
+
+**Step 1: Generate the keys**
+
+Generate a BLS key for consensus and another for the companion role::
+
+   octez-client gen keys my_consensus_key --sig bls
+   octez-client gen keys my_companion_key --sig bls
+
+**Step 2: Register as a delegate with both keys**
+
+If you are registering as a new delegate::
+
+   octez-client register key my_manager as delegate \
+     --consensus-key my_consensus_key \
+     --companion-key my_companion_key
+
+If you are already a delegate, update each key separately::
+
+   octez-client set consensus key for my_manager to my_consensus_key
+   octez-client set companion key for my_manager to my_companion_key
+
+**Step 3: Wait for activation**
+
+Both keys become active after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles
+(see :ref:`cs_constants`). You can check the pending keys via::
+
+   octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+Look for the ``pending_consensus_keys`` and ``pending_companion_keys`` fields.
+
+**Step 4: Start the baker with all keys**
+
+During the transition period (before the new keys activate), pass all key aliases
+so the baker uses the right key at each point::
+
+   octez-baker run with local node ~/.tezos-node \
+     my_consensus_key my_companion_key my_manager \
+     --liquidity-baking-toggle-vote pass
+
+Once the new keys are active, you may omit the manager key alias, but keeping it
+is harmless and recommended for smooth transitions during future key rotations.
+
+**Step 5: Verify**
+
+After activation, confirm your baker is using the new keys by checking the
+attestation operations it produces, or by querying::
+
+   octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+The ``active_consensus_key`` and ``active_companion_key`` fields should reflect
+your new keys.
 
 .. _activate_fundraiser_account:
 
