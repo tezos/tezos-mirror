@@ -312,6 +312,37 @@ participates in the :doc:`DAL <../shell/dal>`.
    The "consensus key" feature is available since the :doc:`Lima<../protocols/015_lima>` protocol.
    The "companion key" feature is available since protocol Seoul.
 
+Do I Need a Consensus Key?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You **should** set up a consensus key if any of the following apply:
+
+- You want to keep your manager key in cold storage (offline) while the baker runs with a separate hot key.
+- You use a remote signer or cloud-hosted Key Management System (KMS) and want to isolate the signing key from the delegate identity.
+- You want the ability to rotate your baking key periodically without requiring your delegators to redelegate.
+- You run your baker infrastructure in a cloud environment where you may lose access, and want to be able to switch to a new key quickly.
+
+You can continue baking **without** a consensus key if you are comfortable using
+your manager key directly for signing consensus operations.
+
+Do I Need a Companion Key?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A companion key is only required if **both** of the following conditions are true:
+
+1. Your active consensus key (or delegate key, if no consensus key is set) is a **tz4** (BLS) key.
+2. You want your baker to include **DAL attestations** in its consensus operations.
+
+If you use a tz1, tz2, or tz3 consensus key, you do **not** need a companion key —
+DAL attestations are signed with the consensus key directly.
+
+If you have a tz4 consensus key but do **not** register a companion key, your baker
+will still produce regular attestations, but will be unable to include DAL attestation
+data. This means you will not participate in the Data Availability Layer.
+
+For more details on the technical reason behind this requirement, see
+:doc:`../shell/baker` (section "The Role of the Companion Key").
+
 Consensus Key
 ~~~~~~~~~~~~~
 
