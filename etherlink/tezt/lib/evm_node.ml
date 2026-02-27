@@ -1613,11 +1613,12 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?max_delayed_inbox_blueprint_length ?kernel_compat
     ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
     ?eth_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_balance
-    ?tez_bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
-    ?sequencer_governance ?kernel_governance ?kernel_security_governance
-    ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?sequencer ?delayed_bridge
+    ?ticketer ?administrator ?sequencer_governance ?kernel_governance
+    ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
     ?(enable_dal = false) ?dal_slots ?dal_publishers_whitelist
@@ -1740,6 +1741,14 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
                    tez_bootstrap_account.Account.public_key;
                  ])
                tez_bootstrap_accounts)
+    @ (match tez_bootstrap_contracts with
+      | None -> []
+      | Some tez_bootstrap_contracts ->
+          List.flatten
+          @@ List.map
+               (fun tez_bootstrap_contract ->
+                 ["--tez-bootstrap-contract"; tez_bootstrap_contract])
+               tez_bootstrap_contracts)
     @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in

@@ -2826,7 +2826,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args13
+       (args14
           (config_key_arg
              ~name:"dal_publishers_whitelist"
              ~placeholder:"tz1...,tz2...,...")
@@ -2843,7 +2843,8 @@ let make_kernel_config_command =
           set_account_code
           enable_runtime_arg
           tez_bootstrap_balance_arg
-          tez_bootstrap_account_arg))
+          tez_bootstrap_account_arg
+          tez_bootstrap_contract_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2886,7 +2887,8 @@ let make_kernel_config_command =
              set_account_code,
              with_runtimes,
              tez_bootstrap_balance,
-             tez_bootstrap_accounts ) )
+             tez_bootstrap_accounts,
+             tez_bootstrap_contracts ) )
          output
          ()
        ->
@@ -2928,6 +2930,7 @@ let make_kernel_config_command =
         ?with_runtimes
         ?tez_bootstrap_accounts
         ~tez_bootstrap_balance
+        ?tez_bootstrap_contracts
         ~output
         ())
 
