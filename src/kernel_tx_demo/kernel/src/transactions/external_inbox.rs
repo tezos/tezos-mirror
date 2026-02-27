@@ -16,7 +16,6 @@ use crypto::CryptoError;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::dac::certificate::{Certificate, CertificateError};
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::concat;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::PathError;
@@ -53,7 +52,7 @@ pub fn process_batch_message<Host>(
     batch: ParsedBatch,
 ) -> Vec<Vec<Withdrawal>>
 where
-    Host: StorageV1 + HostDebug,
+    Host: StorageV1,
 {
     let mut all_withdrawals: Vec<Vec<Withdrawal>> = Vec::new();
 
@@ -97,7 +96,7 @@ pub(crate) fn get_dac_committee<Host: StorageV1>(
 }
 
 /// Parse external message, logging error if it occurs.
-pub(crate) fn parse_external<'a, Host: HostDebug>(
+pub(crate) fn parse_external<'a, Host>(
     _host: &Host,
     message: &'a [u8],
 ) -> Option<ParsedExternalInboxMessage<'a>> {

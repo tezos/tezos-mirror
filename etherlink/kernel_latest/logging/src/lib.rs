@@ -8,7 +8,6 @@ pub use tezos_smart_rollup_debug::debug_str;
 
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use tezos_smart_rollup_host::debug::HostDebug;
 
 #[repr(u8)]
 #[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
@@ -182,6 +181,6 @@ pub mod tracing {
     }
 }
 
-pub trait Logging: HostDebug {
+pub trait Logging {
     fn verbosity(&self) -> Level;
 }

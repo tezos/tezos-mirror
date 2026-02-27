@@ -42,11 +42,13 @@
 - Add `tezos-smart-rollup-keyspace` crate which defines the `KeySpace` high-level durable storage API
 - Move functionality from `Runtime` into new supertraits. This allows kernels to restrict capabilities certain parts of their
   codebase are able to use.
-  - Move `write_debug` to new `HostDebug` supertrait.
   - Move `store_` functions to new `StorageV1` supertrait.
   - Move `reveal_` functions from `Runtime` to new `HostReveal` supertrait.
   - Move all other functions (input/ouput, reboots, runtime version) to new `WasmHost` supertrait. Experimental support
     for using `WasmHost` on RISC-V still exists.
+- Remove `write_debug` from the `Runtime` trait. `debug_msg!` and `debug_str!` no longer require a host implementing
+  any trait — on WASM they call the host's `write_debug` import directly; on all other targets they write to `stderr`
+  via `eprintln!`. The `host` argument to both macros is retained for backward compatibility but is ignored.
 - Expose `store_get_hash` on `StorageV1` trait - wrapping WASM pvm's `__internal_store_get_hash` host function.
 - Storage, DAC and Outbox utilities have been restricted to only use relevant required traits, rather than `Runtime` directly.
   For the most part, this will be backwards compatible - though the specific traits _may_ have to be brought into scope rather than

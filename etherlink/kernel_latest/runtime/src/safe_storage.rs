@@ -8,7 +8,6 @@
 use crate::extensions::WithGas;
 use crate::runtime::IsEvmNode;
 use tezos_evm_logging::Logging;
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
@@ -28,13 +27,6 @@ pub struct SafeStorage<Runtime> {
     pub host: Runtime,
     /// Invariant: paths must not overlap (no path is a prefix of another)
     pub world_states: Vec<OwnedPath>,
-}
-
-impl<Host: HostDebug> HostDebug for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
-    }
 }
 
 impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {

@@ -7,7 +7,6 @@
 #![cfg(pvm_kind = "riscv")]
 
 use super::{Runtime, RuntimeError, ValueType};
-use crate::debug::HostDebug;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
 use crate::reveal::HostReveal;
@@ -59,12 +58,9 @@ impl<R> UnwindableRuntime<R> {
 
     /// Write a debug message. This won't panic if the runtime wrapper is poisoned.
     #[inline]
-    pub fn unreliably_write_debug(&self, msg: &str)
-    where
-        R: Runtime,
-    {
-        if let Ok(runtime) = self.runtime.read() {
-            runtime.write_debug(msg);
+    pub fn unreliably_write_debug(&self, msg: &str) {
+        if !self.runtime.is_poisoned() {
+            std::eprint!("{msg}");
         }
     }
 }
@@ -72,12 +68,6 @@ impl<R> UnwindableRuntime<R> {
 impl<R> UnwindSafe for UnwindableRuntime<R> {}
 
 impl<R> RefUnwindSafe for UnwindableRuntime<R> {}
-
-impl<R: HostDebug> HostDebug for UnwindableRuntime<R> {
-    fn write_debug(&self, msg: &str) {
-        self.runtime.read().unwrap().write_debug(msg)
-    }
-}
 
 impl<R: HostReveal> HostReveal for UnwindableRuntime<R> {
     fn reveal_metadata(&self) -> RollupMetadata {

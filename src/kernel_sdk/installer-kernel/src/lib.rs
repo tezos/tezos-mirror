@@ -25,7 +25,8 @@ use core::panic::PanicInfo;
 use instr::read_config_program_size;
 #[cfg(feature = "entrypoint")]
 use tezos_smart_rollup::entrypoint;
-use tezos_smart_rollup::host::{HostDebug, HostReveal, StorageV1, WasmHost};
+use tezos_smart_rollup::host::{HostReveal, StorageV1, WasmHost};
+use tezos_smart_rollup::prelude::debug_str;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_instr;
 use tezos_smart_rollup_installer_config::binary::{
@@ -44,10 +45,10 @@ const AUXILIARY_CONFIG_INTERPRETATION_PATH: RefPath =
 #[cfg_attr(feature = "entrypoint", entrypoint::main)]
 pub fn installer<Host>(host: &mut Host)
 where
-    Host: WasmHost + StorageV1 + HostDebug + HostReveal,
+    Host: WasmHost + StorageV1 + HostReveal,
 {
     if let Err(e) = install_kernel(host, KERNEL_BOOT_PATH) {
-        HostDebug::write_debug(host, e)
+        debug_str!(host, e)
     } else {
         let _ = host.mark_for_reboot();
     }

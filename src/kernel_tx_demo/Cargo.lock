@@ -2348,8 +2348,8 @@ dependencies = [
 name = "tezos-smart-rollup-debug"
 version = "0.2.2"
 dependencies = [
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
- "tezos-smart-rollup-host",
 ]
 
 [[package]]
@@ -2712,6 +2712,7 @@ dependencies = [
  "rand 0.8.5",
  "tezos-protocol",
  "tezos-smart-rollup",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",

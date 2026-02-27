@@ -16,7 +16,6 @@ use crypto::hash::PublicKeyEd25519;
 use num_bigint::{BigInt, TryFromBigIntError};
 use tezos_smart_rollup_encoding::michelson::ticket::StringTicket;
 use tezos_smart_rollup_encoding::michelson::ticket::{TicketHash, TicketHashError};
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::runtime::RuntimeError::*;
@@ -483,7 +482,7 @@ pub fn deposit_ticket_to_storage<Host>(
     ticket: &StringTicket,
 ) -> Result<(), AccountStorageError>
 where
-    Host: StorageV1 + HostDebug,
+    Host: StorageV1,
 {
     let path = account_path(destination)?;
 

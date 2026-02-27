@@ -20,10 +20,8 @@ use num_bigint::{BigInt, TryFromBigIntError};
 use tezos_crypto_rs::blake2b::Blake2bError;
 use tezos_crypto_rs::hash::Ed25519Signature;
 use tezos_data_encoding::nom::NomReader;
-#[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketHashError;
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use thiserror::Error;
@@ -132,7 +130,7 @@ impl<'a> VerifiableOperation<'a> {
         account_storage: &mut AccountStorage,
     ) -> Result<Vec<Withdrawal>, TransactionError>
     where
-        Host: StorageV1 + HostDebug,
+        Host: StorageV1,
     {
         let signer_address = self.operation.signer.address();
 
@@ -239,7 +237,7 @@ fn handle_transfer<Host>(
     amount: u64,
 ) -> Result<(), TransactionError>
 where
-    Host: StorageV1 + HostDebug,
+    Host: StorageV1,
 {
     let dest_account_path: OwnedPath = account_path(&destination)?;
 
@@ -266,13 +264,17 @@ where
         1 => b'G',
         2 => b'B',
         a => {
-            host.write_debug(&format!("Unknown ticket {a}"));
+            debug_msg!(host, "Unknown ticket {a}");
             return Ok(());
         }
     };
 
-    #[cfg(not(feature = "debug"))]
-    host.write_debug(unsafe { std::str::from_utf8_unchecked(&[_id_0, _id_1, _colour, _amount]) });
+    #[cfg(all(not(feature = "debug"), pvm_kind = "wasm"))]
+    {
+        let bytes: &[u8; 4] = &[_id_0, _id_1, _colour, _amount];
+        // SAFETY: bytes.as_ptr() is a valid ptr to an array of bytes and `len` is the size in bytes
+        unsafe { tezos_smart_rollup_core::target_impl::write_debug(bytes.as_ptr(), bytes.len()) };
+    }
 
     Ok(())
 }

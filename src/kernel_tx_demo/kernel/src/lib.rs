@@ -34,8 +34,9 @@ use thiserror::Error;
 
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
+#[cfg(feature = "debug")]
+use tezos_smart_rollup_debug::debug_str;
 use tezos_smart_rollup_encoding::inbox::{InboxMessage, InternalInboxMessage, Transfer};
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -68,10 +69,10 @@ impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
 #[cfg_attr(feature = "tx-kernel", entrypoint::main)]
 pub fn transactions_run<Host>(host: &mut Host)
 where
-    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+    Host: StorageV1 + WasmHost + HostReveal,
 {
     #[cfg(feature = "debug")]
-    host.write_debug("======\nTX: Entry\n======\n");
+    debug_str!(host, "======\nTX: Entry\n======\n");
 
     let mut account_storage = match init_account_storage() {
         Ok(v) => v,
@@ -131,7 +132,7 @@ where
     }
 
     #[cfg(feature = "debug")]
-    host.write_debug("Filtering inbox messages...\n");
+    debug_str!(host, "Filtering inbox messages...\n");
     let mut reboot = false;
 
     while let Ok(Some(message)) = host.read_input() {
@@ -158,11 +159,11 @@ where
     }
 
     #[cfg(feature = "debug")]
-    host.write_debug("Finished filtering\n");
+    debug_str!(host, "Finished filtering\n");
 
     if reboot {
         #[cfg(feature = "debug")]
-        host.write_debug("Reboot for cached mesages\n");
+        debug_str!(host, "Reboot for cached mesages\n");
 
         if let Err(_e) = host.mark_for_reboot() {
             #[cfg(feature = "debug")]
@@ -198,7 +199,7 @@ fn filter_inbox_message<'a, Host>(
     rollup_address: &SmartRollupHash,
 ) -> Result<(), TransactionError<'a>>
 where
-    Host: StorageV1 + HostReveal + HostDebug,
+    Host: StorageV1 + HostReveal,
 {
     let (remaining, message) = InboxMessage::<
         MichelsonPair<MichelsonString, Ticket<MichelsonString>>,

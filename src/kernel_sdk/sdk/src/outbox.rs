@@ -36,7 +36,6 @@
 //! ```rust
 //! use tezos_protocol::contract::Contract;
 //! use tezos_smart_rollup::prelude::*;
-//! use tezos_smart_rollup::host::HostDebug;
 //! use tezos_smart_rollup::host::StorageV1;
 //! use tezos_smart_rollup::host::WasmHost;
 //! use tezos_smart_rollup::outbox::*;
@@ -46,7 +45,7 @@
 //!
 //! fn kernel_run<Host>(host: &mut Host)
 //! where
-//!     Host: WasmHost + StorageV1 + HostDebug
+//!     Host: WasmHost + StorageV1
 //! {
 //!   while let Ok(Some(message)) = host.read_input() {
 //!     debug_msg!(host, "found {message:?}");

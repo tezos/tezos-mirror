@@ -10,7 +10,6 @@
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
 use tezos_smart_rollup_core::STORE_HASH_SIZE;
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
@@ -54,13 +53,6 @@ impl StaticInbox {
 struct StaticInputHost<'runtime, R> {
     host: &'runtime mut R,
     inbox: &'runtime mut Inbox,
-}
-
-impl<Host: HostDebug> HostDebug for StaticInputHost<'_, Host> {
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
-    }
 }
 
 impl<Host: StorageV1> StorageV1 for StaticInputHost<'_, Host> {

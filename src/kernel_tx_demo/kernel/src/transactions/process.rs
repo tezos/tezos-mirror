@@ -18,7 +18,6 @@ use crate::CachedTransactionError;
 use crate::MAX_ENVELOPE_CONTENT_SIZE;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -38,7 +37,7 @@ pub(crate) fn execute_one_operation<Host>(
     account_storage: &mut AccountStorage,
 ) -> Result<(), CachedTransactionError>
 where
-    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+    Host: StorageV1 + WasmHost + HostReveal,
 {
     let progress = if host
         .store_has(&PROGRESS_KEY)
@@ -134,7 +133,7 @@ pub(crate) fn make_decision<Host>(
     idx: u32,
 ) -> Result<(), CachedTransactionError>
 where
-    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+    Host: StorageV1 + WasmHost + HostReveal,
 {
     let stage_path = cached_message_stage_path(idx).map_err(CachedTransactionError::Path)?;
 
@@ -171,7 +170,7 @@ fn get_cached_message<'a, Host>(
     payload: &'a mut [u8; MAX_ENVELOPE_CONTENT_SIZE],
 ) -> Result<ParsedExternalInboxMessage<'a>, CachedTransactionError>
 where
-    Host: StorageV1 + HostDebug,
+    Host: StorageV1,
 {
     let message = read_large_store_chunk(
         host,
@@ -188,7 +187,7 @@ fn process_at_start<Host>(
     idx: u32,
 ) -> Result<Decision, CachedTransactionError>
 where
-    Host: StorageV1 + WasmHost + HostDebug,
+    Host: StorageV1 + WasmHost,
 {
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
@@ -235,7 +234,7 @@ where
 
 fn process_verified<Host>(host: &mut Host, idx: u32) -> Result<Decision, CachedTransactionError>
 where
-    Host: StorageV1 + HostReveal + HostDebug,
+    Host: StorageV1 + HostReveal,
 {
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
@@ -272,7 +271,7 @@ fn process_revealed<Host>(
     idx: u32,
 ) -> Result<Decision, CachedTransactionError>
 where
-    Host: StorageV1 + WasmHost + HostDebug,
+    Host: StorageV1 + WasmHost,
 {
     let mut tx_per_kernel_run_buffer = [0; core::mem::size_of::<i32>()];
     let read_tx_per_kernel_run_result = host.store_read_slice(

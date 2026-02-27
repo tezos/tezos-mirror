@@ -16,7 +16,6 @@ use tezos_smart_rollup_host::path::OwnedPath;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 
@@ -29,7 +28,7 @@ pub(crate) fn store_dal_slot<Host>(
     slot_index: u8,
     path_to_store: OwnedPath,
 ) where
-    Host: StorageV1 + HostReveal + HostDebug,
+    Host: StorageV1 + HostReveal,
 {
     let mut buffer = vec![0u8; page_size];
     for page_index in 0..(num_pages as i16) {

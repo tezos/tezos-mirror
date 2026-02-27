@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{cell::RefCell, io::Write};
+use std::cell::RefCell;
 
 use tezos_evm_logging::Logging;
 use tezos_evm_runtime::{
@@ -11,7 +11,6 @@ use tezos_evm_runtime::{
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
-    debug::HostDebug,
     input::Message,
     metadata::RollupMetadata,
     path::Path,
@@ -34,16 +33,6 @@ impl EvalHost {
     pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
         let host = MockKernelHost::default();
         Self { host, buffer }
-    }
-}
-
-impl HostDebug for EvalHost {
-    #[inline(always)]
-    fn write_debug(&self, data: &str) {
-        let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{data}") {
-            eprint!("Error due to: {e}")
-        }
     }
 }
 
