@@ -157,7 +157,7 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
     kernels
 
 let test_make_l2_kernel_installer_config chain_family =
-  Protocol.register_test
+  Test.register
     ~__FILE__
     ~title:
       (Printf.sprintf
@@ -165,19 +165,16 @@ let test_make_l2_kernel_installer_config chain_family =
           account at the right path with %s family"
          chain_family)
     ~tags:["evm"; "multichain"; "installer"]
-    ~uses_admin_client:true
-    ~uses_client:true
-    ~uses_node:true
-    ~uses:(fun _protocol ->
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
       [
         Constant.octez_evm_node;
-        Constant.octez_smart_rollup_node;
         Constant.WASM.evm_kernel;
         Constant.smart_rollup_installer;
-      ])
-  @@ fun protocol ->
-  let* node, client = setup_l1 protocol in
-
+      ]
+  @@ fun () ->
   (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
   let chain_id_1 = 2988 in
   let chain_id_2 = 4571 in
@@ -217,34 +214,13 @@ let test_make_l2_kernel_installer_config chain_family =
       ()
   in
 
-  (* Setup the rollup (Origination and Start a rollup node) *)
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      ~default_operator:Constant.bootstrap1.public_key_hash
-      Batcher
-      node
-      ~base_dir:(Client.base_dir client)
-      ~kind:"wasm_2_0_0"
-  in
-
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let preimages_dir = Temp.dir "wasm_2_0_0" in
   let* {output = kernel; _} =
     prepare_installer_kernel_with_multiple_setup_file
       ~output:(Temp.file "kernel.hex")
       ~preimages_dir
       ~configs:[rollup_config; l2_config_1; l2_config_2]
       (Kernel.path Latest)
-  in
-  let* sc_rollup_address =
-    originate_sc_rollup
-      ~keys:[]
-      ~kind:"wasm_2_0_0"
-      ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:Rollup.evm_type
-      client
-  in
-  let* () =
-    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
 
   (* Setup a sequencer with a private rpc port to verify the durable storage. *)
@@ -253,21 +229,16 @@ let test_make_l2_kernel_installer_config chain_family =
       time_between_blocks = Some Nothing;
       genesis_timestamp = None;
       max_number_of_chunks = None;
-      wallet_dir = Some (Client.base_dir client);
+      wallet_dir = None;
     }
   in
   let sequencer_mode =
-    Evm_node.Sequencer
+    Evm_node.Sandbox
       {
-        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
         sequencer_config;
-        sequencer_keys = [Constant.bootstrap1.alias];
-        max_blueprints_lag = None;
-        max_blueprints_ahead = None;
-        max_blueprints_catchup = None;
-        catchup_cooldown = None;
-        dal_slots = None;
-        sequencer_sunset_sec = None;
+        sequencer_keys = [];
+        funded_addresses = [];
+        network = None;
       }
   in
   let* sequencer =
@@ -14973,8 +14944,8 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
-  test_make_l2_kernel_installer_config "EVM" protocols ;
-  test_make_l2_kernel_installer_config "Michelson" protocols ;
+  test_make_l2_kernel_installer_config "EVM" ;
+  test_make_l2_kernel_installer_config "Michelson" ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_deposit_and_fa_fast_withdraw protocols ;

@@ -21,6 +21,12 @@ type init_status = Loaded | Created
 
 type snapshot_source = Url_legacy of string
 
+type signer_source = Sequencer | Sandbox
+
+type sequencer_key_source =
+  | Local of signer_source * Signer.map
+  | RPC_fetch of {evm_node_endpoint : Uri.t; timeout : float; keep_alive : bool}
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -37,7 +43,7 @@ type parameters = {
   kernel_path : Pvm_types.kernel option;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
-  signer : Signer.map option;
+  sequencer_key_source : sequencer_key_source option;
   snapshot_source : snapshot_source option;
 }
 
@@ -1978,9 +1984,48 @@ module State = struct
 
   let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
-  let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-      ~store_perm ?signer ?snapshot_source () =
+  let patch_sequencer_key_if_necessary ~sequencer_key_source
+      ~next_blueprint_number evm_state ~sequencer_key_path () =
     let open Lwt_result_syntax in
+    let* patch_sequencer_key =
+      match sequencer_key_source with
+      | Some (Local (Sandbox, signer)) ->
+          let*? pk, _ = Signer.first_lexicographic_signer signer in
+          return_some pk
+      | Some (RPC_fetch {evm_node_endpoint; timeout; keep_alive}) ->
+          let (Ethereum_types.Qty next) = next_blueprint_number in
+          let current_head = Ethereum_types.Qty (Z.pred next) in
+          let* pk =
+            Batch.call
+              ~timeout
+              ~keep_alive
+              (module Rpc_encodings.Sequencer)
+              ~evm_node_endpoint
+              (Block_parameter (Number current_head))
+          in
+          return_some pk
+      | Some (Local (Sequencer, _)) | None -> return_none
+    in
+    match patch_sequencer_key with
+    | Some pk ->
+        let*! () = Events.patched_sequencer_key pk in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:sequencer_key_path
+            ~value:(Signature.Public_key.to_b58check pk)
+            evm_state
+        in
+        return (evm_state, true)
+    | None -> return (evm_state, false)
+
+  let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
+      ~store_perm ?sequencer_key_source ?snapshot_source () =
+    let open Lwt_result_syntax in
+    let signer =
+      match sequencer_key_source with
+      | Some (Local (_, signer)) -> Some signer
+      | _ -> None
+    in
     let pool =
       (* All interactions of the Evm_context worker with the kernel are purely
          sequential. As a consequence, a pool of 1 domain is enough. *)
@@ -2059,6 +2104,17 @@ module State = struct
             in
             let*! evm_state = Pvm.State.get context in
             let* storage_version = Evm_state.storage_version evm_state in
+            let sequencer_key_path =
+              Durable_storage_path.sequencer_key ~storage_version
+            in
+            let* evm_state, _patched =
+              patch_sequencer_key_if_necessary
+                ~sequencer_key_source
+                ~next_blueprint_number
+                evm_state
+                ~sequencer_key_path
+                ()
+            in
             return (evm_state, context, storage_version)
           else
             let* evm_state = Evm_state.init ~kernel in
@@ -2085,27 +2141,26 @@ module State = struct
                installer. In production the installer has already written the
                key, so this write is a no-op.
             *)
-            let* evm_state =
-              match signer with
-              | Some signer ->
-                  let*? pk, _ = Signer.first_lexicographic_signer signer in
-                  (* The storage version is not yet known at this point (it is
-                     determined by the first execution), so we write the key
-                     under both possible paths to cover either layout. *)
-                  let*! evm_state =
-                    Evm_state.modify
-                      ~key:Durable_storage_path.sequencer_key_legacy
-                      ~value:(Signature.Public_key.to_b58check pk)
-                      evm_state
-                  in
-                  let*! evm_state =
-                    Evm_state.modify
-                      ~key:Durable_storage_path.sequencer_key_world_state
-                      ~value:(Signature.Public_key.to_b58check pk)
-                      evm_state
-                  in
-                  return evm_state
-              | None -> return evm_state
+            (* The storage version is not yet known at this point (it
+               is determined by the first execution), so we write the
+               key under both possible paths to cover either
+               layout. *)
+            let* evm_state, _legacy_sequencer_key_patched =
+              patch_sequencer_key_if_necessary
+                ~sequencer_key_source
+                ~next_blueprint_number
+                evm_state
+                ~sequencer_key_path:Durable_storage_path.sequencer_key_legacy
+                ()
+            in
+            let* evm_state, sequencer_key_patched =
+              patch_sequencer_key_if_necessary
+                ~sequencer_key_source
+                ~next_blueprint_number
+                evm_state
+                ~sequencer_key_path:
+                  Durable_storage_path.sequencer_key_world_state
+                ()
             in
             let* evm_state =
               Evm_state.execute
@@ -2116,25 +2171,27 @@ module State = struct
                 evm_state
                 (`Inbox [])
             in
+            (* Now that the storage version is known, remove whichever
+               key path is not canonical for this version, so no stale
+               entry is left in the state. *)
             let* storage_version = Evm_state.storage_version evm_state in
-            (* Now that the storage version is known, remove whichever key path
-               is not canonical for this version, so no stale entry is left
-               in the state. *)
             let*! evm_state =
               if
-                String.equal
-                  Durable_storage_path.sequencer_key_world_state
-                  (Durable_storage_path.sequencer_key ~storage_version)
+                sequencer_key_patched
+                && String.equal
+                     Durable_storage_path.sequencer_key_world_state
+                     (Durable_storage_path.sequencer_key ~storage_version)
               then
                 Evm_state.delete
                   ~kind:Value
                   evm_state
                   Durable_storage_path.sequencer_key_legacy
-              else
+              else if sequencer_key_patched then
                 Evm_state.delete
                   ~kind:Value
                   evm_state
                   Durable_storage_path.sequencer_key_world_state
+              else Lwt.return evm_state
             in
             let (Qty next) = next_blueprint_number in
             let* context = commit conn context evm_state (Qty Z.(pred next)) in
@@ -2143,6 +2200,17 @@ module State = struct
           if init_status = Loaded then
             let*! evm_state = Pvm.State.get context in
             let* storage_version = Evm_state.storage_version evm_state in
+            let sequencer_key_path =
+              Durable_storage_path.sequencer_key ~storage_version
+            in
+            let* evm_state, _patched_sequencer_key =
+              patch_sequencer_key_if_necessary
+                ~sequencer_key_source
+                ~next_blueprint_number
+                evm_state
+                ~sequencer_key_path
+                ()
+            in
             return (evm_state, context, storage_version)
           else
             failwith
@@ -2475,7 +2543,7 @@ module Handlers = struct
         kernel_path;
         smart_rollup_address : string option;
         store_perm;
-        signer;
+        sequencer_key_source;
         snapshot_source;
       } =
     let open Lwt_result_syntax in
@@ -2485,7 +2553,7 @@ module Handlers = struct
         ?kernel_path
         ?smart_rollup_address
         ~store_perm
-        ?signer
+        ?sequencer_key_source
         ?snapshot_source
         ()
     in
@@ -2758,7 +2826,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-    ~store_perm ?signer ?snapshot_source () =
+    ~store_perm ?sequencer_key_source ?snapshot_source () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
@@ -2770,7 +2838,7 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         kernel_path;
         smart_rollup_address;
         store_perm;
-        signer;
+        sequencer_key_source;
         snapshot_source;
       }
       (module Handlers)

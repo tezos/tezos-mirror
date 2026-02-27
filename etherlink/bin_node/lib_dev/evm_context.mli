@@ -10,6 +10,12 @@ type init_status = Loaded | Created
 
 type snapshot_source = Url_legacy of string
 
+type signer_source = Sequencer | Sandbox
+
+type sequencer_key_source =
+  | Local of signer_source * Signer.map
+  | RPC_fetch of {evm_node_endpoint : Uri.t; timeout : float; keep_alive : bool}
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -47,7 +53,7 @@ val start :
   ?kernel_path:Pvm_types.kernel ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
-  ?signer:Signer.map ->
+  ?sequencer_key_source:sequencer_key_source ->
   ?snapshot_source:snapshot_source ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
