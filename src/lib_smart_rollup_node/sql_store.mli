@@ -361,6 +361,10 @@ module L2_blocks : sig
   val find_last_committed :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
+  (** Retrieve the first block whose context is committed on disk. *)
+  val find_first_committed :
+    ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
   (** Same as {!find_last_committed} but just returns hash and level. *)
   val find_last_committed_hash_level :
     ?conn:Sqlite.conn -> _ t -> (Block_hash.t * int32) option tzresult Lwt.t

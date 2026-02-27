@@ -1133,6 +1133,20 @@ module L2_blocks = struct
       ORDER BY l.level DESC LIMIT 1
       |sql}
 
+    let select_first_committed =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level ASC LIMIT 1
+      |sql}
+
     let select_last_committed_hash_level =
       (unit ->? t2 block_hash level) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -1235,6 +1249,10 @@ module L2_blocks = struct
   let find_last_committed ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_last_committed ()
+
+  let find_first_committed ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_first_committed ()
 
   let find_last_committed_hash_level ?conn store =
     with_connection store conn @@ fun conn ->

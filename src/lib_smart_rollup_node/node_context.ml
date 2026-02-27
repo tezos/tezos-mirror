@@ -1047,6 +1047,9 @@ let first_available_level node_ctxt =
   let+ last_gc_target = Store.State.Last_gc_target.get node_ctxt.store in
   Option.value last_gc_target ~default:node_ctxt.genesis_info.level
 
+let first_committed_block node_ctxt =
+  Store.L2_blocks.find_first_committed node_ctxt.store
+
 let get_last_context_split_level node_ctxt =
   Store.State.Last_context_split.get node_ctxt.store
 

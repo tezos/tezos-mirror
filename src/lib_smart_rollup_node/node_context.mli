@@ -666,6 +666,9 @@ val get_gc_info :
 (** The first non garbage collected level available in the node. *)
 val first_available_level : _ t -> int32 tzresult Lwt.t
 
+(** The first block with a context committed to disk. *)
+val first_committed_block : _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
 (** [check_level_available node_ctxt level] resolves with an error if the
     [level] is before the first non garbage collected level. *)
 val check_level_available : _ t -> int32 -> unit tzresult Lwt.t

@@ -107,16 +107,12 @@ let check_commitment_published cctxt address commitment =
      in
      return_unit
 
-let first_available_level ~data_dir store =
+let first_available_block ~data_dir:_ store =
   let open Lwt_result_syntax in
-  let* first_available_level = Store.State.Last_gc_target.get store in
-  match first_available_level with
-  | Some first_available_level -> return first_available_level
-  | None -> (
-      let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-      match metadata with
-      | None -> failwith "No metadata (needs rollup genesis info)."
-      | Some {genesis_info = {level; _}; _} -> return level)
+  let* first_available_block = Store.L2_blocks.find_first_committed store in
+  match first_available_block with
+  | None -> failwith "No blocks with context committed to disk"
+  | Some b -> return b
 
 let resolve_snapshot_level (store : _ Store.t) ~(head : Sc_rollup_block.t)
     ~first_available_level (level : Cli.snapshot_level) =
@@ -168,9 +164,13 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
   let* head = get_head store in
   let head_level = head.Sc_rollup_block.header.level in
   (* Resolve the target level for the snapshot *)
-  let* first_avail = first_available_level ~data_dir store in
+  let* first_avail = first_available_block ~data_dir store in
   let* target_level =
-    resolve_snapshot_level store ~head ~first_available_level:first_avail level
+    resolve_snapshot_level
+      store
+      ~head
+      ~first_available_level:first_avail.header.level
+      level
   in
   (* Get the block at the target level to use for the snapshot header *)
   let* target_block =
@@ -447,7 +447,8 @@ let check_block_data (store : _ Store.t) context hash _next_commitment =
 let check_l2_chain ~message ~data_dir (store : _ Store.t) context
     (head : Sc_rollup_block.t) check_block =
   let open Lwt_result_syntax in
-  let* first_available_level = first_available_level ~data_dir store in
+  let* first_available_block = first_available_block ~data_dir store in
+  let first_available_level = first_available_block.header.level in
   let blocks_to_check =
     Int32.sub head.header.level first_available_level |> Int32.to_int |> succ
   in
@@ -615,7 +616,9 @@ let with_modify_data_dir cctxt ~data_dir ~apply_unsafe_patches
 let reconstruct_context_from_first_available_level
     (node_ctxt : _ Node_context.t) ~(head : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
-  let* first_level = Node_context.first_available_level node_ctxt in
+  let* first_block = Node_context.first_committed_block node_ctxt in
+  let first_block = WithExceptions.Option.get ~loc:__LOC__ first_block in
+  let first_level = first_block.header.level in
   let total = Int32.sub head.header.level first_level in
   let progress_bar =
     Progress_bar.progress_bar
@@ -646,13 +649,6 @@ let maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches =
     cctxt
     ~data_dir
     ~apply_unsafe_patches
-    ~skip_condition:(fun _store context ~head ->
-      let open Lwt_result_syntax in
-      match head.header.context with
-      | None -> return_true
-      | Some h ->
-          let*! head_ctxt = Context.checkout context h in
-          return (Option.is_some head_ctxt))
     reconstruct_context_from_first_available_level
 
 let post_checks ?(apply_unsafe_patches = false)
@@ -923,12 +919,11 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename
   in
   let (module C) = Plugin.Pvm.context metadata.kind in
   let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
-  let* first_level = first_available_level ~data_dir store in
-  let* first_block = Store.L2_blocks.find_by_level store first_level in
-  let first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
+  let* first_block = first_available_block ~data_dir store in
+  let first_level = first_block.header.level in
   let first_context =
-    match first_block.header.context with
-    | None -> Stdlib.failwith "TODO: first level context is not committed"
+    match first_block.header.context_hash with
+    | None -> assert false
     | Some h -> h
   in
   let* () =
@@ -1129,7 +1124,8 @@ let import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
     match level with
     | Some level ->
         let* store = Store.init Read_write ~data_dir in
-        let* first_avail = first_available_level ~data_dir store in
+        let* first_avail = first_available_block ~data_dir store in
+        let first_avail = first_avail.header.level in
         let* () =
           if level < first_avail then
             failwith
