@@ -11,6 +11,9 @@ type t
 (** See [Daemon.Make.name] *)
 val name : t -> string
 
+(** See [Daemon.Make.pid] *)
+val pid : t -> int option
+
 (** Send SIGTERM and wait for the process to terminate.
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
