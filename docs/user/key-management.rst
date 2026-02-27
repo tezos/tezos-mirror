@@ -548,6 +548,60 @@ attestation operations it produces, or by querying::
 The ``active_consensus_key`` and ``active_companion_key`` fields should reflect
 your new keys.
 
+.. _consensus_companion_faq:
+
+Frequently Asked Questions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**I set my consensus key, but the baker is still using the old one.**
+   Consensus key updates take ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles to activate
+   (see :ref:`cs_constants`). During the transition, pass both key aliases to the baker
+   command so it can use the right key at each point. Check the pending keys with::
+
+      octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+**I have a tz4 key. Do I need a companion key?**
+   Only if you want to participate in the :doc:`DAL <../shell/dal>`. Without a companion key,
+   your baker will still produce regular attestations, but will not include DAL attestation
+   data. If you don't use the DAL, you don't need a companion key.
+
+**Can I use the same tz4 key as both consensus key and companion key?**
+   No. The consensus key and companion key must be distinct keys. They serve different
+   cryptographic roles: the consensus key signs the common attestation payload (enabling
+   aggregation across bakers), while the companion key signs the baker-specific DAL payload.
+
+**How do I check which consensus key is currently active?**
+   Query the delegate's information via RPC::
+
+      octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+   The ``active_consensus_key`` field shows the currently active key. The
+   ``pending_consensus_keys`` field shows upcoming changes.
+
+**I use a remote signer. How do I set up a consensus key with it?**
+   Generate the consensus key on the signer, then import its **public key** on the client::
+
+      # On the signer machine
+      octez-signer gen keys my_consensus_key --sig bls
+
+      # On the client machine (import the public key only)
+      octez-client import public key my_consensus_key unencrypted:<public_key>
+      octez-client set consensus key for my_manager to my_consensus_key
+
+   The private key stays on the signer. The client only needs the public key to register
+   the update. At baking time, the baker will request signatures from the signer.
+   See :ref:`signer` for details on setting up the remote signer connection.
+
+**What happens if my consensus key is compromised?**
+   An attacker with your consensus key can drain your delegate's **spendable** balance
+   (but not staked/frozen funds). To respond:
+
+   1. Use your manager key (which should be in cold storage) to set a new consensus key.
+   2. Consider draining your own account first if you still have access to the consensus key.
+   3. The new key activates after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles.
+
+   To minimize exposure, keep most funds staked and rotate the consensus key regularly.
+
 .. _activate_fundraiser_account:
 
 Getting keys for fundraiser accounts
