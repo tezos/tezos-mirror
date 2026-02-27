@@ -472,7 +472,7 @@ let test_tezlink_balance =
 
 let test_tezlink_storage_via_client =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the storage rpc via client"
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -523,7 +523,7 @@ let test_tezlink_contract_info =
 
 let test_tezlink_list_entrypoints =
   let contract = Michelson_contracts.faucet_contract () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the contract entrypoint list"
     ~tags:["rpc"; "contract"; "info"; "list_entrypoints"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -712,7 +712,7 @@ let test_tezlink_constants =
   unit
 
 let test_tezlink_storage_rpc =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the /storage rpc"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1216,7 +1216,7 @@ let test_tezlink_hash_rpc =
   unit
 
 let test_tezlink_script_rpc =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the script rpc"
     ~tags:["rpc"; "script"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1296,7 +1296,7 @@ let test_tezlink_script_rpc =
 
 let test_contract_storage_normalization =
   let contract = Michelson_contracts.storage_normalization () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the storage rpc with normalization"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1587,7 +1587,7 @@ let test_tezlink_bootstrap_block_info =
 
 let test_tezlink_execution =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of tezlink execution"
     ~tags:["execution"; "hello"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -1654,7 +1654,7 @@ let test_tezlink_bigmap_option =
 
 let test_tezlink_bigmap_counter =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of tezlink big_map persistency"
     ~tags:["persistency"; "big_map"; "counter"; "storage"]
     ~bootstrap_contracts:[counter_contract]
@@ -2217,7 +2217,7 @@ let test_tezlink_internal_operation =
 
 let test_tezlink_internal_receipts =
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Internal receipts"
     ~tags:["internal"; "operation"; "receipts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2479,7 +2479,7 @@ let test_event =
   let emit_events_contract =
     Tezt_etherlink.Michelson_contracts.emit_events_contract ()
   in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Contract emits an event"
     ~tags:["operation"; "event"]
     ~bootstrap_accounts:[Constant.bootstrap1]
