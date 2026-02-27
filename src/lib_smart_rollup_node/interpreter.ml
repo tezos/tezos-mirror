@@ -294,17 +294,66 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
   in
   eval_result.state_info
 
+(** [advance_to_next_block plugin node_ctxt start_state] runs the PVM from the
+    current [start_state] to the end of its block, then builds the start state
+    for the next block with fresh messages. This avoids a context checkout which
+    is expensive for RISC-V. *)
+let advance_to_next_block (module Plugin : Protocol_plugin_sig.PARTIAL)
+    (node_ctxt : _ Node_context.t) start_state =
+  let open Lwt_result_syntax in
+  let level = start_state.Pvm_plugin_sig.info.inbox_level in
+  let* block = Node_context.get_l2_block_by_level node_ctxt level in
+  let end_tick = Z.add block.initial_tick (Z.of_int64 block.num_ticks) in
+  (* Run to the end of the current block. *)
+  let* end_info = run_to_tick (module Plugin) node_ctxt start_state end_tick in
+  assert (Z.equal end_info.tick end_tick) ;
+  (* Build the start state for the next block. *)
+  let next_level = Int32.succ level in
+  let* next_block = Node_context.get_l2_block_by_level node_ctxt next_level in
+  let* inbox = Node_context.get_inbox node_ctxt next_block.header.inbox_hash in
+  let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
+  let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind start_state.state in
+  let* messages =
+    Node_context.get_messages node_ctxt next_block.header.inbox_witness
+  in
+  let info =
+    Pvm_plugin_sig.
+      {
+        state_hash;
+        inbox_level;
+        tick = end_info.tick;
+        message_counter_offset = 0;
+        remaining_fuel = Fuel.Accounted.of_ticks 0L;
+        remaining_messages = messages;
+      }
+  in
+  return Pvm_plugin_sig.{state = start_state.state; info}
+
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
   let open Lwt_result_syntax in
   let* start_state =
-    match start_state with
-    | Some start_state
+    match (start_state, node_ctxt.Node_context.kind) with
+    | Some start_state, _
       when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
         return start_state
+    | Some start_state, Riscv
+      when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level ->
+        (* For RISC-V, it is cheaper to continue evaluating to the end of the
+           block and advance to the next one rather than checking out a context
+           from disk. The levels are always within the same commitment period
+           during a refutation game, so the distance to advance is bounded. *)
+        let rec advance state =
+          if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
+            return state
+          else
+            let* state = advance_to_next_block plugin node_ctxt state in
+            advance state
+        in
+        advance start_state
     | _ ->
-        (* Recompute start state on level change or if we don't have a
-           starting state on hand. *)
+        (* Recompute start state from checkout on level change (except for
+           RISC-V) or if we don't have a starting state on hand. *)
         start_state_of_block plugin node_ctxt event
   in
   let state = start_state.state in
