@@ -1038,6 +1038,12 @@ module Agnostic_baker = struct
         | None -> []
       in
       Cloud.service_register ~name ~executable:path ~on_shutdown agent ;
+      (match Agnostic_baker.pid baker with
+      | None ->
+          Log.error
+            "Cannot update service %s: no pid. Is the program running ?"
+            name
+      | Some pid -> Cloud.notify_service_start ~name ~pid) ;
       Lwt.return baker
   end
 end
