@@ -268,12 +268,52 @@ In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt 
 
 .. _consensus_key_details:
 
-Consensus Key
--------------
+Consensus Key and Companion Key
+-------------------------------
+
+Overview of Baker Key Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A delegate (baker) can use up to three distinct keys. The following table summarizes
+their roles, constraints, and when each is needed:
+
+.. list-table::
+   :widths: 18 22 15 15 30
+   :header-rows: 1
+
+   * - Key
+     - Purpose
+     - Allowed types
+     - Fund access
+     - When needed
+   * - **Manager key**
+     - Delegate identity; signs manager operations (transfers, staking, key updates)
+     - tz1, tz2, tz3, tz4
+     - Full
+     - Always (every delegate has one; cannot be changed)
+   * - **Consensus key**
+     - Signs blocks and consensus operations (preattestations, attestations)
+     - tz1, tz2, tz3, tz4
+     - Can drain spendable balance
+     - Optional — defaults to manager key; recommended for operational security
+   * - **Companion key**
+     - Signs DAL-specific payload inside attestations
+     - tz4 only
+     - None
+     - Only needed for DAL participation when using a tz4 consensus key
+
+By default, only the manager key is used. A consensus key is recommended for bakers who want
+to keep their manager key offline (cold storage) while still baking. A companion key is only
+needed in the specific scenario where the consensus key is a tz4 (BLS) key and the baker
+participates in the :doc:`DAL <../shell/dal>`.
 
 .. note::
 
-   The "consensus key" feature is available starting with the Tezos :doc:`Lima<../protocols/015_lima>` protocol.
+   The "consensus key" feature is available since the :doc:`Lima<../protocols/015_lima>` protocol.
+   The "companion key" feature is available since protocol Seoul.
+
+Consensus Key
+~~~~~~~~~~~~~
 
 By default, the baker's key, also called manager key, is used to sign in the consensus protocol, i.e. signing blocks while baking,
 and signing consensus operations (preattestations and attestations).
