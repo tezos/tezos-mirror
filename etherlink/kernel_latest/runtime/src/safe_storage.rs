@@ -240,6 +240,11 @@ impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
+        // Clean up any leftover data in /tmp from a previous run.
+        // This is safe because start() is only called when no
+        // BlockInProgress exists in storage.
+        let _ = self.host.store_delete(&TMP_PATH);
+
         for world_state in self.world_states.iter() {
             let tmp_path = safe_path(world_state)?;
             self.host.store_copy(world_state, &tmp_path)?;
@@ -283,5 +288,116 @@ impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
 impl<Host: Runtime> IsEvmNode for SafeStorage<&mut Host> {
     fn is_evm_node(&self) -> bool {
         self.host.is_evm_node()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
+
+    fn trace_call_trace_path() -> OwnedPath {
+        // /tmp/evm/trace/call_trace — where traces land through SafeStorage
+        safe_path(&concat(&TRACE_PATH, &RefPath::assert_from(b"/call_trace")).unwrap())
+            .unwrap()
+    }
+
+    fn trace_length_path() -> OwnedPath {
+        concat(&trace_call_trace_path(), &RefPath::assert_from(b"/length")).unwrap()
+    }
+
+    fn trace_entry_path(index: u32) -> OwnedPath {
+        let suffix: Vec<u8> = format!("/{index}").into();
+        concat(&trace_call_trace_path(), &RefPath::assert_from(&suffix)).unwrap()
+    }
+
+    /// Simulate writing trace entries into /tmp/evm/trace/call_trace/,
+    /// as the kernel's IndexableStorage would during block-level tracing.
+    fn write_fake_traces(host: &mut MockKernelHost, count: u32) {
+        let length_path = trace_length_path();
+        host.store_write_all(&length_path, &(count as u64).to_le_bytes())
+            .unwrap();
+        for i in 0..count {
+            let path = trace_entry_path(i);
+            host.store_write_all(&path, &[0xAA, 0xBB]).unwrap();
+        }
+    }
+
+    #[test]
+    fn start_clears_stale_trace_data() {
+        let mut host = MockKernelHost::default();
+
+        // Set up some initial world state
+        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
+        host.store_write_all(&world_state_data, b"some_account_data")
+            .unwrap();
+
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+        };
+
+        // First start: copy world state to /tmp
+        safe.start().unwrap();
+
+        // Simulate traces written during block production (through SafeStorage)
+        write_fake_traces(safe.host, 2);
+
+        // Verify the stale traces exist in /tmp
+        assert!(safe.host.store_has(&trace_length_path()).unwrap().is_some());
+        assert!(safe.host.store_has(&trace_entry_path(0)).unwrap().is_some());
+        assert!(safe.host.store_has(&trace_entry_path(1)).unwrap().is_some());
+
+        // Simulate: kernel was interrupted, no BIP saved.
+        // On restart, start() is called again.
+        safe.start().unwrap();
+
+        // The fix: stale trace entries must be gone
+        assert_eq!(
+            safe.host.store_has(&trace_length_path()).unwrap(),
+            None,
+            "Stale trace length should be cleaned up by start()"
+        );
+        assert_eq!(
+            safe.host.store_has(&trace_entry_path(0)).unwrap(),
+            None,
+            "Stale trace entry 0 should be cleaned up by start()"
+        );
+        assert_eq!(
+            safe.host.store_has(&trace_entry_path(1)).unwrap(),
+            None,
+            "Stale trace entry 1 should be cleaned up by start()"
+        );
+
+        // World state should still be correctly copied
+        let tmp_accounts = safe_path(&world_state_data).unwrap();
+        assert_eq!(
+            safe.host.store_read_all(&tmp_accounts).unwrap(),
+            b"some_account_data"
+        );
+    }
+
+    #[test]
+    fn start_preserves_world_state_when_tmp_is_clean() {
+        let mut host = MockKernelHost::default();
+
+        let world_state_data = RefPath::assert_from(b"/evm/world_state/accounts");
+        host.store_write_all(&world_state_data, b"account_data")
+            .unwrap();
+
+        let mut safe = SafeStorage {
+            host: &mut host,
+            world_states: vec![OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH)],
+        };
+
+        // First start on a clean host (no stale /tmp)
+        safe.start().unwrap();
+
+        let tmp_accounts = safe_path(&world_state_data).unwrap();
+        assert_eq!(
+            safe.host.store_read_all(&tmp_accounts).unwrap(),
+            b"account_data"
+        );
     }
 }

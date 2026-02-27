@@ -160,6 +160,22 @@ impl IndexableStorage {
         let new_index = self.get_length_and_increment(host)?;
         self.store_index(host, new_index, value)
     }
+
+    /// Set the length to a specific value.
+    ///
+    /// This can be used to truncate the storage: entries past the new
+    /// length become unreachable (they are not deleted but will be
+    /// overwritten by subsequent pushes). The caller must ensure that
+    /// `new_length` is not greater than the current length.
+    pub fn set_length<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        new_length: u64,
+    ) -> Result<(), IndexableStorageError> {
+        let path = concat(&self.path, &LENGTH)?;
+        write_u64_le(host, &path, new_length)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

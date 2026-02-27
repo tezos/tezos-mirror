@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::storage::store_call_trace;
+use super::storage::flush_call_traces;
 use crate::{
     database::EtherlinkVMDB,
     helpers::rlp::{
@@ -161,20 +161,16 @@ impl CallTrace {
     fn add_logs(&mut self, logs: Option<Vec<Log>>) {
         self.logs = logs;
     }
-
-    pub fn store(&self, host: &mut impl Runtime, transaction_hash: &Option<B256>) {
-        store_call_trace(host, self, transaction_hash)
-            .inspect_err(|err| {
-                log!(host, Debug, "Storing call trace failed with: {err:?}")
-            })
-            .ok();
-    }
 }
 
 pub struct CallTracer {
     config: CallTracerConfig,
     precompiles: EtherlinkPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
+    /// Traces buffered in memory, flushed to storage once at the end of
+    /// each transaction (depth == 0).  RLP encoding is deferred to flush
+    /// time so the buffer remains readable.
+    pending_traces: Vec<CallTrace>,
     pub transaction_hash: Option<B256>,
     initial_gas: u64,
     spec_id: SpecId,
@@ -191,6 +187,7 @@ impl CallTracer {
             config,
             precompiles,
             call_trace: HashMap::with_capacity(1),
+            pending_traces: Vec::new(),
             transaction_hash,
             initial_gas: 0,
             spec_id,
@@ -214,11 +211,6 @@ impl CallTracer {
         self.initial_gas = initial_gas;
     }
 
-    #[inline]
-    fn clear(&mut self, depth: &u16) {
-        self.call_trace.remove(depth);
-    }
-
     fn end_transaction_layer<
         'a,
         Host: Runtime + 'a,
@@ -236,16 +228,30 @@ impl CallTracer {
             return;
         }
 
-        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+        if let Some(mut call_trace) = self.call_trace.remove(&depth) {
             if self.config.with_logs {
                 call_trace.add_logs(Some(context.journal_mut().take_logs()));
             }
             call_trace.add_gas_used(gas_spent + self.initial_gas);
             call_trace.add_output(Some(output.to_vec()));
             call_trace.add_error_from_instruction_result(instruction_result);
-            call_trace.store(context.db_mut().host, &self.transaction_hash);
 
-            self.clear(&depth);
+            self.pending_traces.push(call_trace);
+        }
+
+        // At depth 0 (end of top-level transaction), flush all buffered
+        // traces to storage in a single batch operation.
+        if depth == 0 && !self.pending_traces.is_empty() {
+            let traces = std::mem::take(&mut self.pending_traces);
+            flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
+                .inspect_err(|err| {
+                    log!(
+                        context.db_mut().host,
+                        Debug,
+                        "Flushing call traces failed with: {err:?}"
+                    );
+                })
+                .ok();
         }
     }
 }
