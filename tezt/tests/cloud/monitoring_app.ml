@@ -255,21 +255,24 @@ module Baker_helpers = struct
     let open Prometheus in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[%dh])"
+        "sum_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_commitments_attested
         tz1
         report_interval
     in
     let* attested = fetch ~decoder:decoder_prometheus_float ~query ~origin in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_dal_commitments_attestable{attester=\"%s\"}[%dh])"
+        "sum_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_commitments_attestable
         tz1
         report_interval
     in
     let* attestable = fetch ~decoder:decoder_prometheus_float ~query ~origin in
     let query =
       Format.sprintf
-        "avg_over_time(tezt_dal_attestation_sent{attester=\"%s\"}[%dh])"
+        "avg_over_time(%s{attester=\"%s\"}[%dh])"
+        Metrics.Name.dal_attestation_sent
         tz1
         report_interval
     in
@@ -278,7 +281,8 @@ module Baker_helpers = struct
     in
     let query =
       Format.sprintf
-        "sum_over_time(tezt_attestation_sent_when_out_of_dal_committee{attester=\"%s\"}[6h])"
+        "sum_over_time(%s{attester=\"%s\"}[6h])"
+        Metrics.Name.attestation_sent_when_out_of_dal_committee
         tz1
     in
     let* out_attestations =
@@ -377,10 +381,10 @@ module Tasks = struct
 
   let fetch_slot_info ~slot_index =
     let open Prometheus in
-    let query s =
+    let query metric_name =
       Format.sprintf
-        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
-        s
+        "increase(%s{slot_index=\"%d\"}[%dh])"
+        metric_name
         slot_index
         report_interval
     in
@@ -389,13 +393,13 @@ module Tasks = struct
       fetch
         ~origin:"fetch_slot_info.attested"
         ~decoder
-        ~query:(query "attested")
+        ~query:(query Metrics.Name.total_attested_commitments_per_slot)
     in
     let* published =
       fetch
         ~origin:"fetch_slot_info.published"
         ~decoder
-        ~query:(query "published")
+        ~query:(query Metrics.Name.total_published_commitments_per_slot)
     in
     Lwt.return (`slot_index slot_index, `attested attested, `published published)
 
@@ -415,10 +419,11 @@ module Tasks = struct
 
   let fetch_dal_commitments_total_info () =
     let open Prometheus in
-    let query s =
+    let query kind =
       Format.sprintf
-        {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
-        s
+        {|increase(%s{kind="%s"}[%dh])|}
+        Metrics.Name.dal_commitments_total
+        kind
         report_interval
     in
     let decoder = decoder_prometheus_float in

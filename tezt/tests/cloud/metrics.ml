@@ -91,6 +91,36 @@ let default =
     last_echo_rollup_fetched_data_size = 0;
   }
 
+module Name = struct
+  let dal_commitments_attested = "tezt_dal_commitments_attested"
+
+  let dal_commitments_attestable = "tezt_dal_commitments_attestable"
+
+  let dal_attestation_sent = "tezt_dal_attestation_sent"
+
+  let attestation_sent_when_out_of_dal_committee =
+    "tezt_attestation_sent_when_out_of_dal_committee"
+
+  let total_published_commitments_per_slot =
+    "tezt_total_published_commitments_per_slot"
+
+  let total_attested_commitments_per_slot =
+    "tezt_total_attested_commitments_per_slot"
+
+  let dal_commitments_ratio = "tezt_dal_commitments_ratio"
+
+  let dal_commitments_total = "tezt_dal_commitments_total"
+
+  let etherlink_operator_balance_total = "tezt_etherlink_operator_balance_total"
+
+  let total_echo_rollup_unattested_slots =
+    "tezt_total_echo_rollup_unattested_slots"
+
+  let total_echo_rollup_fetched_data = "tezt_total_echo_rollup_fetched_data"
+
+  let last_echo_rollup_fetched_data = "tezt_last_echo_rollup_fetched_data"
+end
+
 let aliases =
   Hashtbl.create
     50 (* mapping from baker addresses to their Tzkt aliases (if known)*)
@@ -245,7 +275,7 @@ let push ~versions ~cloud
       ~help:"Number of attested commitments per baker"
       ~typ:`Gauge
       ~labels
-      ~name:"tezt_dal_commitments_attested"
+      ~name:Name.dal_commitments_attested
       (float_of_int value)
   in
   let push_attestable ~labels value =
@@ -256,7 +286,7 @@ let push ~versions ~cloud
          baker is in the DAL committee at attestation level)"
       ~typ:`Gauge
       ~labels
-      ~name:"tezt_dal_commitments_attestable"
+      ~name:Name.dal_commitments_attestable
       (float_of_int value)
   in
   let push_dal_attestation_sent ~labels = function
@@ -269,7 +299,7 @@ let push ~versions ~cloud
              opportunity to"
           ~typ:`Gauge
           ~labels
-          ~name:"tezt_dal_attestation_sent"
+          ~name:Name.dal_attestation_sent
           (if value then 1. else 0.)
   in
   let push_metric_out_attestation_sent ~labels () =
@@ -278,7 +308,7 @@ let push ~versions ~cloud
       ~help:"The baker sent an attestation while out of the DAL committee"
       ~typ:`Gauge
       ~labels
-      ~name:"tezt_attestation_sent_when_out_of_dal_committee"
+      ~name:Name.attestation_sent_when_out_of_dal_committee
       1.
   in
   Hashtbl.iter
@@ -300,7 +330,7 @@ let push ~versions ~cloud
         ~help:"Total published commitments per slot"
         ~typ:`Counter
         ~labels
-        ~name:"tezt_total_published_commitments_per_slot"
+        ~name:Name.total_published_commitments_per_slot
         (float value))
     total_published_commitments_per_slot ;
   Hashtbl.iter
@@ -311,21 +341,21 @@ let push ~versions ~cloud
         ~help:"Total attested commitments per slot"
         ~typ:`Counter
         ~labels
-        ~name:"tezt_total_attested_commitments_per_slot"
+        ~name:Name.total_attested_commitments_per_slot
         (float value))
     total_attested_commitments_per_slot ;
   Cloud.push_metric
     cloud
     ~help:"Ratio between the number of published and expected commitments"
     ~typ:`Gauge
-    ~name:"tezt_dal_commitments_ratio"
+    ~name:Name.dal_commitments_ratio
     ~labels:[("kind", "published")]
     ratio_published_commitments ;
   Cloud.push_metric
     cloud
     ~help:"Ratio between the total number of attested and published commitments"
     ~typ:`Gauge
-    ~name:"tezt_dal_commitments_ratio"
+    ~name:Name.dal_commitments_ratio
     ~labels:[("kind", "attested")]
     ratio_attested_commitments ;
   Cloud.push_metric
@@ -333,7 +363,7 @@ let push ~versions ~cloud
     ~help:
       "Ratio between the number of published and expected commitments per level"
     ~typ:`Gauge
-    ~name:"tezt_dal_commitments_ratio"
+    ~name:Name.dal_commitments_ratio
     ~labels:[("kind", "published_last_level")]
     ratio_published_commitments_last_level ;
   Cloud.push_metric
@@ -341,56 +371,56 @@ let push ~versions ~cloud
     ~help:
       "Ratio between the number of attested and published commitments per level"
     ~typ:`Gauge
-    ~name:"tezt_dal_commitments_ratio"
+    ~name:Name.dal_commitments_ratio
     ~labels:[("kind", "attested_last_level")]
     ratio_attested_commitments_last_level ;
   Cloud.push_metric
     cloud
     ~help:"Number of commitments expected to be published"
     ~typ:`Counter
-    ~name:"tezt_dal_commitments_total"
+    ~name:Name.dal_commitments_total
     ~labels:[("kind", "expected")]
     (float_of_int expected_published_commitments) ;
   Cloud.push_metric
     cloud
     ~help:"Number of published commitments "
     ~typ:`Counter
-    ~name:"tezt_dal_commitments_total"
+    ~name:Name.dal_commitments_total
     ~labels:[("kind", "published")]
     (float_of_int total_published_commitments) ;
   Cloud.push_metric
     cloud
     ~help:"Number of attested commitments"
     ~typ:`Counter
-    ~name:"tezt_dal_commitments_total"
+    ~name:Name.dal_commitments_total
     ~labels:[("kind", "attested")]
     (float_of_int total_attested_commitments) ;
   Cloud.push_metric
     cloud
     ~help:"Sum of the balances of the etherlink operator"
     ~typ:`Gauge
-    ~name:"tezt_etherlink_operator_balance_total"
+    ~name:Name.etherlink_operator_balance_total
     (Tez.to_float etherlink_operator_balance_sum) ;
   Cloud.push_metric
     cloud
     ~help:"Number of slots unattested from the echo rollup perspective"
     ~typ:`Gauge
     ~labels:[("kind", "unattested")]
-    ~name:"tezt_total_echo_rollup_unattested_slots"
+    ~name:Name.total_echo_rollup_unattested_slots
     (float_of_int total_echo_rollup_unattested_slots) ;
   Cloud.push_metric
     cloud
     ~help:"Total size of data fetched by the echo rollup"
     ~typ:`Gauge
     ~labels:[("kind", "data")]
-    ~name:"tezt_total_echo_rollup_fetched_data"
+    ~name:Name.total_echo_rollup_fetched_data
     (float_of_int total_echo_rollup_fetched_data_size) ;
   Cloud.push_metric
     cloud
     ~help:"Last size of data fetched by the echo rollup"
     ~typ:`Gauge
     ~labels:[("kind", "data")]
-    ~name:"tezt_last_echo_rollup_fetched_data"
+    ~name:Name.last_echo_rollup_fetched_data
     (float_of_int last_echo_rollup_fetched_data_size)
 
 let number_of_attested_slots arr =

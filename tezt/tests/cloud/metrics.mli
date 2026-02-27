@@ -8,6 +8,33 @@
 
 (** Tezt‑cloud metrics helpers. *)
 
+(** Prometheus metric names. *)
+module Name : sig
+  val dal_commitments_attested : string
+
+  val dal_commitments_attestable : string
+
+  val dal_attestation_sent : string
+
+  val attestation_sent_when_out_of_dal_committee : string
+
+  val total_published_commitments_per_slot : string
+
+  val total_attested_commitments_per_slot : string
+
+  val dal_commitments_ratio : string
+
+  val dal_commitments_total : string
+
+  val etherlink_operator_balance_total : string
+
+  val total_echo_rollup_unattested_slots : string
+
+  val total_echo_rollup_fetched_data : string
+
+  val last_echo_rollup_fetched_data : string
+end
+
 (** A baker’s public key hash used as a map key. *)
 type public_key_hash = PKH of string
 
