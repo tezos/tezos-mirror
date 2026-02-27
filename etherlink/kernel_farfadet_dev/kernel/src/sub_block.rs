@@ -304,6 +304,7 @@ pub fn assemble_block<Host: Runtime>(
     let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
+    crate::gas_price::register_block(&mut safe_host, &block_in_progress)?;
     let block = block_in_progress.finalize_and_store(&mut safe_host, &block_constants)?;
 
     let timestamp = block.timestamp();
