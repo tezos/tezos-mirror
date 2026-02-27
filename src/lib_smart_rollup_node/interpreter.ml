@@ -363,33 +363,36 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   let+ run_info = run_to_tick plugin node_ctxt start_state tick in
   Pvm_plugin_sig.{state; info = run_info}
 
-(** This function memoizes [f tick], but puts an immutable state copy in the
-    cache, and returns a mutable version. Either the one obtained from [f]
-    directly or a copy of the one in the cache. *)
-let memo_tick_state cache tick f =
-  match Pvm_plugin_sig.Tick_state_cache.bind cache tick Lwt.return with
-  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
-  | None ->
-      let p_mut = f tick in
-      let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
-      Pvm_plugin_sig.Tick_state_cache.put cache tick p_imm ;
-      p_mut
-
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
   Pvm_plugin_sig.make_state_cache 64 (* size of 2 dissections *)
 
-(* Memoized version of [state_of_tick_aux] using global cache. *)
-let global_memo_state_of_tick_aux plugin node_ctxt ~start_state
-    (event : Sc_rollup_block.t) tick =
-  memo_tick_state global_tick_state_cache tick
-  @@ state_of_tick_aux plugin node_ctxt ~start_state event
-
-(* Memoized version of [state_of_tick_aux] using both global and local caches. *)
+(** Memoized version of [state_of_tick_aux] using both global and local caches.
+    A single immutable copy of the state is shared between both caches. *)
 let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     (event : Sc_rollup_block.t) tick =
-  memo_tick_state state_cache tick
-  @@ global_memo_state_of_tick_aux plugin node_ctxt ~start_state event
+  match Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return with
+  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+  | None -> (
+      match
+        Pvm_plugin_sig.Tick_state_cache.bind
+          global_tick_state_cache
+          tick
+          Lwt.return
+      with
+      | Some p_imm ->
+          (* Global hit: share the same immutable copy in local cache. *)
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
+          Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+      | None ->
+          (* Both miss: compute and store a single immutable copy in both. *)
+          let p_mut =
+            state_of_tick_aux plugin node_ctxt ~start_state event tick
+          in
+          let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
+          Pvm_plugin_sig.Tick_state_cache.put global_tick_state_cache tick p_imm ;
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
+          p_mut)
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
     end_state] for [tick] if [tick] happened before
