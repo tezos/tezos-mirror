@@ -797,7 +797,7 @@ let test_tezlink_chain_id =
   unit
 
 let test_tezlink_contracts_rpc =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the contracts rpc"
     ~tags:["rpc"; "contracts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
