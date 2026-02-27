@@ -257,6 +257,13 @@ module Plugin = struct
       ~lag_index:_ slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
 
+  let decode_baker_attestations attestation ~number_of_slots:_ ~number_of_lags:_
+      =
+    let open Result_syntax in
+    match Bitset.to_list attestation with
+    | [] -> return []
+    | slot_indices -> return [{Dal_plugin.lag_index = 0; slot_indices}]
+
   let is_protocol_attested slot_availability ~number_of_slots:_
       ~number_of_lags:_ ~lag_index:_ slot_index =
     match Bitset.mem slot_availability slot_index with

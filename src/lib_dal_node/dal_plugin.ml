@@ -37,6 +37,8 @@ type slot_header = {
   commitment : Cryptobox.Verifier.commitment;
 }
 
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
 module type T = sig
   module Proto : Registered_protocol.T
 
@@ -90,6 +92,12 @@ module type T = sig
     lag_index:int ->
     slot_index ->
     bool
+
+  val decode_baker_attestations :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    unfolded_lag_attestation list tzresult
 
   val is_protocol_attested :
     slot_availability ->

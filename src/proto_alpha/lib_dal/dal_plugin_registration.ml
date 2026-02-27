@@ -427,6 +427,13 @@ module Plugin = struct
           ~lag_index
           slot_index
 
+  let decode_baker_attestations attestations ~number_of_slots ~number_of_lags =
+    Result.map
+      (List.map (fun Dal.Attestations.{lag_index; slot_indices} ->
+           Dal_plugin.{lag_index; slot_indices}))
+    @@ Dal.Attestations.decode attestations ~number_of_slots ~number_of_lags
+    |> wrap
+
   let is_protocol_attested slot_availability ~number_of_slots ~number_of_lags
       ~lag_index slot_index =
     match Dal.Slot_index.of_int_opt ~number_of_slots slot_index with
