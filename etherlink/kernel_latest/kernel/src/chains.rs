@@ -1104,7 +1104,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
     }
 
     fn storage_root_paths(&self) -> Vec<RefPath> {
-        vec![TEZLINK_SAFE_STORAGE_ROOT_PATH]
+        vec![
+            TEZLINK_SAFE_STORAGE_ROOT_PATH,
+            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        ]
     }
 }
 
