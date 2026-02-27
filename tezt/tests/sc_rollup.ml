@@ -3215,7 +3215,7 @@ let test_can_stake ~kind =
 let test_refutation_scenario ?regression ?commitment_period ?challenge_window
     ~variant ~mode ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp
     ?boot_sector ?(extra_tags = []) ?with_dal ?dal_attested_slots_validity_lag
-    ({allow_degraded; _} as scenario) =
+    ?monitor_rollup_node ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3228,6 +3228,27 @@ let test_refutation_scenario ?regression ?commitment_period ?challenge_window
   in
   let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
+  let base_scenario =
+    test_refutation_scenario_aux ?with_dal ~mode ~kind scenario
+  in
+  let scenario =
+    match monitor_rollup_node with
+    | None -> base_scenario
+    | Some monitor_fn ->
+        fun protocol sc_rollup_node sc_rollup_address node client ->
+          let monitor_promise = monitor_fn sc_rollup_node in
+          Lwt.finalize
+            (fun () ->
+              base_scenario
+                protocol
+                sc_rollup_node
+                sc_rollup_address
+                node
+                client)
+            (fun () ->
+              Lwt.cancel monitor_promise ;
+              Lwt.return_unit)
+  in
   test_full_scenario
     ?regression
     ?hooks:None (* We only want to capture dissections manually *)
@@ -3247,7 +3268,7 @@ let test_refutation_scenario ?regression ?commitment_period ?challenge_window
       variant = Some variant;
       description = "refutation games winning strategies";
     }
-    (test_refutation_scenario_aux ?with_dal ~mode ~kind scenario)
+    scenario
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
@@ -7711,6 +7732,57 @@ let register_riscv ~protocols =
     ~preimages_dir
     protocols
 
+(** [monitor_riscv_live_states ?interval sc_rollup_node] polls the metrics
+    endpoint of [sc_rollup_node] every [interval] seconds (default 2), tracking
+    the maximum number of live RISC-V PVM states (immutable and mutable). When
+    the returned promise is cancelled, it logs the observed maximums. *)
+let monitor_riscv_live_states ?(interval = 2.0) sc_rollup_node =
+  let metrics_addr, metrics_port = Sc_rollup_node.metrics sc_rollup_node in
+  let metrics_url = sf "http://%s:%d/metrics" metrics_addr metrics_port in
+  let max_immutable = ref 0 in
+  let max_mutable = ref 0 in
+  let re_immutable =
+    rex "octez_sc_rollup_node_riscv_states\\{kind=\"immutable\"\\} (\\d+)"
+  in
+  let re_mutable =
+    rex "octez_sc_rollup_node_riscv_states\\{kind=\"mutable\"\\} (\\d+)"
+  in
+  let update_max r line re =
+    match line =~* re with
+    | Some v -> r := max !r (int_of_string v)
+    | None -> ()
+  in
+  let parse_riscv_states output =
+    String.split_on_char '\n' output
+    |> List.iter (fun line ->
+           update_max max_immutable line re_immutable ;
+           update_max max_mutable line re_mutable)
+  in
+  let rec poll () =
+    let* () =
+      Lwt.catch
+        (fun () ->
+          let* output =
+            Process.spawn ~log_output:false "curl" ["-s"; metrics_url]
+            |> Process.check_and_read_stdout
+          in
+          parse_riscv_states output ;
+          Lwt.return_unit)
+        (fun _exn -> Lwt.return_unit)
+    in
+    let* () = Lwt_unix.sleep interval in
+    poll ()
+  in
+  let report () =
+    Log.info
+      "RISC-V max live PVM states: immutable=%d, mutable=%d"
+      !max_immutable
+      !max_mutable
+  in
+  let polling = poll () in
+  Lwt.on_cancel polling report ;
+  polling
+
 let register_riscv_kernel ~protocols ~kernel =
   let kind = "riscv" in
   let variant, inbox_file =
@@ -7759,6 +7831,7 @@ let register_riscv_kernel ~protocols ~kernel =
     ~variant
     ~uses:(fun _protocol -> [inbox_file_uses])
     ~boot_sector
+    ~monitor_rollup_node:monitor_riscv_live_states
     (refutation_scenario_parameters
        ~loser_modes:["5 0 1000"]
        (List.map (fun x -> [x]) (read_riscv_test_inbox inbox_file_uses))
