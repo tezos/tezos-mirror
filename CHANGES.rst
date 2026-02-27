@@ -87,6 +87,9 @@ Client
 Signer
 ------
 
+- Added ``create bls proof for`` command to generate BLS proofs of possession
+  directly on the signer, without requiring the client. (MR :gl:`!20961`)
+
 Baker
 -----
 
