@@ -62,6 +62,7 @@ type t = {
   ratio_published_commitments : float;
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
+  ratio_attested_commitments_last_level : float;
   ratio_attested_commitments_per_baker :
     (public_key_hash, per_baker_dal_summary) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
@@ -82,6 +83,7 @@ let default =
     ratio_published_commitments = 0.;
     ratio_attested_commitments = 0.;
     ratio_published_commitments_last_level = 0.;
+    ratio_attested_commitments_last_level = 0.;
     ratio_attested_commitments_per_baker = Hashtbl.create 13;
     etherlink_operator_balance_sum = Tez.zero;
     total_echo_rollup_unattested_slots = 0;
@@ -124,6 +126,7 @@ let pp ~bakers
       ratio_published_commitments;
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
+      ratio_attested_commitments_last_level;
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
       total_echo_rollup_unattested_slots;
@@ -148,12 +151,15 @@ let pp ~bakers
         level_first_commitment_attested) ;
   Log.info "Total published commitments: %d" total_published_commitments ;
   Log.info "Expected published commitments: %d" expected_published_commitments ;
-  Log.info "Total attested commitments: %d" total_attested_commitments ;
   Log.info "Ratio published commitments: %f" ratio_published_commitments ;
-  Log.info "Ratio attested commitments: %f" ratio_attested_commitments ;
   Log.info
     "Ratio published commitments last level: %f"
     ratio_published_commitments_last_level ;
+  Log.info "Total attested commitments: %d" total_attested_commitments ;
+  Log.info "Ratio attested commitments: %f" ratio_attested_commitments ;
+  Log.info
+    "Ratio attested commitments last level: %f"
+    ratio_attested_commitments_last_level ;
   List.iter
     (fun Baker_helpers.{accounts; stake; baker; _} ->
       let baker_name = Agnostic_baker.name baker in
@@ -213,6 +219,7 @@ let push ~versions ~cloud
       ratio_published_commitments;
       ratio_attested_commitments;
       ratio_published_commitments_last_level;
+      ratio_attested_commitments_last_level;
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
       total_echo_rollup_unattested_slots;
@@ -316,7 +323,7 @@ let push ~versions ~cloud
     ratio_published_commitments ;
   Cloud.push_metric
     cloud
-    ~help:"Ratio between the number of attested and expected commitments"
+    ~help:"Ratio between the total number of attested and published commitments"
     ~typ:`Gauge
     ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "attested")]
@@ -324,11 +331,19 @@ let push ~versions ~cloud
   Cloud.push_metric
     cloud
     ~help:
-      "Ratio between the number of attested and expected commitments per level"
+      "Ratio between the number of published and expected commitments per level"
     ~typ:`Gauge
     ~name:"tezt_dal_commitments_ratio"
     ~labels:[("kind", "published_last_level")]
     ratio_published_commitments_last_level ;
+  Cloud.push_metric
+    cloud
+    ~help:
+      "Ratio between the number of attested and published commitments per level"
+    ~typ:`Gauge
+    ~name:"tezt_dal_commitments_ratio"
+    ~labels:[("kind", "attested_last_level")]
+    ratio_attested_commitments_last_level ;
   Cloud.push_metric
     cloud
     ~help:"Number of commitments expected to be published"
@@ -451,7 +466,14 @@ let update_ratio_published_commitments_last_level ~dal_node_producers
         float_of_int (Hashtbl.length per_level_info.published_commitments)
         *. 100. /. float_of_int producers
 
-let update_ratio_attested_commitments ~first_level ~infos
+let update_ratio_attested_commitments metrics =
+  if metrics.total_published_commitments = 0 then 0.
+  else
+    float_of_int metrics.total_attested_commitments
+    *. 100.
+    /. float_of_int metrics.total_published_commitments
+
+let update_ratio_attested_commitments_last_level ~first_level ~infos
     ~cumulative_protocol_attestations ~attestation_lag per_level_info metrics =
   let published_level =
     published_level_of_attested_level ~attestation_lag per_level_info.level
@@ -462,17 +484,17 @@ let update_ratio_attested_commitments ~first_level ~infos
        precedes the earliest available level (%d)."
       published_level
       first_level ;
-    metrics.ratio_attested_commitments)
+    metrics.ratio_attested_commitments_last_level)
   else
     match Hashtbl.find_opt infos published_level with
     | None ->
         Log.warn
           "Unexpected error: The level %d is missing in the infos table"
           published_level ;
-        metrics.ratio_attested_commitments
+        metrics.ratio_attested_commitments_last_level
     | Some old_per_level_info -> (
         let n = Hashtbl.length old_per_level_info.published_commitments in
-        if n = 0 then metrics.ratio_attested_commitments
+        if n = 0 then metrics.ratio_attested_commitments_last_level
         else
           match
             Hashtbl.find_opt cumulative_protocol_attestations published_level
@@ -709,8 +731,9 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
   let ratio_published_commitments =
     update_ratio_published_commitments metrics
   in
-  let ratio_attested_commitments =
-    update_ratio_attested_commitments
+  let ratio_attested_commitments = update_ratio_attested_commitments metrics in
+  let ratio_attested_commitments_last_level =
+    update_ratio_attested_commitments_last_level
       ~first_level
       ~infos
       ~cumulative_protocol_attestations
@@ -755,6 +778,7 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
     ratio_published_commitments;
     ratio_attested_commitments;
     ratio_published_commitments_last_level;
+    ratio_attested_commitments_last_level;
     ratio_attested_commitments_per_baker;
     etherlink_operator_balance_sum =
       infos_per_level.etherlink_operator_balance_sum;
