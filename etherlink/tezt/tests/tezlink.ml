@@ -1428,7 +1428,7 @@ let test_tezlink_transfer =
 
 let test_tezlink_observer_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink transfer via an observer"
     ~tags:["observer"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
