@@ -356,17 +356,33 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
+Security Model
+^^^^^^^^^^^^^^
+
+Using a consensus key improves operational security compared to baking directly with the manager key:
+
+- **Manager key stays offline**: The manager key can be kept in cold storage (hardware wallet, air-gapped machine). Only the consensus key needs to be accessible to the baker or signer.
+- **Key rotation without redelegation**: If the consensus key is compromised, you can rotate it using the offline manager key. Delegators are unaffected.
+- **Faster incident response**: You can detect compromise and rotate the consensus key while the manager key remains safe.
+
 .. warning::
 
-   Note that the consensus key has also access to the delegate's spendable funds: indeed, the consensus
-   key may sign a ``Drain_delegate`` operation to transfer the delegate's
-   spendable balance to an arbitrary account. In :doc:`relevant
-   RPCs<../api/openapi>` like
-   ``/chains/main/blocks/head/helpers/baking_rights``, both the
-   delegate's manager and consensus keys are listed.
-   As a consequence, the consensus key should be treated with equal care as the manager key.
+   The consensus key can **drain the delegate's spendable balance** via a ``Drain_delegate``
+   operation. Both the delegate's manager and consensus keys are listed in
+   :doc:`relevant RPCs<../api/openapi>` like ``/chains/main/blocks/head/helpers/baking_rights``.
+   The consensus key should therefore be treated with care, even though the manager key
+   remains the primary identity.
 
-Further possible options to counter the risk of fund draining by a compromised consensus key include: staking (nearly) all funds available on the baking key, leaving just a minimum to pay operation fees, and, rotating consensus key regularly, specially before unstaking tez. Note that the activation delay for new consensus key is one cycle shorter than the unstake finalization delay.
+To mitigate the risk of fund draining by a compromised consensus key:
+
+- **Stake most of your funds**: only leave a minimum for operation fees in the spendable balance. Frozen (staked) funds cannot be drained.
+- **Rotate the consensus key regularly**, especially before unstaking tez. The activation delay for a new consensus key is one cycle shorter than the unstake finalization delay.
+
+.. note::
+
+   In contrast, a **companion key** has **no access** to the delegate's funds. It can only
+   sign DAL attestation data. If a companion key is compromised, the worst outcome is
+   that the attacker can produce invalid DAL attestations — no funds are at risk.
 
 Registering a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
