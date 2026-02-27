@@ -170,17 +170,6 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
-   Remove this argument in Octez v25. *)
-let adaptive_issuance_vote_arg =
-  Tezos_clic.arg
-    ~doc:
-      "DEPRECATED: This argument is ignored by the baker and will be removed \
-       in the next major version of Octez."
-    ~long:"adaptive-issuance-vote"
-    ~placeholder:"vote"
-    per_block_vote_parameter
-
 let state_recorder_switch_arg =
   let open Lwt_result_syntax in
   let open Baking_configuration in
@@ -420,7 +409,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
     command
       ~group
       ~desc:"Forge and inject block using the delegates' rights."
-      (args13
+      (args12
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
@@ -429,7 +418,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
          force_switch
          operations_arg
          data_dir_path_arg
-         adaptive_issuance_vote_arg
          do_not_monitor_node_mempool_arg
          dal_node_endpoint_arg
          block_count_arg
@@ -443,7 +431,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              force,
              extra_operations,
              data_dir,
-             adaptive_issuance_vote,
              do_not_monitor_node_mempool,
              dal_node_endpoint,
              block_count,
@@ -451,9 +438,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
            pkhs
            cctxt
          ->
-        let*! () =
-          Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
-        in
         let* delegates = get_delegates cctxt pkhs in
         let dal_node_rpc_ctxt =
           Option.map create_dal_node_rpc_ctxt dal_node_endpoint
@@ -629,7 +613,7 @@ let allow_signing_delay_arg =
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args18
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -639,7 +623,6 @@ let baker_args =
     force_apply_from_round_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
-    adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
     dal_node_endpoint_arg
@@ -664,7 +647,6 @@ let run_baker
       force_apply_from_round,
       keep_alive,
       liquidity_baking_vote,
-      adaptive_issuance_vote,
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
@@ -691,9 +673,6 @@ let run_baker
       Octez_agnostic_baker.Per_block_vote_file.lookup_default_vote_file_path
         (cctxt :> Client_context.full)
     else Lwt.return per_block_vote_file
-  in
-  let*! () =
-    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
