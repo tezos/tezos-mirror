@@ -2,16 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_scoru_wasm)
- (public_name octez-libs.scoru-wasm)
+ (name tezos_smart_rollup_wasm_in_memory)
+ (public_name octez-libs.smart-rollup-wasm-in-memory)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  octez-libs.tree-encoding
-  octez-libs.lazy-containers
-  octez-libs.webassembly-interpreter
-  octez-libs.lwt-result-stdlib
-  octez-libs.data-encoding)
+  octez-libs.scoru-wasm
+  octez-libs.tezos-context.memory
+  octez-libs.tezos-context.merkle_proof_encoding)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

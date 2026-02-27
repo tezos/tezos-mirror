@@ -23,7 +23,8 @@
   octez-libs.tezos-sapling
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.plugin
-  octez-proto-libs.protocol-environment)
+  octez-proto-libs.protocol-environment
+  octez-libs.smart-rollup-wasm-in-memory)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
