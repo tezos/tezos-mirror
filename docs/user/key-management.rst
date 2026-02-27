@@ -399,9 +399,9 @@ The command to update the consensus key is::
 
    octez-client set consensus key for <manager_key> to <consensus_key>
 
-The update becomes active after ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. We therefore distinguish
-the active consensus key and the pending consensus keys.
-The active consensus key is by default the delegate’s manager key, which cannot change.
+The update becomes active after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles
+(see :ref:`cs_constants`). We therefore distinguish the active consensus key and the pending
+consensus keys. The active consensus key is by default the delegate’s manager key, which cannot change.
 
 However, it is also possible to register as a delegate and immediately set the consensus key::
 
