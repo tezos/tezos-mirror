@@ -141,7 +141,7 @@ your user account::
 
 .. note::
 
-   It is possible to also register a :ref:`consensus key <consensus_key_details>` and/or a :ref:`companion key <companion_key>` at this step.
+   It is possible to also register a :ref:`consensus key <consensus_key_details>` and/or a :ref:`companion key <companion_key>` at this step. A consensus key is recommended for keeping your manager key offline. See :doc:`../user/key-management` for details on when you need each key and a complete setup example.
 
 You also need to stake some tez, at least ``MINIMAL_FROZEN_STAKE`` (see :ref:`ps_constants`), and to have at least ``MINIMAL_STAKE = 6000`` :ref:`baking power <minimal_baking_power>`, taking into account your own and all your delegators' staked balances, as well as their delegated balances with a lesser weight.
 

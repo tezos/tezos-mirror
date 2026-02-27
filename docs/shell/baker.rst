@@ -86,3 +86,6 @@ Both signatures, one from the consensus key and one from the companion key, are
 aggregated and included in the attestation.
 When a baker produces the next block, they aggregate all ``tz4`` attestations
 (including both already aggregated signatures) into a single aggregated attestation.
+
+For instructions on setting up consensus and companion keys, see the
+:ref:`key management guide <consensus_key_details>`.
