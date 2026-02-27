@@ -65,7 +65,29 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     return Tezlink_constants.all_constants
 
-  let current_level _ _ ~offset:_ = failwith "Not Implemented Yet (%s)" __LOC__
+  let current_level chain block ~offset =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+
+    let* offset =
+      (* Tezos l1 requires non-negative offset #7845 *)
+      if offset >= 0l then return offset
+      else failwith "The specified level offset should be positive."
+    in
+
+    let* block_number = shell_block_param_to_block_number block in
+
+    let constants = Tezlink_constants.all_constants in
+    let level = Int32.add block_number offset in
+    return
+      Tezos_types.
+        {
+          level;
+          cycle =
+            Int32.(div (sub level 1l) constants.parametric.blocks_per_cycle);
+          cycle_position =
+            Int32.(rem (sub level 1l) constants.parametric.blocks_per_cycle);
+        }
 
   let balance _chain block contract =
     let open Lwt_result_syntax in
