@@ -13,23 +13,15 @@
     The abstract protocol-plugin-dependent types ([tb_slot],
     [attestation_operation], [dal_attestations]) are projected into concrete
     types at insertion time: [tb_slot] is converted to [int], the
-    [dal_attestations] value is captured inside a closure, and
+    [dal_attestations] value is decoded into a protocol-agnostic format, and
     [attestation_operation] (only needed by the accuser) is dropped. *)
 
 type t
 
-(** A function that checks whether a given slot is attested by a baker.
-
-    The abstract [dal_attestations] value from the protocol plugin is captured
-    inside the closure, so consumers do not need access to the plugin to
-    evaluate it. *)
-type is_attested_fn =
-  number_of_slots:int -> number_of_lags:int -> lag_index:int -> int -> bool
-
 (** A cached attestation entry: the Tenderbake slot as [int], and an optional
-    attestation-checking closure (present iff the baker included a DAL
-    payload). *)
-type entry = int * is_attested_fn option
+    decoded DAL attestation payload (present iff the baker included a DAL
+    payload and decoding succeeded). *)
+type entry = int * Dal_plugin.unfolded_lag_attestation list option
 
 (** The cached attestation data for a level. *)
 type cached_ops = entry list

@@ -320,7 +320,7 @@ let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     is_attested tb_slot_to_int =
   let count_per_slot = Array.make number_of_slots 0 in
   List.iter
-    (fun (tb_slot, _, dal_attestation_opt) ->
+    (fun (tb_slot, dal_attestation_opt) ->
       match dal_attestation_opt with
       | Some dal_attestation -> (
           match
@@ -339,22 +339,36 @@ let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     attestations ;
   count_per_slot
 
+let decoded_attests_slot (decoded : Dal_plugin.unfolded_lag_attestation list)
+    ~lag_index ~slot_index =
+  match
+    List.find_opt
+      (fun (att : Dal_plugin.unfolded_lag_attestation) ->
+        att.lag_index = lag_index)
+      decoded
+  with
+  | None -> false
+  | Some att -> List.exists (Int.equal slot_index) att.slot_indices
+
 let convert_attestations_to_cache_format (type tb_slot dal_attestations)
     (module Plugin : Dal_plugin.T
       with type tb_slot = tb_slot
-       and type dal_attestations = dal_attestations) attestations =
+       and type dal_attestations = dal_attestations) ~number_of_slots
+    ~number_of_lags attestations =
   List.map
     (fun (tb_slot, _op, dal_att_opt) ->
       ( Plugin.tb_slot_to_int tb_slot,
-        Option.map
-          (fun dal_att ~number_of_slots ~number_of_lags ~lag_index slot_index ->
-            Plugin.is_baker_attested
-              dal_att
-              ~number_of_slots
-              ~number_of_lags
-              ~lag_index
-              slot_index)
-          dal_att_opt ))
+        match dal_att_opt with
+        | None -> None
+        | Some dal_att -> (
+            match
+              Plugin.decode_baker_attestations
+                dal_att
+                ~number_of_slots
+                ~number_of_lags
+            with
+            | Ok decoded -> Some decoded
+            | Error _ -> None) ))
     attestations
 
 let check_attesters_attested cctxt node_ctxt committee slot_to_committee
@@ -382,7 +396,11 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
               Plugin.get_attestations ~block_level:attested_level cctxt
             in
             let attestation_ops =
-              convert_attestations_to_cache_format (module Plugin) attestations
+              convert_attestations_to_cache_format
+                (module Plugin)
+                ~number_of_slots:parameters.number_of_slots
+                ~number_of_lags:(List.length parameters.Types.attestation_lags)
+                attestations
             in
             Attestation_ops_cache.add
               cache
@@ -402,7 +420,6 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
       in
       let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
       let number_of_slots = parameters.number_of_slots in
-      let number_of_lags = List.length parameters.Types.attestation_lags in
       let threshold =
         parameters.cryptobox_parameters.number_of_shards
         / parameters.cryptobox_parameters.redundancy_factor
@@ -413,13 +430,11 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
           (fun (lag_index, _lag, _attested_level, cached_ops) ->
             let shards =
               attested_shards_per_slot
-                (List.map
-                   (fun (tb_int, fn_opt) -> (tb_int, (), fn_opt))
-                   cached_ops)
+                cached_ops
                 slot_to_committee
                 ~number_of_slots
-                (fun f slot ->
-                  f ~number_of_slots ~number_of_lags ~lag_index slot)
+                (fun decoded slot ->
+                  decoded_attests_slot decoded ~lag_index ~slot_index:slot)
                 Fun.id
             in
             Array.iteri
@@ -470,8 +485,8 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
         else
           let has_dal_payload =
             List.exists
-              (fun (_lag_index, _level, (_tb_int, fn_opt)) ->
-                Option.is_some fn_opt)
+              (fun (_lag_index, _level, (_tb_int, decoded_opt)) ->
+                Option.is_some decoded_opt)
               attestation_ops_per_lag
           in
           if not has_dal_payload then (
@@ -489,15 +504,11 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
               if should_be_attested ~slot_index then
                 let baker_attested_slot =
                   List.exists
-                    (fun (lag_index, _level, (_tb_int, fn_opt)) ->
-                      match fn_opt with
+                    (fun (lag_index, _level, (_tb_int, decoded_opt)) ->
+                      match decoded_opt with
                       | None -> false
-                      | Some is_attested ->
-                          is_attested
-                            ~number_of_slots
-                            ~number_of_lags
-                            ~lag_index
-                            slot_index)
+                      | Some decoded ->
+                          decoded_attests_slot decoded ~lag_index ~slot_index)
                     attestation_ops_per_lag
                 in
                 if baker_attested_slot then attested := slot_index :: !attested
@@ -663,7 +674,11 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
   let () =
     let cache = Node_context.get_attestation_ops_cache ctxt in
     let attestation_ops =
-      convert_attestations_to_cache_format (module Plugin) attestations
+      convert_attestations_to_cache_format
+        (module Plugin)
+        ~number_of_slots:proto_parameters.Types.number_of_slots
+        ~number_of_lags:(List.length proto_parameters.Types.attestation_lags)
+        attestations
     in
     Attestation_ops_cache.add cache ~level:block_level ~attestation_ops
   in
