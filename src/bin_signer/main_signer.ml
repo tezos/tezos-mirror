@@ -69,6 +69,14 @@ let group =
     title = "Commands specific to the signing daemon";
   }
 
+let bls_group = {Tezos_clic.name = "BLS"; title = "BLS utility commands"}
+
+let bls_pk_param =
+  Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
+      match Signature.Bls.Public_key.of_b58check_opt s with
+      | Some pk -> Lwt_result_syntax.return pk
+      | None -> cctxt#error "Failed to read a BLS public key")
+
 let magic_bytes_arg =
   Tezos_clic.arg
     ~doc:"values allowed for the magic bytes, defaults to any"
@@ -377,6 +385,23 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
             | None -> Tezos_crypto.Signature.Public_key_hash.to_b58check pkh
           in
           Handler.Authorized_key.add ~force:false cctxt name key);
+      command
+        ~group:bls_group
+        ~desc:"Create a BLS proof of possession for a secret key"
+        (args1
+           (arg
+              ~doc:"Change the public key to sign for the proof"
+              ~long:"override-public-key"
+              ~placeholder:"OVERRIDE_PUBLIC_KEY"
+              bls_pk_param))
+        (prefixes ["create"; "bls"; "proof"; "for"]
+        @@ Client_keys.Secret_key.source_param @@ stop)
+        (fun override_pk sk_uri (cctxt : #Client_context.full) ->
+          let* proof =
+            Client_keys.bls_prove_possession cctxt ?override_pk sk_uri
+          in
+          let*! () = cctxt#message "%a" Signature.Bls.pp proof in
+          return_unit);
     ]
 
 let home = try Sys.getenv "HOME" with Not_found -> "/root"
