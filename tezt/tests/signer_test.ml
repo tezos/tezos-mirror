@@ -454,6 +454,44 @@ let signer_highwatermark_test =
 
   unit
 
+let signer_bls_proof_command_test () =
+  Test.register
+    ~__FILE__
+    ~title:"Signer: create bls proof command"
+    ~tags:[team; "signer"; "bls"; "proof"; "command"]
+    ~uses:[Constant.octez_signer]
+  @@ fun () ->
+  let* signer = Signer.create ~keys:[Constant.tz4_account] () in
+  let sk_uri =
+    match Constant.tz4_account.secret_key with
+    | Unencrypted sk -> "unencrypted:" ^ sk
+    | _ -> Test.fail "Expected unencrypted BLS secret key"
+  in
+  Log.info "Creating BLS proof of possession" ;
+  let* proof = Signer.bls_prove_possession ~sk_uri signer in
+  let expected =
+    Operation.Manager.create_proof_of_possession ~signer:Constant.tz4_account
+  in
+  let expected =
+    match expected with
+    | Some proof -> proof
+    | None -> Test.fail "Expected a BLS proof of possession"
+  in
+  Check.((proof = expected) ~__LOC__ string)
+    ~error_msg:"Expected BLS proof %R, got %L" ;
+  Log.info "BLS proof of possession: %s" proof ;
+  Log.info "Creating BLS proof of possession with --override-public-key" ;
+  let override_pk =
+    "BLpk1xXdveUYh7YFsyf6LwGWfv5zAfLvnMG71byiMFDZc4CkXzZPVko3Dz4sD43Ln5uFNvdjiQJY"
+  in
+  let* proof_with_override =
+    Signer.bls_prove_possession ~override_pk ~sk_uri signer
+  in
+  Log.info "BLS proof with override: %s" proof_with_override ;
+  Check.((proof_with_override <> proof) ~__LOC__ string)
+    ~error_msg:"Expected proof with override to differ from default proof" ;
+  unit
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
@@ -461,4 +499,5 @@ let register ~protocols =
   signer_known_remote_keys_test protocols ;
   signer_prove_possession_test
     (List.filter (fun p -> Protocol.number p > 022) protocols) ;
-  signer_highwatermark_test protocols
+  signer_highwatermark_test protocols ;
+  signer_bls_proof_command_test ()
