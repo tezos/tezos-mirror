@@ -267,14 +267,7 @@ images.alpine-docker-ci:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.alpine-docker-ci
-    - images/ci/datadog/package-lock.json
-    - images/ci/datadog/package.json
-    - images/scripts/install-gcloud-apk.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker_initialize.sh
-    when: on_success
+  - when: always
   needs: []
   dependencies: []
   timeout: 60 minutes

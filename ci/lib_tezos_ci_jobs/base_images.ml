@@ -411,12 +411,14 @@ let jobs ?start_job ?(changeset = false) () =
     in
     job
       ~rules:
-        [
-          job_rule
-            ~changes:Changeset.(encode (make Files.alpine_docker_ci))
-            ~when_:On_success
-            ();
-        ]
+        (if changeset then
+           [
+             job_rule
+               ~changes:Changeset.(encode (make Files.alpine_docker_ci))
+               ~when_:On_success
+               ();
+           ]
+         else [job_rule ~when_:Always ()])
       ~tag:Gcp_very_high_cpu
       ~__POS__
       ~image:Images_external.docker
