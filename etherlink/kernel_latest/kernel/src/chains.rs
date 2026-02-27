@@ -24,7 +24,11 @@ use anyhow::Context;
 use mir::ast::PublicKeyHash;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
-use revm_etherlink::inspectors::TracerInput;
+use revm_etherlink::{
+    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    inspectors::TracerInput,
+    storage::world_state_handler::StorageAccount,
+};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::{Debug, Display};
@@ -34,12 +38,13 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
-    wei::mutez_from_wei,
+    wei::{eth_from_mutez, mutez_from_wei},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{
     context::{self, Context as _, TezlinkContext},
+    get_required_da_fees,
     mir_ctx::BlockCtx,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
@@ -646,6 +651,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 registry,
                 &block_constants.michelson_runtime_block_constants,
                 operation,
+                sequencer_pool_address,
             ),
         }
     }
@@ -737,6 +743,28 @@ pub struct TezlinkBlockConstants<Context: context::Context> {
     pub da_fee_per_byte_mutez: u64,
 }
 
+fn credit_da_fees<Host: Runtime>(
+    host: &mut Host,
+    sequencer_pool_address: Option<H160>,
+    da_fees_mutez: u64,
+) -> Result<(), anyhow::Error> {
+    if let Some(sequencer_pool_address) = sequencer_pool_address {
+        let da_fees_wei = eth_from_mutez(da_fees_mutez);
+        let mut account =
+            StorageAccount::from_address(&h160_to_alloy(&sequencer_pool_address))?;
+        if account
+            .add_balance(host, u256_to_alloy(&da_fees_wei))
+            .is_err()
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to compensate sequencer with da fees",
+            ));
+        }
+    };
+
+    Ok(())
+}
+
 fn apply_tezos_operation(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
@@ -744,6 +772,7 @@ fn apply_tezos_operation(
     registry: &impl Registry,
     block_constants: &TezlinkBlockConstants<impl context::Context>,
     operation: TezlinkOperation,
+    sequencer_pool_address: Option<H160>,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
     let context = &block_constants.context;
 
@@ -760,6 +789,9 @@ fn apply_tezos_operation(
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
+            let required_da_fees =
+                get_required_da_fees(&operation, block_constants.da_fee_per_byte_mutez)?;
+
             let skip_signature_check = false;
 
             let branch = operation.branch.clone();
@@ -775,7 +807,7 @@ fn apply_tezos_operation(
                 operation,
                 &block_ctx,
                 skip_signature_check,
-                Some(block_constants.da_fee_per_byte_mutez),
+                Some(required_da_fees),
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
@@ -803,6 +835,9 @@ fn apply_tezos_operation(
                     },
                 ),
             };
+
+            credit_da_fees(host, sequencer_pool_address, required_da_fees)?;
+
             Ok(crate::apply::ExecutionResult::Valid(
                 RuntimeExecutionInfo::Tezos(applied_operation),
             ))
@@ -960,7 +995,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         block_constants: &Self::BlockConstants,
         transaction: TezosXTransaction,
         _index: u32,
-        _sequencer_pool_address: Option<H160>,
+        sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
         match transaction {
@@ -974,6 +1009,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 registry,
                 block_constants,
                 operation,
+                sequencer_pool_address,
             ),
         }
     }
@@ -1072,6 +1108,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             .unwrap_or_else(|_| U256::from(crate::fees::DA_FEE_PER_BYTE));
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte_wei)
             .map_err(|_| crate::Error::InvalidConversion)?;
+        let required_da_fees = get_required_da_fees(&operation, da_fee_per_byte_mutez)?;
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
@@ -1080,7 +1117,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             operation.clone(),
             &block_ctx,
             skip_signature_check,
-            Some(da_fee_per_byte_mutez),
+            Some(required_da_fees),
         )?;
         let result = AppliedOperation {
             hash,
