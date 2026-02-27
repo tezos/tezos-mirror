@@ -16,10 +16,21 @@ type dal_status =
   | Out_of_committee
   | Expected_to_DAL_attest
 
+(* Summary of a single baker’s DAL performance at one block *)
+type per_baker_dal_summary = {
+  attestable_slots : int;
+  attested_slots : int;
+  in_committee : bool;
+  (* [attestation_with_dal] is [None] if one is out of the DAL committee or did
+     not send an attestation.
+     Otherwise, it is [Some the_sent_attestation_is_"with_dal"]. *)
+  attestation_with_dal : bool option;
+}
+
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, dal_status) Hashtbl.t;
+  baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
@@ -41,7 +52,7 @@ type t = {
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
   ratio_attested_commitments_per_baker :
-    (public_key_hash, Baker_helpers.per_baker_dal_summary) Hashtbl.t;
+    (public_key_hash, per_baker_dal_summary) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
   total_echo_rollup_unattested_slots : int;
   total_echo_rollup_fetched_data_size : int;
@@ -254,22 +265,14 @@ let push ~versions ~cloud
   in
   Hashtbl.iter
     (fun (PKH public_key_hash)
-         Baker_helpers.
-           {
-             attested_slots;
-             attestable_slots;
-             in_committee;
-             attestation_with_dal;
-           }
+         {attested_slots; attestable_slots; in_committee; attestation_with_dal}
        ->
+      let labels = get_labels public_key_hash in
       if in_committee then (
-        let labels = get_labels public_key_hash in
         push_attested ~labels attested_slots ;
         push_attestable ~labels attestable_slots ;
         push_dal_attestation_sent ~labels attestation_with_dal)
-      else
-        let labels = get_labels public_key_hash in
-        push_metric_out_attestation_sent ~labels ())
+      else push_metric_out_attestation_sent ~labels ())
     ratio_attested_commitments_per_baker ;
   Hashtbl.iter
     (fun slot_index value ->
@@ -537,20 +540,21 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
         let attestable_slots =
           Hashtbl.length published_level_info.published_commitments
         in
-        let table = Hashtbl.(create (length per_level_info.attestations)) in
-        Hashtbl.to_seq per_level_info.attestations
+        let table =
+          Hashtbl.(create (length per_level_info.baker_dal_statuses))
+        in
+        Hashtbl.to_seq per_level_info.baker_dal_statuses
         |> Seq.map (fun (public_key_hash, status) ->
                ( public_key_hash,
                  match status with
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
                  | With_DAL attestation_bitset ->
-                     Baker_helpers.
-                       {
-                         attestable_slots;
-                         attested_slots = Z.popcount attestation_bitset;
-                         in_committee = true;
-                         attestation_with_dal = Some true;
-                       }
+                     {
+                       attestable_slots;
+                       attested_slots = Z.popcount attestation_bitset;
+                       in_committee = true;
+                       attestation_with_dal = Some true;
+                     }
                  (* The baker is out of the DAL committee and sent an attestation. *)
                  | Out_of_committee ->
                      {

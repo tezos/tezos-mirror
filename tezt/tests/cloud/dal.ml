@@ -140,15 +140,28 @@ let get_infos_per_level t ~level ~metadata =
     |> Hashtbl.of_seq
   in
   let consensus_operations = JSON.(operations |=> 0 |> as_list) in
-  let get_dal_attestations operation =
+  let* dal_committee_json =
+    let attestation_level = level - 1 in
+    RPC_core.call endpoint
+    @@ RPC.get_chain_block_context_dal_shards ~level:attestation_level ()
+  in
+  let module PkhSet = Set.Make (String) in
+  let dal_committee =
+    List.fold_left
+      (fun set json ->
+        let delegate = JSON.(json |-> "delegate" |> as_string) in
+        PkhSet.add delegate set)
+      PkhSet.empty
+      (JSON.as_list dal_committee_json)
+  in
+  let get_dal_status operation =
     let contents = JSON.(operation |-> "contents" |=> 0) in
     let kind = JSON.(contents |-> "kind" |> as_string) in
     match kind with
     | "attestation_with_dal" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let slot = JSON.(contents |-> "slot" |> as_int) in
         let dal =
-          if slot >= 512 then Out_of_committee
+          if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
           else
             With_DAL
               JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
@@ -161,49 +174,49 @@ let get_infos_per_level t ~level ~metadata =
         let committee_info = JSON.(contents |-> "committee" |> as_list) in
         List.map2
           (fun member_info committee_meta ->
-            let slot = JSON.(member_info |-> "slot" |> as_int) in
+            let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
             let dal =
-              if slot >= 512 then Out_of_committee
+              if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
               else
                 let json = JSON.(member_info |-> "dal_attestation") in
                 if JSON.is_null json then Without_DAL
                 else With_DAL (json |> JSON.as_string |> Z.of_string)
             in
-            let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
             (PKH pkh, dal))
           committee_info
           metadata_committee
     | "attestation" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let slot = JSON.(contents |-> "slot" |> as_int) in
-        let dal = if slot >= 512 then Out_of_committee else Without_DAL in
+        let dal =
+          if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
+          else Without_DAL
+        in
         [(PKH pkh, dal)]
     | _ -> []
   in
   let* attestation_rights =
+    let attestation_level = level - 1 in
     RPC_core.call endpoint
-    @@ RPC.get_chain_block_helper_attestation_rights ~level ()
+    @@ RPC.get_chain_block_helper_validators ~level:attestation_level ()
   in
-  (* We fill the [attestations] table with [Expected_to_DAL_attest] when a baker is in the DAL committee. *)
-  let attestations =
+  (* We fill the [baker_dal_statuses] table with [Expected_to_DAL_attest] when a
+     baker is in the DAL committee. *)
+  let baker_dal_statuses =
     JSON.(attestation_rights |-> "delegates" |> as_list |> List.to_seq)
     |> Seq.filter_map (fun delegate ->
-           let slot = JSON.(delegate |-> "first_slot" |> as_int) in
-           if slot < 512 then
-             let pkh = PKH JSON.(delegate |-> "delegate" |> as_string) in
-             Some (pkh, Expected_to_DAL_attest)
+           let pkh = JSON.(delegate |-> "delegate" |> as_string) in
+           if PkhSet.mem pkh dal_committee then
+             Some (PKH pkh, Expected_to_DAL_attest)
            else None)
     |> Hashtbl.of_seq
   in
-  (* And then update the [attestations] table with the attestations actually received. *)
+  (* And then update the [baker_dal_statuses] table with the operations actually received. *)
   let () =
     consensus_operations
     |> List.iter (fun operation ->
-           let dal_attestations = get_dal_attestations operation in
-           List.iter
-             (fun (pkh, dal_status) ->
-               Hashtbl.replace attestations pkh dal_status)
-             dal_attestations)
+           get_dal_status operation
+           |> List.iter (fun (pkh, dal_status) ->
+                  Hashtbl.replace baker_dal_statuses pkh dal_status))
   in
   let* etherlink_operator_balance_sum =
     Etherlink_helpers.total_operator_balance
@@ -245,7 +258,7 @@ let get_infos_per_level t ~level ~metadata =
     {
       level;
       published_commitments;
-      attestations;
+      baker_dal_statuses;
       attested_commitments;
       etherlink_operator_balance_sum;
       echo_rollup_fetched_data;

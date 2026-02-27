@@ -24,13 +24,6 @@ type baker = {
   stake : int;
 }
 
-type per_baker_dal_summary = {
-  attestable_slots : int;
-  attested_slots : int;
-  in_committee : bool;
-  attestation_with_dal : bool option;
-}
-
 let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
     ~external_rpc ~network ~snapshot ~ppx_profiling_verbosity
     ~ppx_profiling_backends ~memtrace ~with_dal ~disable_shard_validation
