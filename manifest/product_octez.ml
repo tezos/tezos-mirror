@@ -6715,6 +6715,7 @@ end = struct
             ("test_dal_slot_proof", N.(number >= 016));
             ("test_dal_past_parameters_storage", N.(number >= 025));
             ("test_dal_attestations_repr", N.(number >= 025));
+            ("test_dal_slot_storage_bitset", N.(number >= 025));
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number <= 023));
             ("test_percentage", N.(number >= 019));

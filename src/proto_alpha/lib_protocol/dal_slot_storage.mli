@@ -101,3 +101,10 @@ val finalize_pending_slot_headers :
    in [ctxt], or Slots_history.genesis if no value is stored yet. *)
 val get_slot_headers_history :
   Raw_context.t -> Dal_slot_repr.History.t tzresult Lwt.t
+
+module Internal_for_tests : sig
+  val get_delegate_ordering :
+    Raw_context.t ->
+    shard_assignment_level:Raw_level_repr.t ->
+    (Raw_context.t * Signature.public_key_hash list) tzresult Lwt.t
+end

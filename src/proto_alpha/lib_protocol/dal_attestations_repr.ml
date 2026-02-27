@@ -16,7 +16,7 @@ let is_empty = Bitset.is_empty
 
 let to_z = Bitset.to_z
 
-(* Erros when reading/writing the [dal_content] of an attestation. *)
+(* Errors when reading/writing the [dal_content] of an attestation. *)
 type dal_indices = Lag_index of int | Slot_index of int
 
 let dal_indices_encoding =
@@ -39,7 +39,7 @@ let dal_indices_encoding =
 
 type error +=
   | Dal_invalid_attestation_bitset of Bitset.t
-  | Dal_invalid_read_of_attestaion_bitset of dal_indices
+  | Dal_invalid_read_of_attestation_bitset of dal_indices
 
 let () =
   register_error_kind
@@ -60,8 +60,8 @@ let () =
     (fun bitset -> Dal_invalid_attestation_bitset bitset) ;
   register_error_kind
     `Permanent
-    ~id:"dal_invalid_read_of_attestaion_bitset"
-    ~title:"Dal invalid read of attestaion bitset"
+    ~id:"dal_invalid_read_of_attestation_bitset"
+    ~title:"Dal invalid read of attestation bitset"
     ~description:"The DAL attestation bitset was read with invalid indices"
     ~pp:(fun ppf dal_index ->
       match dal_index with
@@ -77,9 +77,9 @@ let () =
             i)
     Data_encoding.(obj1 (req "index" dal_indices_encoding))
     (function
-      | Dal_invalid_read_of_attestaion_bitset dal_index -> Some dal_index
+      | Dal_invalid_read_of_attestation_bitset dal_index -> Some dal_index
       | _ -> None)
-    (fun dal_index -> Dal_invalid_read_of_attestaion_bitset dal_index)
+    (fun dal_index -> Dal_invalid_read_of_attestation_bitset dal_index)
 
 (* A DAL attestation is made of chunks with 1 bit [is_last] followed by
    [slots_per_chunk] bits to state which slots are attested. *)
@@ -207,13 +207,13 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
     let* () =
       error_unless
         Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
-        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+        (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
     in
     let slot = Dal_slot_index_repr.to_int slot_index in
     let* () =
       error_unless
         Compare.Int.(slot >= 0 && slot < number_of_slots)
-        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot))
+        (Dal_invalid_read_of_attestation_bitset (Slot_index slot))
     in
     let* data_bit_pos =
       compute_data_bit_position
@@ -266,12 +266,12 @@ let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
     let* () =
       error_unless
         Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
-        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+        (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
     in
     let* () =
       error_unless
         Compare.Int.(slot_idx >= 0 && slot_idx < number_of_slots)
-        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot_idx))
+        (Dal_invalid_read_of_attestation_bitset (Slot_index slot_idx))
     in
     if is_non_empty_at lag_index then
       let* lag_data =
@@ -279,7 +279,7 @@ let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
       in
       match lag_data with
       | None ->
-          tzfail (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+          tzfail (Dal_invalid_read_of_attestation_bitset (Lag_index lag_index))
       | Some {offset_start; nb_chunks; offset_after} ->
           if Compare.Int.(chunk_index < nb_chunks) then
             (* Fast path: slot is within existing chunks. *)
@@ -504,28 +504,244 @@ module Accountability = struct
   type history =
     attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
 
-  let attestation_status_encoding =
-    let open Data_encoding in
-    conv
-      (fun {total_shards; attested_shards; attesters; is_proto_attested} ->
-        ( total_shards,
-          attested_shards,
-          Signature.Public_key_hash.Set.elements attesters,
-          is_proto_attested ))
-      (fun (total_shards, attested_shards, attesters_list, is_proto_attested) ->
-        {
-          total_shards;
-          attested_shards;
-          attesters = Signature.Public_key_hash.Set.of_list attesters_list;
-          is_proto_attested;
-        })
-      (obj4
-         (req "total_shards" int31)
-         (req "attested_shards" int31)
-         (req "attesters" (list Signature.Public_key_hash.encoding))
-         (req "is_proto_attested" bool))
+  let empty_history = Raw_level_repr.Map.empty
 
-  let level_info_encoding =
+  (** {2 Bitset-based storage types}
+
+      These types support a more compact storage format where attestations
+      are represented as bitsets indexed by delegate position in the cycle's
+      stake distribution. *)
+
+  (** A bitset representing attestations for a single slot.
+      Bit i is set if the delegate at position i (in the cycle's stake
+      distribution) attested this slot. *)
+  type slot_attestation_bitset = Bitset.t
+
+  (** Compressed representation of the attestation history, using bitsets
+      instead of explicit attester sets. Maps published levels to slot-indexed
+      bitsets, where each bitset encodes which delegates attested a given slot
+      based on their position in the committee ordering. *)
+  type packed_history = slot_attestation_bitset SlotMap.t PublishedLevelMap.t
+
+  (** [attesters_to_bitset ~ordered_delegates ~attesters] converts a set
+    of attester public key hashes to a bitset representation.
+
+    Each bit in the result corresponds to a delegate's position in the cycle's
+    stake distribution. Bit [i] is set if the delegate at position [i] is in the
+    [attesters] set.
+
+    @param ~ordered_delegates List of delegates in the committee
+    @param ~attesters The set of delegates who attested
+    @return A bitset where bit [i] is set if the [i]th delegate attested *)
+  let attesters_to_bitset ~ordered_delegates ~attesters =
+    (* Build index map: delegate -> index *)
+    let delegate_to_index =
+      List.fold_left_i
+        (fun i acc delegate -> Signature.Public_key_hash.Map.add delegate i acc)
+        Signature.Public_key_hash.Map.empty
+        ordered_delegates
+    in
+    (* Set bits for attesters *)
+    Signature.Public_key_hash.Set.fold
+      (fun attester acc ->
+        match Signature.Public_key_hash.Map.find attester delegate_to_index with
+        | Some i -> (
+            (* Set bit at index i *)
+            match Bitset.add acc i with
+            | Ok bs -> bs
+            | Error _ ->
+                (* index cannot be negative *)
+                assert false)
+        | None ->
+            (* by construction only bakers in the distribution can attest *)
+            assert false)
+      attesters
+      Bitset.empty
+
+  (** [bitset_to_attesters ~ordered_delegates ~bitset] converts a bitset
+    representation back to a set of attester public key hashes.
+
+    Each set bit in the bitset corresponds to a delegate at that position in the
+    cycle's stake distribution.
+
+    @param ~ordered_delegates list of delegates in the committee
+    @param bitset The bitset where bit [i] indicates if the [i]th delegate attested
+    @return A set of public key hashes of attesters *)
+  let bitset_to_attesters ~ordered_delegates ~bitset =
+    (* Build set from bitset indices *)
+    List.fold_left_i
+      (fun i acc delegate ->
+        let is_set =
+          match Bitset.mem bitset i with
+          | Ok b -> b
+          | Error _ -> (* [i] cannot be negative *) assert false
+        in
+        if is_set then Signature.Public_key_hash.Set.add delegate acc else acc)
+      Signature.Public_key_hash.Set.empty
+      ordered_delegates
+
+  (** [attested_shards ~delegate_to_shard_count ~attesters] calculates the
+      total number of attested shards for a given set of attesters.
+
+      For each attester in [attesters], looks up its shard count in
+      [delegate_to_shard_count] and sums them.
+
+      @param delegate_to_shard_count map from delegate public key hash to the
+        number of shards assigned to that delegate
+      @param attesters the set of delegates who attested
+      @return the total number of attested shards *)
+  let attested_shards ~delegate_to_shard_count ~attesters =
+    (* Sum shards for delegates with bit set *)
+    Signature.Public_key_hash.Set.fold
+      (fun delegate acc ->
+        let shard_count =
+          match
+            Signature.Public_key_hash.Map.find delegate delegate_to_shard_count
+          with
+          | None -> 0
+          | Some n -> n
+        in
+        acc + shard_count)
+      attesters
+      0
+
+  (** [bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
+      ~ordered_delegates ~delegate_to_shard_count] reconstructs an
+      {!attestation_status} from a bitset representation and other necessary
+      information. *)
+  let bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
+      ~ordered_delegates ~delegate_to_shard_count =
+    let attesters = bitset_to_attesters ~ordered_delegates ~bitset in
+    let attested_shards = attested_shards ~delegate_to_shard_count ~attesters in
+    let is_proto_attested =
+      is_threshold_reached ~threshold ~number_of_shards ~attested_shards
+    in
+    {
+      total_shards = number_of_shards;
+      attested_shards;
+      attesters;
+      is_proto_attested;
+    }
+
+  (** [attestation_status_to_bitset ~ordered_delegates attestation_status]
+      converts an {!attestation_status} to its bitset representation by
+      extracting the attester set and encoding it as a bitset according to the
+      delegate ordering in [ordered_delegates]. *)
+  let attestation_status_to_bitset ~ordered_delegates attestation_status =
+    let {attesters; _} = attestation_status in
+    attesters_to_bitset ~ordered_delegates ~attesters
+
+  (** [levels_of_packed_history h] returns the list of published levels present
+      in the packed history [h]. *)
+  let levels_of_packed_history h =
+    Raw_level_repr.Map.fold (fun level _ acc -> level :: acc) h []
+
+  (** Precondition: all published levels in [history] must have an entry in
+      [committee_level_map] and the corresponding committee level must have an
+      entry in [ordered_delegates_for_level].  *)
+  let unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
+      ~threshold ~number_of_shards ~committee_level_map stored_history =
+    PublishedLevelMap.(
+      fold
+        (fun published_level history_of_level decoded_history ->
+          let shard_assignment_level =
+            match
+              Raw_level_repr.Map.find published_level committee_level_map
+            with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                   levels of [committee_level_map] *)
+                assert false
+            | Some level -> level
+          in
+          let ordered_delegates =
+            match ordered_delegates_for_level ~shard_assignment_level with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                   levels of the [stored_history] *)
+                assert false
+            | Some ordered_delegates -> ordered_delegates
+          in
+          let delegate_to_shard_count =
+            match
+              Raw_level_repr.Map.find
+                shard_assignment_level
+                delegate_to_shard_count
+            with
+            | None -> Signature.Public_key_hash.Map.empty
+            | Some map -> map
+          in
+          let decoded_history_of_level =
+            Dal_slot_index_repr.Map.(
+              fold
+                (fun slot_index bitset acc ->
+                  let attestation_status =
+                    bitset_to_attestation_status
+                      ~threshold
+                      ~number_of_shards
+                      ~bitset
+                      ~ordered_delegates
+                      ~delegate_to_shard_count
+                  in
+                  add slot_index attestation_status acc)
+                history_of_level
+                empty)
+          in
+          add published_level decoded_history_of_level decoded_history)
+        stored_history
+        empty)
+
+  (** [pack_history ~ordered_delegates_for_level
+      ~committee_level_of_published_level history] converts an unpacked
+      {!history} into a {!packed_history} by replacing each slot's attester set
+      with its bitset representation.
+
+      Precondition: all published levels in [history] must have an entry in
+      [committee_level_map] and the corresponding committee level must have an
+      entry in [ordered_delegates_for_level].  *)
+  let pack_history ~ordered_delegates_for_level ~committee_level_map history =
+    PublishedLevelMap.(
+      fold
+        (fun published_level history_of_level history ->
+          let shard_assignment_level =
+            match
+              Raw_level_repr.Map.find published_level committee_level_map
+            with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                 levels of [committee_level_map] *)
+                assert false
+            | Some level -> level
+          in
+          let ordered_delegates =
+            match ordered_delegates_for_level ~shard_assignment_level with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                   levels of [history] *)
+                assert false
+            | Some ordered_delegates -> ordered_delegates
+          in
+          let encoded_history_of_level =
+            Dal_slot_index_repr.Map.(
+              fold
+                (fun slot_index status acc ->
+                  let attestation_status =
+                    attestation_status_to_bitset ~ordered_delegates status
+                  in
+                  add slot_index attestation_status acc)
+                history_of_level
+                empty)
+          in
+          add published_level encoded_history_of_level history)
+        history
+        empty)
+
+  (** Encoding for a single slot's attestation bitset. *)
+  let slot_attestation_encoding = Bitset.encoding
+
+  (** Encoding for a single level's attestation data: a list of
+      (slot_index, bitset) pairs. *)
+  let level_attestations_encoding =
     let open Data_encoding in
     conv
       (fun m -> Dal_slot_index_repr.Map.bindings m)
@@ -534,9 +750,11 @@ module Accountability = struct
           (fun m (k, v) -> Dal_slot_index_repr.Map.add k v m)
           Dal_slot_index_repr.Map.empty
           bindings)
-      (list (tup2 Dal_slot_index_repr.encoding attestation_status_encoding))
+      (list (tup2 Dal_slot_index_repr.encoding slot_attestation_encoding))
 
-  let history_encoding =
+  (** Encoding for {!packed_history}: a list of
+      (published_level, level_attestations) pairs. *)
+  let packed_history_encoding =
     let open Data_encoding in
     conv
       (fun m -> Raw_level_repr.Map.bindings m)
@@ -545,9 +763,7 @@ module Accountability = struct
           (fun m (k, v) -> Raw_level_repr.Map.add k v m)
           Raw_level_repr.Map.empty
           bindings)
-      (list (tup2 Raw_level_repr.encoding level_info_encoding))
-
-  let empty_history = Raw_level_repr.Map.empty
+      (list (tup2 Raw_level_repr.encoding level_attestations_encoding))
 end
 
 module Dal_dependent_signing = struct
@@ -623,4 +839,10 @@ end
 
 module Internal_for_tests = struct
   let of_z = Bitset.from_z
+
+  let attesters_to_bitset = Accountability.attesters_to_bitset
+
+  let bitset_to_attesters = Accountability.bitset_to_attesters
+
+  let attested_shards = Accountability.attested_shards
 end

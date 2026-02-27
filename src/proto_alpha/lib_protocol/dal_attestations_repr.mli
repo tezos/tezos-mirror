@@ -255,9 +255,81 @@ module Accountability : sig
   type history =
     attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
 
-  val history_encoding : history Data_encoding.t
-
   val empty_history : history
+
+  (** Compressed representation of the attestation history, using bitsets
+      instead of explicit attester sets. See {!unpack_history} and
+      {!pack_history} for conversion functions. *)
+  type packed_history
+
+  (** Encoding for {!packed_history}. *)
+  val packed_history_encoding : packed_history Data_encoding.t
+
+  (** [levels_of_packed_history h] returns the list of published levels present
+      in the packed history [h]. The order is not specified and should not be
+      relied on. *)
+  val levels_of_packed_history : packed_history -> Raw_level_repr.t list
+
+  (** [unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
+      ~threshold ~number_of_shards ~committee_level_map packed_history]
+      converts a compact bitset-based [packed_history] into the full map-based
+      [history] representation.
+
+      For each published level in the [packed_history]:
+      - Looks up the shard assignment level in [committee_level_map]
+      - Retrieves the ordered list of delegates for that level
+      - Converts each slot's bitset back to a full [attestation_status]
+        structure by expanding the bitset using the delegate ordering
+
+      Parameters:
+      - [delegate_to_shard_count]: Maps shard assignment levels to delegate
+        shard counts
+      - [ordered_delegates_for_level]: Lookup function returning the ordered
+        list of delegates for a given shard assignment level
+      - [threshold]: Attestation threshold percentage (e.g., 50 for 50%)
+      - [number_of_shards]: Total number of shards in the system
+      - [committee_level_map]: Map from published levels to the corresponding
+        shard assignment levels (committee levels)
+
+      Precondition: all levels in [packed_history] must have an entry in
+      [ordered_delegates_for_level]. *)
+  val unpack_history :
+    delegate_to_shard_count:
+      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t ->
+    ordered_delegates_for_level:
+      (shard_assignment_level:Raw_level_repr.t ->
+      Signature.public_key_hash list option) ->
+    threshold:int ->
+    number_of_shards:int ->
+    committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
+    packed_history ->
+    history
+
+  (** [pack_history ~ordered_delegates_for_level ~committee_level_map history]
+      converts a full map-based [history] into the compact bitset-based
+      [packed_history] representation for storage.
+
+      For each published level in the [history]:
+      - Looks up the shard assignment level in [committee_level_map]
+      - Retrieves the ordered list of delegates for that level
+      - Converts each slot's [attestation_status] to a bitset by mapping
+        each attester to their position in the ordered delegate list
+
+      Parameters:
+      - [ordered_delegates_for_level]: Lookup function returning the ordered
+        list of delegates for a given shard assignment level
+      - [committee_level_map]: Map from published levels to the corresponding
+        shard assignment levels (committee levels)
+
+      Precondition: all levels in [history] must have an entry in
+      [ordered_delegates_for_level]. *)
+  val pack_history :
+    ordered_delegates_for_level:
+      (shard_assignment_level:Raw_level_repr.t ->
+      Signature.public_key_hash list option) ->
+    committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
+    history ->
+    packed_history
 end
 
 (** {!type-t}-dependent combination of public keys or signatures. *)
@@ -306,4 +378,19 @@ module Internal_for_tests : sig
 
       Returns an error when the given argument is negative. *)
   val of_z : Z.t -> t tzresult
+
+  val attesters_to_bitset :
+    ordered_delegates:Signature.public_key_hash list ->
+    attesters:Signature.Public_key_hash.Set.t ->
+    Bitset.t
+
+  val bitset_to_attesters :
+    ordered_delegates:Signature.public_key_hash list ->
+    bitset:Bitset.t ->
+    Signature.Public_key_hash.Set.t
+
+  val attested_shards :
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t ->
+    attesters:Signature.Public_key_hash.Set.t ->
+    int
 end

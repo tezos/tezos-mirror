@@ -536,6 +536,148 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
         delegate_map
         ctxt
 
+(** Bitset-based storage utilities.
+
+    These functions support a more compact storage format where attestations
+    are represented as bitsets indexed by delegate position in the cycle's
+    stake distribution. *)
+
+(** [get_delegate_ordering ctxt ~shard_assignment_level] returns the ordered
+    list of delegates for the cycle containing [shard_assignment_level].
+
+    This ordering is derived from the stake distribution cached for that cycle
+    and is used as the basis for bitset indices. The ordering is stable for
+    all blocks within a cycle.
+
+    @param shard_assignment_level The level used to determine delegate shard
+           assignments, namely [published_level + attestation_lag - 1]
+    @return The context and an ordered list of delegate public key hashes *)
+let get_delegate_ordering ctxt ~shard_assignment_level =
+  let open Lwt_result_syntax in
+  (* Get the cycle for the shard assignment level *)
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let cycle = Level_repr.cycle_from_raw ~cycle_eras shard_assignment_level in
+  (* Load the stake distribution for that cycle *)
+  let+ ctxt, distribution =
+    Selected_distribution_storage.get_selected_distribution ctxt cycle
+  in
+  (* Extract delegate public key hashes in order *)
+  let delegates = List.map fst distribution in
+  (ctxt, delegates)
+
+(** [ordered_delegates_for_levels ctxt ~shard_assignment_levels] retrieves the
+    ordered delegate list for each shard assignment level in
+    [shard_assignment_levels]. Returns a map from shard assignment level to the
+    corresponding ordered delegate list. *)
+let ordered_delegates_for_levels ctxt ~shard_assignment_levels =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun (ctxt, map) level ->
+      let+ ctxt, ordered_delegates =
+        get_delegate_ordering ctxt ~shard_assignment_level:level
+      in
+      (ctxt, Raw_level_repr.Map.add level ordered_delegates map))
+    (ctxt, Raw_level_repr.Map.empty)
+    shard_assignment_levels
+
+(** [committee_level_of_published_levels ctxt published_levels] computes the
+    committee level for each published level in [published_levels], using
+    {!Dal_attestations_storage.committee_level_of} (which is protocol-change
+    aware). Returns a map from published level to committee level. *)
+let committee_level_of_published_levels ctxt published_levels =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun (ctxt, map) published_level ->
+      let* committee_level =
+        Dal_attestations_storage.committee_level_of ctxt ~published_level
+      in
+      return (ctxt, Raw_level_repr.Map.add published_level committee_level map))
+    (ctxt, Raw_level_repr.Map.empty)
+    published_levels
+
+(** [unpack_history ctxt ~threshold ~number_of_shards stored_history]
+    converts a {!Dal_attestations_repr.Accountability.packed_history} into an
+    unpacked {!Dal_attestations_repr.Accountability.history} by resolving
+    bitsets back into attester sets and computing attestation statuses.
+
+    This involves:
+    - computing committee levels for each published level,
+    - fetching ordered delegates and shard counts for each committee level,
+    - delegating to {!Dal_attestations_repr.Accountability.unpack_history}. *)
+let unpack_history ctxt ~threshold ~number_of_shards
+    (stored_history : Dal_attestations_repr.Accountability.packed_history) :
+    (Raw_context.t * Dal_attestations_repr.Accountability.history) tzresult
+    Lwt.t =
+  let open Lwt_result_syntax in
+  let published_levels =
+    Dal_attestations_repr.Accountability.levels_of_packed_history stored_history
+  in
+  let* ctxt, committee_level_map =
+    committee_level_of_published_levels ctxt published_levels
+  in
+  let shard_assignment_levels =
+    Raw_level_repr.Map.fold
+      (fun _ level acc -> level :: acc)
+      committee_level_map
+      []
+  in
+  let+ ctxt, ordered_delegates_for_level =
+    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+  in
+  let delegate_to_shard_count =
+    Raw_context.Consensus.delegate_to_shard_count ctxt
+  in
+  let ordered_delegates_for_level ~shard_assignment_level =
+    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  in
+  let history =
+    Dal_attestations_repr.Accountability.unpack_history
+      ~delegate_to_shard_count
+      ~ordered_delegates_for_level
+      ~threshold
+      ~number_of_shards
+      ~committee_level_map
+      stored_history
+  in
+  (ctxt, history)
+
+(** [pack_history ctxt history] converts an unpacked
+    {!Dal_attestations_repr.Accountability.history} into a
+    {!Dal_attestations_repr.Accountability.packed_history} by encoding each
+    slot's attester set as a bitset.
+
+    This involves:
+    - computing committee levels for each published level,
+    - fetching ordered delegates for each committee level,
+    - delegating to {!Dal_attestations_repr.Accountability.pack_history}. *)
+let pack_history ctxt history =
+  let open Lwt_result_syntax in
+  let published_levels =
+    Raw_level_repr.Map.fold (fun level _ acc -> level :: acc) history []
+  in
+  let* ctxt, committee_level_map =
+    committee_level_of_published_levels ctxt published_levels
+  in
+  let shard_assignment_levels =
+    Raw_level_repr.Map.fold
+      (fun _ level acc -> level :: acc)
+      committee_level_map
+      []
+  in
+  let+ ctxt, ordered_delegates_for_level =
+    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+  in
+  let ordered_delegates_for_level ~shard_assignment_level =
+    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  in
+  let history =
+    Dal_attestations_repr.Accountability.pack_history
+      ~ordered_delegates_for_level
+      ~committee_level_map
+      history
+  in
+  (ctxt, history)
+
 (** [finalize_attestation_history ctxt] merges the current block's
     accountability with stored history, updates storage, and returns the newly
     attested slots as a bitset. *)
@@ -548,10 +690,11 @@ let finalize_attestation_history ctxt =
   let number_of_shards = dal.cryptobox_parameters.number_of_shards in
   let current_block_accountability = Raw_context.Dal.get_accountability ctxt in
   let* stored_history_opt = Storage.Dal.AttestationHistory.find ctxt in
-  let stored_history =
-    Option.value
-      ~default:Dal_attestations_repr.Accountability.empty_history
-      stored_history_opt
+  let* ctxt, stored_history =
+    match stored_history_opt with
+    | None -> return (ctxt, Dal_attestations_repr.Accountability.empty_history)
+    | Some stored_history ->
+        unpack_history ctxt ~threshold ~number_of_shards stored_history
   in
   let get_number_of_shards = get_number_of_shards ctxt in
   let updated_history, newly_attested =
@@ -599,6 +742,7 @@ let finalize_attestation_history ctxt =
             Raw_level_repr.(published_level > threshold_level))
           updated_history
   in
+  let* ctxt, pruned_history = pack_history ctxt pruned_history in
   let*! ctxt = Storage.Dal.AttestationHistory.add ctxt pruned_history in
   let*! ctxt =
     match Raw_level_repr.sub current_level attestation_lag with
@@ -768,3 +912,7 @@ let finalize_pending_slot_headers ctxt =
     (* Normal path: use new multi-lag attestation history. *)
     finalize_attestation_history ctxt
   else finalize_and_migrate_attestation_history_for_U ctxt
+
+module Internal_for_tests = struct
+  let get_delegate_ordering = get_delegate_ordering
+end
