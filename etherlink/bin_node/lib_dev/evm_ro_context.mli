@@ -77,6 +77,7 @@ val replay :
   t ->
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
+  ?evm_state:Pvm.State.t ->
   ?alter_evm_state:(Pvm.State.t -> (Pvm.State.t, tztrace) result Lwt.t) ->
   replay_strategy ->
   Ethereum_types.quantity ->

@@ -558,11 +558,17 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
       ~config:(pvm_config ctxt)
       evm_state
 
-let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
-    strategy (Ethereum_types.Qty number) =
+let replay ctxt ?log_file ?profile ?evm_state
+    ?(alter_evm_state = Lwt_result_syntax.return) strategy
+    (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
-  let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
-  let* evm_state = get_evm_state ctxt hash in
+  let* evm_state =
+    match evm_state with
+    | Some evm_state -> return evm_state
+    | None ->
+        let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
+        get_evm_state ctxt hash
+  in
   let* evm_state = alter_evm_state evm_state in
   let* blueprint =
     Evm_store.use ctxt.store @@ fun conn ->
