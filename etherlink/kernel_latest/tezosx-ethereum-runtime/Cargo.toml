@@ -19,6 +19,7 @@ nom.workspace = true
 
 tezos_ethereum.workspace = true
 tezosx-interfaces.workspace = true
+http.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos_data_encoding.workspace = true

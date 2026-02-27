@@ -124,6 +124,9 @@ alloy-consensus = { version = "1.0.32", default-features = false }
 mir = { path = "../../contrib/mir", default-features = false, features = ["allow_lazy_storage_transfer"] }
 typed-arena = "2"
 
+# http
+http = "1"
+
 # miscs
 format_no_std = "1.2.0"
 

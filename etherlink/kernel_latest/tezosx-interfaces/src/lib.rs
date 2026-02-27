@@ -109,6 +109,23 @@ pub trait RuntimeInterface {
         context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError>;
 
+    /// Handle an incoming cross-runtime HTTP request.
+    ///
+    /// The request URL encodes the destination address and optional entrypoint.
+    /// The body contains the payload in the target runtime's native encoding.
+    ///
+    /// All call context is carried in HTTP headers — there is no separate
+    /// context parameter.
+    ///
+    /// Returns an HTTP response with a status code indicating success (200) or
+    /// failure (4xx/5xx), along with runtime-specific response headers and body.
+    fn serve<Host: Runtime>(
+        &self,
+        registry: &impl Registry,
+        host: &mut Host,
+        request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>;
+
     fn address_from_string(
         &self,
         address_str: &str,

@@ -213,6 +213,15 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         }
     }
 
+    fn serve<Host: Runtime>(
+        &self,
+        _registry: &impl tezosx_interfaces::Registry,
+        _host: &mut Host,
+        _request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+        todo!("TezosRuntime::serve — will be implemented in follow-up PRs")
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,
