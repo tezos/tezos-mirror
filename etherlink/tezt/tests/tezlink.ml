@@ -262,7 +262,7 @@ let test_observer_starts =
   unit
 
 let test_tezlink_current_level =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the current_level rpc"
     ~tags:["rpc"; "current_level"]
   @@ fun {sequencer; _} _protocol ->
@@ -980,7 +980,7 @@ let test_tezlink_block_metadata =
   check_current_block_metadata ()
 
 let test_tezlink_block_info =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the block_info rpc"
     ~tags:["rpc"; "block_info"]
   @@ fun {sequencer; client; l2_chains; _} _protocol ->
@@ -1152,7 +1152,7 @@ let test_tezlink_monitor_heads =
   unit
 
 let test_tezlink_produceBlock =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink production block"
     ~tags:["kernel"; "produce_block"]
   @@ fun {sequencer; _} _protocol ->
@@ -1561,7 +1561,7 @@ let test_tezlink_bootstrap_block_info =
      catastrophically. We check block 4 in particular because at this level
      we mock information to index bootstrap accounts. *)
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of tezlink block info on block 4"
     ~tags:["bootstrap"; "block_info"]
     ~bootstrap_contracts:[contract]
@@ -3043,7 +3043,7 @@ let test_tezlink_prevalidation =
   unit
 
 let test_tezlink_prevalidation_gas_limit_lower_bound =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink prevalidation of operation gas limit lower bound"
     ~tags:["kernel"; "prevalidation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3201,7 +3201,7 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
   unit
 
 let test_tezlink_validation_gas_limit =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink validation of block gas limit"
     ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3271,7 +3271,7 @@ let test_tezlink_validation_gas_limit =
   unit
 
 let test_tezlink_validation_counter =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink validation of counters"
     ~tags:["kernel"; "validation"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -3322,7 +3322,7 @@ let test_tezlink_validation_counter =
   unit
 
 let test_tezlink_validation_balance =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink validation of balance"
     ~tags:["kernel"; "validation"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
