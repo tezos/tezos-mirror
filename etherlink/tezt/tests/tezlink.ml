@@ -1066,7 +1066,7 @@ let test_tezlink_bootstrapped =
   unit
 
 let test_tezlink_monitor_heads =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the monitor/heads RPC"
     ~tags:["evm"; "rpc"; "monitor_heads"]
   @@ fun {sequencer; client; _} _protocol ->
