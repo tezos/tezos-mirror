@@ -20,7 +20,6 @@ use crate::{
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
     gas_price::base_fee_per_gas,
-    registry_impl::RegistryImpl,
     retrieve_chain_id, retrieve_da_fee,
     storage::{self, read_sequencer_pool_address},
     upgrade,
@@ -216,7 +215,7 @@ pub fn handle_run_transaction<Host: Runtime>(
             .map(OwnedPath::from)
             .collect(),
     };
-    let registry = RegistryImpl::new(config.get_chain_id());
+    let registry = config.init_registry();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let mut block_in_progress = match crate::storage::read_block_in_progress(&safe_host)?
