@@ -102,6 +102,7 @@ val register_test :
   ?max_number_of_chunks:int ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->

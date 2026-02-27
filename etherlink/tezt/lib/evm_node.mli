@@ -712,6 +712,7 @@ val make_kernel_installer_config :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_balance:Tez.t ->
   ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:string list ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?ticketer:string ->

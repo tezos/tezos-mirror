@@ -96,11 +96,11 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     in
     scenario setup protocol
   in
-  assert (bootstrap_contracts = None) ;
   Setup.register_test
     ~__FILE__
     ~rpc_server:Evm_node.Resto
     ?tez_bootstrap_accounts:bootstrap_accounts
+    ?tez_bootstrap_contracts:bootstrap_contracts
     ?genesis_timestamp
     ?max_blueprints_lag
     ?max_blueprints_catchup

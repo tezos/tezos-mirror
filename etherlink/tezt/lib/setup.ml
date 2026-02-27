@@ -283,12 +283,12 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?kernel_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ?dal_publishers_whitelist ?evm_version ?with_runtimes ~sequencer
-    ~preimages_dir ~kernel protocol () =
+    ?tez_bootstrap_contracts ?sequencer_pool_address ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ~enable_dal ?dal_slots ?dal_publishers_whitelist ?evm_version ?with_runtimes
+    ~sequencer ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
@@ -308,6 +308,36 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
         if Protocol.number protocol > 024 && enable_dal then
           Some [Constant.bootstrap1.public_key_hash]
         else None
+  in
+  let* tez_bootstrap_contracts =
+    match tez_bootstrap_contracts with
+    | None -> none
+    | Some contracts ->
+        let* client = Client.init_mockup ~protocol:Alpha () in
+        let* result =
+          Lwt_list.map_s
+            (fun Evm_node.{address; path; initial_storage} ->
+              let script = Tezt_core.Base.read_file path in
+              let* code =
+                Client.convert_script
+                  ~script
+                  ~src_format:`Michelson
+                  ~dst_format:`Binary
+                  client
+              in
+              let* initial_storage_binary =
+                Client.convert_data
+                  ~data:initial_storage
+                  ~src_format:`Michelson
+                  ~dst_format:`Binary
+                  client
+              in
+              Lwt.return
+                (String.trim address ^ "," ^ String.trim code ^ ","
+                ^ String.trim initial_storage_binary))
+            contracts
+        in
+        some result
   in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -335,6 +365,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?max_blueprint_lookahead_in_seconds
       ~eth_bootstrap_accounts
       ~tez_bootstrap_accounts
+      ?tez_bootstrap_contracts
       ~output:output_config
       ?evm_version
       ?enable_fa_bridge
@@ -524,6 +555,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts:chain_config.Evm_node.eth_bootstrap_accounts
       ?tez_bootstrap_accounts:chain_config.Evm_node.tez_bootstrap_accounts
+      ?tez_bootstrap_contracts:chain_config.Evm_node.tez_bootstrap_contracts
       ?enable_fa_bridge
       ?evm_version
       ?with_runtimes
@@ -1034,16 +1066,16 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ~kernel
-    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?commitment_period ?challenge_window ?uses ?additional_uses
-    ?rollup_history_mode ~enable_dal ?dal_slots ?dal_publishers_whitelist
-    ~enable_multichain ?rpc_server ?websockets ?history_mode ?tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body ~title
-    ~tags protocols =
+    ?tez_bootstrap_contracts ?sequencer ?additional_sequencer_keys
+    ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
+    ?dal_slots ?dal_publishers_whitelist ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes
+    ?instant_confirmations body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -1063,6 +1095,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?max_number_of_chunks
     ~eth_bootstrap_accounts
     ~tez_bootstrap_accounts
+    ?tez_bootstrap_contracts
     ?sequencer
     ?additional_sequencer_keys
     ?sequencer_pool_address
