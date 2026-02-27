@@ -507,7 +507,7 @@ let account_rpc sequencer account key =
   account_str_rpc sequencer account.Account.public_key_hash key
 
 let test_tezlink_contract_info =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -541,7 +541,7 @@ let test_tezlink_list_entrypoints =
 
 let test_tezlink_contract_info_script =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the contract info rpc on smart contracts"
     ~tags:["rpc"; "contract"; "info"; "script"]
     ~bootstrap_contracts:[contract]
@@ -608,7 +608,7 @@ let test_tezlink_counter =
   unit
 
 let test_tezlink_contract_info_on_liquidity_baking =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the contract info rpc on liquidity baking addresses"
     ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
   @@ fun {sequencer; _} _protocol ->
