@@ -1251,7 +1251,7 @@ let add_address ?force client ~alias ~src =
 let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
     ?(wait = "none") ?burn_cap ?fee ?fee_cap ?gas_limit ?safety_guard
     ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
-    ?(force = false) ~amount ~giver ~receiver client =
+    ?(force = false) ?minimal_nanotez_per_byte ~amount ~giver ~receiver client =
   spawn_command
     ?env
     ?log_output
@@ -1274,11 +1274,16 @@ let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
     @ optional_arg "entrypoint" Fun.id entrypoint
     @ optional_arg "arg" Fun.id arg
     @ (if simulation then ["--simulation"] else [])
-    @ if force then ["--force"] else [])
+    @ (if force then ["--force"] else [])
+    @ optional_arg
+        "minimal-nanotez-per-byte"
+        string_of_int
+        minimal_nanotez_per_byte)
 
 let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
     ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
-    ?arg ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
+    ?arg ?simulation ?force ?expect_failure ?minimal_nanotez_per_byte ~amount
+    ~giver ~receiver client =
   spawn_transfer
     ?env
     ?log_requests
@@ -1297,6 +1302,7 @@ let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
     ?arg
     ?simulation
     ?force
+    ?minimal_nanotez_per_byte
     ~amount
     ~giver
     ~receiver

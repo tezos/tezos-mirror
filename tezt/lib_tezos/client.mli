@@ -896,6 +896,7 @@ val transfer :
   ?simulation:bool ->
   ?force:bool ->
   ?expect_failure:bool ->
+  ?minimal_nanotez_per_byte:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -921,6 +922,7 @@ val spawn_transfer :
   ?arg:string ->
   ?simulation:bool ->
   ?force:bool ->
+  ?minimal_nanotez_per_byte:int ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
