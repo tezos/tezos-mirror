@@ -75,7 +75,9 @@
     in this module {!validate_for_blueprint}).
 
     The optionnal [check_signature] is used to bypass signature verifications
-    during simulation.
+    during simulation. Similarly, [check_da_fees] (default [true]) can be set
+    to [false] to skip the DA fee check during simulation, allowing the client
+    to estimate gas and storage before computing the appropriate fee.
 
     The value returned, of type {!Tezos_types.Operation.t}, contains more
     information than just the parsed operation, used by the node notably at
@@ -85,6 +87,7 @@
     value should be created and validated at the same time. *)
 val parse_and_validate_for_queue :
   ?check_signature:bool ->
+  ?check_da_fees:bool ->
   read:(string -> bytes option tzresult Lwt.t) ->
   data_model:Tezlink_durable_storage.implicit_account_data_model ->
   string ->
