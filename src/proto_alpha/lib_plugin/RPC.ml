@@ -4644,6 +4644,15 @@ let get_blocks_preservation_cycles ~get_context =
   in
   return constants_parametrics.blocks_preservation_cycles
 
+type swrr_credit_entry = {delegate : Signature.Public_key_hash.t; credit : Z.t}
+
+let swrr_credit_entry_encoding =
+  let open Data_encoding in
+  conv
+    (fun {delegate; credit} -> (delegate, credit))
+    (fun (delegate, credit) -> {delegate; credit})
+    (obj2 (req "delegate" Signature.Public_key_hash.encoding) (req "credit" z))
+
 module S = struct
   open Data_encoding
 
@@ -4714,6 +4723,28 @@ module S = struct
   let cycle_query : Cycle.t option RPC_query.t =
     let open RPC_query in
     query Fun.id |+ opt_field "cycle" Cycle.rpc_arg Fun.id |> seal
+
+  let swrr_selected_bakers =
+    RPC_service.get_service
+      ~description:
+        "Returns the selected bakers for the round 0 of the cycle, selected \
+         via the SWRR algorithm. If the 'cycle' parameter is not provided, \
+         defaults to the current cycle. Returns 'null' if the baking rights \
+         for this cycle have not been computed yet or have already been \
+         cleaned from the context, or if the 'swrr_new_baker_lottery_enable' \
+         feature flag is not enabled."
+      ~query:cycle_query
+      ~output:Data_encoding.(option (list Signature.Public_key_hash.encoding))
+      RPC_path.(path / "swrr_selected_bakers")
+
+  let swrr_credits =
+    RPC_service.get_service
+      ~description:
+        "Returns the current SWRR state which contains the remaining credits \
+         for all the active delegates."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(list swrr_credit_entry_encoding)
+      RPC_path.(path / "swrr_credits")
 
   let tz4_baker_number_ratio =
     RPC_service.get_service
@@ -4807,6 +4838,25 @@ let register () =
           stake_info_list
       in
       return (total_stake_weight, stake_info_list)) ;
+  Registration.register0 ~chunked:false S.swrr_selected_bakers (fun ctxt q () ->
+      let cycle =
+        Option.value ~default:(Cycle.current ctxt) q
+        |> Cycle.to_int32 |> Cycle_repr.of_int32_exn
+      in
+      let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+      Storage.Stake.Selected_bakers.find ctxt cycle) ;
+  Registration.register0 ~chunked:false S.swrr_credits (fun ctxt () () ->
+      let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+      Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+        ctxt
+        ~order:`Undefined
+        ~init:[]
+        ~f:(fun pkh acc ->
+          let* credit =
+            Storage.Contract.SWRR_credit.get ctxt (Contract_repr.Implicit pkh)
+          in
+          let entry = {delegate = pkh; credit} in
+          return (entry :: acc))) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio

@@ -789,6 +789,19 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
       unit
     else unit
   in
+  let* () =
+    if Protocol.(number protocol >= 025) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helpers_swrr_credits ()
+      in
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_chain_block_helpers_swrr_selected_bakers ()
+      in
+      unit
+    else unit
+  in
   unit
 
 let mempool_hooks =
@@ -1710,6 +1723,11 @@ let register protocols =
           `Int 0 );
       ]
     in
+    let swrr_flag protocol =
+      if Protocol.(number protocol >= 025) then
+        [(["swrr_new_baker_lottery_enable"], `Bool true)]
+      else []
+    in
     check_rpc_regression
       "contracts"
       ~test_function:test_contracts
@@ -1741,7 +1759,8 @@ let register protocols =
     check_rpc_regression
       "misc_protocol"
       ~test_function:test_misc_protocol
-      ~parameter_overrides:consensus_threshold ;
+      ~parameter_overrides:(fun protocol ->
+        consensus_threshold protocol @ swrr_flag protocol) ;
     check_rpc_regression
       "misc_protocol_abaab"
       ~test_function:test_misc_protocol
@@ -1752,7 +1771,8 @@ let register protocols =
           ( ["all_bakers_attest_activation_threshold"],
             `O [("numerator", `Float 0.); ("denominator", `Float 1.)] );
         ]
-        @ consensus_threshold protocol) ;
+        @ consensus_threshold protocol
+        @ swrr_flag protocol) ;
     (match test_mode_tag with
     | `Light -> ()
     | _ ->

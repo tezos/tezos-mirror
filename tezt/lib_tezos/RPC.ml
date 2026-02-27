@@ -2177,3 +2177,16 @@ let get_chain_block_context_address_registry ?(chain = "main") ?(block = "head")
       "next";
     ]
   @@ fun json -> JSON.as_string json |> int_of_string
+
+let get_chain_block_helpers_swrr_credits ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "helpers"; "swrr_credits"] Fun.id
+
+let get_chain_block_helpers_swrr_selected_bakers ?(chain = "main")
+    ?(block = "head") ?cycle () =
+  let query_string = Option.map (fun c -> [("cycle", Int.to_string c)]) cycle in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "swrr_selected_bakers"]
+    Fun.id

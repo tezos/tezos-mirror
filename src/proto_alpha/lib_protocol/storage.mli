@@ -209,6 +209,16 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
+  (* SWRR Credit Storage
+
+   Per-delegate credit for the SWRR baker selection algorithm.
+   Stored as [Z.t] to avoid overflow and keep exact integer arithmetic.
+
+     Persistence:
+     - Credits persist across cycles (cross-cycle fairness)
+     - Reset to zero on delegate deactivation
+     - No expiration: indefinite persistence for active delegates
+  *)
   module SWRR_credit :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -617,6 +627,12 @@ module Stake : sig
        and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
        and type t := Raw_context.t
 
+  (* Selected Bakers Storage
+
+   Per-cycle precomputed baker selections stored as a [List] of
+   [Signature.Public_key_hash.t].
+
+  *)
   module Selected_bakers :
     Indexed_data_storage
       with type key = Cycle_repr.t
