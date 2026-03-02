@@ -653,7 +653,7 @@ module Get_uncle_by_block_number_and_index = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-(* Shared types and encodings between eth_sendRawTransaction and tez_sendRawTezlinkOperation and 
+(* Shared types and encodings between eth_sendRawTransaction and tez_sendRawTezlinkOperation and
    all future RPCs used to relay transactions when the Tx_queue gets a Tick. *)
 module Send_raw_common = struct
   open Ethereum_types
@@ -1330,6 +1330,7 @@ let evm_supported_methods : (module METHOD) list =
     (* Tezos X rpcs *)
     (module Tezosx.Get_tezos_ethereum_address);
     (module Tezosx.Get_ethereum_tezos_address);
+    (module Send_raw_tezlink_operation);
   ]
 
 let evm_unsupported_methods : string list =
@@ -1380,8 +1381,7 @@ let evm_unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let michelson_supported_methods =
-  evm_supported_methods @ [(module Send_raw_tezlink_operation)]
+let michelson_supported_methods = evm_supported_methods
 
 let multichain_sequencer_supported_methods : (module METHOD) list =
   [
