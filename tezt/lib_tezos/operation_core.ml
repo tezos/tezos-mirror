@@ -216,21 +216,15 @@ let sign ?protocol ({kind; signer; contents; _} as t) client =
               (Bytes.cat (Bytes.of_string prefix) (Bytes.of_string chain_id))
           in
           let is_tz4 = String.starts_with ~prefix:"tz4" in
-          (* Under [aggregate_attestation] feature flag, consensus operations
-             signed by tz4 keys are signed using a specific encoding. Moreover,
-             attestions with DAL have their signature aggregated with the
-             companion key signature. *)
-          let* bls_mode =
+          (* Consensus operations signed by tz4 keys use a specific encoding.
+             Moreover, attestations with DAL have their signature aggregated
+             with the companion key signature. *)
+          let bls_mode =
             match protocol with
             | Some p
               when Protocol.number p >= 023 && is_tz4 signer.public_key_hash ->
-                let* constants =
-                  Client.RPC.call_via_endpoint client
-                  @@ RPC.get_chain_block_context_constants ()
-                in
-                return
-                @@ JSON.(constants |-> "aggregate_attestation" |> as_bool)
-            | _ -> return false
+                true
+            | _ -> false
           in
           let* hex =
             if bls_mode then bls_mode_raw t client else hex ?protocol t client

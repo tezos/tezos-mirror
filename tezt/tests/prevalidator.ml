@@ -3815,7 +3815,7 @@ module Revamped = struct
     let* parameter_file =
       Protocol.write_parameter_file
         ~base:(Either.Right (protocol, None))
-        ([(["aggregate_attestation"], `Bool true)] @ abaab_threshold)
+        abaab_threshold
     in
     let* node, client =
       Client.init_with_protocol `Client ~protocol ~parameter_file ()
