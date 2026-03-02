@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Nomadic-Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -14,15 +15,12 @@ alloy-sol-types.workspace = true
 primitive-types.workspace = true
 revm.workspace = true
 revm-etherlink.workspace = true
-thiserror.workspace = true
-nom.workspace = true
 
 tezos_ethereum.workspace = true
 tezosx-interfaces.workspace = true
 http.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
-tezos_data_encoding.workspace = true
 
 [dev-dependencies]
 hex.workspace = true

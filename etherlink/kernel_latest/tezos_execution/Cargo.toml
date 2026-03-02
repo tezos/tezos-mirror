@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -10,14 +10,12 @@ license = "MIT"
 
 [dependencies]
 thiserror.workspace = true
-anyhow.workspace = true
 typed-arena.workspace = true
 
 tezos_crypto_rs.workspace = true
 hex.workspace = true
 num-bigint.workspace = true
 num-traits.workspace = true
-
 
 tezos-evm-runtime.workspace = true
 tezos-storage.workspace = true
