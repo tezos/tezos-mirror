@@ -479,6 +479,12 @@ let nested_delegatecalls_D =
     ~label:"nested_delegatecalls_D"
     ~contract:"D"
 
+let transfer_crac =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/transfer_crac.sol")
+    ~label:"crac_caller"
+    ~contract:"CracCaller"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
