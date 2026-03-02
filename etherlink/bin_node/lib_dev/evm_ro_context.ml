@@ -355,7 +355,7 @@ struct
     Evm_store.use Ctxt.ctxt.store @@ fun conn ->
     Evm_store.L1_l2_finalized_levels.find conn ~l1_level
 
-  let block_param_to_block_number ~chain_family
+  let block_param_to_block_number ~chain_family ?hash_column:_
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
     let root = Durable_storage_path.root_of_chain_family chain_family in
@@ -693,6 +693,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
       Evm_store.use ctxt.store @@ fun conn ->
       Evm_store.Blocks.find_hash_of_number conn (Qty level)
 
+    let nth_tez_block_hash level =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
+
     (* Overwrite Etherlink_block_storage module *)
     module Etherlink_block_storage = struct
       (* Current block number is kept in durable storage. *)
@@ -762,18 +766,23 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     module Tracer_etherlink =
       Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
 
-    let block_param_to_block_number ~chain_family
+    let block_param_to_block_number ~chain_family ?hash_column
         (block_param : Ethereum_types.Block_parameter.extended) =
       let open Lwt_result_syntax in
       match block_param with
       | Block_hash {hash; _} -> (
           Evm_store.use ctxt.store @@ fun conn ->
-          let* res = Evm_store.Blocks.find_number_of_hash conn hash in
+          let* res =
+            match hash_column with
+            | Some `Michelson ->
+                Evm_store.Blocks.find_number_of_tez_hash conn hash
+            | None | Some `Evm -> Evm_store.Blocks.find_number_of_hash conn hash
+          in
           match res with
           | Some number -> return number
           | None ->
               failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
-      | param -> block_param_to_block_number ~chain_family param
+      | param -> block_param_to_block_number ~chain_family ?hash_column param
 
     module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
       let nth_block level =
@@ -795,8 +804,10 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         (struct
           include Backend.SimulatorBackend
 
-          let block_param_to_block_number =
-            block_param_to_block_number ~chain_family:L2_types.Michelson
+          let block_param_to_block_number block_param =
+            block_param_to_block_number
+              ~chain_family:L2_types.Michelson
+              block_param
         end)
         (Tezlink_block_storage)
 
@@ -811,7 +822,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
         | Some block -> return block
 
-      let nth_block_hash = nth_block_hash
+      let nth_block_hash = nth_tez_block_hash
     end
 
     (* Overwrites Tezos using the store instead of the durable_storage *)
@@ -821,7 +832,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           include Backend.SimulatorBackend
 
           let block_param_to_block_number =
-            block_param_to_block_number ~chain_family:L2_types.Michelson
+            block_param_to_block_number
+              ~chain_family:L2_types.Michelson
+              ~hash_column:`Michelson
         end)
         (Tezosx_block_storage)
   end)

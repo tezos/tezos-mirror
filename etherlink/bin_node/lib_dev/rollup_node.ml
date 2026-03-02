@@ -164,7 +164,7 @@ end) : Services_backend_sig.Backend = struct
       | _ -> failwith "Inconsistent simulation results"
   end
 
-  let block_param_to_block_number ~chain_family
+  let block_param_to_block_number ~chain_family ?hash_column:_
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
     let root = Durable_storage_path.root_of_chain_family chain_family in

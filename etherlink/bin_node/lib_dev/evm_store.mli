@@ -211,7 +211,17 @@ module Blocks : sig
     Ethereum_types.quantity ->
     Ethereum_types.block_hash option tzresult Lwt.t
 
+  val find_tez_hash_of_number :
+    conn ->
+    Ethereum_types.quantity ->
+    Ethereum_types.block_hash option tzresult Lwt.t
+
   val find_number_of_hash :
+    conn ->
+    Ethereum_types.block_hash ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  val find_number_of_tez_hash :
     conn ->
     Ethereum_types.block_hash ->
     Ethereum_types.quantity option tzresult Lwt.t

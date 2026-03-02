@@ -21,6 +21,7 @@ module type S = sig
 
   val block_param_to_block_number :
     chain_family:_ L2_types.chain_family ->
+    ?hash_column:[`Evm | `Michelson] ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -104,6 +105,7 @@ module type Backend = sig
       block identified by [block_param]. *)
   val block_param_to_block_number :
     chain_family:_ L2_types.chain_family ->
+    ?hash_column:[`Evm | `Michelson] ->
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
@@ -151,7 +153,9 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
         include Backend.SimulatorBackend
 
         let block_param_to_block_number =
-          Backend.block_param_to_block_number ~chain_family:L2_types.Michelson
+          Backend.block_param_to_block_number
+            ~chain_family:L2_types.Michelson
+            ~hash_column:`Michelson
       end)
       (Tezlink_block_storage)
 
@@ -160,8 +164,10 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
       (struct
         include Backend.SimulatorBackend
 
-        let block_param_to_block_number =
-          Backend.block_param_to_block_number ~chain_family:L2_types.Michelson
+        let block_param_to_block_number block_param =
+          Backend.block_param_to_block_number
+            ~chain_family:L2_types.Michelson
+            block_param
       end)
       (Tezlink_block_storage)
 

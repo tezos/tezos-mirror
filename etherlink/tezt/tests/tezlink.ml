@@ -1473,7 +1473,7 @@ let test_tezlink_observer_transfer =
 
 let test_tezlink_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test Tezlink transfer and wait for inclusion"
     ~tags:["kernel"; "transfer"; "wait"]
     ~bootstrap_accounts:[Constant.bootstrap1]

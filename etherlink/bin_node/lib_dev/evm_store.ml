@@ -437,7 +437,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 23
+    let version = 24
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -923,10 +923,11 @@ DO UPDATE SET value = excluded.value
     let table = "blocks" (* For opentelemetry *)
 
     let insert =
-      (t4 level block_hash block (option tezos_block) ->. unit)
+      (t5 level block_hash block (option tezos_block) (option block_hash)
+      ->. unit)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block) VALUES (?, ?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block, tez_hash) VALUES (?, ?, ?, ?, ?)|eos}
 
     let tez_insert =
       (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
@@ -952,9 +953,17 @@ DO UPDATE SET value = excluded.value
       (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
 
+    let select_tez_hash_of_number =
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT tez_hash FROM blocks WHERE level = ?|eos}
+
     let select_number_of_hash =
       (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
+
+    let select_number_of_tez_hash =
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT level FROM blocks WHERE tez_hash = ?|eos}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -1823,7 +1832,13 @@ module Blocks = struct
   let store ?tez_block store
       (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Blocks.insert (block.number, block.hash, block, tez_block)
+    let tez_hash =
+      Option.map (fun (block : L2_types.Tezos_block.t) -> block.hash) tez_block
+    in
+    Db.exec
+      conn
+      Q.Blocks.insert
+      (block.number, block.hash, block, tez_block, tez_hash)
 
   let tez_store store (block : L2_types.Tezos_block.t) =
     with_connection store @@ fun conn ->
@@ -1928,9 +1943,17 @@ module Blocks = struct
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Blocks.select_hash_of_number level
 
+  let find_tez_hash_of_number store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_tez_hash_of_number level
+
   let find_number_of_hash store hash =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Blocks.select_number_of_hash hash
+
+  let find_number_of_tez_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Blocks.select_number_of_tez_hash hash
 
   let clear_after store level =
     with_connection store @@ fun conn -> Db.exec conn Q.Blocks.clear_after level
