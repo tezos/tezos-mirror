@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,15 +14,9 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-pub struct ImmutableState<T>(Arc<T>);
+use crate::try_clone::TryClone;
 
-impl<T> Clone for ImmutableState<T> {
-    /// Clone method on this struct just shares a reference so it is very cheap, the underlying
-    /// data is not copied.
-    fn clone(&self) -> Self {
-        ImmutableState(Arc::clone(&self.0))
-    }
-}
+pub struct ImmutableState<T>(Arc<T>);
 
 impl<T> From<MutableState<T>> for ImmutableState<T> {
     /// Very cheap conversion from [`MutableState<T>`] to [`ImmutableState<T>`]
@@ -55,13 +50,13 @@ impl<T> ImmutableState<T> {
     /// Apply a mutable function `f` over the underlying state. Clones the old data to the new object.
     #[inline]
     #[must_use = "ImmutableState::apply returns new state"]
-    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> (Self, R)
+    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<(Self, R), T::Error>
     where
-        T: Clone,
+        T: TryClone,
     {
-        let mut t = self.0.as_ref().clone();
+        let mut t = self.0.as_ref().try_clone()?;
         let result = f(&mut t);
-        (ImmutableState::new(t), result)
+        Ok((ImmutableState::new(t), result))
     }
 }
 
@@ -110,16 +105,16 @@ impl<T> MutableState<T> {
 
     /// Create an ImmutableState from a MutableState. This will make a copy if the underlying data has been modified.
     #[inline]
-    pub fn to_imm_state(&self) -> ImmutableState<T>
+    pub fn to_imm_state(&self) -> Result<ImmutableState<T>, T::Error>
     where
-        T: Clone,
+        T: TryClone,
     {
         let guard = self.0.try_read().expect(
             "Shouldn't try to read a MutableState that is being written to. See `move_semantics::MutableState`",
         );
         match guard.deref() {
-            MutableInner::Owned(t) => ImmutableState::new(t.clone()),
-            MutableInner::Borrowed(arc) => ImmutableState(Arc::clone(arc)),
+            MutableInner::Owned(t) => Ok(ImmutableState::new(t.try_clone()?)),
+            MutableInner::Borrowed(arc) => Ok(ImmutableState(Arc::clone(arc))),
         }
     }
 
@@ -138,9 +133,9 @@ impl<T> MutableState<T> {
     /// Apply a mutable function `f` mutating the state in place. May perform a copy if
     /// the underlying state is a borrowed [`MutableState`].
     #[inline]
-    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> R
+    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<R, T::Error>
     where
-        T: Clone,
+        T: TryClone,
     {
         let mut guard = self
             .0
@@ -148,13 +143,13 @@ impl<T> MutableState<T> {
             .expect("Shouldn't be competing for write access. See `move_semantics::MutableState`");
         let inner = guard.deref_mut();
         match inner {
-            MutableInner::Owned(t) => f(t),
+            MutableInner::Owned(t) => Ok(f(t)),
             MutableInner::Borrowed(arc) => {
-                let mut t = arc.as_ref().clone();
+                let mut t = arc.as_ref().try_clone()?;
                 let res = f(&mut t);
 
                 *inner = MutableInner::Owned(t);
-                res
+                Ok(res)
             }
         }
     }
