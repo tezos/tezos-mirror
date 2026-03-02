@@ -944,7 +944,7 @@ let test_tezlink_header =
        ~current_timestamp:(Some current_timestamp)
 
 let test_tezlink_block_metadata =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the metadata rpc"
     ~tags:["rpc"; "metadata"; "offset"]
   @@ fun {sequencer; client; _} _protocol ->
