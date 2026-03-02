@@ -54,6 +54,13 @@ pub enum TezosXRuntimeError {
     Path(#[from] tezos_smart_rollup_host::path::PathError),
     #[error("Custom error: {0}")]
     Custom(String),
+    /// The request is malformed (invalid URL, missing/invalid headers, bad
+    /// encoding). Maps to HTTP 400.
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+    /// The target address was not found. Maps to HTTP 404.
+    #[error("Not found: {0}")]
+    NotFound(String),
 }
 pub trait Registry {
     #[allow(clippy::too_many_arguments)]
