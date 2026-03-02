@@ -318,6 +318,13 @@ mod tests {
             Ok(false)
         }
 
+        fn tezosx_resolve_source_alias(
+            &mut self,
+            _source: Address,
+        ) -> Result<Vec<u8>, CustomPrecompileError> {
+            Ok(vec![])
+        }
+
         fn tezosx_call_michelson(
             &mut self,
             _source: Address,

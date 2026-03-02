@@ -1,9 +1,14 @@
 use alloy_sol_types::{sol, SolInterface, SolValue};
+use http::header::HeaderMap;
 use revm::{
-    context::{ContextTr, JournalTr},
+    context::{Block, ContextTr, JournalTr, Transaction},
     context_interface::journaled_state::account::JournaledAccountTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
+};
+use tezosx_interfaces::{
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -72,12 +77,57 @@ fn build_http_request(
     let mut builder = http::Request::builder().method(method).uri(url);
 
     for (name, value) in headers {
+        if name.as_str().to_ascii_lowercase().starts_with("x-tezos-") {
+            return Err(CustomPrecompileError::Revert(format!(
+                "user-supplied X-Tezos-* headers are forbidden: {name}"
+            )));
+        }
         builder = builder.header(name.as_str(), value.as_str());
     }
 
     builder.body(body.to_vec()).map_err(|e| {
         CustomPrecompileError::Revert(format!("failed to build HTTP request: {e}"))
     })
+}
+
+/// Inject X-Tezos-* headers carrying the trusted execution context.
+///
+/// - `X-Tezos-Sender`: The resolved alias of the immediate caller (UTF-8 string).
+/// - `X-Tezos-Source`: The resolved alias of the transaction originator (UTF-8 string).
+/// - `X-Tezos-Amount`: The value attached to the call, in wei (decimal string).
+/// - `X-Tezos-Gas-Limit`: The gas limit forwarded to the call (decimal string).
+/// - `X-Tezos-Timestamp`: The current block timestamp in seconds (decimal string).
+/// - `X-Tezos-Block-Number`: The current block number (decimal string).
+fn inject_tezos_headers(
+    headers: &mut HeaderMap,
+    sender_alias: &[u8],
+    source_alias: &[u8],
+    amount: U256,
+    gas_limit: u64,
+    timestamp: U256,
+    block_number: U256,
+) -> Result<(), CustomPrecompileError> {
+    let parse_value = |v: String| -> Result<http::HeaderValue, CustomPrecompileError> {
+        v.parse().map_err(|e| {
+            CustomPrecompileError::Revert(format!("invalid header value: {e}"))
+        })
+    };
+    headers.insert(
+        X_TEZOS_SENDER,
+        parse_value(format!("{}", String::from_utf8_lossy(sender_alias)))?,
+    );
+    headers.insert(
+        X_TEZOS_SOURCE,
+        parse_value(format!("{}", String::from_utf8_lossy(source_alias)))?,
+    );
+    headers.insert(X_TEZOS_AMOUNT, parse_value(format!("{amount}"))?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(gas_limit.to_string())?);
+    headers.insert(X_TEZOS_TIMESTAMP, parse_value(format!("{timestamp}"))?);
+    headers.insert(
+        X_TEZOS_BLOCK_NUMBER,
+        parse_value(format!("{block_number}"))?,
+    );
+    Ok(())
 }
 
 pub(crate) fn runtime_gateway_precompile<CTX, DB>(
@@ -176,11 +226,37 @@ where
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
-            let _request =
+            let mut request =
                 build_http_request(&call.url, &call.headers, &call.body, call.method)?;
+
+            // Resolve cross-runtime aliases for the caller and tx originator,
+            // just like tezosx_call_michelson does for transfer/call endpoints.
+            let tx_caller = context.tx().caller();
+            let amount = inputs.value.get();
+            let gas_limit = inputs.gas_limit;
+            let timestamp = context.block().timestamp();
+            let block_number = context.block().number();
+            let sender_alias = context
+                .db_mut()
+                .tezosx_resolve_source_alias(inputs.caller)?;
+            let source_alias = context.db_mut().tezosx_resolve_source_alias(tx_caller)?;
+
+            // Inject X-Tezos-* headers with trusted execution context.
+            // These carry the call context that the target runtime's `serve`
+            // implementation needs (sender, source, amount, gas, block info).
+            inject_tezos_headers(
+                request.headers_mut(),
+                &sender_alias,
+                &source_alias,
+                amount,
+                gas_limit,
+                timestamp,
+                block_number,
+            )?;
 
             // TODO: Dispatch through gateway protocol (L2-918)
             // For now, return placeholder success with empty response body
+            let _request = request;
             let output: Vec<u8> = (true, Vec::<u8>::new()).abi_encode_params();
 
             return Ok(InterpreterResult {
@@ -320,5 +396,131 @@ mod tests {
         assert_eq!(output.len(), 96);
         // bool = true at byte 31
         assert_eq!(output[31], 1);
+    }
+
+    #[test]
+    fn test_inject_tezos_headers() {
+        let mut request = build_http_request(
+            "http://tezos/KT1abc/transfer",
+            &[(
+                "Content-Type".to_string(),
+                "application/micheline".to_string(),
+            )],
+            &[0xCA, 0xFE],
+            1,
+        )
+        .unwrap();
+
+        let sender_alias = b"KT1SenderAlias";
+        let source_alias = b"KT1SourceAlias";
+        let amount = U256::from(42_000_000u64);
+        let gas_limit = 100_000u64;
+        let timestamp = U256::from(1_700_000_000u64);
+        let block_number = U256::from(12345u64);
+
+        inject_tezos_headers(
+            request.headers_mut(),
+            sender_alias,
+            source_alias,
+            amount,
+            gas_limit,
+            timestamp,
+            block_number,
+        )
+        .unwrap();
+
+        // User header is preserved
+        assert_eq!(
+            request.headers().get("Content-Type").unwrap(),
+            "application/micheline"
+        );
+        // Body is preserved
+        assert_eq!(request.body(), &[0xCA, 0xFE]);
+
+        // X-Tezos headers are injected with UTF-8 alias strings
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_SENDER)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "KT1SenderAlias"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_SOURCE)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "KT1SourceAlias"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_AMOUNT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "42000000"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_GAS_LIMIT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "100000"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_TIMESTAMP)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "1700000000"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_BLOCK_NUMBER)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "12345"
+        );
+    }
+
+    #[test]
+    fn test_build_http_request_rejects_user_supplied_x_tezos_headers() {
+        // User-supplied X-Tezos-* headers are forbidden to prevent
+        // forgery of trusted execution context.
+        let result = build_http_request(
+            "http://tezos/KT1abc",
+            &[("X-Tezos-Sender".to_string(), "0xevil".to_string())],
+            &[],
+            0,
+        );
+        assert!(matches!(
+            result,
+            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+        ));
+    }
+
+    #[test]
+    fn test_build_http_request_rejects_x_tezos_case_insensitive() {
+        let result = build_http_request(
+            "http://tezos/KT1abc",
+            &[("x-tezos-amount".to_string(), "999".to_string())],
+            &[],
+            0,
+        );
+        assert!(matches!(
+            result,
+            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+        ));
     }
 }
