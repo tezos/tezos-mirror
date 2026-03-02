@@ -132,6 +132,8 @@ module Tezos_block : sig
   end
 end
 
+type single_tx_receipt = Ethereum of Transaction_receipt.t | Tezos
+
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
 
 val block_hash : 'a block -> Ethereum_types.block_hash

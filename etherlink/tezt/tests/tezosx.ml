@@ -91,6 +91,16 @@ let tezos_client node =
   in
   Client.init ~endpoint ()
 
+let get_tezlink_block_header node =
+  let path = "/tezlink/chains/main/blocks/head/header" in
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name node)
+      (Evm_node.endpoint node ^ path)
+    |> Runnable.run
+  in
+  return (JSON.parse ~origin:"tezlink_block_header" res)
+
 let check_account sandbox (account : Account.key) =
   let* client = tezos_client sandbox in
   let* _balance =
@@ -2086,6 +2096,174 @@ let test_tx_queue_mixed_transaction_types ~runtime () =
       ~error_msg:"Expected %R mutez but got %L") ;
   unit
 
+let test_instant_confirmations ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"Instant confirmations are executed and outputs do not diverge"
+    ~tags:["observer"; "instant_confirmations"; "mixed_types"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+    ~genesis_timestamp:Test_helpers.genesis_timestamp
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+  @@ fun {sandbox; observer} ->
+  let timestamp = Test_helpers.get_timestamp 0 in
+  (* Create a second sandbox without IC *)
+  let* sandbox_no_ic =
+    Test_helpers.init_sequencer_sandbox
+      ~genesis_timestamp:Test_helpers.genesis_timestamp
+      ~with_runtimes:[runtime]
+      ~tez_bootstrap_accounts:[Constant.bootstrap1]
+      ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+      ~sequencer_keys:[Constant.bootstrap1]
+      ()
+  in
+  let tez_amount = Tez.one in
+  let eth_amount = Wei.one in
+  let fee = Tez.one in
+  (* Craft ETH transaction *)
+  let* raw_eth_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ~value:eth_amount
+      ()
+  in
+  (* IC path: send via observer with preconfirmation *)
+  let wait_for_eth_ic = Evm_node.wait_for_single_tx_execution_done observer in
+  let*@ () =
+    (* We must propose a timestamp else the sequencer will use its internal clock *)
+    Rpc.propose_next_block_timestamp ~timestamp sandbox
+  in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:raw_eth_tx observer in
+  let* _ = wait_for_eth_ic in
+  let wait_for_tez_ic = Evm_node.wait_for_single_tx_execution_done observer in
+  let* tezos_client_ic = tezos_client sandbox in
+  let* () =
+    Client.transfer
+      ~amount:tez_amount
+      ~fee
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      tezos_client_ic
+  in
+  let* _ = wait_for_tez_ic in
+  let*@ nb_txs_ic = Rpc.produce_block ~timestamp sandbox in
+  Check.(
+    (nb_txs_ic = 2)
+      int
+      ~error_msg:"Expected %R transactions in the IC block but got %L") ;
+  (* Non-IC path: send directly to sequencer *)
+  let wait_for_eth_no_ic =
+    Evm_node.wait_for_tx_queue_add_transaction sandbox_no_ic
+  in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx:raw_eth_tx sandbox_no_ic in
+  let* _ = wait_for_eth_no_ic in
+  let wait_for_tez_no_ic =
+    Evm_node.wait_for_tx_queue_add_transaction sandbox_no_ic
+  in
+  let* tezos_client_no_ic = tezos_client sandbox_no_ic in
+  let* () =
+    Client.transfer
+      ~amount:tez_amount
+      ~fee
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      tezos_client_no_ic
+  in
+  let* _ = wait_for_tez_no_ic in
+  let*@ nb_txs_no_ic = Rpc.produce_block ~timestamp sandbox_no_ic in
+  Check.(
+    (nb_txs_no_ic = 2)
+      int
+      ~error_msg:"Expected %R transactions in the non-IC block but got %L") ;
+  (* Compare ETH blocks *)
+  let*@ ic_eth_block = Rpc.get_block_by_number ~block:"latest" sandbox in
+  let*@ no_ic_eth_block =
+    Rpc.get_block_by_number ~block:"latest" sandbox_no_ic
+  in
+  Check.(
+    (ic_eth_block.hash = no_ic_eth_block.hash)
+      string
+      ~error_msg:"ETH block hashes should be identical: IC=%L, non-IC=%R") ;
+  Check.(
+    (ic_eth_block.number = no_ic_eth_block.number)
+      int32
+      ~error_msg:"ETH block numbers should be identical: IC=%L, non-IC=%R") ;
+  Check.(
+    (ic_eth_block.gasUsed = no_ic_eth_block.gasUsed)
+      int64
+      ~error_msg:"ETH block gasUsed should be identical: IC=%L, non-IC=%R") ;
+  Check.(
+    (ic_eth_block.stateRoot = no_ic_eth_block.stateRoot)
+      string
+      ~error_msg:"ETH block stateRoot should be identical: IC=%L, non-IC=%R") ;
+  Check.(
+    (ic_eth_block.transactionRoot = no_ic_eth_block.transactionRoot)
+      string
+      ~error_msg:"ETH transactionRoot should be identical: IC=%L, non-IC=%R") ;
+  (* Compare TEZ block headers *)
+  let* ic_tez_header = get_tezlink_block_header sandbox in
+  let* no_ic_tez_header = get_tezlink_block_header sandbox_no_ic in
+  let ic_tez_hash = JSON.(ic_tez_header |-> "hash" |> as_string) in
+  let no_ic_tez_hash = JSON.(no_ic_tez_header |-> "hash" |> as_string) in
+  Check.(
+    (ic_tez_hash = no_ic_tez_hash)
+      string
+      ~error_msg:"TEZ block hashes should be identical: IC=%L, non-IC=%R") ;
+  let ic_tez_level = JSON.(ic_tez_header |-> "level" |> as_int) in
+  let no_ic_tez_level = JSON.(no_ic_tez_header |-> "level" |> as_int) in
+  Check.(
+    (ic_tez_level = no_ic_tez_level)
+      int
+      ~error_msg:"TEZ block levels should be identical: IC=%L, non-IC=%R") ;
+  (* Compare balances *)
+  let* tezos_receiver_balance_ic =
+    Client.get_balance_for
+      ~account:Constant.bootstrap2.public_key_hash
+      tezos_client_ic
+  in
+  Check.(
+    (Tez.to_mutez tezos_receiver_balance_ic = Tez.to_mutez tez_amount)
+      int
+      ~error_msg:"Expected %R mutez but got %L") ;
+  let* tezos_receiver_balance_no_ic =
+    Client.get_balance_for
+      ~account:Constant.bootstrap2.public_key_hash
+      tezos_client_no_ic
+  in
+  Check.(
+    (Tez.to_mutez tezos_receiver_balance_ic
+    = Tez.to_mutez tezos_receiver_balance_no_ic)
+      int
+      ~error_msg:"TEZ balances should match: IC=%L, non-IC=%R") ;
+  let* eth_receiver_balance_ic =
+    Eth_cli.balance
+      ~account:Eth_account.bootstrap_accounts.(1).address
+      ~endpoint:(Evm_node.endpoint sandbox)
+      ()
+  in
+  let* eth_receiver_balance_no_ic =
+    Eth_cli.balance
+      ~account:Eth_account.bootstrap_accounts.(1).address
+      ~endpoint:(Evm_node.endpoint sandbox_no_ic)
+      ()
+  in
+  Check.(
+    (eth_receiver_balance_ic = eth_receiver_balance_no_ic)
+      Wei.typ
+      ~error_msg:"ETH balances should match: IC=%L, non-IC=%R") ;
+  unit
+
 (** Test cross-runtime call from a Michelson contract to EVM via the gateway.
 
     Unlike [test_cross_runtime_call_from_michelson_to_evm] which calls the
@@ -2516,4 +2694,5 @@ let () =
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
   test_get_ethereum_tezos_address_rpc ~runtime:Tezos () ;
-  test_tx_queue_mixed_transaction_types ~runtime:Tezos ()
+  test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
+  test_instant_confirmations ~runtime:Tezos ()

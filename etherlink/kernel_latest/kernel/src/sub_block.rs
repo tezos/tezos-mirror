@@ -15,7 +15,7 @@ use crate::{
     block_storage,
     chains::{
         ChainConfigTrait, EvmChainConfig, TezlinkBlockConstants, TezosXBlockConstants,
-        ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
     },
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
@@ -23,7 +23,6 @@ use crate::{
     registry_impl::RegistryImpl,
     retrieve_chain_id, retrieve_da_fee,
     storage::{self, read_sequencer_pool_address},
-    transaction::Transaction,
     upgrade,
 };
 use anyhow::anyhow;
@@ -53,7 +52,7 @@ const ASSEMBLE_BLOCK_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/assemble_block/input");
 
 pub struct SingleTxExecutionInput {
-    pub tx: Transaction,
+    pub tx: TezosXTransaction,
     pub timestamp: Timestamp,
     pub block_number: U256,
 }
@@ -73,7 +72,7 @@ impl Decodable for SingleTxExecutionInput {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
         let mut it = decoder.iter();
-        let tx = decode_field(&next(&mut it)?, "Transaction")?;
+        let tx = decode_field(&next(&mut it)?, "TezosXTransaction")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
         let block_number = decode_field_u256_le(&next(&mut it)?, "Block number")?;
         Ok(SingleTxExecutionInput {
@@ -186,7 +185,7 @@ pub fn handle_run_transaction<Host: Runtime>(
             "etherlink.transaction.hash".to_string(),
             tezos_evm_logging::OTelAttrValue::String(format!(
                 "{}",
-                revm::primitives::B256::from(input_data.tx.tx_hash)
+                revm::primitives::B256::from(input_data.tx.tx_hash())
             )),
         ),
         (
@@ -262,7 +261,7 @@ pub fn handle_run_transaction<Host: Runtime>(
         }
     };
 
-    block_in_progress.repush_tx(input_data.tx.into());
+    block_in_progress.repush_tx(input_data.tx);
 
     let result = compute(
         &mut safe_host,

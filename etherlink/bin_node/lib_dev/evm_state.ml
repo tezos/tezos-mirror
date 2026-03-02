@@ -357,23 +357,30 @@ type block_in_progress = {
   transactions_count : int32;
 }
 
+let encode ~tezos_x_tag inner =
+  (Rlp.(List [Value (Rlp.encode_int tezos_x_tag); inner]), tezos_x_tag = 1)
+
+let encode_inner ~inner_tag hash raw =
+  let hash = Ethereum_types.hex_to_real_bytes hash in
+  let bytes = String.to_bytes raw in
+  Rlp.(List [Value hash; List [Value (Rlp.encode_int inner_tag); Value bytes]])
+
 let execute_single_transaction ~data_dir ~pool ~native_execution ~config
     evm_state block_in_progress (Hash hash) (tx : Broadcast.transaction) =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.add_attrs (fun () ->
       Telemetry.Attributes.
         [Transaction.hash (Hash hash); Block.number block_in_progress.number]) ;
-  let* tx =
+  let tx, read_receipt =
     match tx with
+    | Broadcast.Delayed tx ->
+        encode ~tezos_x_tag:1 (Evm_events.Delayed_transaction.to_rlp tx)
     | Broadcast.Common (Evm tx) ->
-        let hash = Ethereum_types.hex_to_real_bytes hash in
-        let tx_bytes = String.to_bytes tx in
-        let tag = Bytes.of_string "\x01" in
-        let rlp = Rlp.(List [Value hash; List [Value tag; Value tx_bytes]]) in
-        return rlp
-    | Broadcast.Common (Michelson _op) ->
-        failwith "Michelson operations can not be executed individually"
-    | Broadcast.Delayed tx -> return (Evm_events.Delayed_transaction.to_rlp tx)
+        let inner = encode_inner ~inner_tag:1 hash tx in
+        encode ~tezos_x_tag:1 inner
+    | Broadcast.Common (Michelson op) ->
+        let inner = encode_inner ~inner_tag:1 hash op in
+        encode ~tezos_x_tag:0 inner
   in
   let rlp =
     Rlp.List
@@ -399,22 +406,26 @@ let execute_single_transaction ~data_dir ~pool ~native_execution ~config
       evm_state
       (`Inbox [])
   in
-  let*! read_res =
-    inspect
-      evm_state
-      (Durable_storage_path.Block.current_receipts
-         ~root:Durable_storage_path.etherlink_safe_root)
-  in
-  match read_res with
-  | Some bytes ->
-      return
-        ( Transaction_receipt.decode_last_from_list
+  if read_receipt then
+    let*! read_res =
+      inspect
+        evm_state
+        (Durable_storage_path.Block.current_receipts
+           ~root:Durable_storage_path.etherlink_safe_root)
+    in
+    match read_res with
+    | Some bytes ->
+        let receipt =
+          Transaction_receipt.decode_last_from_list
             Ethereum_types.(Block_hash (Hex (String.make 64 '0')))
-            bytes,
-          evm_state )
-  | None ->
-      failwith
-        "No value found in context where transactions receipts should be stored"
+            bytes
+        in
+        return (L2_types.Ethereum receipt, evm_state)
+    | None ->
+        failwith
+          "No value found in context where transactions receipts should be \
+           stored"
+  else return (L2_types.Tezos, evm_state)
 
 let retrieve_block_at_root ~chain_family ~root evm_state =
   let open Lwt_result_syntax in

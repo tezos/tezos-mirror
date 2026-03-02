@@ -66,6 +66,11 @@ module Attributes = struct
 
     let execution_gas qty =
       ("etherlink.transaction.execution_gas", `Int (Z.to_int qty))
+
+    let receipt_type (receipt : L2_types.single_tx_receipt) =
+      ( "etherlink.transaction.receipt_type",
+        `String
+          (match receipt with Ethereum _ -> "Ethereum" | Tezos -> "Tezos") )
   end
 
   module Block = struct

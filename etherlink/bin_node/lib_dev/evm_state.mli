@@ -150,7 +150,7 @@ val execute_single_transaction :
   block_in_progress ->
   Ethereum_types.hash ->
   Broadcast.transaction ->
-  (Transaction_receipt.t * t) tzresult Lwt.t
+  (L2_types.single_tx_receipt * t) tzresult Lwt.t
 
 (** [assemble_block ~pool ~data_dir ~chain_family ~config ~timestamp ~number
     ~native_execution t]

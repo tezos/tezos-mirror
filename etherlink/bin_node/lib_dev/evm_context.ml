@@ -1071,16 +1071,25 @@ module State = struct
             hash
             tx
         in
-        Octez_telemetry.Trace.add_attrs (fun () ->
-            let (Ethereum_types.Qty gas_used) = receipt.gasUsed in
-            let execution_gas =
-              compute_execution_gas
-                ~tx
-                ~da_fee_per_byte
-                ~base_fee_per_gas
-                ~gas_used
-            in
-            [Telemetry.Attributes.Transaction.execution_gas execution_gas]) ;
+        let otel_attrs () =
+          let common =
+            [Telemetry.Attributes.Transaction.receipt_type receipt]
+          in
+          match receipt with
+          | L2_types.Ethereum r ->
+              let (Ethereum_types.Qty gas_used) = r.gasUsed in
+              let execution_gas =
+                compute_execution_gas
+                  ~tx
+                  ~da_fee_per_byte
+                  ~base_fee_per_gas
+                  ~gas_used
+              in
+              Telemetry.Attributes.Transaction.execution_gas execution_gas
+              :: common
+          | L2_types.Tezos -> common
+        in
+        Octez_telemetry.Trace.add_attrs otel_attrs ;
         ctxt.session.evm_state <- evm_state ;
         ctxt.session.future_block_info <-
           Executing

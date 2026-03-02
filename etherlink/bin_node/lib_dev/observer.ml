@@ -123,9 +123,12 @@ let on_inclusion (txn : Broadcast.transaction) hash =
   let*! () = Events.inclusion hash in
   let* opt_receipt = Evm_context.execute_single_transaction txn hash in
   Option.iter
-    (fun (r : Transaction_receipt.t) ->
-      Broadcast.notify_transaction_result
-        {hash = r.transactionHash; result = Ok r})
+    (fun (receipt : L2_types.single_tx_receipt) ->
+      match receipt with
+      | Ethereum r ->
+          Broadcast.notify_transaction_result
+            {hash = r.transactionHash; result = Ok r}
+      | Tezos -> ())
     opt_receipt ;
   return_unit
 
