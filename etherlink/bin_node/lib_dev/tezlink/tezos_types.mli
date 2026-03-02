@@ -56,6 +56,10 @@ module Tez : sig
   val of_string_exn : string -> t
 
   val to_mutez_z : t -> Z.t
+
+  val wei_to_mutez : Z.t -> int64
+
+  val mutez_to_wei : int64 -> Z.t
 end
 
 module Operation : sig
