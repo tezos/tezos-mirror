@@ -61,6 +61,10 @@ pub enum TezosXRuntimeError {
     /// The target address was not found. Maps to HTTP 404.
     #[error("Not found: {0}")]
     NotFound(String),
+    /// An X-Tezos-* header is missing or contains an invalid value.
+    /// Indicates a gateway bug; propagates as Err and reverts the blueprint.
+    #[error("Header error: {0}")]
+    HeaderError(String),
 }
 pub trait Registry {
     #[allow(clippy::too_many_arguments)]
