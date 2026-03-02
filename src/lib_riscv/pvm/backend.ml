@@ -48,7 +48,7 @@ let from_api_output_info : Api.output_info -> output_info =
     | None -> assert false
     | Some level -> level
   in
-  {message_index = Z.of_int64 message_index; outbox_level}
+  {message_index = Z.of_int32 message_index; outbox_level}
 
 let from_api_output : Api.output -> output =
  fun {info; encoded_message} ->

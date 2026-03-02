@@ -51,7 +51,7 @@ let test_input_request () =
 
 let test_output_info () =
   let open Lwt_syntax in
-  let output_info = {Api.message_index = 42L; outbox_level = 12l} in
+  let output_info = {Api.message_index = 42l; outbox_level = 12l} in
 
   assert (Api.octez_riscv_test_output_info output_info = output_info) ;
 
@@ -59,7 +59,7 @@ let test_output_info () =
 
 let test_output () =
   let open Lwt_syntax in
-  let output_info = {Api.message_index = 42L; outbox_level = 12l} in
+  let output_info = {Api.message_index = 42l; outbox_level = 12l} in
   let output =
     {Api.info = output_info; encoded_message = String.to_bytes "test_output"}
   in
