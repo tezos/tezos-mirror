@@ -1187,6 +1187,7 @@ dependencies = [
  "ethbloom",
  "getrandom 0.2.15",
  "hex",
+ "http",
  "mir",
  "num-bigint",
  "num-derive",

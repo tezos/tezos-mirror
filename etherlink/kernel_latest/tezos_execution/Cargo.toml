@@ -38,3 +38,4 @@ http.workspace = true
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
+http.workspace = true

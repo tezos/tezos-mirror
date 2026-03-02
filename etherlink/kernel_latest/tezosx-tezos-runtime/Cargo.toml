@@ -11,12 +11,12 @@ license = "MIT"
 [dependencies]
 # We use it from RlpHelpers we should probably have a separate crate
 tezos_ethereum.workspace = true
+http.workspace = true
 rlp.workspace = true
 primitive-types.workspace = true
 num-bigint.workspace = true
 
 tezosx-interfaces.workspace = true
-http.workspace = true
 
 tezos-evm-runtime.workspace = true
 tezos_crypto_rs.workspace = true

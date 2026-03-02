@@ -1353,6 +1353,14 @@ pub(crate) mod test_utils {
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             Ok(address_str.as_bytes().to_vec())
         }
+
+        fn serve<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            _request: http::Request<Vec<u8>>,
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
     }
 }
 
@@ -1446,6 +1454,14 @@ mod tests {
             runtime_id: RuntimeId,
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+        }
+
+        fn serve<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            _request: http::Request<Vec<u8>>,
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
         }
     }
 

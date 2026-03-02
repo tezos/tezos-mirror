@@ -18,6 +18,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 thiserror.workspace = true
 anyhow.workspace = true
+http.workspace = true
 
 primitive-types.workspace = true
 num-traits.workspace = true

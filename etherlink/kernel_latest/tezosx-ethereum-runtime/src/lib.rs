@@ -429,6 +429,14 @@ mod tests {
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             unimplemented!("not needed for this test")
         }
+
+        fn serve<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _request: http::Request<Vec<u8>>,
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
     }
 
     /// Adapted from `test_simple_transfer` in `revm/src/lib.rs`.

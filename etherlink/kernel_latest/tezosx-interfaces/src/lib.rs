@@ -69,6 +69,13 @@ pub trait Registry {
         address_str: &str,
         runtime_id: RuntimeId,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
+    /// Route an HTTP request to the appropriate runtime based on the URL host.
+    fn serve<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>;
 }
 
 pub trait RuntimeInterface {
