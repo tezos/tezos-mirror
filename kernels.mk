@@ -4,9 +4,10 @@
 #
 # SPDX-License-Identifier: MIT
 
-KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm dal_echo_kernel_bandwidth.wasm
+KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm dal_echo_kernel_bandwidth.wasm riscv-echo
 SDK_DIR=src/kernel_sdk
 DEMO_DIR=src/kernel_tx_demo
+RISCV_KERNELS_DIR=src/lib_riscv/kernels
 
 .PHONY: all
 all: build-dev-deps check test build
@@ -44,6 +45,9 @@ dal_echo_kernel_bandwidth.wasm:
 	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel_bandwidth.wasm $@
 	@wasm-strip $@
 
+riscv-echo:
+	@ make -C ${RISCV_KERNELS_DIR} build
+
 .PHONY: build
 build: ${KERNELS} kernel_sdk
 
@@ -55,6 +59,7 @@ clang-supports-wasm:
 build-dev-deps: clang-supports-wasm build-deps
 	@make -C ${SDK_DIR} build-dev-deps
 	@make -C ${DEMO_DIR} build-dev-deps
+	@make -C ${RISCV_KERNELS_DIR} build-dev-deps
 
 .PHONY: build-deps
 build-deps:
@@ -74,6 +79,7 @@ test:
 check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${DEMO_DIR} check
+	@make -C ${RISCV_KERNELS_DIR} check
 
 	# Check formatting of all crates.
 	@exec scripts/check-format-rust.sh
@@ -91,4 +97,5 @@ clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
 	@make -C ${DEMO_DIR} clean
+	@make -C ${RISCV_KERNELS_DIR} clean
 	@rm -f smart-rollup-installer tx-demo-collector
