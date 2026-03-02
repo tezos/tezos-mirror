@@ -1624,7 +1624,7 @@ let test_tezlink_execution =
 
 let test_tezlink_bigmap_option =
   let option_contract = Michelson_contracts.big_map_option () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test which syntax is used for big maps in contract storages"
     ~tags:["syntax"; "big_map"; "option"; "storage"]
     ~bootstrap_contracts:[option_contract]
@@ -1711,7 +1711,7 @@ let test_tezlink_bigmap_counter =
 
 let test_tezlink_bigmap_rpcs =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Test of the big_map RPCs"
     ~tags:["rpc"; "big_map"]
     ~bootstrap_contracts:[counter_contract]
