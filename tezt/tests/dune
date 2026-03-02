@@ -33,6 +33,7 @@
   src_proto_alpha_lib_protocol_test_integration_consensus_tezt_lib
   src_proto_alpha_lib_protocol_test_integration_tezt_lib
   src_proto_alpha_lib_plugin_test_tezt_lib
+  src_proto_alpha_lib_delegate_test_workers_tezt_lib
   src_proto_alpha_lib_delegate_test_tezt_lib
   src_proto_alpha_lib_dal_test_tezt_lib
   src_proto_alpha_lib_client_test_tezt_lib

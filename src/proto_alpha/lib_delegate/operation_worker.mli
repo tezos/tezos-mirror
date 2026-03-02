@@ -115,3 +115,14 @@ val cancel_monitoring : t -> unit
     removes current monitored payload.
 *)
 val shutdown_worker : t -> (unit, exn list) result Lwt.t
+
+(** {1 Internal for tests}
+
+    This module exposes internal types and functions for unit testing.
+    Do not use in production code.
+*)
+module Internal_for_tests : sig
+  (** {2 State creation} *)
+
+  val make_initial_state : ?monitor_node_operations:bool -> unit -> t
+end

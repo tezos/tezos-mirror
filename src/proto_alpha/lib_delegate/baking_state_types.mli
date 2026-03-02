@@ -163,3 +163,11 @@ type delegate_info = {
   attestation_slot : Slot.t;
   attesting_power : int64;
 }
+
+(** Internal module exposed for testing purposes only.
+    Do not use outside of tests. *)
+module Internal_for_tests : sig
+  (** Create a Delegate.t from a Key.t for testing purposes.
+      Uses the key as both manager and consensus key. *)
+  val make_delegate_from_key : Key.t -> Delegate.t
+end
