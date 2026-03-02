@@ -193,31 +193,69 @@ let produce_commitment_and_proof =
         in
         return (commitment, commitment_proof)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+let check_publish_crosses_migration ctxt ~published_level =
+  let open Lwt_result_syntax in
+  let* migration_level_opt =
+    Node_context.get_next_migration_level ctxt |> Errors.other_lwt_result
+  in
+  match migration_level_opt with
+  | None -> return_false
+  | Some migration_level ->
+      let*? proto_params =
+        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
+        |> Errors.other_result
+      in
+      let attestation_lag = Int32.of_int proto_params.attestation_lag in
+      let attested_level = Int32.add published_level attestation_lag in
+      if published_level <= migration_level && migration_level < attested_level
+      then
+        let*! () =
+          Event.emit_publish_crosses_migration
+            ~published_level
+            ~migration_level
+            ~attested_level
+        in
+        return_true
+      else return_false
+
 module Tests = struct
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8249
+     Fails at protocol migration *)
   let publish_slot_using_client ctxt cctxt block_level slot_index secret_key
       slot_content (module Plugin : Dal_plugin.T) =
     let open Lwt_result_syntax in
-    let* commitment, commitment_proof =
-      produce_commitment_and_proof ctxt '\000' slot_content
+    (* [block_level] is the finalized block level (L1 head - 2). The injected
+       operation will appear on chain at L1 head + 1 = block_level + 3. *)
+    let* should_skip =
+      check_publish_crosses_migration
+        ctxt
+        ~published_level:(Int32.add block_level 3l)
     in
-    let source =
-      Signature.Public_key.hash @@ Signature.Secret_key.to_public_key secret_key
-    in
-    let*! res =
-      Plugin.publish
-        cctxt
-        ~block_level
-        ~source
-        ~slot_index
-        ~commitment
-        ~commitment_proof
-        ~src_sk:secret_key
-        ()
-    in
-    let*! () =
-      match res with
-      | Ok op_hash -> Event.emit_publication ~block_level ~op_hash
-      | Error error -> Event.emit_publication_failed ~block_level ~error
-    in
-    return_unit
+    if should_skip then return_unit
+    else
+      let* commitment, commitment_proof =
+        produce_commitment_and_proof ctxt '\000' slot_content
+      in
+      let source =
+        Signature.Public_key.hash
+        @@ Signature.Secret_key.to_public_key secret_key
+      in
+      let*! res =
+        Plugin.publish
+          cctxt
+          ~block_level
+          ~source
+          ~slot_index
+          ~commitment
+          ~commitment_proof
+          ~src_sk:secret_key
+          ()
+      in
+      let*! () =
+        match res with
+        | Ok op_hash -> Event.emit_publication ~block_level ~op_hash
+        | Error error -> Event.emit_publication_failed ~block_level ~error
+      in
+      return_unit
 end

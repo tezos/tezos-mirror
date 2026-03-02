@@ -1391,6 +1391,20 @@ open struct
       ("index", Data_encoding.int31)
       ("kind", Data_encoding.string)
       ~pp3:Format.pp_print_string
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+  let publish_crosses_migration =
+    declare_3
+      ~section
+      ~name:"publish_crosses_migration"
+      ~msg:
+        "Cannot publish slot at level {published_level} as it would cross \
+         protocol T to U migration at level {migration_level} (attested at \
+         level {attested_level})"
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("migration_level", Data_encoding.int32)
+      ("attested_level", Data_encoding.int32)
 end
 
 (* DAL node event emission functions *)
@@ -1790,3 +1804,9 @@ let emit_skip_lists_exported_successfully () =
 
 let emit_snapshot_exported_successfully ~dst_root_dir =
   emit snapshot_exported_successfully dst_root_dir
+
+let emit_publish_crosses_migration ~published_level ~migration_level
+    ~attested_level =
+  emit
+    publish_crosses_migration
+    (published_level, migration_level, attested_level)

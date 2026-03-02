@@ -20,6 +20,13 @@ val produce_commitment_and_proof :
   (Cryptobox.commitment * Cryptobox.commitment_proof, [> Errors.other]) result
   Lwt.t
 
+(** [check_publish_crosses_migration ctxt ~published_level] checks if publishing
+    at [~published_level] would cross a protocol migration boundary. *)
+val check_publish_crosses_migration :
+  Node_context.t ->
+  published_level:int32 ->
+  (bool, [> Errors.other]) result Lwt.t
+
 module Tests : sig
   (** [publish_slot_using_client ctxt rpc_ctxt block_level slot_index secret_key
       msg Plugin] uses the layer 1 node accessible through [rpc_ctxt] to inject a
