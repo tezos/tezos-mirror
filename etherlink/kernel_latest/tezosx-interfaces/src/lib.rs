@@ -126,6 +126,10 @@ pub trait RuntimeInterface {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>;
 
+    /// The URL host that identifies this runtime in HTTP requests routed
+    /// by the registry (e.g. `"tezos"`, `"ethereum"`).
+    fn host(&self) -> &'static str;
+
     fn address_from_string(
         &self,
         address_str: &str,

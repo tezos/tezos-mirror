@@ -707,6 +707,10 @@ mod test {
                 todo!("MockTezosRuntime::serve")
             }
 
+            fn host(&self) -> &'static str {
+                "stub"
+            }
+
             fn address_from_string(
                 &self,
                 address_str: &str,

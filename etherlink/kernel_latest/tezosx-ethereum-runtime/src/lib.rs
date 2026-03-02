@@ -278,6 +278,10 @@ impl RuntimeInterface for EthereumRuntime {
         todo!("EthereumRuntime::serve — will be implemented in a future issue")
     }
 
+    fn host(&self) -> &'static str {
+        "ethereum"
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,
