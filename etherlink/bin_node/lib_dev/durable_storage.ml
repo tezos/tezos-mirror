@@ -45,6 +45,12 @@ let chain_id read =
     Durable_storage_path.chain_id
     L2_types.Chain_id.decode_le
 
+let michelson_runtime_chain_id read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.michelson_runtime_chain_id
+    L2_types.Chain_id.decode_be
+
 let l2_minimum_base_fee_per_gas read chain_id =
   inspect_durable_and_decode
     read
@@ -148,6 +154,11 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     chain_id read
+
+  let michelson_runtime_chain_id () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    michelson_runtime_chain_id read
 
   let is_multichain_enabled () =
     let open Lwt_result_syntax in

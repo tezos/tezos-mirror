@@ -32,6 +32,10 @@ module type S = sig
   (** [chain_id ()] returns chain id defined by the rollup. *)
   val chain_id : unit -> L2_types.chain_id tzresult Lwt.t
 
+  (** [michelson_runtime_chain_id ()] returns the chain id of the
+      Michelson runtime defined by the rollup. *)
+  val michelson_runtime_chain_id : unit -> L2_types.chain_id tzresult Lwt.t
+
   (** [chain_family chain_id] returns chain family defined for the chain with id chain_id. *)
   val chain_family :
     L2_types.chain_id -> L2_types.ex_chain_family tzresult Lwt.t

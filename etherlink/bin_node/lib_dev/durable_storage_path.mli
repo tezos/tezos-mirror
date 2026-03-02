@@ -30,6 +30,8 @@ val evm_node_flag : path
 
 val chain_id : path
 
+val michelson_runtime_chain_id : path
+
 val minimum_base_fee_per_gas : path
 
 val backlog : path

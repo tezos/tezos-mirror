@@ -2665,6 +2665,16 @@ let tez_bootstrap_balance_arg =
          Lwt.return @@ Error_monad.catch
          @@ fun () -> Evm_node_lib_dev_tezlink.Tezos_types.Tez.of_string_exn s)
 
+let michelson_runtime_chain_id_arg =
+  Tezos_clic.arg
+    ~long:"michelson-runtime-chain-id"
+    ~doc:"Chain id used for the Michelson runtime, in the usual base58 format"
+    ~placeholder:"NetXH12DFfBVHi4"
+  @@ Tezos_clic.parameter (fun () s ->
+         let open Lwt_result_syntax in
+         let*? chain_id = Chain_id.of_b58check s in
+         return chain_id)
+
 let set_account_code =
   let long = "set-code" in
   let doc = Format.sprintf "Add code to an account in the installer config." in
@@ -2826,7 +2836,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args14
+       (args15
           (config_key_arg
              ~name:"dal_publishers_whitelist"
              ~placeholder:"tz1...,tz2...,...")
@@ -2844,7 +2854,8 @@ let make_kernel_config_command =
           enable_runtime_arg
           tez_bootstrap_balance_arg
           tez_bootstrap_account_arg
-          tez_bootstrap_contract_arg))
+          tez_bootstrap_contract_arg
+          michelson_runtime_chain_id_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2888,7 +2899,8 @@ let make_kernel_config_command =
              with_runtimes,
              tez_bootstrap_balance,
              tez_bootstrap_accounts,
-             tez_bootstrap_contracts ) )
+             tez_bootstrap_contracts,
+             michelson_runtime_chain_id ) )
          output
          ()
        ->
@@ -2898,6 +2910,7 @@ let make_kernel_config_command =
         ?l2_chain_ids
         ?kernel_root_hash
         ?chain_id
+        ?michelson_runtime_chain_id
         ?sequencer
         ?delayed_bridge
         ?ticketer

@@ -18,6 +18,7 @@ val make :
   ?eth_bootstrap_accounts:Ethereum_types.address list ->
   ?kernel_root_hash:string * string ->
   ?chain_id:string * string ->
+  ?michelson_runtime_chain_id:Chain_id.t ->
   ?sequencer:string * string ->
   ?delayed_bridge:string * string ->
   ?ticketer:string * string ->

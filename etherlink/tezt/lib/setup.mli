@@ -103,6 +103,7 @@ val register_test :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
+  ?michelson_runtime_chain_id:string ->
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
@@ -159,6 +160,7 @@ val register_multichain_test :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
+  ?michelson_runtime_chain_id:string ->
   ?sequencer:Account.key ->
   ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->

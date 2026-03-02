@@ -45,6 +45,7 @@ type l2_setup = {
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
+  michelson_runtime_chain_id : string option;
 }
 
 val eth_default_bootstrap_accounts : string list
@@ -713,6 +714,7 @@ val make_kernel_installer_config :
   ?tez_bootstrap_balance:Tez.t ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:string list ->
+  ?michelson_runtime_chain_id:string ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?ticketer:string ->

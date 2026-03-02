@@ -101,6 +101,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ~rpc_server:Evm_node.Resto
     ?tez_bootstrap_accounts:bootstrap_accounts
     ?tez_bootstrap_contracts:bootstrap_contracts
+    ~michelson_runtime_chain_id:"NetXH12DFfBVHi4"
     ?genesis_timestamp
     ?max_blueprints_lag
     ?max_blueprints_catchup

@@ -51,6 +51,7 @@ type l2_setup = {
   minimum_base_fee_per_gas : Wei.t option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
+  michelson_runtime_chain_id : string option;
 }
 
 let eth_default_bootstrap_accounts =
@@ -72,6 +73,7 @@ let default_l2_setup ~l2_chain_id =
     minimum_base_fee_per_gas = None;
     da_fee_per_byte = None;
     maximum_gas_per_transaction = None;
+    michelson_runtime_chain_id = None;
   }
 
 type mode =
@@ -1613,9 +1615,9 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?max_delayed_inbox_blueprint_length ?kernel_compat
     ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
     ?eth_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_balance
-    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?sequencer ?delayed_bridge
-    ?ticketer ?administrator ?sequencer_governance ?kernel_governance
-    ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?michelson_runtime_chain_id
+    ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
+    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
     ?maximum_gas_per_transaction
@@ -1749,6 +1751,10 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
                (fun tez_bootstrap_contract ->
                  ["--tez-bootstrap-contract"; tez_bootstrap_contract])
                tez_bootstrap_contracts)
+    @ Cli_arg.optional_arg
+        "michelson-runtime-chain-id"
+        Fun.id
+        michelson_runtime_chain_id
     @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in

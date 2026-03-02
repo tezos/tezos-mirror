@@ -12,8 +12,9 @@ use crate::{
         dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
         read_admin, read_chain_family, read_delayed_transaction_bridge,
         read_kernel_governance, read_kernel_security_governance,
-        read_maximum_allowed_ticks, read_or_set_maximum_gas_per_transaction,
-        read_sequencer_governance, sequencer,
+        read_maximum_allowed_ticks, read_michelson_runtime_chain_id,
+        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
+        store_michelson_runtime_chain_id,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -191,18 +192,21 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
     host: &mut Host,
     chain_id: U256,
 ) -> ChainConfig {
-    let evm_limits = fetch_evm_limits(host);
-    let spec_id = read_evm_version(host).into();
-    let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let michelson_runtime_chain_id =
-        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
-    ChainConfig::new_evm_config(
-        chain_id,
-        evm_limits,
-        spec_id,
-        experimental_features,
-        michelson_runtime_chain_id,
-    )
+    let config = fetch_pure_evm_config(host, chain_id);
+    ChainConfig::Evm(Box::new(config))
+}
+
+fn fetch_michelson_runtime_chain_id(host: &mut impl Runtime) -> ChainId {
+    let chain_id_res = read_michelson_runtime_chain_id(host);
+    match chain_id_res {
+        Ok(Some(chain_id)) => chain_id,
+        Ok(None) | Err(_) => {
+            // Reading the chain id of the Michelson runtime has failed, fallback on default chain id
+            let default_chain_id = ChainId::from([0; 4]);
+            let _ = store_michelson_runtime_chain_id(host, &default_chain_id);
+            default_chain_id
+        }
+    }
 }
 
 pub fn fetch_pure_evm_config<Host: Runtime>(
@@ -212,8 +216,7 @@ pub fn fetch_pure_evm_config<Host: Runtime>(
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let michelson_runtime_chain_id =
-        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
+    let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host);
     EvmChainConfig::create_config(
         chain_id,
         limits,

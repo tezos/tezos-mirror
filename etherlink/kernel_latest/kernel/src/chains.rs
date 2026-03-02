@@ -14,6 +14,7 @@ use crate::{
     error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
     l2block::L2Block,
+    registry_impl::RegistryImpl,
     simulation::start_simulation_mode,
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
@@ -321,6 +322,8 @@ pub trait ChainConfigTrait: Debug {
 
     fn get_chain_id(&self) -> U256;
 
+    fn init_registry(&self) -> RegistryImpl;
+
     fn get_chain_family(&self) -> ChainFamily;
 
     fn storage_root_paths(&self) -> Vec<RefPath>;
@@ -483,6 +486,10 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
+    }
+
+    fn init_registry(&self) -> RegistryImpl {
+        RegistryImpl::new(self.chain_id, self.michelson_chain_config.chain_id.clone())
     }
 
     fn get_chain_family(&self) -> ChainFamily {
@@ -837,6 +844,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
+    }
+
+    fn init_registry(&self) -> RegistryImpl {
+        RegistryImpl::new(self.get_chain_id(), self.chain_id.clone())
     }
 
     fn get_chain_family(&self) -> ChainFamily {

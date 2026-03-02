@@ -19,7 +19,6 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
-use crate::registry_impl::RegistryImpl;
 use crate::storage;
 use crate::storage::read_block_in_progress;
 use crate::upgrade;
@@ -412,7 +411,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
-    let registry = RegistryImpl::new(chain_config.get_chain_id());
+    let registry = chain_config.init_registry();
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
@@ -527,6 +526,7 @@ mod tests {
     };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
+    use crate::registry_impl::RegistryImpl;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;

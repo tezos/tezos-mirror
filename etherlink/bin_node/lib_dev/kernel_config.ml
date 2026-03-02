@@ -349,18 +349,18 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
   |> List.flatten
 
 let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
-    ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
-    ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
-    ?kernel_security_governance ?minimum_base_fee_per_gas ?da_fee_per_byte
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
-    ?disable_legacy_dal_signals ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
-    ?tez_bootstrap_accounts ~tez_bootstrap_balance ?tez_bootstrap_contracts
-    ~output () =
+    ?l2_chain_ids ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id
+    ?michelson_runtime_chain_id ?sequencer ?delayed_bridge ?ticketer ?admin
+    ?sequencer_governance ?kernel_governance ?kernel_security_governance
+    ?minimum_base_fee_per_gas ?da_fee_per_byte ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?remove_whitelist ?enable_fa_bridge ?enable_revm ?enable_dal ?dal_slots
+    ?dal_publishers_whitelist ?disable_legacy_dal_signals
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?enable_multichain
+    ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
+    ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance
+    ?tez_bootstrap_contracts ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -458,6 +458,15 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
+    @ make_instr
+        ~path_prefix:["tezlink"]
+        (Option.map
+           (fun chain_id ->
+             chain_id
+             |> Data_encoding.Binary.to_bytes_exn Chain_id.encoding
+             |> Bytes.to_string
+             |> fun s -> ("chain_id", s))
+           michelson_runtime_chain_id)
     @ make_instr delayed_bridge @ make_instr admin
     @ make_instr sequencer_governance
     @ make_instr kernel_governance
