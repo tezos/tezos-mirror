@@ -65,8 +65,6 @@ __pycache__
 /octez-accuser
 /octez-baker
 /octez-teztale-snitch
-/octez-tezindex
-
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
 /src/riscv/riscv-dummy-linux-musl.elf
