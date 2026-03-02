@@ -186,7 +186,10 @@ let post_slot :
        its profile allows to publish data on the given slot index. However, \
        slot_index is optional and has NO SEMANTIC EFFECT on the produced \
        commitment. It exists solely to help reverse proxies route POST /slots \
-       requests to a DAL node subscribed to the corresponding topics."
+       requests to a DAL node subscribed to the corresponding topics. The RPC \
+       will fail if publishing at the current level would cross the T to U \
+       protocol migration boundary (when the attestation lag changes between \
+       protocols), as such slots may not be properly attested."
     ~query:slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
