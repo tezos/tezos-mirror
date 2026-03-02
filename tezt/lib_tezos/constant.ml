@@ -86,8 +86,6 @@ let teztale_server =
 let _teztale_snitch =
   Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
 
-let octez_tezindex = Uses.make ~tag:"octez_tezindex" ~path:"./octez-tezindex" ()
-
 (* TODO: Remove these once the binaries are completely removed from
    [released-executables] or [experimental-executables].
    (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
