@@ -73,3 +73,20 @@ fi
 
 # X.Y or X.Y-rcZ
 gitlab_package_version="${suffix}"
+
+# https://docs.gitlab.com/ee/api/packages.html#within-a-project
+# :gitlab_api_url/projects/:id/packages
+package_web_path() {
+  f_package_name="$1"
+  ret=$(curl -fsSL -X GET \
+    -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+    "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${f_package_name}" |
+    jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
+
+  if [ -z "${ret}" ]; then
+    echo "Error: ${f_package_name} could not find package matching version ${gitlab_package_version}"
+    exit 1
+  else
+    echo "https://${CI_SERVER_HOST}${ret}"
+  fi
+}

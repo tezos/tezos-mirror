@@ -108,6 +108,7 @@ module Build = struct
       ?storage
       ~name
       ?retry
+      ~description:("Build the static Octez binaries for " ^ arch_string ^ ".")
       ~image:Images.CI.build
       ~before_script:
         (Helpers.before_script ~take_ownership:true ~eval_opam:true [])
