@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2024-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -33,7 +33,7 @@ let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
     ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?max_blueprints_catchup ?max_blueprints_lag ?catchup_cooldown
-    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) scenario
+    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) ?da_fee scenario
     protocols =
   (* Most of the RPCs tezt tests are RPC that are enable on a real Tezos protocol.
        Now that block 0 and 1 are set on protocol Zero and Genesis, we produce two
@@ -64,6 +64,7 @@ let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
           l2_chain_family = "Michelson";
           tez_bootstrap_accounts = bootstrap_accounts;
           tez_bootstrap_contracts = bootstrap_contracts;
+          da_fee_per_byte = da_fee;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -121,7 +122,7 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown scenario protocols =
+    ?catchup_cooldown ?da_fee scenario protocols =
   register_tezlink_only_test
     ~title:(title ^ " (tezlink)")
     ~tags
@@ -135,6 +136,7 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?catchup_cooldown
     ?additional_uses
     ~wait_for_valid_block
+    ?da_fee
     scenario
     protocols ;
   register_tezosx_test
@@ -3431,6 +3433,42 @@ let test_tezlink_validation_balance =
   let* () = check_operations ~client:client_tezlink ~block:"9" ~expected:[] in
   unit
 
+(** Sends a Michelson transfer with zero fees and verifies it is rejected.
+    [Client.spawn_transfer] triggers a simulation that rejects the operation
+    with [Insufficient_fees]. *)
+let test_tezlink_insufficient_da_fee =
+  register_tezlink_only_test
+    ~title:"Michelson transfer with insufficient DA fee is rejected"
+    ~tags:["kernel"; "validation"; "da_fee"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~da_fee:(Wei.of_eth_int 4)
+  (* For da fees, anything superior to zero works for testing. *)
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~fee:Tez.zero
+      ~force:true
+      ~gas_limit:10000
+      ~storage_limit:10000
+      ~burn_cap:Tez.one
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      client
+  in
+  (* Rejected by prevalidation. *)
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "evm_node.dev.insufficient_fees")
+    ~error_msg:"Prevalidation should have failed with %R but got %L" ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4059,6 +4097,7 @@ let () =
   test_tezlink_validation_gas_limit [Alpha] ;
   test_tezlink_validation_counter [Alpha] ;
   test_tezlink_validation_balance [Alpha] ;
+  test_tezlink_insufficient_da_fee [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;

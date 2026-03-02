@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
-(* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>         *)
 (*                                                                           *)
 (*****************************************************************************)
 open Tezlink_imports
@@ -29,6 +29,7 @@ type error +=
   | Unsupported_manager_operation of clue
   | Oversized_operation of clue * int * int
   | Bls_is_not_allowed of clue * Signature.V2.public_key_hash
+  | Insufficient_fees of string * string
 
 let () =
   register_error_kind
@@ -125,7 +126,25 @@ let () =
     (function
       | Oversized_operation (clue, size, max) -> Some (clue, size, max)
       | _ -> None)
-    (fun (clue, size, max) -> Oversized_operation (clue, size, max))
+    (fun (clue, size, max) -> Oversized_operation (clue, size, max)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.insufficient_fees"
+    ~title:"Fees are insufficient"
+    ~description:
+      "Fees are insufficient to cover for the cost of the transaction"
+    ~pp:(fun ppf (current, required) ->
+      Format.fprintf
+        ppf
+        "Fees are insufficient to cover for the cost of the transaction, \
+         current fees are %s but %s is required"
+        current
+        required)
+    Data_encoding.(obj2 (req "current" string) (req "required" string))
+    (function
+      | Insufficient_fees (current, required) -> Some (current, required)
+      | _ -> None)
+    (fun (current, required) -> Insufficient_fees (current, required))
 
 (** Search for the manager info (public key, counter), and checks that it is
     valid: the public key must be already revealed, or be the reveal must be
@@ -424,14 +443,13 @@ let validate_first_counter ~read ~data_model ~source ~first_counter =
     @@ Imported_protocol.Contract_storage.(
          Counter_in_the_past {contract = Implicit source; expected; found})
 
-let validate_size ~raw ~error_clue =
+let validate_size ~op_raw_size ~error_clue =
   let open Lwt_result_syntax in
-  let length = Bytes.length raw in
-  if length <= Constants.max_operation_data_length then return (Ok ())
+  if op_raw_size <= Constants.max_operation_data_length then return (Ok ())
   else
     tzfail
     @@ Oversized_operation
-         (error_clue, length, Constants.max_operation_data_length)
+         (error_clue, op_raw_size, Constants.max_operation_data_length)
 
 let get_signature signature =
   let open Lwt_result_syntax in
@@ -484,12 +502,17 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
+let compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez =
+  let da_fees_mutez = Int64.(mul (of_int op_raw_size) da_fee_per_byte_mutez) in
+  Tez.of_mutez_exn da_fees_mutez
+
 let parse_and_validate_for_queue ?(check_signature = true) ~read ~data_model raw
     =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
+  let op_raw_size = Bytes.length raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
-  let** () = validate_size ~raw ~error_clue in
+  let** () = validate_size ~op_raw_size ~error_clue in
   let* op =
     match Data_encoding.Binary.of_bytes Operation.encoding raw with
     | Error e -> tzfail @@ Parsing_failure (error_clue, e)
@@ -527,28 +550,38 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read ~data_model raw
     }
   in
   let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
-  let** () =
-    validate_signature
-      ~check_signature
-      shell
-      (Contents_list contents)
-      pk
-      signature
+  let* da_fee_per_byte_mutez =
+    Tezlink_durable_storage.da_fee_per_byte_mutez read
   in
-  let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
-  let operation : Tezos_types.Operation.t =
-    Tezos_types.Operation.
-      {
-        length = ctxt.length;
-        source = ctxt.source;
-        raw;
-        op;
-        first_counter;
-        fee = ctxt.fee_sum;
-        gas_limit = ctxt.gas_limit_sum;
-      }
-  in
-  return (Ok operation)
+  let da_fees = compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez in
+  if ctxt.fee_sum < da_fees then
+    tzfail
+    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string da_fees)
+  else
+    let** () =
+      validate_signature
+        ~check_signature
+        shell
+        (Contents_list contents)
+        pk
+        signature
+    in
+    let*? first_counter =
+      Tezos_types.Operation.counter_to_z ctxt.first_counter
+    in
+    let operation : Tezos_types.Operation.t =
+      Tezos_types.Operation.
+        {
+          length = ctxt.length;
+          source = ctxt.source;
+          raw;
+          op;
+          first_counter;
+          fee = ctxt.fee_sum;
+          gas_limit = ctxt.gas_limit_sum;
+        }
+    in
+    return (Ok operation)
 
 let init_blueprint_validation read ~data_model () =
   let get_counter = Tezlink_durable_storage.counter read ~data_model in

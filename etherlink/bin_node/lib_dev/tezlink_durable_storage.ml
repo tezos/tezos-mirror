@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 open Tezos_types
@@ -244,3 +244,14 @@ module Make_block_storage (Reader : Durable_storage.READER) :
     let* read = read_with_state () in
     nth_block_hash read n
 end
+
+let da_fee_per_byte_mutez read =
+  let open Lwt_result_syntax in
+  let* (Ethereum_types.Qty da_fee_per_byte_wei) =
+    Durable_storage.inspect_durable_and_decode
+      read
+      Durable_storage_path.da_fee_per_byte
+      Ethereum_types.decode_number_le
+  in
+  (* DA fee expressed in wei: converting to mutez. *)
+  return @@ Tezos_types.Tez.wei_to_mutez da_fee_per_byte_wei

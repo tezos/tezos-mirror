@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025-2026 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -78,6 +78,10 @@ module Tez = struct
     | Some s -> s
 
   let to_mutez_z t = t |> to_mutez |> Z.of_int64
+
+  let wei_to_mutez wei = Z.(to_int64 (wei / pow (of_int 10) 12))
+
+  let mutez_to_wei mutez = Z.(of_int64 mutez * pow (of_int 10) 12)
 end
 
 module Operation = struct
