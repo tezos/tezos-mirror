@@ -403,22 +403,22 @@ module CLST_contract = struct
       (* "Operator has precedence over spender" (cf TZIP26), i.e. if an
        infinite allowance is set, then only the [update_operators]
        entrypoint will have an effect on it. *)
-      | Some None, _ -> (None, Script_int.zero)
-      (* Operator already has an allowance *)
-      | Some (Some allowance), L increase ->
-          (Some (Script_int.add_n allowance increase), Script_int.int increase)
+      | Some Infinite, _ -> (Clst_contract_storage.Infinite, Script_int.zero)
+      (* Spender already has a finite allowance *)
+      | Some (Finite allowance), L increase ->
+          (Finite (Script_int.add_n allowance increase), Script_int.int increase)
       (* If the allowance would underflow, TZIP26 considers it as zero,
        and not an error. *)
-      | Some (Some allowance), R decrease ->
+      | Some (Finite allowance), R decrease ->
           let new_allowance =
             Script_int.sub allowance decrease
             |> Script_int.is_nat
             |> Option.value ~default:Script_int.zero_n
           in
-          (Some new_allowance, Script_int.sub new_allowance allowance)
-      (* The operator has no allowance defined already. *)
-      | None, L increase -> (Some increase, Script_int.int increase)
-      | None, R _decrease -> (Some Script_int.zero_n, Script_int.zero)
+          (Finite new_allowance, Script_int.sub new_allowance allowance)
+      (* Spender has no allowance defined already. *)
+      | None, L increase -> (Finite increase, Script_int.int increase)
+      | None, R _decrease -> (Finite Script_int.zero_n, Script_int.zero)
     in
     let* storage, ctxt =
       Clst_contract_storage.set_account_operator_allowance
@@ -429,7 +429,7 @@ module CLST_contract = struct
         (Some new_allowance)
     in
     match new_allowance with
-    | Some new_allowance ->
+    | Finite new_allowance ->
         let* op_allowance_update_event, ctxt =
           Clst_events.allowance_update_event
             (ctxt, step_constants)
@@ -441,7 +441,7 @@ module CLST_contract = struct
             ~diff
         in
         return (op_allowance_update_event :: operations, storage, ctxt)
-    | None ->
+    | Infinite ->
         (* the allowance_update event is not issued iff the allowance
            is infinite *)
         return (operations, storage, ctxt)
@@ -472,7 +472,9 @@ module CLST_contract = struct
     (* Check token_id is the one defined by the contract. *)
     let*? () = check_token_id token_id in
     let new_allowance, is_operator =
-      match action with `Add -> (Some None, true) | `Remove -> (None, false)
+      match action with
+      | `Add -> (Some Clst_contract_storage.Infinite, true)
+      | `Remove -> (None, false)
     in
     let* storage, ctxt =
       Clst_contract_storage.set_account_operator_allowance
@@ -989,9 +991,8 @@ module CLST_contract = struct
           in
           let allowance =
             match allowance with
-            | None -> Script_int.zero_n
-            | Some None -> Script_int.zero_n
-            | Some (Some n) -> n
+            | None | Some Infinite -> Script_int.zero_n
+            | Some (Finite n) -> n
           in
           return (allowance, ctxt)
         else return (Script_int.zero_n, ctxt)
@@ -1020,8 +1021,8 @@ module CLST_contract = struct
              allowance. *)
           let is_operator =
             match allowance with
-            | Some None -> true
-            | None | Some (Some _) -> false
+            | Some Infinite -> true
+            | None | Some (Finite _) -> false
           in
           return (is_operator, ctxt)
         else return (false, ctxt)

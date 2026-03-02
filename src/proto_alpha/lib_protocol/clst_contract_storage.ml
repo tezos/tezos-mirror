@@ -144,6 +144,8 @@ let finalize ctxt ~clst_contract_hash ~staker =
   in
   return (ctxt, unstake_balance_update, finalized_amount)
 
+type allowance = Infinite | Finite of CLST_types.nat
+
 let get_account_operator_allowance context storage ~owner ~spender =
   let open Lwt_result_syntax in
   let* operators, context =
@@ -152,7 +154,14 @@ let get_account_operator_allowance context storage ~owner ~spender =
   let account_operators =
     Option.value ~default:(Script_map.empty address_t) operators
   in
-  return (Script_map.get spender account_operators, context)
+  let allowance = Script_map.get spender account_operators in
+  let allowance =
+    match allowance with
+    | Some None -> Some Infinite
+    | Some (Some n) -> Some (Finite n)
+    | None -> None
+  in
+  return (allowance, context)
 
 let set_account_operator_allowance context storage ~owner ~spender new_allowance
     =
@@ -162,6 +171,12 @@ let set_account_operator_allowance context storage ~owner ~spender new_allowance
   in
   let account_operators =
     Option.value ~default:(Script_map.empty address_t) operators
+  in
+  let new_allowance =
+    match new_allowance with
+    | None -> None
+    | Some Infinite -> Some None
+    | Some (Finite n) -> Some (Some n)
   in
   let updated_operators =
     Script_map.update spender new_allowance account_operators

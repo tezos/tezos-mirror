@@ -100,31 +100,36 @@ val finalize :
   staker:Contract.t ->
   (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
 
+(** Type of spender allowance for owner's tokens:
+    - [Infinite] if a spender is an operator (infinite allowance)
+    - [Finite n] if a spender can spend [n] tokens (finite allowance). *)
+type allowance = Infinite | Finite of CLST_types.nat
+
 (** [get_account_operator_allowance context storage owner spender] get
     [spender] allowance on [owner]'s tokens:
 
-    - None if [spender] is not an operator
-    - Some None if [spender] has an infinite allowance
-    - Some (Some allowance) if [spender] can spend [allowance] tokens. *)
+    - [None] if [spender] has no permission
+    - [Some Infinite] if [spender] has an infinite allowance
+    - [Some (Finite n)] if [spender] can spend [n] tokens. *)
 val get_account_operator_allowance :
   context ->
   t ->
   owner:address ->
   spender:address ->
-  (CLST_types.nat option option * context) tzresult Lwt.t
+  (allowance option * context) tzresult Lwt.t
 
 (** [set_account_operator_allowance context storage owner spender new_allowance]
     set [spender] allowance on [owner]'s tokens:
 
-    - None if [spender] is not an operator
-    - Some None if [spender] has an infinite allowance
-    - Some (Some allowance) if [spender] can spend [allowance] tokens. *)
+    - [None] removes the permission
+    - [Some Infinite] sets an infinite allowance
+    - [Some (Finite n)] sets a finite allowance of [n] tokens. *)
 val set_account_operator_allowance :
   context ->
   t ->
   owner:address ->
   spender:address ->
-  CLST_types.nat option option ->
+  allowance option ->
   (t * context) tzresult Lwt.t
 
 (** [get_token_info context storage token_id] returns the token
