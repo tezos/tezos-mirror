@@ -13,7 +13,6 @@ license = "MIT"
 tezos_ethereum.workspace = true
 rlp.workspace = true
 primitive-types.workspace = true
-thiserror.workspace = true
 num-bigint.workspace = true
 
 tezosx-interfaces.workspace = true

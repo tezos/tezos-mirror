@@ -1170,9 +1170,7 @@ dependencies = [
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
  "tezos_ethereum_latest",
- "tezosx-interfaces",
  "thiserror 1.0.69",
  "walkdir",
 ]
@@ -1187,10 +1185,8 @@ dependencies = [
  "anyhow",
  "bytes",
  "ethbloom",
- "ethereum",
  "getrandom 0.2.15",
  "hex",
- "libsecp256k1",
  "mir",
  "num-bigint",
  "num-derive",
@@ -1212,7 +1208,6 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
- "tezos-smart-rollup-entrypoint",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-installer-config",
  "tezos-smart-rollup-mock",
@@ -1292,12 +1287,6 @@ name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
-
-[[package]]
-name = "format_no_std"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae45e32b0bfe2c62c805f8e87027b5aa08562000326edbc5b421ab6d92873a7"
 
 [[package]]
 name = "funty"
@@ -2536,7 +2525,6 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
  "ethereum",
- "format_no_std",
  "hex",
  "http",
  "nom",
@@ -2549,10 +2537,8 @@ dependencies = [
  "tezos-indexable-storage-latest",
  "tezos-protocol",
  "tezos-smart-rollup",
- "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
- "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
@@ -2578,7 +2564,6 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
- "tezosx-interfaces",
 ]
 
 [[package]]
@@ -3173,10 +3158,8 @@ dependencies = [
 name = "tezos-evm-runtime-latest"
 version = "0.1.0"
 dependencies = [
- "sha3",
  "tezos-evm-logging-latest",
  "tezos-smart-rollup-core",
- "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
@@ -3187,7 +3170,6 @@ dependencies = [
 name = "tezos-execution-latest"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "hex",
  "mir",
  "nom",
@@ -3220,7 +3202,6 @@ dependencies = [
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
  "tezos-storage-latest",
  "thiserror 1.0.69",
@@ -3472,7 +3453,6 @@ dependencies = [
 name = "tezos_ethereum_latest"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bytes",
  "ethbloom",
  "ethereum",
@@ -3484,7 +3464,6 @@ dependencies = [
  "serde",
  "sha3",
  "tezos-smart-rollup-encoding",
- "tezos_crypto_rs",
  "thiserror 1.0.69",
 ]
 
@@ -3496,7 +3475,6 @@ dependencies = [
  "hex",
  "mir",
  "nom",
- "num-bigint",
  "pretty_assertions",
  "primitive-types",
  "rand 0.9.1",
@@ -3507,7 +3485,6 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezosx-interfaces",
  "thiserror 1.0.69",
  "typed-arena",
 ]
@@ -3520,16 +3497,13 @@ dependencies = [
  "alloy-sol-types",
  "hex",
  "http",
- "nom",
  "primitive-types",
  "revm",
  "revm-etherlink",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
- "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezosx-interfaces",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3564,7 +3538,6 @@ dependencies = [
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
  "tezosx-interfaces",
- "thiserror 1.0.69",
 ]
 
 [[package]]
