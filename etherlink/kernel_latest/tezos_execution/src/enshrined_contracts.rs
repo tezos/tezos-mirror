@@ -14,6 +14,7 @@ use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
@@ -289,13 +290,16 @@ fn tezosx_cross_runtime_call<'a, Host: Runtime>(
         .address_from_string(dest, RuntimeId::Ethereum)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
 
+    let amount: u64 = amount
+        .try_into()
+        .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
     let result = registry
         .bridge(
             host,
             RuntimeId::Ethereum,
             &destination_contract,
             &alias,
-            U256::from(amount as u64),
+            eth_from_mutez(amount),
             data,
             context,
         )
@@ -312,11 +316,11 @@ fn tezosx_cross_runtime_call<'a, Host: Runtime>(
             Ok(())
         }
         CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
-            "Cross-runtime call reverted: {}",
+            "Michelson Cross-runtime call reverted: {}",
             hex::encode(&data)
         ))),
         CrossCallResult::Halt(data) => Err(TransferError::GatewayError(format!(
-            "Cross-runtime call halted: {}",
+            "Michelson Cross-runtime call halted: {}",
             hex::encode(&data)
         ))),
     }
@@ -380,7 +384,6 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 #[cfg(test)]
 mod tests {
     use mir::ast::AddressHash;
-    use primitive_types::U256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::RuntimeId;
@@ -459,9 +462,9 @@ mod tests {
         ])
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
-        let amount = 1000i64;
+        let amount = 1000u64;
 
-        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let mut ctx = MockCtx::new(&mut host, source, amount as i64);
         let result = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
         assert!(result.is_ok());
 
@@ -476,7 +479,10 @@ mod tests {
         assert_eq!(bridge_calls[0].0, RuntimeId::Ethereum);
         assert_eq!(bridge_calls[0].1, dest.as_bytes().to_vec());
         assert_eq!(bridge_calls[0].2, generated_alias);
-        assert_eq!(bridge_calls[0].3, U256::from(1000));
+        assert_eq!(
+            bridge_calls[0].3,
+            tezos_ethereum::wei::eth_from_mutez(amount)
+        );
     }
 
     #[test]

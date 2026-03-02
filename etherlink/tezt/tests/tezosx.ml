@@ -1400,7 +1400,7 @@ let test_cross_runtime_transfer_to_evm =
      The gateway passes the raw mutez amount to the EVM bridge,
      which credits it directly as the EVM balance. *)
   let*@ balance = Rpc.get_balance ~address:evm_destination sequencer in
-  let expected_balance = Wei.of_string (string_of_int transfer_amount_mutez) in
+  let expected_balance = Wei.of_tez (Tez.of_mutez_int transfer_amount_mutez) in
   Check.(
     (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
   (* Check that the gateway did not retain any funds. *)
@@ -2522,7 +2522,7 @@ let test_cross_runtime_transfer_from_michelson_contract_to_evm =
   in
   (* Step 3: Verify the EVM destination received the funds. *)
   let*@ balance = Rpc.get_balance ~address:evm_destination sequencer in
-  let expected_balance = Wei.of_string (string_of_int transfer_amount_mutez) in
+  let expected_balance = Wei.of_tez (Tez.of_mutez_int transfer_amount_mutez) in
   Check.(
     (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
   (* Step 4: Check that the gateway did not retain any funds. *)

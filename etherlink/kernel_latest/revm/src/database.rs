@@ -318,11 +318,11 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         match result {
             CrossCallResult::Success(_) => Ok(()),
             CrossCallResult::Revert(data) => Err(CustomPrecompileError::Revert(format!(
-                "Cross-runtime call reverted: {}",
+                "EVM Cross-runtime call reverted: {}",
                 hex::encode(&data)
             ))),
             CrossCallResult::Halt(data) => Err(CustomPrecompileError::Revert(format!(
-                "Cross-runtime call halted: {}",
+                "EVM Cross-runtime call halted: {}",
                 hex::encode(&data)
             ))),
         }
