@@ -1429,12 +1429,12 @@ mod tests {
     use typed_arena::Arena;
 
     use crate::gas::TezlinkOperationGas;
-    use crate::TcCtx;
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
     };
+    use crate::{get_required_da_fees, TcCtx};
     use crate::{make_default_ctx, COST_PER_BYTES};
     use tezosx_interfaces::{
         CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
@@ -5863,6 +5863,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5871,7 +5874,7 @@ mod tests {
             batch,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert!(result.is_ok(), "Batch with sufficient fees should succeed");
@@ -5912,6 +5915,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5920,7 +5926,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert!(
@@ -5962,6 +5968,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: for any operation > 0 bytes, 1 mutez is insufficient.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5970,7 +5979,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert_eq!(
