@@ -1551,11 +1551,9 @@ let test_registered_self_delegate_key_init_delegation () =
   let* () = Assert.equal_pkh ~loc:__LOC__ delegate delegate_pkh in
   return_unit
 
-let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
+let test_bls_account_self_delegate () =
   let open Lwt_result_syntax in
-  let* b, bootstrap =
-    Context.init1 ~consensus_threshold_size:0 ~allow_tz4_delegate_enable ()
-  in
+  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
   let {Account.pkh = tz4_pkh; pk = tz4_pk; _} =
     Account.new_account ~algo:Bls ()
   in
@@ -1573,30 +1571,8 @@ let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
   let* b = Block.bake ~operation b in
   let* operation = Op.delegation (B b) tz4_contract (Some tz4_pkh) in
   let* inc = Incremental.begin_construction b in
-  let tz4_pkh = match tz4_pkh with Bls pkh -> pkh | _ -> assert false in
-  if allow_tz4_delegate_enable then
-    let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
-    return_unit
-  else
-    let expect_failure = function
-      | [
-          Environment.Ecoproto_error
-            (Contract_delegate_storage.Forbidden_tz4_delegate pkh);
-        ]
-        when Signature.Bls.Public_key_hash.(pkh = tz4_pkh) ->
-          return_unit
-      | err ->
-          failwith
-            "Error trace:@,\
-             %a does not match the \
-             [Contract_delegate_storage.Forbidden_tz4_delegate] error"
-            Error_monad.pp_print_trace
-            err
-    in
-    let* (_i : Incremental.t) =
-      Incremental.validate_operation ~expect_failure inc operation
-    in
-    return_unit
+  let* (_i : Incremental.t) = Incremental.validate_operation inc operation in
+  return_unit
 
 let test_mldsa44_account_self_delegate () =
   let open Lwt_result_syntax in
@@ -1808,10 +1784,6 @@ let tests_delegate_registration =
       `Quick
       (test_emptying_delegated_implicit_contract_fails Tez.one_mutez);
     Tztest.tztest
-      "failed BLS self delegation (allow_tz4_delegate_enable:false)"
-      `Quick
-      (test_bls_account_self_delegate ~allow_tz4_delegate_enable:false);
-    Tztest.tztest
       "failed ML-DSA-44 self delegation"
       `Quick
       test_mldsa44_account_self_delegate;
@@ -1851,9 +1823,9 @@ let tests_delegate_registration =
       `Quick
       test_double_registration_when_recredited;
     Tztest.tztest
-      "valid BLS self delegation (allow_tz4_delegate_enable:true)"
+      "valid BLS self delegation"
       `Quick
-      (test_bls_account_self_delegate ~allow_tz4_delegate_enable:true);
+      test_bls_account_self_delegate;
   ]
 
 (******************************************************************************)

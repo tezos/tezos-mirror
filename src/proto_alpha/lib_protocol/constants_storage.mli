@@ -161,16 +161,11 @@ val max_slashing_per_block : Raw_context.t -> Percentage.t
 
 val direct_ticket_spending_enable : Raw_context.t -> bool
 
-val allow_tz4_delegate_enable : Raw_context.t -> bool
-
 val tz5_account_enable : Raw_context.t -> bool
 
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
 val tolerated_inactivity_period : Raw_context.t -> int
-
-(* attestation aggregation feature flag *)
-val aggregate_attestation : Raw_context.t -> bool
 
 val all_bakers_attest_activation_threshold : Raw_context.t -> Ratio_repr.t
 

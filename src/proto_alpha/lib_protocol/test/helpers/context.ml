@@ -778,8 +778,7 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
-    ?nonce_revelation_threshold ?dal ?adaptive_issuance
-    ?allow_tz4_delegate_enable ?aggregate_attestation ?native_contracts_enable
+    ?nonce_revelation_threshold ?dal ?adaptive_issuance ?native_contracts_enable
     ?tz5_account_enable () =
   let open Lwt_result_syntax in
   let n = tup_n tup in
@@ -817,8 +816,6 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
       ?nonce_revelation_threshold
       ?dal
       ?adaptive_issuance
-      ?allow_tz4_delegate_enable
-      ?aggregate_attestation
       ?native_contracts_enable
       ?tz5_account_enable
       bootstrap_accounts

@@ -34,20 +34,16 @@ let pack_operation ctxt signature contents =
   Operation.pack
     ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
+let raw_sign (type kind) _ctxt ?(watermark = Signature.Generic_operation)
     ?(companion_key : Delegate_services.companion_key option)
     (sk : Signature.secret_key) branch (contents : kind contents_list) =
   let open Lwt_result_syntax in
-  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let encoding =
-    if Constants.aggregate_attestation alpha_ctxt then
-      (* Under the [aggregate_attestation] feature flag, operations signed with
-         BLS keys use a dedicated serialization encoding, which differs only for
-         attestations and preattestations. *)
-      match sk with
-      | Bls _ -> Operation.bls_mode_unsigned_encoding
-      | _ -> Operation.unsigned_encoding
-    else Operation.unsigned_encoding
+    (* Operations signed with BLS keys use a dedicated serialization encoding,
+       which differs only for attestations and preattestations. *)
+    match sk with
+    | Bls _ -> Operation.bls_mode_unsigned_encoding
+    | _ -> Operation.unsigned_encoding
   in
   let bytes =
     Data_encoding.Binary.to_bytes_exn encoding ({branch}, Contents_list contents)

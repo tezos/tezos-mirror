@@ -4597,7 +4597,6 @@ module Validators = struct
   let attestation_slots_at_level ctxt attested_level =
     let open Lwt_result_syntax in
     let* ctxt, rights = Baking.attesting_rights ctxt ~attested_level in
-    let aggregate_attestation = Constants.aggregate_attestation ctxt in
     return
       ( ctxt,
         Signature.Public_key_hash.Map.fold
@@ -4613,9 +4612,7 @@ module Validators = struct
                acc
              ->
             let companion_key =
-              match consensus_key with
-              | Bls _ when aggregate_attestation -> companion_key
-              | _ -> None
+              match consensus_key with Bls _ -> companion_key | _ -> None
             in
             {
               delegate;

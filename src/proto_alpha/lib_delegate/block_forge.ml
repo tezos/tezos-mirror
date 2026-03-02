@@ -835,26 +835,22 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
            [@profiler.record_f
              {verbosity = Debug} "retain live operations only"])
         in
-        if constants.aggregate_attestation then
-          let*? consensus =
-            (aggregate_attestations_on_proposal
-               filtered_pool.consensus
-             [@profiler.record_f
-               {verbosity = Debug} "aggregate attestations on proposal"])
-          in
-          return (Filter {filtered_pool with consensus})
-        else return (Filter filtered_pool)
+        let*? consensus =
+          (aggregate_attestations_on_proposal
+             filtered_pool.consensus
+           [@profiler.record_f
+             {verbosity = Debug} "aggregate attestations on proposal"])
+        in
+        return (Filter {filtered_pool with consensus})
     | Apply {ordered_pool; payload_hash} ->
-        if constants.aggregate_attestation then
-          let*? consensus =
-            (aggregate_consensus_operations_on_reproposal
-               ordered_pool.consensus
-             [@profiler.record_f
-               {verbosity = Debug} "aggregate consensus on reproposal"])
-          in
-          let ordered_pool = {ordered_pool with consensus} in
-          return (Apply {ordered_pool; payload_hash})
-        else return simulation_kind
+        let*? consensus =
+          (aggregate_consensus_operations_on_reproposal
+             ordered_pool.consensus
+           [@profiler.record_f
+             {verbosity = Debug} "aggregate consensus on reproposal"])
+        in
+        let ordered_pool = {ordered_pool with consensus} in
+        return (Apply {ordered_pool; payload_hash})
   in
   let* shell_header, operations, manager_operations_infos, payload_hash =
     match (simulation_mode, simulation_kind) with

@@ -446,9 +446,6 @@ let constants_mainnet : Constants.Parametric.t =
        - Split [allow_forged] into [allow_tickets] and [allow_lazy_storage_id]: #2964
        - Introduce a new Ticket constructor in Michelson: #6643 *)
     direct_ticket_spending_enable = false;
-    (* attestation aggregation feature flag *)
-    aggregate_attestation = true;
-    allow_tz4_delegate_enable = true;
     (* Portion of tz4 bakers required to activate all bakers attest (50%) *)
     all_bakers_attest_activation_threshold =
       Ratio.{numerator = 1; denominator = 2};
@@ -492,7 +489,6 @@ let constants_sandbox =
     consensus_threshold_size = 0;
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
-    allow_tz4_delegate_enable = true;
     native_contracts_enable = true;
     tz5_account_enable = true;
     sc_rollup =

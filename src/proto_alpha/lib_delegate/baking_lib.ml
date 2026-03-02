@@ -470,12 +470,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                 level_watched = latest_proposal.shell.level;
                 round_watched = latest_proposal.round;
                 payload_hash_watched = latest_proposal.payload_hash;
-                branch_watched =
-                  (if
-                     state.global_state.constants.parametric
-                       .aggregate_attestation
-                   then Some latest_proposal.grandparent
-                   else None);
+                branch_watched = Some latest_proposal.grandparent;
               }
             in
             let* state =

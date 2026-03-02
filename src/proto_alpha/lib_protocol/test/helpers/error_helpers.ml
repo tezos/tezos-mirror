@@ -193,10 +193,6 @@ let conflicting_consensus_operation ?kind = function
       Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
   | _ -> false
 
-let aggregate_disabled = function
-  | Validate_errors.Consensus.Aggregate_disabled -> true
-  | _ -> false
-
 let aggregate_in_mempool = function
   | Validate_errors.Consensus.Aggregate_in_mempool -> true
   | _ -> false

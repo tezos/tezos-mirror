@@ -885,10 +885,7 @@ let forge_and_sign_consensus_vote (automaton_state : automaton_state)
     | Preattestation -> Operation.(to_watermark (Preattestation chain_id))
     | Attestation -> Operation.(to_watermark (Attestation chain_id))
   in
-  let bls_mode =
-    Key.is_bls delegate.consensus_key
-    && global_state.constants.parametric.aggregate_attestation
-  in
+  let bls_mode = Key.is_bls delegate.consensus_key in
   let* dal_content, companion_key_opt =
     match vote_kind with
     | Preattestation ->
@@ -1258,10 +1255,7 @@ let prepare_waiting_for_quorum state =
       level_watched = latest_proposal.shell.level;
       round_watched = latest_proposal.round;
       payload_hash_watched = latest_proposal.payload_hash;
-      branch_watched =
-        (if state.global_state.constants.parametric.aggregate_attestation then
-           Some latest_proposal.grandparent
-         else None);
+      branch_watched = Some latest_proposal.grandparent;
     }
   in
   (consensus_threshold, consensus_committee, get_slot_voting_power, candidate)

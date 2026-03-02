@@ -138,7 +138,6 @@ module Consensus = struct
       }
     | Consensus_operation_not_allowed
     | Missing_companion_key_for_bls_dal of Consensus_key.t
-    | Aggregate_disabled
     | Aggregate_in_mempool
     | Aggregate_not_implemented
     | Non_bls_key_in_aggregate
@@ -394,19 +393,6 @@ module Consensus = struct
       Data_encoding.empty
       (function Aggregate_in_mempool -> Some () | _ -> None)
       (fun () -> Aggregate_in_mempool) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.aggregate_disabled"
-      ~title:"Aggregate operations disabled"
-      ~description:
-        "Aggregate operations are disabled by the corresponding feature flag"
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Aggregate operations are disabled by the corresponding feature flag")
-      Data_encoding.empty
-      (function Aggregate_disabled -> Some () | _ -> None)
-      (fun () -> Aggregate_disabled) ;
     register_error_kind
       `Permanent
       ~id:"validate.aggregate_not_implemented"

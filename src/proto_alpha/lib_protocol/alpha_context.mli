@@ -988,8 +988,6 @@ module Constants : sig
       zk_rollup : zk_rollup;
       adaptive_issuance : adaptive_issuance;
       direct_ticket_spending_enable : bool;
-      aggregate_attestation : bool;
-      allow_tz4_delegate_enable : bool;
       all_bakers_attest_activation_threshold : Ratio.t;
       native_contracts_enable : bool;
       swrr_new_baker_lottery_enable : bool;
@@ -1143,10 +1141,6 @@ module Constants : sig
   val zk_rollup_max_ticket_payload_size : context -> int
 
   val direct_ticket_spending_enable : context -> bool
-
-  val aggregate_attestation : context -> bool
-
-  val allow_tz4_delegate_enable : context -> bool
 
   val tz5_account_enable : context -> bool
 
@@ -2398,8 +2392,6 @@ end
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles},
    {!Delegate_rewards}, and {!Forbidden_delegates_storage}. *)
 module Delegate : sig
-  val check_not_tz4 : Signature.public_key_hash -> unit tzresult
-
   val check_not_tz5 : Signature.public_key_hash -> unit tzresult
 
   val frozen_deposits_limit :
@@ -2493,9 +2485,6 @@ module Delegate : sig
     context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
-    val check_not_tz4 :
-      Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
-
     val check_not_tz5 :
       Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 

@@ -2743,18 +2743,8 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Attestation {consensus_content; dal_content}) ->
       record_attestation ctxt mode consensus_content dal_content
   | Single (Preattestations_aggregate {consensus_content; committee}) ->
-      let*? () =
-        error_unless
-          (Constants.aggregate_attestation ctxt)
-          Validate_errors.Consensus.(Aggregate_disabled)
-      in
       record_preattestations_aggregate ctxt mode consensus_content committee
   | Single (Attestations_aggregate {consensus_content; committee}) ->
-      let*? () =
-        error_unless
-          (Constants.aggregate_attestation ctxt)
-          Validate_errors.Consensus.(Aggregate_disabled)
-      in
       record_attestations_aggregate ctxt mode consensus_content committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in

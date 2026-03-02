@@ -914,7 +914,7 @@ let test_dal_attestations_skip_list_insertion_scenario () =
    check remains valid even after replacing its slot with a different one. *)
 let slot_substitution_do_not_affect_signature_check () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* {Context.consensus_key = consensus_pkh; _} =
     Context.get_attester (B b)
@@ -978,7 +978,7 @@ let slot_substitution_do_not_affect_signature_check () =
    be mismatched between signing and verification. *)
 let encoding_incompatibility () =
   let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
   let* attester = Context.get_attester (B b) in
   let* signer = Account.find attester.consensus_key in
