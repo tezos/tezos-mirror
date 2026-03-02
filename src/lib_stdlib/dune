@@ -9,7 +9,8 @@
   hex
   zarith
   lwt
-  aches)
+  aches
+  octez-libs.data-encoding)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (foreign_stubs (language c) (names tzBytes_c)))

@@ -16,7 +16,7 @@
     - FallbackArray storage: O(1) indexed access for get_baker (called per block)
     - Z.t credits: arbitrary precision prevents overflow, ensures exact fairness
     - Credit persistence: carries fractional stake weights across cycles
-    - Cache index 3: in-memory array for block production performance
+    - Cache index 4: in-memory array for block production performance
 
     Note that we use {!FallbackArray}s since it's the only allowed implementation of
     arrays in the protocol, whose constant time access property is critical
@@ -34,6 +34,73 @@
       a valid index. *)
 
 type credit_info = {pkh : Signature.public_key_hash; credit : Z.t; stake : Z.t}
+
+(* Cache infrastructure for selected baker arrays.
+
+   We use cache index 4 (fifth slot in the protocol's cache layout)
+   with namespace "swrr_selected_distribution" to store the precomputed
+   baker arrays in memory during block production.
+
+   The cache is keyed by cycle number and stores FallbackArray structures.
+   Symbolic size=1 means one entry per cycle, but actual memory usage
+   depends on blocks_per_cycle.
+
+   Cache lifetime is controlled by the protocol constant
+   [cache_swrr_selected_distribution_cycles]. *)
+module Swrr_selected_distribution = struct
+  module Cache_client = struct
+    type cached_value = Signature.Public_key_hash.t FallbackArray.t
+
+    let namespace = Cache_repr.create_namespace "swrr_selected_distribution"
+
+    let cache_index = 4
+
+    let value_of_identifier ctxt identifier =
+      let cycle = Cycle_repr.of_string_exn identifier in
+      Storage.Stake.Selected_bakers.get ctxt cycle
+  end
+
+  module Cache = (val Cache_repr.register_exn (module Cache_client))
+
+  let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
+
+  (* that's symbolic: 1 cycle = 1 entry *)
+  let size = 1
+
+  let init ctxt cycle delegates =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt = Storage.Stake.Selected_bakers.init ctxt cycle delegates in
+    let*? ctxt = Cache.update ctxt id (Some (delegates, size)) in
+    return ctxt
+
+  let find ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt, cached_opt = Cache.find ctxt id in
+    match cached_opt with
+    | Some _ as some_cache -> return (ctxt, some_cache)
+    | None ->
+        let* delegates = Storage.Stake.Selected_bakers.find ctxt cycle in
+        let*? ctxt =
+          Cache.update ctxt id (Option.map (fun v -> (v, size)) delegates)
+        in
+        return (ctxt, delegates)
+
+  (* Note: uses [remove] not [remove_existing] because SWRR data might not exist.
+
+     Unlike the alias sampler (which always creates sampler state for each cycle),
+     SWRR data only exists when [swrr_new_baker_lottery_enable] is true.
+
+     [Storage.Stake.Selected_bakers.remove] silently succeeds if data doesn't exist,
+     allowing safe cleanup regardless of whether SWRR was active for that cycle. *)
+  let remove ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let*? ctxt = Cache.update ctxt id None in
+    let*! ctxt = Storage.Stake.Selected_bakers.remove ctxt cycle in
+    return ctxt
+end
 
 (** [select_bakers_at_cycle_end ctxt ~target_cycle] precomputes the ordered
     list of bakers for [target_cycle] using the SWRR weighted round-robin
@@ -84,12 +151,24 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
       stakes_pkh
   in
 
-  let rec loop i (credit_list : credit_info list)
-      (acc : Signature.public_key_hash list) :
-      credit_info list * Signature.public_key_hash list =
-    if Compare.Int.(i >= nb_slots) then
-      let bakers = List.rev acc in
-      (credit_list, bakers)
+  (* Use a FallbackArray with fallback=Pkh.zero for the selected bakers
+
+     FallbackArray is used instead of list for O(1) indexed access in get_baker,
+     which is called every 6 seconds during block production. Lists would require
+     O(n) traversal via List.nth.
+
+     The fallback value (Signature.Public_key_hash.zero) should never be accessed
+     in normal operation since indices are always mod array_length. If accessed,
+     it indicates a bug in the index calculation or when populating the array
+     in [loop]. *)
+  let init_selected_bakers_array =
+    FallbackArray.make nb_slots Signature.Public_key_hash.zero
+  in
+  (* 0 <= idx < nb_slots *)
+  let rec loop idx (credit_list : credit_info list)
+      (acc : Signature.public_key_hash FallbackArray.t) :
+      credit_info list * Signature.public_key_hash FallbackArray.t =
+    if Compare.Int.(idx >= nb_slots) then (credit_list, acc)
     else
       (* Increase everyone's credit by their stake, and find the max *)
       let best_credit_info_opt, updated_credit_list =
@@ -112,25 +191,34 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
           (None, [])
           credit_list
       in
-      (* At this point `updated_credit_list` doesn't contain `best_credit_info_opt`, so we can simply update it and add it to the list. *)
+      (* At this point `updated_credit_list` doesn't contain `best_credit_info_opt`,
+         so we can simply update it and add it to the list. *)
       let updated_credit_list, acc =
         match best_credit_info_opt with
-        | None -> (updated_credit_list, acc) (* Should not happen *)
+        | None -> assert false
+        (* Can only happen if credit_list is empty, which is implies stakes_pkh
+           to be empty, which means no baker is active, which is,
+           if not impossible, problematic for many other reasons. *)
         | Some ({credit; pkh; _} as best_credit_info) ->
             (* Subtract total_stake (not just proportional amount) to create "debt".
                This ensures fairness: high-stake delegates are selected more frequently
                but accumulate negative credit proportionally, preventing monopolization.
                Over many iterations, this guarantees selection proportional to stake. *)
-            ( {best_credit_info with credit = Z.sub credit total_stake}
-              :: updated_credit_list,
-              pkh :: acc )
+            let updated_credit_list =
+              {best_credit_info with credit = Z.sub credit total_stake}
+              :: updated_credit_list
+            in
+            FallbackArray.set acc idx pkh ;
+            (updated_credit_list, acc)
       in
-      loop (i + 1) updated_credit_list acc
+      loop (idx + 1) updated_credit_list acc
   in
-  let new_credits, selected_bakers = loop 0 init_credit_list [] in
-  (* update context *)
-  let*! ctxt =
-    Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
+  let new_credits, selected_bakers =
+    loop 0 init_credit_list init_selected_bakers_array
+  in
+  (* Update context: store selected bakers *)
+  let* ctxt =
+    Swrr_selected_distribution.init ctxt target_cycle selected_bakers
   in
   (* Update credits for all delegates.
 
@@ -164,20 +252,18 @@ let get_baker ctxt level round =
   let cycle = level.Level_repr.cycle in
   let pos = level.Level_repr.cycle_position in
   let*? round_int = Round_repr.to_int round in
-
-  let* selected_bakers = Storage.Stake.Selected_bakers.find ctxt cycle in
+  let* ctxt, selected_bakers = Swrr_selected_distribution.find ctxt cycle in
   match selected_bakers with
   | None -> return (ctxt, None)
-  | Some selected_bakers -> (
-      let len = List.length selected_bakers in
+  | Some selected_bakers ->
+      let len = FallbackArray.length selected_bakers in
       let idx = (Int32.to_int pos + (3 * round_int)) mod len in
-      match List.nth_opt selected_bakers idx with
-      | None ->
-          assert false
-          (* should not happen if select_bakers_at_cycle_end is correct *)
-      | Some pkh ->
-          let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
-          return (ctxt, Some pk))
+      (* Safe: [selected_bakers] is never empty (invariant documented at file level).
+         For any non-empty array [l] and index [n], accessing [l.(n mod length l)]
+         always succeeds since [n mod length l] ∈ [0, length l - 1]. *)
+      let pkh = FallbackArray.get selected_bakers idx in
+      let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
+      return (ctxt, Some pk)
 
 (** [reset_credit_for_deactivated_delegates ctxt deactivated_delegates] sets
     SWRR credits to zero for delegates that have been deactivated.
@@ -206,4 +292,4 @@ let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
   in
   return ctxt
 
-let remove_outdated_cycle = Storage.Stake.Selected_bakers.remove
+let remove_outdated_cycle = Swrr_selected_distribution.remove

@@ -82,3 +82,9 @@ val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
    [fallback] is required to initialize a fresh array before it can be
    filled. *)
 val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t
+
+(** [encoding ?max_length e] is a data encoding for fallback arrays
+    whose elements are encoded with [e]. If [max_length] is provided,
+    the length of the encoded arrays is bounded by [max_length]. *)
+val encoding :
+  ?max_length:int -> 'a Data_encoding.encoding -> 'a t Data_encoding.encoding

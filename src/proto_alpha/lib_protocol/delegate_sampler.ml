@@ -478,7 +478,7 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
          the storage has been introduced. *)
       let* ctxt = Delegate_stake_info.remove ctxt outdated_cycle in
       let* ctxt = Seed_storage.remove_for_cycle ctxt outdated_cycle in
-      let*! ctxt = Swrr_sampler.remove_outdated_cycle ctxt outdated_cycle in
+      let* ctxt = Swrr_sampler.remove_outdated_cycle ctxt outdated_cycle in
       return ctxt
 
 let attesting_power ~all_bakers_attest_enabled ctxt level =

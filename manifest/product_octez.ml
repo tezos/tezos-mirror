@@ -237,7 +237,7 @@ let octez_stdlib =
     ~internal_name:"tezos_stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Yet-another local-extension of the OCaml standard library"
-    ~deps:[hex; zarith; lwt; aches]
+    ~deps:[hex; zarith; lwt; aches; data_encoding]
     ~inline_tests:ppx_expect
     ~foreign_stubs:
       {language = C; flags = []; names = ["tzBytes_c"]; include_dirs = []}

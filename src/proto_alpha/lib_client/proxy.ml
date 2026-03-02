@@ -123,6 +123,7 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
         constants_mainnet.cache_stake_distribution_cycles;
         constants_mainnet.cache_sampler_state_cycles;
         constants_mainnet.cache_stake_info_cycles;
+        constants_mainnet.cache_swrr_selected_distribution_cycles;
       ]
   in
   Lwt_result.ok

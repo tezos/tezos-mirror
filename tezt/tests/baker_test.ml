@@ -51,6 +51,14 @@ let abaab_threshold ~abaab ~protocol =
   else if abaab then pair_to_ratio (0, 1)
   else pair_to_ratio (2, 1)
 
+let alpha_new_cache ~protocol ~consensus_rights_delay =
+  if Protocol.number protocol >= 025 then
+    [
+      ( ["cache_swrr_selected_distribution_cycles"],
+        `Int (consensus_rights_delay + 3) );
+    ]
+  else []
+
 let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
   Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
 

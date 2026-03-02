@@ -720,6 +720,8 @@ let prepare_initial_context_params ?consensus_committee_size
     consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_info_cycles =
     consensus_rights_delay + Constants_repr.slashing_delay + 2
+  and cache_swrr_selected_distribution_cycles =
+    consensus_rights_delay + Constants_repr.slashing_delay + 2
   in
   let constants =
     {
@@ -753,6 +755,7 @@ let prepare_initial_context_params ?consensus_committee_size
       cache_sampler_state_cycles;
       cache_stake_distribution_cycles;
       cache_stake_info_cycles;
+      cache_swrr_selected_distribution_cycles;
       allow_tz4_delegate_enable;
       aggregate_attestation;
       native_contracts_enable;
