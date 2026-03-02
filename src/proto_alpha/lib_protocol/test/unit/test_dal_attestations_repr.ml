@@ -558,6 +558,68 @@ let test_complex_pattern () =
         ]
         decoded
 
+let test_out_of_window_failure () =
+  let open Lwt_result_syntax in
+  (* One wants to construct [t] the attestation of slots 0 and 11 for slot 0.
+     [t] contains:
+     1000 as the prefix (only lag 0 is attested),
+     0 0100000 (not the last byte of lag 0 and slot 1 is attested),
+     1 0000100 (last byte of lag 1 and slot 11 is attested).
+     So a total of 20 bits used.
+  *)
+  let z_repr =
+    Z.(one + shift_left one 6 + shift_left one 12 + shift_left one 17)
+  in
+  let*? t =
+    Environment.wrap_tzresult
+      (Dal_attestations_repr.Internal_for_tests.of_z z_repr)
+  in
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  (* We check that the manually constructed bitset is indeed the encoding we want. *)
+  let* () =
+    match decoded with
+    | Error _ -> Alcotest.fail "Cannot decode DAL attestation"
+    | Ok decoded ->
+        assert_equal_decoded_attestations
+          ~loc:__LOC__
+          ""
+          [{lag_index = 0; slot_indices = [1; 11]}]
+          decoded
+  in
+  (* We add a spurious bit after the end of the bitset. *)
+  let z_repr = Z.(z_repr + shift_left one 20) in
+  let*? t =
+    Environment.wrap_tzresult
+      (Dal_attestations_repr.Internal_for_tests.of_z z_repr)
+  in
+  (* We expect decode to detect that the attestation bitset is not valid.*)
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult decoded) (fun _ -> true)
+
+(** Test that decode accepts a bitset whose highest set bit is the very last
+    bit of the last chunk. This exercises the boundary of the trailing-bits
+    check: slot 6 at lag 0 lands at bit 7 of chunk 0 (position 11), which is
+    the last bit before next_offset (12). *)
+let test_decode_last_bit_of_chunk () =
+  let t = Dal_attestations_repr.empty in
+  let t = commit t ~lag_index:0 6 in
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  match decoded with
+  | Error _ ->
+      Alcotest.fail "decode rejected a valid bitset with slot 6 at lag 0"
+  | Ok decoded ->
+      assert_equal_decoded_attestations
+        ~loc:__LOC__
+        ""
+        [{lag_index = 0; slot_indices = [6]}]
+        decoded
+
 let tests =
   [
     Tztest.tztest "example encoding from interface" `Quick test_example_encoding;
@@ -576,6 +638,11 @@ let tests =
     Tztest.tztest "many slots at same lag" `Quick test_many_slots_same_lag;
     Tztest.tztest "size calculation" `Quick test_size_calculation;
     Tztest.tztest "complex pattern" `Quick test_complex_pattern;
+    Tztest.tztest "out of window failure" `Quick test_out_of_window_failure;
+    Tztest.tztest
+      "decode last bit of chunk"
+      `Quick
+      test_decode_last_bit_of_chunk;
   ]
 
 let () =

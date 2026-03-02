@@ -265,7 +265,13 @@ let decode t ~number_of_slots ~number_of_lags =
         ~slots_rev
   in
   let rec decode_lags lag_index offset acc_rev =
-    if Compare.Int.(lag_index >= number_of_lags) then return (List.rev acc_rev)
+    if Compare.Int.(lag_index >= number_of_lags) then
+      let+ () =
+        error_unless
+          Compare.Int.(Bitset.occupied_size_in_bits t <= offset)
+          (Dal_invalid_attestation_bitset t)
+      in
+      List.rev acc_rev
     else if bitset_mem t lag_index then
       let* slots_rev, next_offset =
         decode_chunks ~offset ~chunk_index:0 ~slots_rev:[]
