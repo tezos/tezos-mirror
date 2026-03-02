@@ -33,9 +33,6 @@ type endpoint =
   | Node of Node.t  (** A full-fledged node *)
   | Foreign_endpoint of Endpoint.t  (** A service not managed by Tezt *)
 
-(** Values that can be passed to the client's [--adaptive-issuance-vote] argument *)
-type ai_vote = On | Off | Pass
-
 (** A string representation of an endpoint suitable to be used as a CLI
     argument (e.g., [http://127.0.0.1:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
@@ -603,7 +600,6 @@ val bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   ?expect_failure:bool ->
   t ->
@@ -637,7 +633,6 @@ val bake_for_and_wait :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   t ->
   unit Lwt.t
 
@@ -659,7 +654,6 @@ val bake_for_and_wait_level :
   ?level_before:int ->
   ?node:Node.t ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   int Lwt.t
@@ -680,7 +674,6 @@ val spawn_bake_for :
   ?force:bool ->
   ?context_path:string ->
   ?dal_node_endpoint:string ->
-  ?ai_vote:ai_vote ->
   ?state_recorder:bool ->
   t ->
   Process.t
