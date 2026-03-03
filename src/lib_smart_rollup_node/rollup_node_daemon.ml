@@ -458,8 +458,7 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
   return_unit
 
 let daemonize state =
-  if state.configuration.l1_monitor_finalized || state.node_ctxt.kind = Riscv
-  then
+  if state.configuration.l1_monitor_finalized then
     Layer1.iter_finalized_heads
       ~name:"daemon"
       state.node_ctxt.l1_ctxt
@@ -921,6 +920,29 @@ let setup_opentelemetry ~data_dir config =
       Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
     config.Configuration.opentelemetry
 
+let check_and_patch_config (kind : Kind.t) (config : Configuration.t) =
+  let open Result_syntax in
+  match kind with
+  | Riscv ->
+      (* Force to commit context to disk only on commitments and monitoring of
+         finalized levels. *)
+      return {config with l1_monitor_finalized = true; commit_on = Commitment}
+  | _ ->
+      let* () =
+        if config.l1_monitor_finalized then
+          (* No reorg so can use any commit to disk strategy *)
+          return_unit
+        else
+          match config.commit_on with
+          | Block -> return_unit
+          | Commitment ->
+              error_with
+                "Cannot use a sparse commit on commitment strategy when \
+                 following the head of the L1 chain. Use \
+                 --l1-monitor-finalized or --commit-on block."
+      in
+      return config
+
 let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
     (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
@@ -993,6 +1015,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       cctxt
       configuration.sc_rollup_address
   in
+  let*? configuration = check_and_patch_config kind configuration in
   Metrics.wrap (fun () ->
       Metrics.Info.set_lcc_level_l1 lcc.level ;
       Option.iter

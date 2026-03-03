@@ -723,7 +723,9 @@ let commit_on_arg :
     ~placeholder:"block|commitment"
     ~doc:
       (Format.sprintf
-         "Choose when to commit context to disk. Default is %S."
-         Configuration.(string_of_commit_on_strategy default_commit_on_strategy))
+         "Choose when to commit context to disk. Default is %S and %S for \
+          RISC-V rollups."
+         Configuration.(string_of_commit_on_strategy default_commit_on_strategy)
+         Configuration.(string_of_commit_on_strategy Commitment))
   @@ Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
          Lwt.return (Configuration.commit_on_strategy_of_string s))
