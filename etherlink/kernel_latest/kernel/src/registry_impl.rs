@@ -91,4 +91,62 @@ impl Registry for RegistryImpl {
             }
         }
     }
+
+    fn serve<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError> {
+        match request.uri().host() {
+            Some(h) if h == self.tezos.host() => self.tezos.serve(self, host, request),
+            Some(h) if h == self.ethereum.host() => {
+                self.ethereum.serve(self, host, request)
+            }
+            unknown => Ok(http::Response::builder()
+                .status(http::StatusCode::NOT_FOUND)
+                .body(
+                    format!("No runtime handles host: {}", unknown.unwrap_or("(none)"))
+                        .into_bytes(),
+                )
+                .unwrap()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+
+    #[test]
+    fn test_serve_unknown_host_returns_404() {
+        let registry = RegistryImpl::default();
+        let mut host = MockKernelHost::default();
+
+        let request = http::Request::builder()
+            .uri("http://unknown/some/path")
+            .body(vec![])
+            .unwrap();
+
+        let response = registry.serve(&mut host, request).unwrap();
+        assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
+        let body = String::from_utf8(response.into_body()).unwrap();
+        assert!(body.contains("unknown"));
+    }
+
+    #[test]
+    fn test_serve_no_host_returns_404() {
+        let registry = RegistryImpl::default();
+        let mut host = MockKernelHost::default();
+
+        let request = http::Request::builder()
+            .uri("/some/path")
+            .body(vec![])
+            .unwrap();
+
+        let response = registry.serve(&mut host, request).unwrap();
+        assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
+        let body = String::from_utf8(response.into_body()).unwrap();
+        assert!(body.contains("(none)"));
+    }
 }

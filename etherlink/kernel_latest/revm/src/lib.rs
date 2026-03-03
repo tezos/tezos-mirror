@@ -605,6 +605,14 @@ mod test {
                     }
                 }
             }
+
+            fn serve<Host: Runtime>(
+                &self,
+                _host: &mut Host,
+                _request: http::Request<Vec<u8>>,
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+                unimplemented!("not needed for this test")
+            }
         }
 
         pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
@@ -705,6 +713,10 @@ mod test {
                 _request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
                 todo!("MockTezosRuntime::serve")
+            }
+
+            fn host(&self) -> &'static str {
+                "stub"
             }
 
             fn address_from_string(

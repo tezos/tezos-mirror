@@ -222,6 +222,10 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         todo!("TezosRuntime::serve — will be implemented in follow-up PRs")
     }
 
+    fn host(&self) -> &'static str {
+        "tezos"
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,

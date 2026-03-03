@@ -278,6 +278,10 @@ impl RuntimeInterface for EthereumRuntime {
         todo!("EthereumRuntime::serve — will be implemented in a future issue")
     }
 
+    fn host(&self) -> &'static str {
+        "ethereum"
+    }
+
     fn address_from_string(
         &self,
         address_str: &str,
@@ -423,6 +427,14 @@ mod tests {
             _address_str: &str,
             _runtime_id: RuntimeId,
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+
+        fn serve<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _request: http::Request<Vec<u8>>,
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
             unimplemented!("not needed for this test")
         }
     }
