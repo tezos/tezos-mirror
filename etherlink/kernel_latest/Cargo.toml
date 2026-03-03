@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-# SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023-2026 Functori <contact@functori.com>
 # SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
 # SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
@@ -85,7 +85,6 @@ kernel = { package = "evm_kernel", path = "./kernel"}
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
 tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = [
   "std",
-  "crypto",
   "dlmalloc",
   "panic-hook",
   "data-encoding",

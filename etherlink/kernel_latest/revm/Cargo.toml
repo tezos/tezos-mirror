@@ -30,7 +30,6 @@ tezosx-interfaces.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-encoding.workspace = true
-tezos-smart-rollup.workspace = true
 tezos_crypto_rs.workspace = true
 tezos_data_encoding.workspace = true
 tezos-indexable-storage.workspace = true
