@@ -18,21 +18,11 @@
    See [ci/bin/main.ml] for the list of custom extended test pipelines. *)
 
 open Tezos_ci
-open Common.Build
 
 (* The build_x86_64 jobs are split in two to keep the artifact size
    under the 1GB hard limit set by GitLab. *)
 
-let job_build_x86_64_exp =
-  job_build_dynamic_binaries
-    ~name:"oc.build_amd64-exp"
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    "script-inputs/experimental-executables"
-
 let jobs () =
   (* The jobs we want to run are a subset of the Tezt jobs that run
      in the schedule_extended_test pipeline. They are defined in [tezt.ml]. *)
-  Cacio.get_custom_extended_test_jobs ()
-  @ [job_build_x86_64_exp; job_datadog_pipeline_trace]
+  Cacio.get_custom_extended_test_jobs () @ [job_datadog_pipeline_trace]

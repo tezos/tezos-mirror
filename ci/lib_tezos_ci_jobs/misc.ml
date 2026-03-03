@@ -145,9 +145,8 @@ let job_test_liquidity_baking_scripts =
       [
         (Artifacts, Build.job_build_x86_64_released);
         (Artifacts, Build.job_build_amd64_extra_dev);
+        (Artifacts, Build.job_build_amd64_exp);
       ]
-    ~needs_legacy:
-      [(Artifacts, Code_verification.job_build_x86_64_exp Before_merging)]
     ~only_if_changed:
       [
         "src/**/*";

@@ -308,11 +308,7 @@ let tezt_job ?(retry_tests = 1) =
         (Artifacts, job_build_tezt);
         (Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels);
         (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_released);
-      ]
-    ~needs_legacy:
-      [
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
+        (Artifacts, Tezos_ci_jobs.Build.job_build_amd64_exp);
       ]
     ~retry_tests
 
@@ -460,11 +456,6 @@ let register () =
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
-    ~legacy_jobs:
-      [
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
-          Schedule_extended_test;
-      ]
     [
       (Auto, job_build_evm_node_static Amd64 Test);
       (Auto, job_build_evm_node_static Arm64 Test);

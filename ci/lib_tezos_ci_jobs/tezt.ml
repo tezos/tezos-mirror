@@ -48,14 +48,12 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-let common_needs_legacy =
-  [(Cacio.Artifacts, Code_verification.job_build_x86_64_exp Before_merging)]
-
 let common_needs =
   [
     (Cacio.Artifacts, Kernels.job_build_kernels);
     (Cacio.Artifacts, Build.job_build_x86_64_released);
     (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
+    (Cacio.Artifacts, Build.job_build_amd64_exp);
   ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
@@ -68,8 +66,7 @@ let common_needs =
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific
    to Tezt jobs defined in this module / the [Shared] component. *)
-let tezt_job ?(retry_tests = 1) ?(needs = common_needs)
-    ?(needs_legacy = common_needs_legacy) =
+let tezt_job ?(retry_tests = 1) ?(needs = common_needs) ?(needs_legacy = []) =
   CI.tezt_job
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs
@@ -164,12 +161,12 @@ let job_tezt_static_binaries =
            Since we only need the name, this is fine.
            We did the same in the docs/ci. *)
         (Artifacts, Master_branch.job_static_x86_64);
-        (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
       ]
     ~needs:
       [
         (* No need for kernels for this job. *)
         (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
+        (Cacio.Artifacts, Build.job_build_amd64_exp);
       ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3

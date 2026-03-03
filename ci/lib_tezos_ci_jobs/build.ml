@@ -125,6 +125,48 @@ let job_build_amd64_extra_dev =
       "./scripts/ci/build_full_unreleased.sh";
     ]
 
+let job_build_amd64_exp =
+  CI.job
+    "oc.build_amd64-exp"
+    ~__POS__
+    ~description:"Build the set of experimental executables."
+    ~stage:Build
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:
+      ((* TODO: why "or_doc"? *)
+       Tezos_ci.Changeset.encode
+         Changesets.changeset_octez_or_doc)
+    ~variables:[("EXECUTABLE_FILES", "script-inputs/experimental-executables")]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"build-x86_64-$CI_COMMIT_REF_SLUG"
+         ~when_:On_success
+         ~expire_in:(Duration (Days 1))
+         [
+           (* TODO: clean up this list, which was originally shared with
+              [job_build_amd64_extra_dev] but with no good reason since the two jobs
+              do not build the same set of executables. *)
+           "octez-*";
+           "octez-teztale-*";
+           "src/proto_*/parameters/*.json";
+           "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
+           "_build/default/tezt/tests/main.exe";
+           "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
+           "etherlink-governance-observer";
+           "fa-bridge-watchtower";
+         ])
+    ~dune_cache:true
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ~policy:Pull_push ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "./scripts/ci/build_full_unreleased.sh";
+    ]
+
 let register () =
   (* Since [build_octez_source] is manual, we do not add it to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
@@ -133,11 +175,16 @@ let register () =
      of test jobs, we explicitly want to make sure that the build jobs run
      even if the tests need not be run. *)
   CI.register_merge_request_jobs
-    [(Auto, job_build_x86_64_released); (Auto, job_build_amd64_extra_dev)] ;
+    [
+      (Auto, job_build_x86_64_released);
+      (Auto, job_build_amd64_extra_dev);
+      (Auto, job_build_amd64_exp);
+    ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Auto, build_octez_source);
       (Auto, job_build_x86_64_released);
       (Auto, job_build_amd64_extra_dev);
+      (Auto, job_build_amd64_exp);
     ] ;
   ()
