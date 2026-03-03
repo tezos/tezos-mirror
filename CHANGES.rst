@@ -67,6 +67,14 @@ Signer
 Baker
 -----
 
+- **Breaking change**: Removed the optional baker argument
+  ``--adaptive-issuance-vote <vote>``, as well as the
+  ``adaptive_issuance_vote`` field of the per-block-vote configuration
+  file. Both had been deprecated in Octez v24.0~rc1. This per-block
+  vote was meant to decide the activation of the Adaptive Issuance
+  feature, and has had no effects since the Paris protocol has been
+  voted in.
+
 Accuser
 -------
 

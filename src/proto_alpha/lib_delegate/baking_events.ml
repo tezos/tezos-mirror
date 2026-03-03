@@ -109,22 +109,6 @@ module Commands = struct
          `octez-accuser` instead, which automatically handles protocol \
          switches."
       ()
-
-  let deprecated_adaptive_issuance_vote =
-    declare_0
-      ~section
-      ~name:"deprecated_adaptive_issuance_vote"
-      ~level:Warning
-      ~msg:
-        "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument \
-         (placeholder 'vote') is deprecated. It is already ignored by the \
-         baker, and will be removed in the next major version of Octez."
-      ()
-
-  let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
-    if Option.is_some adaptive_issuance_vote then
-      emit deprecated_adaptive_issuance_vote ()
-    else Lwt.return_unit
 end
 
 module State_transitions = struct

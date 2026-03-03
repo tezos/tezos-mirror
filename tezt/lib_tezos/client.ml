@@ -78,10 +78,6 @@ type stresstest_contract_parameters = {
   invocation_gas_limit : int;
 }
 
-type ai_vote = On | Off | Pass
-
-let ai_vote_to_string = function On -> "on" | Off -> "off" | Pass -> "pass"
-
 let name t = t.name
 
 let base_dir t = t.base_dir
@@ -846,8 +842,7 @@ let spawn_bake_for ?env ?endpoint ?protocol
     ?(keys = [Constant.bootstrap1.alias]) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
     ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?count
-    ?force ?context_path ?dal_node_endpoint ?ai_vote ?(state_recorder = false)
-    client =
+    ?force ?context_path ?dal_node_endpoint ?(state_recorder = false) client =
   spawn_command
     ?env
     ?endpoint
@@ -870,13 +865,12 @@ let spawn_bake_for ?env ?endpoint ?protocol
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg "context" Fun.id context_path
     @ dal_node_arg dal_node_endpoint client
-    @ optional_arg "adaptive-issuance-vote" ai_vote_to_string ai_vote
     @ optional_switch "record_state" state_recorder)
 
 let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?dal_node_endpoint
-    ?ai_vote ?state_recorder ?expect_failure client =
+    ?state_recorder ?expect_failure client =
   spawn_bake_for
     ?env
     ?endpoint
@@ -892,7 +886,6 @@ let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     ?dal_node_endpoint
-    ?ai_vote
     ?state_recorder
     client
   |> Process.check ?expect_failure
@@ -900,7 +893,7 @@ let bake_for ?env ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?ai_vote ?state_recorder client =
+    ?node ?dal_node_endpoint ?state_recorder client =
   let node =
     match node with
     | Some n -> n
@@ -932,7 +925,6 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?force
       ?context_path
       ?dal_node_endpoint
-      ?ai_vote
       ?state_recorder
       client
   in
@@ -942,7 +934,7 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
 let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
     ?mempool ?ignore_node_mempool ?count ?force ?context_path ?level_before
-    ?node ?dal_node_endpoint ?ai_vote client =
+    ?node ?dal_node_endpoint client =
   let* (_level : int) =
     bake_for_and_wait_level
       ?env
@@ -961,7 +953,6 @@ let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?level_before
       ?node
       ?dal_node_endpoint
-      ?ai_vote
       client
   in
   unit

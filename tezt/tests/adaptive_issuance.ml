@@ -54,16 +54,9 @@ module Helpers = struct
       ~error_msg:"expected current_period = %R, got %L" ;
     unit
 
-  let bake ?ai_vote
-      ?(keys = List.map (fun x -> x.Account.alias) bootstrap_accounts) ~endpoint
-      ~protocol client =
-    Client.bake_for
-      ~endpoint
-      ~minimal_timestamp:true
-      ~protocol
-      ~keys
-      client
-      ?ai_vote
+  let bake ?(keys = List.map (fun x -> x.Account.alias) bootstrap_accounts)
+      ~endpoint ~protocol client =
+    Client.bake_for ~endpoint ~minimal_timestamp:true ~protocol ~keys client
 
   let bake_n_cycles bake ?keys n client =
     let* current_level = get_current_level client in
@@ -182,7 +175,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
   Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int launch_cycle ;
   (* Make delegate vote for AI activation*)
   let bake ?keys client =
-    Helpers.bake ~ai_vote:On ~endpoint:sandbox_endpoint ~protocol ?keys client
+    Helpers.bake ~endpoint:sandbox_endpoint ~protocol ?keys client
   in
   (* The vote should have passed during the first cycle *)
   let* () =
@@ -223,8 +216,7 @@ let bake_n ~endpoint ~protocol client i =
         ~protocol
         ~minimal_timestamp:true
         ~keys:[Constant.bootstrap2.alias]
-        client
-        ~ai_vote:On)
+        client)
 
 type bu_check = {
   pred : Operation_receipt.Balance_updates.t -> bool;
@@ -597,7 +589,7 @@ let test_staking =
          Constant.bootstrap2.public_key_hash
   in
   Log.info "Numerator/denominator before: %#d/%#d " numerator denominator ;
-  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  let bake = Helpers.bake ~endpoint ~protocol in
   let* () = Helpers.bake_n_cycles bake 1 client_1 in
 
   let stake0 =
@@ -1237,8 +1229,7 @@ let test_staking =
           ~protocol
           ~minimal_timestamp:true
           ~keys:[Constant.bootstrap1.alias]
-          client_1
-          ~ai_vote:On)
+          client_1)
   in
   let* finalise_unstake_hash = get_hash_of finalize_unstake in
 
@@ -1314,8 +1305,7 @@ let test_staking =
           ~protocol
           ~minimal_timestamp:true
           ~keys:[Constant.bootstrap1.alias]
-          client_1
-          ~ai_vote:On)
+          client_1)
   in
 
   let* () =
@@ -1328,8 +1318,7 @@ let test_staking =
           ~protocol
           ~minimal_timestamp:true
           ~keys:[Constant.bootstrap1.alias]
-          client_1
-          ~ai_vote:On)
+          client_1)
   in
   unit
 
@@ -1385,7 +1374,7 @@ let test_fix_delegated_balance =
   | None -> Test.fail "No delegate found"
   | Some d -> Log.info "Delegated: %s" d) ;
 
-  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  let bake = Helpers.bake ~endpoint ~protocol in
   log_step 4 "Wait for delegate to accept staking" ;
   let* _ = Helpers.bake_n_cycles bake 3 client in
 
@@ -1434,7 +1423,7 @@ let test_delegate_parameter_UX =
     ~tags:["staking"; "node"; "client"]
   @@ fun protocol ->
   let* _proto_hash, endpoint, client, node = init protocol in
-  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  let bake = Helpers.bake ~endpoint ~protocol in
   let current_cycle () = Node.current_cycle node in
 
   let* delegate_parameters_activation_delay =

@@ -178,17 +178,6 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
-   Remove this argument in Octez v25. *)
-let adaptive_issuance_vote_arg =
-  Tezos_clic.arg
-    ~doc:
-      "DEPRECATED: This argument is ignored by the baker and will be removed \
-       in the next major version of Octez."
-    ~long:"adaptive-issuance-vote"
-    ~placeholder:"vote"
-    per_block_vote_parameter
-
 let per_block_vote_file_arg =
   Tezos_clic.arg
     ~doc:"read per block votes as json file"
@@ -331,7 +320,7 @@ let allow_signing_delay_arg =
     ()
 
 let baker_args =
-  Tezos_clic.args18
+  Tezos_clic.args17
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -341,7 +330,6 @@ let baker_args =
     force_apply_from_round_arg
     keep_alive_arg
     liquidity_baking_toggle_vote_arg
-    adaptive_issuance_vote_arg
     per_block_vote_file_arg
     operations_arg
     dal_node_endpoint_arg
@@ -392,7 +380,6 @@ type t = {
   force_apply_from_round : int option;
   keep_alive : bool;
   liquidity_baking_vote : Per_block_votes.per_block_vote option;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote option;
   per_block_vote_file : string option;
   extra_operations : Uri.t option;
   dal_node_endpoint : Uri.t option;
@@ -414,7 +401,6 @@ let create_config
       force_apply_from_round,
       keep_alive,
       liquidity_baking_vote,
-      adaptive_issuance_vote,
       per_block_vote_file,
       extra_operations,
       dal_node_endpoint,
@@ -433,7 +419,6 @@ let create_config
     force_apply_from_round;
     keep_alive;
     liquidity_baking_vote;
-    adaptive_issuance_vote;
     per_block_vote_file;
     extra_operations;
     dal_node_endpoint;

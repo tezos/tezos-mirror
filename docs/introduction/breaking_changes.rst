@@ -46,6 +46,18 @@ Instead, the new ``octez-manager`` tool included in the Octez suite (see https:/
 
 Thus, in Octez v25, installing packages would display a warning about the deprecation and would link to ``octez-manager``.
 
+
+Removal of Adaptive Issuance vote argument from the baker
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Octez v25 removes the optional baker argument
+``--adaptive-issuance-vote <vote>``, as well as the
+``adaptive_issuance_vote`` field of the per-block-vote configuration
+file. Both have been deprecated in Octez v24. This per-block vote was
+meant to decide the activation of the Adaptive Issuance feature, and
+has had no effects since the Paris protocol has been voted in.
+
+
 .. _v24_breaking_changes:
 
 Octez Version 24
