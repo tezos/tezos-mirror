@@ -235,6 +235,73 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
     in
     return {num_messages = 0; num_ticks = 0L; initial_tick = Z.zero; state_hash}
 
+(** [replay_one_block plugin node_ctxt ctxt block] replays the PVM evaluation
+    for [block] on the given context [ctxt], returning the updated context.
+    This is used to reconstruct contexts for blocks that were not committed to
+    disk. *)
+let replay_one_block plugin node_ctxt ctxt (block : Sc_rollup_block.t) =
+  let open Lwt_result_syntax in
+  let predecessor =
+    Layer1.
+      {hash = block.header.predecessor; level = Int32.pred block.header.level}
+  in
+  let head =
+    Layer1.{hash = block.header.block_hash; level = block.header.level}
+  in
+  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+  let* messages =
+    Node_context.get_messages node_ctxt block.header.inbox_witness
+  in
+  let* _result =
+    process_head plugin node_ctxt ctxt ~predecessor head (inbox, messages)
+  in
+  return ctxt
+
+(** [checkout_context_with_replay plugin node_ctxt block_hash] checks out the
+    context for [block_hash]. If the block does not have a committed context
+    (e.g. with sparse commit strategies), finds the nearest committed ancestor
+    using a direct SQL query and replays forward from there. *)
+let checkout_context_with_replay plugin (node_ctxt : _ Node_context.t)
+    block_hash =
+  let open Lwt_result_syntax in
+  let* committed =
+    Node_context.checkout_committed_context node_ctxt block_hash
+  in
+  match committed with
+  | Some ctxt -> return ctxt
+  | None ->
+      let* block = Node_context.get_l2_block node_ctxt block_hash in
+      (* Find the nearest committed ancestor before this block's level. *)
+      let* ctxt, from_level =
+        let* prev =
+          Node_context.find_previous_committed_block
+            node_ctxt
+            block.header.level
+        in
+        match prev with
+        | Some prev_block ->
+            let* ctxt =
+              Node_context.checkout_context
+                node_ctxt
+                prev_block.header.block_hash
+            in
+            return (ctxt, Int32.succ prev_block.header.level)
+        | None ->
+            failwith
+              "No committed ancestor of level %ld, cannot replay with checkout"
+              block.header.level
+      in
+      let* blocks_to_replay =
+        Node_context.get_l2_blocks_by_level_range
+          node_ctxt
+          ~from_level
+          ~to_level:block.header.level
+      in
+      List.fold_left_es
+        (fun ctxt b -> replay_one_block plugin node_ctxt ctxt b)
+        ctxt
+        blocks_to_replay
+
 (** Returns the starting evaluation before the evaluation of the block. It
     contains the PVM state at the end of the execution of the previous block and
     the messages the block ([remaining_messages]). *)
@@ -242,7 +309,7 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
   let pred_level = Int32.pred block.header.level in
   let* ctxt =
-    Node_context.checkout_context node_ctxt block.header.predecessor
+    checkout_context_with_replay plugin node_ctxt block.header.predecessor
   in
   let* state =
     state_of_head

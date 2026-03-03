@@ -181,23 +181,27 @@ let commit_context node_ctxt ~level:_ ~commitment ctxt =
     let*! hash = Context.commit ctxt in
     return_some hash
 
-let checkout_context node_ctxt block_hash =
+let checkout_committed_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
-  let*? context_hash =
-    let open Result_syntax in
-    match context_hash with
-    | None ->
-        tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
-    | Some context -> return context
-  in
-  let*! ctxt = Context.checkout node_ctxt.context context_hash in
-  match ctxt with
-  | None ->
-      tzfail
-        (Rollup_node_errors.Cannot_checkout_context
-           (block_hash, Some context_hash))
+  match context_hash with
+  | None -> return_none
+  | Some context_hash -> (
+      let*! ctxt = Context.checkout node_ctxt.context context_hash in
+      match ctxt with
+      | None ->
+          tzfail
+            (Rollup_node_errors.Cannot_checkout_context
+               (block_hash, Some context_hash))
+      | Some ctxt -> return_some ctxt)
+
+let checkout_context node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let* committed = checkout_committed_context node_ctxt block_hash in
+  match committed with
   | Some ctxt -> return ctxt
+  | None ->
+      tzfail (Rollup_node_errors.Cannot_checkout_context (block_hash, None))
 
 let dal_supported node_ctxt =
   node_ctxt.dal_cctxt <> None
@@ -296,6 +300,9 @@ let last_committed_block {store; _} = Store.L2_blocks.find_last_committed store
 
 let find_previous_committed_block {store; _} level =
   Store.L2_blocks.find_previous_committed store level
+
+let get_l2_blocks_by_level_range {store; _} ~from_level ~to_level =
+  Store.L2_blocks.find_by_level_range store ~from_level ~to_level
 
 let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
 

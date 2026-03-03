@@ -342,6 +342,16 @@ module L2_blocks : sig
   val find_by_level :
     ?conn:Sqlite.conn -> _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
 
+  (** [find_by_level_range ?conn store ~from_level ~to_level] returns all L2
+      blocks with levels between [from_level] and [to_level] (inclusive), ordered
+      by level ascending. *)
+  val find_by_level_range :
+    ?conn:Sqlite.conn ->
+    _ t ->
+    from_level:int32 ->
+    to_level:int32 ->
+    Sc_rollup_block.t list tzresult Lwt.t
+
   (** Retrieve the level of an L2 block with its hash. *)
   val find_level :
     ?conn:Sqlite.conn -> _ t -> Block_hash.t -> int32 option tzresult Lwt.t
@@ -364,6 +374,11 @@ module L2_blocks : sig
   (** Retrieve the first block whose context is committed on disk. *)
   val find_first_committed :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** [find_previous_committed ?conn store level] returns the most recent block
+      with a committed context strictly before [level], if any. *)
+  val find_previous_committed :
+    ?conn:Sqlite.conn -> _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
 
   (** Same as {!find_last_committed} but just returns hash and level. *)
   val find_last_committed_hash_level :

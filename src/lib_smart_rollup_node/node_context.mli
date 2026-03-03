@@ -222,8 +222,16 @@ val commit_context :
   Context.rw ->
   Smart_rollup_context_hash.t option tzresult Lwt.t
 
+(** [checkout_committed_context node_ctxt block_hash] returns [Some context] if
+    block [block_hash] has a committed context, or [None] if the context was not
+    committed to disk (e.g. with sparse commit strategies). *)
+val checkout_committed_context :
+  < store : _ ; context : 'a > t ->
+  Block_hash.t ->
+  < index : 'a ; state : Access_mode.rw > Context.t option tzresult Lwt.t
+
 (** [checkout_context node_ctxt block_hash] returns the context at block
-    [block_hash]. *)
+    [block_hash]. Fails if the block does not have a committed context. *)
 val checkout_context :
   < store : _ ; context : 'a > t ->
   Block_hash.t ->
@@ -318,6 +326,15 @@ val last_committed_block : _ t -> Sc_rollup_block.t option tzresult Lwt.t
     with a committed context strictly before [level], if any. *)
 val find_previous_committed_block :
   _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
+
+(** [get_l2_blocks_by_level_range node_ctxt ~from_level ~to_level] returns all
+    L2 blocks with levels between [from_level] and [to_level] (inclusive),
+    ordered by level ascending. *)
+val get_l2_blocks_by_level_range :
+  _ t ->
+  from_level:int32 ->
+  to_level:int32 ->
+  Sc_rollup_block.t list tzresult Lwt.t
 
 (** [mark_finalized_head store hash level] remembers that the block with [hash]
     at [level] is finalized. By construction, every block whose level is smaller

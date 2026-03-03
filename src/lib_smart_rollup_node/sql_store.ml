@@ -1091,6 +1091,20 @@ module L2_blocks = struct
       AND l.level = ?
 |sql}
 
+    let select_by_level_range =
+      (t2 level level ->* l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, predecessor, commitment_hash,
+       previous_commitment_hash, context, inbox_witness,
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      WHERE l.level >= ? AND l.level <= ?
+      ORDER BY l.level ASC
+      |sql}
+
     let select_level =
       (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -1130,6 +1144,21 @@ module L2_blocks = struct
       INNER JOIN l2_levels as l
       ON l.block_hash = b.block_hash
       AND b.context IS NOT NULL
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
+    let select_previous_committed =
+      (level ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      WHERE l.level < ?
       ORDER BY l.level DESC LIMIT 1
       |sql}
 
@@ -1232,6 +1261,10 @@ module L2_blocks = struct
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_by_level level
 
+  let find_by_level_range ?conn store ~from_level ~to_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.select_by_level_range (from_level, to_level)
+
   let find_level ?conn store block_hash =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_level block_hash
@@ -1249,6 +1282,10 @@ module L2_blocks = struct
   let find_last_committed ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_last_committed ()
+
+  let find_previous_committed ?conn store level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_previous_committed level
 
   let find_first_committed ?conn store =
     with_connection store conn @@ fun conn ->
