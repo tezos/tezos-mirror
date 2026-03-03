@@ -55,9 +55,41 @@ pub type MutState = MutableState<NodePvm<Normal>>;
 pub struct Id(hash::Hash);
 
 ocaml::custom!(Repo);
-ocaml::custom!(State);
-ocaml::custom!(MutState);
 ocaml::custom!(Id);
+
+/// Manual implementation of `Custom` to encourage ocaml GC to kick in
+/// once more than two instances of `State` are allocated.
+impl ocaml::Custom for State {
+    const NAME: &'static str = "riscv.State\u{0}";
+
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        ..ocaml::custom::CustomOps {
+            finalize: Some(Self::finalize),
+            ..ocaml::custom::DEFAULT_CUSTOM_OPS
+        }
+    };
+
+    const USED: usize = 1;
+    const MAX: usize = 2;
+}
+
+/// Manual implementation of `Custom` to encourage ocaml GC to kick in
+/// once more than two instances of `MutState` are allocated.
+impl ocaml::Custom for MutState {
+    const NAME: &'static str = "riscv.MutState\u{0}";
+
+    const OPS: ::ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        ..ocaml::custom::CustomOps {
+            finalize: Some(Self::finalize),
+            ..ocaml::custom::DEFAULT_CUSTOM_OPS
+        }
+    };
+
+    const USED: usize = 1;
+    const MAX: usize = 2;
+}
 
 #[derive(ocaml::FromValue, ocaml::ToValue, strum::EnumCount)]
 #[ocaml::sig("Evaluating | Waiting_for_input | Waiting_for_reveal")]
