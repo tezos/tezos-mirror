@@ -335,8 +335,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
         in
         some result
   in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let kernel_setup =
+    Evm_node.make_kernel_setup
       ?max_delayed_inbox_blueprint_length
       ?kernel_compat
       ~sequencer
@@ -363,11 +363,13 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ~tez_bootstrap_accounts
       ?tez_bootstrap_contracts
       ?michelson_runtime_chain_id
-      ~output:output_config
       ?evm_version
       ?enable_fa_bridge
       ?with_runtimes
       ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config kernel_setup ~output:output_config ()
   in
   let* {output; _} =
     prepare_installer_kernel
@@ -483,8 +485,8 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
   let disable_legacy_dal_signals =
     Protocol.number protocol > 024 && enable_dal
   in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let kernel_setup =
+    Evm_node.make_kernel_setup
       ?chain_id
       ~l2_chain_ids
       ?max_delayed_inbox_blueprint_length
@@ -509,10 +511,12 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ~enable_multichain:true
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts
-      ~output:rollup_config
       ?enable_fa_bridge
       ?evm_version
       ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config kernel_setup ~output:rollup_config ()
   in
   let* {output; _} =
     prepare_installer_kernel_with_multiple_setup_file
@@ -531,7 +535,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     protocol () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
-    let chain_config = List.hd l2_chains in
+    let chain_config : Evm_node.l2_setup = List.hd l2_chains in
     setup_kernel_singlechain
       ~l1_contracts
       ?max_delayed_inbox_blueprint_length

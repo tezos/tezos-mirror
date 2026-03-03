@@ -126,6 +126,114 @@ type node_setup = {
   tx_queue_tx_per_addr_limit : int option;
 }
 
+type kernel_setup = {
+  kernel : Kernel.t;
+  l2_chain_ids : int list option;
+  max_delayed_inbox_blueprint_length : int option;
+  kernel_compat : string option;
+  remove_whitelist : bool option;
+  kernel_root_hash : string option;
+  chain_id : int option;
+  eth_bootstrap_balance : Wei.t option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_balance : Tez.t option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : string list option;
+  sequencer : string option;
+  delayed_bridge : string option;
+  ticketer : string option;
+  administrator : string option;
+  sequencer_governance : string option;
+  kernel_governance : string option;
+  kernel_security_governance : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  delayed_inbox_timeout : int option;
+  delayed_inbox_min_levels : int option;
+  sequencer_pool_address : string option;
+  maximum_allowed_ticks : int64 option;
+  maximum_gas_per_transaction : int64 option;
+  max_blueprint_lookahead_in_seconds : int64 option;
+  set_account_code : (string * string) list option;
+  enable_fa_bridge : bool option;
+  enable_revm : bool option;
+  enable_dal : bool option;
+  dal_slots : int list option;
+  dal_publishers_whitelist : string list option;
+  disable_legacy_dal_signals : bool option;
+  enable_fast_withdrawal : bool option;
+  enable_fast_fa_withdrawal : bool option;
+  enable_multichain : bool option;
+  evm_version : Evm_version.t option;
+  with_runtimes : Tezosx_runtime.t list option;
+  michelson_runtime_chain_id : string option;
+}
+
+let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
+    ?kernel_compat ?remove_whitelist ?kernel_root_hash ?chain_id
+    ?eth_bootstrap_balance
+    ?(eth_bootstrap_accounts = eth_default_bootstrap_accounts)
+    ?tez_bootstrap_balance ?tez_bootstrap_accounts ?tez_bootstrap_contracts
+    ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
+    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?set_account_code ?enable_fa_bridge
+    ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
+    ?disable_legacy_dal_signals ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?enable_multichain ?evm_version ?with_runtimes
+    ?michelson_runtime_chain_id () =
+  let tez_bootstrap_accounts =
+    match tez_bootstrap_accounts with
+    | Some _ -> tez_bootstrap_accounts
+    | None ->
+        if Tezosx_runtime.(mem Tezos with_runtimes) then
+          Some tez_default_bootstrap_accounts
+        else Some []
+  in
+  {
+    kernel = Option.value ~default:Kernel.Latest kernel;
+    l2_chain_ids;
+    max_delayed_inbox_blueprint_length;
+    kernel_compat;
+    remove_whitelist;
+    kernel_root_hash;
+    chain_id;
+    eth_bootstrap_balance;
+    eth_bootstrap_accounts = Some eth_bootstrap_accounts;
+    tez_bootstrap_balance;
+    tez_bootstrap_accounts;
+    tez_bootstrap_contracts;
+    sequencer;
+    delayed_bridge;
+    ticketer;
+    administrator;
+    sequencer_governance;
+    kernel_governance;
+    kernel_security_governance;
+    minimum_base_fee_per_gas;
+    da_fee_per_byte;
+    delayed_inbox_timeout;
+    delayed_inbox_min_levels;
+    sequencer_pool_address;
+    maximum_allowed_ticks;
+    maximum_gas_per_transaction;
+    max_blueprint_lookahead_in_seconds;
+    set_account_code;
+    enable_fa_bridge;
+    enable_revm;
+    enable_dal;
+    dal_slots;
+    dal_publishers_whitelist;
+    disable_legacy_dal_signals;
+    enable_fast_withdrawal;
+    enable_fast_fa_withdrawal;
+    enable_multichain;
+    evm_version;
+    with_runtimes;
+    michelson_runtime_chain_id;
+  }
+
 module Per_level_map = Map.Make (Int)
 
 let daemon_default_colors =
@@ -1611,139 +1719,147 @@ let wait_termination (evm_node : t) =
 
 let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
 
-let make_kernel_installer_config ?(l2_chain_ids = [])
-    ?max_delayed_inbox_blueprint_length ?kernel_compat
-    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
-    ?eth_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_balance
-    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?michelson_runtime_chain_id
-    ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
-    ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
-    ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction
-    ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
-    ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
-    ?(enable_dal = false) ?dal_slots ?dal_publishers_whitelist
-    ?(disable_legacy_dal_signals = false) ?(enable_fast_withdrawal = false)
-    ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
-    ?evm_version ?(with_runtimes = []) ~output () =
+let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
   let set_account_code =
-    List.flatten
-    @@ List.map
-         (fun (address, code) ->
-           ["--set-code"; Format.sprintf "%s,%s" address code])
-         set_account_code
+    List.concat_map
+      (fun (address, code) ->
+        ["--set-code"; Format.sprintf "%s,%s" address code])
+      (Option.value ~default:[] kernel_setup.set_account_code)
   in
   let l2_chain_ids =
-    List.flatten
-    @@ List.map
-         (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
-         l2_chain_ids
+    List.concat_map
+      (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
+      (Option.value ~default:[] kernel_setup.l2_chain_ids)
   in
   let with_runtimes =
     List.concat_map
       (fun runtime -> ["--with-runtime"; Tezosx_runtime.to_string runtime])
-      with_runtimes
+      (Option.value ~default:[] kernel_setup.with_runtimes)
   in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_arg
         "max-delayed-inbox-blueprint-length"
         Int.to_string
-        max_delayed_inbox_blueprint_length
-    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_compat
-    @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
-    @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
-    @ Cli_arg.optional_arg "chain-id" string_of_int chain_id
+        kernel_setup.max_delayed_inbox_blueprint_length
+    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_setup.kernel_compat
+    @ Cli_arg.optional_switch
+        "remove-whitelist"
+        (Option.value ~default:false kernel_setup.remove_whitelist)
+    @ Cli_arg.optional_arg
+        "kernel-root-hash"
+        Fun.id
+        kernel_setup.kernel_root_hash
+    @ Cli_arg.optional_arg "chain-id" string_of_int kernel_setup.chain_id
     @ l2_chain_ids
-    @ Cli_arg.optional_arg "sequencer" Fun.id sequencer
-    @ Cli_arg.optional_arg "delayed-bridge" Fun.id delayed_bridge
-    @ Cli_arg.optional_arg "ticketer" Fun.id ticketer
-    @ Cli_arg.optional_arg "admin" Fun.id administrator
-    @ Cli_arg.optional_arg "sequencer-governance" Fun.id sequencer_governance
-    @ Cli_arg.optional_arg "kernel-governance" Fun.id kernel_governance
+    @ Cli_arg.optional_arg "sequencer" Fun.id kernel_setup.sequencer
+    @ Cli_arg.optional_arg "delayed-bridge" Fun.id kernel_setup.delayed_bridge
+    @ Cli_arg.optional_arg "ticketer" Fun.id kernel_setup.ticketer
+    @ Cli_arg.optional_arg "admin" Fun.id kernel_setup.administrator
+    @ Cli_arg.optional_arg
+        "sequencer-governance"
+        Fun.id
+        kernel_setup.sequencer_governance
+    @ Cli_arg.optional_arg
+        "kernel-governance"
+        Fun.id
+        kernel_setup.kernel_governance
     @ Cli_arg.optional_arg
         "kernel-security-governance"
         Fun.id
-        kernel_security_governance
+        kernel_setup.kernel_security_governance
     @ Cli_arg.optional_arg
         "minimum-base-fee-per-gas"
         Wei.to_string
-        minimum_base_fee_per_gas
-    @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
+        kernel_setup.minimum_base_fee_per_gas
+    @ [
+        "--da-fee-per-byte";
+        Wei.to_string
+          (Option.value ~default:Wei.zero kernel_setup.da_fee_per_byte);
+      ]
     @ Cli_arg.optional_arg
         "delayed-inbox-timeout"
         string_of_int
-        delayed_inbox_timeout
+        kernel_setup.delayed_inbox_timeout
     @ Cli_arg.optional_arg
         "delayed-inbox-min-levels"
         string_of_int
-        delayed_inbox_min_levels
+        kernel_setup.delayed_inbox_min_levels
     @ Cli_arg.optional_arg
         "sequencer-pool-address"
         Fun.id
-        sequencer_pool_address
+        kernel_setup.sequencer_pool_address
     @ Cli_arg.optional_arg
         "maximum-allowed-ticks"
         Int64.to_string
-        maximum_allowed_ticks
+        kernel_setup.maximum_allowed_ticks
     @ set_account_code
     @ Cli_arg.optional_arg
         "maximum-gas-per-transaction"
         Int64.to_string
-        maximum_gas_per_transaction
+        kernel_setup.maximum_gas_per_transaction
     @ [
         "--max-blueprint-lookahead-in-seconds";
-        Int64.to_string max_blueprint_lookahead_in_seconds;
+        Int64.to_string
+          (Option.value
+             ~default:ten_years_in_seconds
+             kernel_setup.max_blueprint_lookahead_in_seconds);
       ]
-    @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
-    @ Cli_arg.optional_switch "enable-revm" enable_revm
-    @ Cli_arg.optional_switch "enable-multichain" enable_multichain
-    @ Cli_arg.optional_switch "enable-dal" enable_dal
-    @ Cli_arg.optional_switch "enable-fast-withdrawal" enable_fast_withdrawal
+    @ Cli_arg.optional_switch
+        "enable-fa-bridge"
+        (Option.value ~default:false kernel_setup.enable_fa_bridge)
+    @ Cli_arg.optional_switch
+        "enable-revm"
+        (Option.value ~default:false kernel_setup.enable_revm)
+    @ Cli_arg.optional_switch
+        "enable-multichain"
+        (Option.value ~default:false kernel_setup.enable_multichain)
+    @ Cli_arg.optional_switch
+        "enable-dal"
+        (Option.value ~default:false kernel_setup.enable_dal)
+    @ Cli_arg.optional_switch
+        "enable-fast-withdrawal"
+        (Option.value ~default:false kernel_setup.enable_fast_withdrawal)
     @ Cli_arg.optional_switch
         "enable-fast-fa-withdrawal"
-        enable_fast_fa_withdrawal
+        (Option.value ~default:false kernel_setup.enable_fast_fa_withdrawal)
     @ Cli_arg.optional_arg
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
-        dal_slots
+        kernel_setup.dal_slots
     @ Cli_arg.optional_arg
         "dal-publishers-whitelist"
         (fun l -> String.concat "," l)
-        dal_publishers_whitelist
+        kernel_setup.dal_publishers_whitelist
     @ Cli_arg.optional_switch
         "disable-legacy-dal-signals"
-        disable_legacy_dal_signals
+        (Option.value ~default:false kernel_setup.disable_legacy_dal_signals)
     @ Cli_arg.optional_arg
         "eth-bootstrap-balance"
         Wei.to_string
-        eth_bootstrap_balance
-    @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
-    @ (match eth_bootstrap_accounts with
+        kernel_setup.eth_bootstrap_balance
+    @ Cli_arg.optional_arg
+        "evm-version"
+        Evm_version.to_string
+        kernel_setup.evm_version
+    @ (match kernel_setup.eth_bootstrap_accounts with
       | None -> []
       | Some eth_bootstrap_accounts ->
-          List.flatten
-          @@ List.map
-               (fun eth_bootstrap_account ->
-                 ["--eth-bootstrap-account"; eth_bootstrap_account])
-               eth_bootstrap_accounts)
+          List.concat_map
+            (fun account -> ["--eth-bootstrap-account"; account])
+            eth_bootstrap_accounts)
     @ Cli_arg.optional_arg
         "tez-bootstrap-balance"
         Tez.to_string
-        tez_bootstrap_balance
-    @ (match tez_bootstrap_accounts with
+        kernel_setup.tez_bootstrap_balance
+    @ (match kernel_setup.tez_bootstrap_accounts with
       | None -> []
       | Some tez_bootstrap_accounts ->
-          List.flatten
-          @@ List.map
-               (fun tez_bootstrap_account ->
-                 [
-                   "--tez-bootstrap-account";
-                   tez_bootstrap_account.Account.public_key;
-                 ])
-               tez_bootstrap_accounts)
-    @ (match tez_bootstrap_contracts with
+          List.concat_map
+            (fun account ->
+              ["--tez-bootstrap-account"; account.Account.public_key])
+            tez_bootstrap_accounts)
+    @ (match kernel_setup.tez_bootstrap_contracts with
       | None -> []
       | Some tez_bootstrap_contracts ->
           List.flatten
@@ -1754,7 +1870,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     @ Cli_arg.optional_arg
         "michelson-runtime-chain-id"
         Fun.id
-        michelson_runtime_chain_id
+        kernel_setup.michelson_runtime_chain_id
     @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in

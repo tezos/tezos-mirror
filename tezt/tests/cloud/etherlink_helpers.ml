@@ -261,15 +261,20 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
   let*! () =
     let sequencer = if is_sequencer then Some account.public_key else None in
     let () = toplog "Init Etherlink: configuring the kernel" in
+    let kernel_setup =
+      Tezt_etherlink.Evm_node.make_kernel_setup
+        ?sequencer
+        ~eth_bootstrap_accounts
+        ~enable_dal:(Option.is_some dal_slots)
+        ~chain_id
+        ?dal_slots
+        ~enable_multichain:tezlink
+        ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
+        ()
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ?sequencer
-      ~eth_bootstrap_accounts
+      kernel_setup
       ~output:rollup_config
-      ~enable_dal:(Option.is_some dal_slots)
-      ~chain_id
-      ?dal_slots
-      ~enable_multichain:tezlink
-      ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
       ()
   in
   let* () = Process.spawn "cat" [rollup_config] |> Process.check in
@@ -474,9 +479,14 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
     let sequencer =
       if operator.is_sequencer then Some operator.account.public_key else None
     in
+    let kernel_setup =
+      Tezt_etherlink.Evm_node.make_kernel_setup
+        ?sequencer
+        ~eth_bootstrap_accounts
+        ()
+    in
     Tezt_etherlink.Evm_node.make_kernel_installer_config
-      ?sequencer
-      ~eth_bootstrap_accounts
+      kernel_setup
       ~output:output_config
       ()
   in

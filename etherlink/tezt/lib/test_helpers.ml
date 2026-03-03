@@ -616,13 +616,12 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     if not Tezosx_runtime.(mem Tezos with_runtimes) then []
     else tez_bootstrap_accounts
   in
-  let*! () =
-    Evm_node.make_kernel_installer_config
+  let kernel_setup =
+    Evm_node.make_kernel_setup
       ?maximum_gas_per_transaction
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
-      ~output:output_config
       ~eth_bootstrap_accounts
       ~tez_bootstrap_accounts
       ?evm_version
@@ -632,6 +631,9 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)
       ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config kernel_setup ~output:output_config ()
   in
   let _tag, uses = Kernel.to_uses_and_tags kernel in
   let* {output; _} =
