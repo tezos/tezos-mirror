@@ -96,6 +96,10 @@ pub trait DatabasePrecompileStateChanges {
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
     fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+    ) -> Result<Vec<u8>, CustomPrecompileError>;
     fn tezosx_call_michelson(
         &mut self,
         source: Address,
@@ -255,6 +259,32 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         }
     }
 
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+    ) -> Result<Vec<u8>, CustomPrecompileError> {
+        let context = CrossRuntimeContext {
+            gas_limit: self.block.gas_limit,
+            timestamp: self.block.timestamp,
+            block_number: self.block.number,
+        };
+        match get_alias(self.host, &source, RuntimeId::Tezos)? {
+            Some(alias) => Ok(alias),
+            None => {
+                let alias = self
+                    .registry
+                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos, context)
+                    .map_err(|e| {
+                        CustomPrecompileError::Revert(format!(
+                            "Failed to generate alias for source address: {e:?}"
+                        ))
+                    })?;
+                store_alias(self.host, &source, RuntimeId::Tezos, &alias)?;
+                Ok(alias)
+            }
+        }
+    }
+
     fn tezosx_call_michelson(
         &mut self,
         source: Address,
@@ -262,30 +292,11 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         amount: U256,
         data: &[u8],
     ) -> Result<(), CustomPrecompileError> {
+        let alias = self.tezosx_resolve_source_alias(source)?;
         let context = CrossRuntimeContext {
             gas_limit: self.block.gas_limit,
             timestamp: self.block.timestamp,
             block_number: self.block.number,
-        };
-        let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
-            Some(alias) => alias,
-            None => {
-                let alias = self
-                    .registry
-                    .generate_alias(
-                        self.host,
-                        &source.0 .0,
-                        RuntimeId::Tezos,
-                        context.clone(),
-                    )
-                    .map_err(|e| {
-                        CustomPrecompileError::Revert(format!(
-                            "Failed to generate alias for source address: {e:?}"
-                        ))
-                    })?;
-                store_alias(self.host, &source, RuntimeId::Tezos, &alias)?;
-                alias
-            }
         };
         let destination_contract = self
             .registry

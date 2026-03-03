@@ -7,6 +7,18 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
+/// Header names for the Tezos cross-runtime execution context.
+///
+/// These headers are injected by the gateway precompile so that the
+/// target runtime's `serve` implementation can recover the call context
+/// (sender, source, amount, gas, and block info).
+pub const X_TEZOS_SENDER: &str = "X-Tezos-Sender";
+pub const X_TEZOS_SOURCE: &str = "X-Tezos-Source";
+pub const X_TEZOS_AMOUNT: &str = "X-Tezos-Amount";
+pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
+pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
+pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
+
 /// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
 pub struct CrossRuntimeContext {
