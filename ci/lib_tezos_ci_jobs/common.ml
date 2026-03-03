@@ -185,15 +185,6 @@ module Build = struct
     |> enable_cargo_cache
     |> enable_sccache ~policy:Pull_push
 
-  let job_build_arm64_exp ?rules () : tezos_job =
-    job_build_dynamic_binaries
-      ~name:"oc.build_arm64-exp"
-      ?rules
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      "script-inputs/experimental-executables"
-
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     let profiled_binaries =
       ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]

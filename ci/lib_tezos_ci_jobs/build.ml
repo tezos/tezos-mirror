@@ -152,7 +152,7 @@ let job_build_exp =
         "etherlink-governance-observer";
         "fa-bridge-watchtower";
       ]
-    ~dune_cache:true
+    ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
 let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
@@ -162,6 +162,7 @@ let register () =
       (Manual, build_octez_source);
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
+      (Manual, job_build_exp Arm64);
     ] ;
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
@@ -180,7 +181,12 @@ let register () =
       (Auto, job_build_exp Amd64);
       (Auto, job_build_released Arm64);
       (Auto, job_build_extra_dev Arm64);
+      (Auto, job_build_exp Arm64);
     ] ;
   CI.register_master_jobs
-    [(Manual, job_build_released Arm64); (Manual, job_build_extra_dev Arm64)] ;
+    [
+      (Manual, job_build_released Arm64);
+      (Manual, job_build_extra_dev Arm64);
+      (Manual, job_build_exp Arm64);
+    ] ;
   ()
