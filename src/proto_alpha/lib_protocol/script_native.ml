@@ -226,29 +226,67 @@ module CLST_contract = struct
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     return (Script_list.of_list [op], storage, balance_updates, ctxt)
 
-  let execute_transfer_one_from (step_constants : step_constants) entrypoint_str
-      (ctxt, storage) from_ (token_id, amount) =
+  (** - If the sender is [from_] itself, no permission is needed.
+      - Otherwise, infinite allowance take precedence over finite allowance.
+      - If the sender is a spender, the allowance is decremented by
+        [amount] and an [allowance_update] event is emitted.
+      - Fails with [FA2_NOT_OPERATOR] if no relationship exists, or
+        with [FA2.1_INSUFFICIENT_ALLOWANCE] if the spender's allowance
+        is insufficient. *)
+  let allowance_check_and_update (step_constants : step_constants)
+      entrypoint_str (ctxt, storage, ops) from_ (token_id, amount) =
     let open Lwt_result_syntax in
-    let*? () = check_token_id token_id in
-    (* Checking that [from_] is the sender here instead of in
-       [execute_from] means that we repeat the check for each new
-       transfer from the same origin. On the other hand, it lets the
-       whole execution succeed if [from_] is not the sender but its
-       associated list of transfers is empty, which satisfies the
-       atomical behavior prescribed by the standard. Moreover, once
-       operators are implemented, the transferred [amount] will be
-       relevant to determining permission. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8214 Update
-       permission policy once operators are implemented *)
     let from_is_sender =
       let {destination; entrypoint} = from_ in
       Destination.equal destination step_constants.sender
       && Entrypoint.is_default entrypoint
     in
-    let*? () =
-      error_unless from_is_sender (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
-    in
+    if from_is_sender then return (ctxt, storage, ops)
+    else
+      let sender_address =
+        {destination = step_constants.sender; entrypoint = Entrypoint.default}
+      in
+      let* allowance, ctxt =
+        Clst_contract_storage.get_account_operator_allowance
+          ctxt
+          storage
+          ~owner:from_
+          ~spender:sender_address
+      in
+      match allowance with
+      | Some Infinite -> return (ctxt, storage, ops)
+      | Some (Finite allowance) ->
+          let*? () =
+            error_unless
+              Compare.Int.(Script_int.compare allowance amount >= 0)
+              (standard_error ~mnemonic:"FA2.1_INSUFFICIENT_ALLOWANCE")
+          in
+          let new_allowance = Script_int.(abs (sub allowance amount)) in
+          let* storage, ctxt =
+            Clst_contract_storage.set_account_operator_allowance
+              ctxt
+              storage
+              ~owner:from_
+              ~spender:sender_address
+              (Some (Finite new_allowance))
+          in
+          let* op_allowance_event, ctxt =
+            Clst_events.allowance_update_event
+              (ctxt, step_constants)
+              ~entrypoint:entrypoint_str
+              ~owner:from_
+              ~spender:sender_address
+              ~token_id
+              ~new_allowance
+              ~diff:(Script_int.neg amount)
+          in
+          return (ctxt, storage, op_allowance_event :: ops)
+      | None -> tzfail (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
 
+  let execute_transfer_one_from (step_constants : step_constants) entrypoint_str
+      (ctxt, storage, ops) from_ (token_id, amount) =
+    let open Lwt_result_syntax in
+    let*? () = check_token_id token_id in
     (* Smart contracts cannot hold tokens at all.
 
        We do check that [from_] is implicit too, because otherwise a
@@ -258,6 +296,16 @@ module CLST_contract = struct
       error_unless
         (is_implicit from_.destination)
         (Non_implicit_contract from_.destination)
+    in
+    (* Check permission and update the allowance if the sender has a
+       finite allowance on the owner's tokens. *)
+    let* ctxt, storage, ops =
+      allowance_check_and_update
+        step_constants
+        entrypoint_str
+        (ctxt, storage, ops)
+        from_
+        (token_id, amount)
     in
     let* balance_from, ctxt =
       Clst_contract_storage.get_balance_from_storage ctxt storage from_
@@ -293,7 +341,7 @@ module CLST_contract = struct
         ~new_balance:new_balance_from
         ~diff:(Script_int.neg amount)
     in
-    return (ctxt, storage, op_balance_event_from)
+    return (ctxt, storage, op_balance_event_from :: ops)
 
   (** Implementation of the [transfer] entrypoint, compliant with the
       FA2.1 standard:
@@ -320,11 +368,11 @@ module CLST_contract = struct
           (is_implicit to_.destination)
           (Non_implicit_contract to_.destination)
       in
-      let* ctxt, storage, op_balance_event_source =
+      let* ctxt, storage, ops =
         execute_transfer_one_from
           step_constants
           entrypoint_str
-          (ctxt, storage)
+          (ctxt, storage, ops)
           from_
           (token_id, amount)
       in
@@ -357,11 +405,7 @@ module CLST_contract = struct
           ~token_id:Clst_contract_storage.token_id
           ~amount
       in
-      return
-        ( ctxt,
-          storage,
-          op_balance_event_source :: op_balance_event_dest :: op_transfer_event
-          :: ops )
+      return (ctxt, storage, op_balance_event_dest :: op_transfer_event :: ops)
     in
     let execute_from (ctxt, storage, ops) (from_, txs) =
       List.fold_left_es
@@ -568,11 +612,11 @@ module CLST_contract = struct
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
     let create_ticket_one (ctxt, storage, ops) (from_, (token_id, amount)) =
-      let* ctxt, storage, op_balance_event_source =
+      let* ctxt, storage, ops =
         execute_transfer_one_from
           step_constants
           entrypoint_str
-          (ctxt, storage)
+          (ctxt, storage, ops)
           from_
           (token_id, amount)
       in
@@ -588,7 +632,7 @@ module CLST_contract = struct
           amount = ticket_amount;
         }
       in
-      return (ctxt, storage, op_balance_event_source :: ops, ticket)
+      return (ctxt, storage, ops, ticket)
     in
 
     let transfer_ticket (ctxt, ops) (to_, ticket) =
