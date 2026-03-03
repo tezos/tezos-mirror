@@ -187,7 +187,15 @@ let add_l2_genesis_block ?boot_sector (node_ctxt : _ Node_context.t) =
       }
   in
   let l2_block =
-    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    Sc_rollup_block.
+      {
+        header;
+        content = ();
+        num_ticks;
+        initial_tick;
+        state_hash = None;
+        pvm_status = None;
+      }
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () = Node_context.set_l2_head node_ctxt l2_block in

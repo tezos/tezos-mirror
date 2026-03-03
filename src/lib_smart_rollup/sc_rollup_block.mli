@@ -72,6 +72,12 @@ type ('header, 'content) block = {
   num_ticks : int64;
       (** Number of ticks produced by the evaluation of the messages in this
           block. *)
+  state_hash : State_hash.t option;
+      (** Hash of the PVM state after evaluation of the messages in this block.
+          [None] for blocks stored before this field was introduced. *)
+  pvm_status : string option;
+      (** Status of the PVM after evaluation of the messages in this block.
+          [None] for blocks stored before this field was introduced. *)
 }
 
 (** The type of layer 2 blocks. This type corresponds to what is stored on disk

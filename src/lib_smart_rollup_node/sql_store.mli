@@ -360,6 +360,11 @@ module L2_blocks : sig
     _ t ->
     Block_hash.t ->
     Sc_rollup_block.full option tzresult Lwt.t
+
+  (** [find_pvm_status ?conn s block_hash] retrieves the stored PVM status for
+      the L2 block identified by [block_hash], if any. *)
+  val find_pvm_status :
+    ?conn:Sqlite.conn -> _ t -> Block_hash.t -> string option tzresult Lwt.t
 end
 
 (** Storage of single values. *)

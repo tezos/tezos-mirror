@@ -292,6 +292,10 @@ val save_level : _ rw_store -> Layer1.head -> unit tzresult Lwt.t
     system should not have to come back to it. *)
 val save_l2_block : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 
+(** [find_pvm_status t block_hash] retrieves the stored PVM status for the
+    block identified by [block_hash], if any. *)
+val find_pvm_status : _ t -> Block_hash.t -> string option tzresult Lwt.t
+
 (** [set_l2_head t l2_block] sets [l2_block] as the new head of the L2 chain. *)
 val set_l2_head : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
 

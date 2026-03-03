@@ -47,6 +47,8 @@ type ('header, 'content) block = {
   content : 'content;
   initial_tick : Z.t;
   num_ticks : int64;
+  state_hash : State_hash.t option;
+  pvm_status : string option;
 }
 
 type t = (header, unit) block
@@ -176,13 +178,13 @@ let content_encoding =
 let block_encoding header_encoding content_encoding =
   let open Data_encoding in
   conv
-    (fun {header; content; initial_tick; num_ticks} ->
-      (header, (content, (initial_tick, num_ticks))))
-    (fun (header, (content, (initial_tick, num_ticks))) ->
-      {header; content; initial_tick; num_ticks})
+    (fun {header; content; initial_tick; num_ticks; state_hash; pvm_status} ->
+      (header, (content, (initial_tick, num_ticks, state_hash, pvm_status))))
+    (fun (header, (content, (initial_tick, num_ticks, state_hash, pvm_status)))
+       -> {header; content; initial_tick; num_ticks; state_hash; pvm_status})
   @@ merge_objs header_encoding
   @@ merge_objs content_encoding
-  @@ obj2
+  @@ obj4
        (req
           "initial_tick"
           Data_encoding.n
@@ -195,6 +197,17 @@ let block_encoding header_encoding content_encoding =
           ~description:
             "Number of ticks produced by the evaluation of the messages in \
              this block.")
+       (opt
+          "state_hash"
+          State_hash.encoding
+          ~description:
+            "Hash of the PVM state after evaluation of the messages in this \
+             block.")
+       (opt
+          "pvm_status"
+          Data_encoding.string
+          ~description:
+            "Status of the PVM after evaluation of the messages in this block.")
 
 let encoding = block_encoding header_encoding Data_encoding.unit
 

@@ -255,6 +255,9 @@ let save_level {store; _} Layer1.{hash; level} =
 let save_l2_block {store; _} (head : Sc_rollup_block.t) =
   Store.L2_blocks.store store head
 
+let find_pvm_status {store; _} block_hash =
+  Store.L2_blocks.find_pvm_status store block_hash
+
 let notify_processed_tezos_level node_ctxt level =
   node_ctxt.sync.processed_level <- level ;
   Lwt_watcher.notify node_ctxt.sync.sync_level_input level

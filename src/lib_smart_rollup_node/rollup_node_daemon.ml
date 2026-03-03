@@ -222,7 +222,8 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       }
   in
   let l2_block =
-    Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+    Sc_rollup_block.
+      {header; content = (); num_ticks; initial_tick; state_hash = None}
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () =
@@ -856,7 +857,8 @@ module Internal_for_tests = struct
         }
     in
     let l2_block =
-      Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
+      Sc_rollup_block.
+        {header; content = (); num_ticks; initial_tick; state_hash = None}
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in

@@ -74,7 +74,7 @@ CREATE TABLE l2_blocks (
   inbox_hash VARCHAR(55) NOT NULL ,
   initial_tick VARCHAR NOT NULL,
   num_ticks INTEGER NOT NULL
-);
+, state_hash VARCHAR(54), pvm_status BLOB);
 CREATE INDEX idx_l2_blocks_level
 ON l2_blocks(level);
 CREATE TABLE l2_levels (
