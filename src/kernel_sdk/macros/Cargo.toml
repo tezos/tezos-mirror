@@ -41,7 +41,6 @@ version = "0.2.2"
 path = "../sdk"
 features = [
 	"std",
-	"crypto",
 	"panic-hook",
 	"data-encoding",
 	"proto-alpha",
