@@ -394,6 +394,31 @@ let job_update_gitlab_release =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
+let job_release_page_packaging_revision =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "publish:release-page-packaging-revision"
+    ~__POS__
+    ~image:Images.CI.release_page
+    ~stage:Publish
+    ~description:
+      "A job to update the Octez release page for a packaging revision. \
+       Updates build number in versions.json, re-uploads binaries, and \
+       regenerates the release page and RSS feed."
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) ["index.html"])
+    ?needs:
+      (Some
+         [
+           (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
+           (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+         ])
+    ~variables:(release_page_variables ~mode)
+    [
+      "eval $(opam env)";
+      "./scripts/releases/publish-release-page-packaging-revision.sh";
+    ]
+
 let () =
   Cacio.register_jobs
     Packaging_revision
@@ -404,6 +429,7 @@ let () =
       (Manual, job_docker `real Arm64);
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_promote_to_version `real);
+      (Manual, job_release_page_packaging_revision `real);
     ] ;
   Cacio.register_jobs
     Packaging_revision_test
@@ -414,6 +440,7 @@ let () =
       (Manual, job_docker `test Arm64);
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_docker_promote_to_version `test);
+      (Manual, job_release_page_packaging_revision `test);
     ] ;
   ()
 
