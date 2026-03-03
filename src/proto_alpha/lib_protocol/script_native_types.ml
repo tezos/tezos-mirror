@@ -128,6 +128,12 @@ module Helpers = struct
     let+ typed = Script_typed_ir.contract_t loc ty in
     {untyped = prim Script.T_contract [untyped]; typed = Ty_ex_c typed}
 
+  let ticket_ty (type t) (ty : t comparable_ty) (untyped : Script.node) :
+      t ticket ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.ticket_t loc ty in
+    {untyped = prim Script.T_ticket [untyped]; typed = Ty_ex_c typed}
+
   (** Entrypoints combinator *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
@@ -256,8 +262,28 @@ module CLST_types = struct
     balance_request s_list
     * (balance_request * nat (* balance*)) s_list typed_contract
 
+  type ticket_with_token_id = (nat (* token_id *) * bytes option) ticket
+
+  type export_ticket =
+    ( (address * ticket_with_token_id s_list) s_list typed_contract option
+    (* destination *),
+      ( address (* to_ *),
+        (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+      (* tickets_to_export *) )
+      pair
+      s_list
+    (* txs *) )
+    pair
+    s_list
+
+  type allowance_entrypoints = (approve, update_operators) or_
+
+  type tickets_entrypoints = export_ticket
+
   type fa21_entrypoints =
-    ((transfer, approve) or_, (update_operators, balance_of) or_) or_
+    ( (transfer, balance_of) or_,
+      (allowance_entrypoints, tickets_entrypoints) or_ )
+    or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -280,27 +306,30 @@ module CLST_types = struct
     | Redeem of redeem
     | Finalize of finalize
     | Transfer of transfer
+    | Balance_of of balance_of
     | Approve of approve
     | Update_operators of update_operators
-    | Balance_of of balance_of
+    | Export_ticket of export_ticket
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L p)) -> Deposit p
     | L (L (R p)) -> Redeem p
     | L (R p) -> Finalize p
     | R (L (L p)) -> Transfer p
-    | R (L (R p)) -> Approve p
-    | R (R (L p)) -> Update_operators p
-    | R (R (R p)) -> Balance_of p
+    | R (L (R p)) -> Balance_of p
+    | R (R (L (L p))) -> Approve p
+    | R (R (L (R p))) -> Update_operators p
+    | R (R (R p)) -> Export_ticket p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L p))
     | Redeem p -> L (L (R p))
     | Finalize p -> L (R p)
     | Transfer p -> R (L (L p))
-    | Approve p -> R (L (R p))
-    | Update_operators p -> R (R (L p))
-    | Balance_of p -> R (R (R p))
+    | Balance_of p -> R (L (R p))
+    | Approve p -> R (R (L (L p)))
+    | Update_operators p -> R (R (L (R p)))
+    | Export_ticket p -> R (R (R p))
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -379,15 +408,63 @@ module CLST_types = struct
     in
     make_entrypoint_leaf "balance_of" balance_of_type
 
+  let clst_contents_ticket_ty : (nat * bytes option) comparable_ty tzresult =
+    Script_typed_ir.comparable_pair_t loc nat_t Script_typed_ir.option_bytes_t
+
+  let clst_ticket_ty : (ticket_with_token_id, _) ty tzresult =
+    let open Result_syntax in
+    let* clst_contents_ticket_ty in
+    Script_typed_ir.ticket_t loc clst_contents_ticket_ty
+
+  let ticket_with_token_id_type : ticket_with_token_id ty_node tzresult =
+    let open Result_syntax in
+    let* clst_contents_ticket_ty in
+    let untyped =
+      prim
+        Script.T_pair
+        [nat_ty.untyped; prim Script.T_option [bytes_ty.untyped]]
+    in
+    ticket_ty clst_contents_ticket_ty untyped
+
+  let export_ticket_type :
+      (export_ticket ty_node * export_ticket entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_to_export_ty =
+      tup3_ty
+        (add_name "from_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    let* tickets_to_export_ty = list_ty ticket_to_export_ty in
+    let* tx_ty =
+      pair_ty
+        (add_name "to_" address_ty)
+        (add_name "tickets_to_export" tickets_to_export_ty)
+    in
+    let* txs_ty = list_ty tx_ty in
+
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* dest_ty = pair_ty address_ty tickets_ty in
+    let* dests_ty = list_ty dest_ty in
+    let* dests_contract_ty = contract_ty dests_ty in
+    let* destination_ty = option_ty dests_contract_ty in
+    let* export_ticket_ty =
+      pair_ty (add_name "destination" destination_ty) (add_name "txs" txs_ty)
+    in
+    let* export_tickets_ty = list_ty export_ticket_ty in
+    make_entrypoint_leaf "export_ticket" export_tickets_ty
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
     let* finalize_type in
     let* transfer_type in
+    let* balance_of_type in
     let* approve_type in
     let* update_operators_type in
-    let* balance_of_type in
+    let* export_ticket_type in
     let* clst_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
@@ -395,10 +472,13 @@ module CLST_types = struct
       make_entrypoint_node clst_entrypoints_type_l finalize_type
     in
     let* fa21_entrypoints_type_l =
-      make_entrypoint_node transfer_type approve_type
+      make_entrypoint_node transfer_type balance_of_type
+    in
+    let* allowance_entrypoints_type =
+      make_entrypoint_node approve_type update_operators_type
     in
     let* fa21_entrypoints_type_r =
-      make_entrypoint_node update_operators_type balance_of_type
+      make_entrypoint_node allowance_entrypoints_type export_ticket_type
     in
     let* fa21_entrypoints_type =
       make_entrypoint_node fa21_entrypoints_type_l fa21_entrypoints_type_r

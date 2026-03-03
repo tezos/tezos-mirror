@@ -31,3 +31,6 @@
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_balance'
 "0"
+
+./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_ticket_balance'
+"0"

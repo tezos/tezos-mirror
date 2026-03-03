@@ -28,6 +28,17 @@ let to_clst_storage {ledger; total_supply; operators_table; token_metadata} =
 (* In case of single assets contracts, the token id of the asset is always 0. *)
 let token_id = Script_int.zero_n
 
+let ticket_token ~clst_hash =
+  let open Lwt_result_syntax in
+  let*? cty = CLST_types.clst_contents_ticket_ty in
+  return
+  @@ Ticket_token.Ex_token
+       {
+         ticketer = Contract.Originated clst_hash;
+         contents_type = cty;
+         contents = (token_id, (None : bytes option));
+       }
+
 let get_storage ctxt : (t option * context) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* clst_contract_hash = Contract.get_clst_contract_hash ctxt in

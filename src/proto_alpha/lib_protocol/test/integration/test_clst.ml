@@ -1009,3 +1009,41 @@ let () =
     | _ -> Test.fail "Unexpected output"
   in
   return_unit
+
+let () =
+  register_test ~title:"Test export_ticket entrypoint" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst) = Context.init2 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let ticket_amount_export = 30_000_000L in
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+  in
+  let* b = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg ticket_amount_export)
+      b
+      src
+  in
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance)
+      ticket_amount_export
+  in
+
+  let* op_export_ticket_zero = Op.clst_export_ticket (B b) ~src ~dst 0L in
+  let*! b = Block.bake ~operation:op_export_ticket_zero b in
+  match b with
+  | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
+  | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
