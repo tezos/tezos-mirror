@@ -3495,6 +3495,7 @@ dependencies = [
  "primitive-types",
  "revm",
  "revm-etherlink",
+ "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
@@ -3507,6 +3508,7 @@ version = "0.1.0"
 dependencies = [
  "http",
  "primitive-types",
+ "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-storage-latest",
@@ -3522,6 +3524,7 @@ dependencies = [
  "num-bigint",
  "primitive-types",
  "rlp",
+ "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-execution-latest",
  "tezos-protocol",
