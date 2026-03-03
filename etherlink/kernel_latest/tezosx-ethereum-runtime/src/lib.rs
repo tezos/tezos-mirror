@@ -2,8 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod url;
+
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
 use alloy_sol_types::SolCall;
+use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{ExecutionResult, Output};
 use revm::state::Bytecode;
@@ -79,6 +82,104 @@ fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types:
         Ok(20) => Some(bytes.into()),
         _ => None,
     }
+}
+
+/// Build an HTTP response from the result of [`execute_request`].
+///
+/// Execution results are mapped to HTTP status codes:
+/// - `Success` → 200
+/// - `Revert` → 400 (the contract rejected the call)
+/// - `Halt` → 500 (out of gas, invalid opcode, etc.)
+///
+/// Pre-execution errors are mapped as:
+/// - `BadRequest` → 400
+/// - `NotFound` → 404
+///
+/// All other errors propagate as `Err` — they indicate infrastructure
+/// problems that cannot be meaningfully represented as HTTP responses.
+fn build_response(
+    result: Result<ExecutionOutcome, TezosXRuntimeError>,
+) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+    let builder_result = match result {
+        Ok(outcome) => match outcome.result {
+            ExecutionResult::Success { output, .. } => {
+                let body = match output {
+                    Output::Call(bytes) => bytes.to_vec(),
+                    Output::Create(bytes, _) => bytes.to_vec(),
+                };
+                http::Response::builder().status(StatusCode::OK).body(body)
+            }
+            ExecutionResult::Revert { output, .. } => http::Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(output.to_vec()),
+            ExecutionResult::Halt { reason, .. } => http::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(format!("EVM execution halted: {reason:?}").into_bytes()),
+        },
+        Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(msg.into_bytes()),
+        Err(TezosXRuntimeError::NotFound(msg)) => http::Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(msg.into_bytes()),
+        Err(e) => return Err(e),
+    };
+    builder_result.map_err(|e| {
+        TezosXRuntimeError::Custom(format!("Failed to build HTTP response: {e}"))
+    })
+}
+
+/// Execute a cross-runtime request: parse the URL, extract the
+/// destination address, and run the EVM transaction.
+///
+/// This is the core logic behind [`EthereumRuntime::serve`], separated
+/// so that `serve` only handles the result-to-HTTP-status mapping.
+fn execute_request<Host>(
+    runtime: &EthereumRuntime,
+    registry: &impl Registry,
+    host: &mut Host,
+    request: http::Request<Vec<u8>>,
+) -> Result<ExecutionOutcome, TezosXRuntimeError>
+where
+    Host: StorageV1 + Logging,
+{
+    let parsed = url::parse_ethereum_url(request.uri())?;
+    let call_data = Bytes::from(request.into_body());
+
+    // TODO: Extract from X-Tezos-* headers.
+    let caller = TEZOSX_CALLER_ADDRESS;
+    let amount = AlloyU256::ZERO;
+    let gas_limit = u64::MAX;
+    let timestamp = U256::zero();
+    let block_number = U256::zero();
+
+    let context = CrossRuntimeContext {
+        gas_limit,
+        timestamp,
+        block_number,
+    };
+
+    let evm_version = read_evm_version(host);
+    let block_constants = runtime.create_block_constants(host, &context);
+    let gas_data = GasData::new(gas_limit, 0, gas_limit);
+
+    run_transaction(
+        host,
+        registry,
+        evm_version.into(),
+        &block_constants,
+        None,
+        caller,
+        Some(parsed.destination),
+        call_data,
+        gas_data,
+        amount,
+        revm::context::transaction::AccessList(vec![]),
+        None,
+        None,
+        false,
+    )
+    .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))
 }
 
 impl RuntimeInterface for EthereumRuntime {
@@ -278,14 +379,14 @@ impl RuntimeInterface for EthereumRuntime {
 
     fn serve<Host>(
         &self,
-        _registry: &impl Registry,
-        _host: &mut Host,
-        _request: http::Request<Vec<u8>>,
+        registry: &impl Registry,
+        host: &mut Host,
+        request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
-        todo!("EthereumRuntime::serve — will be implemented in a future issue")
+        build_response(execute_request(self, registry, host, request))
     }
 
     fn host(&self) -> &'static str {
@@ -682,5 +783,160 @@ mod tests {
         let alias2 = compute_alias(b"tz1xyz");
 
         assert_ne!(alias1, alias2);
+    }
+
+    mod build_response_tests {
+        use super::*;
+        use crate::build_response;
+        use http::StatusCode;
+        use revm::context::result::{
+            ExecutionResult, HaltReason, Output, ResultGas, SuccessReason,
+        };
+        use revm_etherlink::ExecutionOutcome;
+
+        fn make_success(output: Vec<u8>) -> ExecutionOutcome {
+            ExecutionOutcome {
+                result: ExecutionResult::Success {
+                    reason: SuccessReason::Return,
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    output: Output::Call(output.into()),
+                    logs: vec![],
+                },
+                withdrawals: vec![],
+            }
+        }
+
+        #[test]
+        fn success_returns_200() {
+            let resp = build_response(Ok(make_success(b"hello".to_vec()))).unwrap();
+            assert_eq!(resp.status(), StatusCode::OK);
+            assert_eq!(resp.body(), b"hello");
+        }
+
+        #[test]
+        fn success_empty_body() {
+            let resp = build_response(Ok(make_success(vec![]))).unwrap();
+            assert_eq!(resp.status(), StatusCode::OK);
+            assert!(resp.body().is_empty());
+        }
+
+        #[test]
+        fn revert_returns_400() {
+            let outcome = ExecutionOutcome {
+                result: ExecutionResult::Revert {
+                    logs: vec![],
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    output: b"revert reason".to_vec().into(),
+                },
+                withdrawals: vec![],
+            };
+            let resp = build_response(Ok(outcome)).unwrap();
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+            assert_eq!(resp.body(), b"revert reason");
+        }
+
+        #[test]
+        fn halt_returns_500() {
+            let outcome = ExecutionOutcome {
+                result: ExecutionResult::Halt {
+                    reason: HaltReason::OutOfGas(
+                        revm::context::result::OutOfGasError::Basic,
+                    ),
+                    logs: vec![],
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                },
+                withdrawals: vec![],
+            };
+            let resp = build_response(Ok(outcome)).unwrap();
+            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        }
+
+        #[test]
+        fn bad_request_error_returns_400() {
+            let resp =
+                build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())))
+                    .unwrap();
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+            assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
+        }
+
+        #[test]
+        fn not_found_error_returns_404() {
+            let resp = build_response(Err(TezosXRuntimeError::NotFound(
+                "no such contract".into(),
+            )))
+            .unwrap();
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            assert!(String::from_utf8_lossy(resp.body()).contains("no such contract"));
+        }
+
+        #[test]
+        fn custom_error_propagates() {
+            let result = build_response(Err(TezosXRuntimeError::Custom("boom".into())));
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_serve_calls_contract() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let contract = Address::from_slice(&[0x33; 20]);
+
+        // Deploy a contract that stores CALLVALUE to slot 0 and returns
+        // the value from slot 0 (32 bytes).
+        //   CALLVALUE      (0x34)
+        //   PUSH1 0x00     (0x6000)
+        //   SSTORE         (0x55)
+        //   PUSH1 0x20     (0x6020)  -- return size: 32 bytes
+        //   PUSH1 0x00     (0x6000)  -- return offset: 0
+        //   PUSH1 0x00     (0x6000)  -- slot 0
+        //   SLOAD          (0x54)    -- load slot 0
+        //   PUSH1 0x00     (0x6000)  -- memory offset: 0
+        //   MSTORE         (0x52)    -- store to memory
+        //   RETURN         (0xF3)
+        let bytecode_raw = Bytes::from_hex("34600055602060006000546000525AF3").unwrap();
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
+        contract_account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::ZERO,
+                    nonce: 0,
+                    code_hash,
+                    account_id: None,
+                    code: Some(Bytecode::new_raw(bytecode_raw.clone())),
+                },
+            )
+            .unwrap();
+        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+
+        // Fund the TEZOSX_CALLER_ADDRESS so run_transaction doesn't fail
+        let caller_addr = revm_etherlink::precompiles::constants::TEZOSX_CALLER_ADDRESS;
+        let mut caller_account = StorageAccount::from_address(&caller_addr).unwrap();
+        caller_account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::MAX,
+                    nonce: 0,
+                    code_hash: revm::primitives::B256::ZERO,
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        let url = format!(
+            "http://ethereum/{}",
+            alloy_primitives::hex::encode(contract.0 .0)
+        );
+        let request = http::Request::builder().uri(&url).body(vec![]).unwrap();
+
+        let resp = runtime.serve(&registry, &mut host, request).unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
     }
 }
