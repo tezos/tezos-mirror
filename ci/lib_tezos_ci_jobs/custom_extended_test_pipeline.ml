@@ -22,14 +22,6 @@ open Common.Build
 
 (* The build_x86_64 jobs are split in two to keep the artifact size
    under the 1GB hard limit set by GitLab. *)
-(* [job_build_x86_64_release] builds the released executables. *)
-let job_build_x86_64_release =
-  job_build_released_binaries
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ()
 
 let job_build_x86_64_exp =
   job_build_dynamic_binaries
@@ -53,7 +45,6 @@ let jobs () =
      in the schedule_extended_test pipeline. They are defined in [tezt.ml]. *)
   Cacio.get_custom_extended_test_jobs ()
   @ [
-      job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
       job_datadog_pipeline_trace;

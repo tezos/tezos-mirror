@@ -307,12 +307,10 @@ let tezt_job ?(retry_tests = 1) =
       [
         (Artifacts, job_build_tezt);
         (Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels);
+        (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_released);
       ]
     ~needs_legacy:
       [
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-            Before_merging );
         ( Artifacts,
           Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
       ]
@@ -464,8 +462,6 @@ let register () =
     ~description:"Daily tests to run for Etherlink."
     ~legacy_jobs:
       [
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-          Schedule_extended_test;
         Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
           Schedule_extended_test;
       ]

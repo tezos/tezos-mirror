@@ -380,58 +380,6 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build_x86_64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu_ramfs
-  rules:
-  - when: always
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - src/proto_*/parameters/*.json
-    when: on_success
-
 oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -672,6 +620,104 @@ sdk_bindings.test:
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+
+build_octez_source:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_very_high_cpu_ramfs
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/create_octez_tarball.sh octez
+  - mv octez.tar.bz2 ../
+  - cd ../
+  - tar xf octez.tar.bz2
+  - cd octez/
+  - eval $(opam env)
+  - make octez
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+oc.build_x86_64-released:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu_ramfs
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    name: build-x86_64-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - src/proto_*/parameters/*.json
+    when: on_success
 
 check_riscv_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
@@ -1196,14 +1242,14 @@ oc.test-liquidity-baking-scripts:
   - gcp
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
+  - oc.build_x86_64-released
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -1763,55 +1809,6 @@ oc.compile_sources_doc_ubuntu:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-build_octez_source:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_very_high_cpu_ramfs
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - ./scripts/ci/restrict_export_to_octez_source.sh
-  - ./scripts/ci/create_octez_tarball.sh octez
-  - mv octez.tar.bz2 ../
-  - cd ../
-  - tar xf octez.tar.bz2
-  - cd octez/
-  - eval $(opam env)
-  - make octez
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
 oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
@@ -1996,16 +1993,16 @@ tezt-flaky:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   allow_failure: true
   timeout: 40 minutes
   interruptible: false
@@ -2061,16 +2058,16 @@ tezt-extra:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -2124,16 +2121,16 @@ tezt-slow:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -2188,16 +2185,16 @@ tezt-riscv-slow-sequential:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -2251,16 +2248,16 @@ tezt-time-sensitive:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -2315,16 +2312,16 @@ tezt:
   - gcp_tezt
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
+  - oc.build_x86_64-released
   timeout: 40 minutes
   interruptible: false
   before_script:

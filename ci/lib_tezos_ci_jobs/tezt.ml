@@ -50,12 +50,16 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
 
 let common_needs_legacy =
   [
-    (Cacio.Artifacts, Code_verification.job_build_x86_64_release Before_merging);
-    (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
-    (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
+    (Cacio.Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
+    ( Cacio.Artifacts,
+      Code_verification.job_build_x86_64_extra_dev Before_merging );
   ]
 
-let common_needs = [(Cacio.Artifacts, Kernels.job_build_kernels)]
+let common_needs =
+  [
+    (Cacio.Artifacts, Kernels.job_build_kernels);
+    (Cacio.Artifacts, Build.job_build_x86_64_released);
+  ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
    But they still had a global Tezt timeout of 30 minutes,

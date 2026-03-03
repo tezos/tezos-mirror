@@ -143,20 +143,6 @@ let depending_on_pipeline_type :
      We just specialize its type to make it more clear what we are doing. *)
   Cacio.parameterize
 
-(* The build_x86_64 jobs are split in two to keep the artifact size
-   under the 1GB hard limit set by GitLab. *)
-(* [job_build_x86_64_release] builds the released executables. *)
-let job_build_x86_64_release =
-  depending_on_pipeline_type @@ fun pipeline_type ->
-  job_build_released_binaries
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ~dependencies:(dependencies_needs_start pipeline_type)
-    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
-    ()
-
 (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
    executables, as well as the tezt test suite used by the subsequent
    'tezt' jobs and TPS evaluation tool. *)
@@ -226,7 +212,6 @@ let jobs pipeline_type =
       child_pipeline_path
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
-  let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
   let job_build_x86_64_exp = job_build_x86_64_exp pipeline_type in
 
@@ -267,7 +252,6 @@ let jobs pipeline_type =
       job_build_arm64_exp;
       job_static_x86_64_experimental;
       job_static_arm64_experimental;
-      job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
       job_build_layer1_profiling

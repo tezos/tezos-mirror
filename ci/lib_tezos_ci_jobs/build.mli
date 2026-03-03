@@ -5,5 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Job [oc.build_x86_64-released]. *)
+val job_build_x86_64_released : Cacio.job
+
 (** Register build jobs. *)
 val register : unit -> unit
