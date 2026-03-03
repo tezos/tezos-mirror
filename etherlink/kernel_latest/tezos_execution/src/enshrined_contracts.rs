@@ -3,16 +3,19 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::Type;
-use mir::ast::{BinWriter, ByteReprTrait};
-use mir::lexer::Prim;
+use mir::ast::{BinWriter, ByteReprTrait, TypedValue};
+use mir::context::PushableTypecheckingContext;
+use mir::gas::Gas;
+use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
     context::CtxTrait,
 };
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
+use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_runtime::runtime::Runtime;
@@ -24,7 +27,7 @@ use crate::alias::{get_alias, store_alias};
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{HasContractAccount, HasHost};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EnshrinedContracts {
     TezosXGateway,
     ERC20Wrapper,
@@ -60,11 +63,29 @@ pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
 }
 
-fn extract_destination<'a>(value: Micheline<'a>) -> Result<String, TransferError> {
-    match value {
-        Micheline::String(address) => Ok(address.clone()),
-        _ => Err(TransferError::MirAddressUnsupportedError),
-    }
+/// Unwrap an `Rc<TypedValue>`, consuming it if possible to avoid cloning.
+fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
+    Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
+}
+
+/// Typecheck a Micheline value against the expected type for the given
+/// enshrined contract entrypoint. Returns the typed value, or an error
+/// if the entrypoint is unknown or the value doesn't match the type.
+fn typecheck_entrypoint_value<'a>(
+    contract: EnshrinedContracts,
+    entrypoint: &Entrypoint,
+    value: &Micheline<'a>,
+) -> Result<TypedValue<'a>, TransferError> {
+    let entrypoints = get_enshrined_contract_entrypoint(contract).ok_or_else(|| {
+        TransferError::GatewayError("Failed to build entrypoint map".into())
+    })?;
+    let ty = entrypoints.get(entrypoint).ok_or_else(|| {
+        TransferError::GatewayError(format!("Unknown entrypoint: {entrypoint}"))
+    })?;
+    let mut gas = Gas::default();
+    let mut tc_ctx = PushableTypecheckingContext { gas: &mut gas };
+    typecheck_value(value, &mut tc_ctx, ty)
+        .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
 pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
@@ -74,18 +95,28 @@ pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     registry: &impl Registry,
 ) -> Result<(), TransferError> {
+    let typed = typecheck_entrypoint_value(contract, entrypoint, &value)?;
     match contract {
         EnshrinedContracts::TezosXGateway => {
             if entrypoint.is_default() {
-                let dest = extract_destination(value)?;
-                tezosx_cross_runtime_call(registry, ctx, dest.as_str(), &[])
+                let TypedValue::String(dest) = typed else {
+                    return Err(TransferError::GatewayError(
+                        "Expected string for default entrypoint".into(),
+                    ));
+                };
+                tezosx_cross_runtime_call(registry, ctx, &dest, &[])
             } else if entrypoint.as_str() == "call" {
-                let (dest, method_sig, abi_params) = extract_call_params(value)?;
+                let (dest, method_sig, abi_params) = extract_call_params(typed)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
                 tezosx_cross_runtime_call(registry, ctx, &dest, &calldata)
+            } else if entrypoint.as_str() == "http_call" {
+                let _request = extract_http_call_request(typed)?;
+                // Mock: no dispatch, return success.
+                // Will be wired to RuntimeInterface::serve when available.
+                Ok(())
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
@@ -104,104 +135,169 @@ pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
                 }
             };
             let (evm_contract, addr_bytes, amount) =
-                extract_erc20_address_uint256_params(value)?;
+                extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
             tezosx_cross_runtime_call(registry, ctx, &evm_contract, &calldata)
         }
     }
 }
 
-/// Extract (destination, method_signature, abi_parameters) from a Micheline
-/// Pair(String(destination), Pair(String(method_sig), Bytes(abi_params))).
+/// Extract (destination, method_signature, abi_parameters) from a typed
+/// Pair(String, Pair(String, Bytes)) value.
 fn extract_call_params(
-    value: Micheline<'_>,
+    typed: TypedValue<'_>,
 ) -> Result<(String, String, Vec<u8>), TransferError> {
-    match value {
-        Micheline::App(Prim::Pair, args, _) if args.len() == 2 => {
-            let dest = match &args[0] {
-                Micheline::String(s) => s.clone(),
-                _ => {
-                    return Err(TransferError::GatewayError(
-                        "Expected string destination in call parameters".into(),
-                    ))
-                }
-            };
-            match &args[1] {
-                Micheline::App(Prim::Pair, inner_args, _) if inner_args.len() == 2 => {
-                    let method_sig = match &inner_args[0] {
-                        Micheline::String(s) => s.clone(),
-                        _ => {
-                            return Err(TransferError::GatewayError(
-                                "Expected string method signature".into(),
-                            ))
-                        }
-                    };
-                    let abi_params = match &inner_args[1] {
-                        Micheline::Bytes(b) => b.clone(),
-                        _ => {
-                            return Err(TransferError::GatewayError(
-                                "Expected bytes for ABI parameters".into(),
-                            ))
-                        }
-                    };
-                    Ok((dest, method_sig, abi_params))
-                }
-                _ => Err(TransferError::GatewayError(
-                    "Expected Pair(string, bytes) for method signature and parameters"
-                        .into(),
-                )),
-            }
-        }
-        _ => Err(TransferError::GatewayError(
-            "Expected Pair(string, Pair(string, bytes)) for call parameters".into(),
-        )),
-    }
+    let TypedValue::Pair(dest_rc, inner_rc) = typed else {
+        return Err(TransferError::GatewayError(
+            "call: expected pair (destination, (method_sig, abi_params))".into(),
+        ));
+    };
+    let TypedValue::String(dest) = unwrap_rc(dest_rc) else {
+        return Err(TransferError::GatewayError(
+            "call: expected string for destination".into(),
+        ));
+    };
+    let TypedValue::Pair(sig_rc, params_rc) = unwrap_rc(inner_rc) else {
+        return Err(TransferError::GatewayError(
+            "call: expected pair (method_sig, abi_params)".into(),
+        ));
+    };
+    let TypedValue::String(method_sig) = unwrap_rc(sig_rc) else {
+        return Err(TransferError::GatewayError(
+            "call: expected string for method signature".into(),
+        ));
+    };
+    let TypedValue::Bytes(abi_params) = unwrap_rc(params_rc) else {
+        return Err(TransferError::GatewayError(
+            "call: expected bytes for ABI parameters".into(),
+        ));
+    };
+    Ok((dest, method_sig, abi_params))
 }
 
-/// Extract (evm_contract, address_bytes, value) from a Micheline
-/// Pair(String(evm_contract), Pair(Bytes(address), Int(value))).
-fn extract_erc20_address_uint256_params(
-    value: Micheline<'_>,
-) -> Result<(String, Vec<u8>, BigInt), TransferError> {
-    match value {
-        Micheline::App(Prim::Pair, args, _) if args.len() == 2 => {
-            let evm_contract = match &args[0] {
-                Micheline::String(s) => s.clone(),
-                _ => {
-                    return Err(TransferError::GatewayError(
-                        "Expected string EVM contract address".into(),
-                    ))
-                }
+/// Build an `http::Request<Vec<u8>>` from a typed
+/// Pair(String, Pair(List(Pair(String, String)), Pair(Bytes, Nat))) value.
+///
+/// Method mapping: 0 = GET, 1 = POST. Other values default to POST.
+fn extract_http_call_request(
+    typed: TypedValue<'_>,
+) -> Result<http::Request<Vec<u8>>, TransferError> {
+    let TypedValue::Pair(url_rc, inner_rc) = typed else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected pair (url, (headers, (body, method)))".into(),
+        ));
+    };
+    let TypedValue::String(url) = unwrap_rc(url_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected string for URL".into(),
+        ));
+    };
+    let TypedValue::Pair(headers_rc, body_method_rc) = unwrap_rc(inner_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected pair (headers, (body, method))".into(),
+        ));
+    };
+    let TypedValue::List(headers_list) = unwrap_rc(headers_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected list for headers".into(),
+        ));
+    };
+    let headers: Vec<(String, String)> = headers_list
+        .into_iter()
+        .map(|item| {
+            let TypedValue::Pair(name_rc, val_rc) = unwrap_rc(item) else {
+                return Err(TransferError::GatewayError(
+                    "http_call: expected pair (name, value) in headers list".into(),
+                ));
             };
-            match &args[1] {
-                Micheline::App(Prim::Pair, inner_args, _) if inner_args.len() == 2 => {
-                    let addr_bytes = match &inner_args[0] {
-                        Micheline::Bytes(b) => b.clone(),
-                        _ => {
-                            return Err(TransferError::GatewayError(
-                                "Expected bytes for EVM address".into(),
-                            ))
-                        }
-                    };
-                    let value = match &inner_args[1] {
-                        Micheline::Int(n) => n.clone(),
-                        _ => {
-                            return Err(TransferError::GatewayError(
-                                "Expected int for token amount".into(),
-                            ))
-                        }
-                    };
-                    Ok((evm_contract, addr_bytes, value))
-                }
-                _ => Err(TransferError::GatewayError(
-                    "Expected Pair(bytes, int) for address and amount".into(),
-                )),
-            }
-        }
-        _ => Err(TransferError::GatewayError(
-            "Expected Pair(string, Pair(bytes, int)) for ERC-20 parameters".into(),
-        )),
+            let TypedValue::String(name) = unwrap_rc(name_rc) else {
+                return Err(TransferError::GatewayError(
+                    "http_call: expected string for header name".into(),
+                ));
+            };
+            let TypedValue::String(val) = unwrap_rc(val_rc) else {
+                return Err(TransferError::GatewayError(
+                    "http_call: expected string for header value".into(),
+                ));
+            };
+            Ok((name, val))
+        })
+        .collect::<Result<_, _>>()?;
+    let TypedValue::Pair(body_rc, method_rc) = unwrap_rc(body_method_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected pair (body, method)".into(),
+        ));
+    };
+    let TypedValue::Bytes(body) = unwrap_rc(body_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected bytes for body".into(),
+        ));
+    };
+    let TypedValue::Nat(method) = unwrap_rc(method_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected nat for method".into(),
+        ));
+    };
+    build_http_request(&url, &headers, &body, method)
+}
+
+/// Build an `http::Request<Vec<u8>>` from extracted parameters.
+fn build_http_request(
+    url: &str,
+    headers: &[(String, String)],
+    body: &[u8],
+    method: BigUint,
+) -> Result<http::Request<Vec<u8>>, TransferError> {
+    use num_traits::ToPrimitive;
+    let http_method = match method.to_u64() {
+        Some(0) => http::Method::GET,
+        Some(1) => http::Method::POST,
+        _ => http::Method::POST,
+    };
+
+    let mut builder = http::Request::builder().method(http_method).uri(url);
+    for (name, value) in headers {
+        builder = builder.header(name.as_str(), value.as_str());
     }
+
+    builder.body(body.to_vec()).map_err(|e| {
+        TransferError::GatewayError(format!(
+            "http_call: failed to build HTTP request: {e}"
+        ))
+    })
+}
+
+/// Extract (evm_contract, address_bytes, value) from a typed
+/// Pair(String, Pair(Bytes, Int)) value.
+fn extract_erc20_address_uint256_params(
+    typed: TypedValue<'_>,
+) -> Result<(String, Vec<u8>, BigInt), TransferError> {
+    let TypedValue::Pair(contract_rc, inner_rc) = typed else {
+        return Err(TransferError::GatewayError(
+            "ERC-20: expected pair (contract, (address, amount))".into(),
+        ));
+    };
+    let TypedValue::String(evm_contract) = unwrap_rc(contract_rc) else {
+        return Err(TransferError::GatewayError(
+            "ERC-20: expected string for EVM contract address".into(),
+        ));
+    };
+    let TypedValue::Pair(addr_rc, amount_rc) = unwrap_rc(inner_rc) else {
+        return Err(TransferError::GatewayError(
+            "ERC-20: expected pair (address, amount)".into(),
+        ));
+    };
+    let TypedValue::Bytes(addr_bytes) = unwrap_rc(addr_rc) else {
+        return Err(TransferError::GatewayError(
+            "ERC-20: expected bytes for EVM address".into(),
+        ));
+    };
+    let TypedValue::Int(amount) = unwrap_rc(amount_rc) else {
+        return Err(TransferError::GatewayError(
+            "ERC-20: expected int for token amount".into(),
+        ));
+    };
+    Ok((evm_contract, addr_bytes, amount))
 }
 
 /// ABI-encode a call to an ERC-20 function with signature `method_sig` and
@@ -360,6 +456,18 @@ pub(crate) fn get_enshrined_contract_entrypoint(
                 Entrypoint::try_from("call").ok()?,
                 Type::new_pair(Type::String, Type::new_pair(Type::String, Type::Bytes)),
             );
+            // %http_call: pair string (pair (list (pair string string)) (pair bytes nat))
+            //   (url, (headers, (body, method)))
+            entrypoints.insert(
+                Entrypoint::try_from("http_call").ok()?,
+                Type::new_pair(
+                    Type::String,
+                    Type::new_pair(
+                        Type::List(Rc::new(Type::new_pair(Type::String, Type::String))),
+                        Type::new_pair(Type::Bytes, Type::Nat),
+                    ),
+                ),
+            );
             Some(entrypoints)
         }
         EnshrinedContracts::ERC20Wrapper => {
@@ -384,6 +492,7 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 #[cfg(test)]
 mod tests {
     use mir::ast::AddressHash;
+    use mir::lexer::Prim;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::RuntimeId;
@@ -516,5 +625,113 @@ mod tests {
         // bridge should have been called twice
         let bridge_calls = registry.bridge_calls.borrow();
         assert_eq!(bridge_calls.len(), 2);
+    }
+
+    /// Helper to build a Micheline http_call value:
+    /// Pair(String(url), Pair(Seq(headers), Pair(Bytes(body), Int(method))))
+    fn build_http_call_micheline<'a>(
+        arena: &'a typed_arena::Arena<Micheline<'a>>,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+        method: i64,
+    ) -> Micheline<'a> {
+        let header_pairs: Vec<Micheline<'a>> = headers
+            .iter()
+            .map(|(name, value)| {
+                Micheline::prim2(
+                    arena,
+                    Prim::Pair,
+                    name.to_string().into(),
+                    value.to_string().into(),
+                )
+            })
+            .collect();
+        let headers_seq = Micheline::Seq(arena.alloc_extend(header_pairs));
+        let body_method = Micheline::prim2(
+            arena,
+            Prim::Pair,
+            body.to_vec().into(),
+            num_bigint::BigInt::from(method).into(),
+        );
+        let inner_pair = Micheline::prim2(arena, Prim::Pair, headers_seq, body_method);
+        Micheline::prim2(arena, Prim::Pair, url.to_string().into(), inner_pair)
+    }
+
+    /// Typecheck a Micheline http_call value into a TypedValue.
+    fn typecheck_http_call<'a>(
+        value: &Micheline<'a>,
+    ) -> Result<TypedValue<'a>, TransferError> {
+        typecheck_entrypoint_value(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("http_call").unwrap(),
+            value,
+        )
+    }
+
+    #[test]
+    fn test_http_call_parses_valid_parameters() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc/transfer",
+            &[("Content-Type", "application/micheline")],
+            &[0x01, 0x02],
+            1,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
+        assert_eq!(request.method(), http::Method::POST);
+        assert_eq!(
+            request.headers().get("Content-Type").unwrap(),
+            "application/micheline"
+        );
+        assert_eq!(request.body(), &vec![0x01, 0x02]);
+    }
+
+    #[test]
+    fn test_http_call_empty_headers() {
+        let arena = typed_arena::Arena::new();
+        let value =
+            build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
+        let typed = typecheck_http_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        assert_eq!(request.uri(), "http://michelson/KT1abc");
+        assert_eq!(request.method(), http::Method::GET);
+        assert!(request.headers().is_empty());
+        assert!(request.body().is_empty());
+    }
+
+    #[test]
+    fn test_http_call_multiple_headers() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc",
+            &[
+                ("Content-Type", "application/micheline"),
+                ("X-Custom", "some-value"),
+            ],
+            &[0xDE, 0xAD],
+            42,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        // Unknown method defaults to POST
+        assert_eq!(request.method(), http::Method::POST);
+        assert_eq!(
+            request.headers().get("Content-Type").unwrap(),
+            "application/micheline"
+        );
+        assert_eq!(request.headers().get("X-Custom").unwrap(), "some-value");
+        assert_eq!(request.body(), &vec![0xDE, 0xAD]);
+    }
+
+    #[test]
+    fn test_http_call_malformed_parameters() {
+        let result =
+            typecheck_http_call(&Micheline::String("not a valid http_call".to_string()));
+        assert!(result.is_err());
     }
 }

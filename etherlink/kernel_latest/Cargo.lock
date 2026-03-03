@@ -3169,6 +3169,7 @@ name = "tezos-execution-latest"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "http",
  "mir",
  "nom",
  "num-bigint",
