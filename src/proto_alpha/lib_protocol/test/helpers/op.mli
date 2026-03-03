@@ -984,14 +984,18 @@ val clst_update_operator :
   [< `Add | `Remove] ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_export_ticket ctxt src dst amount] exports [amount] clst
-    tokens as a clst ticket from [src] to [dst]. *)
+(** [clst_export_ticket ?destination_contract ctxt src dst amount]
+    exports [amount] clst tokens as a clst ticket from [src] to [dst]
+    if [destination_contract] is [None]. Otherwise, emits the internal
+    transaction to the [destination_contract] entrypoint of [list
+    (pair dst_address (list ticket))] type. *)
 val clst_export_ticket :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
+  ?destination_contract:string option ->
   Context.t ->
   src:Contract.t ->
   dst:Contract.t ->

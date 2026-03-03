@@ -87,9 +87,12 @@ module CLST_types : sig
     pair
     s_list
 
+  type import_ticket =
+    (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
+
   type allowance_entrypoints = (approve, update_operators) or_
 
-  type tickets_entrypoints = export_ticket
+  type tickets_entrypoints = (export_ticket, import_ticket) or_
 
   type fa21_entrypoints =
     ( (transfer, balance_of) or_,
@@ -146,6 +149,7 @@ module CLST_types : sig
     | Approve of approve
     | Update_operators of update_operators
     | Export_ticket of export_ticket
+    | Import_ticket of import_ticket
 
   val entrypoint_from_arg : arg -> entrypoint
 

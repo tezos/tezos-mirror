@@ -30,6 +30,8 @@ type t = n num
 let of_n n =
   if Compare.Int.(Script_int.(compare n zero_n) > 0) then Some (n : t) else None
 
+let to_n n = (n : n num)
+
 let of_z z = Option.bind (is_nat z) of_n
 
 let of_zint z = of_z @@ of_zint z
