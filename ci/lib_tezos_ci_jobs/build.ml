@@ -152,9 +152,10 @@ let job_build_exp =
     ~dune_cache:true
 
 let register () =
-  (* Since [build_octez_source] is manual, we do not add it to [merge_train] pipelines,
+  (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
-  CI.register_before_merging_jobs [(Manual, build_octez_source)] ;
+  CI.register_before_merging_jobs
+    [(Manual, build_octez_source); (Manual, job_build_released Arm64)] ;
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
      even if the tests need not be run. *)
@@ -170,5 +171,7 @@ let register () =
       (Auto, job_build_released Amd64);
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
+      (Auto, job_build_released Arm64);
     ] ;
+  CI.register_master_jobs [(Manual, job_build_released Arm64)] ;
   ()

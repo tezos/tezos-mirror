@@ -145,10 +145,6 @@ let depending_on_pipeline_type :
 let build_arm_rules ~pipeline_type =
   make_rules ~pipeline_type ~label:"ci--arm64" ~manual:Yes ()
 
-let job_build_arm64_release =
-  depending_on_pipeline_type @@ fun pipeline_type ->
-  job_build_arm64_release ~rules:(build_arm_rules ~pipeline_type) ()
-
 let job_build_arm64_extra_dev =
   depending_on_pipeline_type @@ fun pipeline_type ->
   job_build_arm64_extra_dev ~rules:(build_arm_rules ~pipeline_type) ()
@@ -184,7 +180,6 @@ let jobs pipeline_type =
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
 
-  let job_build_arm64_release = job_build_arm64_release pipeline_type in
   let job_build_arm64_extra_dev = job_build_arm64_extra_dev pipeline_type in
   let job_build_arm64_exp = job_build_arm64_exp pipeline_type in
 
@@ -216,7 +211,6 @@ let jobs pipeline_type =
   (* Build jobs *)
   let build =
     [
-      job_build_arm64_release;
       job_build_arm64_extra_dev;
       job_build_arm64_exp;
       job_static_x86_64_experimental;
