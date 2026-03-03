@@ -14,6 +14,7 @@ license = "MIT"
 revm.workspace = true
 
 # Types
+http.workspace = true
 hex.workspace = true
 primitive-types.workspace = true
 tezos_ethereum.workspace = true
