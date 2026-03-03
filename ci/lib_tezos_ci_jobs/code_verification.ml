@@ -143,22 +143,6 @@ let depending_on_pipeline_type :
      We just specialize its type to make it more clear what we are doing. *)
   Cacio.parameterize
 
-(* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
-   executables, as well as the tezt test suite used by the subsequent
-   'tezt' jobs and TPS evaluation tool. *)
-let job_build_x86_64_extra_dev =
-  depending_on_pipeline_type @@ fun pipeline_type ->
-  job_build_dynamic_binaries
-    ~name:"oc.build_amd64-extra-dev"
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~dependencies:(dependencies_needs_start pipeline_type)
-    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
-    ~extra:true
-    "script-inputs/dev-executables"
-  |> enable_dune_cache
-
 let job_build_x86_64_exp =
   depending_on_pipeline_type @@ fun pipeline_type ->
   job_build_dynamic_binaries
@@ -212,7 +196,6 @@ let jobs pipeline_type =
       child_pipeline_path
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
-  let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
   let job_build_x86_64_exp = job_build_x86_64_exp pipeline_type in
 
   let job_build_arm64_release = job_build_arm64_release pipeline_type in
@@ -252,7 +235,6 @@ let jobs pipeline_type =
       job_build_arm64_exp;
       job_static_x86_64_experimental;
       job_static_arm64_experimental;
-      job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
       job_build_layer1_profiling
         ~rules:(make_rules ~changes:changeset_octez ())

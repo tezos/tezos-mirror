@@ -49,16 +49,13 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
     @ and_)
 
 let common_needs_legacy =
-  [
-    (Cacio.Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
-    ( Cacio.Artifacts,
-      Code_verification.job_build_x86_64_extra_dev Before_merging );
-  ]
+  [(Cacio.Artifacts, Code_verification.job_build_x86_64_exp Before_merging)]
 
 let common_needs =
   [
     (Cacio.Artifacts, Kernels.job_build_kernels);
     (Cacio.Artifacts, Build.job_build_x86_64_released);
+    (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
   ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
@@ -168,9 +165,12 @@ let job_tezt_static_binaries =
            We did the same in the docs/ci. *)
         (Artifacts, Master_branch.job_static_x86_64);
         (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
-        (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
       ]
-    ~needs:[] (* No need for kernels for this job. *)
+    ~needs:
+      [
+        (* No need for kernels for this job. *)
+        (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
+      ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]

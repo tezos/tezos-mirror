@@ -31,21 +31,8 @@ let job_build_x86_64_exp =
     ~cpu:Very_high
     "script-inputs/experimental-executables"
 
-let job_build_x86_64_extra_dev =
-  job_build_dynamic_binaries
-    ~name:"oc.build_amd64-extra-dev"
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~extra:true
-    "script-inputs/dev-executables"
-
 let jobs () =
   (* The jobs we want to run are a subset of the Tezt jobs that run
      in the schedule_extended_test pipeline. They are defined in [tezt.ml]. *)
   Cacio.get_custom_extended_test_jobs ()
-  @ [
-      job_build_x86_64_extra_dev;
-      job_build_x86_64_exp;
-      job_datadog_pipeline_trace;
-    ]
+  @ [job_build_x86_64_exp; job_datadog_pipeline_trace]
