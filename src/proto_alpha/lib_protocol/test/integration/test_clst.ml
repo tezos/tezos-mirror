@@ -513,7 +513,7 @@ let () =
           ~view_name:"get_total_supply"
           ~input:
             Environment.Micheline.(
-              Prim (dummy_location, Script.D_Unit, [], []) |> strip_locations)
+              Int (dummy_location, Z.zero) |> strip_locations)
           b
       in
       let total_supply =
