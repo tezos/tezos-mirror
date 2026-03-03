@@ -125,7 +125,7 @@ mir = { path = "../../contrib/mir", default-features = false, features = ["allow
 typed-arena = "2"
 
 # http
-http = "1"
+http = { path = "../../vendors/http" }
 
 # miscs
 format_no_std = "1.2.0"
