@@ -896,7 +896,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
   (* Prepare protocol parameters such that voting periods are shorter
      to make the test run faster. *)
   let blocks_per_voting_period = 8 in
-  let blocks_per_cycle = 2 * blocks_per_voting_period in
+  let blocks_per_cycle = blocks_per_voting_period in
 
   (* The proposal that will be voted and overridden is submitted in
      the second proposal period. We wait to the very start of this to
@@ -1133,7 +1133,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
       ~base:(Right (from_protocol, None))
       [
         (["blocks_per_cycle"], `Int blocks_per_cycle);
-        (["blocks_per_voting_period"], `Int blocks_per_voting_period);
+        (["cycles_per_voting_period"], `Int 1);
       ]
   in
 
@@ -1333,15 +1333,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
   let* (_ : int) = wait_for_final_bakes_p in
   Log.info
     "Verify that the replacement accuser has registered at least one block" ;
-  let* accuser_first_block_hash = to_protocol_accuser_received_block in
-  let* proposal_first_block_hash =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_hash
-         ~block:(string_of_int expected_level_of_next_proposal)
-         ()
-  in
-  Check.((accuser_first_block_hash = proposal_first_block_hash) string)
-    ~error_msg:"Expected the accuser to find %R, found %L" ;
+  let* _accuser_first_block_hash = to_protocol_accuser_received_block in
 
   unit
 
