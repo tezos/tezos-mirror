@@ -13,6 +13,9 @@
 
 ### RPCs changes
 
+- Proxy mode is being deprecated, and will soon be fully removed.
+  In proxy mode RPCs are not expected to work and this mode is not to be used in production. (!20786)
+
 ### Monitoring changes
 
 - Export metrics for the number of host function calls during kernel
