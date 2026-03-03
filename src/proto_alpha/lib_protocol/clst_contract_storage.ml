@@ -15,13 +15,15 @@ type t = {
   ledger : CLST_types.ledger;
   total_supply : CLST_types.total_supply;
   operators_table : CLST_types.operators_table;
+  token_metadata : CLST_types.token_metadata;
 }
 
-let from_clst_storage (ledger, (total_supply, operators_table)) =
-  {ledger; total_supply; operators_table}
+let from_clst_storage (ledger, (total_supply, (operators_table, token_metadata)))
+    =
+  {ledger; total_supply; operators_table; token_metadata}
 
-let to_clst_storage {ledger; total_supply; operators_table} =
-  (ledger, (total_supply, operators_table))
+let to_clst_storage {ledger; total_supply; operators_table; token_metadata} =
+  (ledger, (total_supply, (operators_table, token_metadata)))
 
 (* In case of single assets contracts, the token id of the asset is always 0. *)
 let token_id = Script_int.zero_n
@@ -161,3 +163,6 @@ let set_account_operator_allowance context storage ~owner ~spender new_allowance
       storage.operators_table
   in
   return ({storage with operators_table}, context)
+
+let get_token_info context storage ~token_id =
+  Script_big_map.get context token_id storage.token_metadata

@@ -121,3 +121,12 @@ val set_account_operator_allowance :
   spender:address ->
   CLST_types.nat option option ->
   (t * context) tzresult Lwt.t
+
+(** [get_token_info context storage token_id] returns the token
+    metadata associated with [token_id], or [None] if [token_id] does
+    not exist. *)
+val get_token_info :
+  context ->
+  t ->
+  token_id:CLST_types.nat ->
+  ((CLST_types.nat * CLST_types.token_info) option * context) tzresult Lwt.t

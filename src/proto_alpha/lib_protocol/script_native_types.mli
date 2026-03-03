@@ -93,7 +93,11 @@ module CLST_types : sig
       tokens into tickets. Operators cannot increase the allowance. *)
   type operators_table = (address, operators) big_map
 
-  type storage = (ledger, total_supply, operators_table) tup3
+  type token_info = (Script_string.t, bytes) map
+
+  type token_metadata = (nat, nat (* token_id *) * token_info) big_map
+
+  type storage = (ledger, total_supply, operators_table, token_metadata) tup4
 
   type balance_view = (address * nat, nat) view_type
 
@@ -110,6 +114,8 @@ module CLST_types : sig
     ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
       bool (* is_operator *) )
     view_type
+
+  type get_token_metadata_view = (nat (* token_id *), token_info) view_type
 
   type entrypoint =
     | Deposit of deposit
@@ -133,6 +139,8 @@ module CLST_types : sig
   val get_allowance_view_ty : get_allowance_view tzresult
 
   val is_operator_view_ty : is_operator_view tzresult
+
+  val get_token_metadata_view_ty : get_token_metadata_view tzresult
 
   val transfer_event_type :
     ( address (* from_ *),
@@ -174,6 +182,10 @@ module CLST_types : sig
       bool (* is_operator *) )
     tup4
     ty_node
+    tzresult
+
+  val token_metadata_update_event_type :
+    (nat (* token_id *), token_info option (* new_metadata *)) pair ty_node
     tzresult
 end
 

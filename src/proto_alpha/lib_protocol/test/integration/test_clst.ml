@@ -939,3 +939,73 @@ let () =
   let amount = Tez.to_mutez amount in
   let* () = Assert.equal_int64 ~loc:__LOC__ amount balance in
   return_unit
+
+let () =
+  register_test ~title:"Test get_token_metadata view" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, _ = Context.init1 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let* token_metadata_id0 =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"get_token_metadata"
+      ~input:
+        Environment.Micheline.(Int (dummy_location, Z.zero) |> strip_locations)
+      b
+  in
+  let* () =
+    let open Environment.Micheline in
+    let open Michelson_v1_primitives in
+    let expected_token_metadata =
+      let elt key value =
+        Prim
+          ( dummy_location,
+            D_Elt,
+            [String (dummy_location, key); Bytes (dummy_location, value)],
+            [] )
+      in
+      [
+        elt "decimals" (Bytes.of_string "6");
+        elt "name" (Bytes.of_string "Staked Tez");
+        elt "symbol" (Bytes.of_string "sTez");
+        elt "tokenKind" (Bytes.of_string "fungible");
+      ]
+    in
+    match token_metadata_id0 |> Environment.Micheline.root with
+    | Seq (_, token_metadata) ->
+        let is_equal =
+          List.equal
+            (fun a b ->
+              match (a, b) with
+              | ( Prim
+                    ( _,
+                      Script.D_Elt,
+                      [String (_, key_a); Bytes (_, value_a)],
+                      [] ),
+                  Prim
+                    ( _,
+                      Script.D_Elt,
+                      [String (_, key_b); Bytes (_, value_b)],
+                      [] ) ) ->
+                  String.equal key_a key_b && Bytes.equal value_a value_b
+              | _ -> false)
+            token_metadata
+            expected_token_metadata
+        in
+        Assert.is_true ~loc:__LOC__ is_equal
+    | _ -> Test.fail "Unexpected output"
+  in
+  let* token_metadata_id1 =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"get_token_metadata"
+      ~input:
+        Environment.Micheline.(Int (dummy_location, Z.one) |> strip_locations)
+      b
+  in
+  let () =
+    match token_metadata_id1 |> Environment.Micheline.root with
+    | Environment.Micheline.Seq (_, []) -> ()
+    | _ -> Test.fail "Unexpected output"
+  in
+  return_unit

@@ -47,25 +47,37 @@ module Helpers = struct
   let address_ty =
     {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
 
-  let address_map_ty (type value)
+  let string_ty = {untyped = prim Script.T_string []; typed = Ty_ex_c string_t}
+
+  let bytes_ty = {untyped = prim Script.T_bytes []; typed = Ty_ex_c bytes_t}
+
+  let map_ty (type key value) (ty_key : key comparable_ty)
+      (unty_key : Script.node)
       ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
-      (address, value) map ty_node tzresult =
+      (key, value) map ty_node tzresult =
     let open Result_syntax in
-    let* map_t : ((address, value) map, _) ty = map_t loc address_t ty_value in
-    let untyped_map = prim Script.T_map [address_ty.untyped; unty_value] in
+    let* map_t : ((key, value) map, _) ty = map_t loc ty_key ty_value in
+    let untyped_map = prim Script.T_map [unty_key; unty_value] in
     return {untyped = untyped_map; typed = Ty_ex_c map_t}
 
-  let address_big_map_ty (type value)
+  let address_map_ty value = map_ty address_t address_ty.untyped value
+
+  let string_map_ty value = map_ty string_t string_ty.untyped value
+
+  let big_map_ty (type key value) (ty_key : key comparable_ty)
+      (unty_key : Script.node)
       ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
-      (address, value) big_map ty_node tzresult =
+      (key, value) big_map ty_node tzresult =
     let open Result_syntax in
-    let* big_map_t : ((address, value) big_map, _) ty =
-      big_map_t loc address_t ty_value
+    let* big_map_t : ((key, value) big_map, _) ty =
+      big_map_t loc ty_key ty_value
     in
-    let untyped_big_map =
-      prim Script.T_big_map [address_ty.untyped; unty_value]
-    in
+    let untyped_big_map = prim Script.T_big_map [unty_key; unty_value] in
     return {untyped = untyped_big_map; typed = Ty_ex_c big_map_t}
+
+  let address_big_map_ty value = big_map_ty address_t address_ty.untyped value
+
+  let nat_big_map_ty value = big_map_ty nat_t nat_ty.untyped value
 
   let pair_ty (type a b) ({untyped = unty1; typed = Ty_ex_c ty1; _} : a ty_node)
       ({untyped = unty2; typed = Ty_ex_c ty2; _} : b ty_node) :
@@ -257,7 +269,11 @@ module CLST_types = struct
 
   type operators_table = (address, operators) big_map
 
-  type storage = (ledger, total_supply, operators_table) tup3
+  type token_info = (Script_string.t, bytes) map
+
+  type token_metadata = (nat, nat (* token_id *) * token_info) big_map
+
+  type storage = (ledger, total_supply, operators_table, token_metadata) tup4
 
   type entrypoint =
     | Deposit of deposit
@@ -398,11 +414,20 @@ module CLST_types = struct
     let* operators_ty = address_map_ty allowance_ty in
     address_big_map_ty operators_ty
 
+  let token_info_ty : token_info ty_node tzresult = string_map_ty bytes_ty
+
+  let token_metadata_ty : token_metadata ty_node tzresult =
+    let open Result_syntax in
+    let* token_info_ty in
+    let* token_metadata_one_ty = pair_ty nat_ty token_info_ty in
+    nat_big_map_ty token_metadata_one_ty
+
   let storage_type : storage ty_node tzresult =
     let open Result_syntax in
     let* ledger_ty = address_big_map_ty nat_ty in
     let* operators_table_ty in
-    tup3_ty ledger_ty nat_ty operators_table_ty
+    let* token_metadata_ty in
+    tup4_ty ledger_ty nat_ty operators_table_ty token_metadata_ty
 
   type balance_view = (address * nat, nat) view_type
 
@@ -419,6 +444,8 @@ module CLST_types = struct
     ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
       bool (* is_operator *) )
     view_type
+
+  type get_token_metadata_view = (nat (* token_id *), token_info) view_type
 
   let balance_view_ty =
     let open Result_syntax in
@@ -439,6 +466,11 @@ module CLST_types = struct
     let open Result_syntax in
     let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
     return {input_ty; output_ty = bool_ty.typed}
+
+  let get_token_metadata_view_ty =
+    let open Result_syntax in
+    let* {typed = output_ty; _} = token_info_ty in
+    return {input_ty = nat_ty.typed; output_ty}
 
   let transfer_event_type =
     let open Result_syntax in
@@ -494,6 +526,17 @@ module CLST_types = struct
         (add_name "is_operator" bool_ty)
     in
     return @@ add_name "operator_update" x
+
+  let token_metadata_update_event_type =
+    let open Result_syntax in
+    let* token_info_ty in
+    let* token_info_ty = option_ty token_info_ty in
+    let* x =
+      pair_ty
+        (add_name "token_id" nat_ty)
+        (add_name "new_metadata" token_info_ty)
+    in
+    return @@ add_name "token_metadata_update" x
 end
 
 type ('arg, 'storage) kind =
