@@ -140,6 +140,25 @@ let job_gitlab_publish =
         | `non_release_tag -> "");
       ])
 
+let release_page_variables ~mode =
+  match mode with
+  | `test ->
+      (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+       depends on the release type (tests or not). *)
+      [
+        ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+        ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+        ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+        ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+      ]
+  | `real ->
+      [
+        ("S3_BUCKET", "site-prod.octez.tezos.com");
+        ("BUCKET_PATH", "/releases");
+        ("URL", "octez.tezos.com");
+        ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+      ]
+
 let job_release_page =
   Cacio.parameterize @@ fun mode ->
   Cacio.parameterize @@ fun wait_for ->
@@ -164,24 +183,7 @@ let job_release_page =
               (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
               (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
             ])
-    ~variables:
-      (match mode with
-      | `test ->
-          (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
-            depends on the release type (tests or not). *)
-          [
-            ("S3_BUCKET", "release-page-test.nomadic-labs.com");
-            ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
-          ]
-      | `real ->
-          [
-            ("S3_BUCKET", "site-prod.octez.tezos.com");
-            ("BUCKET_PATH", "/releases");
-            ("URL", "octez.tezos.com");
-            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
-          ])
+    ~variables:(release_page_variables ~mode)
     ["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
 let job_opam_release =
