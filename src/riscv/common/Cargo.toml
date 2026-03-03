@@ -1,0 +1,11 @@
+[package]
+name = "octez-riscv-api-common"
+version = "0.0.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+ocaml.workspace = true
+parking_lot.workspace = true

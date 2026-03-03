@@ -16,6 +16,37 @@ use parking_lot::RwLock;
 
 use crate::try_clone::TryClone;
 
+/// Trait to allow rust types to self-configure the 'resource markers' passed to
+/// OCaml's `caml_alloc_custom` function.
+///
+/// These control how many of a particular type can be allocated before OCaml will
+/// start to be proactive about GC-ing them.
+///
+/// The `USED` and `MAX` are defaulted to the values chosen by [`ocaml::Custom`] trait.
+/// The resources they refer to are of 'arbitrary unit' - the importance is the
+/// comparison between `USED` and `MAX`.
+pub trait CustomGcResource {
+    /// Custom type name when under immutable semantics
+    const IMMUTABLE_NAME: &'static str;
+
+    /// Custom type name when under mutable semantics
+    const MUTABLE_NAME: &'static str;
+
+    /// How many resources an immutable allocation of this type should consume.
+    const IMMUTABLE_USED: usize = 0;
+
+    /// The maximum number of resources immutable allocations of the type may consume
+    /// before GC kicks in more heavily.
+    const IMMUTABLE_MAX: usize = 1;
+
+    /// How many resources an immutable allocation of this type should consume.
+    const MUTABLE_USED: usize = 0;
+
+    /// The maximum number of resources mutable allocations of the type may consume
+    /// before GC kicks in more heavily.
+    const MUTABLE_MAX: usize = 1;
+}
+
 pub struct ImmutableState<T>(Arc<T>);
 
 impl<T> From<MutableState<T>> for ImmutableState<T> {
@@ -43,21 +74,39 @@ impl<T> ImmutableState<T> {
 
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
-    pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+    pub fn apply_ro<U, R>(&self, f: impl FnOnce(&U) -> R) -> R
+    where
+        T: Deref<Target = U>,
+    {
         f(&self.0)
     }
 
     /// Apply a mutable function `f` over the underlying state. Clones the old data to the new object.
     #[inline]
     #[must_use = "ImmutableState::apply returns new state"]
-    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<(Self, R), T::Error>
+    pub fn apply<U, R>(&self, f: impl FnOnce(&mut U) -> R) -> Result<(Self, R), T::Error>
     where
-        T: TryClone,
+        T: TryClone + DerefMut<Target = U>,
     {
         let mut t = self.0.as_ref().try_clone()?;
         let result = f(&mut t);
         Ok((ImmutableState::new(t), result))
     }
+}
+
+impl<T: CustomGcResource> ocaml::Custom for ImmutableState<T> {
+    const NAME: &'static str = T::IMMUTABLE_NAME;
+
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        ..ocaml::custom::CustomOps {
+            finalize: Some(Self::finalize),
+            ..ocaml::custom::DEFAULT_CUSTOM_OPS
+        }
+    };
+
+    const USED: usize = T::IMMUTABLE_USED;
+    const MAX: usize = T::IMMUTABLE_MAX;
 }
 
 /// [`MutableState`] can hold a state of type `T` and have it borrowed or owned.
@@ -120,7 +169,10 @@ impl<T> MutableState<T> {
 
     /// Apply a read-only function `f` over the underlying state. Never clones data.
     #[inline]
-    pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
+    pub fn apply_ro<U, R>(&self, f: impl FnOnce(&U) -> R) -> R
+    where
+        T: Deref<Target = U>,
+    {
         let guard = self.0.try_read().expect(
             "Shouldn't try to read a MutableState that is being written to. See `move_semantics::MutableState`",
         );
@@ -133,9 +185,9 @@ impl<T> MutableState<T> {
     /// Apply a mutable function `f` mutating the state in place. May perform a copy if
     /// the underlying state is a borrowed [`MutableState`].
     #[inline]
-    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<R, T::Error>
+    pub fn apply<U, R>(&self, f: impl FnOnce(&mut U) -> R) -> Result<R, T::Error>
     where
-        T: TryClone,
+        T: TryClone + DerefMut<Target = U>,
     {
         let mut guard = self
             .0
@@ -153,4 +205,19 @@ impl<T> MutableState<T> {
             }
         }
     }
+}
+
+impl<T: CustomGcResource> ocaml::Custom for MutableState<T> {
+    const NAME: &'static str = T::MUTABLE_NAME;
+
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        ..ocaml::custom::CustomOps {
+            finalize: Some(Self::finalize),
+            ..ocaml::custom::DEFAULT_CUSTOM_OPS
+        }
+    };
+
+    const USED: usize = T::MUTABLE_USED;
+    const MAX: usize = T::MUTABLE_MAX;
 }
