@@ -1,11 +1,11 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
-use tezos_data_encoding::{enc::BinWriter, types::Narith};
+use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
@@ -252,22 +252,11 @@ pub fn execute_validation<Host: Runtime, C: Context>(
     context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
-    da_fee_per_byte_in_mutez: Option<u64>,
+    required_da_fees: Option<u64>,
 ) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError> {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }
-
-    // Compute the raw size of the operation for DA fee checking.
-    // Must be done before the operation is consumed by signature verification.
-    let op_raw_size = if da_fee_per_byte_in_mutez.is_some() {
-        operation
-            .to_bytes()
-            .map(|bytes| bytes.len())
-            .map_err(|_| ValidityError::FailedToSerializeOperation)?
-    } else {
-        0
-    };
 
     // Initialize the validation gas using the gas limit of the first operation in the batch
     let mut validation_gas =
@@ -340,24 +329,19 @@ pub fn execute_validation<Host: Runtime, C: Context>(
     // of posting this operation to L1.
     // When da_fee_per_byte_in_mutez is None (e.g. delayed inbox operations that already
     // paid L1 fees, or unit tests), this check is skipped entirely.
-    if let Some(fee_per_byte) = da_fee_per_byte_in_mutez {
+    if let Some(required_da_fees) = required_da_fees {
         let total_fees: Narith = validated_operations
             .iter()
             .fold(Narith::from(0_u64), |acc, op| {
                 Narith(acc.0 + &op.content.fee.0)
             });
-        let required_fee =
-            Narith::from((op_raw_size as u64).saturating_mul(fee_per_byte));
-        if total_fees < required_fee {
+        if total_fees < Narith(required_da_fees.into()) {
             log!(
                 host,
                 Error,
-                "Insufficient DA fee: batch provides {:?} mutez but needs {:?} mutez \
-                 for an operation of {} bytes (at {} mutez/byte)",
+                "Insufficient DA fee: batch provides {:?} mutez but needs {:?} mutez",
                 total_fees,
-                required_fee,
-                op_raw_size,
-                fee_per_byte
+                required_da_fees
             );
             return Err(ValidityError::InsufficientFee);
         }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,6 +6,7 @@ use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
+use mir::ast::BinWriter;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
@@ -1014,6 +1015,21 @@ fn execute_smart_contract<'a, Host: Runtime>(
     }
 }
 
+pub fn get_required_da_fees(
+    operation: &Operation,
+    da_fee_per_byte_mutez: u64,
+) -> anyhow::Result<u64> {
+    let op_raw_size = operation
+        .to_bytes()
+        .map(|bytes| bytes.len())
+        .map_err(|_| anyhow::anyhow!("Cannot map operation to its raw size"))?;
+    // TODO: See: L2-939.
+    // It is needed for the fees to be updated but without
+    // a proper gas system 'à-la-Ethereum' we can't use for `FeeUpdates`
+    // for now.
+    Ok(da_fee_per_byte_mutez.saturating_mul(op_raw_size as u64))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
@@ -1023,7 +1039,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
-    da_fee_per_byte_in_mutez: Option<u64>,
+    required_da_fees: Option<u64>,
 ) -> Result<Vec<OperationWithMetadata>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
@@ -1039,7 +1055,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
         context,
         operation,
         skip_signature_check,
-        da_fee_per_byte_in_mutez,
+        required_da_fees,
     ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
@@ -1413,12 +1429,12 @@ mod tests {
     use typed_arena::Arena;
 
     use crate::gas::TezlinkOperationGas;
-    use crate::TcCtx;
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
     };
+    use crate::{get_required_da_fees, TcCtx};
     use crate::{make_default_ctx, COST_PER_BYTES};
     use tezosx_interfaces::{
         CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
@@ -5847,6 +5863,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&batch, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5855,7 +5874,7 @@ mod tests {
             batch,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert!(result.is_ok(), "Batch with sufficient fees should succeed");
@@ -5896,6 +5915,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: 10_000 mutez covers up to 2500 bytes.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5904,7 +5926,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert!(
@@ -5946,6 +5968,9 @@ mod tests {
         );
 
         // DA fee = 4 mutez/byte: for any operation > 0 bytes, 1 mutez is insufficient.
+        let da_fee_per_byte_mutez = 4;
+        let required_da_fees =
+            get_required_da_fees(&operation, da_fee_per_byte_mutez).unwrap();
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
@@ -5954,7 +5979,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
-            Some(4),
+            Some(required_da_fees),
         );
 
         assert_eq!(

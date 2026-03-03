@@ -33,8 +33,8 @@ let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
     ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?max_blueprints_catchup ?max_blueprints_lag ?catchup_cooldown
-    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) ?da_fee scenario
-    protocols =
+    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) ?da_fee
+    ?sequencer_pool_address scenario protocols =
   (* Most of the RPCs tezt tests are RPC that are enable on a real Tezos protocol.
        Now that block 0 and 1 are set on protocol Zero and Genesis, we produce two
        blocks to skip the two first blocks. *)
@@ -65,6 +65,7 @@ let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
           tez_bootstrap_accounts = bootstrap_accounts;
           tez_bootstrap_contracts = bootstrap_contracts;
           da_fee_per_byte = da_fee;
+          sequencer_pool_address;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -3469,6 +3470,54 @@ let test_tezlink_insufficient_da_fee =
     ~error_msg:"Prevalidation should have failed with %R but got %L" ;
   unit
 
+let test_tezlink_da_fee_credited_to_pool =
+  let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
+  let da_fee_eth_int = 4 in
+  register_tezlink_only_test
+    ~title:"DA fees are credited to sequencer pool address"
+    ~tags:["kernel"; "da_fee"; "sequencer_pool_address"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~da_fee:(Wei.of_eth_int da_fee_eth_int)
+    ~sequencer_pool_address
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* Check initial balance of pool address is zero. *)
+  let*@ initial_balance =
+    Rpc.get_balance ~address:sequencer_pool_address sequencer
+  in
+  Check.((Wei.zero = initial_balance) Wei.typ)
+    ~error_msg:"Initial balance of the sequencer pool address should be zero" ;
+  (* Perform a successful transfer with fee > 0. *)
+  let fee = Tez.of_int 650 in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~fee
+      ~gas_limit:10000
+      ~storage_limit:10000
+      ~fee_cap:fee
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* Check balance of pool address increased.
+     In this scenario, DA fees per byte is [da_fee_eth_int=4],
+     and the size of the operation is [raw_op_size=154].
+     [raw_op_size] × [da_fee_eth_int] = 616 *)
+  let raw_op_size = 154 in
+  let expected_da_fees = Tez.of_int (raw_op_size * da_fee_eth_int) in
+  let*@ balance = Rpc.get_balance ~address:sequencer_pool_address sequencer in
+  Check.((Wei.of_tez expected_da_fees = balance) Wei.typ)
+    ~error_msg:"Balance of the sequencer pool address should be %L but go %R" ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4098,6 +4147,7 @@ let () =
   test_tezlink_validation_counter [Alpha] ;
   test_tezlink_validation_balance [Alpha] ;
   test_tezlink_insufficient_da_fee [Alpha] ;
+  test_tezlink_da_fee_credited_to_pool [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;

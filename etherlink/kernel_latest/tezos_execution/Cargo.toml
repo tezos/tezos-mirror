@@ -9,6 +9,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+anyhow.workspace = true
 thiserror.workspace = true
 typed-arena.workspace = true
 
