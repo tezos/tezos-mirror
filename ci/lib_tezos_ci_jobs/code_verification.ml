@@ -414,22 +414,6 @@ let jobs pipeline_type =
               ();
           ]
     in
-    let jobs_sdk_rust : tezos_job list =
-      let job_test_sdk_rust =
-        job
-          ~__POS__
-          ~name:"test_sdk_rust"
-          ~image:Images.Base_images.rust_toolchain_trixie
-          ~stage:Stages.test
-          ~dependencies:dependencies_needs_start
-          ~rules:
-            (make_rules ~dependent:true ~changes:changeset_test_sdk_rust ())
-          ["make -C sdk/rust check"; "make -C sdk/rust test"]
-        |> enable_cargo_cache
-        |> enable_sccache ~policy:Pull_push
-      in
-      [job_test_sdk_rust]
-    in
 
     let jobs_packaging =
       match pipeline_type with
@@ -437,7 +421,7 @@ let jobs pipeline_type =
           [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_sdk_rust @ jobs_install_octez
+    jobs_packaging @ jobs_install_octez
   in
 
   (* Manual jobs *)

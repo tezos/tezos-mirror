@@ -171,13 +171,6 @@ let changeset_lint_files =
           "etherlink/**/*";
         ])
 
-let changeset_test_sdk_rust =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_toolchain
-      (* Run if the [rust-toolchain] image is updated *)
-    @ make ["sdk/rust/**/*"])
-
 let changeset_test_sdk_bindings =
   Changeset.(
     changeset_base
