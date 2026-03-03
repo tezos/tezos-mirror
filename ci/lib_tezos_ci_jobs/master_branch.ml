@@ -108,15 +108,11 @@ let jobs =
   (* arm builds are manual on the master branch pipeline *)
   let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in
   let job_build_arm64_exp = job_build_arm64_exp ~rules:build_arm_rules () in
-  let job_build_arm64_extra_dev =
-    job_build_arm64_extra_dev ~rules:build_arm_rules ()
-  in
 
   [
     (* Stage: build *)
     job_static_x86_64;
     job_static_arm64;
-    job_build_arm64_extra_dev;
     job_build_arm64_exp;
     (* Stage: sanity *)
     job_datadog_pipeline_trace;

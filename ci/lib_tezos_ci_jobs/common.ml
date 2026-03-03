@@ -185,16 +185,6 @@ module Build = struct
     |> enable_cargo_cache
     |> enable_sccache ~policy:Pull_push
 
-  let job_build_arm64_extra_dev ?rules () : tezos_job =
-    job_build_dynamic_binaries
-      ~name:"oc.build_arm64-extra-dev"
-      ?rules
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~extra:true
-      "script-inputs/dev-executables"
-
   let job_build_arm64_exp ?rules () : tezos_job =
     job_build_dynamic_binaries
       ~name:"oc.build_arm64-exp"

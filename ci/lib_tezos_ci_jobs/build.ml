@@ -108,12 +108,15 @@ let job_build_extra_dev =
     ~arch
     ~executable_files:"script-inputs/dev-executables"
     ~extra:
-      [
-        "src/bin_tps_evaluation/main_tps_evaluation.exe";
-        "src/bin_octogram/octogram_main.exe";
-        "tezt/tests/main.exe";
-        "contrib/octez_injector_server/octez_injector_server.exe";
-      ]
+      ([
+         "src/bin_tps_evaluation/main_tps_evaluation.exe";
+         "src/bin_octogram/octogram_main.exe";
+         "tezt/tests/main.exe";
+       ]
+      @
+      match arch with
+      | Amd64 -> ["contrib/octez_injector_server/octez_injector_server.exe"]
+      | _ -> [])
     ~artifacts:
       [
         "octez-*";
@@ -125,7 +128,7 @@ let job_build_extra_dev =
         "etherlink-governance-observer";
         "fa-bridge-watchtower";
       ]
-    ~dune_cache:true
+    ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
 let job_build_exp =
   Cacio.parameterize @@ fun arch ->
@@ -155,7 +158,11 @@ let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
   CI.register_before_merging_jobs
-    [(Manual, build_octez_source); (Manual, job_build_released Arm64)] ;
+    [
+      (Manual, build_octez_source);
+      (Manual, job_build_released Arm64);
+      (Manual, job_build_extra_dev Arm64);
+    ] ;
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
      even if the tests need not be run. *)
@@ -172,6 +179,8 @@ let register () =
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
       (Auto, job_build_released Arm64);
+      (Auto, job_build_extra_dev Arm64);
     ] ;
-  CI.register_master_jobs [(Manual, job_build_released Arm64)] ;
+  CI.register_master_jobs
+    [(Manual, job_build_released Arm64); (Manual, job_build_extra_dev Arm64)] ;
   ()
