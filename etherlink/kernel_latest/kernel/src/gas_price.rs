@@ -217,6 +217,7 @@ mod test {
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 )
                 .unwrap(),
+                da_fee_per_byte_mutez: 0,
             },
         };
 

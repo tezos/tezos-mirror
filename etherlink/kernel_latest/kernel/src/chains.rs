@@ -34,6 +34,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
+    wei::mutez_from_wei,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -504,6 +505,8 @@ impl ChainConfigTrait for EvmChainConfig {
     ) -> anyhow::Result<Self::BlockConstants> {
         let level = block_in_progress.number.try_into()?;
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
+            .map_err(|_| crate::Error::InvalidConversion)?;
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.chain_id,
@@ -513,7 +516,11 @@ impl ChainConfigTrait for EvmChainConfig {
                 coinbase,
                 self.enable_tezos_runtime(),
             ),
-            michelson_runtime_block_constants: TezlinkBlockConstants { level, context },
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level,
+                context,
+                da_fee_per_byte_mutez,
+            },
         })
     }
 
@@ -725,6 +732,9 @@ fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> 
 pub struct TezlinkBlockConstants<Context: context::Context> {
     pub level: BlockNumber,
     pub context: Context,
+    /// DA fee per byte in mutez, read once at block start from durable storage.
+    /// When `disable_da_fees` is set, this is 0.
+    pub da_fee_per_byte_mutez: u64,
 }
 
 fn apply_tezos_operation(
@@ -765,6 +775,7 @@ fn apply_tezos_operation(
                 operation,
                 &block_ctx,
                 skip_signature_check,
+                Some(block_constants.da_fee_per_byte_mutez),
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
@@ -857,13 +868,19 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn constants(
         &self,
         block_in_progress: &BlockInProgress,
-        _da_fee_per_byte: U256,
+        da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
         let level = block_in_progress.number.try_into()?;
         let context =
             context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
-        Ok(TezlinkBlockConstants { level, context })
+        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
+            .map_err(|_| crate::Error::InvalidConversion)?;
+        Ok(TezlinkBlockConstants {
+            level,
+            context,
+            da_fee_per_byte_mutez,
+        })
     }
 
     fn base_fee_per_gas(&self, _host: &impl Runtime, _timestamp: Timestamp) -> U256 {
@@ -1047,6 +1064,14 @@ impl ChainConfigTrait for MichelsonChainConfig {
         };
         let branch = operation.branch.clone();
         let signature = operation.signature.clone();
+        // Read the DA fee per byte from durable storage (in wei), convert to mutez.
+        // When da_fee_per_byte is 0 in storage (the default), this effectively
+        // disables the DA fee check. When explicitly configured (e.g. 4 mutez),
+        // operations with insufficient fees are rejected during simulation.
+        let da_fee_per_byte_wei = crate::storage::read_da_fee(host)
+            .unwrap_or_else(|_| U256::from(crate::fees::DA_FEE_PER_BYTE));
+        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte_wei)
+            .map_err(|_| crate::Error::InvalidConversion)?;
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
@@ -1055,6 +1080,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             operation.clone(),
             &block_ctx,
             skip_signature_check,
+            Some(da_fee_per_byte_mutez),
         )?;
         let result = AppliedOperation {
             hash,

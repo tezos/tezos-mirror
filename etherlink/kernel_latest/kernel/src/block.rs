@@ -1018,6 +1018,8 @@ mod tests {
     // Test if tezlink block production works with a reveal operation
     fn test_produce_tezlink_block_with_reveal_operation() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
@@ -1259,6 +1261,8 @@ mod tests {
     // Test a scenario where bootstrap 1 reveal its manager and then send mutez to bootstrap 2
     fn test_produce_tezlink_block_with_reveal_and_transfer() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
@@ -1370,6 +1374,8 @@ mod tests {
     #[test]
     fn test_tezlink_level_now_chain_id_instructions() {
         let mut host = MockKernelHost::default();
+        // Disable DA fees so that low-fee test operations are not rejected.
+        storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
@@ -1815,6 +1821,7 @@ mod tests {
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 )
                 .unwrap(),
+                da_fee_per_byte_mutez: 0,
             },
         }
     }

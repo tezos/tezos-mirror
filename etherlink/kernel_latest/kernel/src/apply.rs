@@ -875,6 +875,8 @@ pub fn apply_transaction<Host: Runtime>(
             let op_hash = op.hash().map_err(|e| {
                 Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
             })?;
+            // Delayed operations already paid L1 fees through the delayed inbox,
+            // so DA fee check is not applicable.
             match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -894,6 +896,7 @@ pub fn apply_transaction<Host: Runtime>(
                     chain_id: &ChainId::try_from_bytes(&chain_id_bytes[..4])?,
                 },
                 skip_signature_check,
+                None,
             ) {
                 Ok(operations_with_metadata) => {
                     log!(

@@ -76,6 +76,10 @@ pub enum ValidityError {
     OutOfGas,
     #[error("Operation not supported")]
     UnsupportedOperation,
+    #[error("Failed to serialize operation for DA fee computation.")]
+    FailedToSerializeOperation,
+    #[error("Insufficient fee: the total fees for this batch do not cover DA cost.")]
+    InsufficientFee,
 }
 
 impl From<gas::OutOfGas> for ValidityError {
