@@ -1464,3 +1464,26 @@ let () =
   | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
   | Some active_parameters ->
       check_expected_parameters ~loc:__LOC__ next_parameters active_parameters
+
+let () =
+  register_test ~title:"Test simple transfer" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst) = Context.init2 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let transfer_amount = 30_000_000L in
+  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst transfer_amount in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg transfer_amount)
+      b
+      src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+  return_unit
