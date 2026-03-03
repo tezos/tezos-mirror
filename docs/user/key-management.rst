@@ -286,7 +286,7 @@ their roles, constraints, and when each is needed:
      - Allowed types
      - Fund access
      - When needed
-   * - **Manager key**
+   * - **Baking (aka Manager) key**
      - Delegate identity; signs manager operations (transfers, staking, key updates)
      - tz1, tz2, tz3, tz4
      - Full
@@ -295,14 +295,14 @@ their roles, constraints, and when each is needed:
      - Signs blocks and consensus operations (preattestations, attestations)
      - tz1, tz2, tz3, tz4
      - Can drain spendable balance
-     - Optional — defaults to manager key; recommended for operational security
+     - Optional: defaults to baking (manager) key; recommended for operational security
    * - **Companion key**
-     - Signs DAL-specific payload inside attestations
+     - Signs DAL-specific payload included in aggregated attestations
      - tz4 only
      - None
      - Only needed for DAL participation when using a tz4 consensus key
 
-By default, only the manager key is used. A consensus key is recommended for bakers who want
+By default, the baking (manager) key is also the consensus key. A separate consensus key is recommended for bakers who want
 to keep their manager key offline (cold storage) while still baking. A companion key is only
 needed in the specific scenario where the consensus key is a tz4 (BLS) key and the baker
 participates in the :doc:`DAL <../shell/dal>`.
@@ -310,16 +310,16 @@ participates in the :doc:`DAL <../shell/dal>`.
 .. note::
 
    The "consensus key" feature is available since the :doc:`Lima<../protocols/015_lima>` protocol.
-   The "companion key" feature is available since protocol Seoul.
+   The "companion key" feature is available since protocol :doc:`Seoul <../protocols/023_seoul>`.
 
 Do I Need a Consensus Key?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You **should** set up a consensus key if any of the following apply:
 
-- You want to keep your manager key in cold storage (offline) while the baker runs with a separate hot key.
-- You use a remote signer or cloud-hosted Key Management System (KMS) and want to isolate the signing key from the delegate identity.
-- You want the ability to rotate your baking key periodically without requiring your delegators to redelegate.
+- You want to keep your manager key in cold storage (offline) while the baker runs with a separate key.
+- You use a remote signer or cloud-hosted Key Management System (KMS) and want to isolate the signing key from the baker's identity.
+- You want the ability to rotate your consensus key periodically without requiring your delegators to redelegate.
 - You run your baker infrastructure in a cloud environment where you may lose access, and want to be able to switch to a new key quickly.
 
 You can continue baking **without** a consensus key if you are comfortable using
@@ -330,15 +330,15 @@ Do I Need a Companion Key?
 
 A companion key is only required if **both** of the following conditions are true:
 
-1. Your active consensus key (or delegate key, if no consensus key is set) is a **tz4** (BLS) key.
+1. Your active consensus key (or baking (manager) key, if a different consensus key is not active) is a **tz4** (BLS) key.
 2. You want your baker to include **DAL attestations** in its consensus operations.
 
-If you use a tz1, tz2, or tz3 consensus key, you do **not** need a companion key —
-DAL attestations are signed with the consensus key directly.
+If you use a tz1, tz2, or tz3 consensus key, you do **not** need a companion key---DAL attestations are signed with the consensus key directly.
 
 If you have a tz4 consensus key but do **not** register a companion key, your baker
 will still produce regular attestations, but will be unable to include DAL attestation
-data. This means you will not participate in the Data Availability Layer.
+data. This means you will not participate in the Data Availability Layer,
+and as a result, you might lose DAL participation rewards when the DAL is active.
 
 For more details on the technical reason behind this requirement, see
 :doc:`../shell/baker` (section "The Role of the Companion Key").
