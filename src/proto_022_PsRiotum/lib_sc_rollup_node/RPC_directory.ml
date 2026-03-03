@@ -115,23 +115,28 @@ let () =
   Block_directory.register0 Sc_rollup_services.Block.status
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let* constants =
-    Protocol_plugins.get_constants_of_block_hash node_ctxt block
-  in
-  let is_reveal_enabled =
-    constants.sc_rollup.reveal_activation_level
-    |> WithExceptions.Option.get ~loc:__LOC__
-    |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
-    |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
-  in
-  let open (val Pvm.of_kind node_ctxt.kind) in
-  let*! status =
-    Mutable_state.get_status
-      ~is_reveal_enabled
-      (Ctxt_wrapper.of_node_pvmstate state)
-  in
-  return (string_of_status status)
+  let* stored = Node_context.find_pvm_status node_ctxt block in
+  match stored with
+  | Some status -> return status
+  | None ->
+      (* Fallback for blocks stored before migration *)
+      let* state = get_state node_ctxt block in
+      let* constants =
+        Protocol_plugins.get_constants_of_block_hash node_ctxt block
+      in
+      let is_reveal_enabled =
+        constants.sc_rollup.reveal_activation_level
+        |> WithExceptions.Option.get ~loc:__LOC__
+        |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
+        |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
+      in
+      let open (val Pvm.of_kind node_ctxt.kind) in
+      let*! status =
+        Mutable_state.get_status
+          ~is_reveal_enabled
+          (Ctxt_wrapper.of_node_pvmstate state)
+      in
+      return (string_of_status status)
 
 let get_outbox_messages node_ctxt block outbox_level =
   let open Lwt_result_syntax in

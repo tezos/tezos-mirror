@@ -115,7 +115,10 @@ module type S = sig
     Kind.t -> Access_mode.rw Context.pvmstate -> string -> unit Lwt.t
 
   val get_status :
-    _ Node_context.t -> _ Context.pvmstate -> string tzresult Lwt.t
+    _ Node_context.t ->
+    ?constants:Rollup_constants.protocol_constants ->
+    _ Context.pvmstate ->
+    string tzresult Lwt.t
 
   val find_whitelist_update_output_index :
     _ Node_context.t ->

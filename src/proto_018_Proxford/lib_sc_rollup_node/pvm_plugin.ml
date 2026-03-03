@@ -59,17 +59,24 @@ let get_current_level kind state =
   let+ current_level = PVM.get_current_level !(of_node_pvmstate state) in
   Raw_level.to_int32 current_level
 
-let get_status (node_ctxt : _ Node_context.t) state =
+let get_status (node_ctxt : _ Node_context.t) ?constants state =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! current_level = PVM.get_current_level !(of_node_pvmstate state) in
   let* constants =
-    match current_level with
-    | None -> return (Reference.get node_ctxt.current_protocol).constants
-    | Some level ->
-        Protocol_plugins.get_constants_of_level
-          node_ctxt
-          (Raw_level.to_int32 level)
+    match constants with
+    | Some c -> return c
+    | None -> (
+        let*! current_level = PVM.get_current_level !(of_node_pvmstate state) in
+        let level =
+          (* Ignore PVM-internal levels that are before genesis (e.g. arith PVM
+             returns level 0 for the initial boot state). *)
+          Option.bind current_level (fun level ->
+              let level = Raw_level.to_int32 level in
+              if level >= node_ctxt.genesis_info.level then Some level else None)
+        in
+        match level with
+        | None -> return (Reference.get node_ctxt.current_protocol).constants
+        | Some level -> Protocol_plugins.get_constants_of_level node_ctxt level)
   in
   let is_reveal_enabled =
     constants.sc_rollup.reveal_activation_level

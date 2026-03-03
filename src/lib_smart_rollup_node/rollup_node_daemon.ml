@@ -221,6 +221,18 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         inbox_hash;
       }
   in
+  let* pvm_state = Context.PVMState.get ctxt in
+  let constants = (Reference.get node_ctxt.current_protocol).constants in
+  let* pvm_status =
+    Lwt.catch
+      (fun () ->
+        Plugin.Pvm.get_status node_ctxt ~constants pvm_state
+        |> Lwt_result.map Option.some)
+      (fun _ ->
+        (* Guard against partial implementations of status to string
+           conversions *)
+        Option.none_es)
+  in
   let l2_block =
     Sc_rollup_block.
       {
@@ -229,6 +241,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         num_ticks;
         initial_tick;
         state_hash = Some state_hash;
+        pvm_status;
       }
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
@@ -862,6 +875,9 @@ module Internal_for_tests = struct
           inbox_hash;
         }
     in
+    let* pvm_state = Context.PVMState.get ctxt in
+    let constants = (Reference.get node_ctxt.current_protocol).constants in
+    let* pvm_status = Plugin.Pvm.get_status node_ctxt ~constants pvm_state in
     let l2_block =
       Sc_rollup_block.
         {
@@ -870,6 +886,7 @@ module Internal_for_tests = struct
           num_ticks;
           initial_tick;
           state_hash = Some state_hash;
+          pvm_status = Some pvm_status;
         }
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
