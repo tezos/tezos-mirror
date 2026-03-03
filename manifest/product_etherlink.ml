@@ -599,23 +599,6 @@ let _evm_node =
       ]
     ~bisect_ppx:Yes
 
-let _tezt_testnet_scenarios =
-  public_exe
-    "octez-testnet-scenarios"
-    ~internal_name:"main"
-    ~path:"src/bin_testnet_scenarios"
-    ~synopsis:"Run scenarios on testnets"
-    ~bisect_ppx:No
-    ~static:false
-    ~deps:
-      [
-        bls12_381_archive;
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_etherlink |> open_;
-      ]
-
 let tezt_benchmark_lib =
   private_lib
     "etherlink_benchmark_lib"
