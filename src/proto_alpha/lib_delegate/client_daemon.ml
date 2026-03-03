@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Events = Baking_events.Client_daemon
+
 let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
   let open Lwt_result_syntax in
   let*! result = f () in
@@ -67,7 +69,7 @@ module Baker = struct
       ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
       ?votes ?extra_operations ?pre_emptive_forge_time ?force_apply_from_round
       ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive
-      delegates =
+      ~extra_nodes delegates =
     let open Lwt_result_syntax in
     let process () =
       let* user_activated_upgrades = Node_rpc.user_activated_upgrades cctxt in
@@ -120,6 +122,16 @@ module Baker = struct
           ?state_recorder
           ()
       in
+      let* () =
+        if Option.is_some data_dir && not (List.is_empty extra_nodes) then
+          (* Multiple nodes work only when all the nodes are remote for now. *)
+          failwith
+            "Incompatible configuration: `--extra-node` cannot be used with \
+             local node."
+        else
+          let*! () = Events.(emit extra_node_warning ()) in
+          return_unit
+      in
       let*! () =
         cctxt#message
           "Baker %a (%s) for %a started."
@@ -141,6 +153,7 @@ module Baker = struct
       Lifted_protocol.set_log_message_consumer consumer ;
       Baking_scheduling.run
         cctxt
+        ~extra_nodes
         ?dal_node_rpc_ctxt
         ~canceler
         ~chain

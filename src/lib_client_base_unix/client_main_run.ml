@@ -526,6 +526,38 @@ let () =
     (function Rand_seed_not_allowed -> Some () | _ -> None)
     (fun () -> Rand_seed_not_allowed)
 
+let parse_rpc_config parsed_config_file parsed_args default_media_type =
+  let rpc_config : RPC_client_unix.config =
+    match parsed_config_file with
+    | None -> RPC_client_unix.default_config
+    | Some cfg ->
+        {
+          RPC_client_unix.default_config with
+          media_type =
+            Option.value
+              cfg.Client_config.Cfg_file.media_type
+              ~default:default_media_type;
+          endpoint =
+            Option.value cfg.endpoint ~default:Client_config.default_endpoint;
+        }
+  in
+  match parsed_args with
+  | Some parsed_args ->
+      if parsed_args.Client_config.print_timings then
+        let gettimeofday = Unix.gettimeofday in
+        {
+          rpc_config with
+          logger =
+            RPC_client_unix.timings_logger ~gettimeofday Format.err_formatter;
+        }
+      else if parsed_args.Client_config.log_requests then
+        {
+          rpc_config with
+          logger = RPC_client_unix.full_logger Format.err_formatter;
+        }
+      else rpc_config
+  | None -> rpc_config
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let open Lwt_result_syntax in
@@ -597,23 +629,10 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
                 ~base_dir
                 ()
           in
-          let* rpc_config =
-            let rpc_config : RPC_client_unix.config =
-              match parsed_config_file with
-              | None -> RPC_client_unix.default_config
-              | Some cfg ->
-                  {
-                    RPC_client_unix.default_config with
-                    media_type =
-                      Option.value cfg.media_type ~default:C.default_media_type;
-                    endpoint =
-                      Option.value
-                        cfg.endpoint
-                        ~default:Client_config.default_endpoint;
-                  }
-            in
+
+          let* () =
             match parsed_args with
-            | Some parsed_args ->
+            | Some parsed_args -> (
                 (* check if fixed random seed is allowed and stop the program if
                   not while the variable is set *)
                 let* _ =
@@ -630,41 +649,24 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
                   | _ -> return_unit
                 in
                 (* Initialize RNG only after checking the gate. *)
-                let* () =
-                  match
-                    Sys.getenv_opt
-                      Client_config.client_fixed_random_seed_env_var
-                  with
-                  | None -> return @@ Random.self_init ()
-                  | Some seed_str -> (
-                      match int_of_string_opt seed_str with
-                      | Some seed ->
-                          let*! () = Events.(emit rand_seed_is_set) seed in
-                          return @@ Random.init seed
-                      | None ->
-                          let*! () =
-                            Events.(emit rand_seed_is_not_an_int) seed_str
-                          in
-                          return @@ Random.self_init ())
-                in
-                if parsed_args.Client_config.print_timings then
-                  let gettimeofday = Unix.gettimeofday in
-                  return
-                    {
-                      rpc_config with
-                      logger =
-                        RPC_client_unix.timings_logger
-                          ~gettimeofday
-                          Format.err_formatter;
-                    }
-                else if parsed_args.Client_config.log_requests then
-                  return
-                    {
-                      rpc_config with
-                      logger = RPC_client_unix.full_logger Format.err_formatter;
-                    }
-                else return rpc_config
-            | None -> return rpc_config
+                match
+                  Sys.getenv_opt Client_config.client_fixed_random_seed_env_var
+                with
+                | None -> return @@ Random.self_init ()
+                | Some seed_str -> (
+                    match int_of_string_opt seed_str with
+                    | Some seed ->
+                        let*! () = Events.(emit rand_seed_is_set) seed in
+                        return @@ Random.init seed
+                    | None ->
+                        let*! () =
+                          Events.(emit rand_seed_is_not_an_int) seed_str
+                        in
+                        return @@ Random.self_init ()))
+            | None -> return_unit
+          in
+          let rpc_config =
+            parse_rpc_config parsed_config_file parsed_args C.default_media_type
           in
           let* client_config =
             setup_client_config

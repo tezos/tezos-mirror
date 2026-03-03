@@ -42,6 +42,7 @@ module Baker : sig
     ?state_recorder:Baking_configuration.state_recorder_config ->
     chain:Shell_services.chain ->
     keep_alive:bool ->
+    extra_nodes:Protocol_client_context.full list ->
     Baking_state_types.Key.t list ->
     unit tzresult Lwt.t
 end

@@ -6048,6 +6048,7 @@ let octez_agnostic_baker_lib =
         octez_dal_node_services;
         octez_dal_node_lib;
         octez_baking_common_lib;
+        octez_rpc_http_client_unix;
       ]
 
 (* PROTOCOL PACKAGES *)

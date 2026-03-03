@@ -327,6 +327,12 @@ module Baker = struct
     in
     let parsed_config_file = parsed.Client_config.parsed_config_file in
     let parsed_args = parsed.Client_config.parsed_args in
+    let rpc_config =
+      Client_main_run.parse_rpc_config
+        parsed_config_file
+        parsed_args
+        C.default_media_type
+    in
     let*! () =
       Client_main_run.init_logging
         (module C)
@@ -335,7 +341,7 @@ module Baker = struct
         ~base_dir
         ()
     in
-    return_unit
+    return rpc_config
 
   let commands client_config =
     let open Lwt_result_syntax in
@@ -359,9 +365,12 @@ module Baker = struct
              directory_parameter
         @@ sources_param)
         (fun args data_dir sources cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           let args = Configuration.create_config args in
           Daemon.Baker.run
+            ~rpc_config
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_with_local_node {data_dir; args; sources})
             cctxt);
@@ -371,9 +380,12 @@ module Baker = struct
         baker_args
         (prefixes ["run"; "remotely"] @@ sources_param)
         (fun args sources cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           let args = Configuration.create_config args in
           Daemon.Baker.run
+            ~rpc_config
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_remotely {args; sources})
             cctxt);
@@ -383,8 +395,11 @@ module Baker = struct
         (args2 pidfile_arg keep_alive_arg)
         (prefixes ["run"; "vdf"] @@ stop)
         (fun (pidfile, keep_alive) cctxt ->
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           Daemon.Baker.run
+            ~rpc_config
             ~keep_alive
             ~command:(Daemon.Run_vdf {pidfile; keep_alive})
             cctxt);
@@ -402,8 +417,11 @@ module Baker = struct
               let default_daily_logs_path = Some "octez-accuser"
             end)
           in
-          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
+          let* rpc_config =
+            init_logging client_config ~base_dir:cctxt#get_base_dir
+          in
           Daemon.Baker.run
+            ~rpc_config
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
@@ -430,6 +448,8 @@ module Accuser = struct
         (prefix "run" @@ stop)
         (fun (pidfile, preserved_levels, keep_alive) cctxt ->
           Daemon.Accuser.run
+            ~rpc_config:
+              Tezos_rpc_http_client_unix.RPC_client_unix.default_config
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})

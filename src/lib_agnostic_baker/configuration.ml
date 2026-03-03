@@ -319,8 +319,17 @@ let allow_signing_delay_arg =
          Octez_baking_common.Signing_delay.env_var)
     ()
 
+let extra_nodes_arg =
+  Tezos_clic.multiple_arg
+    ~doc:
+      "EXPERIMENTAL: Allow the use of multiple nodes to improve fault \
+       resilience."
+    ~long:"extra-node"
+    ~placeholder:"Endpoint of an octez-node, e.g. 'http://localhost:8733'"
+    uri_parameter
+
 let baker_args =
-  Tezos_clic.args17
+  Tezos_clic.args18
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -338,6 +347,7 @@ let baker_args =
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
     allow_signing_delay_arg
+    extra_nodes_arg
 
 let directory_parameter =
   let open Lwt_result_syntax in
@@ -388,6 +398,7 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
+  extra_nodes : Uri.t list;
 }
 
 (** Create the configuration from the given arguments. *)
@@ -408,7 +419,8 @@ let create_config
       state_recorder,
       pre_emptive_forge_time,
       remote_calls_timeout,
-      allow_signing_delay ) =
+      allow_signing_delay,
+      extra_nodes ) =
   {
     pidfile;
     node_version_check_bypass;
@@ -427,6 +439,7 @@ let create_config
     pre_emptive_forge_time;
     remote_calls_timeout;
     allow_signing_delay;
+    extra_nodes = Option.value ~default:[] extra_nodes;
   }
 
 type per_block_votes_config = {
