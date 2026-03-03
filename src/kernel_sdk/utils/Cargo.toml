@@ -18,7 +18,6 @@ default = []
 
 [dependencies]
 tezos_crypto_rs.workspace = true
-tezos_data_encoding.workspace = true
 
 [dependencies.tezos-smart-rollup-encoding]
 path = "../encoding"
