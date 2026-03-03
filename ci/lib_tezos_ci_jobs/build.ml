@@ -71,9 +71,9 @@ let job_build_x86_64_released =
       "./scripts/ci/build_full_unreleased.sh";
     ]
 
-let job_build_amd64_extra_dev =
+let job_build_x86_64_extra_dev =
   CI.job
-    "oc.build_amd64-extra-dev"
+    "oc.build_x86_64-extra-dev"
     ~__POS__
     ~description:
       "Build the set of developer executables, as well as the TPS evaluation \
@@ -125,9 +125,9 @@ let job_build_amd64_extra_dev =
       "./scripts/ci/build_full_unreleased.sh";
     ]
 
-let job_build_amd64_exp =
+let job_build_x86_64_exp =
   CI.job
-    "oc.build_amd64-exp"
+    "oc.build_x86_64-exp"
     ~__POS__
     ~description:"Build the set of experimental executables."
     ~stage:Build
@@ -146,7 +146,7 @@ let job_build_amd64_exp =
          ~expire_in:(Duration (Days 1))
          [
            (* TODO: clean up this list, which was originally shared with
-              [job_build_amd64_extra_dev] but with no good reason since the two jobs
+              [job_build_x86_64_extra_dev] but with no good reason since the two jobs
               do not build the same set of executables. *)
            "octez-*";
            "octez-teztale-*";
@@ -177,14 +177,14 @@ let register () =
   CI.register_merge_request_jobs
     [
       (Auto, job_build_x86_64_released);
-      (Auto, job_build_amd64_extra_dev);
-      (Auto, job_build_amd64_exp);
+      (Auto, job_build_x86_64_extra_dev);
+      (Auto, job_build_x86_64_exp);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Auto, build_octez_source);
       (Auto, job_build_x86_64_released);
-      (Auto, job_build_amd64_extra_dev);
-      (Auto, job_build_amd64_exp);
+      (Auto, job_build_x86_64_extra_dev);
+      (Auto, job_build_x86_64_exp);
     ] ;
   ()

@@ -104,7 +104,7 @@ oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-oc.build_amd64-extra-dev:
+oc.build_x86_64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -198,11 +198,11 @@ documentation.manuals:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
   timeout: 60 minutes
   interruptible: false
   before_script:

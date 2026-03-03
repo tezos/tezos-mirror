@@ -308,7 +308,7 @@ let tezt_job ?(retry_tests = 1) =
         (Artifacts, job_build_tezt);
         (Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels);
         (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_released);
-        (Artifacts, Tezos_ci_jobs.Build.job_build_amd64_exp);
+        (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_exp);
       ]
     ~retry_tests
 

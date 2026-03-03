@@ -52,8 +52,8 @@ let common_needs =
   [
     (Cacio.Artifacts, Kernels.job_build_kernels);
     (Cacio.Artifacts, Build.job_build_x86_64_released);
-    (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
-    (Cacio.Artifacts, Build.job_build_amd64_exp);
+    (Cacio.Artifacts, Build.job_build_x86_64_extra_dev);
+    (Cacio.Artifacts, Build.job_build_x86_64_exp);
   ]
 
 (* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
@@ -165,8 +165,8 @@ let job_tezt_static_binaries =
     ~needs:
       [
         (* No need for kernels for this job. *)
-        (Cacio.Artifacts, Build.job_build_amd64_extra_dev);
-        (Cacio.Artifacts, Build.job_build_amd64_exp);
+        (Cacio.Artifacts, Build.job_build_x86_64_extra_dev);
+        (Cacio.Artifacts, Build.job_build_x86_64_exp);
       ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3

@@ -124,7 +124,7 @@ let job_manuals =
     ~needs:
       [
         (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_released);
-        (Artifacts, Tezos_ci_jobs.Build.job_build_amd64_extra_dev);
+        (Artifacts, Tezos_ci_jobs.Build.job_build_x86_64_extra_dev);
       ]
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]

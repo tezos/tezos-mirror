@@ -144,8 +144,8 @@ let job_test_liquidity_baking_scripts =
     ~needs:
       [
         (Artifacts, Build.job_build_x86_64_released);
-        (Artifacts, Build.job_build_amd64_extra_dev);
-        (Artifacts, Build.job_build_amd64_exp);
+        (Artifacts, Build.job_build_x86_64_extra_dev);
+        (Artifacts, Build.job_build_x86_64_exp);
       ]
     ~only_if_changed:
       [
