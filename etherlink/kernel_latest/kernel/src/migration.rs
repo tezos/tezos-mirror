@@ -32,11 +32,13 @@ use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_ethereum::block::EthBlock;
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::{evm_node_flag, Runtime};
+use tezos_evm_runtime::runtime::{evm_node_flag, IsEvmNode};
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 #[derive(Eq, PartialEq)]
 pub enum MigrationStatus {
@@ -55,7 +57,7 @@ const MAINNET_CHAIN_ID: u64 = 42793;
 
 #[allow(dead_code)]
 fn is_etherlink_network(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     expected_chain_id: u64,
 ) -> Result<bool, Error> {
     match read_chain_id(host) {
@@ -97,8 +99,8 @@ mod legacy {
     use tezos_storage::read_h256_be;
     use thiserror::Error;
 
-    pub fn read_next_blueprint_number<Host: Runtime>(
-        host: &Host,
+    pub fn read_next_blueprint_number(
+        host: &impl StorageV1,
     ) -> Result<U256, crate::Error> {
         match block_storage::read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         {
@@ -150,7 +152,7 @@ mod legacy {
         /// integer.
         pub fn increment_nonce(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<(), AccountStorageError> {
             let mut old_info = self.info(host)?;
 
@@ -165,7 +167,7 @@ mod legacy {
         /// Get the **balance** of an account in Wei held by the account.
         pub fn balance(
             &self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<U256, AccountStorageError> {
             let new_format_account = StorageAccount::from_path(self.path.clone());
             Ok(alloy_to_u256(&new_format_account.info(host)?.balance))
@@ -177,7 +179,7 @@ mod legacy {
         /// ie the account held enough funds, the function returns `Ok(true)`.
         pub fn balance_remove(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
             amount: U256,
         ) -> Result<bool, AccountStorageError> {
             let mut old_info = self.info(host)?;
@@ -193,7 +195,7 @@ mod legacy {
 
         pub fn set_info_without_code(
             &mut self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
             info: AccountInfo,
         ) -> Result<(), AccountStorageError> {
             let mut new_format_account = StorageAccount::from_path(self.path.clone());
@@ -204,7 +206,7 @@ mod legacy {
 
         pub fn info(
             &self,
-            host: &mut impl Runtime,
+            host: &mut impl StorageV1,
         ) -> Result<AccountInfo, AccountStorageError> {
             let new_format_account = StorageAccount::from_path(self.path.clone());
             new_format_account
@@ -283,14 +285,14 @@ mod legacy {
     }
 
     pub fn read_current_hash(
-        host: &impl Runtime,
+        host: &impl StorageV1,
         root: &impl Path,
     ) -> anyhow::Result<H256> {
         read_h256_be(host, &current_hash(root)?)
     }
 
     pub fn read_current_etherlink_block(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> anyhow::Result<EthBlock> {
         let hash = read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let block_path = path(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, hash)?;
@@ -300,10 +302,13 @@ mod legacy {
     }
 }
 
-fn migrate_to<Host: Runtime>(
+fn migrate_to<Host>(
     host: &mut Host,
     version: StorageVersion,
-) -> anyhow::Result<MigrationStatus> {
+) -> anyhow::Result<MigrationStatus>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     log!(host, Info, "Migrating to {:?}", version);
     match version {
         StorageVersion::V11 => anyhow::bail!(Error::UpgradeError(
@@ -824,7 +829,10 @@ fn migrate_to<Host: Runtime>(
 //     in an inconsistent storage.
 // /!\
 //
-fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> {
+fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     match read_storage_version(host)?.next() {
         Some(next_version) => {
             let status = migrate_to(host, next_version)?;
@@ -844,9 +852,10 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     }
 }
 
-pub fn storage_migration<Host: Runtime>(
-    host: &mut Host,
-) -> Result<MigrationStatus, Error> {
+pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))
 }

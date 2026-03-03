@@ -21,10 +21,10 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_nom::error::DecodeError;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
+use tezos_smart_rollup_host::storage::StorageV1;
 
 /// The size of one 256 bit word. Size in bytes.
 pub const WORD_SIZE: usize = 32usize;
@@ -37,7 +37,7 @@ pub const KT1_B58_SIZE: usize = 36usize;
 ///
 /// NB: Value is read starting 0.
 pub fn store_read_slice(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     buffer: &mut [u8],
     expected_size: usize,
@@ -62,7 +62,7 @@ pub fn path_from_h256(index: &H256) -> Result<OwnedPath, Error> {
 /// Return a 32 bytes hash from storage at the given `path`.
 ///
 /// NB: The given bytes are interpreted in big endian order.
-pub fn read_h256_be(host: &impl Runtime, path: &impl Path) -> anyhow::Result<H256> {
+pub fn read_h256_be(host: &impl StorageV1, path: &impl Path) -> anyhow::Result<H256> {
     let mut buffer = [0_u8; WORD_SIZE];
     store_read_slice(host, path, &mut buffer, WORD_SIZE)?;
     Ok(H256::from_slice(&buffer))
@@ -72,7 +72,7 @@ pub fn read_h256_be(host: &impl Runtime, path: &impl Path) -> anyhow::Result<H25
 ///
 /// NB: The given bytes are interpreted in big endian order.
 pub fn read_h256_be_opt(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<Option<H256>, Error> {
     match host.store_read(path, 0, WORD_SIZE) {
@@ -87,7 +87,7 @@ pub fn read_h256_be_opt(
 ///
 /// NB: The given bytes are interpreted in big endian order.
 pub fn read_h256_be_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: H256,
 ) -> Result<H256, Error> {
@@ -101,7 +101,7 @@ pub fn read_h256_be_default(
 ///
 /// NB: The hash is stored in big endian order.
 pub fn write_h256_be(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
     hash: H256,
 ) -> Result<(), Error> {
@@ -111,7 +111,7 @@ pub fn write_h256_be(
 /// Return an unsigned 32 bytes value from storage at the given `path`.
 ///
 /// NB: The given bytes are interpreted in little endian order.
-pub fn read_u256_le(host: &impl Runtime, path: &impl Path) -> Result<U256, Error> {
+pub fn read_u256_le(host: &impl StorageV1, path: &impl Path) -> Result<U256, Error> {
     let bytes = host.store_read(path, 0, 32)?;
     Ok(U256::from_little_endian(&bytes))
 }
@@ -121,7 +121,7 @@ pub fn read_u256_le(host: &impl Runtime, path: &impl Path) -> Result<U256, Error
 ///
 /// NB: The given bytes are interpreted in little endian order.
 pub fn read_u256_le_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: U256,
 ) -> Result<U256, Error> {
@@ -136,7 +136,7 @@ pub fn read_u256_le_default(
 ///
 /// NB: The value is stored in little endian order.
 pub fn write_u256_le(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
     value: U256,
 ) -> Result<(), Error> {
@@ -148,7 +148,7 @@ pub fn write_u256_le(
 /// Return an unsigned 8 bytes value from storage at the given `path`.
 ///
 /// NB: The given bytes are interpreted in little endian order.
-pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> {
+pub fn read_u64_le(host: &impl StorageV1, path: &impl Path) -> Result<u64, Error> {
     let mut bytes = [0; std::mem::size_of::<u64>()];
     host.store_read_slice(path, 0, bytes.as_mut_slice())?;
     Ok(u64::from_le_bytes(bytes))
@@ -159,7 +159,7 @@ pub fn read_u64_le(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> 
 ///
 /// NB: The given bytes are interpreted in little endian order.
 pub fn read_u64_le_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: u64,
 ) -> Result<u64, Error> {
@@ -180,7 +180,7 @@ pub fn read_u64_le_default(
 ///
 /// NB: The given bytes are interpreted in little endian order.
 pub fn read_u16_le_default(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     default: u16,
 ) -> Result<u16, Error> {
@@ -202,7 +202,7 @@ pub fn read_u16_le_default(
 ///
 /// NB: The value is stored in little endian order.
 pub fn write_u64_le(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
     value: u64,
 ) -> Result<(), Error> {
@@ -214,7 +214,7 @@ pub fn write_u64_le(
 /// at the given `path`.
 pub fn store_rlp<T: Encodable>(
     src: &T,
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
 ) -> Result<(), Error> {
     host.store_write_all(path, &src.rlp_bytes())
@@ -223,7 +223,10 @@ pub fn store_rlp<T: Encodable>(
 
 /// Return a decodable value from storage as rlp bytes
 /// at the given `path`.
-pub fn read_rlp<T: Decodable>(host: &impl Runtime, path: &impl Path) -> Result<T, Error> {
+pub fn read_rlp<T: Decodable>(
+    host: &impl StorageV1,
+    path: &impl Path,
+) -> Result<T, Error> {
     let bytes = host.store_read_all(path)?;
     FromRlpBytes::from_rlp_bytes(&bytes).map_err(Error::from)
 }
@@ -233,7 +236,7 @@ pub fn read_rlp<T: Decodable>(host: &impl Runtime, path: &impl Path) -> Result<T
 ///
 /// If there is no data, `None` is returned.
 pub fn read_optional_rlp<T: Decodable>(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<Option<T>, anyhow::Error> {
     if let Some(ValueType::Value) = host.store_has(path)? {
@@ -245,7 +248,7 @@ pub fn read_optional_rlp<T: Decodable>(
 }
 
 /// Return a base58 contract address from storage at the given `path`.
-pub fn read_b58_kt1(host: &impl Runtime, path: &impl Path) -> Option<ContractKt1Hash> {
+pub fn read_b58_kt1(host: &impl StorageV1, path: &impl Path) -> Option<ContractKt1Hash> {
     let bytes = host.store_read(path, 0, KT1_B58_SIZE).ok()?;
     let kt1_b58 = String::from_utf8(bytes).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
@@ -256,7 +259,7 @@ pub fn read_b58_kt1(host: &impl Runtime, path: &impl Path) -> Option<ContractKt1
 /// The stored value must implement BinWriter
 pub fn store_bin(
     value: &impl BinWriter,
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     path: &impl Path,
 ) -> Result<(), Error> {
     let mut buffer = vec![];
@@ -268,7 +271,7 @@ pub fn store_bin(
 /// Return a potential decoded value using NomReader
 /// at the given `path`
 pub fn read_nom_value<T: for<'a> NomReader<'a>>(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<T, Error> {
     let bytes = host.store_read_all(path)?;
@@ -294,7 +297,7 @@ pub fn read_nom_value<T: for<'a> NomReader<'a>>(
 /// Return an optional decoded value using NomReader
 /// at the given `path`
 pub fn read_optional_nom_value<T: for<'a> NomReader<'a>>(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> Result<Option<T>, Error> {
     if let Some(ValueType::Value) = host.store_has(path)? {

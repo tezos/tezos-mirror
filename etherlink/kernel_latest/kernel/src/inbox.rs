@@ -38,23 +38,30 @@ use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
     pub transactions: Vec<TezosXTransaction>,
 }
 
-pub fn read_input<Host: Runtime, Mode: Parsable>(
+pub fn read_input<Host, Mode: Parsable>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     inbox_is_empty: &mut bool,
     parsing_context: &mut Mode::Context,
     enable_fa_deposits: bool,
-) -> Result<InputResult<Mode>, Error> {
+) -> Result<InputResult<Mode>, Error>
+where
+    Host: WasmHost + Logging,
+{
     let input = host.read_input()?;
 
     match input {
@@ -81,25 +88,31 @@ where
     /// Abstracts the type used to store the inputs once handled
     type Inbox;
 
-    fn handle_input<Host: Runtime>(
+    fn handle_input<Host>(
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
 
-    fn handle_deposit<Host: Runtime>(
+    fn handle_deposit<Host>(
         host: &mut Host,
         deposit: Deposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
 
-    fn handle_fa_deposit<Host: Runtime>(
+    fn handle_fa_deposit<Host>(
         host: &mut Host,
         fa_deposit: FaDeposit,
         chain_id: Option<U256>,
         inbox_content: &mut Self::Inbox,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
 }
 
 impl InputHandler for ProxyInput {
@@ -107,11 +120,14 @@ impl InputHandler for ProxyInput {
     // everything is doable in a single kernel_run.
     type Inbox = ProxyInboxContent;
 
-    fn handle_input<Host: Runtime>(
+    fn handle_input<Host>(
         host: &mut Host,
         input: Self,
         inbox_content: &mut Self::Inbox,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging,
+    {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
                 .transactions
@@ -137,7 +153,7 @@ impl InputHandler for ProxyInput {
         Ok(())
     }
 
-    fn handle_deposit<Host: Runtime>(
+    fn handle_deposit<Host: HostReveal>(
         host: &mut Host,
         deposit: Deposit,
         _chain_id: Option<U256>,
@@ -150,7 +166,7 @@ impl InputHandler for ProxyInput {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host: Runtime>(
+    fn handle_fa_deposit<Host: HostReveal>(
         host: &mut Host,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
@@ -163,10 +179,13 @@ impl InputHandler for ProxyInput {
     }
 }
 
-fn handle_blueprint_chunk<Host: Runtime>(
+fn handle_blueprint_chunk<Host>(
     host: &mut Host,
     blueprint: UnsignedSequencerBlueprint,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     log!(host, Benchmarking, "Handling a blueprint input");
     log!(
         host,
@@ -184,11 +203,14 @@ impl InputHandler for SequencerInput {
     // there is nothing to return in the end.
     type Inbox = DelayedInbox;
 
-    fn handle_input<Host: Runtime>(
+    fn handle_input<Host>(
         host: &mut Host,
         input: Self,
         delayed_inbox: &mut Self::Inbox,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+    {
         log!(host, Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
@@ -264,12 +286,15 @@ impl InputHandler for SequencerInput {
         }
     }
 
-    fn handle_deposit<Host: Runtime>(
+    fn handle_deposit<Host>(
         host: &mut Host,
         deposit: Deposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+    {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         let tx = handle_deposit(host, deposit)?;
@@ -277,12 +302,15 @@ impl InputHandler for SequencerInput {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    fn handle_fa_deposit<Host: Runtime>(
+    fn handle_fa_deposit<Host>(
         host: &mut Host,
         fa_deposit: FaDeposit,
         _chain_id: Option<U256>,
         delayed_inbox: &mut Self::Inbox,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+    {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         let tx = handle_fa_deposit(host, fa_deposit)?;
@@ -290,13 +318,16 @@ impl InputHandler for SequencerInput {
     }
 }
 
-fn handle_transaction_chunk<Host: Runtime>(
+fn handle_transaction_chunk<Host>(
     host: &mut Host,
     tx_hash: TransactionHash,
     i: u16,
     chunk_hash: TransactionHash,
     data: Vec<u8>,
-) -> Result<Option<Transaction>, Error> {
+) -> Result<Option<Transaction>, Error>
+where
+    Host: StorageV1 + Logging,
+{
     // If the number of chunks doesn't exist in the storage, the chunked
     // transaction wasn't created, so the chunk is ignored.
     let num_chunks = match chunked_transaction_num_chunks(host, &tx_hash) {
@@ -341,8 +372,8 @@ fn handle_transaction_chunk<Host: Runtime>(
     Ok(None)
 }
 
-fn handle_deposit<Host: Runtime>(
-    host: &mut Host,
+fn handle_deposit(
+    host: &mut impl HostReveal,
     deposit: Deposit,
 ) -> Result<TezosXTransaction, Error> {
     let seed = host.reveal_metadata().raw_rollup_address;
@@ -355,8 +386,8 @@ fn handle_deposit<Host: Runtime>(
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
-fn handle_fa_deposit<Host: Runtime>(
-    host: &mut Host,
+fn handle_fa_deposit(
+    host: &mut impl HostReveal,
     fa_deposit: FaDeposit,
 ) -> Result<TezosXTransaction, Error> {
     let seed = host.reveal_metadata().raw_rollup_address;
@@ -368,7 +399,10 @@ fn handle_fa_deposit<Host: Runtime>(
     .into())
 }
 
-fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
+fn force_kernel_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost,
+{
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
             let current_timestamp = read_last_info_per_level_timestamp(host)?.i64();
@@ -387,13 +421,16 @@ fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
 
 /// Import DAL slots based on protocol attestation information.
 /// This is called when processing DalAttestedSlots internal messages.
-fn import_dal_attested_slots<Host: Runtime>(
+fn import_dal_attested_slots<Host>(
     host: &mut Host,
     published_level: i32,
     slot_size: u64,
     page_size: u64,
     slot_indices: &[u8],
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + HostReveal,
+{
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
         return Ok(());
@@ -454,11 +491,15 @@ fn import_dal_attested_slots<Host: Runtime>(
     Ok(())
 }
 
-pub fn handle_input<Mode: Parsable + InputHandler>(
-    host: &mut impl Runtime,
+pub fn handle_input<Host, Mode>(
+    host: &mut Host,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Mode: Parsable + InputHandler,
+{
     match input {
         Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
@@ -504,11 +545,7 @@ enum ReadStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn read_and_dispatch_input<
-    Host: Runtime,
-    Mode: Parsable + InputHandler,
-    ChainConfig: ChainConfigTrait,
->(
+fn read_and_dispatch_input<Host, Mode, ChainConfig>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -517,7 +554,12 @@ fn read_and_dispatch_input<
     res: &mut Mode::Inbox,
     enable_fa_bridge: bool,
     chain_configuration: &ChainConfig,
-) -> anyhow::Result<ReadStatus> {
+) -> anyhow::Result<ReadStatus>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Mode: Parsable + InputHandler,
+    ChainConfig: ChainConfigTrait,
+{
     let input: InputResult<Mode> = read_input(
         host,
         smart_rollup_address,
@@ -557,13 +599,16 @@ fn read_and_dispatch_input<
     }
 }
 
-pub fn read_proxy_inbox<Host: Runtime>(
+pub fn read_proxy_inbox<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     chain_configuration: &EvmChainConfig,
-) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
+) -> Result<Option<ProxyInboxContent>, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+{
     let mut res = ProxyInboxContent {
         transactions: vec![],
     };
@@ -623,7 +668,7 @@ pub enum StageOneStatus {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn read_sequencer_inbox<Host, ChainConfig>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -634,7 +679,11 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     maximum_allowed_ticks: u64,
     dal: Option<DalConfiguration>,
     chain_configuration: &ChainConfig,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    ChainConfig: ChainConfigTrait,
+{
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed

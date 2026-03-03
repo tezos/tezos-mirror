@@ -8,10 +8,9 @@ use tezos_crypto_rs::public_key::PublicKey;
 use tezos_ethereum::rlp_helpers::{
     append_public_key, append_timestamp, decode_public_key, decode_timestamp, next,
 };
-use tezos_evm_logging::{log, Level::Info};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::Info, Logging};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
 
 use crate::{storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH, Error};
 
@@ -72,10 +71,13 @@ impl std::fmt::Display for SequencerKeyChange {
     }
 }
 
-pub fn store_sequencer_key_change<Host: Runtime>(
+pub fn store_sequencer_key_change<Host>(
     host: &mut Host,
     sequencer_key_change: SequencerKeyChange,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
     log!(
         host,
         Info,

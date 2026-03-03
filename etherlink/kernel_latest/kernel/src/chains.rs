@@ -40,8 +40,8 @@ use tezos_ethereum::{
     transaction::TransactionHash,
     wei::{eth_from_mutez, mutez_from_wei},
 };
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+
 use tezos_execution::{
     context::{self, Context as _, TezlinkContext},
     get_required_da_fees,
@@ -49,6 +49,8 @@ use tezos_execution::{
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -97,7 +99,7 @@ pub struct ExperimentalFeatures {
 }
 
 impl ExperimentalFeatures {
-    pub fn read_from_storage(host: &mut impl Runtime) -> Self {
+    pub fn read_from_storage(host: &mut impl StorageV1) -> Self {
         let enable_tezos_runtime = crate::storage::enable_tezos_runtime(host);
 
         ExperimentalFeatures {
@@ -346,33 +348,31 @@ pub trait ChainConfigTrait: Debug {
         write!(f, "{{Chain family: {chain_family}, {self:?}}}")
     }
 
-    fn fetch_hashes_from_delayed_inbox(
-        host: &mut impl Runtime,
+    fn fetch_hashes_from_delayed_inbox<Host>(
+        host: &mut Host,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>;
-
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
+    where
+        Host: StorageV1 + Logging;
     fn transaction_from_bytes(
-        host: &mut impl Runtime,
+        host: &mut impl Logging,
         bytes: &[u8],
         blueprint_version: u8,
     ) -> anyhow::Result<TezosXTransaction>;
-
-    fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
-
+    fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256;
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
         tx: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool>;
-
     #[allow(clippy::too_many_arguments)]
-    fn apply_transaction(
+    fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
@@ -380,20 +380,24 @@ pub trait ChainConfigTrait: Debug {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>;
-
-    fn finalize_and_store(
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+    where
+        Host: StorageV1 + Logging;
+    fn finalize_and_store<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
-    ) -> anyhow::Result<L2Block>;
-
-    fn start_simulation_mode(
+    ) -> anyhow::Result<L2Block>
+    where
+        Host: StorageV1 + Logging;
+    fn start_simulation_mode<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + WasmHost + Logging;
 }
 
 fn ethereum_transaction_from_bytes(
@@ -529,7 +533,7 @@ impl ChainConfigTrait for EvmChainConfig {
         })
     }
 
-    fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
+    fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256 {
         crate::gas_price::base_fee_per_gas(
             host,
             timestamp,
@@ -538,7 +542,7 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn transaction_from_bytes(
-        host: &mut impl Runtime,
+        host: &mut impl Logging,
         bytes: &[u8],
         blueprint_version: u8,
     ) -> anyhow::Result<TezosXTransaction> {
@@ -584,12 +588,14 @@ impl ChainConfigTrait for EvmChainConfig {
         }
     }
 
-    fn fetch_hashes_from_delayed_inbox(
-        host: &mut impl Runtime,
+    fn fetch_hashes_from_delayed_inbox<Host>(
+        host: &mut Host,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
+    where
+        Host: StorageV1 + Logging,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
@@ -619,10 +625,10 @@ impl ChainConfigTrait for EvmChainConfig {
         }
     }
 
-    fn apply_transaction(
+    fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
@@ -630,7 +636,10 @@ impl ChainConfigTrait for EvmChainConfig {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+    where
+        Host: StorageV1 + Logging,
+    {
         match transaction {
             TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
                 host,
@@ -656,12 +665,15 @@ impl ChainConfigTrait for EvmChainConfig {
         }
     }
 
-    fn finalize_and_store(
+    fn finalize_and_store<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
-    ) -> anyhow::Result<L2Block> {
+    ) -> anyhow::Result<L2Block>
+    where
+        Host: StorageV1 + Logging,
+    {
         block_in_progress.finalize_and_store(
             host,
             block_constants,
@@ -669,11 +681,14 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn start_simulation_mode(
+    fn start_simulation_mode<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + WasmHost + Logging,
+    {
         start_simulation_mode(host, registry, &self.spec_id)
     }
 
@@ -743,11 +758,14 @@ pub struct TezlinkBlockConstants<Context: context::Context> {
     pub da_fee_per_byte_mutez: u64,
 }
 
-fn credit_da_fees<Host: Runtime>(
+fn credit_da_fees<Host>(
     host: &mut Host,
     sequencer_pool_address: Option<H160>,
     da_fees_mutez: u64,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    Host: Logging + StorageV1,
+{
     if let Some(sequencer_pool_address) = sequencer_pool_address {
         let da_fees_wei = eth_from_mutez(da_fees_mutez);
         let mut account =
@@ -765,15 +783,18 @@ fn credit_da_fees<Host: Runtime>(
     Ok(())
 }
 
-fn apply_tezos_operation(
+fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
-    host: &mut impl Runtime,
+    host: &mut Host,
     registry: &impl Registry,
     block_constants: &TezlinkBlockConstants<impl context::Context>,
     operation: TezlinkOperation,
     sequencer_pool_address: Option<H160>,
-) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
     let context = &block_constants.context;
 
     let level = block_constants.level;
@@ -918,16 +939,18 @@ impl ChainConfigTrait for MichelsonChainConfig {
         })
     }
 
-    fn base_fee_per_gas(&self, _host: &impl Runtime, _timestamp: Timestamp) -> U256 {
+    fn base_fee_per_gas(&self, _host: &impl StorageV1, _timestamp: Timestamp) -> U256 {
         U256::zero()
     }
 
-    fn fetch_hashes_from_delayed_inbox(
-        host: &mut impl Runtime,
+    fn fetch_hashes_from_delayed_inbox<Host>(
+        host: &mut Host,
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
+    where
+        Host: StorageV1 + Logging,
     {
         // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
         // the logic to retrieve delayed_inbox items.
@@ -969,7 +992,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     }
 
     fn transaction_from_bytes(
-        _host: &mut impl Runtime,
+        _host: &mut impl Logging,
         bytes: &[u8],
         _version: u8,
     ) -> anyhow::Result<TezosXTransaction> {
@@ -986,10 +1009,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(true)
     }
 
-    fn apply_transaction(
+    fn apply_transaction<Host>(
         &self,
         block_in_progress: &BlockInProgress,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
@@ -997,7 +1020,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _index: u32,
         sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+    where
+        Host: StorageV1 + Logging,
+    {
         match transaction {
             TezosXTransaction::Ethereum(_transaction) => {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
@@ -1014,12 +1040,15 @@ impl ChainConfigTrait for MichelsonChainConfig {
         }
     }
 
-    fn finalize_and_store(
+    fn finalize_and_store<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
-    ) -> anyhow::Result<L2Block> {
+    ) -> anyhow::Result<L2Block>
+    where
+        Host: StorageV1 + Logging,
+    {
         // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(
             block_constants.level,
@@ -1034,13 +1063,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(new_block)
     }
 
-    fn start_simulation_mode(
+    fn start_simulation_mode<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         registry: &impl Registry,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + WasmHost + Logging,
+    {
         fn read_inbox_message(
-            host: &mut impl Runtime,
+            host: &mut impl WasmHost,
         ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
             match host.read_input()? {
                 Some(input) => Ok(input),

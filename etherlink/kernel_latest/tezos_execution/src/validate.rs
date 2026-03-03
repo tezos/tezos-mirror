@@ -6,10 +6,10 @@ use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
@@ -30,7 +30,7 @@ use crate::{
 /// successor of the stored counter. If not, it returns the appropriate
 /// error.
 fn check_and_increment_counter(
-    host: &impl Runtime,
+    host: &impl Logging,
     account_counter: &mut Narith,
     operation_counter: &Narith,
 ) -> Result<(), ValidityError> {
@@ -100,7 +100,7 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: Runtime, A: TezosImplicitAccount>(
+fn get_revealed_key<Host: StorageV1, A: TezosImplicitAccount>(
     host: &Host,
     account: &A,
     first_content: &ManagerOperationContent,
@@ -133,7 +133,7 @@ fn check_storage_limit(
     }
 }
 
-fn validate_source<Host: Runtime, C: Context>(
+fn validate_source<Host: StorageV1, C: Context>(
     host: &Host,
     context: &C,
     content: &[ManagerOperationContent],
@@ -163,8 +163,8 @@ fn validate_source<Host: Runtime, C: Context>(
     Ok((pk, account))
 }
 
-fn validate_individual_operation<Host: Runtime>(
-    host: &Host,
+fn validate_individual_operation(
+    host: &impl Logging,
     content: ManagerOperation<OperationContent>,
     account_pkh: &PublicKeyHash,
     account_balance: &mut Narith,
@@ -247,13 +247,16 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host: Runtime, C: Context>(
+pub fn execute_validation<Host, C: Context>(
     host: &mut Host,
     context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
     required_da_fees: Option<u64>,
-) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError> {
+) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError>
+where
+    Host: StorageV1 + Logging,
+{
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }

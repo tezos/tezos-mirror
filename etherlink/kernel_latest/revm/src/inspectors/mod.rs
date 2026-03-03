@@ -20,7 +20,8 @@ use revm::{
     ExecuteCommitEvm, ExecuteEvm, InspectEvm, Inspector,
 };
 use struct_logger::StructLoggerInput;
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
 pub mod call_tracer;
@@ -37,17 +38,20 @@ pub type EvmInspection<'a, Host, INSP, R> = Evm<
     EthFrame<EthInterpreter>,
 >;
 
-pub struct EtherlinkEvmInspector<
-    'a,
-    Host: Runtime,
+pub struct EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1 + Logging,
     R: Registry,
     INSP: EtherlinkInspector<'a, Host, R>,
-> {
+{
     inner: EvmInspection<'a, Host, INSP, R>,
 }
 
-impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>> ExecuteEvm
-    for EtherlinkEvmInspector<'a, Host, R, INSP>
+impl<'a, Host, R, INSP> ExecuteEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1 + Logging,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
 {
     type ExecutionResult = ExecutionResult;
     type State = EvmState;
@@ -80,8 +84,11 @@ impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>> Exec
     }
 }
 
-impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>
-    ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+impl<'a, Host, R, INSP> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1 + Logging,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
 {
     fn commit(&mut self, state: Self::State) {
         self.inner.commit(state);
@@ -125,8 +132,11 @@ where
     type IT = EthInterpreter;
 }
 
-impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>> InspectEvm
-    for EtherlinkEvmInspector<'a, Host, R, INSP>
+impl<'a, Host, R, INSP> InspectEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
+where
+    Host: StorageV1 + Logging,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
 {
     type Inspector = INSP;
 
@@ -158,15 +168,21 @@ impl TracerInput {
     }
 }
 
-pub trait EtherlinkInspector<'a, Host: Runtime + 'a, R: Registry + 'a>:
+pub trait EtherlinkInspector<'a, Host, R>:
     Inspector<EVMInnerContext<'a, Host, R>>
+where
+    Host: StorageV1 + Logging + 'a,
+    R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool;
     fn get_transaction_hash(&self) -> Option<B256>;
 }
 
-impl<'a, Host: Runtime + 'a, R: Registry + 'a> EtherlinkInspector<'a, Host, R>
+impl<'a, Host, R> EtherlinkInspector<'a, Host, R>
     for Box<dyn EtherlinkInspector<'a, Host, R>>
+where
+    Host: StorageV1 + Logging + 'a,
+    R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool {
         self.as_ref().is_struct_logger()

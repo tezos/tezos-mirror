@@ -17,10 +17,11 @@ use tezos_ethereum::{
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
 };
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::read_u16_le_default;
 use tezos_tezlink::operation::Operation;
 
@@ -199,18 +200,24 @@ impl Decodable for DelayedInboxItem {
 }
 
 impl DelayedInbox {
-    pub fn new<Host: Runtime>(host: &mut Host) -> Result<Self> {
+    pub fn new<Host>(host: &mut Host) -> Result<Self>
+    where
+        Host: StorageV1 + Logging,
+    {
         let linked_list = LinkedList::new(&DELAYED_INBOX_PATH, host)?;
         Ok(Self(linked_list))
     }
 
-    pub fn save_transaction<Host: Runtime>(
+    pub fn save_transaction<Host>(
         &mut self,
         host: &mut Host,
         tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        Host: StorageV1 + Logging + IsEvmNode,
+    {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
                 let Transaction { tx_hash, content } = *tx.clone();
@@ -268,9 +275,9 @@ impl DelayedInbox {
         }
     }
 
-    pub fn find_transaction<Host: Runtime>(
+    pub fn find_transaction(
         &mut self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
         tx_hash: Hash,
     ) -> Result<Option<(Transaction, Timestamp)>> {
         let tx = self.0.find(host, &tx_hash)?.map(
@@ -291,14 +298,17 @@ impl DelayedInbox {
 
     // Returns the oldest tx in the delayed inbox (and its hash) if it
     // timed out
-    fn first_if_timed_out<Host: Runtime>(
+    fn first_if_timed_out<Host>(
         &mut self,
         host: &mut Host,
         now: Timestamp,
         timeout: u64,
         current_level: u32,
         min_levels: u32,
-    ) -> Result<Option<(Hash, DelayedTransaction)>> {
+    ) -> Result<Option<(Hash, DelayedTransaction)>>
+    where
+        Host: StorageV1 + Logging,
+    {
         let to_pop = self.0.first_with_id(host)?.and_then(
             |(
                 tx_hash,
@@ -327,15 +337,12 @@ impl DelayedInbox {
     }
 
     #[cfg(test)]
-    pub fn is_empty<Host: Runtime>(&self, host: &mut Host) -> Result<bool> {
+    pub fn is_empty(&self, host: &mut impl StorageV1) -> Result<bool> {
         let first = self.0.first_with_id(host)?;
         Ok(first.is_none())
     }
 
-    fn pop_first<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-    ) -> Result<Option<Transaction>> {
+    fn pop_first(&mut self, host: &mut impl StorageV1) -> Result<Option<Transaction>> {
         let to_pop = self.0.first_with_id(host)?;
         match to_pop {
             None => Ok(None),
@@ -349,10 +356,10 @@ impl DelayedInbox {
     }
 
     /// Returns whether the oldest tx in the delayed inbox has timed out.
-    pub fn first_has_timed_out<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-    ) -> Result<bool> {
+    pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
+    where
+        Host: StorageV1 + Logging,
+    {
         let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
         let current_level = storage::read_l1_level(host)?;
@@ -367,9 +374,9 @@ impl DelayedInbox {
     /// signal that we're done.
     /// Note that this function assumes we're on a "timeout" state,
     /// which should be checked before calling it.
-    pub fn next_delayed_inbox_blueprint<Host: Runtime>(
+    pub fn next_delayed_inbox_blueprint(
         &mut self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
     ) -> Result<Option<Vec<Transaction>>> {
         let max_delayed_inbox_blueprint_length = read_u16_le_default(
             host,
@@ -396,11 +403,10 @@ impl DelayedInbox {
     /// a transaction is removed or not. The only property ensured by the
     /// function is that the transaction is not part of the delayed inbox
     /// after the call.
-    pub fn delete<Host: Runtime>(
-        &mut self,
-        host: &mut Host,
-        tx_hash: Hash,
-    ) -> Result<()> {
+    pub fn delete<Host>(&mut self, host: &mut Host, tx_hash: Hash) -> Result<()>
+    where
+        Host: StorageV1 + Logging,
+    {
         log!(
             host,
             Info,

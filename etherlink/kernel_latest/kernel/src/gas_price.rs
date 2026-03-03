@@ -6,8 +6,8 @@
 
 use primitive_types::U256;
 use softfloat::F64;
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 const CAPACITY: u64 = 27_000_000;
 const TARGET: u64 = CAPACITY / 2;
@@ -19,7 +19,7 @@ const ALPHA: F64 = softfloat::f64!(0.000_000_000_99);
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     bip_cumulative_execution_gas: U256,
     bip_timestamp: Timestamp,
     bip_queue_length: usize,
@@ -42,7 +42,7 @@ pub fn register_block(
 
 /// Retrieve *base fee per gas*, according to the current timestamp.
 pub fn base_fee_per_gas(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     timestamp: Timestamp,
     minimum_gas_price: U256,
 ) -> U256 {
@@ -58,7 +58,7 @@ pub fn base_fee_per_gas(
 }
 
 fn backlog_with_time_elapsed(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     extra_gas: u64,
     current_timestamp: u64,
     last_timestamp: u64,
@@ -74,7 +74,7 @@ fn backlog_with_time_elapsed(
 }
 
 fn update_backlog(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     cumulative_execution_gas: u64,
     timestamp: Timestamp,
 ) -> anyhow::Result<()> {
@@ -168,8 +168,10 @@ mod test {
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_evm_logging::Logging;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_execution::context::Context;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     proptest! {
@@ -283,7 +285,10 @@ mod test {
         );
     }
 
-    fn load_gas_price(host: &mut impl Runtime) -> (U256, U256) {
+    fn load_gas_price<Host>(host: &mut Host) -> (U256, U256)
+    where
+        Host: StorageV1 + Logging,
+    {
         let bf = crate::retrieve_block_fees(host).unwrap();
 
         (bf.minimum_base_fee_per_gas(), bf.base_fee_per_gas())

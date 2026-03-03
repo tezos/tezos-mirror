@@ -20,7 +20,8 @@ use revm_etherlink::{
     ExecutionOutcome, GasData,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
 };
@@ -44,9 +45,9 @@ impl EthereumRuntime {
         Self { chain_id }
     }
 
-    fn create_block_constants<Host: Runtime>(
+    fn create_block_constants(
         &self,
-        host: &Host,
+        host: &impl StorageV1,
         context: &CrossRuntimeContext,
     ) -> BlockConstants {
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
@@ -69,7 +70,7 @@ impl EthereumRuntime {
 }
 
 /// Read the sequencer pool address (coinbase) from storage.
-fn read_sequencer_pool_address(host: &impl Runtime) -> Option<primitive_types::H160> {
+fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types::H160> {
     use tezos_smart_rollup_host::path::RefPath;
     const SEQUENCER_POOL_PATH: RefPath =
         RefPath::assert_from(b"/evm/sequencer_pool_address");
@@ -81,13 +82,16 @@ fn read_sequencer_pool_address(host: &impl Runtime) -> Option<primitive_types::H
 }
 
 impl RuntimeInterface for EthereumRuntime {
-    fn generate_alias<Host: Runtime>(
+    fn generate_alias<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         native_address: &[u8],
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + tezos_evm_logging::Logging,
+    {
         // Step 1: Compute the alias address deterministically from the native address
         let mut hasher = Keccak256::new();
         hasher.update(native_address);
@@ -196,7 +200,7 @@ impl RuntimeInterface for EthereumRuntime {
         }
     }
 
-    fn call<Host: Runtime>(
+    fn call<Host>(
         &self,
         registry: &impl tezosx_interfaces::Registry,
         host: &mut Host,
@@ -205,7 +209,10 @@ impl RuntimeInterface for EthereumRuntime {
         amount: primitive_types::U256,
         data: &[u8],
         context: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, TezosXRuntimeError>
+    where
+        Host: StorageV1 + tezos_evm_logging::Logging,
+    {
         if from.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
                 "Invalid 'from' address length".to_string(),
@@ -269,12 +276,15 @@ impl RuntimeInterface for EthereumRuntime {
         }
     }
 
-    fn serve<Host: Runtime>(
+    fn serve<Host>(
         &self,
         _registry: &impl Registry,
         _host: &mut Host,
         _request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         todo!("EthereumRuntime::serve — will be implemented in a future issue")
     }
 
@@ -294,9 +304,9 @@ impl RuntimeInterface for EthereumRuntime {
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
     #[cfg(feature = "testing")]
-    fn get_balance<Host: Runtime>(
+    fn get_balance(
         &self,
-        _host: &mut Host,
+        _host: &mut impl StorageV1,
         _address: &[u8],
     ) -> Result<primitive_types::U256, TezosXRuntimeError> {
         unimplemented!("Use mocks if you are in tests")
@@ -320,7 +330,7 @@ impl RuntimeInterface for EthereumRuntime {
 /// - On error: resets the alias balance to zero.
 ///
 /// TODO: L2-885 this should be done using the revm journal.
-fn with_temporary_credit<Host: Runtime>(
+fn with_temporary_credit<Host: StorageV1>(
     caller: Address,
     host: &mut Host,
     value: AlloyU256,
@@ -366,8 +376,8 @@ fn with_temporary_credit<Host: Runtime>(
     outcome
 }
 
-fn reset_balance<Host: Runtime>(
-    host: &mut Host,
+fn reset_balance(
+    host: &mut impl StorageV1,
     address: &Address,
 ) -> Result<(), TezosXRuntimeError> {
     let mut account = StorageAccount::from_address(address)?;
@@ -387,7 +397,9 @@ mod tests {
         helpers::storage::bytes_hash,
         storage::{code::CodeStorage, world_state_handler::StorageAccount},
     };
+    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
         CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
         TezosXRuntimeError,
@@ -399,7 +411,7 @@ mod tests {
     struct StubRegistry;
 
     impl Registry for StubRegistry {
-        fn bridge<Host: tezos_evm_runtime::runtime::Runtime>(
+        fn bridge<Host>(
             &self,
             _host: &mut Host,
             _destination_runtime: RuntimeId,
@@ -408,17 +420,23 @@ mod tests {
             _amount: U256,
             _data: &[u8],
             _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError> {
+        ) -> Result<CrossCallResult, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             unimplemented!("not needed for this test")
         }
 
-        fn generate_alias<Host: tezos_evm_runtime::runtime::Runtime>(
+        fn generate_alias<Host>(
             &self,
             _host: &mut Host,
             _native_address: &[u8],
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             unimplemented!("not needed for this test")
         }
 
@@ -430,11 +448,14 @@ mod tests {
             unimplemented!("not needed for this test")
         }
 
-        fn serve<Host: tezos_evm_runtime::runtime::Runtime>(
+        fn serve<Host>(
             &self,
             _host: &mut Host,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             unimplemented!("not needed for this test")
         }
     }

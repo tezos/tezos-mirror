@@ -9,10 +9,10 @@ use revm::{
     state::{AccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
     runtime::RuntimeError,
+    storage::StorageV1,
 };
 
 use crate::{
@@ -209,7 +209,7 @@ impl StorageAccount {
         Self { path }
     }
 
-    pub fn info(&self, host: &mut impl Runtime) -> Result<AccountInfo, Error> {
+    pub fn info(&self, host: &mut impl StorageV1) -> Result<AccountInfo, Error> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
             Ok(bytes) => {
@@ -277,7 +277,7 @@ impl StorageAccount {
 
     pub fn info_without_migration(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Option<AccountInfo>, Error> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
@@ -293,7 +293,7 @@ impl StorageAccount {
 
     pub fn set_info(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         mut new_infos: AccountInfo,
     ) -> Result<(), Error> {
         let path = concat(&self.path, &INFO_PATH)?;
@@ -312,7 +312,7 @@ impl StorageAccount {
 
     pub fn set_info_without_code(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         new_infos: AccountInfo,
     ) -> Result<(), Error> {
         let path = concat(&self.path, &INFO_PATH)?;
@@ -322,7 +322,7 @@ impl StorageAccount {
         Ok(())
     }
 
-    pub fn delete_info(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
+    pub fn delete_info(&mut self, host: &mut impl StorageV1) -> Result<(), Error> {
         let path = concat(&self.path, &INFO_PATH)?;
         match host.store_delete(&path) {
             Ok(()) | Err(RuntimeError::PathNotFound) => (),
@@ -334,7 +334,7 @@ impl StorageAccount {
     // In the future we might want to optimize reading to not use `info`.
     pub fn add_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         amount: U256,
     ) -> Result<(), Error> {
         let mut info = self.info(host)?;
@@ -348,7 +348,7 @@ impl StorageAccount {
     // In the future we might want to optimize reading to not use `info`.
     pub fn sub_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         amount: U256,
     ) -> Result<(), Error> {
         let mut info = self.info(host)?;
@@ -365,14 +365,18 @@ impl StorageAccount {
         concat(&storage_path, &index_path)
     }
 
-    pub fn get_storage(&self, host: &impl Runtime, index: &U256) -> Result<U256, Error> {
+    pub fn get_storage(
+        &self,
+        host: &impl StorageV1,
+        index: &U256,
+    ) -> Result<U256, Error> {
         let path = self.storage_path(index)?;
         Ok(read_u256_be_default(host, &path, STORAGE_DEFAULT_VALUE)?)
     }
 
     pub fn set_storage(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         index: &U256,
         value: &U256,
     ) -> Result<(), Error> {
@@ -382,14 +386,17 @@ impl StorageAccount {
         Ok(host.store_write(&path, &value_bytes, 0)?)
     }
 
-    pub(crate) fn read_global_counter(&self, host: &impl Runtime) -> Result<U256, Error> {
+    pub(crate) fn read_global_counter(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<U256, Error> {
         let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
         Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
 
     pub(crate) fn write_global_counter(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         value: U256,
     ) -> Result<(), Error> {
         let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
@@ -412,7 +419,7 @@ impl StorageAccount {
 
     pub fn read_ticket_balance(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<U256, Error> {
@@ -422,7 +429,7 @@ impl StorageAccount {
 
     pub fn write_ticket_balance(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         ticket_hash: &U256,
         owner: &Address,
         amount: U256,
@@ -441,7 +448,7 @@ impl StorageAccount {
 
     pub(crate) fn write_deposit(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         deposit_id: &U256,
         deposit: &FaDepositWithProxy,
     ) -> Result<(), Error> {
@@ -451,7 +458,7 @@ impl StorageAccount {
 
     pub(crate) fn read_deposit_from_queue(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
@@ -461,7 +468,7 @@ impl StorageAccount {
 
     pub(crate) fn remove_deposit_from_queue(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         deposit_id: &U256,
     ) -> Result<(), Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
@@ -491,14 +498,15 @@ mod test {
         state::Bytecode,
     };
     use rlp::Encodable;
-    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     fn bytecode_from_static(bytes: &'static [u8]) -> Result<Bytecode, Error> {
         Ok(Bytecode::new_legacy(Bytes::from_static(bytes)))
     }
 
     fn check_account_code_info_fetching(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         code_voucher: Bytecode,
         code_hash_voucher: FixedBytes<32>,
     ) {

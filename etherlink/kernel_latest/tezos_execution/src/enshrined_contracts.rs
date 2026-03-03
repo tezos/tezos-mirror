@@ -18,7 +18,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::wei::eth_from_mutez;
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
 
@@ -88,13 +89,16 @@ fn typecheck_entrypoint_value<'a>(
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
-pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
+pub(crate) fn execute_enshrined_contract<'a, Host>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     registry: &impl Registry,
-) -> Result<(), TransferError> {
+) -> Result<(), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value)?;
     match contract {
         EnshrinedContracts::TezosXGateway => {
@@ -344,12 +348,15 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
-fn tezosx_cross_runtime_call<'a, Host: Runtime>(
+fn tezosx_cross_runtime_call<'a, Host>(
     registry: &impl Registry,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     dest: &str,
     data: &[u8],
-) -> Result<(), TransferError> {
+) -> Result<(), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let source = ctx.sender();
     let amount = ctx.amount();
     let block_number = ctx.level();

@@ -14,7 +14,7 @@ use tezos_data_encoding::{
     nom::NomReader,
     types::{Narith, Zarith},
 };
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
 use tezos_execution::{
     account_storage::TezlinkAccount,
     context::Context,
@@ -24,6 +24,7 @@ use tezos_execution::{
 };
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
+use tezos_smart_rollup_host::storage::StorageV1;
 // `Parameters` could come from `tezos_protocol::operation`, but we also need
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
@@ -130,11 +131,14 @@ fn build_response(
 ///
 /// This is the core logic behind [`TezosRuntime::serve`], separated so
 /// that `serve` only handles the error-to-HTTP-status mapping.
-fn execute_request<Host: Runtime>(
+fn execute_request<Host>(
     registry: &impl Registry,
     host: &mut Host,
     request: http::Request<Vec<u8>>,
-) -> Result<TransferSuccess, TezosXRuntimeError> {
+) -> Result<TransferSuccess, TezosXRuntimeError>
+where
+    Host: StorageV1 + Logging,
+{
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
 
@@ -198,13 +202,16 @@ fn execute_request<Host: Runtime>(
 }
 
 impl RuntimeInterface for TezosRuntime {
-    fn generate_alias<Host: Runtime>(
+    fn generate_alias<Host>(
         &self,
         _registry: &impl Registry,
         _host: &mut Host,
         native_address: &[u8],
         _context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         // TODO: Add code in this contract.
         let contract = Contract::Originated(ContractKt1Hash::from(blake2b::digest_160(
             native_address,
@@ -220,7 +227,7 @@ impl RuntimeInterface for TezosRuntime {
     /// debited by the calling runtime (e.g. EVM gateway). This handles both
     /// implicit and originated destinations, including Michelson code execution
     /// and internal operations.
-    fn call<Host: Runtime>(
+    fn call<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
@@ -229,7 +236,10 @@ impl RuntimeInterface for TezosRuntime {
         amount: U256,
         data: &[u8],
         cross_ctx: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         let dest = Contract::nom_read_exact(to).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(
                 "Failed to decode address from bytes: {e:?}"
@@ -336,12 +346,15 @@ impl RuntimeInterface for TezosRuntime {
         }
     }
 
-    fn serve<Host: Runtime>(
+    fn serve<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         build_response(execute_request(registry, host, request))
     }
 
@@ -367,9 +380,9 @@ impl RuntimeInterface for TezosRuntime {
 
     // Need to implement this only for IDE. Not needed in compilation or tests.
     #[cfg(feature = "testing")]
-    fn get_balance<Host: Runtime>(
+    fn get_balance(
         &self,
-        _host: &mut Host,
+        _host: &mut impl StorageV1,
         _address: &[u8],
     ) -> Result<U256, TezosXRuntimeError> {
         unimplemented!("Use mocks if you are in tests")
@@ -388,7 +401,7 @@ impl TezosRuntime {
     }
 
     pub fn add_balance(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         pub_key_hash: &PublicKeyHash,
         amount: U256,
     ) -> Result<(), TezosXRuntimeError> {
@@ -402,7 +415,7 @@ impl TezosRuntime {
 
     // Used for debug while we don't have our own originated account implementation.
     pub fn get_originated_account_balance(
-        host: &impl Runtime,
+        host: &impl StorageV1,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;

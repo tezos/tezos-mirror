@@ -19,8 +19,8 @@ use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
 use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -29,6 +29,7 @@ use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{
     read_b58_kt1, read_optional_nom_value, read_u256_le, read_u64_le, store_bin,
     store_read_slice, write_u256_le, write_u64_le,
@@ -228,10 +229,13 @@ pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
     concat(&CHAIN_CONFIGURATIONS, &chain_id_path).map_err(Error::from)
 }
 
-pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
-    host: &mut Host,
+pub fn store_simulation_result<T>(
+    host: &mut impl StorageV1,
     result: SimulationResult<T, String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    T: Decodable + Encodable,
+{
     let encoded = result.to_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
@@ -260,8 +264,8 @@ pub fn chunked_hashes_transaction_path(
     concat(chunked_transaction_path, &CHUNKED_HASHES).map_err(Error::from)
 }
 
-pub fn chunked_transaction_hash_exists<Host: Runtime>(
-    host: &mut Host,
+pub fn chunked_transaction_hash_exists(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     hash: &TransactionHash,
 ) -> Result<bool, Error> {
@@ -287,8 +291,8 @@ pub fn transaction_chunk_path(
     concat(chunked_transaction_path, &i_path).map_err(Error::from)
 }
 
-fn is_transaction_complete<Host: Runtime>(
-    host: &mut Host,
+fn is_transaction_complete(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
 ) -> Result<bool, Error> {
@@ -301,8 +305,8 @@ fn is_transaction_complete<Host: Runtime>(
     Ok(true)
 }
 
-fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
-    host: &mut Host,
+fn chunked_transaction_num_chunks_by_path(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
 ) -> Result<u16, Error> {
     let chunked_transaction_num_chunks_path =
@@ -312,16 +316,16 @@ fn chunked_transaction_num_chunks_by_path<Host: Runtime>(
     Ok(u16::from_le_bytes(buffer))
 }
 
-pub fn chunked_transaction_num_chunks<Host: Runtime>(
-    host: &mut Host,
+pub fn chunked_transaction_num_chunks(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
 ) -> Result<u16, Error> {
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
     chunked_transaction_num_chunks_by_path(host, &chunked_transaction_path)
 }
 
-fn store_transaction_chunk_data<Host: Runtime>(
-    host: &mut Host,
+fn store_transaction_chunk_data(
+    host: &mut impl StorageV1,
     transaction_chunk_path: &OwnedPath,
     data: Vec<u8>,
 ) -> Result<(), Error> {
@@ -341,8 +345,8 @@ fn store_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-pub fn read_transaction_chunk_data<Host: Runtime>(
-    host: &mut Host,
+pub fn read_transaction_chunk_data(
+    host: &mut impl StorageV1,
     transaction_chunk_path: &OwnedPath,
 ) -> Result<Vec<u8>, Error> {
     let data_size = host.store_value_size(transaction_chunk_path)?;
@@ -362,8 +366,8 @@ pub fn read_transaction_chunk_data<Host: Runtime>(
     }
 }
 
-fn get_full_transaction<Host: Runtime>(
-    host: &mut Host,
+fn get_full_transaction(
+    host: &mut impl StorageV1,
     chunked_transaction_path: &OwnedPath,
     num_chunks: u16,
 ) -> Result<Vec<u8>, Error> {
@@ -376,8 +380,8 @@ fn get_full_transaction<Host: Runtime>(
     Ok(buffer)
 }
 
-pub fn remove_chunked_transaction<Host: Runtime>(
-    host: &mut Host,
+pub fn remove_chunked_transaction(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
 ) -> Result<(), Error> {
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
@@ -403,8 +407,8 @@ pub fn remove_chunked_transaction<Host: Runtime>(
 
 /// Store the transaction chunk in the storage. Returns the full transaction
 /// if the last chunk to store is the last missing chunk.
-pub fn store_transaction_chunk<Host: Runtime>(
-    host: &mut Host,
+pub fn store_transaction_chunk(
+    host: &mut impl StorageV1,
     tx_hash: &TransactionHash,
     i: u16,
     data: Vec<u8>,
@@ -428,12 +432,15 @@ pub fn store_transaction_chunk<Host: Runtime>(
     }
 }
 
-pub fn create_chunked_transaction<Host: Runtime>(
+pub fn create_chunked_transaction<Host>(
     host: &mut Host,
     tx_hash: &TransactionHash,
     num_chunks: u16,
     chunk_hashes: Vec<TransactionHash>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
 
     // A new chunked transaction creates the `../<tx_hash>/num_chunks`, if there
@@ -471,71 +478,71 @@ pub fn create_chunked_transaction<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_chain_id<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> Result<(), Error> {
+pub fn store_chain_id(host: &mut impl StorageV1, chain_id: U256) -> Result<(), Error> {
     write_u256_le(host, &EVM_CHAIN_ID, chain_id).map_err(Error::from)
 }
 
-pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn read_chain_id(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_CHAIN_ID).map_err(Error::from)
 }
 
-pub fn store_michelson_runtime_chain_id<Host: Runtime>(
-    host: &mut Host,
+pub fn store_michelson_runtime_chain_id(
+    host: &mut impl StorageV1,
     chain_id: &ChainId,
 ) -> Result<(), Error> {
     store_bin(chain_id, host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
 }
 
-pub fn read_michelson_runtime_chain_id<Host: Runtime>(
-    host: &Host,
+pub fn read_michelson_runtime_chain_id(
+    host: &impl StorageV1,
 ) -> Result<Option<ChainId>, Error> {
     read_optional_nom_value(host, &MICHELSON_RUNTIME_CHAIN_ID).map_err(Error::from)
 }
 
-pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+pub fn read_minimum_base_fee_per_gas(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS).map_err(Error::from)
 }
 
-pub fn read_backlog(host: &impl Runtime) -> Result<u64, Error> {
+pub fn read_backlog(host: &impl StorageV1) -> Result<u64, Error> {
     read_u64_le(host, &BACKLOG_PATH).map_err(Error::from)
 }
 
-pub fn store_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+pub fn store_backlog(host: &mut impl StorageV1, value: u64) -> Result<(), Error> {
     write_u64_le(host, &BACKLOG_PATH, value).map_err(Error::from)
 }
 
-pub fn read_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+pub fn read_backlog_timestamp(host: &impl StorageV1) -> Result<u64, Error> {
     read_u64_le(host, &BACKLOG_TIMESTAMP_PATH).map_err(Error::from)
 }
 
-pub fn store_backlog_timestamp(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+pub fn store_backlog_timestamp(
+    host: &mut impl StorageV1,
+    value: u64,
+) -> Result<(), Error> {
     write_u64_le(host, &BACKLOG_TIMESTAMP_PATH, value)?;
     Ok(())
 }
 
-pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
+pub fn store_minimum_base_fee_per_gas(
+    host: &mut impl StorageV1,
     price: U256,
 ) -> Result<(), Error> {
     write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS, price).map_err(Error::from)
 }
 
 pub fn store_da_fee(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     base_fee_per_gas: U256,
 ) -> Result<(), Error> {
     write_u256_le(host, &EVM_DA_FEE, base_fee_per_gas).map_err(Error::from)
 }
 
-pub fn read_da_fee(host: &impl Runtime) -> Result<U256, Error> {
+pub fn read_da_fee(host: &impl StorageV1) -> Result<U256, Error> {
     read_u256_le(host, &EVM_DA_FEE).map_err(Error::from)
 }
 
 pub fn update_burned_fees(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     burned_fee: U256,
 ) -> Result<(), Error> {
     let path = &EVM_BURNED_FEES;
@@ -545,12 +552,15 @@ pub fn update_burned_fees(
 }
 
 #[cfg(test)]
-pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
+pub fn read_burned_fees(host: &mut impl StorageV1) -> U256 {
     let path = &EVM_BURNED_FEES;
     read_u256_le(host, path).unwrap_or_else(|_| U256::zero())
 }
 
-pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
+pub fn read_sequencer_pool_address<Host>(host: &Host) -> Option<H160>
+where
+    Host: StorageV1 + Logging,
+{
     let mut bytes = [0; std::mem::size_of::<H160>()];
     let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice())
     else {
@@ -561,7 +571,7 @@ pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
 }
 
 pub fn store_sequencer_pool_address(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     address: H160,
 ) -> Result<(), Error> {
     let bytes = address.to_fixed_bytes();
@@ -569,8 +579,8 @@ pub fn store_sequencer_pool_address(
     Ok(())
 }
 
-pub fn store_timestamp_path<Host: Runtime>(
-    host: &mut Host,
+pub fn store_timestamp_path(
+    host: &mut impl StorageV1,
     path: &OwnedPath,
     timestamp: &Timestamp,
 ) -> Result<(), Error> {
@@ -579,27 +589,27 @@ pub fn store_timestamp_path<Host: Runtime>(
 }
 
 #[allow(dead_code)]
-pub fn read_l1_level<Host: Runtime>(host: &mut Host) -> Result<u32, Error> {
+pub fn read_l1_level(host: &mut impl StorageV1) -> Result<u32, Error> {
     let mut buffer = [0u8; 4];
     store_read_slice(host, &EVM_L1_LEVEL, &mut buffer, 4)?;
     let level = u32::from_le_bytes(buffer);
     Ok(level)
 }
 
-pub fn store_l1_level<Host: Runtime>(host: &mut Host, level: u32) -> Result<(), Error> {
+pub fn store_l1_level(host: &mut impl StorageV1, level: u32) -> Result<(), Error> {
     host.store_write(&EVM_L1_LEVEL, &level.to_le_bytes(), 0)?;
     Ok(())
 }
 
-pub fn store_last_info_per_level_timestamp<Host: Runtime>(
-    host: &mut Host,
+pub fn store_last_info_per_level_timestamp(
+    host: &mut impl StorageV1,
     timestamp: Timestamp,
 ) -> Result<(), Error> {
     store_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into(), &timestamp)
 }
 
-pub fn read_timestamp_path<Host: Runtime>(
-    host: &Host,
+pub fn read_timestamp_path(
+    host: &impl StorageV1,
     path: &OwnedPath,
 ) -> Result<Timestamp, Error> {
     let mut buffer = [0u8; 8];
@@ -608,41 +618,39 @@ pub fn read_timestamp_path<Host: Runtime>(
     Ok(timestamp_as_i64.into())
 }
 
-pub fn read_last_info_per_level_timestamp<Host: Runtime>(
-    host: &Host,
+pub fn read_last_info_per_level_timestamp(
+    host: &impl StorageV1,
 ) -> Result<Timestamp, Error> {
     read_timestamp_path(host, &EVM_INFO_PER_LEVEL_TIMESTAMP.into())
 }
 
-pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+pub fn read_admin(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN)
 }
 
-pub fn read_sequencer_governance<Host: Runtime>(
-    host: &mut Host,
-) -> Option<ContractKt1Hash> {
+pub fn read_sequencer_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &SEQUENCER_GOVERNANCE)
 }
 
-pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+pub fn read_kernel_governance(host: &mut impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_GOVERNANCE)
 }
 
-pub fn read_kernel_security_governance<Host: Runtime>(
-    host: &mut Host,
+pub fn read_kernel_security_governance(
+    host: &mut impl StorageV1,
 ) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE)
 }
 
-pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64> {
+pub fn read_maximum_allowed_ticks(host: &mut impl StorageV1) -> Option<u64> {
     read_u64_le(host, &MAXIMUM_ALLOWED_TICKS).ok()
 }
 
 /// Reads the maximum gas per transaction. If the value cannot found in the storage,
 /// we write the kernel default value in the storage. The value becomes accessible
 /// from outside the kernel.
-pub fn read_or_set_maximum_gas_per_transaction<Host: Runtime>(
-    host: &mut Host,
+pub fn read_or_set_maximum_gas_per_transaction(
+    host: &mut impl StorageV1,
 ) -> anyhow::Result<u64> {
     match read_u64_le(host, &MAXIMUM_GAS_PER_TRANSACTION) {
         Ok(gas_limit) => Ok(gas_limit),
@@ -653,8 +661,8 @@ pub fn read_or_set_maximum_gas_per_transaction<Host: Runtime>(
     }
 }
 
-pub fn store_storage_version<Host: Runtime>(
-    host: &mut Host,
+pub fn store_storage_version(
+    host: &mut impl StorageV1,
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
@@ -662,9 +670,10 @@ pub fn store_storage_version<Host: Runtime>(
         .map_err(Error::from)
 }
 
-pub fn read_storage_version<Host: Runtime>(
-    host: &mut Host,
-) -> Result<StorageVersion, Error> {
+pub fn read_storage_version<Host>(host: &mut Host) -> Result<StorageVersion, Error>
+where
+    Host: StorageV1 + Logging,
+{
     match host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) => {
             let slice_of_bytes: [u8; 8] =
@@ -679,7 +688,7 @@ pub fn read_storage_version<Host: Runtime>(
     }
 }
 
-pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Error> {
+pub fn read_kernel_version(host: &mut impl StorageV1) -> Result<String, Error> {
     match host.store_read_all(&KERNEL_VERSION_PATH) {
         Ok(bytes) => {
             let kernel_version =
@@ -690,8 +699,8 @@ pub fn read_kernel_version<Host: Runtime>(host: &mut Host) -> Result<String, Err
     }
 }
 
-pub fn store_kernel_version<Host: Runtime>(
-    host: &mut Host,
+pub fn store_kernel_version(
+    host: &mut impl StorageV1,
     kernel_version: &str,
 ) -> Result<(), Error> {
     let kernel_version = kernel_version.as_bytes();
@@ -703,10 +712,13 @@ pub fn store_kernel_version<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_block_in_progress<Host: Runtime>(
+pub fn store_block_in_progress<Host>(
     host: &mut Host,
     bip: &BlockInProgress,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
     log!(
@@ -723,9 +735,12 @@ pub fn store_block_in_progress<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn read_block_in_progress<Host: Runtime>(
+pub fn read_block_in_progress<Host>(
     host: &Host,
-) -> anyhow::Result<Option<BlockInProgress>> {
+) -> anyhow::Result<Option<BlockInProgress>>
+where
+    Host: StorageV1 + Logging,
+{
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
         let bytes = host
@@ -746,12 +761,12 @@ pub fn read_block_in_progress<Host: Runtime>(
     }
 }
 
-pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+pub fn delete_block_in_progress(host: &mut impl StorageV1) -> anyhow::Result<()> {
     host.store_delete(&EVM_BLOCK_IN_PROGRESS)
         .context("Failed to delete block in progress")
 }
 
-pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
+pub fn sequencer(host: &impl StorageV1) -> anyhow::Result<Option<PublicKey>> {
     if host.store_has(&SEQUENCER_KEY_PATH)?.is_some() {
         let bytes = host.store_read_all(&SEQUENCER_KEY_PATH)?;
         let Ok(tz1_b58) = String::from_utf8(bytes) else {
@@ -766,7 +781,10 @@ pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>
     }
 }
 
-pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
+pub fn enable_dal<Host>(host: &Host) -> anyhow::Result<bool>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
         // When run from the EVM node, the DAL feature is always
         // considered as disabled.
@@ -777,12 +795,12 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     }
 }
 
-pub fn enable_tezos_runtime<Host: Runtime>(host: &Host) -> bool {
+pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
     Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
 }
 
-pub fn tweak_dal_activation<Host: Runtime>(
-    host: &mut Host,
+pub fn tweak_dal_activation(
+    host: &mut impl StorageV1,
     activate_dal: bool,
 ) -> anyhow::Result<()> {
     if activate_dal {
@@ -793,23 +811,18 @@ pub fn tweak_dal_activation<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_dal_slots<Host: Runtime>(
-    host: &mut Host,
-    slots: &[u8],
-) -> anyhow::Result<()> {
+pub fn store_dal_slots(host: &mut impl StorageV1, slots: &[u8]) -> anyhow::Result<()> {
     Ok(host.store_write_all(&DAL_SLOTS, slots)?)
 }
 
 /// Returns true if legacy DAL slot import signals are disabled.
 /// When disabled, the kernel ignores `DalSlotImportSignals` external messages
 /// and instead relies on `DalAttestedSlots` internal messages.
-pub fn is_legacy_dal_signals_disabled<Host: Runtime>(
-    host: &Host,
-) -> anyhow::Result<bool> {
+pub fn is_legacy_dal_signals_disabled(host: &impl StorageV1) -> anyhow::Result<bool> {
     Ok(host.store_has(&DISABLE_LEGACY_DAL_SIGNALS)?.is_some())
 }
 
-pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> {
+pub fn dal_slots(host: &impl StorageV1) -> anyhow::Result<Option<Vec<u8>>> {
     if host.store_has(&DAL_SLOTS)?.is_some() {
         let bytes = host.store_read_all(&DAL_SLOTS)?;
         Ok(Some(bytes))
@@ -824,8 +837,8 @@ pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> 
 ///
 /// NOTE: An empty whitelist means NO publishers are authorized
 /// The kernel will reject all DAL slots if the whitelist is empty.
-pub fn read_dal_publishers_whitelist<Host: Runtime>(
-    host: &Host,
+pub fn read_dal_publishers_whitelist(
+    host: &impl StorageV1,
 ) -> anyhow::Result<Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>> {
     if host.store_has(&DAL_PUBLISHERS_WHITELIST)?.is_some() {
         let rlp_bytes = host.store_read_all(&DAL_PUBLISHERS_WHITELIST)?;
@@ -850,12 +863,12 @@ pub fn read_dal_publishers_whitelist<Host: Runtime>(
     }
 }
 
-pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+pub fn remove_sequencer(host: &mut impl StorageV1) -> anyhow::Result<()> {
     host.store_delete(&SEQUENCER_KEY_PATH).map_err(Into::into)
 }
 
-pub fn store_sequencer<Host: Runtime>(
-    host: &mut Host,
+pub fn store_sequencer(
+    host: &mut impl StorageV1,
     public_key: &PublicKey,
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
@@ -864,7 +877,10 @@ pub fn store_sequencer<Host: Runtime>(
         .map_err(Into::into)
 }
 
-pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     if host.store_has(&KEEP_EVENTS)?.is_some() {
         host.store_delete(&KEEP_EVENTS)?;
         Ok(())
@@ -874,14 +890,17 @@ pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
     }
 }
 
-pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Result<()> {
+pub fn store_event(host: &mut impl StorageV1, event: &Event) -> anyhow::Result<()> {
     let index = IndexableStorage::new(&EVENTS)?;
     index
         .push_value(host, &event.rlp_bytes())
         .map_err(Into::into)
 }
 
-pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> {
+pub fn delayed_inbox_timeout<Host>(host: &Host) -> anyhow::Result<u64>
+where
+    Host: StorageV1 + Logging,
+{
     // The default timeout is 12 hours
     let default_timeout = 43200;
     if host.store_has(&EVM_DELAYED_INBOX_TIMEOUT)?.is_some() {
@@ -908,7 +927,10 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
     }
 }
 
-pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u32> {
+pub fn delayed_inbox_min_levels<Host>(host: &Host) -> anyhow::Result<u32>
+where
+    Host: StorageV1 + Logging,
+{
     let default_min_levels = 720;
     if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
         let mut buffer = [0u8; 4];
@@ -932,9 +954,10 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
     }
 }
 
-pub fn read_tracer_input<Host: Runtime>(
-    host: &mut Host,
-) -> anyhow::Result<Option<TracerInput>> {
+pub fn read_tracer_input<Host>(host: &mut Host) -> anyhow::Result<Option<TracerInput>>
+where
+    Host: StorageV1 + Logging,
+{
     if let Some(ValueType::Value) = host.store_has(&TRACER_INPUT).map_err(Error::from)? {
         let bytes = host
             .store_read_all(&TRACER_INPUT)
@@ -957,7 +980,7 @@ pub fn read_tracer_input<Host: Runtime>(
     }
 }
 
-pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
+pub fn is_enable_fa_bridge(host: &impl StorageV1) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
         Ok(true)
     } else {
@@ -965,7 +988,7 @@ pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
     }
 }
 
-pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result<i64> {
+pub fn max_blueprint_lookahead_in_seconds(host: &impl StorageV1) -> anyhow::Result<i64> {
     let bytes = host.store_read(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS, 0, 8)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
@@ -974,7 +997,7 @@ pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result
 // Storage functions related to a chain configuration
 
 pub fn read_chain_family(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     chain_id: U256,
 ) -> anyhow::Result<ChainFamily> {
     let chain_configurations_path = chain_config_path(&chain_id)?;
@@ -991,9 +1014,7 @@ pub fn read_chain_family(
 ///
 /// This smart contract is used to submit transactions to the rollup
 /// when in sequencer mode
-pub fn read_delayed_transaction_bridge<Host: Runtime>(
-    host: &Host,
-) -> Option<ContractKt1Hash> {
+pub fn read_delayed_transaction_bridge(host: &impl StorageV1) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &DELAYED_BRIDGE)
 }
 

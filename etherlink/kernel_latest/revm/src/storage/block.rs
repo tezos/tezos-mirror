@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm::primitives::B256;
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
 
 use crate::Error;
 
@@ -20,7 +19,7 @@ fn to_block_hash_path(block_number: u64) -> Result<OwnedPath, Error> {
 }
 
 /// Get block hash by block number.
-pub fn get_block_hash(host: &impl Runtime, block_number: u64) -> Result<B256, Error> {
+pub fn get_block_hash(host: &impl StorageV1, block_number: u64) -> Result<B256, Error> {
     let block_path = to_block_hash_path(block_number)?;
     let block_hash = host.store_read(&block_path, 0, 32)?;
 

@@ -9,10 +9,10 @@ use revm::{
     primitives::{Bytes, B256},
     state::Bytecode,
 };
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
     runtime::RuntimeError,
+    storage::StorageV1,
 };
 
 use crate::{
@@ -55,33 +55,33 @@ impl CodeStorage {
         })
     }
 
-    fn exists(&self, host: &impl Runtime) -> Result<bool, Error> {
+    fn exists(&self, host: &impl StorageV1) -> Result<bool, Error> {
         let store_has_code = host.store_has(&concat(&self.path, &CODE_PATH)?)?;
         Ok(store_has_code.is_some())
     }
 
-    fn get_ref_count(&self, host: &mut impl Runtime) -> Result<u64, Error> {
+    fn get_ref_count(&self, host: &mut impl StorageV1) -> Result<u64, Error> {
         let reference_path = concat(&self.path, &REFERENCE_PATH)?;
         read_u64_le_default(host, &reference_path, 0)
     }
 
     fn set_ref_count(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         number_ref: u64,
     ) -> Result<(), Error> {
         let reference_path = concat(&self.path, &REFERENCE_PATH)?;
         Ok(write_u64_le(host, &reference_path, number_ref)?)
     }
 
-    fn increment_code_usage(&self, host: &mut impl Runtime) -> Result<(), Error> {
+    fn increment_code_usage(&self, host: &mut impl StorageV1) -> Result<(), Error> {
         let number_reference = self.get_ref_count(host)?;
         let number_reference = number_reference.saturating_add(1u64);
         self.set_ref_count(host, number_reference)
     }
 
     pub fn add(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         bytecode: &[u8],
         code_hash: Option<B256>,
     ) -> Result<B256, Error> {
@@ -95,7 +95,7 @@ impl CodeStorage {
         Ok(code_hash)
     }
 
-    pub fn get_code(&self, host: &impl Runtime) -> Result<Option<Bytecode>, Error> {
+    pub fn get_code(&self, host: &impl StorageV1) -> Result<Option<Bytecode>, Error> {
         if let Some(code) = get_precompile_bytecode(&self.hash)? {
             return Ok(Some(code));
         }
@@ -109,7 +109,7 @@ impl CodeStorage {
         }
     }
 
-    fn decrement_code_usage(&self, host: &mut impl Runtime) -> Result<u64, Error> {
+    fn decrement_code_usage(&self, host: &mut impl StorageV1) -> Result<u64, Error> {
         let mut number_reference = self.get_ref_count(host)?;
         if number_reference != 0 {
             // Condition avoids an unnecessary write access
@@ -120,7 +120,7 @@ impl CodeStorage {
     }
 
     #[allow(dead_code)]
-    pub fn delete(host: &mut impl Runtime, code_hash: &B256) -> Result<(), Error> {
+    pub fn delete(host: &mut impl StorageV1, code_hash: &B256) -> Result<(), Error> {
         let code = Self::new(code_hash)?;
         if code.exists(host)? {
             let number_reference = code.decrement_code_usage(host)?;

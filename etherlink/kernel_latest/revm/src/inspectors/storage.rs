@@ -6,10 +6,12 @@ use super::struct_logger::StructLog;
 use crate::{helpers::storage::concat, Error};
 
 use revm::primitives::B256;
-use tezos_evm_logging::{log, Level::Debug};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::Debug, Logging};
 use tezos_indexable_storage::IndexableStorage;
-use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::{
+    path::{OwnedPath, RefPath},
+    storage::StorageV1,
+};
 
 const EVM_TRACE: RefPath = RefPath::assert_from(b"/evm/trace");
 const CALL_TRACE: RefPath = RefPath::assert_from(b"/call_trace");
@@ -32,8 +34,8 @@ pub fn trace_tx_path(hash: &Option<B256>, field: &RefPath) -> Result<OwnedPath, 
     concat(&trace_tx_path, field)
 }
 
-pub fn flush_call_traces<Host: Runtime>(
-    host: &mut Host,
+pub fn flush_call_traces(
+    host: &mut impl StorageV1,
     traces: &[impl rlp::Encodable],
     hash: &Option<B256>,
 ) -> Result<(), Error> {
@@ -48,8 +50,8 @@ pub fn flush_call_traces<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_trace_gas<Host: Runtime>(
-    host: &mut Host,
+pub fn store_trace_gas(
+    host: &mut impl StorageV1,
     gas: u64,
     hash: &Option<B256>,
 ) -> Result<(), Error> {
@@ -58,33 +60,42 @@ pub fn store_trace_gas<Host: Runtime>(
     Ok(())
 }
 
-pub fn store_trace_failed<Host: Runtime>(
+pub fn store_trace_failed<Host>(
     host: &mut Host,
     is_success: bool,
     hash: &Option<B256>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
     let path = trace_tx_path(hash, &FAILED)?;
     host.store_write(&path, &[u8::from(!is_success)], 0)?;
     log!(host, Debug, "Store trace info: is_success {is_success}");
     Ok(())
 }
 
-pub fn store_return_value<Host: Runtime>(
+pub fn store_return_value<Host>(
     host: &mut Host,
     value: &[u8],
     hash: &Option<B256>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
     let path = trace_tx_path(hash, &RETURN_VALUE)?;
     host.store_write(&path, value, 0)?;
     log!(host, Debug, "Store trace info: value {value:?}");
     Ok(())
 }
 
-pub fn store_struct_log<Host: Runtime>(
+pub fn store_struct_log<Host>(
     host: &mut Host,
     struct_log: &StructLog,
     hash: &Option<B256>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
     let encoded_strug_log = rlp::encode(struct_log);
 
     let path = trace_tx_path(hash, &STRUCT_LOGS)?;

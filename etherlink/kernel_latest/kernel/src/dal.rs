@@ -6,9 +6,8 @@ use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
-use tezos_evm_logging::{log, Level::*};
-
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_smart_rollup_host::reveal::HostReveal;
 
 const TAG_SIZE: usize = 1;
 
@@ -23,8 +22,8 @@ enum ParsedInput {
 }
 
 // Import all the pages of a DAL slot and concatenate them.
-fn import_dal_slot<Host: Runtime>(
-    host: &mut Host,
+fn import_dal_slot(
+    host: &mut impl HostReveal,
     slot_size: u64,
     page_size: u64,
     published_level: u32,
@@ -70,8 +69,8 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
     Result::Ok(header_len + value_len)
 }
 
-fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
-    host: &mut Host,
+fn parse_unsigned_sequencer_blueprint(
+    host: &mut impl Logging,
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -97,8 +96,8 @@ fn parse_unsigned_sequencer_blueprint<Host: Runtime>(
     }
 }
 
-fn parse_input<Host: Runtime>(
-    host: &mut Host,
+fn parse_input(
+    host: &mut impl Logging,
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -125,8 +124,8 @@ fn parse_input<Host: Runtime>(
     }
 }
 
-fn parse_slot<Host: Runtime>(
-    host: &mut Host,
+fn parse_slot(
+    host: &mut impl Logging,
     slot: &[u8],
     next_blueprint_number: &U256,
 ) -> Vec<UnsignedSequencerBlueprint> {
@@ -166,14 +165,17 @@ fn parse_slot<Host: Runtime>(
     }
 }
 
-pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
+pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host>(
     host: &mut Host,
     slot_size: u64,
     page_size: u64,
     next_blueprint_number: &U256,
     slot_index: u8,
     published_level: u32,
-) -> Option<Vec<UnsignedSequencerBlueprint>> {
+) -> Option<Vec<UnsignedSequencerBlueprint>>
+where
+    Host: HostReveal + Logging,
+{
     if let Some(slot) =
         import_dal_slot(host, slot_size, page_size, published_level, slot_index)
     {

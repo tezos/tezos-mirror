@@ -38,13 +38,14 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::context::Context;
 use tezos_execution::mir_ctx::BlockCtx;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
@@ -161,14 +162,17 @@ pub enum Validity {
 //       arguably, effective_gas_price should be set on EthereumTransactionCommon
 //       directly - initialised when constructed.
 #[instrument(skip_all)]
-pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
+pub fn is_valid_ethereum_transaction_common<Host>(
     host: &mut Host,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
     effective_gas_price: U256,
     is_delayed: bool,
     limits: &EvmLimits,
-) -> Result<Validity, Error> {
+) -> Result<Validity, Error>
+where
+    Host: StorageV1 + Logging,
+{
     // Chain id is correct.
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
@@ -252,7 +256,7 @@ pub enum RuntimeTransactionResult {
 /// Technically incorrect: it is possible to do a call without sending any data,
 /// however it's done for benchmarking only, and benchmarking doesn't include
 /// such a scenario
-fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8]) {
+fn log_transaction_type(host: &impl Logging, to: Option<H160>, data: &[u8]) {
     if to.is_none() {
         log!(host, Benchmarking, "Transaction type: CREATE");
     } else if data.is_empty() {
@@ -265,7 +269,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
 #[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn revm_run_transaction<Host: Runtime>(
+pub fn revm_run_transaction<Host>(
     host: &mut Host,
     registry: &impl Registry,
     block_constants: &BlockConstants,
@@ -282,7 +286,10 @@ pub fn revm_run_transaction<Host: Runtime>(
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
-) -> Result<ExecutionOutcome, anyhow::Error> {
+) -> Result<ExecutionOutcome, anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
     // Disclaimer:
     // The following code is over-complicated because we maintain
     // two sets of primitives inside the kernel's codebase.
@@ -381,7 +388,7 @@ pub fn revm_run_transaction<Host: Runtime>(
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-fn apply_ethereum_transaction_common<Host: Runtime>(
+fn apply_ethereum_transaction_common<Host>(
     host: &mut Host,
     registry: &impl Registry,
     block_constants: &BlockConstants,
@@ -391,7 +398,10 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
         host,
@@ -469,7 +479,7 @@ impl From<&Deposit> for SolXTZDeposit {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn pure_xtz_deposit<Host: Runtime>(
+pub fn pure_xtz_deposit<Host>(
     host: &mut Host,
     registry: &impl Registry,
     deposit: &Deposit,
@@ -478,7 +488,10 @@ pub fn pure_xtz_deposit<Host: Runtime>(
     maximum_gas_limit: u64,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
-) -> Result<ExecutionOutcome, Error> {
+) -> Result<ExecutionOutcome, Error>
+where
+    Host: StorageV1 + Logging,
+{
     // Fees are set to zero, this is an internal call to the XTZ bridge
     // solidity contract.
     // It isn't required for anyone to pay for the execution cost.
@@ -582,7 +595,7 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
 
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn pure_fa_deposit<Host: Runtime>(
+pub fn pure_fa_deposit<Host>(
     host: &mut Host,
     registry: &impl Registry,
     fa_deposit: &FaDeposit,
@@ -591,7 +604,10 @@ pub fn pure_fa_deposit<Host: Runtime>(
     maximum_gas_limit: u64,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
-) -> Result<ExecutionOutcome, Error> {
+) -> Result<ExecutionOutcome, Error>
+where
+    Host: StorageV1 + Logging,
+{
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
     let block_constants = BlockConstants {
@@ -642,7 +658,7 @@ pub fn pure_fa_deposit<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_fa_deposit<Host: Runtime>(
+fn apply_fa_deposit<Host>(
     host: &mut Host,
     registry: &impl Registry,
     fa_deposit: &FaDeposit,
@@ -651,7 +667,10 @@ fn apply_fa_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<RuntimeTransactionResult>, Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
+where
+    Host: StorageV1 + Logging,
+{
     let execution_outcome = pure_fa_deposit(
         host,
         registry,
@@ -706,7 +725,7 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn handle_transaction_result<Host: Runtime>(
+pub fn handle_transaction_result<Host>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
@@ -715,7 +734,10 @@ pub fn handle_transaction_result<Host: Runtime>(
     transaction_result: RuntimeTransactionResult,
     pay_fees: bool,
     sequencer_pool_address: Option<H160>,
-) -> Result<RuntimeExecutionInfo, anyhow::Error> {
+) -> Result<RuntimeExecutionInfo, anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
     match transaction_result {
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
             caller,
@@ -791,7 +813,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn apply_transaction<Host: Runtime>(
+pub fn apply_transaction<Host>(
     host: &mut Host,
     registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -802,7 +824,10 @@ pub fn apply_transaction<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
     let tracer_input = get_tracer_configuration(
         revm::primitives::B256::from_slice(&transaction.tx_hash),
         tracer_input,

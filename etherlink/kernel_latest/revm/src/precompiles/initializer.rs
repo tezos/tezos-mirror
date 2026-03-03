@@ -7,7 +7,7 @@ use revm::{
     primitives::{Address, Bytes, KECCAK_EMPTY},
     state::Bytecode,
 };
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use crate::{
     custom,
@@ -23,8 +23,8 @@ use crate::{
 
 use super::constants::PredeployedContract;
 
-pub fn init_precompile_bytecodes<Host: Runtime>(
-    host: &'_ mut Host,
+pub fn init_precompile_bytecodes(
+    host: &'_ mut impl StorageV1,
     tezosx_enabled: bool,
 ) -> Result<(), Error> {
     init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
@@ -45,8 +45,8 @@ pub fn init_precompile_bytecodes<Host: Runtime>(
     Ok(())
 }
 
-fn init_precompile_bytecode<Host: Runtime>(
-    host: &'_ mut Host,
+fn init_precompile_bytecode(
+    host: &'_ mut impl StorageV1,
     addr: &Address,
     predeployed: &'static PredeployedContract,
 ) -> Result<(), Error> {

@@ -29,15 +29,18 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::{KernelHost, Runtime};
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost, Runtime};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
     OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tracing::trace_kernel;
 
 mod apply;
@@ -79,7 +82,10 @@ extern crate alloc;
 // This needs to be set to the frozen commit on snapshot time
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
-fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn switch_to_public_rollup<Host>(host: &mut Host) -> Result<(), Error>
+where
+    Host: StorageV1 + WasmHost + Logging,
+{
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
         log!(
             host,
@@ -100,7 +106,10 @@ fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 }
 
 #[trace_kernel]
-pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
+pub fn stage_zero<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
+where
+    Host: StorageV1 + WasmHost + Logging + IsEvmNode,
+{
     log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     switch_to_public_rollup(host)?;
@@ -112,12 +121,15 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 // function is visible in the profiling results.
 #[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn stage_one<Host: Runtime>(
+pub fn stage_one<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     chain_config: &chains::ChainConfig,
     configuration: &mut Configuration,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+{
     log!(host, Debug, "Entering stage one.");
     log!(host, Debug, "Chain Configuration: {}", chain_config);
     log!(host, Debug, "Configuration: {}", configuration);
@@ -125,7 +137,7 @@ pub fn stage_one<Host: Runtime>(
     fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
 }
 
-fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
     match read_kernel_version(host) {
         Ok(kernel_version) => {
             if kernel_version != KERNEL_VERSION {
@@ -137,14 +149,14 @@ fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     }
 }
 
-fn init_storage_versioning<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
     match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
         Ok(_) => Ok(()),
         Err(_) => store_storage_version(host, STORAGE_VERSION),
     }
 }
 
-fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+fn retrieve_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
     match read_chain_id(host) {
         Ok(chain_id) => Ok(chain_id),
         Err(_) => {
@@ -155,7 +167,10 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 
-fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
+fn retrieve_minimum_base_fee_per_gas<Host>(host: &mut Host) -> U256
+where
+    Host: StorageV1 + Logging,
+{
     match read_minimum_base_fee_per_gas(host) {
         Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
         Err(_) => {
@@ -176,8 +191,8 @@ fn retrieve_minimum_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> U256 {
 }
 
 #[cfg(test)]
-fn retrieve_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
+fn retrieve_base_fee_per_gas(
+    host: &mut impl StorageV1,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
     match block_storage::read_current_etherlink_block(host) {
@@ -193,7 +208,7 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(
     }
 }
 
-fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+fn retrieve_da_fee(host: &mut impl StorageV1) -> Result<U256, Error> {
     match read_da_fee(host) {
         Ok(da_fee) => Ok(da_fee),
         Err(_) => {
@@ -205,9 +220,12 @@ fn retrieve_da_fee<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
 }
 
 #[cfg(test)]
-fn retrieve_block_fees<Host: Runtime>(
+fn retrieve_block_fees<Host>(
     host: &mut Host,
-) -> Result<tezos_ethereum::block::BlockFees, Error> {
+) -> Result<tezos_ethereum::block::BlockFees, Error>
+where
+    Host: StorageV1 + Logging,
+{
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
     let da_fee = retrieve_da_fee(host)?;
@@ -220,7 +238,7 @@ fn retrieve_block_fees<Host: Runtime>(
     Ok(block_fees)
 }
 
-pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
+pub fn run(host: &mut impl Runtime) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
@@ -456,7 +474,6 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use alloy_sol_types::SolCall;
-    use tezos_evm_runtime::runtime::Runtime;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -472,7 +489,7 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
-    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);

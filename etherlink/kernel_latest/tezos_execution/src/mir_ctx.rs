@@ -26,10 +26,10 @@ use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprH
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
@@ -38,7 +38,7 @@ use tezos_tezlink::lazy_storage_diff::{
 use tezos_tezlink::operation_result::TransferError;
 use typed_arena::Arena;
 
-pub struct TcCtx<'operation, Host: Runtime, C: Context> {
+pub struct TcCtx<'operation, Host: StorageV1, C: Context> {
     pub host: &'operation mut Host,
     pub context: &'operation C,
     pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
@@ -69,7 +69,7 @@ pub struct ExecCtx {
     pub contract_account: TezlinkOriginatedAccount,
 }
 
-pub struct Ctx<'a, 'operation, Host: Runtime, C: Context> {
+pub struct Ctx<'a, 'operation, Host: StorageV1, C: Context> {
     pub tc_ctx: &'a mut TcCtx<'operation, Host, C>,
     pub exec_ctx: ExecCtx,
     pub operation_ctx: &'a mut OperationCtx<'operation, C::ImplicitAccountType>,
@@ -90,7 +90,7 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 
 impl ExecCtx {
     pub fn create(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         sender_account: &impl TezlinkAccount,
         dest_account: &impl TezosOriginatedAccount,
         amount: &Narith,
@@ -124,7 +124,7 @@ impl ExecCtx {
     }
 }
 
-impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
+impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         &mut self.operation_gas.remaining
     }
@@ -165,7 +165,7 @@ impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
     }
 }
 
-impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, C> {
+impl<'a, Host: StorageV1, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -185,7 +185,7 @@ impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, C>
     }
 }
 
-impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
+impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -289,7 +289,7 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     }
 }
 
-pub trait HasHost<Host: Runtime> {
+pub trait HasHost<Host> {
     fn host(&mut self) -> &mut Host;
 }
 
@@ -298,7 +298,7 @@ pub trait HasContractAccount {
     fn contract_account(&self) -> &Self::Account;
 }
 
-impl<'a, 'operation, Host: Runtime, C: Context> HasContractAccount
+impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
     for Ctx<'a, 'operation, Host, C>
 {
     type Account = TezlinkOriginatedAccount;
@@ -307,7 +307,7 @@ impl<'a, 'operation, Host: Runtime, C: Context> HasContractAccount
     }
 }
 
-impl<'a, 'operation, Host: Runtime, C: Context> HasHost<Host>
+impl<'a, 'operation, Host: StorageV1, C: Context> HasHost<Host>
     for Ctx<'a, 'operation, Host, C>
 {
     fn host(&mut self) -> &mut Host {
@@ -315,7 +315,7 @@ impl<'a, 'operation, Host: Runtime, C: Context> HasHost<Host>
     }
 }
 
-impl<Host: Runtime, C: Context> TcCtx<'_, Host, C> {
+impl<Host: StorageV1, C: Context> TcCtx<'_, Host, C> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -380,7 +380,7 @@ impl<Host: Runtime, C: Context> TcCtx<'_, Host, C> {
     }
 }
 
-fn remove_big_map<Host: Runtime, C: Context>(
+fn remove_big_map<Host: StorageV1, C: Context>(
     host: &mut Host,
     context: &C,
     id: &BigMapId,
@@ -402,7 +402,7 @@ fn remove_big_map<Host: Runtime, C: Context>(
 /// Function to clear temporary big_maps create for an operation
 ///
 /// This function also reset the next temporary id to minus one
-pub fn clear_temporary_big_maps<Host: Runtime, C: Context>(
+pub fn clear_temporary_big_maps<Host: StorageV1, C: Context>(
     host: &mut Host,
     context: &C,
     next_temp_id: &mut BigMapId,
@@ -455,13 +455,13 @@ struct BigMapKeys {
 
 impl BigMapKeys {
     #[cfg(test)]
-    fn get<C: Context>(host: &mut impl Runtime, context: &C, id: &BigMapId) -> Self {
+    fn get<C: Context>(host: &mut impl StorageV1, context: &C, id: &BigMapId) -> Self {
         let path = keys_of_big_map(context, id).unwrap();
         read_nom_value(host, &path).unwrap_or(BigMapKeys { keys: vec![] })
     }
 
     fn add_key<C: Context>(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         context: &C,
         id: &BigMapId,
         key: &ScriptExprHash,
@@ -473,7 +473,7 @@ impl BigMapKeys {
     }
 
     fn remove_key<C: Context>(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         context: &C,
         id: &BigMapId,
         key: &ScriptExprHash,
@@ -488,7 +488,7 @@ impl BigMapKeys {
     }
 
     fn remove_keys_in_storage<C: Context>(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         context: &C,
         id: &BigMapId,
     ) -> Result<(), LazyStorageError> {
@@ -515,7 +515,7 @@ impl BigMapKeys {
     }
 
     fn copy_keys_in_storage<C: Context>(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         context: &C,
         source: &BigMapId,
         dest: &BigMapId,
@@ -549,7 +549,7 @@ impl BigMapKeys {
     }
 }
 
-impl<'a, Host: Runtime, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
+impl<'a, Host: StorageV1, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -728,7 +728,7 @@ pub mod tests {
         };
     }
 
-    pub fn assert_big_map_eq<'a, Host: Runtime, C: Context>(
+    pub fn assert_big_map_eq<'a, Host: StorageV1, C: Context>(
         ctx: &mut TcCtx<'a, Host, C>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
@@ -758,7 +758,7 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: Runtime, C: Context>(
+    fn assert_big_map_removed<'a, Host: StorageV1, C: Context>(
         ctx: &TcCtx<'a, Host, C>,
         id: &BigMapId,
         removed_keys: &BigMapKeys,
@@ -1066,7 +1066,7 @@ pub(crate) mod mock {
 
     /// Mock execution context for testing enshrined contracts.
     /// Implements CtxTrait and HasHost with configurable values.
-    pub struct MockCtx<'a, Host: Runtime> {
+    pub struct MockCtx<'a, Host: StorageV1> {
         pub host: &'a mut Host,
         pub sender: AddressHash,
         pub amount: i64,
@@ -1077,7 +1077,7 @@ pub(crate) mod mock {
         pub contract_account: TezlinkOriginatedAccount,
     }
 
-    impl<'a, Host: Runtime> MockCtx<'a, Host> {
+    impl<'a, Host: StorageV1> MockCtx<'a, Host> {
         pub fn new(host: &'a mut Host, sender: AddressHash, amount: i64) -> Self {
             Self {
                 host,
@@ -1095,20 +1095,20 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, Host: Runtime> HasHost<Host> for MockCtx<'a, Host> {
+    impl<'a, Host: StorageV1> HasHost<Host> for MockCtx<'a, Host> {
         fn host(&mut self) -> &mut Host {
             self.host
         }
     }
 
-    impl<'a, Host: Runtime> HasContractAccount for MockCtx<'a, Host> {
+    impl<'a, Host: StorageV1> HasContractAccount for MockCtx<'a, Host> {
         type Account = TezlinkOriginatedAccount;
         fn contract_account(&self) -> &Self::Account {
             &self.contract_account
         }
     }
 
-    impl<'a, Host: Runtime> TypecheckingCtx<'a> for MockCtx<'a, Host> {
+    impl<'a, Host: StorageV1> TypecheckingCtx<'a> for MockCtx<'a, Host> {
         fn gas(&mut self) -> &mut mir::gas::Gas {
             &mut self.gas
         }
@@ -1128,7 +1128,7 @@ pub(crate) mod mock {
         }
     }
 
-    impl<'a, Host: Runtime> CtxTrait<'a> for MockCtx<'a, Host> {
+    impl<'a, Host: StorageV1> CtxTrait<'a> for MockCtx<'a, Host> {
         fn sender(&self) -> AddressHash {
             self.sender.clone()
         }

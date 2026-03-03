@@ -1,6 +1,8 @@
 use revm::primitives::Address;
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::{
+    path::{concat, OwnedPath, RefPath},
+    storage::StorageV1,
+};
 use tezosx_interfaces::RuntimeId;
 
 use crate::Error;
@@ -9,7 +11,7 @@ use crate::Error;
 const ACCOUNTS_PATH: RefPath = crate::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 
 pub fn store_alias(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     native_address: &Address,
     runtime_id: RuntimeId,
     alias: &[u8],
@@ -29,7 +31,7 @@ pub fn store_alias(
 }
 
 pub fn get_alias(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     native_address: &Address,
     runtime_id: RuntimeId,
 ) -> Result<Option<Vec<u8>>, Error> {

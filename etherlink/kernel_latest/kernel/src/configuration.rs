@@ -21,9 +21,10 @@ use crate::{
 use primitive_types::U256;
 use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
@@ -140,7 +141,7 @@ impl TezosContracts {
     }
 }
 
-fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
+fn fetch_tezos_contracts(host: &mut impl StorageV1) -> TezosContracts {
     // 1. Fetch the kernel's ticketer, returns `None` if it is badly
     //    encoded or absent.
     let ticketer = read_ticketer(host);
@@ -166,7 +167,10 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     }
 }
 
-pub fn fetch_evm_limits(host: &mut impl Runtime) -> EvmLimits {
+pub fn fetch_evm_limits<Host>(host: &mut Host) -> EvmLimits
+where
+    Host: StorageV1 + Logging,
+{
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
 
@@ -178,7 +182,10 @@ pub fn fetch_evm_limits(host: &mut impl Runtime) -> EvmLimits {
     }
 }
 
-fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfiguration> {
+fn fetch_dal_configuration<Host>(host: &mut Host) -> Option<DalConfiguration>
+where
+    Host: StorageV1 + IsEvmNode,
+{
     let enable_dal = enable_dal(host).unwrap_or(false);
     if enable_dal {
         let slot_indices: Vec<u8> = dal_slots(host).unwrap_or(None)?;
@@ -188,15 +195,15 @@ fn fetch_dal_configuration<Host: Runtime>(host: &mut Host) -> Option<DalConfigur
     }
 }
 
-fn fetch_evm_chain_configuration<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> ChainConfig {
+fn fetch_evm_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
+where
+    Host: StorageV1 + Logging,
+{
     let config = fetch_pure_evm_config(host, chain_id);
     ChainConfig::Evm(Box::new(config))
 }
 
-fn fetch_michelson_runtime_chain_id(host: &mut impl Runtime) -> ChainId {
+fn fetch_michelson_runtime_chain_id(host: &mut impl StorageV1) -> ChainId {
     let chain_id_res = read_michelson_runtime_chain_id(host);
     match chain_id_res {
         Ok(Some(chain_id)) => chain_id,
@@ -209,10 +216,10 @@ fn fetch_michelson_runtime_chain_id(host: &mut impl Runtime) -> ChainId {
     }
 }
 
-pub fn fetch_pure_evm_config<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> EvmChainConfig {
+pub fn fetch_pure_evm_config<Host>(host: &mut Host, chain_id: U256) -> EvmChainConfig
+where
+    Host: StorageV1 + Logging,
+{
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
@@ -226,14 +233,14 @@ pub fn fetch_pure_evm_config<Host: Runtime>(
     )
 }
 
-fn fetch_michelson_chain_configuration<Host: Runtime>(
-    _host: &mut Host,
+fn fetch_michelson_chain_configuration(
+    _host: &mut impl StorageV1,
     chain_id: ChainId,
 ) -> ChainConfig {
     ChainConfig::new_michelson_config(chain_id)
 }
 
-fn try_chain_id_from_u256(host: &impl Runtime, chain_id: U256) -> Option<ChainId> {
+fn try_chain_id_from_u256(host: &impl Logging, chain_id: U256) -> Option<ChainId> {
     // Tezos-compatible chain ids have only 4 bytes.
     let chain_id_low_bytes = chain_id.low_u32();
 
@@ -260,10 +267,10 @@ fn try_chain_id_from_u256(host: &impl Runtime, chain_id: U256) -> Option<ChainId
     }
 }
 
-pub fn fetch_chain_configuration<Host: Runtime>(
-    host: &mut Host,
-    chain_id: U256,
-) -> ChainConfig {
+pub fn fetch_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
+where
+    Host: StorageV1 + Logging,
+{
     // if the info is not in durable storage, we must not fail, but treat it as EVM
     let chain_family = read_chain_family(host, chain_id).unwrap_or_default();
     match chain_family {
@@ -279,7 +286,10 @@ pub fn fetch_chain_configuration<Host: Runtime>(
     }
 }
 
-pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
+pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     let tezos_contracts = fetch_tezos_contracts(host);
     let maximum_allowed_ticks =
         read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);

@@ -31,8 +31,7 @@ use tezos_ethereum::{
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
 };
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_encoding::{
     inbox::{
@@ -177,8 +176,8 @@ pub type RollupType = MichelsonOr<
 pub trait Parsable {
     type Context;
 
-    fn parse_external<Host: Runtime>(
-        host: &mut Host,
+    fn parse_external(
+        host: &mut impl Logging,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -282,8 +281,8 @@ impl ProxyInput {
 impl Parsable for ProxyInput {
     type Context = ();
 
-    fn parse_external<Host: Runtime>(
-        _host: &mut Host,
+    fn parse_external(
+        _host: &mut impl Logging,
         tag: &u8,
         input: &[u8],
         _: &mut (),
@@ -430,8 +429,8 @@ impl SequencerInput {
         InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(res)))
     }
 
-    pub fn parse_dal_slot_import_signal<Host: Runtime>(
-        host: &mut Host,
+    pub fn parse_dal_slot_import_signal(
+        host: &mut impl Logging,
         bytes: &[u8],
         context: &mut SequencerParsingContext,
     ) -> InputResult<Self> {
@@ -640,8 +639,8 @@ mod delayed_chunked_transaction {
 impl Parsable for SequencerInput {
     type Context = SequencerParsingContext;
 
-    fn parse_external<Host: Runtime>(
-        host: &mut Host,
+    fn parse_external(
+        host: &mut impl Logging,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -769,8 +768,8 @@ impl<Mode: Parsable> InputResult<Mode> {
     ///
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    pub fn parse_external<Host: Runtime>(
-        host: &mut Host,
+    pub fn parse_external(
+        host: &mut impl Logging,
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,
@@ -801,8 +800,8 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
-    fn parse_fa_deposit<Host: Runtime>(
-        host: &mut Host,
+    fn parse_fa_deposit(
+        host: &mut impl Logging,
         ticket: FA2_1Ticket,
         routing_info: MichelsonBytes,
         inbox_level: u32,
@@ -829,8 +828,8 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
-    fn parse_deposit<Host: Runtime>(
-        host: &mut Host,
+    fn parse_deposit(
+        host: &mut impl Logging,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
         inbox_level: u32,
@@ -858,8 +857,8 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn parse_internal_transfer<Host: Runtime>(
-        host: &mut Host,
+    fn parse_internal_transfer(
+        host: &mut impl Logging,
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -945,8 +944,8 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn parse_internal<Host: Runtime>(
-        host: &mut Host,
+    fn parse_internal(
+        host: &mut impl Logging,
         message: InternalInboxMessage<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -1041,8 +1040,8 @@ impl<Mode: Parsable> InputResult<Mode> {
         }
     }
 
-    pub fn parse<Host: Runtime>(
-        host: &mut Host,
+    pub fn parse(
+        host: &mut impl Logging,
         input: Message,
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,

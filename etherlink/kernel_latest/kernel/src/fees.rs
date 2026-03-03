@@ -26,7 +26,8 @@ use revm_etherlink::{storage::world_state_handler::StorageAccount, Error};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use std::mem::size_of;
 
@@ -167,12 +168,15 @@ impl FeeUpdates {
         outcome.gas_used = self.overall_gas_used.as_u64();
     }
 
-    pub fn apply(
+    pub fn apply<Host>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         caller: H160,
         sequencer_pool_address: Option<H160>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), anyhow::Error>
+    where
+        Host: StorageV1 + Logging,
+    {
         tezos_evm_logging::log!(
             host,
             tezos_evm_logging::Level::Debug,
