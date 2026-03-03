@@ -43,6 +43,10 @@ type release_tag_pipeline_type =
   | Non_release_tag
   | Schedule_test
 
+(* Release jobs must not be retried: they publish artifacts and retrying could
+   result in publishing the same artifact twice. *)
+let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
+
 let monitoring_child_pipeline =
   (* The Teztale build job is defined using Cacio, which does not provide a way
      to include it in the monitoring child pipeline, because we plan to remove
@@ -129,7 +133,7 @@ let job_release_page ~test ?dependencies () =
            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
          ])
     ["./scripts/releases/publish_release_page.sh"]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
@@ -213,7 +217,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         "./scripts/ci/restrict_export_to_octez_source.sh";
         "./scripts/releases/gitlab-release.sh";
       ]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
@@ -239,7 +243,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         | Schedule_test -> " --dry-run"
         | _ -> "");
       ]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   let jobs_debian_repository =
@@ -284,7 +288,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ?variables
       ~name:"opam:release"
       [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   let job_promote_to_latest_test =
@@ -402,7 +406,7 @@ let octez_packaging_revision_jobs ?(test = false) () =
       ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
       ~ci_docker_hub:(not test)
       ["./scripts/ci/docker_promote_to_version.sh"]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   (* We want to be able to trigger each "batch" of jobs manually.
@@ -445,7 +449,7 @@ let octez_packaging_revision_jobs ?(test = false) () =
       ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
       ~id_tokens:Tezos_ci.id_tokens
       ["./scripts/ci/create_gitlab_package.sh"]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   let job_update_gitlab_release =
@@ -460,7 +464,7 @@ let octez_packaging_revision_jobs ?(test = false) () =
       ~dependencies:(Dependent [Job job_create_gitlab_package])
       ~id_tokens:Tezos_ci.id_tokens
       ["./scripts/releases/update_gitlab_release.sh"]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~retry:no_retry
       ~tag:Gcp_not_interruptible
   in
   [
