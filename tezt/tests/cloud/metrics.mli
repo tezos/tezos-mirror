@@ -8,35 +8,67 @@
 
 (** Tezt‑cloud metrics helpers. *)
 
+(** Prometheus metric names. *)
+module Name : sig
+  val dal_commitments_attested : string
+
+  val dal_commitments_attestable : string
+
+  val dal_attestation_sent : string
+
+  val attestation_sent_when_out_of_dal_committee : string
+
+  val total_published_commitments_per_slot : string
+
+  val total_attested_commitments_per_slot : string
+
+  val dal_commitments_ratio : string
+
+  val dal_commitments_total : string
+
+  val etherlink_operator_balance_total : string
+
+  val total_echo_rollup_unattested_slots : string
+
+  val total_echo_rollup_fetched_data : string
+
+  val last_echo_rollup_fetched_data : string
+end
+
 (** A baker’s public key hash used as a map key. *)
 type public_key_hash = PKH of string
 
 (** Information about a single published DAL commitment. *)
 type commitment_info = {commitment : string; publisher_pkh : string}
 
-(** "Status" of an attester at some level.
-    There are 5 cases:
-    - The attester is in the DAL committee and sent a dal_attestation -> With_DAL
-    - The attester is in the DAL committee and sent an attestation without DAL -> Without_DAL
-    - The attester is in the DAL committee and sent no attestation -> Expected_to_DAL_attest
-    - The attester is out of the DAL committee (but in the Tenderbake committee) and
-      sent an attestation -> Out_of_committee
-    - The attester is out of the DAL committee and did not send an attestation
-      (this case can happen either because they are out of the Tenderbake committee or
-      because their baker had an issue at this level) -> Those bakers will not be in the
-      `baker_dal_statuses` field of the `per_level_infos` crafted at the current level.
-*)
-type dal_status =
-  | With_DAL of Z.t
+(** Cumulative status of a baker for a given published level, accumulated
+    across all attested levels in the attestation window.
+
+    The variants are ordered by priority: when merging a per-level status
+    into an existing cumulative status, the higher-priority variant wins. *)
+type baker_window_status =
+  | With_DAL of bool array
+      (** Baker is in the DAL committee and sent a DAL payload at at least one
+          attested level. Carries per-slot cumulative attestation bits (OR'd
+          across the window). *)
   | Without_DAL
+      (** Baker is in the DAL committee and sent at least one attestation
+          operation but never with a DAL payload. *)
+  | In_committee
+      (** Baker is in the DAL committee, but never sent an attestation operation
+          during the window. *)
   | Out_of_committee
-  | Expected_to_DAL_attest
+      (** Baker is not in the DAL committee and sent at least one attestation
+          operation. *)
 
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
-  attested_commitments : Z.t;
+  attested_commitments : bool array array;
+      (** Per-lag attestation data decoded from block metadata.
+          [attested_commitments.(lag_index).(slot_index)] is [true] when
+          slot [slot_index] was newly confirmed as attested for the
+          published level corresponding to [lag_index]. *)
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
 }
@@ -59,14 +91,31 @@ val pp : bakers:Baker_helpers.baker list -> t -> unit
     registry, attaching optional [versions] labels for each baker PKH. *)
 val push : versions:(string, string) Hashtbl.t -> cloud:Cloud.t -> t -> unit
 
-(** [get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
-    ~infos infos_per_level metrics] updates the [metrics] statistics. *)
+(** [get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
+    ~infos ~cumulative_protocol_attestations ~cumulative_baker_window_status
+    infos_per_level metrics] updates the [metrics] statistics.
+
+    [attestation_lags] is the list of lags at which a DAL slot can be attested
+    after publication. The maximum lag determines when a published level's
+    attestation window closes.
+
+    [cumulative_protocol_attestations] maps each published level to the per-slot
+    cumulative attestation status accumulated across all levels in the
+    attestation window.
+
+    [cumulative_baker_window_status] maps each published level to a per-baker
+    table of {!baker_window_status}, recording committee membership,
+    attestation behavior, and per-slot attestation bits across the full
+    attestation window. *)
 val get :
   first_level:int ->
-  attestation_lag:int ->
+  attestation_lags:int list ->
   dal_node_producers:'a list ->
   number_of_slots:int ->
   infos:(int, per_level_info) Hashtbl.t ->
+  cumulative_protocol_attestations:(int, bool array) Hashtbl.t ->
+  cumulative_baker_window_status:
+    (int, (public_key_hash, baker_window_status) Hashtbl.t) Hashtbl.t ->
   per_level_info ->
   t ->
   t

@@ -159,6 +159,8 @@ module type Dal = sig
 
   val attestation_lag : int option
 
+  val attestation_lags : int list option
+
   val config : Scenarios_configuration.DAL.t
 
   val traps_fraction : Q.t option
@@ -776,11 +778,28 @@ module Dal () : Dal = struct
         ~section
         ~long:"attestation-lag"
         ~description:
-          "Attestation lag - the number of L1 blocks between a slot's \
-           publication and its attestation."
+          "Set the `attestation_lag` protocol parameter -- the number of L1 \
+           blocks between a slot's publication and its attestation. This is \
+           equivalent to the maximum of --attestation-lags. If \
+           --attestation-lags is also provided, then it takes precedence. For \
+           protocols that do not support multiple lags, only this parameter is \
+           used."
         ()
     in
     Option.fold ~none:config.attestation_lag ~some:Option.some from_cli
+
+  let attestation_lags =
+    let from_cli =
+      Clap.list_int
+        ~section
+        ~long:"attestation-lags"
+        ~description:
+          "Set the `attestation_lags` protocol parameter (from protocol U \
+           onwards). For protocols that do not support multiple lags, this \
+           parameter is ignored."
+        ()
+    in
+    match from_cli with [] -> config.attestation_lags | lags -> Some lags
 
   let traps_fraction =
     let typ =

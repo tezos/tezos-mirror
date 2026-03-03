@@ -55,6 +55,7 @@ type configuration = {
   slot_size : int option;
   number_of_slots : int option;
   attestation_lag : int option;
+  attestation_lags : int list option;
   traps_fraction : Q.t option;
   stresstest : Stresstest.t option;
 }
@@ -89,6 +90,18 @@ type t = {
   parameters : Dal_common.Parameters.t;
   infos : (int, Metrics.per_level_info) Hashtbl.t;
   metrics : (int, Metrics.t) Hashtbl.t;
+  cumulative_protocol_attestations : (int, bool array) Hashtbl.t;
+      (* Maps published_level to per-slot cumulative attestation status.
+         For each published level P, accumulates newly-confirmed attestations
+         across all levels in the attestation window [P, P + max_lag].
+         An entry is removed once the window closes and metrics are computed. *)
+  cumulative_baker_window_status :
+    ( int,
+      (Metrics.public_key_hash, Metrics.baker_window_status) Hashtbl.t )
+    Hashtbl.t;
+      (* Maps published_level to a per-baker table of cumulative window
+         status, tracking committee membership, attestation behavior, and
+         per-slot attestation bits across the full attestation window. *)
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
@@ -97,8 +110,9 @@ type t = {
   otel : string option;
 }
 
+module PkhSet = Set.Make (String)
+
 let get_infos_per_level t ~level ~metadata =
-  let open Metrics in
   let client = t.bootstrap.client in
   let endpoint = t.some_node_rpc_endpoint in
   let etherlink_operators =
@@ -112,7 +126,8 @@ let get_infos_per_level t ~level ~metadata =
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
   let attested_commitments =
-    JSON.(metadata |-> "dal_attestation" |> as_string |> Z.of_string)
+    let str = JSON.(metadata |-> "dal_attestation" |> as_string) in
+    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
   in
   let manager_operation_batches = JSON.(operations |=> 3 |> as_list) in
   let is_published_commitment operation =
@@ -125,7 +140,7 @@ let get_infos_per_level t ~level ~metadata =
   let commitment_info operation =
     let commitment = get_commitment operation in
     let publisher_pkh = get_publisher operation in
-    {commitment; publisher_pkh}
+    Metrics.{commitment; publisher_pkh}
   in
   let get_slot_index operation =
     JSON.(operation |-> "slot_header" |-> "slot_index" |> as_int)
@@ -145,7 +160,6 @@ let get_infos_per_level t ~level ~metadata =
     RPC_core.call endpoint
     @@ RPC.get_chain_block_context_dal_shards ~level:attestation_level ()
   in
-  let module PkhSet = Set.Make (String) in
   let dal_committee =
     List.fold_left
       (fun set json ->
@@ -154,19 +168,19 @@ let get_infos_per_level t ~level ~metadata =
       PkhSet.empty
       (JSON.as_list dal_committee_json)
   in
-  let get_dal_status operation =
+  let decode_dal_attestation str =
+    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
+  in
+  (* For each attester that sent an attestation operation, record
+     whether they attached a DAL payload ([Some bits]) or not ([None]). *)
+  let get_dal_payload operation =
     let contents = JSON.(operation |-> "contents" |=> 0) in
     let kind = JSON.(contents |-> "kind" |> as_string) in
     match kind with
     | "attestation_with_dal" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let dal =
-          if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
-          else
-            With_DAL
-              JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
-        in
-        [(PKH pkh, dal)]
+        let str = JSON.(contents |-> "dal_attestation" |> as_string) in
+        [(Metrics.PKH pkh, Some (decode_dal_attestation str))]
     | "attestations_aggregate" ->
         let metadata_committee =
           JSON.(contents |-> "metadata" |-> "committee" |> as_list)
@@ -175,49 +189,25 @@ let get_infos_per_level t ~level ~metadata =
         List.map2
           (fun member_info committee_meta ->
             let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
-            let dal =
-              if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
-              else
-                let json = JSON.(member_info |-> "dal_attestation") in
-                if JSON.is_null json then Without_DAL
-                else With_DAL (json |> JSON.as_string |> Z.of_string)
+            let json = JSON.(member_info |-> "dal_attestation") in
+            let payload =
+              if JSON.is_null json then None
+              else Some (decode_dal_attestation (JSON.as_string json))
             in
-            (PKH pkh, dal))
+            (Metrics.PKH pkh, payload))
           committee_info
           metadata_committee
     | "attestation" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        let dal =
-          if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
-          else Without_DAL
-        in
-        [(PKH pkh, dal)]
+        [(Metrics.PKH pkh, None)]
     | _ -> []
   in
-  let* attestation_rights =
-    let attestation_level = level - 1 in
-    RPC_core.call endpoint
-    @@ RPC.get_chain_block_helper_validators ~level:attestation_level ()
-  in
-  (* We fill the [baker_dal_statuses] table with [Expected_to_DAL_attest] when a
-     baker is in the DAL committee. *)
-  let baker_dal_statuses =
-    JSON.(attestation_rights |-> "delegates" |> as_list |> List.to_seq)
-    |> Seq.filter_map (fun delegate ->
-           let pkh = JSON.(delegate |-> "delegate" |> as_string) in
-           if PkhSet.mem pkh dal_committee then
-             Some (PKH pkh, Expected_to_DAL_attest)
-           else None)
-    |> Hashtbl.of_seq
-  in
-  (* And then update the [baker_dal_statuses] table with the operations actually received. *)
-  let () =
-    consensus_operations
-    |> List.iter (fun operation ->
-           get_dal_status operation
-           |> List.iter (fun (pkh, dal_status) ->
-                  Hashtbl.replace baker_dal_statuses pkh dal_status))
-  in
+  let baker_dal_payloads = Hashtbl.create 16 in
+  consensus_operations
+  |> List.iter (fun operation ->
+         get_dal_payload operation
+         |> List.iter (fun (pkh, payload) ->
+                Hashtbl.replace baker_dal_payloads pkh payload)) ;
   let* etherlink_operator_balance_sum =
     Etherlink_helpers.total_operator_balance
       ~client
@@ -255,14 +245,16 @@ let get_infos_per_level t ~level ~metadata =
       ~level
   in
   Lwt.return
-    {
-      level;
-      published_commitments;
-      baker_dal_statuses;
-      attested_commitments;
-      etherlink_operator_balance_sum;
-      echo_rollup_fetched_data;
-    }
+    ( Metrics.
+        {
+          level;
+          published_commitments;
+          attested_commitments;
+          etherlink_operator_balance_sum;
+          echo_rollup_fetched_data;
+        },
+      baker_dal_payloads,
+      dal_committee )
 
 let init_teztale (configuration : configuration) cloud agent =
   if configuration.teztale then init_teztale cloud agent |> Lwt.map Option.some
@@ -762,10 +754,25 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             | Some number_of_slots ->
                 [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
             | None -> [])
-          @ (match configuration.attestation_lag with
-            | Some attestation_lag ->
-                [(["dal_parametric"; "attestation_lag"], `Int attestation_lag)]
-            | None -> [])
+          @ (match configuration.attestation_lags with
+            | Some attestation_lags ->
+                let max_lag = List.fold_left max 0 attestation_lags in
+                [
+                  ( ["dal_parametric"; "attestation_lags"],
+                    `A
+                      (List.map
+                         (fun l -> `Float (float_of_int l))
+                         attestation_lags) );
+                  (["dal_parametric"; "attestation_lag"], `Int max_lag);
+                ]
+            | None -> (
+                match configuration.attestation_lag with
+                | Some attestation_lag ->
+                    [
+                      ( ["dal_parametric"; "attestation_lag"],
+                        `Int attestation_lag );
+                    ]
+                | None -> []))
           @
           match configuration.traps_fraction with
           | Some {num; den} ->
@@ -1162,6 +1169,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       parameters;
       infos;
       metrics;
+      cumulative_protocol_attestations = Hashtbl.create 101;
+      cumulative_baker_window_status = Hashtbl.create 101;
       disconnection_state;
       first_level;
       teztale;
@@ -1186,7 +1195,9 @@ let wait_for_level t level =
 
 let clean_up t level =
   Hashtbl.remove t.infos level ;
-  Hashtbl.remove t.metrics level
+  Hashtbl.remove t.metrics level ;
+  Hashtbl.remove t.cumulative_protocol_attestations level ;
+  Hashtbl.remove t.cumulative_baker_window_status level
 
 let update_bakers_infos t =
   let open Baker_helpers in
@@ -1212,16 +1223,109 @@ let on_new_level t level ~metadata =
   let* () =
     if level mod 1_000 = 0 then update_bakers_infos t else Lwt.return_unit
   in
-  let* infos_per_level = get_infos_per_level t ~level ~metadata in
+  let* infos_per_level, baker_dal_payloads, dal_committee =
+    get_infos_per_level t ~level ~metadata
+  in
   toplog "Level %d's info processed" level ;
   Hashtbl.replace t.infos level infos_per_level ;
+  (* Update cumulative attestations: for each lag, OR the newly-confirmed
+     slots into the entry for the corresponding published level. *)
+  let number_of_slots = t.parameters.number_of_slots in
+  let max_lag = List.fold_left max 0 t.parameters.attestation_lags in
+  List.iteri
+    (fun lag_index lag ->
+      let published_level = level - lag in
+      if published_level >= t.first_level then (
+        let existing =
+          match
+            Hashtbl.find_opt t.cumulative_protocol_attestations published_level
+          with
+          | Some arr -> arr
+          | None -> Array.make number_of_slots false
+        in
+        let newly_attested = infos_per_level.attested_commitments.(lag_index) in
+        Array.iteri (fun i v -> if v then existing.(i) <- true) newly_attested ;
+        Hashtbl.replace
+          t.cumulative_protocol_attestations
+          published_level
+          existing))
+    t.parameters.attestation_lags ;
+  (* Phase 1: Accumulate DAL payload information for each lag.
+     For each baker that sent an attestation, merge their per-slot bits
+     (if they attached a DAL payload) or record that they sent without DAL. *)
+  let get_or_create_status_table published_level =
+    match Hashtbl.find_opt t.cumulative_baker_window_status published_level with
+    | Some tbl -> tbl
+    | None ->
+        let tbl = Hashtbl.create 16 in
+        Hashtbl.replace t.cumulative_baker_window_status published_level tbl ;
+        tbl
+  in
+  List.iteri
+    (fun lag_index lag ->
+      let published_level = level - lag in
+      if published_level >= t.first_level then
+        let status_table = get_or_create_status_table published_level in
+        Hashtbl.iter
+          (fun pkh payload_opt ->
+            let prev = Hashtbl.find_opt status_table pkh in
+            let updated =
+              match payload_opt with
+              | Some per_lag_bits ->
+                  if lag_index < Array.length per_lag_bits then (
+                    let existing =
+                      match prev with
+                      | Some (Metrics.With_DAL arr) -> arr
+                      | _ -> Array.make number_of_slots false
+                    in
+                    let newly = per_lag_bits.(lag_index) in
+                    Array.iteri
+                      (fun i v -> if v then existing.(i) <- true)
+                      newly ;
+                    Some (Metrics.With_DAL existing))
+                  else
+                    Test.fail
+                      ~__LOC__
+                      "lag_index %d out of range of per_lag_bits array of \
+                       length %d"
+                      lag_index
+                      (Array.length per_lag_bits)
+              | None -> (
+                  match prev with
+                  | Some (Metrics.With_DAL _) -> None
+                  | _ -> Some Metrics.Without_DAL)
+            in
+            Option.iter (Hashtbl.replace status_table pkh) updated)
+          baker_dal_payloads)
+    t.parameters.attestation_lags ;
+  (* Phase 2: Finalize committee membership for the published level whose
+     committee level is the current level.  [dal_committee] was fetched at
+     [level - 1], which is [committee_published_level + max_lag - 1], i.e.
+     exactly the committee level for [committee_published_level]. *)
+  let committee_published_level = level - max_lag in
+  if committee_published_level >= t.first_level then (
+    let status_table = get_or_create_status_table committee_published_level in
+    PkhSet.iter
+      (fun pkh_str ->
+        let pkh = Metrics.PKH pkh_str in
+        if not (Hashtbl.mem status_table pkh) then
+          Hashtbl.replace status_table pkh Metrics.In_committee)
+      dal_committee ;
+    Hashtbl.filter_map_inplace
+      (fun pkh status ->
+        let (Metrics.PKH pkh_str) = pkh in
+        if PkhSet.mem pkh_str dal_committee then Some status
+        else Some Metrics.Out_of_committee)
+      status_table) ;
   let metrics =
     Metrics.get
       ~first_level:t.first_level
-      ~attestation_lag:t.parameters.attestation_lag
+      ~attestation_lags:t.parameters.attestation_lags
       ~dal_node_producers:t.configuration.dal_node_producers
-      ~number_of_slots:t.parameters.number_of_slots
+      ~number_of_slots
       ~infos:t.infos
+      ~cumulative_protocol_attestations:t.cumulative_protocol_attestations
+      ~cumulative_baker_window_status:t.cumulative_baker_window_status
       infos_per_level
       (Hashtbl.find t.metrics (level - 1))
   in
@@ -1397,6 +1501,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let slot_size = Cli.slot_size in
     let number_of_slots = Cli.number_of_slots in
     let attestation_lag = Cli.attestation_lag in
+    let attestation_lags = Cli.attestation_lags in
     let traps_fraction = Cli.traps_fraction in
     let publish_slots_regularly = Cli.publish_slots_regularly in
     let stresstest = Cli.stresstest in
@@ -1439,6 +1544,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         slot_size;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         traps_fraction;
         publish_slots_regularly;
         stresstest;

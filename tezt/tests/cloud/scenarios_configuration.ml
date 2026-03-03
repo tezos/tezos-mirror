@@ -53,6 +53,7 @@ module DAL = struct
     slot_size : int option;
     number_of_slots : int option;
     attestation_lag : int option;
+    attestation_lags : int list option;
     traps_fraction : Q.t option;
     publish_slots_regularly : bool;
     stresstest : Stresstest.t option;
@@ -114,6 +115,7 @@ module DAL = struct
              slot_size;
              number_of_slots;
              attestation_lag;
+             attestation_lags;
              traps_fraction;
              publish_slots_regularly;
              stresstest;
@@ -162,6 +164,7 @@ module DAL = struct
           ( slot_size,
             number_of_slots,
             attestation_lag,
+            attestation_lags,
             traps_fraction,
             publish_slots_regularly,
             stresstest ) ))
@@ -208,6 +211,7 @@ module DAL = struct
              ( slot_size,
                number_of_slots,
                attestation_lag,
+               attestation_lags,
                traps_fraction,
                publish_slots_regularly,
                stresstest ) )
@@ -259,6 +263,7 @@ module DAL = struct
           slot_size;
           number_of_slots;
           attestation_lag;
+          attestation_lags;
           traps_fraction;
           publish_slots_regularly;
           stresstest;
@@ -317,10 +322,11 @@ module DAL = struct
                      (dft "ppx_profiling_backends" (list string) [])
                      (opt "enable_network_health_monitoring" bool))
                   (obj1 (opt "tezlink" bool)))))
-         (obj6
+         (obj7
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)
             (opt "attestation_lag" int31)
+            (opt "attestation_lags" (list int31))
             (opt "traps_fraction" q_encoding)
             (dft "publish_slots_regularly" bool false)
             (opt "stresstest" Stresstest.encoding)))
