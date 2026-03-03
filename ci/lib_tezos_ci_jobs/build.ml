@@ -41,81 +41,37 @@ let build_octez_source =
       "make octez";
     ]
 
-let job_build_x86_64_released =
+(* Common features of build jobs that use [build_full_unreleased.sh]. *)
+let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = []) ~artifacts
+    ?dune_cache name =
   CI.job
-    "oc.build_x86_64-released"
+    name
     ~__POS__
-    ~description:"Build the set of released executables for Octez, for amd64."
     ~stage:Build
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ~image:Tezos_ci.Images.CI.build
-    ~only_if_changed:
-      ((* TODO: why "or_doc"? *)
-       Tezos_ci.Changeset.encode
-         Changesets.changeset_octez_or_doc)
-    ~variables:[("EXECUTABLE_FILES", "script-inputs/released-executables")]
-    ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~name:"build-x86_64-$CI_COMMIT_REF_SLUG"
-         ~when_:On_success
-         ~expire_in:(Duration (Days 1))
-         ["octez-*"; "src/proto_*/parameters/*.json"])
-    ~cargo_cache:true
-    ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_full_unreleased.sh";
-    ]
-
-let job_build_x86_64_extra_dev =
-  CI.job
-    "oc.build_x86_64-extra-dev"
-    ~__POS__
-    ~description:
-      "Build the set of developer executables, as well as the TPS evaluation \
-       tool, Octogram, the main Tezt executable, and the Octez injector \
-       server."
-    ~stage:Build
-    ~arch:Amd64
-    ~cpu:Very_high
+    ~arch
+    ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
+    ?storage
     ~image:Tezos_ci.Images.CI.build
     ~only_if_changed:
       ((* TODO: why "or_doc"? *)
        Tezos_ci.Changeset.encode
          Changesets.changeset_octez_or_doc)
     ~variables:
-      [
-        ("EXECUTABLE_FILES", "script-inputs/dev-executables");
-        ( "BUILD_EXTRA",
-          String.concat
-            " "
-            [
-              "src/bin_tps_evaluation/main_tps_evaluation.exe";
-              "src/bin_octogram/octogram_main.exe";
-              "tezt/tests/main.exe";
-              "contrib/octez_injector_server/octez_injector_server.exe";
-            ] );
-      ]
+      (("EXECUTABLE_FILES", executable_files)
+      ::
+      (match extra with
+      | [] -> []
+      | _ :: _ -> [("BUILD_EXTRA", String.concat " " extra)]))
     ~artifacts:
       (Gitlab_ci.Util.artifacts
-         ~name:"build-x86_64-$CI_COMMIT_REF_SLUG"
+         ~name:
+           (sf
+              "build-%s-$CI_COMMIT_REF_SLUG"
+              (Tezos_ci.Runner.Arch.show_easy_to_distinguish arch))
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
-         [
-           "octez-*";
-           "octez-teztale-*";
-           "src/proto_*/parameters/*.json";
-           "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-           "_build/default/tezt/tests/main.exe";
-           "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-           "etherlink-governance-observer";
-           "fa-bridge-watchtower";
-         ])
-    ~dune_cache:true
+         artifacts)
+    ?dune_cache
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     [
@@ -125,47 +81,68 @@ let job_build_x86_64_extra_dev =
       "./scripts/ci/build_full_unreleased.sh";
     ]
 
+let job_build_x86_64_released =
+  build_job
+    "oc.build_x86_64-released"
+    ~__POS__
+    ~description:"Build the set of released executables for Octez, for amd64."
+    ~arch:Amd64
+    ~storage:Ramfs
+    ~executable_files:"script-inputs/released-executables"
+    ~artifacts:["octez-*"; "src/proto_*/parameters/*.json"]
+
+let job_build_x86_64_extra_dev =
+  build_job
+    "oc.build_x86_64-extra-dev"
+    ~__POS__
+    ~description:
+      "Build the set of developer executables, as well as the TPS evaluation \
+       tool, Octogram, the main Tezt executable, and the Octez injector \
+       server."
+    ~arch:Amd64
+    ~executable_files:"script-inputs/dev-executables"
+    ~extra:
+      [
+        "src/bin_tps_evaluation/main_tps_evaluation.exe";
+        "src/bin_octogram/octogram_main.exe";
+        "tezt/tests/main.exe";
+        "contrib/octez_injector_server/octez_injector_server.exe";
+      ]
+    ~artifacts:
+      [
+        "octez-*";
+        "octez-teztale-*";
+        "src/proto_*/parameters/*.json";
+        "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
+        "_build/default/tezt/tests/main.exe";
+        "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
+        "etherlink-governance-observer";
+        "fa-bridge-watchtower";
+      ]
+    ~dune_cache:true
+
 let job_build_x86_64_exp =
-  CI.job
+  build_job
     "oc.build_x86_64-exp"
     ~__POS__
     ~description:"Build the set of experimental executables."
-    ~stage:Build
     ~arch:Amd64
-    ~cpu:Very_high
-    ~image:Tezos_ci.Images.CI.build
-    ~only_if_changed:
-      ((* TODO: why "or_doc"? *)
-       Tezos_ci.Changeset.encode
-         Changesets.changeset_octez_or_doc)
-    ~variables:[("EXECUTABLE_FILES", "script-inputs/experimental-executables")]
+    ~executable_files:"script-inputs/experimental-executables"
     ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~name:"build-x86_64-$CI_COMMIT_REF_SLUG"
-         ~when_:On_success
-         ~expire_in:(Duration (Days 1))
-         [
-           (* TODO: clean up this list, which was originally shared with
-              [job_build_x86_64_extra_dev] but with no good reason since the two jobs
-              do not build the same set of executables. *)
-           "octez-*";
-           "octez-teztale-*";
-           "src/proto_*/parameters/*.json";
-           "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-           "_build/default/tezt/tests/main.exe";
-           "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-           "etherlink-governance-observer";
-           "fa-bridge-watchtower";
-         ])
+      [
+        (* TODO: clean up this list, which was originally shared with
+           [job_build_x86_64_extra_dev] but with no good reason since the two jobs
+           do not build the same set of executables. *)
+        "octez-*";
+        "octez-teztale-*";
+        "src/proto_*/parameters/*.json";
+        "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
+        "_build/default/tezt/tests/main.exe";
+        "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
+        "etherlink-governance-observer";
+        "fa-bridge-watchtower";
+      ]
     ~dune_cache:true
-    ~cargo_cache:true
-    ~sccache:(Cacio.sccache ~policy:Pull_push ())
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_full_unreleased.sh";
-    ]
 
 let register () =
   (* Since [build_octez_source] is manual, we do not add it to [merge_train] pipelines,
