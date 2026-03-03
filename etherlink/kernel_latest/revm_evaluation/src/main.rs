@@ -174,6 +174,10 @@ fn find_fixture(path: &Path, acc: &mut Fixtures, report: &mut Report) {
             if entry_path.is_dir() {
                 find_fixture(&entry_path, acc, report);
             } else if entry_path.is_file()
+                && entry_path
+                    .extension()
+                    .map(|ext| ext == "json")
+                    .unwrap_or(false)
                 && !entry_path
                     .file_name()
                     .map(|file_name| {
