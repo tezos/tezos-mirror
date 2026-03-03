@@ -30,7 +30,8 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Logging};
-use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost, Runtime};
+use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -238,7 +239,10 @@ where
     Ok(block_fees)
 }
 
-pub fn run(host: &mut impl Runtime) -> Result<(), anyhow::Error> {
+pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
+where
+    Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+{
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.

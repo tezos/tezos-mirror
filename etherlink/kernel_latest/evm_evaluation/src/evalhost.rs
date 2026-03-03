@@ -16,7 +16,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::Path,
     reveal::HostReveal,
-    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    runtime::{RuntimeError, ValueType},
     storage::StorageV1,
     wasm::WasmHost,
 };
@@ -218,8 +218,6 @@ impl WasmHost for EvalHost {
         self.host.runtime_version()
     }
 }
-
-impl SdkRuntime for EvalHost {}
 
 impl Logging for EvalHost {
     fn verbosity(&self) -> tezos_evm_logging::Level {
