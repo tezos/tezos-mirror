@@ -143,9 +143,9 @@ let job_test_liquidity_baking_scripts =
     ~image:Tezos_ci.Images.CI.build
     ~needs:
       [
-        (Artifacts, Build.job_build_x86_64_released);
-        (Artifacts, Build.job_build_x86_64_extra_dev);
-        (Artifacts, Build.job_build_x86_64_exp);
+        (Artifacts, Build.job_build_released Amd64);
+        (Artifacts, Build.job_build_extra_dev Amd64);
+        (Artifacts, Build.job_build_exp Amd64);
       ]
     ~only_if_changed:
       [

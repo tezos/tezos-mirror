@@ -81,25 +81,31 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = []) ~artifacts
       "./scripts/ci/build_full_unreleased.sh";
     ]
 
-let job_build_x86_64_released =
+let job_build_released =
+  Cacio.parameterize @@ fun arch ->
   build_job
-    "oc.build_x86_64-released"
+    (sf
+       "oc.build_%s-released"
+       (Tezos_ci.Runner.Arch.show_easy_to_distinguish arch))
     ~__POS__
     ~description:"Build the set of released executables for Octez, for amd64."
-    ~arch:Amd64
+    ~arch
     ~storage:Ramfs
     ~executable_files:"script-inputs/released-executables"
     ~artifacts:["octez-*"; "src/proto_*/parameters/*.json"]
 
-let job_build_x86_64_extra_dev =
+let job_build_extra_dev =
+  Cacio.parameterize @@ fun arch ->
   build_job
-    "oc.build_x86_64-extra-dev"
+    (sf
+       "oc.build_%s-extra-dev"
+       (Tezos_ci.Runner.Arch.show_easy_to_distinguish arch))
     ~__POS__
     ~description:
       "Build the set of developer executables, as well as the TPS evaluation \
        tool, Octogram, the main Tezt executable, and the Octez injector \
        server."
-    ~arch:Amd64
+    ~arch
     ~executable_files:"script-inputs/dev-executables"
     ~extra:
       [
@@ -121,12 +127,13 @@ let job_build_x86_64_extra_dev =
       ]
     ~dune_cache:true
 
-let job_build_x86_64_exp =
+let job_build_exp =
+  Cacio.parameterize @@ fun arch ->
   build_job
-    "oc.build_x86_64-exp"
+    (sf "oc.build_%s-exp" (Tezos_ci.Runner.Arch.show_easy_to_distinguish arch))
     ~__POS__
     ~description:"Build the set of experimental executables."
-    ~arch:Amd64
+    ~arch
     ~executable_files:"script-inputs/experimental-executables"
     ~artifacts:
       [
@@ -153,15 +160,15 @@ let register () =
      even if the tests need not be run. *)
   CI.register_merge_request_jobs
     [
-      (Auto, job_build_x86_64_released);
-      (Auto, job_build_x86_64_extra_dev);
-      (Auto, job_build_x86_64_exp);
+      (Auto, job_build_released Amd64);
+      (Auto, job_build_extra_dev Amd64);
+      (Auto, job_build_exp Amd64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Auto, build_octez_source);
-      (Auto, job_build_x86_64_released);
-      (Auto, job_build_x86_64_extra_dev);
-      (Auto, job_build_x86_64_exp);
+      (Auto, job_build_released Amd64);
+      (Auto, job_build_extra_dev Amd64);
+      (Auto, job_build_exp Amd64);
     ] ;
   ()
