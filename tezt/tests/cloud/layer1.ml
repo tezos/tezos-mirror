@@ -368,6 +368,7 @@ module Node = struct
       let client_import_pks =
         Lwt_list.iter_s (fun (account : Account.key) ->
             Client.import_public_key
+              ~force:true
               ~alias:account.public_key_hash
               ~public_key:account.public_key
               client)
@@ -399,7 +400,9 @@ module Node = struct
     let* client = client ~local:true ~node agent in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
-    let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
+    let* () =
+      Client.import_public_key ~force:true ~alias:pkh ~public_key:pk client
+    in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
     let* accounts =
       Client.stresstest_gen_keys
@@ -557,6 +560,7 @@ let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
   in
   let* () =
     Client.import_public_key
+      ~force:true
       ~alias:account.public_key_hash
       ~public_key:account.public_key
       client

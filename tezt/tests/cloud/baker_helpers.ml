@@ -138,6 +138,7 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
           Lwt_list.iter_s
             (fun account ->
               Client.import_public_key
+                ~force:true
                 client
                 ~public_key:account.Account.public_key
                 ~alias:account.alias)
