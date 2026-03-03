@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Build the kernels, including the Etherlink kernel. *)
+(** Job [oc.build_kernels]. *)
 val job_build_kernels : Cacio.job
 
 (** Register kernel jobs. *)
