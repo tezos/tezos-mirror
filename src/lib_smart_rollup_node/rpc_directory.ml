@@ -376,12 +376,17 @@ let () =
   Block_directory.register0 Rollup_node_services.Block.state_hash
   @@ fun (node_ctxt, block) () () ->
   let open Lwt_result_syntax in
-  let* state = get_state node_ctxt block in
-  let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_block node_ctxt block
-  in
-  let*! hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  return hash
+  let* l2_block = Node_context.get_l2_block node_ctxt block in
+  match l2_block.state_hash with
+  | Some hash -> return hash
+  | None ->
+      (* Fallback for blocks stored before migration *)
+      let* state = get_state node_ctxt block in
+      let* (module Plugin) =
+        Protocol_plugins.proto_plugin_for_block node_ctxt block
+      in
+      let*! hash = Plugin.Pvm.state_hash node_ctxt.kind state in
+      return hash
 
 let () =
   Block_directory.register0 Rollup_node_services.Block.state_current_level

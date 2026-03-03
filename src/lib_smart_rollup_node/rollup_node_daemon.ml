@@ -179,7 +179,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   (* Avoid storing and publishing commitments if the head is not final. *)
   (* Avoid triggering the pvm execution if this has been done before for
      this head. *)
-  let* _num_messages, num_ticks, initial_tick =
+  let* {num_ticks; initial_tick; state_hash; _} =
     Interpreter.process_head
       (module Plugin)
       node_ctxt
@@ -223,7 +223,13 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   in
   let l2_block =
     Sc_rollup_block.
-      {header; content = (); num_ticks; initial_tick; state_hash = None}
+      {
+        header;
+        content = ();
+        num_ticks;
+        initial_tick;
+        state_hash = Some state_hash;
+      }
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () =
@@ -815,7 +821,7 @@ module Internal_for_tests = struct
         ~predecessor
         messages
     in
-    let* _num_messages, num_ticks, initial_tick =
+    let* {num_ticks; initial_tick; state_hash; _} =
       Interpreter.process_head
         (module Plugin)
         node_ctxt
@@ -858,7 +864,13 @@ module Internal_for_tests = struct
     in
     let l2_block =
       Sc_rollup_block.
-        {header; content = (); num_ticks; initial_tick; state_hash = None}
+        {
+          header;
+          content = ();
+          num_ticks;
+          initial_tick;
+          state_hash = Some state_hash;
+        }
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in
@@ -1152,7 +1164,7 @@ module Replay = struct
     let* (module Plugin) =
       Protocol_plugins.proto_plugin_for_level node_ctxt block.header.level
     in
-    let* _num_messages, num_ticks, initial_tick =
+    let* {num_ticks; initial_tick; _} =
       Interpreter.process_head
         (module Plugin)
         node_ctxt

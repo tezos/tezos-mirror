@@ -23,14 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Result of evaluating a head's messages through the PVM. *)
+type process_head_result = {
+  num_messages : int;  (** Number of messages consumed during evaluation. *)
+  num_ticks : int64;
+      (** Number of ticks taken by the PVM for the evaluation. *)
+  initial_tick : Z.t;  (** Tick counter of the PVM before evaluation started. *)
+  state_hash : State_hash.t;  (** Root hash of the PVM state after evaluation. *)
+}
+
 (** [process_head plugin node_ctxt ctxt ~predecessor head (inbox, messages)]
     interprets the [messages] associated with a [head] (where [predecessor] is
     the predecessor of [head] in the L1 chain). This requires the [inbox] to be
-    updated beforehand. It returns [(ctxt, num_messages, num_ticks, tick)] where
-    [ctxt] is the updated layer 2 context (with the new PVM state),
-    [num_messages] is the number of [messages], [num_ticks] is the number of
-    ticks taken by the PVM for the evaluation and [tick] is the tick reached by
-    the PVM after the evaluation.
+    updated beforehand.
     NOTE: [ctxt] is modified in place by [process_head]. It is the
     responsibility of the caller to make a copy and revert if needed in case of
     error.
@@ -42,7 +47,7 @@ val process_head :
   predecessor:Layer1.head ->
   Layer1.head ->
   Octez_smart_rollup.Inbox.t * string list ->
-  (int * int64 * Z.t) tzresult Lwt.t
+  process_head_result tzresult Lwt.t
 
 (** {2 Genesis state}
 

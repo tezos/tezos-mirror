@@ -167,6 +167,13 @@ let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
       else tzfail (Rollup_node_errors.Missing_PVM_state (hash, level))
   | Some state -> return state
 
+type process_head_result = {
+  num_messages : int;
+  num_ticks : int64;
+  initial_tick : Z.t;
+  state_hash : State_hash.t;
+}
+
 (** [transition_pvm plugin node_ctxt ctxt predecessor head] runs a PVM at the
     previous state from block [predecessor] by consuming as many messages as
     possible from block [head]. *)
@@ -195,7 +202,8 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
   let*! () =
     Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
   in
-  return (num_messages, Z.to_int64 num_ticks, initial_tick)
+  return
+    {num_messages; num_ticks = Z.to_int64 num_ticks; initial_tick; state_hash}
 
 (** [process_head plugin node_ctxt ctxt ~predecessor head inbox_and_messages] runs the PVM for the given
     head. *)
@@ -216,8 +224,16 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
         node_ctxt
     in
     let*! () = Context.PVMState.set ctxt state in
-    return (0, 0L, Z.zero)
-  else return (0, 0L, Z.zero)
+    let (module Plugin) = plugin in
+    let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
+    return {num_messages = 0; num_ticks = 0L; initial_tick = Z.zero; state_hash}
+  else
+    let*! state_hash =
+      let (module Plugin) = plugin in
+      let state = Context.PVMState.empty node_ctxt.context in
+      Plugin.Pvm.state_hash node_ctxt.kind state
+    in
+    return {num_messages = 0; num_ticks = 0L; initial_tick = Z.zero; state_hash}
 
 (** Returns the starting evaluation before the evaluation of the block. It
     contains the PVM state at the end of the execution of the previous block and
