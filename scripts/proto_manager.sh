@@ -156,7 +156,6 @@ function usage() {
   t="${green}-t${reset}"
   h="${green}-h${reset}"
   s="${green}-s${reset}"
-  p="${green}-p${reset}"
   c="${green}-c${reset}"
   a="${green}-a${reset}"
   d="${green}-d${reset}"
@@ -166,7 +165,6 @@ function usage() {
   as="${green}--as${reset}"
   help="${green}--help${reset}"
   stabilise="${green}--stabilise${reset}"
-  snapshot="${green}--snapshot${reset}"
   hash="${green}--hash${reset}"
   finalize_docs="${green}--finalize-docs${reset}"
   copy="${green}--copy${reset}"
@@ -174,7 +172,7 @@ function usage() {
   force_snapshot="${green}--force-snapshot${reset}"
   ## colored vars
   alpha="${red}alpha${reset}"
-  beta="${red}beta${reset}"
+  rotuma_022="${red}rotuma_022${reset}"
   stockholm_023="${red}stockholm_023${reset}"
   stockholm="${magenta}stockholm${reset}"
   pt_stockholm="${red}023_PtStockh${reset}"
@@ -188,9 +186,8 @@ ${red}Options:${reset}
   ${h} , ${help}
     Print this help message.
   ${s}, ${stabilise}
-    Stabilise a protocol.
-  ${p}, ${snapshot}
-    Snapshot a protocol.
+    Stabilise and snapshot a protocol in a single pass.
+    Target must be in label_NNN format (e.g., rotuma_022).
   ${hash}
     Updates the hash of a protocol.
   ${finalize_docs}
@@ -202,38 +199,33 @@ ${red}Options:${reset}
   ${green}-y${reset}, ${green}--non-interactive${reset}
     Accept all defaults without prompting (for CI/scripted runs).
   ${f}, ${from} ${red}<protocol_source>${reset}
-    The source protocol to stabilise or snapshot.
+    The source protocol to stabilise.
   ${t}, ${to} ${red}<protocol_target>${reset}
-    The target protocol to stabilise or snapshot.
+    The target protocol (label_NNN format for stabilise).
   ${a}, ${as} ${red}<label>${reset}
 
 ${yellow}tl;dr:${reset}
-- To stabilise protocol alpha into beta and link it in the node, client and codec:
-  ${script} ${stabilise} ${from} ${alpha} ${to} ${beta}
+- To stabilise protocol alpha into rotuma_022 (single-pass stabilise+snapshot):
+  ${script} ${stabilise} ${from} ${alpha} ${to} ${rotuma_022}
   or
-  ${script} ${s} ${f} ${alpha} ${t} ${beta}
-
-- To snapshot protocol alpha into stockholm_023 and link it in the node, client and codec:
-  ${script} ${snapshot} ${from} ${beta} ${to} ${stockholm_023}
-  or
-  ${script} ${p} ${f} ${beta} ${t} ${stockholm_023}
+  ${script} ${s} ${f} ${alpha} ${t} ${rotuma_022}
 
 - To update the hash of a protocol:
-  ${script} ${hash} ${f} ${beta}
+  ${script} ${hash} ${f} ${alpha}
   or
-  ${script} ${hash} ${from} ${beta}
+  ${script} ${hash} ${from} ${alpha}
 To update the hash of a previously snapshotted protocol:
-  ${script} ${hash} ${f} ${beta} ${F}
+  ${script} ${hash} ${f} ${alpha} ${F}
   or
-  ${script} ${hash} ${from} ${beta} ${force_snapshot}
+  ${script} ${hash} ${from} ${alpha} ${force_snapshot}
 
 - To finalize documentation (rename docs folder from code label to human-readable name):
   ${script} ${finalize_docs} ${from} ${t024} ${to} ${tallinn}
 
 - To copy stockholm_023 known as stockholm into beta and link it in the node, client and codec:
-  ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${beta}
+  ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${alpha}
   or
-  ${script} ${c} ${f} ${stockholm_023} ${a} ${stockholm} ${t} ${beta}
+  ${script} ${c} ${f} ${stockholm_023} ${a} ${stockholm} ${t} ${alpha}
 
 - To delete a snapshotted protocol from the source code:
   ${script} ${delete} ${pt_stockholm} ${as} ${stockholm}
@@ -241,9 +233,9 @@ To update the hash of a previously snapshotted protocol:
   ${script} ${d} ${pt_stockholm} ${a} ${stockholm}
 
 - To delete a protocol in stabilisation from the source code:
-  ${script} ${delete} ${beta}
+  ${script} ${delete} ${alpha}
   or
-  ${script} ${d} ${beta}
+  ${script} ${d} ${alpha}
 "
 }
 
@@ -256,10 +248,6 @@ while true; do
     ;;
   -s | --stabilise)
     command="stabilise"
-    shift
-    ;;
-  -p | --snapshot)
-    command="snapshot"
     shift
     ;;
   --hash)
@@ -345,10 +333,10 @@ fi
 
 ## ensure command is known
 case ${command} in
-stabilise | snapshot | hash | copy | delete | finalize_docs) ;;
+stabilise | hash | copy | delete | finalize_docs) ;;
 *)
   error "Unknown command: ${command}" 1>&2
-  error "Command should be one of stabilise, snapshot, hash, copy, delete or finalize_docs" 1>&2
+  error "Command should be one of stabilise, hash, copy, delete or finalize_docs" 1>&2
   usage 1>&2
   print_and_exit 1 "${LINENO}"
   ;;
@@ -366,7 +354,7 @@ delete) ;;
 esac
 
 case ${command} in
-stabilise | snapshot | copy)
+stabilise | copy)
   if [[ -z ${protocol_target} ]]; then
     error "No protocol target specified" 1>&2
     usage 1>&2
@@ -404,14 +392,15 @@ if [[ ${command} != "finalize_docs" && ! -d "src/proto_${protocol_source}" ]]; t
   print_and_exit 1 "${LINENO}"
 fi
 
-# if stabilise command is used, protocol_target should be of the form [a-z]+[0-9]*
+# if stabilise command is used, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]
 if [[ ${command} == "stabilise" ]]; then
   if ! [[ ${protocol_source} =~ ^[a-z]+[0-9]*$ ]]; then
     error "To ${yellow}stabilise${red}, protocol_source should be of the form [a-z]+[0-9]+" 1>&2
     print_and_exit 1 "${LINENO}"
   fi
-  if ! [[ ${protocol_target} =~ ^[a-z]+[0-9]*$ ]]; then
-    error "To ${yellow}stabilise${red} protocol_target should be of the form [a-z]+[0-9]+" 1>&2
+  if ! [[ ${protocol_target} =~ ^[a-z]+_[0-9][0-9][0-9]$ ]]; then
+    error "target must be in label_NNN format (e.g., rotuma_022)" 1>&2
+    print_and_exit 1 "${LINENO}"
   fi
   # warn if source_label is given that it will not be used
   if [[ -n ${source_label} ]]; then
@@ -433,22 +422,6 @@ if [[ ${command} == "copy" ]]; then
     error "No source label specified" 1>&2
     usage 1>&2
     print_and_exit 1 "${LINENO}"
-  fi
-fi
-
-# if snapshot_command is used, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]
-if [[ ${command} == "snapshot" ]]; then
-  # if ! [[ ${protocol_source} =~ ^[a-z]+[0-9]*$ ]]; then
-  #   error "To ${red}snapshot${reset}, protocol_source should be of the form [a-z]+[0-9]+" 1>&2
-  #   print_and_exit 1 "${LINENO}"
-  # fi
-  if ! [[ ${protocol_target} =~ ^[a-z]+_[0-9][0-9][0-9]$ ]]; then
-    error "To ${red}snapshot${reset}, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]" 1>&2
-    clean_and_exit 1 "${LINENO}"
-  fi
-  # warn if source_label is given that it will not be used
-  if [[ -n ${source_label} ]]; then
-    warning "source_label will not be used for stabilisation"
   fi
 fi
 
@@ -545,7 +518,7 @@ function sanity_check_before_script() {
     fi
   fi
   case ${command} in
-  stabilise | snapshot | copy)
+  stabilise | copy)
     if [[ -d "src/proto_${version}" && ! ${skip_copy_source} ]]; then
       error "'src/proto_${version}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
@@ -3420,35 +3393,6 @@ case ${command} in
 stabilise)
   label=${protocol_target}
   version=${protocol_target}
-  snapshot_protocol "${protocol_source}" "${protocol_target}"
-  ;;
-snapshot)
-  label=$(echo "${protocol_target}" | cut -d'_' -f1)
-  version=$(echo "${protocol_target}" | cut -d'_' -f2)
-  if ! { [[ ${label} =~ ^[a-z]+$ ]] && [[ ${version} =~ ^[0-9][0-9][0-9]$ ]]; }; then
-    error "Wrong protocol version."
-    error "Name should be a lowercase alphabetic word."
-    error "Number should be a 3-digit number."
-    echo
-    usage
-    print_and_exit 1 "${LINENO}"
-  fi
-  capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
-
-  # extract number in "let number = function ParisC -> 020 | $capitalized_source -> 021 | Alpha -> 022"
-  expected_version=$(grep -oP "(?<=${capitalized_source} -> )[0-9]+" "tezt/lib_tezos/protocol.ml")
-
-  if [[ ${version} != "${expected_version}" ]]; then
-    error "Wrong protocol version: ${version}"
-    error "Expected version: ${expected_version}"
-    echo "press y to continue"
-    read -r -n 1 -s -p "" key
-    if [[ ${key} != "y" ]]; then
-      print_and_exit 1 "${LINENO}"
-    fi
-  fi
-
-  is_snapshot=true
   snapshot_protocol "${protocol_source}" "${protocol_target}"
   ;;
 hash)
