@@ -775,43 +775,6 @@ let check_block_progression ~produce_block ~endpoint ~expected_block_level =
   @@ Check.((block_number = expected_block_level) int)
        ~error_msg:"Unexpected block number, should be %%R, but got %%L"
 
-let test_evm_node_connection =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"]
-    ~uses:(fun _protocol -> Constant.[octez_smart_rollup_node; octez_evm_node])
-    ~title:"EVM node server connection"
-  @@ fun protocol ->
-  let* tezos_node, tezos_client = setup_l1 protocol in
-  let* sc_rollup =
-    originate_sc_rollup
-      ~kind:"wasm_2_0_0"
-      ~parameters_ty:"string"
-      ~src:Constant.bootstrap1.alias
-      tezos_client
-  in
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      Observer
-      tezos_node
-      ~base_dir:(Client.base_dir tezos_client)
-      ~kind:"wasm_2_0_0"
-      ~default_operator:Constant.bootstrap1.alias
-  in
-  let evm_node =
-    Evm_node.create ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node)) ()
-  in
-  let* () = Process.check @@ Evm_node.spawn_init_config evm_node in
-  (* Tries to start the EVM node server without a listening rollup node. *)
-  let* () = Process.check ~expect_failure:true @@ Evm_node.spawn_run evm_node in
-  (* Starts the rollup node. *)
-  let* _ = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
-  (* Starts the EVM node server and asks its version. *)
-  let* () = Evm_node.run evm_node in
-  let*? process = evm_node_version evm_node in
-  let* () = Process.check process in
-  unit
-
 let test_originate_evm_kernel =
   register_sequencer ~tags:["evm"] ~title:"Originate EVM kernel with installer"
   @@ fun ~protocol:_ ~evm_setup:{client; node; sc_rollup_node; _} ->
@@ -3625,39 +3588,6 @@ let test_latest_kernel_migration protocols =
   in
   latest_kernel_migration ~from:Mainnet protocols
 
-let test_cannot_prepayed_leads_to_no_inclusion =
-  (* In sequencer the balance validation is only done during the
-     production of the block. *)
-  register_proxy
-    ~tags:["evm"; "prepay"; "inclusion"]
-    ~title:
-      "Not being able to prepay a transaction leads to it not being included."
-    ~eth_bootstrap_accounts:[]
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  (* No bootstrap accounts, so no one has funds. *)
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
-     Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
-     this test because we want the results of the simulation. *)
-  let* raw_transfer =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~gas:23_300
-      ~value:(Wei.of_string "1000000000000000000")
-      ~address:Eth_account.bootstrap_accounts.(1).address
-      ()
-  in
-  let*@? error = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
-  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
-  Check.(
-    ((error.message = "Cannot prepay transaction.") string)
-      ~error_msg:
-        "The transaction should be rejected for not being able to prepay") ;
-  unit
-
 let test_cannot_prepayed_with_delay_leads_to_no_injection =
   register_sequencer
     ~tags:["evm"; "prepay"; "injection"]
@@ -6110,7 +6040,6 @@ let register_evm_node ~protocols =
   test_kernel_root_hash_originate_absent protocols ;
   test_kernel_root_hash_originate_present protocols ;
   test_kernel_root_hash_after_upgrade protocols ;
-  test_evm_node_connection protocols ;
   test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;
   test_rpc_getCode protocols ;
@@ -6161,7 +6090,6 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
-  test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
