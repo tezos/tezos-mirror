@@ -50,6 +50,19 @@ end
 open Test_helpers
 open Setup
 
+let get_rollup_kernel_version ~sc_rollup_node =
+  let* kernel_version =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/evm/kernel_version"
+         ()
+  in
+  match kernel_version with
+  | None -> Test.fail "Kernel version not found in rollup node durable storage"
+  | Some hex -> return (Hex.to_string (`Hex hex))
+
 let check_kernel_version ~evm_node ~equal expected =
   let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
   if equal then
@@ -2075,14 +2088,11 @@ let test_fa_withdrawal_is_included =
       ~withdrawal_level
       ~commitment_period:5
       ~challenge_window:5
-      ~evm_node:sequencer
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
       ()
   in
-
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Check ticket balance for the zero account on L1 *)
   let* l1_balance =
@@ -5114,6 +5124,7 @@ let test_flushed_blueprint_reorg_upgrade =
 let test_delayed_transfer_timeout =
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5128,17 +5139,13 @@ let test_delayed_transfer_timeout =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5157,18 +5164,15 @@ let test_delayed_transfer_timeout =
   in
   let* _hash =
     send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
       ~sc_rollup_node
       ~client
       ~l1_contracts
       ~sc_rollup_address
       raw_transfer
   in
-  (* Bake a few blocks, should be enough for the tx to time out and be
-     forced *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5193,15 +5197,7 @@ let test_forced_blueprint_takes_pred_timestamp =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
     ~title:"Forced blueprint can take predecessor timestamp"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* The head timestamp will be high enough that we don't use the L1 timestamp
@@ -5228,18 +5224,21 @@ let test_forced_blueprint_takes_pred_timestamp =
       ~sc_rollup_address
       raw_transfer
   in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
+  in
+  (* The sequencer has applied the force blueprint, it's latest is the
+     forced blueprint *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.(
-    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_notation sequencer_head.timestamp
     = "2020-01-01T00:04:00Z")
       string)
     ~error_msg:
       "The forced blueprint should have the same timestamp as its predecessor" ;
   let* l1_timestamp = l1_timestamp client in
   Check.(
-    (Tezos_base.Time.Protocol.to_seconds proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_seconds sequencer_head.timestamp
     > Tezos_base.Time.Protocol.to_seconds l1_timestamp)
       int64)
     ~error_msg:"The proxy should have taken a timestamp greater than L1 one" ;
@@ -5256,15 +5255,7 @@ let test_forced_blueprint_takes_l1_timestamp =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
     ~title:"Forced blueprint can take l1 timestamp"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer in
@@ -5290,12 +5281,14 @@ let test_forced_blueprint_takes_l1_timestamp =
       raw_transfer
   in
   let* l1_timestamp = l1_timestamp client in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
+  in
 
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   (* The forced block will have a timestamp of l1_timestamp. *)
   Check.(
-    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_notation sequencer_head.timestamp
     = Tezos_base.Time.Protocol.to_notation l1_timestamp)
       string)
     ~error_msg:
@@ -5305,6 +5298,7 @@ let test_forced_blueprint_takes_l1_timestamp =
 let test_delayed_transfer_timeout_fails_l1_levels =
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5319,17 +5313,13 @@ let test_delayed_transfer_timeout_fails_l1_levels =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5371,10 +5361,8 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   Check.((receiver_balance_prev = receiver_balance_next) Wei.typ)
     ~error_msg:"Receiver balance should be the same (prev %L = next %R)" ;
   (* Wait until it's forced *)
-  let* _ =
-    repeat 15 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5399,36 +5387,16 @@ let test_force_kernel_upgrade_too_early =
   @@
   fun _from
       to_
-      {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+      {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?l2_chains:(if enable_multichain then Some l2_chains else None)
-      ()
-  in
-  let* proxy =
-    Evm_node.init
-      ~patch_config
-      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
-      ()
-  in
 
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day after the genesis. Therefore, it cannot
@@ -5452,8 +5420,8 @@ let test_force_kernel_upgrade_too_early =
 
   (* Assert the kernel version are still the same. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = new_proxy_kernelVersion) string)
+  let* new_rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = new_rollup_kernelVersion) string)
     ~error_msg:"The force kernel upgrade should have failed" ;
   unit
 
@@ -5472,36 +5440,15 @@ let test_force_kernel_upgrade =
     ~title:"Force kernel upgrade"
     ~additional_uses:[Constant.WASM.debug_kernel]
   @@
-  fun {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?l2_chains:(if enable_multichain then Some l2_chains else None)
-      ()
-  in
-  let* proxy =
-    Evm_node.init
-      ~patch_config
-      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
-      ()
-  in
-
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day before the genesis. Therefore, it can
@@ -5529,8 +5476,8 @@ let test_force_kernel_upgrade =
   (* Assert the kernel version is the same, it proves the upgrade did not
       happen. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same even after the message" ;
 
   (* Now we force the kernel upgrade via an external message. They will
@@ -5568,12 +5515,15 @@ let test_external_transaction_to_delayed_inbox_fails =
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "external"]
     ~title:"Sending an external transaction to the delayed inbox fails"
-  @@ fun {client; sequencer; proxy; sc_rollup_node; _} _protocol ->
-  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
-  (* Bake a couple more levels for the blueprint to be final *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let raw_tx, _ = read_tx_from_file () |> List.hd in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
+  @@ fun {client; sequencer; sc_rollup_node; sc_rollup_address; _} _protocol ->
+  let raw_tx, tx_hash = read_tx_from_file () |> List.hd in
+  let* _ =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.post_local_batcher_injection
+       (* See Message_format.frame_message for the used encoding *)
+         ~messages:["\000" ^ sc_rollup_address ^ "\000" ^ tx_hash ^ raw_tx]
+         ()
+  in
   (* Bake enough levels to make sure the transaction would be processed
      if added *)
   let* () =
@@ -5583,8 +5533,6 @@ let test_external_transaction_to_delayed_inbox_fails =
         unit)
   in
   (* Response should be none *)
-  let*@ response = Rpc.get_transaction_receipt ~tx_hash proxy in
-  assert (Option.is_none response) ;
   let*@ response = Rpc.get_transaction_receipt ~tx_hash sequencer in
   assert (Option.is_none response) ;
   unit
@@ -5600,6 +5548,7 @@ let test_delayed_inbox_flushing =
   *)
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:1
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5613,17 +5562,13 @@ let test_delayed_inbox_flushing =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5678,10 +5623,8 @@ let test_delayed_inbox_flushing =
   in
   (* Bake a few more blocks to make sure the first tx times out, but not
      the second one. However, the latter should also be included. *)
-  let* _ =
-    repeat 10 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -6682,7 +6625,6 @@ let test_outbox_size_limit_resilience ~slow =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         evm_version;
         _;
       }
@@ -6809,7 +6751,6 @@ let test_outbox_size_limit_resilience ~slow =
         ~withdrawal_level
         ~commitment_period
         ~challenge_window
-        ~evm_node:proxy
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
@@ -6828,7 +6769,6 @@ let test_outbox_size_limit_resilience ~slow =
         ~withdrawal_level:(actual_withdrawal_level + 1)
         ~commitment_period
         ~challenge_window
-        ~evm_node:proxy
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
@@ -9349,7 +9289,6 @@ let test_deposit_and_fast_withdraw =
         sc_rollup_address;
         client;
         l1_contracts;
-        proxy;
         sc_rollup_node;
         kernel;
         _;
@@ -9489,7 +9428,6 @@ let test_deposit_and_fast_withdraw =
       ~withdrawal_level
       ~commitment_period
       ~challenge_window
-      ~evm_node:proxy
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
@@ -9536,7 +9474,6 @@ let test_deposit_and_fa_fast_withdraw =
         sc_rollup_address;
         client;
         l1_contracts;
-        proxy;
         sc_rollup_node;
         kernel;
         _;
@@ -9699,7 +9636,6 @@ let test_deposit_and_fa_fast_withdraw =
       ~withdrawal_level
       ~commitment_period
       ~challenge_window
-      ~evm_node:proxy
       ~sc_rollup_node
       ~sc_rollup_address
       ~client

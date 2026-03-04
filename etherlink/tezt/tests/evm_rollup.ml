@@ -2388,8 +2388,7 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
   wait_for_application ~produce_block call_withdraw
 
 let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
-    ~produce_block ~evm_node ~sc_rollup_node ~sc_rollup_address ~client
-    ~endpoint =
+    ~produce_block ~sc_rollup_node ~sc_rollup_address ~client ~endpoint =
   let* withdrawal_level = Client.level client in
   (* Call the withdrawal precompiled contract. *)
   let* _tx =
@@ -2406,7 +2405,6 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
       ~withdrawal_level
       ~commitment_period
       ~challenge_window
-      ~evm_node
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
@@ -2490,7 +2488,6 @@ let test_deposit_and_withdraw =
   let* _tx =
     withdraw
       ~produce_block
-      ~evm_node
       ~sc_rollup_address
       ~commitment_period
       ~challenge_window

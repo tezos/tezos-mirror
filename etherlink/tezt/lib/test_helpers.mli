@@ -210,6 +210,20 @@ val bake_until_sync :
   unit ->
   unit Lwt.t
 
+(** [bake_until_blueprint_forced ?timeout_in_blocks ?timeout
+    ~sc_rollup_node ~evm_node ~client] bakes blocks until a blueprint
+    is forced by the kernel. *)
+val bake_until_blueprint_forced :
+  ?__LOC__:string ->
+  ?timeout_in_blocks:int ->
+  ?timeout:float ->
+  ?network:network ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  evm_node:Evm_node.t ->
+  client:Client.t ->
+  unit ->
+  unit Lwt.t
+
 (** [wait_for_transaction_receipt ?count ~evm_node ~transaction_hash ()] takes a
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
@@ -268,7 +282,7 @@ val default_bootstrap_account_balance : Wei.t
 val l1_timestamp : Client.t -> Tezos_base.Time.Protocol.t Lwt.t
 
 (** [find_and_execute_withdrawal ~withdrawal_level ~commitment_period ~challenge_window
-    ~evm_node ~sc_rollup_node ~sc_rollup_address ~client] bakes enough levels to have
+    ~sc_rollup_node ~sc_rollup_address ~client] bakes enough levels to have
     a commitment and cement it, then constructs outbox proof
     and executes the outbox message *)
 val find_and_execute_withdrawal :
@@ -276,7 +290,6 @@ val find_and_execute_withdrawal :
   withdrawal_level:int ->
   commitment_period:int ->
   challenge_window:int ->
-  evm_node:Evm_node.t ->
   sc_rollup_node:Sc_rollup_node.t ->
   sc_rollup_address:string ->
   client:Client.t ->
