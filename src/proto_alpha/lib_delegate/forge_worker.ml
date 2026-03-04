@@ -125,9 +125,8 @@ module Request = struct
           (obj2
              (req "request" (constant "Forge_and_sign_attestations"))
              (req "block" Block_hash.encoding))
-          (function
-            | Forge_and_sign_preattestations h -> Some ((), h) | _ -> None)
-          (fun ((), h) -> Forge_and_sign_preattestations h);
+          (function Forge_and_sign_attestations h -> Some ((), h) | _ -> None)
+          (fun ((), h) -> Forge_and_sign_attestations h);
       ]
 
   let view (type a b) (req : (a, b) t) : view =
