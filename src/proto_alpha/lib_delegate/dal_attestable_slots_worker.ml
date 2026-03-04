@@ -61,7 +61,9 @@ type stream_handle = {
   stopper : Tezos_rpc.Context.stopper;
 }
 
-type slots_by_delegate = bool array Delegate_id.Table.t
+type slot_attestation_status = Attestable | Trap | Unknown
+
+type slots_by_delegate = slot_attestation_status array Delegate_id.Table.t
 
 module Level_map =
   Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
@@ -107,7 +109,7 @@ let get_or_create_bit_array state ~published_level ~delegate_id =
   match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
   | Some slots_array -> slots_array
   | None ->
-      let slots_array = Array.make state.number_of_slots false in
+      let slots_array = Array.make state.number_of_slots Unknown in
       Delegate_id.Table.replace slots_by_delegate delegate_id slots_array ;
       slots_array
 
@@ -119,7 +121,7 @@ let update_slots_cache state ~delegate_id ~slot_id ~is_trap =
   let bitset =
     get_or_create_bit_array state ~published_level:slot_level ~delegate_id
   in
-  bitset.(slot_index) <- not is_trap
+  bitset.(slot_index) <- (if is_trap then Trap else Attestable)
 
 (** [update_committee_cache state ~delegate_id ~committee_level] records that
     the [~delegate_id] is NOT in the committee at the given [~committee_level]. *)

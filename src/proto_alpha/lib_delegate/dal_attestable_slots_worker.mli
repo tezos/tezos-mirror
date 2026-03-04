@@ -42,6 +42,9 @@ val update_streams_subscriptions :
   delegate_ids:Baking_state_types.Delegate_id.t list ->
   unit Lwt.t
 
+(** Status of a single DAL slot for a given delegate and published level. *)
+type slot_attestation_status = Attestable | Trap | Unknown
+
 (** [get_dal_attestable_slots t ctxt ~delegate_id ~published_level]
     returns for [~delegate_id], the current bitset for [~published_level], if
     found in the cache. *)
@@ -49,7 +52,7 @@ val get_dal_attestable_slots :
   t ->
   delegate_id:Baking_state_types.Delegate_id.t ->
   published_level:int32 ->
-  bool list option Lwt.t
+  slot_attestation_status list option Lwt.t
 
 (** [is_not_in_committee state ~delegate_id ~committee_level] returns [false] if
     [~delegate_id] is in the committee at the given [~committee_level].

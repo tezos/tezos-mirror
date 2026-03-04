@@ -520,9 +520,9 @@ let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
     state.global_state.constants.parametric.dal.number_of_slots
   in
   List.fold_left_i
-    (fun i acc' flag ->
+    (fun i acc' status ->
       match Dal.Slot_index.of_int_opt ~number_of_slots i with
-      | Some index when flag ->
+      | Some index when status = Dal_attestable_slots_worker.Attestable ->
           Dal.Attestations.commit
             acc'
             ~number_of_slots
@@ -534,7 +534,19 @@ let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
     slots
 
 let attested_slot_indices slots =
-  List.fold_left_i (fun i acc flag -> if flag then i :: acc else acc) [] slots
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Attestable then i :: acc else acc)
+    []
+    slots
+  |> List.rev
+
+let trap_slot_indices slots =
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Trap then i :: acc else acc)
+    []
+    slots
   |> List.rev
 
 let may_get_dal_content state consensus_vote =
@@ -575,10 +587,11 @@ let may_get_dal_content state consensus_vote =
       let number_of_lags = List.length attestation_lags in
       let* ( dal_attestations,
              no_dal_attestations_levels,
-             dal_attested_slots_per_level ) =
+             dal_attested_slots_per_level,
+             dal_trap_slots_per_level ) =
         List.fold_left_i_s
           (fun lag_index
-               (acc, missing_levels, slots_per_level)
+               (acc, missing_levels, slots_per_level, traps_per_level)
                published_level
              ->
             let+ dal_attestable_slots =
@@ -595,13 +608,23 @@ let may_get_dal_content state consensus_vote =
                       published_level)])
             in
             match dal_attestable_slots with
-            | None -> (acc, published_level :: missing_levels, slots_per_level)
+            | None ->
+                ( acc,
+                  published_level :: missing_levels,
+                  slots_per_level,
+                  traps_per_level )
             | Some slots ->
                 let attested_indices = attested_slot_indices slots in
+                let trap_indices = trap_slot_indices slots in
                 let slots_per_level =
                   if attested_indices <> [] then
                     (published_level, attested_indices) :: slots_per_level
                   else slots_per_level
+                in
+                let traps_per_level =
+                  if trap_indices <> [] then
+                    (published_level, trap_indices) :: traps_per_level
+                  else traps_per_level
                 in
                 ( process_and_accumulate_dal_rpc_result
                     state
@@ -610,13 +633,15 @@ let may_get_dal_content state consensus_vote =
                     ~lag_index
                     slots,
                   missing_levels,
-                  slots_per_level ))
-          (Dal.Attestations.empty, [], [])
+                  slots_per_level,
+                  traps_per_level ))
+          (Dal.Attestations.empty, [], [], [])
           published_levels
       in
       let dal_attested_slots_per_level =
         List.rev dal_attested_slots_per_level
       in
+      let dal_trap_slots_per_level = List.rev dal_trap_slots_per_level in
       let* () =
         if no_dal_attestations_levels <> [] then
           let published_levels_str =
@@ -627,6 +652,24 @@ let may_get_dal_content state consensus_vote =
             emit
               no_attestable_dal_slots_for_levels
               (delegate_id, attested_level, published_levels_str))
+        else return_unit
+      in
+      let* () =
+        if dal_trap_slots_per_level <> [] then
+          let trap_details =
+            dal_trap_slots_per_level
+            |> List.map (fun (published_level, slots) ->
+                   Format.asprintf
+                     "%ld -> [%a]"
+                     published_level
+                     (Format.pp_print_list
+                        ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+                        Format.pp_print_int)
+                     slots)
+            |> String.concat "; "
+          in
+          Events.(
+            emit dal_slots_not_attested_due_to_traps (delegate_id, trap_details))
         else return_unit
       in
       let dal_content = {attestations = dal_attestations} in
