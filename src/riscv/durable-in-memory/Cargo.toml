@@ -1,0 +1,24 @@
+[package]
+name = "octez-riscv-durable-storage-in-memory"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+ocaml.workspace = true
+ocaml-boxroot-sys.workspace = true
+ocaml-sys.workspace = true
+octez-riscv-api-common.workspace = true
+octez-riscv-data.workspace = true
+octez-riscv-durable-storage.workspace = true
+
+[build-dependencies]
+ocaml-build.workspace = true
+
+[features]
+default = ["ocaml/default"]
+# `ci` should be activated in isolation. Activating it in conjuction with `default` may cause build
+# errors.
+ci = ["ocaml/without-ocamlopt", "ocaml-sys/without-ocamlopt", "ocaml/derive"]
