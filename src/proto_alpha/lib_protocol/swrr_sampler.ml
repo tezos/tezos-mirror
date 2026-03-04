@@ -134,21 +134,28 @@ let select_bakers_at_cycle_end ctxt ~target_cycle ~stakes_pk ~total_stake_weight
   let total_stake_weight = Z.of_int64 total_stake_weight in
   let blocks_per_cycle = Constants_storage.blocks_per_cycle ctxt in
   let nb_slots = Int32.to_int blocks_per_cycle in
-  let* init_credit_list =
-    List.fold_left_es
-      (fun acc (consensus_pk, stake_weight) ->
-        let* credit_opt =
-          Storage.Contract.SWRR_credit.find
-            ctxt
-            (Contract_repr.Implicit consensus_pk.Raw_context.delegate)
+  (* Loads the initial delegates' credits. Delegates not present
+     in the map (new delegates, or first cycle) default to Z.zero. *)
+  let* prev_credits_map =
+    let* credits_list = Storage.Stake.SWRR_credits.find ctxt in
+    let credits_list = Option.value ~default:[] credits_list in
+    return
+      (List.fold_left
+         (fun map (pkh, credit) -> Implicit_account_repr.Map.add pkh credit map)
+         Implicit_account_repr.Map.empty
+         credits_list)
+  in
+  let init_credit_list =
+    List.rev_map
+      (fun (consensus_pk, stake_weight) ->
+        let old_credit =
+          Option.value
+            ~default:Z.zero
+            (Implicit_account_repr.Map.find
+               consensus_pk.Raw_context.delegate
+               prev_credits_map)
         in
-        let old_credit = Option.value ~default:Z.zero credit_opt in
-        let acc =
-          {consensus_pk; credit = old_credit; stake = Z.of_int64 stake_weight}
-          :: acc
-        in
-        return acc)
-      []
+        {consensus_pk; credit = old_credit; stake = Z.of_int64 stake_weight})
       stakes_pk
   in
   let fallback_baker =
@@ -225,24 +232,19 @@ let select_bakers_at_cycle_end ctxt ~target_cycle ~stakes_pk ~total_stake_weight
   let* ctxt =
     Swrr_selected_distribution.init ctxt target_cycle selected_bakers
   in
-  (* Update credits for all delegates.
-
-     Use [add] instead of [update] to handle both cases:
-     - New delegates: first time participating in SWRR, no credit entry exists yet
-     - Existing delegates: already have credit from previous cycles
-
-     [add] creates new entries or updates existing ones, making it robust to
-     delegate set changes across cycles (e.g., new delegates meeting minimal stake). *)
-  let*! ctxt =
-    List.fold_left_s
-      (fun ctxt {consensus_pk; credit; _} ->
-        Storage.Contract.SWRR_credit.add
-          ctxt
-          (Contract_repr.Implicit consensus_pk.delegate)
-          credit)
-      ctxt
+  (* Store updated credits in the global credit map.
+     Only delegates in the current distribution are included, which
+     automatically excludes delegates that dropped below minimum stake
+     or were deactivated. *)
+  let credits_list =
+    List.map
+      (fun {consensus_pk; credit; _} ->
+        (consensus_pk.Raw_context.delegate, credit))
       new_credits
   in
+  (* Uses [add] instead of [update] to handle the first storage write,
+     afterwards [add] overwrites the old credits with the new ones. *)
+  let*! ctxt = Storage.Stake.SWRR_credits.add ctxt credits_list in
   return ctxt
 
 (** [get_baker ctxt level round] retrieves the consensus key for the baker
@@ -268,32 +270,5 @@ let get_baker ctxt level round =
          always succeeds since [n mod length l] ∈ [0, length l - 1]. *)
       let consensus_pk = FallbackArray.get selected_bakers idx in
       return (ctxt, Some consensus_pk)
-
-(** [reset_credit_for_deactivated_delegates ctxt deactivated_delegates] sets
-    SWRR credits to zero for delegates that have been deactivated.
-
-    This prevents negative credits from accumulating during deactivation periods.
-    Without reset, a delegate could accumulate large negative credit while inactive,
-    making them unfairly disadvantaged when (if) they reactivate.
-
-    Called from delegate_cycles.ml during cycle finalization, before computing
-    the new stake distribution, ensuring deactivated delegates don't influence
-    next cycle's selection.
-
-    Note: credits can be negative at deactivation time if the delegate was
-    recently selected multiple times. This is expected and handled correctly. *)
-let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
-  let open Lwt_result_syntax in
-  let*! ctxt =
-    List.fold_left_s
-      (fun ctxt pkh ->
-        Storage.Contract.SWRR_credit.add
-          ctxt
-          (Contract_repr.Implicit pkh)
-          Z.zero)
-      ctxt
-      deactivated_delegates
-  in
-  return ctxt
 
 let remove_outdated_cycle = Swrr_selected_distribution.remove
