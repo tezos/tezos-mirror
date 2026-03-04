@@ -149,4 +149,4 @@ val only_if_dal_feature_enabled :
     by querying the [Dal_attestable_slots_worker] for the corresponding
     [attestation_level]. *)
 val may_get_dal_content :
-  state -> unsigned_consensus_vote -> dal_content option Lwt.t
+  state -> unsigned_consensus_vote -> unsigned_consensus_vote Lwt.t

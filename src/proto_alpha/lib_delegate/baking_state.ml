@@ -297,11 +297,16 @@ let pp_consensus_vote_kind fmt = function
   | Attestation -> Format.fprintf fmt "attestation"
   | Preattestation -> Format.fprintf fmt "preattestation"
 
+type dal_info = {
+  content : dal_content;
+  attested_slots_per_level : (int32 * int list) list;
+}
+
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
   delegate : Delegate.t;
-  dal_content : dal_content option;
+  dal_info : dal_info option;
 }
 
 type batch_content = {
@@ -328,7 +333,7 @@ let make_unsigned_consensus_vote_batch kind
           vote_kind = kind;
           vote_consensus_content = consensus_content;
           delegate;
-          dal_content = None;
+          dal_info = None;
         })
       delegates_and_slots
   in
@@ -342,13 +347,16 @@ let dal_content_map_p f unsigned_consensus_vote_batch =
         let fallback_case =
           {
             unsigned_consensus_vote with
-            dal_content = Some {attestations = Dal.Attestations.empty};
+            dal_info =
+              Some
+                {
+                  content = {attestations = Dal.Attestations.empty};
+                  attested_slots_per_level = [];
+                };
           }
         in
         Lwt.catch
-          (fun () ->
-            let* dal_content = f unsigned_consensus_vote in
-            return {unsigned_consensus_vote with dal_content})
+          (fun () -> f unsigned_consensus_vote)
           (fun _exn -> return fallback_case))
       unsigned_consensus_vote_batch.unsigned_consensus_votes
   in
@@ -428,7 +436,7 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
         match batch_kind with
         | Preattestation ->
             error_when
-              (Option.is_some unsigned_consensus_vote.dal_content)
+              (Option.is_some unsigned_consensus_vote.dal_info)
               Unauthorised_dal_content_in_preattestation
         | Attestation -> return_unit)
       signed_consensus_votes
@@ -562,18 +570,29 @@ let dal_content_encoding =
     (fun attestations -> {attestations})
     Dal.Attestations.encoding
 
+let dal_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {content; attested_slots_per_level} ->
+      (content, attested_slots_per_level))
+    (fun (content, attested_slots_per_level) ->
+      {content; attested_slots_per_level})
+    (obj2
+       (req "content" dal_content_encoding)
+       (dft "attested_slots_per_level" (list (tup2 int32 (list int31))) []))
+
 let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
   conv
-    (fun {vote_kind; vote_consensus_content; delegate; dal_content} ->
-      (vote_kind, vote_consensus_content, delegate, dal_content))
-    (fun (vote_kind, vote_consensus_content, delegate, dal_content) ->
-      {vote_kind; vote_consensus_content; delegate; dal_content})
+    (fun {vote_kind; vote_consensus_content; delegate; dal_info} ->
+      (vote_kind, vote_consensus_content, delegate, dal_info))
+    (fun (vote_kind, vote_consensus_content, delegate, dal_info) ->
+      {vote_kind; vote_consensus_content; delegate; dal_info})
     (obj4
        (req "operation_kind" consensus_vote_kind_encoding)
        (req "consensus_content" consensus_content_encoding)
        (req "delegate" Delegate.encoding_for_logging__cannot_decode)
-       (opt "dal_content" dal_content_encoding))
+       (opt "dal_info" dal_info_encoding))
 
 let signed_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
@@ -1298,26 +1317,44 @@ let pp_dal_content fmt {attestations} =
     fmt
     (Environment.Bitset.to_z (attestations :> Environment.Bitset.t))
 
-let pp_kind_and_dal fmt {vote_kind; dal_content; _} =
-  match (vote_kind, dal_content) with
+let pp_attested_slots_per_level fmt dal_attested_slots_per_level =
+  let non_empty =
+    List.filter (fun (_, slots) -> slots <> []) dal_attested_slots_per_level
+  in
+  match non_empty with
+  | [] -> Format.fprintf fmt "no DAL slots"
+  | _ ->
+      Format.fprintf fmt "DAL slots at published level(s): " ;
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+        (fun fmt (published_level, slots) ->
+          Format.fprintf
+            fmt
+            "%ld -> [%a]"
+            published_level
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+               Format.pp_print_int)
+            slots)
+        fmt
+        non_empty
+
+let pp_kind_and_dal fmt {vote_kind; dal_info; _} =
+  match (vote_kind, dal_info) with
   | Preattestation, _ -> Format.fprintf fmt "preattestation"
   | Attestation, None -> Format.fprintf fmt "attestation (without DAL content)"
-  | Attestation, Some dal_attestation ->
+  | Attestation, Some {attested_slots_per_level; _} ->
       Format.fprintf
         fmt
-        "attestation (with DAL bitset %a)"
-        pp_dal_content
-        dal_attestation
+        "attestation (attesting %a)"
+        pp_attested_slots_per_level
+        attested_slots_per_level
 
 let pp_unsigned_consensus_vote fmt
-    ({
-       vote_kind;
-       vote_consensus_content = {level; round; _};
-       delegate;
-       dal_content;
-     } as t) =
+    ({vote_kind; vote_consensus_content = {level; round; _}; delegate; dal_info}
+     as t) =
   let companion_key_is_relevant =
-    match (vote_kind, dal_content) with
+    match (vote_kind, dal_info) with
     | Attestation, Some _ -> Key.is_bls delegate.consensus_key
     | Attestation, None | Preattestation, _ -> false
   in
