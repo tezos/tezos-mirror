@@ -5124,6 +5124,7 @@ let test_flushed_blueprint_reorg_upgrade =
 let test_delayed_transfer_timeout =
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5138,14 +5139,11 @@ let test_delayed_transfer_timeout =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -5166,18 +5164,15 @@ let test_delayed_transfer_timeout =
   in
   let* _hash =
     send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
       ~sc_rollup_node
       ~client
       ~l1_contracts
       ~sc_rollup_address
       raw_transfer
   in
-  (* Bake a few blocks, should be enough for the tx to time out and be
-     forced *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5202,15 +5197,7 @@ let test_forced_blueprint_takes_pred_timestamp =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
     ~title:"Forced blueprint can take predecessor timestamp"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* The head timestamp will be high enough that we don't use the L1 timestamp
@@ -5237,18 +5224,21 @@ let test_forced_blueprint_takes_pred_timestamp =
       ~sc_rollup_address
       raw_transfer
   in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
+  in
+  (* The sequencer has applied the force blueprint, it's latest is the
+     forced blueprint *)
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.(
-    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_notation sequencer_head.timestamp
     = "2020-01-01T00:04:00Z")
       string)
     ~error_msg:
       "The forced blueprint should have the same timestamp as its predecessor" ;
   let* l1_timestamp = l1_timestamp client in
   Check.(
-    (Tezos_base.Time.Protocol.to_seconds proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_seconds sequencer_head.timestamp
     > Tezos_base.Time.Protocol.to_seconds l1_timestamp)
       int64)
     ~error_msg:"The proxy should have taken a timestamp greater than L1 one" ;
@@ -5265,15 +5255,7 @@ let test_forced_blueprint_takes_l1_timestamp =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"]
     ~title:"Forced blueprint can take l1 timestamp"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer in
@@ -5299,12 +5281,14 @@ let test_forced_blueprint_takes_l1_timestamp =
       raw_transfer
   in
   let* l1_timestamp = l1_timestamp client in
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
+  in
 
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   (* The forced block will have a timestamp of l1_timestamp. *)
   Check.(
-    (Tezos_base.Time.Protocol.to_notation proxy_head.timestamp
+    (Tezos_base.Time.Protocol.to_notation sequencer_head.timestamp
     = Tezos_base.Time.Protocol.to_notation l1_timestamp)
       string)
     ~error_msg:
@@ -5314,6 +5298,7 @@ let test_forced_blueprint_takes_l1_timestamp =
 let test_delayed_transfer_timeout_fails_l1_levels =
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5328,17 +5313,13 @@ let test_delayed_transfer_timeout_fails_l1_levels =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5380,10 +5361,8 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   Check.((receiver_balance_prev = receiver_balance_next) Wei.typ)
     ~error_msg:"Receiver balance should be the same (prev %L = next %R)" ;
   (* Wait until it's forced *)
-  let* _ =
-    repeat 15 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5568,6 +5547,7 @@ let test_delayed_inbox_flushing =
   *)
   register_all
     ~__FILE__
+    ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:1
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5581,17 +5561,13 @@ let test_delayed_inbox_flushing =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
     ->
-  (* Kill the sequencer *)
-  let* () = Evm_node.terminate sequencer in
-  let endpoint = Evm_node.endpoint proxy in
+  let endpoint = Evm_node.endpoint sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -5646,10 +5622,8 @@ let test_delayed_inbox_flushing =
   in
   (* Bake a few more blocks to make sure the first tx times out, but not
      the second one. However, the latter should also be included. *)
-  let* _ =
-    repeat 10 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_blueprint_forced ~sc_rollup_node ~evm_node:sequencer ~client ()
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in

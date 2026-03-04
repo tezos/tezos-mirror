@@ -368,11 +368,47 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ?(network = Etherlink)
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__
-            "rollup node has more recent block. Not supposed to happened "
+            "Rollup node has more recent block. Not supposed to happen."
         else if sequencer_level = proxy_level then return @@ Some ()
         else Lwt.return_none
   in
   bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
+
+let bake_until_blueprint_forced ?__LOC__ ?timeout_in_blocks ?timeout
+    ?(network = Etherlink) ~sc_rollup_node ~evm_node ~client () =
+  let bake () =
+    let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let result_f () =
+    let open Rpc.Syntax in
+    let* sc_rollup_node_block_number_opt =
+      rollup_level_opt ~network sc_rollup_node
+    in
+    let*@ evm_level = Rpc.generic_block_number evm_node in
+    match sc_rollup_node_block_number_opt with
+    | None -> Lwt.return_none
+    | Some rollup_level ->
+        if evm_level > rollup_level then
+          (* Not all sequencer blueprints were propagated to the
+             rollup yet, continue baking. *)
+          Lwt.return_none
+        else if evm_level = rollup_level then Lwt.return_none
+        else Lwt.return_some ()
+  in
+  let* () =
+    bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
+  in
+  let* evm_level =
+    let open Rpc.Syntax in
+    let*@ evm_level = Rpc.generic_block_number evm_node in
+    return evm_level
+  in
+  let forced_blueprint_applied =
+    Evm_node.wait_for_blueprint_applied evm_node (Int32.to_int evm_level + 1)
+  in
+  let* _ = repeat 3 bake and* _ = forced_blueprint_applied in
+  unit
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]

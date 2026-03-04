@@ -210,6 +210,20 @@ val bake_until_sync :
   unit ->
   unit Lwt.t
 
+(** [bake_until_blueprint_forced ?timeout_in_blocks ?timeout
+    ~sc_rollup_node ~evm_node ~client] bakes blocks until a blueprint
+    is forced by the kernel. *)
+val bake_until_blueprint_forced :
+  ?__LOC__:string ->
+  ?timeout_in_blocks:int ->
+  ?timeout:float ->
+  ?network:network ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  evm_node:Evm_node.t ->
+  client:Client.t ->
+  unit ->
+  unit Lwt.t
+
 (** [wait_for_transaction_receipt ?count ~evm_node ~transaction_hash ()] takes a
     transaction_hash and returns only when the receipt is non null, or [count]
     blocks have passed and the receipt is still not available. *)
