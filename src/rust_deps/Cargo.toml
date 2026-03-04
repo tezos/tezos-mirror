@@ -18,6 +18,9 @@ path = "../rustzcash_deps"
 [dependencies.octez-riscv-api]
 path = "../riscv/api"
 
+[dependencies.octez-riscv-durable-storage-in-memory]
+path = "../riscv/durable-in-memory"
+
 [dependencies.rust_igd_next]
 path = "./rust_igd_next"
 
