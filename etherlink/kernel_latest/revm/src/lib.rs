@@ -155,6 +155,11 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
                 .unwrap_or_default(),
         ),
         blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+        // The slot number of the block.
+        // Incorporated as part of the Amsterdam upgrade via [EIP-7843].
+        //
+        // Not used for now, so we default to 0 here.
+        slot_num: 0,
     })
 }
 
