@@ -388,6 +388,11 @@ module L2_blocks : sig
   val find_finalized :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
+  (** Retrieve the last block with a committed context whose level is at or
+      below the finalized level. *)
+  val find_last_committed_finalized :
+    ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
   (** Returns the predecessor, and its level, of an L2 block. *)
   val find_predecessor :
     ?conn:Sqlite.conn ->

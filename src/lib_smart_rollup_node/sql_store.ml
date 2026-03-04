@@ -1200,6 +1200,24 @@ module L2_blocks = struct
       ON s.name = "finalized_level" AND s.value = b.block_hash
       |sql}
 
+    let select_last_committed_finalized =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks AS b
+      INNER JOIN l2_levels AS l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      WHERE l.level <= (
+        SELECT s.level FROM rollup_node_state AS s
+        WHERE s.name = "finalized_level"
+      )
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
     let select_level_and_predecessor =
       (block_hash ->? t2 level block_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -1298,6 +1316,10 @@ module L2_blocks = struct
   let find_finalized ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_finalized ()
+
+  let find_last_committed_finalized ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed_finalized ()
 
   let find_predecessor ?conn store block_hash =
     let open Lwt_result_syntax in
