@@ -549,6 +549,45 @@ let trap_slot_indices slots =
     slots
   |> List.rev
 
+let emit_dal_attestation_logs ~delegate_id ~attested_level
+    ~no_dal_attestations_levels ~dal_trap_slots_per_level ~dal_content
+    ~published_levels ~level ~round =
+  let open Lwt_syntax in
+  let* () =
+    if no_dal_attestations_levels <> [] then
+      let published_levels_str =
+        no_dal_attestations_levels |> List.map Int32.to_string
+        |> String.concat ", "
+      in
+      Events.(
+        emit
+          no_attestable_dal_slots_for_levels
+          (delegate_id, attested_level, published_levels_str))
+    else return_unit
+  in
+  let* () =
+    if dal_trap_slots_per_level <> [] then
+      let trap_details =
+        dal_trap_slots_per_level
+        |> List.map (fun (published_level, slots) ->
+               Format.asprintf
+                 "%ld -> [%a]"
+                 published_level
+                 (Format.pp_print_list
+                    ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+                    Format.pp_print_int)
+                 slots)
+        |> String.concat "; "
+      in
+      Events.(
+        emit dal_slots_not_attested_due_to_traps (delegate_id, trap_details))
+    else return_unit
+  in
+  Events.(
+    emit
+      attach_dal_attestation
+      (delegate_id, dal_content, published_levels, level, round))
+
 let may_get_dal_content state consensus_vote =
   let open Lwt_syntax in
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -642,42 +681,17 @@ let may_get_dal_content state consensus_vote =
         List.rev dal_attested_slots_per_level
       in
       let dal_trap_slots_per_level = List.rev dal_trap_slots_per_level in
-      let* () =
-        if no_dal_attestations_levels <> [] then
-          let published_levels_str =
-            no_dal_attestations_levels |> List.map Int32.to_string
-            |> String.concat ", "
-          in
-          Events.(
-            emit
-              no_attestable_dal_slots_for_levels
-              (delegate_id, attested_level, published_levels_str))
-        else return_unit
-      in
-      let* () =
-        if dal_trap_slots_per_level <> [] then
-          let trap_details =
-            dal_trap_slots_per_level
-            |> List.map (fun (published_level, slots) ->
-                   Format.asprintf
-                     "%ld -> [%a]"
-                     published_level
-                     (Format.pp_print_list
-                        ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
-                        Format.pp_print_int)
-                     slots)
-            |> String.concat "; "
-          in
-          Events.(
-            emit dal_slots_not_attested_due_to_traps (delegate_id, trap_details))
-        else return_unit
-      in
       let dal_content = {attestations = dal_attestations} in
       let* () =
-        Events.(
-          emit
-            attach_dal_attestation
-            (delegate_id, dal_content, published_levels, level, round))
+        emit_dal_attestation_logs
+          ~delegate_id
+          ~attested_level
+          ~no_dal_attestations_levels
+          ~dal_trap_slots_per_level
+          ~dal_content
+          ~published_levels
+          ~level
+          ~round
       in
       return
         {
