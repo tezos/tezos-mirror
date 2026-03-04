@@ -22,7 +22,10 @@ use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
-use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::{
+    CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_TIMESTAMP,
+};
 
 use crate::alias::{get_alias, store_alias};
 
@@ -274,6 +277,42 @@ fn build_http_request(
             "http_call: failed to build HTTP request: {e}"
         ))
     })
+}
+
+/// Build a `CrossRuntimeContext` from the current execution context.
+fn cross_runtime_ctx_from_ctx<'a, Host: Runtime>(
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+) -> Result<CrossRuntimeContext, TransferError> {
+    Ok(CrossRuntimeContext {
+        gas_limit: u64::MAX, // TODO: L2-916 — no gas metering yet
+        timestamp: bigint_to_u256(&ctx.now())?,
+        block_number: biguint_to_u256(ctx.level())?,
+    })
+}
+
+/// Inject trusted X-Tezos-* context headers into `headers`, overwriting any
+/// existing values with the same name.
+fn inject_context_headers_raw(
+    headers: &mut http::HeaderMap,
+    sender_alias: &[u8],
+    amount: u64,
+    gas_limit: u64,
+    timestamp: i64,
+    block_number: u32,
+) -> Result<(), TransferError> {
+    let parse_value = |v: String| -> Result<http::HeaderValue, TransferError> {
+        v.parse()
+            .map_err(|e| TransferError::GatewayError(format!("invalid header value: {e}")))
+    };
+    headers.insert(
+        X_TEZOS_SENDER,
+        parse_value(String::from_utf8_lossy(sender_alias).into_owned())?,
+    );
+    headers.insert(X_TEZOS_AMOUNT, parse_value(amount.to_string())?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(gas_limit.to_string())?);
+    headers.insert(X_TEZOS_TIMESTAMP, parse_value(timestamp.to_string())?);
+    headers.insert(X_TEZOS_BLOCK_NUMBER, parse_value(block_number.to_string())?);
+    Ok(())
 }
 
 /// Extract (evm_contract, address_bytes, value) from a typed
@@ -745,6 +784,29 @@ mod tests {
         let result =
             typecheck_http_call(&Micheline::String("not a valid http_call".to_string()));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_inject_context_headers_raw_sets_values() {
+        let mut headers = http::HeaderMap::new();
+        inject_context_headers_raw(&mut headers, b"alias_bytes", 42, 1000, 1700000000, 5)
+            .unwrap();
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "alias_bytes");
+        assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "42");
+        assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
+        assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
+        assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
+    }
+
+    #[test]
+    fn test_inject_context_headers_raw_overwrites_existing() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::HeaderName::from_static("x-tezos-sender"),
+            "old-value".parse().unwrap(),
+        );
+        inject_context_headers_raw(&mut headers, b"new_alias", 0, 0, 0, 0).unwrap();
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
     }
 
     #[test]
