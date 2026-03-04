@@ -1126,7 +1126,7 @@ open struct
       ~msg:
         "{delegate} cannot attest slot {slot_index} at published level \
          {published_level}: shard {shard_index} is a trap."
-      ~level:Notice
+      ~level:Info
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
