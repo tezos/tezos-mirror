@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -27,18 +27,25 @@ use crate::{
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
     },
+    storage::version::EVMVersion,
     Error,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
     pub builtins: EthPrecompiles,
+}
+
+impl Default for EtherlinkPrecompiles {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EtherlinkPrecompiles {
     pub fn new() -> Self {
         Self {
-            builtins: EthPrecompiles::default(),
+            builtins: EthPrecompiles::new(EVMVersion::default().into()),
         }
     }
 

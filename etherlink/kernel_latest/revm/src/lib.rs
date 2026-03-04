@@ -155,6 +155,11 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
                 .unwrap_or_default(),
         ),
         blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
+        // The slot number of the block.
+        // Incorporated as part of the Amsterdam upgrade via [EIP-7843].
+        //
+        // Not used for now, so we default to 0 here.
+        slot_num: 0,
     })
 }
 
@@ -1071,8 +1076,8 @@ mod test {
 
         // Check the outcome of the transaction
         match execution_result.result {
-            ExecutionResult::Success { gas_used, .. } => {
-                assert!(gas_used > 0);
+            ExecutionResult::Success { gas, .. } => {
+                assert!(gas.spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
@@ -2154,10 +2159,7 @@ mod test {
                 U256::ZERO,
             );
             match res.result {
-                ExecutionResult::Halt {
-                    reason,
-                    gas_used: _,
-                } => {
+                ExecutionResult::Halt { reason, .. } => {
                     assert_eq!(reason, HaltReason::OutOfGas(OutOfGasError::Basic))
                 }
                 _ => panic!("Should fail with OOG"),
@@ -2786,8 +2788,8 @@ mod test {
         .unwrap();
 
         match execution_result.result {
-            ExecutionResult::Success { gas_used, .. } => {
-                assert!(gas_used > 0);
+            ExecutionResult::Success { gas, .. } => {
+                assert!(gas.spent() > 0);
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")

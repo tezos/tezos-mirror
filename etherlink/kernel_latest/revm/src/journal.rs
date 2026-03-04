@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -16,8 +16,8 @@ use revm::{
     },
     inspector::JournalExt,
     primitives::{
-        hardfork::SpecId, Address, HashMap, HashSet, Log, StorageKey, StorageValue, B256,
-        U256,
+        hardfork::SpecId, Address, AddressMap, AddressSet, HashMap, HashSet, Log,
+        StorageKey, StorageValue, B256, U256,
     },
     state::{Account, EvmState},
     JournalEntry,
@@ -162,14 +162,14 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         self.inner.warm_addresses.set_coinbase(address);
     }
 
-    fn warm_precompiles(&mut self, precompiles: HashSet<Address>) {
+    fn warm_precompiles(&mut self, precompiles: AddressSet) {
         self.inner
             .warm_addresses
             .set_precompile_addresses(precompiles);
     }
 
     #[inline]
-    fn precompile_addresses(&self) -> &HashSet<Address> {
+    fn precompile_addresses(&self) -> &AddressSet {
         self.inner.warm_addresses.precompiles()
     }
 
@@ -181,7 +181,13 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
 
     #[inline]
     fn set_spec_id(&mut self, spec_id: SpecId) {
-        self.inner.spec = spec_id;
+        self.inner.cfg.spec = spec_id;
+    }
+
+    #[inline]
+    fn set_eip7708_config(&mut self, disabled: bool, delayed_burn_disabled: bool) {
+        self.inner.cfg.eip7708_disabled = disabled;
+        self.inner.cfg.eip7708_delayed_burn_disabled = delayed_burn_disabled;
     }
 
     #[inline]
@@ -216,6 +222,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         old_balance: U256,
         bump_nonce: bool,
     ) {
+        #[allow(deprecated)]
         self.inner
             .caller_accounting_journal_entry(address, old_balance, bump_nonce);
     }
@@ -234,6 +241,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     /// Increments the nonce of the account.
     #[inline]
     fn nonce_bump_journal_entry(&mut self, address: Address) {
+        #[allow(deprecated)]
         self.inner.nonce_bump_journal_entry(address)
     }
 
@@ -328,7 +336,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         skip_cold_load: bool,
     ) -> Result<AccountInfoLoad<'_>, JournalLoadError<<Self::Database as Database>::Error>>
     {
-        let spec = self.inner.spec;
+        let spec = self.inner.cfg.spec;
         self.inner
             .load_account_optional(&mut self.database, address, load_code, skip_cold_load)
             .map(|a| {
@@ -346,7 +354,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     }
 
     #[inline]
-    fn warm_access_list(&mut self, access_list: HashMap<Address, HashSet<StorageKey>>) {
+    fn warm_access_list(&mut self, access_list: AddressMap<HashSet<StorageKey>>) {
         self.inner.warm_addresses.set_access_list(access_list)
     }
 

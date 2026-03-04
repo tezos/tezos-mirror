@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -322,9 +322,9 @@ fn extract_gas_refunded(
 ) -> u64 {
     match execution_result {
         Ok(ExecutionOutcome {
-            result: ExecutionResult::Success { gas_refunded, .. },
+            result: ExecutionResult::Success { gas, .. },
             ..
-        }) => *gas_refunded,
+        }) => gas.final_refunded(),
         _ => 0,
     }
 }

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -21,7 +21,7 @@ use crate::{
     Error,
 };
 use revm::{
-    primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
+    primitives::{Address, AddressMap, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -428,7 +428,7 @@ impl<Host: Runtime, R: Registry> DatabaseCommitPrecompileStateChanges
 }
 
 impl<Host: Runtime, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R> {
-    fn commit(&mut self, changes: HashMap<Address, Account>) {
+    fn commit(&mut self, changes: AddressMap<Account>) {
         for (address, account) in changes {
             // The account isn't marked as touched, the changes are not commited
             // to the database.
