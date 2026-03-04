@@ -1100,15 +1100,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         };
         let branch = operation.branch.clone();
         let signature = operation.signature.clone();
-        // Read the DA fee per byte from durable storage (in wei), convert to mutez.
-        // When da_fee_per_byte is 0 in storage (the default), this effectively
-        // disables the DA fee check. When explicitly configured (e.g. 4 mutez),
-        // operations with insufficient fees are rejected during simulation.
-        let da_fee_per_byte_wei = crate::storage::read_da_fee(host)
-            .unwrap_or_else(|_| U256::from(crate::fees::DA_FEE_PER_BYTE));
-        let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte_wei)
-            .map_err(|_| crate::Error::InvalidConversion)?;
-        let required_da_fees = get_required_da_fees(&operation, da_fee_per_byte_mutez)?;
+        // During simulation, skip the DA fee check: the client sends fee=0
+        // because it doesn't know the fees yet (that's what simulation computes).
+        // The OCaml node-side prevalidation also skips DA fees during simulation.
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
@@ -1117,7 +1111,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             operation.clone(),
             &block_ctx,
             skip_signature_check,
-            Some(required_da_fees),
+            None,
         )?;
         let result = AppliedOperation {
             hash,

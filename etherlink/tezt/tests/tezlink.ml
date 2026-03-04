@@ -3518,6 +3518,62 @@ let test_tezlink_da_fee_credited_to_pool =
     ~error_msg:"Balance of the sequencer pool address should be %L but go %R" ;
   unit
 
+(** Tests the interaction between DA fees and [--minimal-nanotez-per-byte].
+    The client internally simulates with fee=0 to estimate gas, so the
+    kernel and node must skip the DA fee check during simulation. The fee
+    is then patched using [--minimal-nanotez-per-byte] before injection.
+    First, verifies that a value below the DA fee (1000 nanotez/byte vs
+    4 mutez/byte) is rejected with [insufficient_fees]. Then, verifies
+    that a matching value (4000 nanotez/byte) lets the transfer succeed. *)
+let test_tezlink_simulation_with_da_fee =
+  register_tezlink_only_test
+    ~title:"Michelson transfer simulation succeeds with DA fees enabled"
+    ~tags:["kernel"; "validation"; "da_fee"; "simulation"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~da_fee:(Wei.of_string "4000000000000")
+  (* 4 mutez/byte = 4 * 10^12 wei *)
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* 1000 nanotez/byte = 1 mutez/byte (L1 default), below the DA fee of
+     4 mutez/byte: the total fee doesn't cover the DA cost. *)
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      ~minimal_nanotez_per_byte:1000
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "evm_node.dev.insufficient_fees")
+    ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
+  (* 4000 nanotez/byte = 4 mutez/byte, matching the DA fee: the fee now
+     covers the DA cost and the transfer succeeds. *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      ~minimal_nanotez_per_byte:4000
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.((Tez.to_mutez balance = Tez.(to_mutez one)) int)
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4148,6 +4204,7 @@ let () =
   test_tezlink_validation_balance [Alpha] ;
   test_tezlink_insufficient_da_fee [Alpha] ;
   test_tezlink_da_fee_credited_to_pool [Alpha] ;
+  test_tezlink_simulation_with_da_fee [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
