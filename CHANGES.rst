@@ -167,6 +167,10 @@ Smart Rollup node
   head in the snapshot is on a branch that was reorganized on L1. (MR
   :gl:`!21201`)
 
+- Added ``--commit-on`` option to control how frequently the rollup node commits
+  PVM context to disk, reducing I/O overhead for PVMs with expensive
+  serialization such as RISC-V. (MR :gl:`!19902`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
