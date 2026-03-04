@@ -38,6 +38,8 @@ use tezosx_interfaces::{
 
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
+const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
+
 use crate::{
     account::{get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info},
     context::TezosRuntimeContext,
@@ -47,6 +49,7 @@ pub struct TezosRuntime(pub ChainId);
 
 pub mod account;
 pub mod context;
+pub mod headers;
 pub mod url;
 
 /// Decode cross-runtime call data into Michelson [`Parameters`].
@@ -133,43 +136,29 @@ fn execute_request<Host: Runtime>(
     request: http::Request<Vec<u8>>,
 ) -> Result<TransferSuccess, TezosXRuntimeError> {
     let parsed = url::parse_tezos_url(request.uri())?;
+    let hdrs = headers::parse_request_headers(request.headers())?;
 
     let parameters = Parameters {
         entrypoint: parsed.entrypoint,
         value: request.into_body(),
     };
 
-    // TODO: Extract from X-Tezos-* headers.
-    let amount_u64: u64 = 0;
-    let gas_limit = TezlinkOperationGas::MAX_LIMIT / 1000;
-    let timestamp: i64 = 0;
-    let block_number: u32 = 0;
-
     let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
 
-    // FIXME: Sender and source are hardcoded to the null address.
-    // Will be extracted from X-Tezos-Sender / X-Tezos-Source headers.
-    let null_pkh = PublicKeyHash::from_b58check("tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
-        .map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!("Failed to parse zero address: {e}"))
+    let sender_account = context.originated_from_kt1(&hdrs.sender).map_err(|e| {
+        TezosXRuntimeError::Custom(format!("Failed to fetch sender account: {e:?}"))
     })?;
-    let sender_account = context
-        .originated_from_contract(&Contract::Originated(ContractKt1Hash::from(
-            blake2b::digest_160(null_pkh.to_string().as_bytes()),
-        )))
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!(
-                "Failed to fetch sender originated account: {e:?}"
-            ))
-        })?;
-    let source_account =
-        context
-            .implicit_from_public_key_hash(&null_pkh)
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!("Failed to fetch zero account: {e:?}"))
-            })?;
 
-    let mut gas = TezlinkOperationGas::start(&Narith(gas_limit.into()))
+    let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
+    })?;
+    let source_account = context
+        .implicit_from_public_key_hash(&hdrs.source.unwrap_or(null_pkh))
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to fetch source account: {e:?}"))
+        })?;
+
+    let mut gas = TezlinkOperationGas::start(&hdrs.gas_limit)
         .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
     let mut next_temp_id = BigMapId {
         value: Zarith(0.into()),
@@ -181,8 +170,6 @@ fn execute_request<Host: Runtime>(
         big_map_diff: BTreeMap::new(),
         next_temporary_id: &mut next_temp_id,
     };
-    let level = BlockNumber { block_number };
-    let now = Timestamp::from(timestamp);
     let chain_id = ChainId::try_from_bytes(&[0u8; 4]).unwrap();
     let mut nonce = OriginationNonce::initial(OperationHash::default());
     let mut counter = 0u128;
@@ -190,19 +177,18 @@ fn execute_request<Host: Runtime>(
         source: &source_account,
         origination_nonce: &mut nonce,
         counter: &mut counter,
-        level: &level,
-        now: &now,
+        level: &hdrs.block_number,
+        now: &hdrs.timestamp,
         chain_id: &chain_id,
     };
     let parser = mir::parser::Parser::new();
-    let amount = Narith(amount_u64.into());
 
     cross_runtime_transfer(
         &mut tc_ctx,
         &mut operation_ctx,
         registry,
         &sender_account,
-        &amount,
+        &hdrs.amount,
         &parsed.destination,
         &parameters,
         &parser,
@@ -278,12 +264,11 @@ impl RuntimeInterface for TezosRuntime {
         // retrieve the original tz source in the future.
         let source_account = context
             .implicit_from_public_key_hash(
-                &PublicKeyHash::from_b58check("tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
-                    .map_err(|e| {
-                        TezosXRuntimeError::ConversionError(format!(
-                            "Failed to parse zero address: {e}"
-                        ))
-                    })?,
+                &PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
+                    TezosXRuntimeError::ConversionError(format!(
+                        "Failed to parse null address: {e}"
+                    ))
+                })?,
             )
             .map_err(|e| {
                 TezosXRuntimeError::Custom(format!("Failed to fetch zero account: {e:?}"))
