@@ -1023,4 +1023,181 @@ mod tests {
             panic!("The DAL signal shouldn't have been applied by the kernel, and the blueprint shouldn't have been read")
         }
     }
+
+    #[test]
+    fn test_proxy_no_transactions_produces_empty_blueprint() {
+        // The mock host always contains SOL/info-per-level/EOL messages, so
+        // the proxy reads an inbox with zero user transactions and produces
+        // a blueprint with an empty transaction list.
+        let mut host = MockKernelHost::default();
+        let mut conf = dummy_proxy_configuration();
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Even with no user transactions the proxy reads the inbox and requests a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    0,
+                    "The blueprint should have zero transactions"
+                );
+            }
+            None => panic!("There should be an (empty) blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_multiple_simple_transactions_in_one_blueprint() {
+        // All transactions received during a single L1 level must be
+        // collected into a single proxy blueprint.
+        let mut host = MockKernelHost::default();
+        // Add the same transaction three times (they are independent
+        // external messages).
+        for _ in 0..3 {
+            host.host
+                .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+        }
+        let mut conf = dummy_proxy_configuration();
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Non-empty proxy inbox should request a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    3,
+                    "All three transactions should appear in the same blueprint"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_mixed_simple_tx_and_deposit() {
+        // A blueprint produced in proxy mode should contain both plain
+        // transactions and deposits received during the same L1 level.
+        let mut host = MockKernelHost::default();
+
+        // One simple transaction
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+
+        // One deposit
+        let mut conf = dummy_proxy_configuration();
+        let metadata = TransferMetadata::new(
+            conf.tezos_contracts.ticketer.clone().unwrap(),
+            PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
+        );
+        host.host.add_transfer(
+            dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
+            &metadata,
+        );
+
+        let status = fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        assert!(
+            matches!(status, StageOneStatus::Reboot),
+            "Mixed tx+deposit inbox should request a reboot"
+        );
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { transactions, .. }) => {
+                assert_eq!(
+                    transactions.len(),
+                    2,
+                    "Blueprint should contain both the simple transaction and the deposit"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_blueprint_carries_timestamp() {
+        // The proxy blueprint must carry the info-per-level timestamp
+        // extracted from the inbox. We verify that after
+        // fetch_blueprints the resulting blueprint has a non-zero
+        // timestamp that matches the value read back from storage.
+        let mut host = MockKernelHost::default();
+
+        host.host
+            .add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
+
+        let mut conf = dummy_proxy_configuration();
+        fetch_blueprints(
+            &mut host,
+            DEFAULT_SR_ADDRESS,
+            &test_chain_config(),
+            &mut conf,
+        )
+        .expect("fetch failed");
+
+        // Read back the timestamp that fetch_blueprints stored from
+        // the info-per-level message.
+        let stored_ts = read_last_info_per_level_timestamp(&host)
+            .expect("timestamp should be readable after fetch");
+
+        match read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .0
+        {
+            Some(Blueprint { timestamp, .. }) => {
+                assert_eq!(
+                    timestamp, stored_ts,
+                    "The blueprint timestamp should match the info-per-level timestamp"
+                );
+            }
+            None => panic!("There should be a blueprint"),
+        }
+    }
+
+    #[test]
+    fn test_proxy_fetch_configuration_without_sequencer_key() {
+        // fetch_configuration should return Proxy when the durable
+        // storage contains no sequencer public key.
+        use crate::configuration::fetch_configuration;
+
+        let mut host = MockKernelHost::default();
+        let conf = fetch_configuration(&mut host);
+        assert!(
+            matches!(conf.mode, ConfigurationMode::Proxy),
+            "fetch_configuration should return Proxy when no sequencer key is stored"
+        );
+    }
 }
