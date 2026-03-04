@@ -114,6 +114,16 @@ let _release_page_tests =
     ~deps:
       [tezt_lib |> open_ |> open_ ~m:"Base"; _release_page_base_lib |> open_]
 
+let ci_release_page =
+  private_lib
+    "release_page_ci"
+    ~opam:""
+    ~path:"ci/bin_release_page/ci"
+    ~bisect_ppx:No
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+    ~release_status:Unreleased
+
 let ci_grafazos =
   private_lib
     "grafazos_ci"
@@ -194,6 +204,7 @@ let _ci_bin_main =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_tezos_ci_jobs |> open_;
+        ci_release_page;
         ci_grafazos;
         ci_teztale;
         ci_rollup_node;

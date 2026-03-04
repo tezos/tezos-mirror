@@ -20,3 +20,4 @@ merge_request,etherlink,,36,3
 merge_request,etherlink,slow,3,3
 merge_request,etherlink,extra,12,6
 merge_request,etherlink,flaky,2,1
+merge_request,release_page,,1,1
