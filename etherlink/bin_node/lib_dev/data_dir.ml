@@ -72,10 +72,7 @@ let export_store ~data_dir ~output_db_file =
       ~perm:(Read_only {pool_size = 1})
       ()
   in
-  Evm_store.use store @@ fun conn ->
-  let* info = store_info conn in
-  let* () = Evm_store.vacuum ~conn ~output_db_file in
-  return info
+  Evm_store.use store @@ fun conn -> Evm_store.vacuum ~conn ~output_db_file
 
 let store_info ~data_dir =
   let open Lwt_result_syntax in

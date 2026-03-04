@@ -95,22 +95,44 @@ let export ?snapshot_file ~compression ~data_dir () =
       []
   in
   let files = evm_context_files in
-  (* Export SQLite database *)
-  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
-  @@ fun tmp_dir ->
-  let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
   let* {
          rollup_address;
          current_number = current_level;
          history_mode;
          first_number = first_level;
        } =
-    Data_dir.export_store ~data_dir ~output_db_file
+    Data_dir.store_info ~data_dir
   in
   let header =
     Header.(V1 {rollup_address; current_level; history_mode; first_level})
   in
-  let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
+  (* Export SQLite database *)
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
+  @@ fun tmp_dir ->
+  let* files =
+    match history_mode with
+    | Archive ->
+        (* For archive mode, feed the original DB files directly into the
+           archive to avoid the expensive vacuum operation. The data dir is
+           locked, so the files are stable. *)
+        let sqlite_file = Filename.concat data_dir Evm_store.sqlite_file_name in
+        let sqlite_files =
+          List.filter_map
+            (fun suffix ->
+              let path = sqlite_file ^ suffix in
+              if Sys.file_exists path then
+                Some (path, Evm_store.sqlite_file_name ^ suffix)
+              else None)
+            [""; "-wal"; "-shm"]
+        in
+        return (sqlite_files @ files)
+    | Rolling _ | Full _ ->
+        let output_db_file =
+          Filename.concat tmp_dir Evm_store.sqlite_file_name
+        in
+        let* () = Data_dir.export_store ~data_dir ~output_db_file in
+        return ((output_db_file, Evm_store.sqlite_file_name) :: files)
+  in
   let writer =
     match compression with
     | On_the_fly -> gzip_writer
@@ -307,8 +329,15 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
   let rm f =
     try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
   in
-  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
-  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
+  let rename_if_exists src dst =
+    if Sys.file_exists src then Unix.rename src dst else rm dst
+  in
+  rename_if_exists
+    ((dest // Evm_store.sqlite_file_name) ^ "-shm")
+    ((data_dir // Evm_store.sqlite_file_name) ^ "-shm") ;
+  rename_if_exists
+    ((dest // Evm_store.sqlite_file_name) ^ "-wal")
+    ((data_dir // Evm_store.sqlite_file_name) ^ "-wal") ;
   Unix.rename
     (dest // Evm_store.sqlite_file_name)
     (data_dir // Evm_store.sqlite_file_name) ;

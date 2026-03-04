@@ -52,6 +52,12 @@
   legacy paths (`/evm/sequencer` and `/evm/sequencer_upgrade`) for older
   kernels.
 
+### Snapshot changes
+
+- Skip the SQLite `VACUUM INTO` step when exporting legacy snapshots in archive
+  mode. The original database files are included directly in the archive,
+  avoiding the expensive vacuum operation on large databases. (!21037)
+
 ### Documentation changes
 
 ### Experimental features changes
