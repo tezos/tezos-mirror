@@ -365,11 +365,12 @@ let test_keep_alive =
   let process = Agnostic_baker.spawn_run baker in
   let* () = Process.check_error ~msg:(rex "Cannot connect to node") process in
   (* Start the baker with no node running and [--keep-alive], it'll wait. *)
-  let wait_for_cannot_connect =
-    Agnostic_baker.wait_for baker "cannot_connect.v0" (fun _json -> Some ())
+  let wait_for_retry_on_disconnection () =
+    Agnostic_baker.wait_for baker "retry_on_disconnection.v0" (fun _json ->
+        Some ())
   in
   let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker
-  and* () = wait_for_cannot_connect in
+  and* () = wait_for_retry_on_disconnection () in
   (* Start the node. *)
   let f_wait_for_chain_id () =
     (* This is an event emitted by the baker lib. *)
@@ -394,7 +395,7 @@ let test_keep_alive =
   and* () = wait_baker_proposal
   and* () = wait_period_status in
   (* Kill the node now that they are connected, the baker will stay alive. *)
-  let* () = Node.terminate node and* () = wait_for_cannot_connect in
+  let* () = Node.terminate node and* () = wait_for_retry_on_disconnection () in
   (* Redo the procedure, restart the node and wait for the block events. *)
   let wait_for_chain_id = f_wait_for_chain_id () in
   let* () = Node.run node []

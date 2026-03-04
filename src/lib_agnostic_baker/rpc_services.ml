@@ -18,9 +18,15 @@ let request_uri ~node_addr ~uri =
       let*! resp = Client.get (Uri.of_string uri) in
       return resp)
     (function
-      | Unix.(Unix_error (ECONNREFUSED, _, _)) ->
+      | Unix.(Unix_error ((ECONNREFUSED | ECONNRESET), _, _)) ->
           tzfail (Cannot_connect_to_node node_addr)
-      | e -> raise e)
+      | e -> (
+          (* Ugly hack to catch Cohttp IO errors (Cohttp_lwt_unix.IO.Io_error)
+             that are not exported from the Cohttp library *)
+          match Printexc.to_string e with
+          | msg when String.starts_with ~prefix:"IO error:" msg ->
+              tzfail (Cannot_connect_to_node node_addr)
+          | _ -> raise e))
 
 (** [call_and_wrap_rpc ~node_addr ~uri ~f] makes the RPC call given
     by the [~uri] against [~node_addr], and in case of a well-formed

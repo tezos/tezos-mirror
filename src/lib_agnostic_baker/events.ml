@@ -107,16 +107,30 @@ let period_status =
     ("period", string)
     ("remaining", int31)
 
-(* Error *)
-let cannot_connect =
+let head_stream_ended =
   declare_1
     ~section
-    ~alternative_color
-    ~level:Error
-    ~name:"cannot_connect"
-    ~msg:"Cannot connect to node. {message}"
-    ~pp1:Format.pp_print_string
-    ("message", Data_encoding.string)
+    ~level:Notice
+    ~name:"head_stream_ended"
+    ~msg:"agnostic daemon lost stream connection with node {node}"
+    ("node", string)
+
+let head_stream_reconnected =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"head_stream_reconnected"
+    ~msg:"agnostic daemon managed to reconnect to node {node}"
+    ("node", string)
+
+let old_baker_stopped =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"old_baker_stopped"
+    ~msg:"agnostic daemon witnessed shutdown of protocol {protocol} baker"
+    ~pp1:Protocol_hash.pp
+    ("protocol", Protocol_hash.encoding)
 
 (* Warning *)
 let node_version_check_bypass =
@@ -126,6 +140,16 @@ let node_version_check_bypass =
     ~level:Warning
     ~msg:"Compatibility between node version and baker version by passed"
     ()
+
+let retry_on_disconnection =
+  declare_1
+    ~section
+    ~alternative_color
+    ~level:Warning
+    ~name:"retry_on_disconnection"
+    ~msg:"{msg}"
+    ~pp1:Format.pp_print_string
+    ("msg", Data_encoding.string)
 
 (* Debug *)
 let node_version_check =
@@ -152,6 +176,14 @@ let node_version_check =
     ( "baker_commit",
       Data_encoding.option Tezos_version.Octez_node_version.commit_info_encoding
     )
+
+let new_head =
+  declare_0
+    ~section
+    ~name:"new_head"
+    ~level:Debug
+    ~msg:"agnostic daemon received a new head"
+    ()
 
 module Per_block_votes = struct
   include Internal_event.Simple
