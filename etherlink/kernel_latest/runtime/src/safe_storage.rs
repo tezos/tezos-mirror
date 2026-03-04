@@ -7,7 +7,7 @@
 
 use crate::extensions::WithGas;
 use crate::runtime::{IsEvmNode, Runtime};
-use tezos_evm_logging::Verbosity;
+use tezos_evm_logging::Logging;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::debug::HostDebug;
@@ -232,7 +232,7 @@ impl<Host: WasmHost> WasmHost for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {}
 
-impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
+impl<Host: Runtime> Logging for SafeStorage<&mut Host> {
     fn verbosity(&self) -> tezos_evm_logging::Level {
         self.host.verbosity()
     }

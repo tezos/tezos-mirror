@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::{
     runtime::Runtime,
     safe_storage::{safe_path, SafeStorage},

@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::extensions::WithGas;
-use tezos_evm_logging::{tracing::instrument, Level, Verbosity};
+use tezos_evm_logging::{tracing::instrument, Level, Logging};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -37,10 +37,13 @@ pub trait IsEvmNode {
     fn is_evm_node(&self) -> bool;
 }
 
-pub trait Runtime: SdkRuntime + Verbosity + WithGas + IsEvmNode {}
+pub trait Runtime:
+    HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode
+{
+}
 
 // If a type implements the Runtime trait, it also implements the kernel Runtime.
-impl<T: SdkRuntime + Verbosity + WithGas + IsEvmNode> Runtime for T {}
+impl<T: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode> Runtime for T {}
 
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
@@ -307,15 +310,13 @@ where
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> Verbosity for KernelHost<R, Host> {
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {
     fn verbosity(&self) -> Level {
         self.logs_verbosity
     }
 }
 
-pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
-    host: &Host,
-) -> Level {
+pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
     match host.store_read(&VERBOSITY_PATH, 0, 1) {
         Ok(value) if value.len() == 1 => {
             Level::try_from(value[0]).unwrap_or(Level::default())
@@ -327,9 +328,7 @@ pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
 // If the flag is set, the kernel consider that this is local evm node execution.
 const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
-pub fn evm_node_flag<Host: tezos_smart_rollup_host::runtime::Runtime>(
-    host: &Host,
-) -> bool {
+pub fn evm_node_flag(host: &impl StorageV1) -> bool {
     Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
 }
 

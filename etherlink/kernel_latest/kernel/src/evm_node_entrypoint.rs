@@ -11,7 +11,7 @@
 
 use crate::{delayed_inbox::DelayedInbox, sub_block, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
-use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 
