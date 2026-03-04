@@ -937,15 +937,22 @@ let test_snapshots_import_outdated ~desync =
 
 (* A test for the fix introduced in
    https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
-let test_snapshots_reexport ~desync =
+let test_snapshots_reexport ~desync ?history_mode =
+  let archive = history_mode = Some Evm_node.Archive in
+  let tags =
+    ["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync |> fun tags ->
+    if archive then tags @ ["archive"] else tags
+  in
   register_all
     ~__FILE__
-    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~tags
     ~title:
       (sf
-         "Import %ssequencer snapshot and re-export"
-         (if desync then "desync " else ""))
+         "Import %s%ssequencer snapshot and re-export"
+         (if desync then "desync " else "")
+         (if archive then "archive " else ""))
     ~time_between_blocks:Nothing
+    ?history_mode
   @@ fun ({sequencer; sc_rollup_node = _; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, _block_number =
     snapshots_setup ~desync setup
@@ -14949,6 +14956,7 @@ let () =
   test_persistent_state () ;
   test_snapshots ~desync:false protocols ;
   test_snapshots ~desync:true protocols ;
+  test_snapshots_reexport ~desync:false ~history_mode:Archive protocols ;
   test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
   test_publish_blueprints_signatory protocols ;

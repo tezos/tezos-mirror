@@ -36,11 +36,15 @@ module Header : sig
   val encoding : t Data_encoding.t
 end
 
-(** [export ?snapshot_file ~compression ~data_dir () ] creates a
-    tar gzipped archive with name [snapshot_file] (or a generated name in the
-    current directory) containing a snapshot of the data of the rollup node
-    with data directory [data_dir]. The path of the snapshot archive is
-    returned.  *)
+(** [export ?snapshot_file ~compression ~data_dir ()] creates a tar archive
+    with name [snapshot_file] (or a generated name in the current directory)
+    containing a snapshot of the EVM node with data directory [data_dir]. The
+    path of the snapshot archive is returned.
+
+    For {b archive} history mode, the original SQLite database files are
+    included directly in the archive to avoid the expensive vacuum operation.
+    For {b rolling} and {b full} modes, the database is exported using SQLite
+    VACUUM INTO to produce a compacted copy. *)
 val export :
   ?snapshot_file:string ->
   compression:compression ->
