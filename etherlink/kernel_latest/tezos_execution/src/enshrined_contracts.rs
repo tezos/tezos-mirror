@@ -12,6 +12,7 @@ use mir::{
     context::CtxTrait,
 };
 use num_bigint::{BigInt, BigUint};
+use num_traits::ToPrimitive;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -252,7 +253,6 @@ fn build_http_request(
     body: &[u8],
     method: BigUint,
 ) -> Result<http::Request<Vec<u8>>, TransferError> {
-    use num_traits::ToPrimitive;
     let http_method = match method.to_u64() {
         Some(0) => http::Method::GET,
         Some(1) => http::Method::POST,
@@ -261,6 +261,11 @@ fn build_http_request(
 
     let mut builder = http::Request::builder().method(http_method).uri(url);
     for (name, value) in headers {
+        if name.to_ascii_lowercase().starts_with("x-tezos-") {
+            return Err(TransferError::GatewayError(format!(
+                "http_call: user-supplied X-Tezos-* headers are forbidden: {name}"
+            )));
+        }
         builder = builder.header(name.as_str(), value.as_str());
     }
 
@@ -739,6 +744,41 @@ mod tests {
     fn test_http_call_malformed_parameters() {
         let result =
             typecheck_http_call(&Micheline::String("not a valid http_call".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_http_call_rejects_x_tezos_headers() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc",
+            &[("X-Tezos-Sender", "attacker")],
+            &[],
+            0,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let result = extract_http_call_request(typed);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("X-Tezos-"),
+            "error should mention the header name: {err}"
+        );
+    }
+
+    #[test]
+    fn test_http_call_rejects_x_tezos_headers_case_insensitive() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc",
+            &[("x-tezos-amount", "999")],
+            &[],
+            0,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
 }
