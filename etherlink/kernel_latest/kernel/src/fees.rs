@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -319,7 +319,7 @@ mod tests {
     use super::*;
     use alloy_primitives::Bytes;
     use primitive_types::{H160, U256};
-    use revm::context::result::{ExecutionResult, Output};
+    use revm::context::result::{ExecutionResult, Output, ResultGas};
     use revm_etherlink::helpers::legacy::alloy_to_u256;
     use revm_etherlink::ExecutionOutcome;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -519,8 +519,7 @@ mod tests {
             withdrawals: vec![],
             result: ExecutionResult::Success {
                 reason: revm::context::result::SuccessReason::Return,
-                gas_used,
-                gas_refunded: 0,
+                gas: ResultGas::new(1_000_000, gas_used, 0, 0, 0),
                 logs: vec![],
                 output: Output::Call(Bytes::new()),
             },
