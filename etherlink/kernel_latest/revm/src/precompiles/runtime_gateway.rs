@@ -7,8 +7,8 @@ use revm::{
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
 use tezosx_interfaces::{
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -79,7 +79,7 @@ fn build_http_request(
     for (name, value) in headers {
         if name.as_str().to_ascii_lowercase().starts_with("x-tezos-") {
             return Err(CustomPrecompileError::Revert(format!(
-                "user-supplied X-Tezos-* headers are forbidden: {name}"
+                "{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"
             )));
         }
         builder = builder.header(name.as_str(), value.as_str());
