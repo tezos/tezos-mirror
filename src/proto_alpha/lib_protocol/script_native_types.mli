@@ -90,9 +90,17 @@ module CLST_types : sig
   type import_ticket =
     (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
 
+  type lambda_export =
+    ( (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+    (* tickets_to_export *),
+      (ticket_with_token_id s_list, operation s_list) lambda
+    (* action *) )
+    pair
+
   type allowance_entrypoints = (approve, update_operators) or_
 
-  type tickets_entrypoints = (export_ticket, import_ticket) or_
+  type tickets_entrypoints =
+    ((export_ticket, import_ticket) or_, lambda_export) or_
 
   type fa21_entrypoints =
     ( (transfer, balance_of) or_,
@@ -150,6 +158,7 @@ module CLST_types : sig
     | Update_operators of update_operators
     | Export_ticket of export_ticket
     | Import_ticket of import_ticket
+    | Lambda_export of lambda_export
 
   val entrypoint_from_arg : arg -> entrypoint
 

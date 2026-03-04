@@ -1094,3 +1094,26 @@ let () =
     Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
   in
   Assert.equal_int64 ~loc:__LOC__ (Z.to_int64 clst_ticket_balance) 0L
+
+let () =
+  register_test ~title:"Test lambda_export is not implemented" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, _dst) = Context.init2 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_op = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_op b in
+
+  let ticket_amount_export = 30_000_000L in
+  let lambda_action = Expr.from_string "{ DROP ; NIL operation }" in
+  let* op =
+    Op.clst_lambda_export (B b) ~src ~lambda_action ticket_amount_export
+  in
+  let*! b = Block.bake ~operation:op b in
+  match b with
+  | Ok _ -> Test.fail "lambda_export is not implemented and expected to fail"
+  | Error trace ->
+      Error_helpers.expect_clst_standard_error
+        ~loc:__LOC__
+        ~str:"FA2.1 lambda_export is not implemented"
+        trace

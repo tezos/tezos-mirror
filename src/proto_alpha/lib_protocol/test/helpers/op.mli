@@ -1001,3 +1001,19 @@ val clst_export_ticket :
   dst:Contract.t ->
   int64 ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_lambda_export ctxt src amount lambda_action] exports
+    [amount] clst tokens as a clst ticket from [src] and passes them
+    to [lambda_action], a Michelson lambda of type [list ticket ->
+    list operation]. *)
+val clst_lambda_export :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  src:Contract.t ->
+  lambda_action:Script.expr ->
+  int64 ->
+  Operation.packed tzresult Lwt.t

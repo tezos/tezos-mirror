@@ -1775,3 +1775,46 @@ let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let clst_lambda_export ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(src : Contract.t) ~(lambda_action : Script.expr)
+    (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let ticket_to_export =
+    Prim
+      ( dummy_location,
+        Script.D_Pair,
+        [
+          String (dummy_location, Contract.to_b58check src);
+          Int (dummy_location, Z.zero);
+          Int (dummy_location, Z.of_int64 amount);
+        ],
+        [] )
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      (Prim
+         ( dummy_location,
+           Script.D_Pair,
+           [
+             Seq (dummy_location, [ticket_to_export]);
+             Micheline.root lambda_action;
+           ],
+           [] )
+      |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "lambda_export")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
