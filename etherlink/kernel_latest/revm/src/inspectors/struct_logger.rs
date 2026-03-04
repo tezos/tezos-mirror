@@ -6,8 +6,8 @@ use crate::{
     database::EtherlinkVMDB,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
     inspectors::EtherlinkInspector,
-    Error,
 };
+use evm_types::Error;
 
 use revm::{
     context::{ContextTr, JournalTr},

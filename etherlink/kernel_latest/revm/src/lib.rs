@@ -5,23 +5,24 @@
 
 use crate::{
     inspectors::EtherlinkInspector, journal::Journal,
-    precompiles::send_outbox_message::Withdrawal,
     storage::world_state_handler::StorageAccount,
 };
 use database::EtherlinkVMDB;
+pub use evm_types::Error;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
     struct_logger::{StructLogger, StructLoggerInput},
     EvmInspection, TracerInput,
 };
+pub use michelson_types::Withdrawal;
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
         result::{EVMError, ExecutionResult},
         transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
-        BlockEnv, CfgEnv, ContextTr, DBErrorMarker, Evm, TxEnv,
+        BlockEnv, CfgEnv, ContextTr, Evm, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
     handler::{instructions::EthInstructions, EthFrame},
@@ -33,14 +34,12 @@ use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
     __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, Logging, OTelAttrValue,
 };
-use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
-use tezosx_interfaces::{Registry, TezosXRuntimeError};
-use thiserror::Error;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
 
 pub mod helpers;
 pub mod inspectors;
 pub mod journal;
-pub mod layered_state;
 pub mod precompiles;
 pub mod storage;
 pub mod tezosx;
@@ -62,41 +61,6 @@ type EvmContext<'a, Host, R> = Evm<
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
-
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum Error {
-    #[error("Runtime error: {0}")]
-    Runtime(#[from] RuntimeError),
-    #[error("Execution error: {0}")]
-    Custom(String),
-    /// Converting non-execution fees to gas overflowed u64::max
-    #[error("Gas for fees overflowed u64::max in conversion")]
-    FeesToGasOverflow,
-    /// Underflow of gas limit when subtracting gas for fees
-    #[error("Insufficient gas to cover the non-execution fees")]
-    GasToFeesUnderflow,
-}
-
-impl From<Error> for TezosXRuntimeError {
-    fn from(value: Error) -> Self {
-        match value {
-            Error::Runtime(err) => TezosXRuntimeError::Runtime(err),
-            Error::Custom(msg) => TezosXRuntimeError::Custom(msg),
-            Error::FeesToGasOverflow => TezosXRuntimeError::Custom(
-                "Gas for fees overflowed u64::max in conversion".to_string(),
-            ),
-            Error::GasToFeesUnderflow => TezosXRuntimeError::Custom(
-                "Insufficient gas to cover the non-execution fees".to_string(),
-            ),
-        }
-    }
-}
-
-pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
-    Error::Custom(e.to_string())
-}
-
-impl DBErrorMarker for Error {}
 
 #[derive(Debug, PartialEq)]
 pub struct ExecutionOutcome {

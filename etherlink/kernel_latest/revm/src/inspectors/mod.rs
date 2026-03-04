@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{precompiles::provider::EtherlinkPrecompiles, EVMInnerContext, Error};
+use crate::{precompiles::provider::EtherlinkPrecompiles, EVMInnerContext};
 use call_tracer::CallTracerInput;
+use evm_types::Error;
 use revm::{
     context::{
         result::{EVMError, ExecutionResult, HaltReason},

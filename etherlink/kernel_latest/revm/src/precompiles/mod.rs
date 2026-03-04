@@ -4,7 +4,6 @@
 
 pub mod change_sequencer_key;
 pub mod constants;
-pub mod error;
 pub mod initializer;
 pub mod provider;
 pub mod runtime_gateway;

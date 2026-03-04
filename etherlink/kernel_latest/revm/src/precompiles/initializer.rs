@@ -9,8 +9,9 @@ use revm::{
 };
 use tezos_smart_rollup_host::storage::StorageV1;
 
+use evm_types::{custom, Error};
+
 use crate::{
-    custom,
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
         FA12_WRAPPER_SOL_ADDR, FA12_WRAPPER_SOL_CONTRACT, FA_BRIDGE_SOL_ADDR,
@@ -18,7 +19,6 @@ use crate::{
         XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
-    Error,
 };
 
 use super::constants::PredeployedContract;

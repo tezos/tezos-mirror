@@ -1176,6 +1176,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm-types"
+version = "0.1.0"
+dependencies = [
+ "michelson-types",
+ "primitive-types",
+ "revm",
+ "rlp",
+ "tezos-evm-logging-latest",
+ "tezos-smart-rollup-encoding",
+ "tezos-smart-rollup-host",
+ "tezos_crypto_rs",
+ "tezos_ethereum_latest",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
@@ -1769,6 +1785,13 @@ name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
+
+[[package]]
+name = "michelson-types"
+version = "0.1.0"
+dependencies = [
+ "tezos-smart-rollup-encoding",
+]
 
 [[package]]
 name = "minimal-lexical"
@@ -2524,8 +2547,10 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
  "ethereum",
+ "evm-types",
  "hex",
  "http",
+ "michelson-types",
  "nom",
  "num-bigint",
  "primitive-types",
@@ -2542,6 +2567,7 @@ dependencies = [
  "tezos_ethereum_latest",
  "tezosx-ethereum-runtime",
  "tezosx-interfaces",
+ "tezosx-journal",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -3507,6 +3533,7 @@ dependencies = [
 name = "tezosx-interfaces"
 version = "0.1.0"
 dependencies = [
+ "evm-types",
  "http",
  "primitive-types",
  "tezos-evm-logging-latest",
@@ -3514,6 +3541,17 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-storage-latest",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezosx-journal"
+version = "0.1.0"
+dependencies = [
+ "evm-types",
+ "michelson-types",
+ "revm",
+ "tezos-evm-logging-latest",
+ "tezos_crypto_rs",
 ]
 
 [[package]]

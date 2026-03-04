@@ -1,20 +1,16 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
-// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 use std::mem;
 
-use revm::primitives::{Address, U256};
-
-use crate::{
-    database::DatabasePrecompileStateChanges,
-    helpers::legacy::FaDepositWithProxy,
-    journal::PrecompileStateChanges,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
-    storage::sequencer_key_change::SequencerKeyChange,
-    Error,
+use evm_types::{
+    CustomPrecompileError, DatabasePrecompileStateChanges, Error, EtherlinkEntry,
+    FaDepositWithProxy, PrecompileStateChanges, SequencerKeyChange,
 };
+use michelson_types::Withdrawal;
+use revm::primitives::{Address, U256};
 
 /// This state is created to manage one object because
 /// everything that we used here, is stored in one address (Address::ZERO).
@@ -25,29 +21,6 @@ pub struct LayeredState {
     etherlink_data: PrecompileStateChanges,
     entries: Vec<EtherlinkEntry>,
     depths: Vec<usize>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum EtherlinkEntry {
-    TicketBalanceAdd {
-        ticket_hash: U256,
-        owner: Address,
-        amount: U256,
-    },
-    TicketBalanceRemove {
-        ticket_hash: U256,
-        owner: Address,
-        amount: U256,
-    },
-    RemoveDeposit {
-        deposit_id: U256,
-    },
-    QueueDeposit,
-    PushWithdrawal,
-    IncrementGlobalCounter,
-    StoreSequencerKeyChange {
-        old_sequencer_key_change: Option<SequencerKeyChange>,
-    },
 }
 
 impl Default for LayeredState {
@@ -257,14 +230,13 @@ impl LayeredState {
 
 #[cfg(test)]
 mod tests {
+    use evm_types::{
+        custom, CustomPrecompileError, DatabasePrecompileStateChanges, FaDepositWithProxy,
+    };
     use revm::primitives::{Address, U256};
     use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 
-    use crate::{
-        custom, database::DatabasePrecompileStateChanges,
-        helpers::legacy::FaDepositWithProxy, layered_state::LayeredState,
-        precompiles::error::CustomPrecompileError,
-    };
+    use super::LayeredState;
 
     struct DummyDB;
 
@@ -312,23 +284,6 @@ mod tests {
             &self,
         ) -> Result<bool, CustomPrecompileError> {
             Ok(false)
-        }
-
-        fn tezosx_resolve_source_alias(
-            &mut self,
-            _source: Address,
-        ) -> Result<Vec<u8>, CustomPrecompileError> {
-            Ok(vec![])
-        }
-
-        fn tezosx_call_michelson(
-            &mut self,
-            _source: Address,
-            _destination: &str,
-            _amount: U256,
-            _data: &[u8],
-        ) -> Result<(), CustomPrecompileError> {
-            Ok(())
         }
     }
 

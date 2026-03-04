@@ -3,23 +3,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    custom,
-    helpers::legacy::{alloy_to_u256, FaDepositWithProxy},
-    journal::PrecompileStateChanges,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
-    storage::{
-        block::{get_block_hash, BLOCKS_STORED},
-        code::CodeStorage,
-        sequencer_key_change::store_sequencer_key_change,
-        world_state_handler::{
-            StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
-            NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
-        },
+use crate::storage::{
+    block::{get_block_hash, BLOCKS_STORED},
+    code::CodeStorage,
+    sequencer_key_change::store_sequencer_key_change,
+    world_state_handler::{
+        StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
+        NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_PATH,
     },
-    tezosx::{get_alias, store_alias},
-    Error,
 };
+use evm_types::{
+    custom, CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
+    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, PrecompileStateChanges,
+};
+use michelson_types::Withdrawal;
 use revm::{
     primitives::{Address, AddressMap, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
@@ -29,17 +26,17 @@ use tezos_crypto_rs::{
     hash::{ContractKt1Hash, HashTrait},
     public_key::PublicKey,
 };
-use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
+use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level, Logging};
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
-use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::Registry;
 
 pub struct EtherlinkVMDB<'a, Host: StorageV1 + Logging, R: Registry> {
     pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
     /// Constants for the current block
-    block: &'a BlockConstants,
+    pub(crate) block: &'a BlockConstants,
     /// Commit guard, the `DatabaseCommit` trait and in particular
     /// its `commit` function does NOT return errors.
     /// We need this guard to change if there's an unrecoverable
@@ -81,38 +78,6 @@ where
             original_account_infos: HashMap::default(),
         })
     }
-}
-
-pub trait DatabasePrecompileStateChanges {
-    fn log_node_message(&mut self, level: Level, message: &str);
-    fn global_counter(&self) -> Result<U256, CustomPrecompileError>;
-    fn ticket_balance(
-        &self,
-        ticket_hash: &U256,
-        owner: &Address,
-    ) -> Result<U256, CustomPrecompileError>;
-    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError>;
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError>;
-    fn deposit_in_queue(
-        &self,
-        deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
-    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
-    fn tezosx_resolve_source_alias(
-        &mut self,
-        source: Address,
-    ) -> Result<Vec<u8>, CustomPrecompileError>;
-    fn tezosx_call_michelson(
-        &mut self,
-        source: Address,
-        destination: &str,
-        amount: U256,
-        data: &[u8],
-    ) -> Result<(), CustomPrecompileError>;
-}
-
-pub(crate) trait DatabaseCommitPrecompileStateChanges {
-    fn commit(&mut self, etherlink_data: PrecompileStateChanges);
 }
 
 macro_rules! abort_on_error {
@@ -262,86 +227,6 @@ where
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
             Err(e) => Err(CustomPrecompileError::from(e)),
-        }
-    }
-
-    fn tezosx_resolve_source_alias(
-        &mut self,
-        source: Address,
-    ) -> Result<Vec<u8>, CustomPrecompileError> {
-        let context = CrossRuntimeContext {
-            gas_limit: self.block.gas_limit,
-            timestamp: self.block.timestamp,
-            block_number: self.block.number,
-        };
-        match get_alias(self.host, &source, RuntimeId::Tezos)? {
-            Some(alias) => Ok(alias),
-            None => {
-                let alias = self
-                    .registry
-                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos, context)
-                    .map_err(|e| {
-                        CustomPrecompileError::Revert(format!(
-                            "Failed to generate alias for source address: {e:?}"
-                        ))
-                    })?;
-                store_alias(self.host, &source, RuntimeId::Tezos, &alias)?;
-                Ok(alias)
-            }
-        }
-    }
-
-    fn tezosx_call_michelson(
-        &mut self,
-        source: Address,
-        destination: &str,
-        amount: U256,
-        data: &[u8],
-    ) -> Result<(), CustomPrecompileError> {
-        let alias = self.tezosx_resolve_source_alias(source)?;
-        let context = CrossRuntimeContext {
-            gas_limit: self.block.gas_limit,
-            timestamp: self.block.timestamp,
-            block_number: self.block.number,
-        };
-        let destination_contract = self
-            .registry
-            .address_from_string(destination, RuntimeId::Tezos)
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!(
-                    "Failed to get destination contract address from string: {e:?}"
-                ))
-            })?;
-        let result = self
-            .registry
-            .bridge(
-                self.host,
-                RuntimeId::Tezos,
-                &destination_contract,
-                &alias,
-                primitive_types::U256::from(
-                    mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
-                        CustomPrecompileError::Revert(format!(
-                            "Failed to convert amount from wei to mutez: {e:?}"
-                        ))
-                    })?,
-                ),
-                data,
-                context,
-            )
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!("Cross-runtime call failed: {e:?}"))
-            })?;
-        match result {
-            CrossCallResult::Success(_) => Ok(()),
-            CrossCallResult::Revert(data) => Err(CustomPrecompileError::Revert(format!(
-                "EVM Cross-runtime call reverted: {}",
-                hex::encode(&data)
-            ))),
-            CrossCallResult::Halt(data) => Err(CustomPrecompileError::Revert(format!(
-                "EVM Cross-runtime call halted: {}",
-                hex::encode(&data)
-            ))),
         }
     }
 }

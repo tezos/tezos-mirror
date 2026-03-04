@@ -5,7 +5,7 @@ use tezos_smart_rollup_host::{
 };
 use tezosx_interfaces::RuntimeId;
 
-use crate::Error;
+use evm_types::Error;
 
 // Path where accounts informations are stored.
 const ACCOUNTS_PATH: RefPath = crate::storage::world_state_handler::EVM_ACCOUNTS_PATH;

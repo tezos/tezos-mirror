@@ -5,7 +5,7 @@
 use revm::primitives::B256;
 use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
 
-use crate::Error;
+use evm_types::Error;
 
 // Ref. https://www.evm.codes/?fork=cancun#40
 // (opcode 0x40: BLOCKHASH)
@@ -33,7 +33,7 @@ pub fn get_block_hash(host: &impl StorageV1, block_number: u64) -> Result<B256, 
 #[cfg(test)]
 mod test {
     use super::{get_block_hash, to_block_hash_path, MALFORMED_HASH_ERR};
-    use crate::Error;
+    use evm_types::Error;
     use revm::primitives::B256;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;

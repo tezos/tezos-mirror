@@ -12,18 +12,17 @@ use revm::{
 };
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
-    helpers::legacy::{
-        alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy, FaDepositWithProxy,
-    },
+    helpers::legacy::{alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy},
     journal::Journal,
     precompiles::{
         constants::{
             FA_BRIDGE_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
-        error::CustomPrecompileError,
         guard::{guard, out_of_gas, revert},
     },
+};
+use evm_types::{
+    CustomPrecompileError, DatabasePrecompileStateChanges, FaDepositWithProxy,
 };
 
 sol! {

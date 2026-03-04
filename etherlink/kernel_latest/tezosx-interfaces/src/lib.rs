@@ -221,3 +221,18 @@ impl TryFrom<u8> for RuntimeId {
         }
     }
 }
+
+impl From<evm_types::Error> for TezosXRuntimeError {
+    fn from(value: evm_types::Error) -> Self {
+        match value {
+            evm_types::Error::Runtime(err) => TezosXRuntimeError::Runtime(err),
+            evm_types::Error::Custom(msg) => TezosXRuntimeError::Custom(msg),
+            evm_types::Error::FeesToGasOverflow => TezosXRuntimeError::Custom(
+                "Gas for fees overflowed u64::max in conversion".to_string(),
+            ),
+            evm_types::Error::GasToFeesUnderflow => TezosXRuntimeError::Custom(
+                "Insufficient gas to cover the non-execution fees".to_string(),
+            ),
+        }
+    }
+}
