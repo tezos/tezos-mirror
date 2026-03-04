@@ -5515,12 +5515,15 @@ let test_external_transaction_to_delayed_inbox_fails =
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "external"]
     ~title:"Sending an external transaction to the delayed inbox fails"
-  @@ fun {client; sequencer; proxy; sc_rollup_node; _} _protocol ->
-  let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
-  (* Bake a couple more levels for the blueprint to be final *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let raw_tx, _ = read_tx_from_file () |> List.hd in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
+  @@ fun {client; sequencer; sc_rollup_node; sc_rollup_address; _} _protocol ->
+  let raw_tx, tx_hash = read_tx_from_file () |> List.hd in
+  let* _ =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.post_local_batcher_injection
+       (* See Message_format.frame_message for the used encoding *)
+         ~messages:["\000" ^ sc_rollup_address ^ "\000" ^ tx_hash ^ raw_tx]
+         ()
+  in
   (* Bake enough levels to make sure the transaction would be processed
      if added *)
   let* () =
@@ -5530,8 +5533,6 @@ let test_external_transaction_to_delayed_inbox_fails =
         unit)
   in
   (* Response should be none *)
-  let*@ response = Rpc.get_transaction_receipt ~tx_hash proxy in
-  assert (Option.is_none response) ;
   let*@ response = Rpc.get_transaction_receipt ~tx_hash sequencer in
   assert (Option.is_none response) ;
   unit
