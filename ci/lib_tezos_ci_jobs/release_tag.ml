@@ -16,7 +16,6 @@
    GitLab}, the associated artifacts, and to push releases to opam. *)
 
 open Tezos_ci
-open Tezos_ci.Cache
 open Common.Build
 open Common.Docker
 
@@ -54,53 +53,13 @@ let monitoring_child_pipeline =
      and only once (there are multiple pipelines with a trigger job for octez_monitoring,
      but a pipeline cannot be registered more than once). *)
   lazy
-    ((* The Teztale build job is defined using Cacio, which does not provide a way
-       to include it in the monitoring child pipeline, because we plan to remove
-       this child pipeline. In the meantime, we redefine the job here. *)
-     let job_teztale_build ?cpu ~arch ?storage () =
-       let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-       job
-         ~__POS__
-         ~arch
-         ?cpu
-         ?storage
-         ~name:("teztale.build:static-" ^ arch_string)
-         ~image:Images.CI.build
-         ~stage:Stages.build
-         ~variables:[("PROFILE", "static")]
-         ~artifacts:
-           (Gitlab_ci.Util.artifacts
-              ~name:"teztale-binaries"
-              ~expire_in:Never
-              ~when_:On_success
-              ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
-         ~before_script:
-           [
-             "./scripts/ci/take_ownership.sh";
-             ". ./scripts/version.sh";
-             "eval $(opam env)";
-           ]
-         ~after_script:
-           [
-             "mkdir -p ./teztale-binaries/" ^ arch_string;
-             "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
-           ]
-         ["make teztale"]
-       |> enable_cargo_cache |> enable_sccache
-     in
-     Pipeline.register_child
+    (Pipeline.register_child
        "octez_monitoring"
        ~description:"Octez monitoring jobs"
        ~inherit_:
          (Gitlab_ci.Types.Variable_list
             ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
-       ~jobs:
-         ([
-            job_datadog_pipeline_trace;
-            job_teztale_build ~arch:Arm64 ~storage:Ramfs ();
-            job_teztale_build ~arch:Amd64 ~cpu:Very_high ();
-          ]
-         @ Cacio.get_octez_monitoring_jobs ()))
+       ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_octez_monitoring_jobs ()))
 
 let job_release_page ~test ?dependencies () =
   job

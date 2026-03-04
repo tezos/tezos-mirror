@@ -118,21 +118,22 @@ teztale.build:static-arm64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
   - make teztale
+  - mkdir -p ./teztale-binaries/arm64
+  - mv octez-teztale-* ./teztale-binaries/arm64/
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - mkdir -p ./teztale-binaries/arm64
-  - mv octez-teztale-* ./teztale-binaries/arm64/
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -154,7 +155,7 @@ teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_ramfs
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -167,21 +168,22 @@ teztale.build:static-x86_64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
   - make teztale
+  - mkdir -p ./teztale-binaries/x86_64
+  - mv octez-teztale-* ./teztale-binaries/x86_64/
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - mkdir -p ./teztale-binaries/x86_64
-  - mv octez-teztale-* ./teztale-binaries/x86_64/
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
