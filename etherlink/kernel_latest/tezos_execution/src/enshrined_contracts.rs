@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::Type;
-use mir::ast::{BinWriter, ByteReprTrait, TypedValue};
+use mir::ast::{AddressHash, BinWriter, ByteReprTrait, TypedValue};
 use mir::context::PushableTypecheckingContext;
 use mir::gas::Gas;
 use mir::typechecker::typecheck_value;
@@ -301,8 +301,9 @@ fn inject_context_headers_raw(
     block_number: u32,
 ) -> Result<(), TransferError> {
     let parse_value = |v: String| -> Result<http::HeaderValue, TransferError> {
-        v.parse()
-            .map_err(|e| TransferError::GatewayError(format!("invalid header value: {e}")))
+        v.parse().map_err(|e| {
+            TransferError::GatewayError(format!("invalid header value: {e}"))
+        })
     };
     headers.insert(
         X_TEZOS_SENDER,
@@ -392,7 +393,26 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
-fn tezosx_cross_runtime_call<'a, Host>(
+/// Look up the Ethereum alias for `address`. If none exists, generate one via
+/// `registry`, persist it, and return it.
+fn get_or_create_alias<Host: Runtime>(
+    host: &mut Host,
+    address: &AddressHash,
+    context: CrossRuntimeContext,
+    registry: &impl Registry,
+) -> Result<Vec<u8>, TransferError> {
+    if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
+        return Ok(alias);
+    }
+    let address_b58 = address.to_base58_check();
+    let alias = registry
+        .generate_alias(host, address_b58.as_bytes(), RuntimeId::Ethereum, context)
+        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+    store_alias(host, address, RuntimeId::Ethereum, &alias)?;
+    Ok(alias)
+}
+
+fn tezosx_cross_runtime_call<'a, Host: Runtime>(
     registry: &impl Registry,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     dest: &str,
@@ -417,22 +437,7 @@ where
         block_number: biguint_to_u256(block_number)?,
     };
 
-    let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
-        Some(alias) => alias,
-        None => {
-            let source_b58 = source.to_base58_check();
-            let alias = registry
-                .generate_alias(
-                    host,
-                    source_b58.as_bytes(),
-                    RuntimeId::Ethereum,
-                    context.clone(),
-                )
-                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-            store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
-            alias
-        }
-    };
+    let alias = get_or_create_alias(host, &source, context.clone(), registry)?;
     let destination_contract = registry
         .address_from_string(dest, RuntimeId::Ethereum)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
