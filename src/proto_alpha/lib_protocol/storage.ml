@@ -389,18 +389,6 @@ module Contract = struct
          end))
          (Make_index (Contract_repr.Index))
 
-  module SWRR_credit =
-    Indexed_context.Make_map
-      (Registered)
-      (struct
-        let name = ["swrr_credit"]
-      end)
-      (struct
-        type t = Z.t
-
-        let encoding = Data_encoding.z
-      end)
-
   module Counter =
     Indexed_context.Make_map
       (Registered)
@@ -1519,6 +1507,22 @@ module Stake = struct
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
   module Selected_bakers = Cycle.Selected_bakers
+
+  module SWRR_credits =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["swrr_credits"]
+      end)
+      (struct
+        type t = (Implicit_account_repr.t * Z.t) list
+
+        let encoding =
+          Data_encoding.(
+            Variable.list
+              (obj2
+                 (req "delegate" Implicit_account_repr.encoding)
+                 (req "credit" z)))
+      end)
 end
 
 module Clst = struct
