@@ -27,7 +27,6 @@ type multichain_sequencer_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   observers : Evm_node.t list;
   sequencer : Evm_node.t;
-  proxies : Evm_node.t list;
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Kernel.t;
@@ -44,7 +43,6 @@ type sequencer_setup = {
   sc_rollup_node : Sc_rollup_node.t;
   observer : Evm_node.t;
   sequencer : Evm_node.t;
-  proxy : Evm_node.t;
   l1_contracts : l1_contracts;
   boot_sector : string;
   kernel : Kernel.t;
@@ -64,7 +62,6 @@ let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
   let observer =
     match setup.observers with [observer] -> observer | _ -> assert false
   in
-  let proxy = match setup.proxies with [proxy] -> proxy | _ -> assert false in
   {
     node = setup.node;
     client = setup.client;
@@ -72,7 +69,6 @@ let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
     sc_rollup_node = setup.sc_rollup_node;
     observer;
     sequencer = setup.sequencer;
-    proxy;
     l1_contracts = setup.l1_contracts;
     boot_sector = setup.boot_sector;
     kernel = setup.kernel;
@@ -751,16 +747,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
            instant_confirmations)
       ()
   in
-  let proxy_patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?l2_chains:(if enable_multichain then Some l2_chains else None)
-      ~drop_duplicate_when_injection
-      ~blueprints_publisher_order_enabled
-      ?next_wasm_runtime
-      ?rpc_server
-      ?periodic_snapshot_path
-      ()
-  in
   let sequencer_config : Evm_node.sequencer_config =
     {
       time_between_blocks;
@@ -827,22 +813,12 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
      need to bake a block to include it in the inbox, which will
      trigger the installation of the kernel in the rollup. *)
   let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-  let* proxies =
-    Lwt_list.map_s
-      (fun _l2 ->
-        Evm_node.init
-          ~patch_config:proxy_patch_config
-          ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
-          ())
-      l2_chains
-  in
   let evm_version = Kernel.select_evm_version kernel ?evm_version in
   return
     {
       node;
       client;
       sequencer;
-      proxies;
       observers;
       l1_contracts;
       sc_rollup_address;
