@@ -1701,27 +1701,6 @@ function tezt_commit_01_update_alcotezt() {
   fi
 }
 
-# TEZT COMMIT 03: Fix testnets_scenarios
-#
-# MODE: snapshot (replace), stabilise/copy (add)
-# MODIFIES: src/bin_testnet_scenarios/*.ml
-#
-# DESCRIPTION:
-#   Updates protocol references in testnet scenario files.
-#   Snapshot: replaces source protocol with new label.
-#   Stabilise/copy: adds new label as alternative match.
-#
-# CREATES: 0-1 commits — "tezt: fix testnets_scenarios" (conditional)
-function tezt_commit_03_fix_testnets_scenarios() {
-  if [[ ${is_snapshot} == true ]]; then
-    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i src/bin_testnet_scenarios/*.ml
-  else
-    sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i src/bin_testnet_scenarios/*.ml
-  fi
-  ocamlformat -i src/bin_testnet_scenarios/*.ml
-  commit_if_changes "tezt: fix testnets_scenarios"
-}
-
 # TEZT COMMIT 04: Fix other tests
 #
 # MODE: snapshot (replace), stabilise/copy (add)
@@ -2036,7 +2015,6 @@ function update_tezt_tests() {
   # TODO: fix and reintroduce this test
   #generate_regression_test
 
-  tezt_commit_03_fix_testnets_scenarios
   tezt_commit_04_fix_other_tests
   tezt_commit_05_handle_encoding_samples
   tezt_commit_06_handle_regression_files
@@ -2617,10 +2595,8 @@ function remove_from_tezt_tests() {
     commit_if_changes "tezt: adapt protocol_migration.ml"
   fi
 
-  sed -i.old -e "/| Protocol.${capitalized_label} -> */d" src/bin_testnet_scenarios/upgrade_etherlink.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup_migration.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup.ml
-  ocamlformat -i src/bin_testnet_scenarios/upgrade_etherlink.ml
   ocamlformat -i tezt/tests/sc_rollup_migration.ml
   ocamlformat -i tezt/tests/sc_rollup.ml
   commit "test: fix other tests"
@@ -3168,12 +3144,6 @@ function hash() {
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
-
-  #fix testnets_scenarios:
-  sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
-    -e "s/${previous_tag}/${new_tag}/g" -i src/bin_testnet_scenarios/*.ml
-  ocamlformat -i src/bin_testnet_scenarios/*.ml
-  commit_if_changes "tezt: fix testnets_scenarios"
 
   # fix tezt/lib_tezos/constants.ml
   # replace short hash in Uses.make ~tag:"baker_<uncapitalized short hash>" ~path:"./octez-baker-<short hash>" ()
