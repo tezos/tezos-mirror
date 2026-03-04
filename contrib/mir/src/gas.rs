@@ -584,14 +584,12 @@ pub mod interpret_cost {
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair = |l1: &Rc<TypedValue>,
-                        l2: &Rc<TypedValue>,
-                        r1: &Rc<TypedValue>,
-                        r2: &Rc<TypedValue>| {
-            let c = Checked::from(10u32);
-            (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
-                .as_gas_cost()
-        };
+        let cmp_pair =
+            |l1: &Rc<TypedValue>, l2: &Rc<TypedValue>, r1: &Rc<TypedValue>, r2: &Rc<TypedValue>| {
+                let c = Checked::from(10u32);
+                (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
+                    .as_gas_cost()
+            };
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
