@@ -65,6 +65,7 @@ COPY --chown=tezos:nogroup src evm_kernel/src
 COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 COPY --chown=tezos:nogroup contrib evm_kernel/contrib
+COPY --chown=tezos:nogroup vendors evm_kernel/vendors
 RUN make -C evm_kernel -f etherlink.mk build-deps \
   && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
   && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes evm_benchmark_kernel.wasm
