@@ -484,8 +484,8 @@ let l1_timestamp client =
       |> Tezos_base.Time.Protocol.of_notation_exn)
 
 let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
-    ~commitment_period ~challenge_window ~evm_node ~sc_rollup_node
-    ~sc_rollup_address ~client () =
+    ~commitment_period ~challenge_window ~sc_rollup_node ~sc_rollup_address
+    ~client () =
   (* Bake enough levels to have a commitment and cement it. *)
   let* _ =
     repeat
@@ -542,7 +542,7 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
         ~proof
         client
     in
-    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let* () =

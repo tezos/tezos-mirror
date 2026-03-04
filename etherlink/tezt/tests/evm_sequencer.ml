@@ -2088,14 +2088,11 @@ let test_fa_withdrawal_is_included =
       ~withdrawal_level
       ~commitment_period:5
       ~challenge_window:5
-      ~evm_node:sequencer
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
       ()
   in
-
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Check ticket balance for the zero account on L1 *)
   let* l1_balance =
@@ -5151,7 +5148,6 @@ let test_delayed_transfer_timeout =
   let endpoint = Evm_node.endpoint proxy in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
-  let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -6654,7 +6650,6 @@ let test_outbox_size_limit_resilience ~slow =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         evm_version;
         _;
       }
@@ -6781,7 +6776,6 @@ let test_outbox_size_limit_resilience ~slow =
         ~withdrawal_level
         ~commitment_period
         ~challenge_window
-        ~evm_node:proxy
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
@@ -6800,7 +6794,6 @@ let test_outbox_size_limit_resilience ~slow =
         ~withdrawal_level:(actual_withdrawal_level + 1)
         ~commitment_period
         ~challenge_window
-        ~evm_node:proxy
         ~sc_rollup_node
         ~sc_rollup_address
         ~client
@@ -9321,7 +9314,6 @@ let test_deposit_and_fast_withdraw =
         sc_rollup_address;
         client;
         l1_contracts;
-        proxy;
         sc_rollup_node;
         kernel;
         _;
@@ -9461,7 +9453,6 @@ let test_deposit_and_fast_withdraw =
       ~withdrawal_level
       ~commitment_period
       ~challenge_window
-      ~evm_node:proxy
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
@@ -9508,7 +9499,6 @@ let test_deposit_and_fa_fast_withdraw =
         sc_rollup_address;
         client;
         l1_contracts;
-        proxy;
         sc_rollup_node;
         kernel;
         _;
@@ -9671,7 +9661,6 @@ let test_deposit_and_fa_fast_withdraw =
       ~withdrawal_level
       ~commitment_period
       ~challenge_window
-      ~evm_node:proxy
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
