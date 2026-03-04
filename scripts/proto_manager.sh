@@ -25,6 +25,7 @@ skip_update_source=""
 skip_update_tezt_tests=""
 skip_misc_updates=""
 skip_generate_doc=""
+non_interactive=""
 
 ## Log colors:
 if [[ -t 1 ]]; then
@@ -198,6 +199,8 @@ ${red}Options:${reset}
     Copy a protocol.
   ${d}, ${delete} ${red}<protocol_source_dirname>${reset}
     Delete a protocol from the source code.
+  ${green}-y${reset}, ${green}--non-interactive${reset}
+    Accept all defaults without prompting (for CI/scripted runs).
   ${f}, ${from} ${red}<protocol_source>${reset}
     The source protocol to stabilise or snapshot.
   ${t}, ${to} ${red}<protocol_target>${reset}
@@ -322,6 +325,10 @@ while true; do
     ;;
   --skip-generate-doc)
     skip_generate_doc=true
+    shift
+    ;;
+  --non-interactive | -y)
+    non_interactive=true
     shift
     ;;
   *)
@@ -743,7 +750,11 @@ function commit_04_compute_hash_and_rename() {
     printf "${yellow}seq 1 8 | parallel --line-buffer ${red}<path_to_hasher> ${blue}proto_to_hash.txt ${magenta}%s${reset}\n" "$(echo "${label}" | cut -c 1-6)"
     echo "Please insert vanity nonce or press enter to continue with the current hash"
     echo -e "${yellow}${blinking}Vanity nonce: ${reset}\c"
-    read -r nonce
+    if [[ ${non_interactive} == true ]]; then
+      nonce=""
+    else
+      read -r nonce
+    fi
 
     if [[ -n ${nonce} ]]; then
       sed -i.old -e "s/Vanity nonce: TBD/Vanity nonce: ${nonce}/" "src/proto_${version}/lib_protocol/main.ml"
@@ -755,7 +766,11 @@ function commit_04_compute_hash_and_rename() {
 
       echo "New hash is: ${long_hash}"
       echo "Press y to continue or n to stop"
-      read -r continue
+      if [[ ${non_interactive} == true ]]; then
+        continue="y"
+      else
+        read -r continue
+      fi
       if [[ ${continue} != "y" ]]; then
         print_and_exit 1 "${LINENO}"
       fi
@@ -2456,15 +2471,23 @@ function snapshot_protocol() {
     # by default only propose to use one character values for variant and label
     expected_variant="${capitalized_label:0:1}"
     log_blue "Current expected variant is ${magenta}${expected_variant}${reset}"
-    read -r -p "Please enter the new variant or press enter to keep this one: " -e -i "${expected_variant}" new_variant
+    if [[ ${non_interactive} == true ]]; then
+      new_variant="${expected_variant}"
+    else
+      read -r -p "Please enter the new variant or press enter to keep this one: " -e -i "${expected_variant}" new_variant
+    fi
     expected_label="${label:0:1}"
     echo -e "Current expected tag is ${magenta}${expected_label}${reset}"
-    read -r -p "Please enter the new tag or press enter to keep this one: " -e -i "${expected_label}" new_tag
-    # new_tag must use only lowercase digits and underscores
-    while [[ ! "${new_tag}" =~ ^[a-z0-9_]+$ ]]; do
-      echo "Tag must use only lowercase digits and underscores"
-      read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
-    done
+    if [[ ${non_interactive} == true ]]; then
+      new_tag="${expected_label}"
+    else
+      read -r -p "Please enter the new tag or press enter to keep this one: " -e -i "${expected_label}" new_tag
+      # new_tag must use only lowercase digits and underscores
+      while [[ ! "${new_tag}" =~ ^[a-z0-9_]+$ ]]; do
+        echo "Tag must use only lowercase digits and underscores"
+        read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
+      done
+    fi
     capitalized_new_tag=$(tr '[:lower:]' '[:upper:]' <<< "${new_tag:0:1}")${new_tag:1}
     label="${new_tag}"
     capitalized_label="${capitalized_new_tag}"
@@ -2556,7 +2579,11 @@ function remove_from_tezt_tests() {
     echo "Please replace 'Some ${capitalized_label}' in tezt/lib_tezos/protocol.ml"
     grep -C 3 ".* -> Some ${capitalized_label}" tezt/lib_tezos/protocol.ml
     # query the user for the Protocol to use instead and replace it
-    read -r -p "What Protocol should be used instead? " -e -i "Alpha" replacing_protocol
+    if [[ ${non_interactive} == true ]]; then
+      replacing_protocol="Alpha"
+    else
+      read -r -p "What Protocol should be used instead? " -e -i "Alpha" replacing_protocol
+    fi
     #ensure the user input is capitalized
     capitalized_replacing_protocol=$(tr '[:lower:]' '[:upper:]' <<< "${replacing_protocol:0:1}")${replacing_protocol:1}
     sed -i.old -e "s/Some ${capitalized_label}/Some ${capitalized_replacing_protocol}/g" tezt/lib_tezos/protocol.ml
@@ -2587,7 +2614,11 @@ function remove_from_tezt_tests() {
     echo "Please replace 'Protocol.${capitalized_label}' in tezt/tests/protocol_migration.ml"
     grep -C 3 "Protocol.${capitalized_label}" tezt/tests/protocol_migration.ml
     # query the user for the Protocol to use instead and replace it
-    read -r -p "What Protocol should be used instead? " -e -i "Alpha" replacing_protocol
+    if [[ ${non_interactive} == true ]]; then
+      replacing_protocol="Alpha"
+    else
+      read -r -p "What Protocol should be used instead? " -e -i "Alpha" replacing_protocol
+    fi
     #ensure the user input is capitalized
     capitalized_replacing_protocol=$(tr '[:lower:]' '[:upper:]' <<< "${replacing_protocol:0:1}")${replacing_protocol:1}
     sed -i.old -e "s/Protocol.${capitalized_label}/Protocol.${capitalized_replacing_protocol}/g" tezt/tests/protocol_migration.ml
@@ -2912,14 +2943,22 @@ function hash() {
   previous_variant=$(grep "| .* -> \"proto_${protocol_source}\"" "tezt/lib_tezos/protocol.ml" | cut -d'|' -f2 | cut -d'-' -f1)
   previous_variant=$(echo "${previous_variant}" | tr -d ' ')
   log_blue "Current variant used in types is ${magenta}${previous_variant}${reset}"
-  read -r -p "Please enter the new variant or press enter to keep the current one: " -e -i "${previous_variant}" new_variant
+  if [[ ${non_interactive} == true ]]; then
+    new_variant="${previous_variant}"
+  else
+    read -r -p "Please enter the new variant or press enter to keep the current one: " -e -i "${previous_variant}" new_variant
+  fi
   echo -e "Current used tag is ${magenta}${previous_tag}${reset}"
-  read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
-  # new_tag must use only lowercase digits and underscores
-  while [[ ! "${new_tag}" =~ ^[a-z0-9_]+$ ]]; do
-    echo "Tag must use only lowercase digits and underscores"
+  if [[ ${non_interactive} == true ]]; then
+    new_tag="${previous_tag}"
+  else
     read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
-  done
+    # new_tag must use only lowercase digits and underscores
+    while [[ ! "${new_tag}" =~ ^[a-z0-9_]+$ ]]; do
+      echo "Tag must use only lowercase digits and underscores"
+      read -r -p "Please enter the new tag or press enter to keep the current one: " -e -i "${previous_tag}" new_tag
+    done
+  fi
   capitalized_new_tag=$(tr '[:lower:]' '[:upper:]' <<< "${new_tag:0:1}")${new_tag:1}
   label="${new_tag}"
   capitalized_label="${capitalized_new_tag}"
@@ -2958,21 +2997,29 @@ function hash() {
   log_magenta "Computed hash is: ${long_hash}"
   if [[ ${source_hash} == "${long_hash}" ]]; then
     log_green "Hashes match"
-    log_blue "Press y to recompute a vanity hash or n to stop"
-    read -r continue
-    if [[ ${continue} != "y" ]]; then
-      print_and_exit 1 "${LINENO}"
+    if [[ ${non_interactive} == true ]]; then
+      vanity=false
     else
-      vanity=true
+      log_blue "Press y to recompute a vanity hash or n to stop"
+      read -r continue
+      if [[ ${continue} != "y" ]]; then
+        print_and_exit 1 "${LINENO}"
+      else
+        vanity=true
+      fi
     fi
   else
     warning "Hashes don't match"
-    log_blue "Press y to compute a vanity hash or n to simply update the hash"
-    read -r continue
-    if [[ ${continue} != "y" ]]; then
+    if [[ ${non_interactive} == true ]]; then
       vanity=false
     else
-      vanity=true
+      log_blue "Press y to compute a vanity hash or n to simply update the hash"
+      read -r continue
+      if [[ ${continue} != "y" ]]; then
+        vanity=false
+      else
+        vanity=true
+      fi
     fi
   fi
 
@@ -2991,7 +3038,11 @@ function hash() {
     printf "${yellow}seq 1 8 | parallel --line-buffer ${red}<path_to_hasher> ${blue}proto_to_hash.txt ${magenta}%s${reset}\n" "$(echo "${label}" | cut -c 1-6)"
     echo "Please insert vanity nonce or press enter to continue with the current hash"
     echo -e "${yellow}${blinking}Vanity nonce: ${reset}\c"
-    read -r nonce
+    if [[ ${non_interactive} == true ]]; then
+      nonce=""
+    else
+      read -r nonce
+    fi
     # if nonce is not empty, sed     '(* Vanity nonce: TBD *)'  in proto_${version}/lib_protocol/main.ml
     if [[ -n ${nonce} ]]; then
       sed -i.old -e "s/Vanity nonce: TBD/Vanity nonce: ${nonce}/" "src/proto_${protocol_source}/lib_protocol/main.ml"
@@ -3002,7 +3053,11 @@ function hash() {
       log_magenta "Short hash: ${short_hash}"
       echo "New hash is: ${long_hash}"
       echo "Press y to continue or n to stop"
-      read -r continue
+      if [[ ${non_interactive} == true ]]; then
+        continue="y"
+      else
+        read -r continue
+      fi
       if [[ ${continue} != "y" ]]; then
         rm -f proto_to_hash.txt
         print_and_exit 1 "${LINENO}"
