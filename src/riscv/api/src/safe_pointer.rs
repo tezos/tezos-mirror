@@ -13,6 +13,7 @@
 use std::ops::Deref;
 
 use super::move_semantics::ImmutableState;
+use super::try_clone::TryClone;
 
 /// A version of [`ocaml::Pointer`] which does not allow mutable references to the underlying data.
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -34,13 +35,13 @@ impl<T: Sync> Deref for SafePointer<T> {
 
 impl<T> SafePointer<ImmutableState<T>>
 where
-    T: Clone,
+    T: TryClone,
     ImmutableState<T>: ocaml::Custom + Sync + Send,
 {
     /// In the case that we have an `ImmutableState` and a function that requires a mutable
     /// reference, we first make a copy of the state to apply the function to.
-    pub fn apply_imm<R>(&self, f: impl FnOnce(&mut T) -> R) -> (Self, R) {
-        let (new_v, result) = self.apply(f);
-        (new_v.into(), result)
+    pub fn apply_imm<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<(Self, R), T::Error> {
+        let (new_v, result) = self.apply(f)?;
+        Ok((new_v.into(), result))
     }
 }

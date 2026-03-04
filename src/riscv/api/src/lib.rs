@@ -7,11 +7,11 @@
 
 mod move_semantics;
 mod safe_pointer;
+mod try_clone;
 
 use core::panic;
 use std::fs;
 use std::str;
-use std::sync::OnceLock;
 
 use arbitrary_int::u31;
 use move_semantics::ImmutableState;
@@ -35,12 +35,22 @@ use octez_riscv_data::hash;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::Verify;
+use parking_lot::Mutex;
 use parking_lot::RwLock;
 use safe_pointer::SafePointer;
 use sha2::Digest;
 use sha2::Sha256;
+use try_clone::TryClone;
 
 type OcamlFallible<T> = Result<T, ocaml::Error>;
+
+impl TryClone for NodePvm<Normal> {
+    type Error = ocaml::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        NodePvm::try_clone(self).map_err(|e| ocaml::Error::Error(Box::new(e)))
+    }
+}
 
 #[ocaml::sig]
 pub struct Repo(RwLock<PvmStorage>);
@@ -294,8 +304,8 @@ pub fn octez_riscv_from_imm(state: SafePointer<State>) -> SafePointer<MutState> 
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> state")]
-pub fn octez_riscv_to_imm(state: SafePointer<MutState>) -> SafePointer<State> {
-    state.to_imm_state().into()
+pub fn octez_riscv_to_imm(state: SafePointer<MutState>) -> OcamlFallible<SafePointer<State>> {
+    Ok(state.to_imm_state()?.into())
 }
 
 #[ocaml::func]
@@ -411,8 +421,8 @@ pub fn octez_riscv_string_of_status(status: Status) -> String {
 
 #[ocaml::func]
 #[ocaml::sig("state -> state")]
-pub fn octez_riscv_compute_step(state: SafePointer<State>) -> SafePointer<State> {
-    state.apply_imm(|pvm| pvm.compute_step(StdoutDebugHooks)).0
+pub fn octez_riscv_compute_step(state: SafePointer<State>) -> OcamlFallible<SafePointer<State>> {
+    Ok(state.apply_imm(|pvm| pvm.compute_step(StdoutDebugHooks))?.0)
 }
 
 #[ocaml::func]
@@ -420,9 +430,9 @@ pub fn octez_riscv_compute_step(state: SafePointer<State>) -> SafePointer<State>
 pub fn octez_riscv_compute_step_with_debug(
     state: SafePointer<State>,
     printer: ocaml::Value,
-) -> SafePointer<State> {
+) -> OcamlFallible<SafePointer<State>> {
     let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
-    state.apply_imm(|pvm| pvm.compute_step(hooks)).0
+    Ok(state.apply_imm(|pvm| pvm.compute_step(hooks))?.0)
 }
 
 #[ocaml::func]
@@ -430,13 +440,16 @@ pub fn octez_riscv_compute_step_with_debug(
 pub fn octez_riscv_compute_step_many(
     max_steps: u64,
     state: SafePointer<State>,
-) -> (SafePointer<State>, i64) {
+) -> OcamlFallible<(SafePointer<State>, i64)> {
     state.apply_imm(|pvm| pvm.compute_step_many(StdoutDebugHooks, max_steps as usize))
 }
 
 #[ocaml::func]
 #[ocaml::sig("int64 -> mut_state -> int64")]
-pub fn octez_riscv_mut_compute_step_many(max_steps: u64, state: SafePointer<MutState>) -> i64 {
+pub fn octez_riscv_mut_compute_step_many(
+    max_steps: u64,
+    state: SafePointer<MutState>,
+) -> OcamlFallible<i64> {
     state.apply(|pvm| pvm.compute_step_many(StdoutDebugHooks, max_steps as usize))
 }
 
@@ -446,7 +459,7 @@ pub fn octez_riscv_compute_step_many_with_debug(
     max_steps: u64,
     state: SafePointer<State>,
     printer: ocaml::Value,
-) -> (SafePointer<State>, i64) {
+) -> OcamlFallible<(SafePointer<State>, i64)> {
     let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
     state.apply_imm(|pvm| pvm.compute_step_many(hooks, max_steps as usize))
 }
@@ -457,7 +470,7 @@ pub fn octez_riscv_mut_compute_step_many_with_debug(
     max_steps: u64,
     state: SafePointer<MutState>,
     printer: ocaml::Value,
-) -> i64 {
+) -> OcamlFallible<i64> {
     let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
     state.apply(|pvm| pvm.compute_step_many(hooks, max_steps as usize))
 }
@@ -528,15 +541,18 @@ fn install_boot_sector(pvm: &mut NodePvm, boot_sector: &[u8]) {
 pub fn octez_riscv_install_boot_sector(
     state: SafePointer<State>,
     boot_sector: &[u8],
-) -> SafePointer<State> {
-    state
-        .apply_imm(|pvm| install_boot_sector(pvm, boot_sector))
-        .0
+) -> OcamlFallible<SafePointer<State>> {
+    Ok(state
+        .apply_imm(|pvm| install_boot_sector(pvm, boot_sector))?
+        .0)
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> bytes -> unit")]
-pub fn octez_riscv_mut_install_boot_sector(state: SafePointer<MutState>, boot_sector: &[u8]) {
+pub fn octez_riscv_mut_install_boot_sector(
+    state: SafePointer<MutState>,
+    boot_sector: &[u8],
+) -> OcamlFallible<()> {
     state.apply(|pvm| install_boot_sector(pvm, boot_sector))
 }
 
@@ -554,17 +570,21 @@ pub fn octez_riscv_mut_state_hash(state: SafePointer<MutState>) -> [u8; 32] {
 
 #[ocaml::func]
 #[ocaml::sig("state -> input -> state")]
-pub fn octez_riscv_set_input(state: SafePointer<State>, input: Input) -> SafePointer<State> {
-    state
-        .apply_imm(|pvm| NodePvm::set_input(pvm, input.into()))
-        .0
+pub fn octez_riscv_set_input(
+    state: SafePointer<State>,
+    input: Input,
+) -> OcamlFallible<SafePointer<State>> {
+    Ok(state
+        .apply_imm(|pvm| NodePvm::set_input(pvm, input.into()))?
+        .0)
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> input -> unit")]
-pub fn octez_riscv_mut_set_input(state: SafePointer<MutState>, input: Input) -> () {
-    let res = state.apply(|pvm| NodePvm::set_input(pvm, input.into()));
-    assert!(res)
+pub fn octez_riscv_mut_set_input(state: SafePointer<MutState>, input: Input) -> OcamlFallible<()> {
+    let res = state.apply(|pvm| NodePvm::set_input(pvm, input.into()))?;
+    assert!(res);
+    Ok(())
 }
 
 #[ocaml::func]
@@ -600,7 +620,7 @@ struct Proof {
     final_state_hash: hash::Hash,
     serialised_proof: Box<[u8]>,
     /// When deserialising a proof in the protocol, a verifier backend and its [`MerkleProof`] are needed for the rest of the API.
-    verifier: OnceLock<(NodePvm<Verify, EmptyPageCache>, MerkleProof)>,
+    verifier: Mutex<Option<(NodePvm<Verify, EmptyPageCache>, MerkleProof)>>,
 }
 
 impl From<PvmProof> for Proof {
@@ -608,34 +628,43 @@ impl From<PvmProof> for Proof {
         Proof {
             final_state_hash: proof.final_state_hash(),
             serialised_proof: serialise_proof(&proof).into_boxed_slice(),
-            verifier: OnceLock::new(),
+            verifier: Mutex::new(None),
         }
     }
 }
 
 impl Proof {
+    /// Run a closure over the [`NodePvm`] and [`MerkleProof`] for this proof.
+    ///
+    /// Create them from the raw proof bytes if they do not exist.
+    fn with_verifier<R>(
+        &self,
+        f: impl FnOnce(&(NodePvm<Verify, EmptyPageCache>, MerkleProof)) -> R,
+    ) -> Result<R, String> {
+        let mut guard = self.verifier.lock();
+        if guard.is_none() {
+            let (proof, node_pvm) = deserialise_proof(self.serialised_proof.iter().copied())
+                .map_err(|e| e.to_string())?;
+            *guard = Some((node_pvm, proof.into_tree()));
+        }
+        Ok(f(guard.as_ref().expect(
+            "The verifier either already existed or has just been instantiated",
+        )))
+    }
+
     /// Obtain the [`NodePvm`] and [`MerkleProof`] for this proof.
     ///
-    /// Create them from the raw proof bytes if they do not exist yet.
-    fn get_or_create_verifier(
+    /// Create them from the raw proof bytes if they do not exist.
+    fn take_or_create_verifier(
         &self,
-    ) -> Result<&(NodePvm<Verify, EmptyPageCache>, MerkleProof), String> {
-        match self.verifier.get() {
-            Some(node_pvm_and_merkle_tree) => Ok(node_pvm_and_merkle_tree),
-            None => {
-                let (proof, node_pvm) = deserialise_proof(self.serialised_proof.iter().copied())
-                    .map_err(|e| e.to_string())?;
-                let merkle_tree = proof.into_tree();
-                // Not impossible that some other thread has jumped in and set the value before us.
-                // That is not a problem though as it will have done exactly the same calculation
-                // as us; therefore we can ignore the `Err` returned here.
-                let _ = self.verifier.set((node_pvm, merkle_tree));
-                Ok(self
-                    .verifier
-                    .get()
-                    .expect("The `verifier` field has just been set."))
-            }
+    ) -> Result<(NodePvm<Verify, EmptyPageCache>, MerkleProof), String> {
+        if let Some(verifier) = self.verifier.lock().take() {
+            return Ok(verifier);
         }
+
+        let (proof, node_pvm) =
+            deserialise_proof(self.serialised_proof.iter().copied()).map_err(|e| e.to_string())?;
+        Ok((node_pvm, proof.into_tree()))
     }
 }
 
@@ -644,19 +673,11 @@ ocaml::custom!(Proof);
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_proof_start_state(proof: SafePointer<Proof>) -> OcamlFallible<[u8; 32]> {
-    // Ensure that the proof has been deserialised and contains the verifier backend.
-    let (_, merkle_proof) = match proof.get_or_create_verifier() {
-        Ok(verifier) => verifier,
-        Err(e) => {
-            return Err(ocaml::Error::Error(
-                format!("Error getting start state hash from proof: {e}").into(),
-            ));
-        }
-    };
-
-    Ok(<[u8; hash::Hash::DIGEST_SIZE]>::from(
-        merkle_proof.root_hash(),
-    ))
+    proof
+        .with_verifier(|(_, merkle_proof)| merkle_proof.root_hash().into())
+        .map_err(|e| {
+            ocaml::Error::Error(format!("Error getting start state hash from proof: {e}").into())
+        })
 }
 
 #[ocaml::func]
@@ -681,17 +702,17 @@ pub fn octez_riscv_produce_proof(
 pub fn octez_riscv_verify_proof(
     input: Option<Input>,
     proof: SafePointer<Proof>,
-) -> Option<InputRequest> {
+) -> OcamlFallible<Option<InputRequest>> {
     let input = input.map(|i| i.into());
-
     let final_state_hash = proof.final_state_hash;
-    let (node_pvm, merkle_tree) = proof.get_or_create_verifier().ok()?;
-    let input_request =
-        node_pvm
-            .clone()
-            .verify_proof(merkle_tree, &final_state_hash, input, NoHooks)?;
 
-    Some(InputRequest::from(input_request))
+    let Ok((mut node_pvm, merkle_tree)) = proof.take_or_create_verifier() else {
+        return Ok(None);
+    };
+
+    Ok(node_pvm
+        .verify_proof(&merkle_tree, &final_state_hash, input, NoHooks)
+        .map(InputRequest::from))
 }
 
 #[ocaml::func]
@@ -716,7 +737,7 @@ pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<SafePointer<Proof>,
     Ok(Proof {
         final_state_hash,
         serialised_proof: bytes.into(),
-        verifier: OnceLock::from((node_pvm, merkle_tree)),
+        verifier: Mutex::new(Some((node_pvm, merkle_tree))),
     }
     .into())
 }
@@ -773,13 +794,13 @@ pub fn octez_riscv_mut_get_reveal_request(state: SafePointer<MutState>) -> Bytes
 
 #[ocaml::func]
 #[ocaml::sig("state -> state")]
-pub fn octez_riscv_insert_failure(state: SafePointer<State>) -> SafePointer<State> {
-    state.apply_imm(|pvm| pvm.insert_failure()).0
+pub fn octez_riscv_insert_failure(state: SafePointer<State>) -> OcamlFallible<SafePointer<State>> {
+    Ok(state.apply_imm(|pvm| pvm.insert_failure())?.0)
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> unit")]
-pub fn octez_riscv_mut_insert_failure(state: SafePointer<MutState>) {
+pub fn octez_riscv_mut_insert_failure(state: SafePointer<MutState>) -> OcamlFallible<()> {
     state.apply(|pvm| pvm.insert_failure())
 }
 
