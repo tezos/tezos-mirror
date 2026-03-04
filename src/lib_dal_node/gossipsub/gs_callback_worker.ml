@@ -85,7 +85,11 @@ module P2p_callback_worker = struct
 
   type launch_error = error trace
 
-  let try_connect ?expected_peer_id gs_worker p2p_layer ~trusted point =
+  (* Note: We don't check any peer_id associated to the [point] anymore because
+     people frequently wipe/regenerate their peer identities while keeping the
+     same IP addresses. The peer_id check, if enabled, would make Octez-p2p
+     reject any other connection with a different identity. *)
+  let try_connect gs_worker p2p_layer ~trusted point =
     let open Lwt_syntax in
     (* We don't wait for the promise to resolve here, because if the
      advertised peer is not reachable or is not responding, we might block
@@ -95,11 +99,6 @@ module P2p_callback_worker = struct
      be delayed. *)
     Lwt.dont_wait
       (fun () ->
-        (* We don't check [expected_peer_id] anymore because people frequently
-         wipe / regenerate their peer identities while keeping the same IP
-         addresses. The [expected_peer_id] check, if enabled, will make
-         Octez-p2p reject any other connection with a different identity. *)
-        ignore expected_peer_id ;
         let* (result : _ P2p.connection tzresult) =
           P2p.connect ~trusted p2p_layer point
         in
@@ -152,10 +151,9 @@ module P2p_callback_worker = struct
                   state.p2p_layer)
       | Connect {peer; origin} ->
           let trusted = origin = Trusted in
-          let Types.Peer.{maybe_reachable_point; peer_id} = peer in
+          let Types.Peer.{maybe_reachable_point; _} = peer in
           try_connect
             ~trusted
-            ~expected_peer_id:peer_id
             state.gs_worker
             state.p2p_layer
             maybe_reachable_point
