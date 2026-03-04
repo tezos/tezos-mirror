@@ -151,6 +151,54 @@ let job_build_exp =
       ]
     ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
+let job_build_layer1_profiling =
+  let profiled_binaries =
+    ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]
+  in
+  let binaries =
+    List.map
+      (Filename.concat "./octez-binaries/x86_64/profiler/")
+      profiled_binaries
+    @ List.map
+        (Filename.concat "./octez-binaries/x86_64/telemetry/")
+        profiled_binaries
+  in
+  let profiled_binaries_string = String.concat " " profiled_binaries in
+  let octez_executables =
+    "OCTEZ_EXECUTABLES?=\"" ^ profiled_binaries_string ^ "\""
+  in
+  CI.job
+    "build-layer1-profiling"
+    ~__POS__
+    ~description:
+      "Build some layer1 executables with the profiler PPX enabled, to check \
+       that it can still be built."
+    ~stage:Test
+    ~image:Tezos_ci.Images.CI.build
+    ~cpu:Very_high
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) binaries)
+    ~variables:[("PROFILE", "static")]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "scripts/slim-mode.sh on";
+      (* turn on -opaque for all subsequent builds *)
+      "scripts/custom-flags.sh set -opaque";
+      (* 1) compile with PPX profiling *)
+      "TEZOS_PPX_PROFILER=profiling make build " ^ octez_executables;
+      "mkdir -p octez-binaries/x86_64/profiler";
+      "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/profiler";
+      (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
+      "TEZOS_PPX_PROFILER=opentelemetry make build " ^ octez_executables;
+      "mkdir -p octez-binaries/x86_64/telemetry";
+      "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
+    ]
+
 let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
@@ -169,6 +217,7 @@ let register () =
       (Auto, job_build_released Amd64);
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
+      (Auto, job_build_layer1_profiling);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -179,6 +228,7 @@ let register () =
       (Auto, job_build_released Arm64);
       (Auto, job_build_extra_dev Arm64);
       (Auto, job_build_exp Arm64);
+      (Auto, job_build_layer1_profiling);
     ] ;
   CI.register_master_jobs
     [
