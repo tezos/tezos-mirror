@@ -539,8 +539,9 @@ function sanity_check_before_script() {
 }
 
 # Recompute the different protocol and version names
+# MODE: hashed naming when is_snapshot==true or command=="stabilise"; plain naming otherwise
 function recompute_names() {
-  if [[ ${is_snapshot} == true ]]; then
+  if [[ ${is_snapshot} == true ]] || [[ ${command} == "stabilise" ]]; then
     new_protocol_name="${version}_${short_hash}"
     new_tezos_protocol="${version}-${short_hash}"
     new_versioned_name="${version}_${label}"
@@ -692,8 +693,8 @@ function commit_03_adapt_predecessors() {
 }
 
 # COMMIT 4: Compute hash and rename to hashed protocol
-# MODE: vanity nonce (snapshot only), hash update (both), rename (snapshot only)
-# RENAMES: proto_024 → proto_024_PtXXXXXX (snapshot only)
+# MODE: vanity nonce (snapshot or stabilise), hash update (both), rename (snapshot or stabilise)
+# RENAMES: proto_024 → proto_024_PtXXXXXX (snapshot or stabilise)
 #
 # DESCRIPTION:
 #   Computes the protocol hash and optionally adds vanity nonce.
@@ -705,8 +706,8 @@ function commit_03_adapt_predecessors() {
 #   - "src: replace ${protocol_source} hash with ${label} hash"
 #   - "src: rename proto_${version} to proto_${version}_${short_hash}"
 function commit_04_compute_hash_and_rename() {
-  # Vanity nonce handling (snapshot only)
-  if [[ ${is_snapshot} == true ]]; then
+  # Vanity nonce handling (snapshot or stabilise)
+  if [[ ${is_snapshot} == true ]] || [[ ${command} == "stabilise" ]]; then
 
     log_blue "Computing protocol hash"
 
@@ -761,8 +762,8 @@ function commit_04_compute_hash_and_rename() {
   cd ../../..
   commit_no_hooks "src: replace ${protocol_source} hash with ${label} hash"
 
-  # Rename directory to include hash (snapshot only)
-  if [[ ${is_snapshot} == true ]]; then
+  # Rename directory to include hash (snapshot or stabilise)
+  if [[ ${is_snapshot} == true ]] || [[ ${command} == "stabilise" ]]; then
     log_blue "Renaming src/proto_${version} to src/proto_${new_protocol_name}"
 
     if [[ -d "src/proto_${new_protocol_name}" ]]; then
@@ -867,7 +868,7 @@ function commit_08_update_readme() {
     rm "src/proto_${new_protocol_name}/README.md"
     commit_no_hooks "src: remove README"
   else
-    sed -i "s/${protocol_source}/${label}/g" "src/proto_${label}/README.md"
+    sed -i "s/${protocol_source}/${label}/g" "src/proto_${new_protocol_name}/README.md"
     commit_no_hooks "src: rename protocol in the README"
   fi
 }
@@ -892,7 +893,7 @@ function commit_09_link_in_manifest() {
   elif [[ ${command} == "copy" ]]; then
     sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
   else
-    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
+    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${version}_${short_hash} = active (Name.v \"${short_hash}\" ${version})\n" -i manifest/product_octez.ml
   fi
   ocamlformat -i manifest/product_octez.ml
   commit_no_hooks "manifest: link protocol in the node, client and codec"
@@ -1136,7 +1137,7 @@ function protocol_tests_commit_03_update_scoru_wasm_migration() {
       sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${source_label}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_${label}_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/${capitalized_source} -> (V.*)/ ${capitalized_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
     else
-      sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}\"" -i.old src/lib_scoru_wasm/constants.ml
+      sed "/let proto_${protocol_source}_name = .*/i \let proto_${label}_name = \"${label}_${version}\"" -i.old src/lib_scoru_wasm/constants.ml
       sed "/| payload when String.equal payload Constants.proto_${protocol_source}_name ->/i \  | payload when String.equal payload Constants.proto_${label}_name -> Some (Protocol_migration $capitalized_label)" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/(Data_encoding.\(Binary.to_string_exn string Constants.proto_${protocol_source}_name\))/\1 | ${capitalized_label} ->Data_encoding.(Binary.to_string_exn string Constants.proto_${label}_name)/" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
       sed -r "s/Proto_${protocol_source} -> (V.*)/ Proto_${protocol_source} -> \1 | ${capitalized_label} -> \1/" -i.old src/lib_scoru_wasm/wasm_vm.ml
@@ -1220,14 +1221,17 @@ function source_commit_01_update_teztale() {
     sed -e "s/${protocol_source}/${version}/g" \
       -e "s/${capitalized_source}/${short_hash}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
     ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+  elif [[ ${command} == "stabilise" ]]; then
+    cp "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    git add "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "s/${protocol_source}/${new_protocol_name}/g" -i.old "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
+    sed -e "/module Malpha = Alpha_machine.M/i \ module M${version} = ${short_hash}_machine.M" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
+    ocamlformat -i "teztale/bin_teztale_archiver/${short_hash}_machine.real.ml"
   else
     cp "teztale/bin_teztale_archiver/${source_short_hash}_machine.real.ml" "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     git add "teztale/bin_teztale_archiver/${label}_machine.real.ml"
     sed -e "s/${protocol_source}/${label}/g" -i.old "teztale/bin_teztale_archiver/${label}_machine.real.ml"
-    # sed -e "s/${protocol_source}/${version}/g" \
-    #   -e "s/${capitalized_source}/${capitalized_label}/g" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
     sed -e "/module Malpha = Alpha_machine.M/i \ module M${label} = ${capitalized_label}_machine.M" -i.old "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
-
     ocamlformat -i "teztale/bin_teztale_archiver/${label}_machine.real.ml"
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
@@ -1509,7 +1513,11 @@ function source_commit_03_fix_alpha_raw_context_stabilise() {
   perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.mli"
 
   # Step 7: Update Compare.String condition for protocol matching
-  replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
+  if [[ ${command} == "stabilise" ]]; then
+    replace_string="Compare.String.(s = \"${protocol_target}\") then return (${capitalized_label}, ctxt)"
+  else
+    replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
+  fi
   perl -0777 -pe "s/${type_to_remove}[ \t]+Compare.*${type_to_remove}/${type_to_remove}$replace_string${type_to_remove}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
 
   # Reformat raw_context files
@@ -1645,7 +1653,11 @@ function tezt_commit_02_adapt_lib_tezos_protocol() {
     else
       sed -r 's/(.*) '${capitalized_source}' -> ([0-9][0-9][0-9])/printf "\1 '${capitalized_label}' -> \2 | '${capitalized_source}' -> %03i" "$(echo \2+1 | bc)"/ge' -i.old tezt/lib_tezos/protocol.ml
     fi
-    sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/a | ${capitalized_label} -> \"proto_${label}\"\n" -i.old tezt/lib_tezos/protocol.ml
+    if [[ ${command} == "stabilise" ]]; then
+      sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/a | ${capitalized_label} -> \"proto_${new_protocol_name}\"\n" -i.old tezt/lib_tezos/protocol.ml
+    else
+      sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/a | ${capitalized_label} -> \"proto_${label}\"\n" -i.old tezt/lib_tezos/protocol.ml
+    fi
 
     # add $(capitalized_label) -> "$long_hash" before "(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)"
     sed "/\(\* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE \*\)/i \ | ${capitalized_label} -> \"${long_hash}\"" -i.old tezt/lib_tezos/protocol.ml
@@ -1848,7 +1860,28 @@ function tezt_commit_06_handle_regression_files() {
 function tezt_commit_07_add_unused_baker() {
   # add new protocol baker
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
-  if [[ ${is_snapshot} == false ]]; then
+  if [[ ${command} == "stabilise" ]]; then
+    lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
+    awk -v source="$protocol_source" -v full_label="$full_label" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
+$0 ~ "let _octez_baker_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  new1 = gensub(source, full_label, "g", orig1)
+  new2 = orig2
+  gsub("baker_" source, "baker_" lowercase_shorthash, new2)
+  gsub("./octez-baker-" source, "./octez-baker-" short_hash, new2)
+  print new1
+  print new2
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  elif [[ ${is_snapshot} == false ]]; then
     awk -v source="$protocol_source" -v target="$protocol_target" '
 $0 ~ "let _octez_baker_" source " =" {
   orig1 = $0
@@ -1898,7 +1931,27 @@ $0 ~ "let _octez_baker_" source " =" {
 function tezt_commit_08_add_unused_accuser() {
   # add new protocol accuser
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
-  if [[ ${is_snapshot} == false ]]; then
+  if [[ ${command} == "stabilise" ]]; then
+    awk -v source="$protocol_source" -v full_label="$full_label" -v short_hash="$short_hash" '
+$0 ~ "let _octez_accuser_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  new1 = gensub(source, full_label, "g", orig1)
+  new2 = orig2
+  gsub("accuser_" source, "accuser_" full_label, new2)
+  gsub("./octez-accuser-" source, "./octez-accuser-" short_hash, new2)
+  print new1
+  print new2
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  elif [[ ${is_snapshot} == false ]]; then
     awk -v source="$protocol_source" -v target="$protocol_target" '
 $0 ~ "let _octez_accuser_" source " =" {
   orig1 = $0
@@ -1975,7 +2028,11 @@ function tezt_commit_10_reset_runtime_deps_regressions() {
 #
 # CREATES: 0-1 commits — "tezt: reset weeklynet regression test" (conditional)
 function tezt_commit_11_reset_weeklynet_regression() {
-  if [[ ${is_snapshot} != true ]]; then
+  if [[ ${command} == "stabilise" ]]; then
+    cp tezt/tests/weeklynet_configs/alpha.json tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
+    dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
+    commit_if_changes "tezt: reset weeklynet regression test"
+  elif [[ ${is_snapshot} != true ]]; then
     cp tezt/tests/weeklynet_configs/alpha.json tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
     dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
     commit_if_changes "tezt: reset weeklynet regression test"
@@ -2053,6 +2110,8 @@ function misc_commit_02_update_testnet_experiment_tools() {
     sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
       -e "s/protocol_${protocol_source}_parameters_template/(Filename.concat network_parameters_templates_dir \"proto_${version}_${short_hash}_mainnet.json\")/" \
       devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+  elif [[ ${command} == "stabilise" ]]; then
+    sed "/| Tezt_tezos.Protocol.${capitalized_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n      Some\n        (Filename.concat\n           network_parameters_templates_dir\n           \"proto_${new_protocol_name}_mainnet.json\")" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   else
     sed "/let protocol_${protocol_source}_parameters_template =/i \ let protocol_${label}_parameters_template =\n  Filename.current_dir_name \/\/ \"src\" \/\/ \"proto_${label}\" \/\/ \"parameters\"\n  \/\/ \"mainnet_parameters.json\"" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
     sed "/| Tezt_tezos.Protocol.${capitalized_source} ->/i \  | Tezt_tezos.Protocol.${capitalized_label} ->\n Some protocol_${label}_parameters_template" -i.old devtools/testnet_experiment_tools/testnet_experiment_tools.ml
@@ -2076,6 +2135,9 @@ function misc_commit_03_update_linter() {
     # update linter to remove special rule for stabilised protocol
     sed -i.old -e "s/ -not -name \"proto_${protocol_source}\"//" scripts/lint.sh
     commit "scripts: update linter to remove special rule for ${protocol_source} protocol"
+  elif [[ ${command} == "stabilise" ]]; then
+    # in single-pass stabilise, the frozen protocol doesn't need a formatting exclusion
+    :
   else
     # update linter to allow reformating of beta protocol
     sed -i.old -e "s/-not -name \"proto_alpha\"/-not -name \"proto_${label}\" -not -name \"proto_alpha\"/" scripts/lint.sh
@@ -2390,6 +2452,14 @@ function docs_commit_07_update_docs_makefile() {
       -e "s/${protocol_source}/${label}/g" \
       -e "s/${source_hash}/${long_hash}/g" \
       -i docs/Makefile
+  elif [[ ${command} == "stabilise" ]]; then
+    sed -i.old -e "s/xrefscheck:/xrefscheck:\n\t\$\(CHECKXREFS\) -l ${label}/g" docs/Makefile
+    sed -i.old -r "s/(NAMED_PROTOS .*)/\1 ${label}/" docs/Makefile
+    line=$(printf "%s_long%*s= %s" "${label}" $((10 - ${#label})) '' "$long_hash")
+    sed "/alpha_long .*/i${line}" -i docs/Makefile
+    sed "/alpha_short .*/i${label}_short       = ${short_hash}" -i docs/Makefile
+    sed -i.old -e "/[#>]/! s/alpha\/rpc\.rst/alpha\/rpc.rst ${label}\/rpc.rst/g" docs/Makefile
+    sed -i.old -r "s/alpha\/octez-\*\.html/alpha\/octez-*.html ${label}\/octez-*.html/g" docs/Makefile
   else
     sed -i.old -e "s/xrefscheck:/xrefscheck:\n\t\$\(CHECKXREFS\) -l ${label}/g" docs/Makefile
     sed -i.old -r "s/(PROTOCOLS .*) alpha/\1 ${protocol_source} ${label}/" docs/Makefile
@@ -2437,10 +2507,11 @@ function generate_doc() {
 
 }
 
+# MODE: interactive variant/tag prompt runs when is_snapshot==true or command=="stabilise"
 function snapshot_protocol() {
   compute_protocol_names
 
-  if [[ ${is_snapshot} == true ]]; then
+  if [[ ${is_snapshot} == true ]] || [[ ${command} == "stabilise" ]]; then
     # by default only propose to use one character values for variant and label
     expected_variant="${capitalized_label:0:1}"
     log_blue "Current expected variant is ${magenta}${expected_variant}${reset}"
@@ -2462,21 +2533,11 @@ function snapshot_protocol() {
       done
     fi
     capitalized_new_tag=$(tr '[:lower:]' '[:upper:]' <<< "${new_tag:0:1}")${new_tag:1}
+    full_label="${label}"
     label="${new_tag}"
     capitalized_label="${capitalized_new_tag}"
 
     tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
-
-    short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
-    if [[ "${is_snapshot}" == false ]]; then
-      if [[ ${source_short_hash} != "${short_hash}" ]]; then
-        is_snapshot=false
-      else
-        is_snapshot=true
-      fi
-    fi
-    label="${new_tag}"
-    capitalized_label="${capitalized_new_tag}"
 
     protocol_target="${label}_${version}"
 
@@ -3391,8 +3452,9 @@ function hash() {
 #run command
 case ${command} in
 stabilise)
-  label=${protocol_target}
-  version=${protocol_target}
+  label=$(echo "${protocol_target}" | cut -d'_' -f1)
+  version=$(echo "${protocol_target}" | cut -d'_' -f2)
+  # is_snapshot stays false → insertion semantics in all commit functions
   snapshot_protocol "${protocol_source}" "${protocol_target}"
   ;;
 hash)
