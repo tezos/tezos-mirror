@@ -5043,20 +5043,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
       diagnostic_from
       diagnostic_to ;
 
-    (* Start baker. *)
-    log_step "Start baker" ;
-    let baker =
-      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
-      Agnostic_baker.create
-        ~dal_node_rpc_endpoint
-        ~delegates:
-          (List.map
-             (fun x -> x.Account.public_key_hash)
-             Constant.all_secret_keys)
-        node
-        client
-    in
-    let* () = Agnostic_baker.run baker in
+    let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
 
     (* Originate rollup BEFORE migration. We do NOT start the rollup node
        yet; it will be started after migration so the import inbox_level is
@@ -5072,6 +5059,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
         ~parameters_ty:"string"
         client
     in
+    let* () = bake_for ~dal_node_endpoint client in
     let* current_level = Client.level client in
     Check.((current_level < published_level) int)
       ~error_msg:
@@ -5085,30 +5073,51 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
       published_level
       slot_index ;
     let old_slot_size = dal_parameters.cryptobox.slot_size in
-    let _producer_promise =
-      simple_slot_producer
-        ~slot_size:old_slot_size
-        ~slot_index
-        ~from:(published_level - 3)
-        ~into:published_level
-        dal_node
-        node
+    let slot =
+      Cryptobox.Internal_for_tests.generate_slot ~slot_size:old_slot_size
+      |> Bytes.to_string
+      |> Helpers.make_slot ~slot_size:old_slot_size
+    in
+    let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+    (* Bake to published_level - 1 so the next block is published_level. *)
+    let levels_to_pre_publish = published_level - 1 - current_level in
+    let* () =
+      if levels_to_pre_publish > 0 then
+        bake_for ~count:levels_to_pre_publish ~dal_node_endpoint client
+      else unit
+    in
+    log_step "Injecting DAL publish_commitment for slot_index=%d" slot_index ;
+    let* _op_hash =
+      publish_commitment
+        ~force:true
+        ~fee:5000
+        ~source:Constant.bootstrap2
+        ~index:slot_index
+        ~commitment
+        ~proof
         client
     in
-    let* _ = Node.wait_for_level node (published_level + dal_lag + 1) in
+    (* Bake one block: publication is included at exactly published_level. *)
+    let* () = bake_for ~dal_node_endpoint client in
+    (* Bake until attestation_level + 1 = published_level + dal_lag + 1 so the
+       slot attestation is processed.  The ~dal_node_endpoint flag ensures DAL
+       attestations are included automatically by the bake command. *)
+    let* () = bake_for ~count:dal_lag ~dal_node_endpoint client in
 
-    (* Wait for the protocol migration. *)
-    log_step
-      "Waiting for migration level M=%d (switch to next protocol)"
-      migration_level ;
-    let* _ = Node.wait_for_level node migration_level in
-    (* Wait for one block past the migration block.  The migration block is
+    (* Bake to one block past the migration level.  The migration block is
        special: its binary-encoded constants may not be decodable by the new
        protocol's rollup-node plugin (the new field
        dal.minimal_participation_ratio is not yet present in the old binary
        format).  Starting rollup nodes only after level M+1 ensures the HEAD
        they observe has fully-migrated constants. *)
-    let* _ = Node.wait_for_level node (migration_level + 1) in
+    log_step
+      "Baking to migration level M=%d + 1 (switch to next protocol)"
+      migration_level ;
+    let* current_level = Client.level client in
+    let to_migration = migration_level + 1 - current_level in
+    let* () =
+      repeat to_migration (fun () -> bake_for ~dal_node_endpoint client)
+    in
 
     (* Start the HONEST rollup node after migration so the DAL page import
        inbox_level is greater than the migration level. *)
@@ -5161,6 +5170,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
        flag from a background Lwt promise so we can assert later that a
        refutation game actually started. *)
     let conflict_detected_honest = ref false in
+    let conflict_detected_loser = ref false in
     let _conflict_monitor_honest =
       let* json =
         Sc_rollup_node.wait_for
@@ -5179,6 +5189,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
           "smart_rollup_node_conflict_detected.v0"
         @@ fun json -> Some json
       in
+      conflict_detected_loser := true ;
       log_step "loser conflict event detected: %s" (JSON.encode json) ;
       Lwt.return_unit
     in
@@ -5230,23 +5241,27 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
     in
     let _loser_mode_monitor = watch_loser_mode_dal_decisions () in
 
-    (* Bake until final_level.  The agnostic baker produces blocks continuously;
-       by final_level the game should have fully resolved. *)
+    (* Bake one block at a time until the refutation game resolves or
+       final_level is reached.  Each bake_for call deterministically produces
+       one block, giving rollup nodes time to react and inject their moves
+       into the mempool before the next block. *)
     log_step
-      "Baking to level %d to allow refutation game to complete"
+      "Baking to level %d (max) to allow refutation game to complete"
       final_level ;
     let* current_level = Client.level client in
     let game_seen = ref false in
     let first_game_level = ref None in
-    let rec bake_and_poll level =
+    let rec bake_and_check level =
       if level >= final_level then unit
       else
         let next_level = level + 1 in
-        let* _ = Node.wait_for_level node next_level in
+        let* () = bake_for ~dal_node_endpoint client in
+        (* Poll game state.  Once the game has been seen, poll every level
+           to detect resolution promptly and terminate early. *)
         let should_poll_games =
-          next_level <= diagnostic_to || next_level mod 5 = 0
+          !game_seen || next_level <= diagnostic_to || next_level mod 5 = 0
         in
-        let* () =
+        let* no_active_games =
           if should_poll_games then (
             let* honest_games =
               Client.RPC.call client
@@ -5275,8 +5290,11 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
               if !first_game_level = None then (
                 first_game_level := Some next_level ;
                 log_step "First refutation game observed at level=%d" next_level)) ;
-            unit)
-          else unit
+            let no_active =
+              JSON.as_list honest_games = [] && JSON.as_list loser_games = []
+            in
+            return no_active)
+          else return false
         in
         let* () =
           if next_level >= diagnostic_from && next_level <= diagnostic_to then (
@@ -5307,9 +5325,14 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
               expected_import_level_from_old_lag
           else unit
         in
-        bake_and_poll next_level
+        if !game_seen && no_active_games then (
+          log_step
+            "Refutation game resolved at level=%d (early termination)"
+            next_level ;
+          unit)
+        else bake_and_check next_level
     in
-    let* () = bake_and_poll current_level in
+    let* () = bake_and_check current_level in
 
     log_step
       "Summary: conflict_detected(honest=%b loser=%b) loser_mode(events=%d \
@@ -5415,7 +5438,6 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
 
     let* () = Sc_rollup_node.terminate honest_node in
     let* () = Sc_rollup_node.terminate loser_node in
-    let* () = Agnostic_baker.terminate baker in
     unit
   in
   if Protocol.number migrate_from >= 024 then
@@ -5425,7 +5447,6 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
       ~description
       ~uses:
         [
-          Constant.octez_agnostic_baker;
           Constant.octez_dal_node;
           Constant.octez_smart_rollup_node;
           Constant.WASM.echo_dal_reveal_pages;
