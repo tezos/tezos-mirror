@@ -97,7 +97,6 @@ let monitoring_child_pipeline =
        ~jobs:
          ([
             job_datadog_pipeline_trace;
-            job_build_layer1_profiling ~expire_in:Never ();
             job_teztale_build ~arch:Arm64 ~storage:Ramfs ();
             job_teztale_build ~arch:Amd64 ~cpu:Very_high ();
           ]
