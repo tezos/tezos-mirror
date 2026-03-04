@@ -50,6 +50,19 @@ end
 open Test_helpers
 open Setup
 
+let get_rollup_kernel_version ~sc_rollup_node =
+  let* kernel_version =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/evm/kernel_version"
+         ()
+  in
+  match kernel_version with
+  | None -> Test.fail "Kernel version not found in rollup node durable storage"
+  | Some hex -> return (Hex.to_string (`Hex hex))
+
 let check_kernel_version ~evm_node ~equal expected =
   let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
   if equal then
@@ -5399,36 +5412,16 @@ let test_force_kernel_upgrade_too_early =
   @@
   fun _from
       to_
-      {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+      {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?l2_chains:(if enable_multichain then Some l2_chains else None)
-      ()
-  in
-  let* proxy =
-    Evm_node.init
-      ~patch_config
-      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
-      ()
-  in
 
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day after the genesis. Therefore, it cannot
@@ -5452,8 +5445,8 @@ let test_force_kernel_upgrade_too_early =
 
   (* Assert the kernel version are still the same. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = new_proxy_kernelVersion) string)
+  let* new_rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = new_rollup_kernelVersion) string)
     ~error_msg:"The force kernel upgrade should have failed" ;
   unit
 
@@ -5472,36 +5465,15 @@ let test_force_kernel_upgrade =
     ~title:"Force kernel upgrade"
     ~additional_uses:[Constant.WASM.debug_kernel]
   @@
-  fun {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ?l2_chains:(if enable_multichain then Some l2_chains else None)
-      ()
-  in
-  let* proxy =
-    Evm_node.init
-      ~patch_config
-      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
-      ()
-  in
-
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day before the genesis. Therefore, it can
@@ -5529,8 +5501,8 @@ let test_force_kernel_upgrade =
   (* Assert the kernel version is the same, it proves the upgrade did not
       happen. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let*@ proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
-  Check.((sequencer_kernelVersion = proxy_kernelVersion) string)
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same even after the message" ;
 
   (* Now we force the kernel upgrade via an external message. They will
