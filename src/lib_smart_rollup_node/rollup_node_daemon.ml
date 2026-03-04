@@ -921,20 +921,25 @@ let setup_opentelemetry ~data_dir config =
     config.Configuration.opentelemetry
 
 let check_and_patch_config (kind : Kind.t) (config : Configuration.t) =
-  let open Result_syntax in
+  let open Lwt_result_syntax in
   match kind with
   | Riscv ->
       (* Force to commit context to disk only on commitments and monitoring of
          finalized levels. *)
+      let*! () =
+        if config.commit_on = Block then
+          Daemon_event.riscv_force_commit_strategy ()
+        else Lwt.return_unit
+      in
       return {config with l1_monitor_finalized = true; commit_on = Commitment}
   | _ ->
-      let* () =
+      let*? () =
         if config.l1_monitor_finalized then
           (* No reorg so can use any commit to disk strategy *)
-          return_unit
+          Ok ()
         else
           match config.commit_on with
-          | Block -> return_unit
+          | Block -> Ok ()
           | Commitment ->
               error_with
                 "Cannot use a sparse commit on commitment strategy when \
@@ -1015,7 +1020,8 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       cctxt
       configuration.sc_rollup_address
   in
-  let*? configuration = check_and_patch_config kind configuration in
+  let* configuration = check_and_patch_config kind configuration in
+  let*! () = Daemon_event.commit_strategy configuration.commit_on in
   Metrics.wrap (fun () ->
       Metrics.Info.set_lcc_level_l1 lcc.level ;
       Option.iter

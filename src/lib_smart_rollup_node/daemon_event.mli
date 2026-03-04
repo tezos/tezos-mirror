@@ -97,3 +97,9 @@ val main_loop_retry : float -> unit Lwt.t
 (** Emit an event when the node exits after recovering the operator's
     stakes. *)
 val exit_bailout_mode : unit -> unit Lwt.t
+
+(** Emit the active context commit strategy at startup. *)
+val commit_strategy : Configuration.commit_on_strategy -> unit Lwt.t
+
+(** Emit a warning that the commit strategy is forced for RISC-V rollups. *)
+val riscv_force_commit_strategy : unit -> unit Lwt.t

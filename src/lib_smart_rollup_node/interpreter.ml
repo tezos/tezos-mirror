@@ -271,6 +271,11 @@ let checkout_context_with_replay plugin (node_ctxt : _ Node_context.t)
   | Some ctxt -> return ctxt
   | None ->
       let* block = Node_context.get_l2_block node_ctxt block_hash in
+      let*! () =
+        Refutation_game_event.no_committed_context
+          ~block_hash
+          ~level:block.header.level
+      in
       (* Find the nearest committed ancestor before this block's level. *)
       let* ctxt, from_level =
         let* prev =
@@ -296,6 +301,12 @@ let checkout_context_with_replay plugin (node_ctxt : _ Node_context.t)
           node_ctxt
           ~from_level
           ~to_level:block.header.level
+      in
+      let*! () =
+        Refutation_game_event.replaying_blocks
+          ~count:(List.length blocks_to_replay)
+          ~from_level
+          ~block_hash
       in
       List.fold_left_es
         (fun ctxt b -> replay_one_block plugin node_ctxt ctxt b)

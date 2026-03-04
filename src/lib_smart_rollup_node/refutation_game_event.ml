@@ -92,6 +92,31 @@ module Simple = struct
                  Octez_smart_rollup.Game.dissection_chunk_encoding)
               d))
 
+  let no_committed_context =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_refutation_game_no_committed_context"
+      ~msg:
+        "No committed context for {block_hash} at level {level}, walking back \
+         to find nearest committed ancestor"
+      ~level:Error
+      ~pp1:Block_hash.pp_short
+      ("block_hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+
+  let replaying_blocks =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_refutation_game_replaying_blocks"
+      ~msg:
+        "Replaying {count} blocks from level {from_level} to reconstruct \
+         context for {block_hash}"
+      ~level:Warning
+      ("count", Data_encoding.int31)
+      ("from_level", Data_encoding.int32)
+      ~pp3:Block_hash.pp_short
+      ("block_hash", Block_hash.encoding)
+
   module Worker
       (ARG : sig
         val section : string list
@@ -204,6 +229,12 @@ let timeout_detected other = Simple.(emit timeout_detected other)
 
 let computed_dissection ~opponent ~start_tick ~end_tick dissection =
   Simple.(emit computed_dissection (opponent, start_tick, end_tick, dissection))
+
+let no_committed_context ~block_hash ~level =
+  Simple.(emit no_committed_context) (block_hash, level)
+
+let replaying_blocks ~count ~from_level ~block_hash =
+  Simple.(emit replaying_blocks) (count, from_level, block_hash)
 
 module Player = struct
   let section = Simple.Player.section
