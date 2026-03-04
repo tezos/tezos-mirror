@@ -14,7 +14,14 @@ val init :
   current_level:Level_repr.t ->
   t
 
+(** Encoding starting with Protocol U (with [stez_frozen]).
+    All staking balances must be migrated at protocol activation before
+    this encoding can be used for reads. *)
 val encoding : t Data_encoding.t
+
+(** Encoding that reads the Q/Paris/Oxford formats (without [stez_frozen]).
+    Used by the legacy storage module to read existing data during migration. *)
+val encoding_up_to_t : t Data_encoding.t
 
 (** The weight of a delegate used for voting rights. *)
 val voting_weight : t -> Int64.t tzresult
@@ -28,6 +35,12 @@ val own_frozen : t -> Tez_repr.t
 
     Does not take the [limit_of_staking_over_baking] into account. *)
 val staked_frozen : t -> Tez_repr.t
+
+(** The frozen funds allocated from the Stez staking ledger.
+
+    Similar to direct staking, the tez remains in the Stez staking
+    ledger but only contributes to the delegate's baking rights. *)
+val stez_frozen : t -> Tez_repr.t
 
 (** The total delegated funds from all delegators.
 
@@ -113,6 +126,10 @@ val add_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
 val add_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
 
+val set_stez_frozen : amount:Tez_repr.t -> t -> t tzresult
+
+val clear_stez_frozen : t -> t tzresult
+
 module Internal_for_tests_and_RPCs : sig
   val min_delegated_and_level :
     cycle_eras:Level_repr.cycle_eras ->
@@ -130,5 +147,6 @@ module Internal_for_tests_and_RPCs : sig
     delegated:Tez_repr.t ->
     last_modified_level:Level_repr.t ->
     previous_min:(Tez_repr.t * Level_repr.t) option ->
+    stez_frozen:Tez_repr.t ->
     t
 end

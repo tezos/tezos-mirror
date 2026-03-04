@@ -81,6 +81,9 @@ Data Availability Layer
 Adaptive Issuance
 -----------------
 
+- Added ``stez_frozen`` field to staking balance representation to track
+  Stez stake allocations for baking rights computation. (MR :gl:`!21097`)
+
 Gas improvements
 ----------------
 

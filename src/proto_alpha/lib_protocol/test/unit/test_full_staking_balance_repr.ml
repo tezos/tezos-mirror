@@ -126,6 +126,9 @@ let equal_full_staking_balance (a : Full_staking_balance_repr.t)
       (current_delegated b)
   in
   let* () =
+    Assert.equal_tez_repr ~loc:__LOC__ (stez_frozen a) (stez_frozen b)
+  in
+  let* () =
     Assert.equal_level_repr
       ~loc:__LOC__
       (last_modified_level a)
@@ -197,23 +200,22 @@ let check_staking_balance_invariant ~(current_level : Level_repr.t)
       return_unit
 
 (** Encodes [staking_balance_to_serialize] using
-    [serialization_encoding], then decodes it using the current
-    {!Full_staking_balance_repr.encoding}, and check that we obtain
+    [serialization_encoding], then decodes it using
+    [deserialization_encoding], and checks that we obtain
     [expected]. *)
 let check_encoding_compatibility ~__LOC__ ~serialization_encoding
-    ~staking_balance_to_serialize ~expected =
+    ~deserialization_encoding ~staking_balance_to_serialize ~expected () =
   let open Lwt_result_syntax in
   let bytes =
     Binary.to_bytes_exn serialization_encoding staking_balance_to_serialize
   in
   let* sb =
-    match Binary.of_bytes Full_staking_balance_repr.encoding bytes with
+    match Binary.of_bytes deserialization_encoding bytes with
     | Ok x -> return x
     | Error e ->
         Test.fail
           ~__LOC__
-          "Data_encoding.Binary.read shouldn't have failed with \
-           Full_staking_balance_repr.encoding: %a"
+          "Data_encoding.Binary.read shouldn't have failed: %a"
           Binary.pp_read_error
           e
   in
@@ -236,9 +238,10 @@ let test_encodings () =
       ~delegated
       ~last_modified_level:Level_repr.Internal_for_tests.root
       ~previous_min:None
+      ~stez_frozen:Tez_repr.zero
   in
 
-  (* Oxford encoding *)
+  (* Oxford encoding read with encoding_up_to_t *)
   let staking_balance_to_serialize =
     Full_staking_balance_repr_oxford.make ~own_frozen ~staked_frozen ~delegated
   in
@@ -246,11 +249,14 @@ let test_encodings () =
     check_encoding_compatibility
       ~__LOC__
       ~serialization_encoding:Full_staking_balance_repr_oxford.encoding
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
       ~staking_balance_to_serialize
       ~expected:expected_when_reading_old_encodings
+      ()
   in
 
-  (* Paris encoding when [level_of_min_delegated = Some _] *)
+  (* Paris encoding when [level_of_min_delegated = Some _],
+     read with encoding_up_to_t *)
   let staking_balance_to_serialize =
     Full_staking_balance_repr_paris.
       {
@@ -265,11 +271,14 @@ let test_encodings () =
     check_encoding_compatibility
       ~__LOC__
       ~serialization_encoding:Full_staking_balance_repr_paris.encoding
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
       ~staking_balance_to_serialize
       ~expected:expected_when_reading_old_encodings
+      ()
   in
 
-  (* Paris encoding when [level_of_min_delegated = None]
+  (* Paris encoding when [level_of_min_delegated = None],
+     read with encoding_up_to_t.
 
      Note that in practice, Paris never encodes a staking balance
      where [min_delegated_in_cycle] is [None], but we might as well
@@ -288,11 +297,14 @@ let test_encodings () =
     check_encoding_compatibility
       ~__LOC__
       ~serialization_encoding:Full_staking_balance_repr_paris.encoding
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
       ~staking_balance_to_serialize
       ~expected:expected_when_reading_old_encodings
+      ()
   in
 
-  (* Protocol Q encoding when [previous_min = None] *)
+  (* Protocol Q encoding when [previous_min = None],
+     roundtrip with encoding_up_to_t *)
   let staking_balance_to_serialize =
     Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
       ~own_frozen
@@ -300,17 +312,20 @@ let test_encodings () =
       ~delegated
       ~last_modified_level:level_52
       ~previous_min:None
+      ~stez_frozen:Tez_repr.zero
   in
   let* () =
     check_encoding_compatibility
       ~__LOC__
-      ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~serialization_encoding:Full_staking_balance_repr.encoding_up_to_t
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
       ~staking_balance_to_serialize
       ~expected:staking_balance_to_serialize
+      ()
   in
 
   (* Protocol Q encoding when [previous_min = Some _], when the levels
-     are in the same cycle. *)
+     are in the same cycle, roundtrip with encoding_up_to_t *)
   let staking_balance_to_serialize =
     Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
       ~own_frozen
@@ -318,17 +333,20 @@ let test_encodings () =
       ~delegated
       ~last_modified_level:level_57
       ~previous_min:(Some (Tez_repr.(mul_exn one 100), level_52))
+      ~stez_frozen:Tez_repr.zero
   in
   let* () =
     check_encoding_compatibility
       ~__LOC__
-      ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~serialization_encoding:Full_staking_balance_repr.encoding_up_to_t
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
       ~staking_balance_to_serialize
       ~expected:staking_balance_to_serialize
+      ()
   in
 
   (* Protocol Q encoding when [previous_min = Some _], when the levels
-     are in different cycles. *)
+     are in different cycles, roundtrip with encoding_up_to_t *)
   let staking_balance_to_serialize =
     Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
       ~own_frozen
@@ -336,14 +354,61 @@ let test_encodings () =
       ~delegated
       ~last_modified_level:level_57
       ~previous_min:(Some (Tez_repr.(mul_exn one 100), level_32))
+      ~stez_frozen:Tez_repr.zero
+  in
+  let* () =
+    check_encoding_compatibility
+      ~__LOC__
+      ~serialization_encoding:Full_staking_balance_repr.encoding_up_to_t
+      ~deserialization_encoding:Full_staking_balance_repr.encoding_up_to_t
+      ~staking_balance_to_serialize
+      ~expected:staking_balance_to_serialize
+      ()
+  in
+
+  (* Alpha encoding with stez_frozen, roundtrip *)
+  let staking_balance_to_serialize =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~last_modified_level:level_52
+      ~previous_min:None
+      ~stez_frozen:(Tez_repr.of_mutez_exn 10_000_000L)
   in
   let* () =
     check_encoding_compatibility
       ~__LOC__
       ~serialization_encoding:Full_staking_balance_repr.encoding
+      ~deserialization_encoding:Full_staking_balance_repr.encoding
       ~staking_balance_to_serialize
       ~expected:staking_balance_to_serialize
+      ()
   in
+
+  (* Migration path: encode with encoding_up_to_t, decode with
+     encoding_up_to_t, re-encode with encoding, decode with encoding.
+     Simulates what happens during protocol activation. *)
+  let q_balance =
+    Full_staking_balance_repr.Internal_for_tests_and_RPCs.init_raw
+      ~own_frozen
+      ~staked_frozen
+      ~delegated
+      ~last_modified_level:level_57
+      ~previous_min:(Some (Tez_repr.(mul_exn one 100), level_52))
+      ~stez_frozen:Tez_repr.zero
+  in
+  let bytes =
+    Binary.to_bytes_exn Full_staking_balance_repr.encoding_up_to_t q_balance
+  in
+  let migrated =
+    Binary.of_bytes_exn Full_staking_balance_repr.encoding_up_to_t bytes
+  in
+  let bytes2 =
+    Binary.to_bytes_exn Full_staking_balance_repr.encoding migrated
+  in
+  let final = Binary.of_bytes_exn Full_staking_balance_repr.encoding bytes2 in
+  let* () = equal_full_staking_balance final q_balance in
   return_unit
 
 (** Tests for add_delegated and remove_delegated *)
@@ -439,6 +504,7 @@ let create_staking_balance ~own_frozen ~staked_frozen ~delegated
        ~delegated
        ~last_modified_level
        ~previous_min
+       ~stez_frozen:Tez_repr.zero
 
 let make_previous_min ?previous_min_value ?previous_min_level ~blocks_per_cycle
     () =
@@ -909,6 +975,7 @@ let check_delegated_variation ~kind ~amount ~current_level ~last_modified_level
       ~delegated:delegated_expected
       ~last_modified_level
       ~previous_min
+      ~stez_frozen:Tez_repr.zero
   in
   let* () =
     check_staking_balance

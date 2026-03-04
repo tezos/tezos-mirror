@@ -294,6 +294,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             ctxt
             cycles
         in
+        (* Migrate staking balances to include stez_frozen field *)
+        let* ctxt =
+          Storage.Stake.Staking_balance_up_to_T.fold
+            ctxt
+            ~order:`Undefined
+            ~init:(Ok ctxt)
+            ~f:(fun delegate balance acc ->
+              let*? ctxt = acc in
+              let*! ctxt =
+                Storage.Stake.Staking_balance.add ctxt delegate balance
+              in
+              return ctxt)
+        in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in

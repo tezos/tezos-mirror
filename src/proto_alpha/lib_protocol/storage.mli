@@ -614,6 +614,13 @@ module Stake : sig
        and type value = Full_staking_balance_repr.t
        and type t := Raw_context.t
 
+  (* TODO: Remove after next protocol *)
+  module Staking_balance_up_to_T :
+    Indexed_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Full_staking_balance_repr.t
+       and type t := Raw_context.t
+
   (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
     Data_set_storage

@@ -138,6 +138,14 @@ let add_staked_frozen_stake ctxt delegate amount =
   let f = Full_staking_balance_repr.add_staked_frozen ~amount in
   update_stake ctxt delegate ~f
 
+let set_stez_frozen_stake ctxt delegate amount =
+  let f = Full_staking_balance_repr.set_stez_frozen ~amount in
+  update_stake ctxt delegate ~f
+
+let clear_stez_frozen_stake ctxt delegate =
+  let f = Full_staking_balance_repr.clear_stez_frozen in
+  update_stake ctxt delegate ~f
+
 let add_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Frozen_staker_repr.Baker delegate ->

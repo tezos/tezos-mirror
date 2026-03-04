@@ -9,8 +9,13 @@
     full staking balances that are maintained to be used at cycle end to compute
     staking rights.
 
-    The module supports lazy migrations both from Oxford to Paris and
-    from Paris to Q. See comments on [encoding] below.
+    The module provides two encodings:
+
+    - [encoding_up_to_t] reads the Q/Paris/Oxford formats (without [stez_frozen]).
+      It is used during protocol activation to migrate existing data.
+
+    - [encoding] reads and writes the Protocol U format (with [stez_frozen]).
+      It is used for all reads and writes after migration.
 *)
 
 (** This type gathers the information we need to store so that we can
@@ -81,6 +86,7 @@ type t = {
   staked_frozen : Tez_repr.t;
   delegated : Tez_repr.t;
   min_delegated_in_cycle : min_delegated_t;
+  stez_frozen : Tez_repr.t;
 }
 
 (* This ensures the {!min_delegated_t} creation post-conditions. *)
@@ -91,146 +97,172 @@ let init ~own_frozen ~staked_frozen ~delegated ~current_level =
     delegated;
     min_delegated_in_cycle =
       {last_modified_level = current_level; previous_min = None};
+    stez_frozen = Tez_repr.zero;
   }
 
-(* This encoding is backward-compatible with both the encodings used
-   in Oxford and in Paris, to allow for lazy migrations.
-
-   In Oxford, {!field-min_delegated_in_cycle} didn't exist at all See
-   [Full_staking_balance_repr_oxford] in
-   [test/unit/test_full_staking_balance_repr.ml]. A decoded value was
-   encoded during Oxford (or before) IFF the "min_delegated_in_cycle"
-   field is [None].
-
-   In Paris, {!field-min_delegated_in_cycle} was of type [Tez_repr.t],
-   and there was another field [level_of_min_delegated : Level_repr.t
-   option]. Both were stored inside the "min_delegated_in_cycle" field
-   in the Paris encoding, with the following encoding:
-
-   {[
-    obj2
-      (req "min_delegated_in_cycle" Tez_repr.encoding)
-      (req "level_of_min_delegated" (option Level_repr.encoding))
-   ]}
-
-   A decoded value was encoded during Paris IFF the
-   "min_delegated_in_cycle" field is present, but its
-   "last_modified_level" field is [None].
-
-   When reading any value that was encoded during a pre-Q protocol, we
-   don't actually care about its min-delegated-related field. So we
-   set [previous_min] to [None] and [last_modified_level] to zero, and
-   we will treat them as coming from an old cycle.
-
-   If this lazy migration happens in the middle of a cycle (which
-   shouldn't be the case because the new min-delegated semantics is a
-   new feature, not a bug fix, so it should be activated as a result
-   of the voting process), this means the cycle that contained the
-   migration, the min will be computed only during the Q portion of
-   the cycle, not the whole cycle.
-
-   Note that we can't use [previous_min_level = None] to signal a
-   value that was read from an older protocol, because it already
-   signifies that [previous_min = None] which has a semantic of its
-   own.
-*)
-let encoding =
+let min_delegated_in_cycle_encoding =
   let open Data_encoding in
-  let min_delegated_in_cycle_encoding =
-    (* This encoding must be backward-compatible with the [added_in_p]
-       encoding of [Full_staking_balance_repr_paris.encoding] in
-       [test/unit/test_full_staking_balance_repr.ml]. That's why
-       "previous_min_level" has to be an option, whereas
-       "previous_min_value" cannot be an option.
+  (* This encoding must be backward-compatible with the [added_in_p]
+     encoding of [Full_staking_balance_repr_paris.encoding] in
+     [test/unit/test_full_staking_balance_repr.ml]. That's why
+     "previous_min_level" has to be an option, whereas
+     "previous_min_value" cannot be an option.
 
-       - "previous_min_level" contains the level part of
-       {!field-previous_min} when it's [Some _], otherwise [None].
+     - "previous_min_level" contains the level part of
+     {!field-previous_min} when it's [Some _], otherwise [None].
 
-       - "previous_min_value" contains the tez part of
-       {!field-previous_min} when it's [Some _], otherwise
-       [Tez_repr.zero].
+     - "previous_min_value" contains the tez part of
+     {!field-previous_min} when it's [Some _], otherwise
+     [Tez_repr.zero].
 
-       - "last_modified_level" contains
-       {!field-last_modified_level}. So this field is always provided
-       when using this encoding to serialize a
-       {!min_delegated_t}. When decoding, if this field is missing,
-       this means that the value comes from the Paris encoding.
+     - "last_modified_level" contains
+     {!field-last_modified_level}. So this field is always provided
+     when using this encoding to serialize a
+     {!min_delegated_t}. When decoding, if this field is missing,
+     this means that the value comes from the Paris encoding.
 
-       Since only the binary encoding is used in the context and not
-       the json one, we use different names for the fields. Thus, this
-       encoding is only *binary* backward-compatible with both the
-       encodings used in Oxford and in Paris. *)
-    obj3
-      (req "previous_min_value" Tez_repr.encoding)
-      (req "previous_min_level" (option Level_repr.encoding))
-      (varopt "last_modified_level" Level_repr.encoding)
+     Since only the binary encoding is used in the context and not
+     the json one, we use different names for the fields. Thus, this
+     encoding is only *binary* backward-compatible with both the
+     encodings used in Oxford and in Paris. *)
+  obj3
+    (req "previous_min_value" Tez_repr.encoding)
+    (req "previous_min_level" (option Level_repr.encoding))
+    (varopt "last_modified_level" Level_repr.encoding)
+
+let min_delegated_of_raw min_delegated_in_cycle_opt =
+  match min_delegated_in_cycle_opt with
+  | None (* Oxford encoding *) | Some (_, _, None) (* Paris encoding *) ->
+      {
+        last_modified_level = Level_repr.level_zero_use_with_care;
+        (* In [min_delegated_and_level] and
+           [compute_new_previous_min], this will ensure that
+           [Cycle_repr.(last_modified_level.cycle <
+           current_level.cycle) && previous_min = None], in
+           which case [last_modified_level] will not be used any
+           further. *)
+        previous_min = None;
+      }
+  | Some (previous_min_value, previous_min_level_opt, Some last_modified_level)
+    -> (
+      (* Protocol Q encoding *)
+      match previous_min_level_opt with
+      | None ->
+          (* This means that [previous_min] is [None]; ignore
+             [previous_min_value] (which should be zero
+             anyway). *)
+          {last_modified_level; previous_min = None}
+      | Some previous_min_level ->
+          {
+            last_modified_level;
+            previous_min = Some (previous_min_value, previous_min_level);
+          })
+
+let min_delegated_to_raw {last_modified_level; previous_min} =
+  let previous_min_value, previous_min_level =
+    match previous_min with
+    | Some (previous_min_value, previous_min_level) ->
+        (previous_min_value, Some previous_min_level)
+    | None -> (Tez_repr.zero, None)
   in
+  (previous_min_value, previous_min_level, Some last_modified_level)
+
+(* This encoding reads and writes the Q format (without [stez_frozen]).
+   It is backward-compatible with both the encodings used in Oxford and
+   in Paris. It is used by {!Staking_balance_up_to_T} in [storage.ml]
+   to read existing data during migration at protocol activation. After
+   migration, all data is read/written using {!encoding} instead. *)
+let encoding_up_to_t =
+  let open Data_encoding in
   conv
     (fun {
            own_frozen;
            staked_frozen;
            delegated;
-           min_delegated_in_cycle = {last_modified_level; previous_min};
+           min_delegated_in_cycle;
+           stez_frozen = _;
          }
        ->
-      let previous_min_value, previous_min_level =
-        match previous_min with
-        | Some (previous_min_value, previous_min_level) ->
-            (previous_min_value, Some previous_min_level)
-        | None -> (Tez_repr.zero, None)
-      in
       ( own_frozen,
         staked_frozen,
         delegated,
-        Some (previous_min_value, previous_min_level, Some last_modified_level)
-      ))
+        Some (min_delegated_to_raw min_delegated_in_cycle) ))
     (fun (own_frozen, staked_frozen, delegated, min_delegated_in_cycle_opt) ->
       let min_delegated_in_cycle =
-        match min_delegated_in_cycle_opt with
-        | None (* Oxford encoding *) | Some (_, _, None) (* Paris encoding *) ->
-            {
-              last_modified_level = Level_repr.level_zero_use_with_care;
-              (* In [min_delegated_and_level] and
-                 [compute_new_previous_min], this will ensure that
-                 [Cycle_repr.(last_modified_level.cycle <
-                 current_level.cycle) && previous_min = None], in
-                 which case [last_modified_level] will not be used any
-                 further. *)
-              previous_min = None;
-            }
-        | Some
-            ( previous_min_value,
-              previous_min_level_opt,
-              Some last_modified_level ) -> (
-            (* Protocol Q encoding *)
-            match previous_min_level_opt with
-            | None ->
-                (* This means that [previous_min] is [None]; ignore
-                   [previous_min_value] (which should be zero
-                   anyway). *)
-                {last_modified_level; previous_min = None}
-            | Some previous_min_level ->
-                {
-                  last_modified_level;
-                  previous_min = Some (previous_min_value, previous_min_level);
-                })
+        min_delegated_of_raw min_delegated_in_cycle_opt
       in
-      {own_frozen; staked_frozen; delegated; min_delegated_in_cycle})
+      {
+        own_frozen;
+        staked_frozen;
+        delegated;
+        min_delegated_in_cycle;
+        stez_frozen = Tez_repr.zero;
+      })
     (obj4
        (req "own_frozen" Tez_repr.encoding)
        (req "staked_frozen" Tez_repr.encoding)
        (req "delegated" Tez_repr.encoding)
        (varopt "min_delegated_in_cycle" min_delegated_in_cycle_encoding))
 
+(* This encoding includes the [stez_frozen] field. It is NOT backward-
+   compatible with data up to Tallinn. All existing staking balances must be
+   migrated at protocol activation (see [init_storage.ml]) before this
+   encoding can be used for reads. *)
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           own_frozen;
+           staked_frozen;
+           delegated;
+           min_delegated_in_cycle;
+           stez_frozen;
+         }
+       ->
+      ( own_frozen,
+        staked_frozen,
+        delegated,
+        stez_frozen,
+        Some (min_delegated_to_raw min_delegated_in_cycle) ))
+    (fun ( own_frozen,
+           staked_frozen,
+           delegated,
+           stez_frozen,
+           min_delegated_in_cycle_opt )
+       ->
+      let min_delegated_in_cycle =
+        min_delegated_of_raw min_delegated_in_cycle_opt
+      in
+      {
+        own_frozen;
+        staked_frozen;
+        delegated;
+        min_delegated_in_cycle;
+        stez_frozen;
+      })
+    (obj5
+       (req "own_frozen" Tez_repr.encoding)
+       (req "staked_frozen" Tez_repr.encoding)
+       (req "delegated" Tez_repr.encoding)
+       (req "stez_frozen" Tez_repr.encoding)
+       (varopt "min_delegated_in_cycle" min_delegated_in_cycle_encoding))
+
 let voting_weight
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle = _} =
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   let open Result_syntax in
   let* frozen = Tez_repr.(own_frozen +? staked_frozen) in
   let+ all = Tez_repr.(frozen +? delegated) in
   Tez_repr.to_mutez all
 
 let apply_slashing ~percentage
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle} =
+    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+    =
   let remaining_percentage = Percentage.neg percentage in
   let own_frozen =
     Tez_repr.mul_percentage ~rounding:`Down own_frozen remaining_percentage
@@ -238,22 +270,56 @@ let apply_slashing ~percentage
   let staked_frozen =
     Tez_repr.mul_percentage ~rounding:`Down staked_frozen remaining_percentage
   in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle}
+  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
 
 let own_frozen
-    {own_frozen; staked_frozen = _; delegated = _; min_delegated_in_cycle = _} =
+    {
+      own_frozen;
+      staked_frozen = _;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   own_frozen
 
 let staked_frozen
-    {own_frozen = _; staked_frozen; delegated = _; min_delegated_in_cycle = _} =
+    {
+      own_frozen = _;
+      staked_frozen;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   staked_frozen
 
+let stez_frozen
+    {
+      own_frozen = _;
+      staked_frozen = _;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      stez_frozen;
+    } =
+  stez_frozen
+
 let total_frozen
-    {own_frozen; staked_frozen; delegated = _; min_delegated_in_cycle = _} =
+    {
+      own_frozen;
+      staked_frozen;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   Tez_repr.(own_frozen +? staked_frozen)
 
 let current_delegated
-    {own_frozen = _; staked_frozen = _; delegated; min_delegated_in_cycle = _} =
+    {
+      own_frozen = _;
+      staked_frozen = _;
+      delegated;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   delegated
 
 (** Computes [min_delegated_in_cycle] (see mli), but also the level at
@@ -290,6 +356,7 @@ let min_delegated_and_level ~cycle_eras ~(current_level : Level_repr.t)
       staked_frozen = _;
       delegated;
       min_delegated_in_cycle = {last_modified_level; previous_min};
+      stez_frozen = _;
     } =
   match previous_min with
   | Some (previous_min_value, previous_min_level)
@@ -392,14 +459,26 @@ let min_delegated_in_cycle ~cycle_eras ~current_level staking_balance =
   fst (min_delegated_and_level ~cycle_eras ~current_level staking_balance)
 
 let current_total
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle = _} =
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   let open Result_syntax in
   let* total_frozen = Tez_repr.(own_frozen +? staked_frozen) in
   Tez_repr.(total_frozen +? delegated)
 
 let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
     ~delegate_limit_of_staking_over_baking_millionth
-    {own_frozen; staked_frozen; delegated = _; min_delegated_in_cycle = _} =
+    {
+      own_frozen;
+      staked_frozen;
+      delegated = _;
+      min_delegated_in_cycle = _;
+      stez_frozen = _;
+    } =
   let global_limit_of_staking_over_baking_millionth =
     Int64.(
       mul
@@ -424,8 +503,13 @@ let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
 
 let own_ratio ~adaptive_issuance_global_limit_of_staking_over_baking
     ~delegate_limit_of_staking_over_baking_millionth
-    ({own_frozen; staked_frozen; delegated = _; min_delegated_in_cycle = _} as t)
-    =
+    ({
+       own_frozen;
+       staked_frozen;
+       delegated = _;
+       min_delegated_in_cycle = _;
+       stez_frozen = _;
+     } as t) =
   if Tez_repr.(own_frozen = zero && staked_frozen = zero) then (1L, 1L)
   else if Tez_repr.(own_frozen = zero) then (0L, 1L)
   else
@@ -516,6 +600,7 @@ let remove_delegated ~cycle_eras ~(current_level : Level_repr.t) ~amount
       staked_frozen;
       delegated = old_delegated;
       min_delegated_in_cycle;
+      stez_frozen;
     } =
   let open Result_syntax in
   let+ new_delegated = Tez_repr.(old_delegated -? amount) in
@@ -532,19 +617,22 @@ let remove_delegated ~cycle_eras ~(current_level : Level_repr.t) ~amount
     delegated = new_delegated;
     min_delegated_in_cycle =
       {last_modified_level = current_level; previous_min = new_previous_min};
+    stez_frozen;
   }
 
 let remove_own_frozen ~amount
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle} =
+    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+    =
   let open Result_syntax in
   let+ own_frozen = Tez_repr.(own_frozen -? amount) in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle}
+  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
 
 let remove_staked_frozen ~amount
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle} =
+    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+    =
   let open Result_syntax in
   let+ staked_frozen = Tez_repr.(staked_frozen -? amount) in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle}
+  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
 
 (* This function must ensure {!min_delegated_t} modification
    post-conditions. *)
@@ -554,6 +642,7 @@ let add_delegated ~cycle_eras ~(current_level : Level_repr.t) ~amount
       staked_frozen;
       delegated = old_delegated;
       min_delegated_in_cycle;
+      stez_frozen;
     } =
   let open Result_syntax in
   let+ new_delegated = Tez_repr.(old_delegated +? amount) in
@@ -570,19 +659,56 @@ let add_delegated ~cycle_eras ~(current_level : Level_repr.t) ~amount
     delegated = new_delegated;
     min_delegated_in_cycle =
       {last_modified_level = current_level; previous_min = new_previous_min};
+    stez_frozen;
   }
 
 let add_own_frozen ~amount
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle} =
+    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+    =
   let open Result_syntax in
   let+ own_frozen = Tez_repr.(own_frozen +? amount) in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle}
+  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
 
 let add_staked_frozen ~amount
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle} =
+    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+    =
   let open Result_syntax in
   let+ staked_frozen = Tez_repr.(staked_frozen +? amount) in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle}
+  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
+
+let set_stez_frozen ~amount
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle;
+      stez_frozen = _;
+    } =
+  Ok
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle;
+      stez_frozen = amount;
+    }
+
+let clear_stez_frozen
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle;
+      stez_frozen = _;
+    } =
+  Ok
+    {
+      own_frozen;
+      staked_frozen;
+      delegated;
+      min_delegated_in_cycle;
+      stez_frozen = Tez_repr.zero;
+    }
 
 module Internal_for_tests_and_RPCs = struct
   let min_delegated_and_level = min_delegated_and_level
@@ -593,6 +719,7 @@ module Internal_for_tests_and_RPCs = struct
         staked_frozen = _;
         delegated = _;
         min_delegated_in_cycle = {last_modified_level; previous_min = _};
+        stez_frozen = _;
       } =
     last_modified_level
 
@@ -602,15 +729,17 @@ module Internal_for_tests_and_RPCs = struct
         staked_frozen = _;
         delegated = _;
         min_delegated_in_cycle = {last_modified_level = _; previous_min};
+        stez_frozen = _;
       } =
     previous_min
 
   let init_raw ~own_frozen ~staked_frozen ~delegated ~last_modified_level
-      ~previous_min =
+      ~previous_min ~stez_frozen =
     {
       own_frozen;
       staked_frozen;
       delegated;
       min_delegated_in_cycle = {last_modified_level; previous_min};
+      stez_frozen;
     }
 end
