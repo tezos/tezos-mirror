@@ -145,10 +145,14 @@ blueprint_application:
         { "level": $positive_bignum,
           "timestamp": $timestamp.rfc,
           "txs_nb": integer ∈ [-2^30, 2^30],
-          "gas_used": $positive_bignum,
+          "gas_used": $bignum,
           "block_hash": $unistring,
-          "execution_gas": $positive_bignum,
+          "execution_gas": $bignum,
           "process_time": $timespan.system } }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
