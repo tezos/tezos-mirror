@@ -1111,8 +1111,8 @@ module Actions = struct
       ~name:"no_attestable_dal_slots_for_levels"
       ~level:Warning
       ~msg:
-        "No attestable DAL slots found for {delegate_id} at attested level \
-         {attested_level} for published levels [{published_levels}]"
+        "No DAL attestation data received for {delegate_id} at attested \
+         level {attested_level} for published levels [{published_levels}]"
       ("delegate_id", Delegate_id.encoding)
       ("attested_level", Data_encoding.int32)
       ("published_levels", Data_encoding.string)
