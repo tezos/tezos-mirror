@@ -50,6 +50,18 @@ version_manager --file versions.json set-latest --major 25 --minor 0
 version_manager --file versions.json upload --path BUCKET/PATH
 ```
 
+### RSS Feed
+
+The `version_manager` tool can generate an RSS feed for the releases:
+
+```shell
+version_manager --file versions.json generate-rss --path octez.tezos.com/releases --output feed.xml
+```
+
+- `--path PATH` (required): used to construct the default feed link (`https://PATH`) unless `--base-url` is provided.
+- `--base-url URL` (optional): overrides the base URL used for feed links.
+- `--output FILE` (optional): path to write the RSS feed to. Defaults to `feed.xml` in the current directory.
+
 The `release_page` script makes the following assumptions:
 
   - Each component `COMPONENT` has a base path of `BUCKET/PATH/COMPONENT`, which we refer to as `COMPONENT_LOCATION`.
