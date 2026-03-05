@@ -2773,6 +2773,57 @@ let test_cross_runtime_erc20_transfer_from_michelson =
       ~error_msg:"Expected storage slot 0 = %R but got %L") ;
   unit
 
+(** Query manager_key on a specific block hash (not head) via the Tezlink RPC.
+
+    1. Capture the current Tezlink block header hash (the reveal block).
+    2. Produce one more block via a transfer (head moves forward).
+    3. Query manager_key using the captured block hash in the URL path.
+    4. Verify it returns the correct public key. *)
+let test_manager_key_on_block_hash =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Query manager_key on a specific block hash via Tezlink RPC"
+    ~tags:["manager_key"; "block_hash"; "rpc"]
+    ~with_runtimes:[Tezos]
+  @@ fun {sequencer; _} _protocol ->
+  let receiver_account = Constant.bootstrap2 in
+  let*@ _block_number = Rpc.produce_block sequencer in
+
+  (* Step 1: Capture the current block header hash (block with the reveal) *)
+  let* header = get_tezlink_block_header sequencer in
+  let block_hash = JSON.(header |-> "hash" |> as_string) in
+  Log.info "Captured block hash: %s" block_hash ;
+  (* Step 2: Produce one more block via a transfer to move head forward *)
+  let*@ _block_number = Rpc.produce_block sequencer in
+
+  (* Sanity check: head has moved past the reveal block *)
+  let* new_header = get_tezlink_block_header sequencer in
+  let new_hash = JSON.(new_header |-> "hash" |> as_string) in
+  Check.(
+    (block_hash <> new_hash)
+      string
+      ~error_msg:"Head should have moved but hash is still %L") ;
+  (* Step 3: Query manager_key using the saved block hash *)
+  let path =
+    sf
+      "/tezlink/chains/main/blocks/%s/context/contracts/%s/manager_key"
+      block_hash
+      receiver_account.public_key_hash
+  in
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  let manager_key = JSON.parse ~origin:"manager_key_on_block_hash" res in
+  (* Step 4: Verify manager_key matches the revealed public key *)
+  Check.(
+    JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -2806,5 +2857,6 @@ let () =
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
   test_get_ethereum_tezos_address_rpc ~runtime:Tezos () ;
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
+  test_manager_key_on_block_hash [Alpha] ;
   test_instant_confirmations ~runtime:Tezos () ;
   test_nested_crac [Alpha]

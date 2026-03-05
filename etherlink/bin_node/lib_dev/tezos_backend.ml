@@ -51,10 +51,6 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         return
         @@ Ethereum_types.Block_parameter.Block_parameter
              Ethereum_types.Block_parameter.Latest
-    | `Hash (hash, 0l) ->
-        return
-        @@ Ethereum_types.Block_parameter.Block_hash
-             {hash; require_canonical = false}
     | block ->
         let* num = shell_block_param_to_block_number block in
         return
