@@ -68,11 +68,12 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args7
+       (args8
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
+          no_slow_vm_fallback_switch
           profiling_arg
           etherlink_switch
           l1_monitor_finalized_switch))
@@ -109,6 +110,7 @@ let config_init_command =
              allowed_headers,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
+             no_slow_vm_fallback,
              profiling,
              force_etherlink,
              l1_monitor_finalized ) )
@@ -154,6 +156,7 @@ let config_init_command =
           ~allowed_headers
           ~apply_unsafe_patches:false
           ~bail_on_disagree
+          ~no_slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -188,7 +191,7 @@ let legacy_run_command =
           enable_performance_metrics_arg
           disable_performance_metrics_arg
           l1_monitor_finalized_switch)
-       (args21
+       (args22
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -209,6 +212,7 @@ let legacy_run_command =
           apply_unsafe_patches_switch
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
+          no_slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
@@ -243,6 +247,7 @@ let legacy_run_command =
              apply_unsafe_patches,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
+             no_slow_vm_fallback,
              profiling ) )
          cctxt
        ->
@@ -285,6 +290,7 @@ let legacy_run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~no_slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -320,7 +326,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args17
+       (args18
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -337,6 +343,7 @@ let run_command =
           apply_unsafe_patches_switch
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
+          no_slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
@@ -372,6 +379,7 @@ let run_command =
              apply_unsafe_patches,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
+             no_slow_vm_fallback,
              profiling ) )
          mode
          sc_rollup_address
@@ -417,6 +425,7 @@ let run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~no_slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized

@@ -149,6 +149,7 @@ type t = {
   log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
+  no_slow_vm_fallback : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
@@ -336,6 +337,7 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    no_slow_vm_fallback:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
     l1_monitor_finalized:bool option ->
@@ -374,6 +376,7 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    no_slow_vm_fallback:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
     l1_monitor_finalized:bool option ->
