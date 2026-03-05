@@ -255,12 +255,16 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     Signer.of_sequencer_keys configuration cctxt sequencer_config.sequencer
   in
   let* status, smart_rollup_address_typed =
+    let signer_type =
+      if Option.is_some sandbox_config then Evm_context.Sandbox else Sequencer
+    in
+    let sequencer_key_source = Evm_context.Local (signer_type, signer) in
     Evm_context.start
       ~configuration
       ?kernel_path:kernel
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:Read_write
-      ~signer
+      ~sequencer_key_source
       ?snapshot_source
       ()
   in
@@ -277,16 +281,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
           tezlink;
           _;
         } ->
-        let*? pk, _ = Signer.first_lexicographic_signer signer in
-        let* () =
-          Evm_context.patch_state
-            ~key:
-              (Durable_storage_path.sequencer_key
-                 ~storage_version:head.storage_version)
-            ~value:(Signature.Public_key.to_b58check pk)
-            ()
-        in
-        let*! () = Events.patched_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
         in

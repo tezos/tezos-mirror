@@ -218,6 +218,18 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ()
   in
 
+  let sequencer_key_source =
+    if sandbox then
+      Some
+        (Evm_context.RPC_fetch
+           {
+             evm_node_endpoint;
+             timeout = config.rpc_timeout;
+             keep_alive = config.keep_alive;
+           })
+    else None
+  in
+
   let* _loaded =
     Evm_context.start
       ~configuration:config
@@ -226,30 +238,8 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~store_perm:Read_write
+      ?sequencer_key_source
       ?snapshot_source
-      ()
-  in
-
-  let* () =
-    when_ sandbox @@ fun () ->
-    let*! {
-            next_blueprint_number = Qty next_blueprint_number;
-            storage_version;
-            _;
-          } =
-      Evm_context.head_info ()
-    in
-    let* pk =
-      Batch.call
-        ~timeout:config.rpc_timeout
-        ~keep_alive:config.keep_alive
-        (module Rpc_encodings.Sequencer)
-        ~evm_node_endpoint
-        (Block_parameter (Number (Qty (Z.pred next_blueprint_number))))
-    in
-    Evm_context.patch_state
-      ~key:(Durable_storage_path.sequencer_key ~storage_version)
-      ~value:(Signature.Public_key.to_b58check pk)
       ()
   in
 
