@@ -3700,13 +3700,15 @@ let test_tezlink_da_fee_credited_to_pool =
     ~error_msg:"Balance of the sequencer pool address should be %L but go %R" ;
   unit
 
-(** Tests the interaction between DA fees and [--minimal-nanotez-per-byte].
+(** Tests the interaction between DA fees and fee estimation.
     The client internally simulates with fee=0 to estimate gas, so the
     kernel and node must skip the DA fee check during simulation. The fee
-    is then patched using [--minimal-nanotez-per-byte] before injection.
-    First, verifies that a value below the DA fee (1000 nanotez/byte vs
-    4 mutez/byte) is rejected with [insufficient_fees]. Then, verifies
-    that a matching value (4000 nanotez/byte) lets the transfer succeed. *)
+    is then patched using the DA fee before injection.
+    First, verifies that an explicit [--minimal-nanotez-per-byte] below
+    the DA fee (1000 nanotez/byte vs 4 mutez/byte) is rejected with
+    [insufficient_fees]. Then, verifies that without the flag, the client
+    fetches the correct DA fee from the mempool filter RPC and the
+    transfer succeeds. *)
 let test_tezlink_simulation_with_da_fee =
   register_tezlink_only_test
     ~title:"Michelson transfer simulation succeeds with DA fees enabled"
@@ -3737,25 +3739,9 @@ let test_tezlink_simulation_with_da_fee =
   Check.(err =~ rex "evm_node.dev.insufficient_fees")
     ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
 
-  (* Currently, without setting DA fees, the hadcoded value of 1000 nanotez/byte
-     will be used. Which should make the transfer fail.
-     But this test should succeed (and thus adapted) with
-     MR https://gitlab.com/tezos/tezos/-/merge_requests/21050 *)
-  let process =
-    Client.spawn_transfer
-      ~endpoint
-      ~amount:Tez.one
-      ~giver:Constant.bootstrap1.alias
-      ~receiver:Constant.bootstrap2.alias
-      ~burn_cap:Tez.one
-      client
-  in
-  let* err = Process.check_and_read_stderr ~expect_failure:true process in
-  Check.(err =~ rex "evm_node.dev.insufficient_fees")
-    ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
-
-  (* 4000 nanotez/byte = 4 mutez/byte, matching the DA fee: the fee now
-     covers the DA cost and the transfer succeeds. *)
+  (* Without [--minimal-nanotez-per-byte], the client fetches the DA fee
+     from the node's [GET .../mempool/filter] RPC (4000 nanotez/byte here)
+     and uses it to compute a sufficient fee. *)
   let* () =
     Client.transfer
       ~endpoint
@@ -3763,7 +3749,6 @@ let test_tezlink_simulation_with_da_fee =
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
-      ~minimal_nanotez_per_byte:4000
       client
   in
   let*@ _ = Rpc.produce_block sequencer in
