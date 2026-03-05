@@ -512,26 +512,61 @@ let only_if_dal_feature_enabled state ~default_value f =
       state.global_state.dal_node_rpc_ctxt
   else return default_value
 
-(** [process_and_accumulate_dal_rpc_result state acc slots] processes
-    attestable [slots] and adds them to the accumulator [acc]. *)
-let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
-    slots =
+let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index
+    ~published_level ~current_level ~predecessor_hash ~block_hash ~delegate_id
+    acc slots =
+  let open Lwt_syntax in
+  let open Dal_included_attestations_cache in
   let number_of_slots =
     state.global_state.constants.parametric.dal.number_of_slots
   in
-  List.fold_left_i
-    (fun i acc' status ->
-      match Dal.Slot_index.of_int_opt ~number_of_slots i with
-      | Some index when status = Dal_attestable_slots_worker.Attestable ->
+  let attestable_slots =
+    List.fold_left_i
+      (fun i acc status ->
+        match Dal.Slot_index.of_int_opt ~number_of_slots i with
+        | Some _ when status = Dal_attestable_slots_worker.Attestable ->
+            SlotSet.add i acc
+        | _ -> acc)
+      SlotSet.empty
+      slots
+  in
+  let+ slots_to_attest =
+    match
+      filter_attestable_slots
+        state.global_state.dal_included_attestations_cache
+        ~delegate_id
+        ~published_level
+        ~attestable_slots
+        ~head_level:current_level
+        ~head_hash:block_hash
+        ~predecessor_hash
+      [@profiler.record_f
+        {verbosity = Debug}
+          (Format.asprintf "filter_attestable_slots (PL : %ld)" published_level)]
+    with
+    | Ok filtered -> return filtered
+    | Error trace ->
+        let* () =
+          Events.(
+            emit
+              dal_attestation_deduplication_error
+              (delegate_id, published_level, trace))
+        in
+        return attestable_slots
+  in
+  SlotSet.fold
+    (fun slot_index acc' ->
+      match Dal.Slot_index.of_int_opt ~number_of_slots slot_index with
+      | Some index ->
           Dal.Attestations.commit
             acc'
             ~number_of_slots
             ~number_of_lags
             ~lag_index
             index
-      | None | Some _ -> acc')
+      | None -> acc')
+    slots_to_attest
     acc
-    slots
 
 let attested_slot_indices slots =
   List.fold_left_i
@@ -633,7 +668,7 @@ let may_get_dal_content state consensus_vote =
                (acc, missing_levels, slots_per_level, traps_per_level)
                published_level
              ->
-            let+ dal_attestable_slots =
+            let* dal_attestable_slots =
               (Dal_attestable_slots_worker.get_dal_attestable_slots
                  dal_attestable_slots_worker
                  ~delegate_id
@@ -648,10 +683,11 @@ let may_get_dal_content state consensus_vote =
             in
             match dal_attestable_slots with
             | None ->
-                ( acc,
-                  published_level :: missing_levels,
-                  slots_per_level,
-                  traps_per_level )
+                return
+                  ( acc,
+                    published_level :: missing_levels,
+                    slots_per_level,
+                    traps_per_level )
             | Some slots ->
                 let attested_indices = attested_slot_indices slots in
                 let trap_indices = trap_slot_indices slots in
@@ -665,15 +701,21 @@ let may_get_dal_content state consensus_vote =
                     (published_level, trap_indices) :: traps_per_level
                   else traps_per_level
                 in
-                ( process_and_accumulate_dal_rpc_result
+                let+ acc' =
+                  process_and_accumulate_dal_rpc_result
                     state
-                    acc
                     ~number_of_lags
                     ~lag_index
-                    slots,
-                  missing_levels,
-                  slots_per_level,
-                  traps_per_level ))
+                    ~published_level
+                    ~current_level:level
+                    ~predecessor_hash:
+                      state.level_state.latest_proposal.predecessor.hash
+                    ~block_hash:state.level_state.latest_proposal.block.hash
+                    ~delegate_id
+                    acc
+                    slots
+                in
+                (acc', missing_levels, slots_per_level, traps_per_level))
           (Dal.Attestations.empty, [], [], [])
           published_levels
       in

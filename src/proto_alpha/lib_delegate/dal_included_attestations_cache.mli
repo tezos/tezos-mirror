@@ -23,8 +23,11 @@
     the block(s) that included it ([block_hashes]). *)
 
 open Protocol.Alpha_context
+open Baking_state_types
 
 type t
+
+module SlotSet : Set.S with type elt = int
 
 (** [create ~attestation_lags ~number_of_slots] creates a new empty cache. *)
 val create : attestation_lags:int list -> number_of_slots:int -> t
@@ -35,6 +38,19 @@ val create : attestation_lags:int list -> number_of_slots:int -> t
     without receipts. *)
 val set_committee :
   t -> level:int32 -> (Slot.t -> Signature.Public_key_hash.t option) -> unit
+
+(** [filter_attestable_slots t ~delegate_id ~published_level ~attestable_slots
+    ~head_level ~head_hash ~predecessor_hash] filters out slots that have
+    already been attested on-chain from [~attestable_slots]. *)
+val filter_attestable_slots :
+  t ->
+  delegate_id:Delegate_id.t ->
+  published_level:int32 ->
+  attestable_slots:SlotSet.t ->
+  head_level:int32 ->
+  head_hash:Block_hash.t ->
+  predecessor_hash:Block_hash.t ->
+  SlotSet.t tzresult
 
 (** [update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
     ~grandparent ~operations] extracts DAL attestations from the consensus

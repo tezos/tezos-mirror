@@ -9,10 +9,43 @@ open Protocol.Alpha_context
 open Baking_state_types
 
 type error +=
+  | Attestation_deduplication_cache_internal_error of {
+      message : string;
+      attested_level : int32;
+      head_level : int32;
+    }
   | Committee_not_found of {committee_level : int32}
   | Slot_to_delegate_lookup_failed of {slot : Slot.t; committee_level : int32}
 
 let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal_included_attestations_cache.cache_internal_error"
+    ~title:"DAL attestation deduplication cache internal error"
+    ~description:
+      "An internal inconsistency was detected in the DAL attestation \
+       deduplication cache"
+    ~pp:(fun ppf (message, attested_level, head_level) ->
+      Format.fprintf
+        ppf
+        "DAL attestation deduplication cache internal error: %s \
+         (attested_level=%ld, head_level=%ld)"
+        message
+        attested_level
+        head_level)
+    Data_encoding.(
+      obj3
+        (req "message" string)
+        (req "attested_level" int32)
+        (req "head_level" int32))
+    (function
+      | Attestation_deduplication_cache_internal_error
+          {message; attested_level; head_level} ->
+          Some (message, attested_level, head_level)
+      | _ -> None)
+    (fun (message, attested_level, head_level) ->
+      Attestation_deduplication_cache_internal_error
+        {message; attested_level; head_level}) ;
   register_error_kind
     `Permanent
     ~id:"dal_included_attestations_cache.committee_not_found"
@@ -98,6 +131,53 @@ let set_committee t ~level lookup_fn =
 (** [get_committee t ~level] retrieves the committee lookup function for the
     given level from the cache. *)
 let get_committee t ~level = Level_map.find_opt t.committees level
+
+(** For each slot, the decision
+    depends on how "deep" the attesting block is relative to [~head_level]:
+    - depth >= 2: the attesting block is final by Tenderbake - filter the
+      slot out unconditionally;
+    - depth 0 or 1: the attesting block is not yet final — filter the slot
+      out only if one of the recorded block hashes sits on the current chain
+      (matched against [~head_hash] or [~predecessor_hash]), respectively;
+    - depth < 0 (attested_level > head_level): returns an error. *)
+let filter_attestable_slots t ~delegate_id ~published_level ~attestable_slots
+    ~head_level ~head_hash ~predecessor_hash =
+  let open Result_syntax in
+  match Delegate_id.Table.find_opt t.cache delegate_id with
+  | None -> return attestable_slots
+  | Some published_level_cache -> (
+      match Level_map.find_opt published_level_cache published_level with
+      | None -> return attestable_slots
+      | Some slot_map ->
+          SlotSet.fold_e
+            (fun slot_index acc ->
+              match SlotMap.find_opt slot_index slot_map with
+              | None -> return @@ SlotSet.add slot_index acc
+              | Some {attested_level; block_hashes} ->
+                  let level_diff = Int32.sub head_level attested_level in
+                  if level_diff >= 2l then return acc
+                  else if level_diff < 0l then
+                    tzfail
+                      (Attestation_deduplication_cache_internal_error
+                         {
+                           message = "attested_level > head_level";
+                           attested_level;
+                           head_level;
+                         })
+                  else
+                    let target_block_hash =
+                      if level_diff = 0l then head_hash else predecessor_hash
+                    in
+                    return
+                    @@
+                    if
+                      List.exists
+                        (Block_hash.equal target_block_hash)
+                        block_hashes
+                    then acc
+                    else SlotSet.add slot_index acc)
+            attestable_slots
+            SlotSet.empty)
 
 (** [extract_attested_pairs] decodes the attestation bitset and returns one
     entry per [published_level] with the set of all slot indices attested at

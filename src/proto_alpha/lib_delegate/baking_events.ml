@@ -1105,6 +1105,19 @@ module Actions = struct
       ("round", Round.encoding)
       ("seconds", Data_encoding.float)
 
+  let dal_attestation_deduplication_error =
+    declare_3
+      ~section
+      ~name:"dal_attestation_deduplication_error"
+      ~level:Warning
+      ~msg:
+        "DAL attestation deduplication failed for {delegate_id} at published \
+         level {published_level}, with error: {trace}"
+      ("delegate_id", Delegate_id.encoding)
+      ("published_level", Data_encoding.int32)
+      ("trace", Error_monad.trace_encoding)
+      ~pp3:Error_monad.pp_print_trace
+
   let no_attestable_dal_slots_for_levels =
     declare_3
       ~section
