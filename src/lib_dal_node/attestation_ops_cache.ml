@@ -13,10 +13,7 @@ module Level_map =
       let hash = Hashtbl.hash
     end)
 
-type is_attested_fn =
-  number_of_slots:int -> number_of_lags:int -> lag_index:int -> int -> bool
-
-type entry = int * is_attested_fn option
+type entry = int * Dal_plugin.unfolded_lag_attestation list option
 
 type cached_ops = entry list
 

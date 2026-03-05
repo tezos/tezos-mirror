@@ -29,6 +29,33 @@ let slot_index_of_int i =
 let assert_equal_bool ~loc msg expected actual =
   Assert.equal ~loc Bool.equal msg Format.pp_print_bool expected actual
 
+let assert_equal_decoded_attestations ~loc msg expected actual =
+  let open Dal_attestations_repr in
+  let pp_unfolded_lag_attestation fmt {lag_index; slot_indices} =
+    Format.fprintf
+      fmt
+      "{lag = %d; slots = %a}"
+      lag_index
+      Format.(
+        pp_print_list
+          ~pp_sep:Format.(fun fmt () -> fprintf fmt "%a" pp_print_string ",")
+          pp_print_int)
+      slot_indices
+  in
+  Assert.equal
+    ~loc
+    (List.equal
+       (fun
+         {lag_index = lag_idx_a; slot_indices = slot_idx_a}
+         {lag_index = lag_idx_b; slot_indices = slot_idx_b}
+       ->
+         Int.equal lag_idx_a lag_idx_b
+         && List.equal Int.equal slot_idx_a slot_idx_b))
+    msg
+    (Format.pp_print_list pp_unfolded_lag_attestation)
+    expected
+    actual
+
 (** Helper for is_attested with pre-filled number_of_slots and number_of_lags *)
 let is_attested t ~lag_index slot_index =
   Dal_attestations_repr.is_attested
@@ -515,7 +542,83 @@ let test_complex_pattern () =
   let* () = check_slot 3 31 true in
   let* () = check_slot 3 1 false in
 
-  return_unit
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  match decoded with
+  | Error _ -> Alcotest.fail "Cannot decode DAL attestation"
+  | Ok decoded ->
+      assert_equal_decoded_attestations
+        ~loc:__LOC__
+        ""
+        [
+          {lag_index = 0; slot_indices = [1; 3; 5]};
+          {lag_index = 1; slot_indices = [10]};
+          {lag_index = 3; slot_indices = [0; 15; 31]};
+        ]
+        decoded
+
+let test_out_of_window_failure () =
+  let open Lwt_result_syntax in
+  (* One wants to construct [t] the attestation of slots 0 and 11 for slot 0.
+     [t] contains:
+     1000 as the prefix (only lag 0 is attested),
+     0 0100000 (not the last byte of lag 0 and slot 1 is attested),
+     1 0000100 (last byte of lag 1 and slot 11 is attested).
+     So a total of 20 bits used.
+  *)
+  let z_repr =
+    Z.(one + shift_left one 6 + shift_left one 12 + shift_left one 17)
+  in
+  let*? t =
+    Environment.wrap_tzresult
+      (Dal_attestations_repr.Internal_for_tests.of_z z_repr)
+  in
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  (* We check that the manually constructed bitset is indeed the encoding we want. *)
+  let* () =
+    match decoded with
+    | Error _ -> Alcotest.fail "Cannot decode DAL attestation"
+    | Ok decoded ->
+        assert_equal_decoded_attestations
+          ~loc:__LOC__
+          ""
+          [{lag_index = 0; slot_indices = [1; 11]}]
+          decoded
+  in
+  (* We add a spurious bit after the end of the bitset. *)
+  let z_repr = Z.(z_repr + shift_left one 20) in
+  let*? t =
+    Environment.wrap_tzresult
+      (Dal_attestations_repr.Internal_for_tests.of_z z_repr)
+  in
+  (* We expect decode to detect that the attestation bitset is not valid.*)
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult decoded) (fun _ -> true)
+
+(** Test that decode accepts a bitset whose highest set bit is the very last
+    bit of the last chunk. This exercises the boundary of the trailing-bits
+    check: slot 6 at lag 0 lands at bit 7 of chunk 0 (position 11), which is
+    the last bit before next_offset (12). *)
+let test_decode_last_bit_of_chunk () =
+  let t = Dal_attestations_repr.empty in
+  let t = commit t ~lag_index:0 6 in
+  let decoded =
+    Dal_attestations_repr.decode ~number_of_slots ~number_of_lags t
+  in
+  match decoded with
+  | Error _ ->
+      Alcotest.fail "decode rejected a valid bitset with slot 6 at lag 0"
+  | Ok decoded ->
+      assert_equal_decoded_attestations
+        ~loc:__LOC__
+        ""
+        [{lag_index = 0; slot_indices = [6]}]
+        decoded
 
 let tests =
   [
@@ -535,6 +638,11 @@ let tests =
     Tztest.tztest "many slots at same lag" `Quick test_many_slots_same_lag;
     Tztest.tztest "size calculation" `Quick test_size_calculation;
     Tztest.tztest "complex pattern" `Quick test_complex_pattern;
+    Tztest.tztest "out of window failure" `Quick test_out_of_window_failure;
+    Tztest.tztest
+      "decode last bit of chunk"
+      `Quick
+      test_decode_last_bit_of_chunk;
   ]
 
 let () =
