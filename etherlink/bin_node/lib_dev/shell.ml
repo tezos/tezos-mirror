@@ -50,6 +50,7 @@ let run ~(config : Configuration.t) block_param k =
         Ethereum_types.Block_parameter.pp_extended
         block_param
   | Some hash ->
+      Pvm.Context.reload ro_ctxt.index ;
       let*! context = Pvm.Context.checkout_exn ro_ctxt.index hash in
       let*! tree = Pvm.State.get context in
       k ro_ctxt tree

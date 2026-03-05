@@ -38,6 +38,11 @@
   DAL slot import signals and relies exclusively on `DalAttestedSlots` internal
   inbox messages for importing DAL data (requires protocol U). (!20143)
 
+### Bug fixes
+
+- Fix `shell` (and children subcommands) failing with "No store found"
+  when the EVM node is running on the same data directory. (!21067)
+
 ### Execution changes
 
 - Supports executing Farfadet-r2 natively. (!20604)
