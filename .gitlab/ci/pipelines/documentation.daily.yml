@@ -112,13 +112,10 @@ oc.build_x86_64-extra-dev:
     expire_in: 1 day
     paths:
     - octez-*
-    - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
     when: on_success
 
 oc.build_x86_64-released:

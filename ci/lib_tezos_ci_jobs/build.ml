@@ -117,13 +117,10 @@ let job_build_extra_dev =
     ~artifacts:
       [
         "octez-*";
-        "octez-teztale-*";
         "src/proto_*/parameters/*.json";
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
         "_build/default/tezt/tests/main.exe";
         "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-        "etherlink-governance-observer";
-        "fa-bridge-watchtower";
       ]
     ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
@@ -137,15 +134,9 @@ let job_build_exp =
     ~executable_files:"script-inputs/experimental-executables"
     ~artifacts:
       [
-        (* TODO: clean up this list, which was originally shared with
-           [job_build_x86_64_extra_dev] but with no good reason since the two jobs
-           do not build the same set of executables. *)
         "octez-*";
         "octez-teztale-*";
         "src/proto_*/parameters/*.json";
-        "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-        "_build/default/tezt/tests/main.exe";
-        "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
         "etherlink-governance-observer";
         "fa-bridge-watchtower";
       ]
