@@ -689,7 +689,14 @@ impl ChainConfigTrait for EvmChainConfig {
     where
         Host: StorageV1 + WasmHost + Logging,
     {
-        start_simulation_mode(host, registry, &self.spec_id)
+        if self.enable_tezos_runtime() {
+            let context =
+                TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+            self.michelson_chain_config
+                .run_tezlink_simulation(host, registry, context)
+        } else {
+            start_simulation_mode(host, registry, &self.spec_id)
+        }
     }
 
     fn storage_root_paths(&self) -> Vec<RefPath> {
@@ -1071,6 +1078,33 @@ impl ChainConfigTrait for MichelsonChainConfig {
     where
         Host: StorageV1 + WasmHost + Logging,
     {
+        let context =
+            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
+        self.run_tezlink_simulation(host, registry, context)
+    }
+
+    fn storage_root_paths(&self) -> Vec<RefPath> {
+        vec![
+            TEZLINK_SAFE_STORAGE_ROOT_PATH,
+            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        ]
+    }
+}
+
+impl MichelsonChainConfig {
+    pub fn create_config(chain_id: ChainId) -> Self {
+        Self { chain_id }
+    }
+
+    pub fn run_tezlink_simulation<Host, C: context::Context>(
+        &self,
+        host: &mut Host,
+        registry: &impl Registry,
+        context: C,
+    ) -> anyhow::Result<()>
+    where
+        Host: StorageV1 + WasmHost + Logging,
+    {
         fn read_inbox_message(
             host: &mut impl WasmHost,
         ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
@@ -1121,8 +1155,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
             "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
             operation_bytes.len()
         );
-        let context =
-            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
 
         let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
         let block_ctx = BlockCtx {
@@ -1164,19 +1196,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
         );
         host.store_write_all(&TEZLINK_SIMULATION_RESULT_PATH, &result.to_bytes()?)?;
         Ok(())
-    }
-
-    fn storage_root_paths(&self) -> Vec<RefPath> {
-        vec![
-            TEZLINK_SAFE_STORAGE_ROOT_PATH,
-            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-        ]
-    }
-}
-
-impl MichelsonChainConfig {
-    pub fn create_config(chain_id: ChainId) -> Self {
-        Self { chain_id }
     }
 }
 
