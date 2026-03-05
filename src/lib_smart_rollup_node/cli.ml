@@ -621,12 +621,12 @@ let unsafe_disable_wasm_kernel_checks_switch :
        debug, do not use in production!"
     ()
 
-let no_slow_vm_fallback_switch : (bool, Client_context.full) Tezos_clic.arg =
+let slow_vm_fallback_switch : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
-    ~long:"no-slow-vm-fallback"
+    ~long:"slow-vm-fallback"
     ~doc:
-      "Exit the node instead of falling back to the slow VM interpreter when \
-       the fast execution engine (Wasmer) fails."
+      "Fall back to the slow VM interpreter when the fast execution engine \
+       (Wasmer) fails instead of exiting."
     ()
 
 let level_param next =

@@ -73,7 +73,7 @@ let config_init_command =
           cors_allowed_headers_arg
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
-          no_slow_vm_fallback_switch
+          slow_vm_fallback_switch
           profiling_arg
           etherlink_switch
           l1_monitor_finalized_switch))
@@ -110,7 +110,7 @@ let config_init_command =
              allowed_headers,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
-             no_slow_vm_fallback,
+             slow_vm_fallback,
              profiling,
              force_etherlink,
              l1_monitor_finalized ) )
@@ -156,7 +156,7 @@ let config_init_command =
           ~allowed_headers
           ~apply_unsafe_patches:false
           ~bail_on_disagree
-          ~no_slow_vm_fallback
+          ~slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -212,7 +212,7 @@ let legacy_run_command =
           apply_unsafe_patches_switch
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
-          no_slow_vm_fallback_switch
+          slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
@@ -247,7 +247,7 @@ let legacy_run_command =
              apply_unsafe_patches,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
-             no_slow_vm_fallback,
+             slow_vm_fallback,
              profiling ) )
          cctxt
        ->
@@ -290,7 +290,7 @@ let legacy_run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
-          ~no_slow_vm_fallback
+          ~slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -343,7 +343,7 @@ let run_command =
           apply_unsafe_patches_switch
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
-          no_slow_vm_fallback_switch
+          slow_vm_fallback_switch
           profiling_arg))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
@@ -379,7 +379,7 @@ let run_command =
              apply_unsafe_patches,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
-             no_slow_vm_fallback,
+             slow_vm_fallback,
              profiling ) )
          mode
          sc_rollup_address
@@ -425,7 +425,7 @@ let run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
-          ~no_slow_vm_fallback
+          ~slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized

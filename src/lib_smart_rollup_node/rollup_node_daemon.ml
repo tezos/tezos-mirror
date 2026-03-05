@@ -1089,7 +1089,7 @@ module Replay = struct
         ~allowed_headers:None
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
-        ~no_slow_vm_fallback:false
+        ~slow_vm_fallback:false
         ~profiling
         ~force_etherlink:false
         ~l1_monitor_finalized:None

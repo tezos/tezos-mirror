@@ -106,7 +106,7 @@ type t = {
   log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
-  no_slow_vm_fallback : bool;
+  slow_vm_fallback : bool;
   gc_parameters : gc_parameters;
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
@@ -568,7 +568,7 @@ let encoding default_display : t Data_encoding.t =
            log_kernel_debug_file;
            unsafe_disable_wasm_kernel_checks;
            no_degraded;
-           no_slow_vm_fallback;
+           slow_vm_fallback;
            gc_parameters;
            history_mode;
            cors;
@@ -609,7 +609,7 @@ let encoding default_display : t Data_encoding.t =
               log_kernel_debug_file,
               unsafe_disable_wasm_kernel_checks ),
             ( no_degraded,
-              no_slow_vm_fallback,
+              slow_vm_fallback,
               gc_parameters,
               history_mode,
               cors,
@@ -648,7 +648,7 @@ let encoding default_display : t Data_encoding.t =
                  log_kernel_debug_file,
                  unsafe_disable_wasm_kernel_checks ),
                ( no_degraded,
-                 no_slow_vm_fallback,
+                 slow_vm_fallback,
                  gc_parameters,
                  history_mode,
                  cors,
@@ -692,7 +692,7 @@ let encoding default_display : t Data_encoding.t =
         log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
-        no_slow_vm_fallback;
+        slow_vm_fallback;
         gc_parameters;
         history_mode;
         cors;
@@ -815,11 +815,11 @@ let encoding default_display : t Data_encoding.t =
              (obj8
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
-                   "no-slow-vm-fallback"
+                   "slow-vm-fallback"
                    ~description:
-                     "When set to true, the rollup node will exit instead of \
-                      falling back to the slow VM interpreter when the fast \
-                      execution engine fails."
+                     "When set to true, the rollup node will fall back to the \
+                      slow VM interpreter when the fast execution engine fails \
+                      instead of exiting."
                    Data_encoding.bool
                    false)
                 (dft
@@ -953,7 +953,7 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~no_slow_vm_fallback
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
       ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
@@ -1018,7 +1018,7 @@ module Cli = struct
         log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
-        no_slow_vm_fallback;
+        slow_vm_fallback;
         gc_parameters =
           {frequency_in_blocks = gc_frequency; context_splitting_period = None};
         history_mode;
@@ -1048,7 +1048,7 @@ module Cli = struct
       ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
-      ~no_slow_vm_fallback ~profiling ~force_etherlink ~l1_monitor_finalized =
+      ~slow_vm_fallback ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1129,8 +1129,7 @@ module Cli = struct
           unsafe_disable_wasm_kernel_checks
           || configuration.unsafe_disable_wasm_kernel_checks;
         no_degraded = no_degraded || configuration.no_degraded;
-        no_slow_vm_fallback =
-          no_slow_vm_fallback || configuration.no_slow_vm_fallback;
+        slow_vm_fallback = slow_vm_fallback || configuration.slow_vm_fallback;
         gc_parameters =
           {
             frequency_in_blocks =
@@ -1171,7 +1170,7 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~no_slow_vm_fallback
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~slow_vm_fallback
       ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
@@ -1210,7 +1209,7 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
-          ~no_slow_vm_fallback
+          ~slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -1266,7 +1265,7 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
-          ~no_slow_vm_fallback
+          ~slow_vm_fallback
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized

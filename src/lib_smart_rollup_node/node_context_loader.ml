@@ -257,7 +257,7 @@ module For_snapshots = struct
           loop_retry_delay = 10.;
           pre_images_endpoint = None;
           bail_on_disagree = false;
-          no_slow_vm_fallback = false;
+          slow_vm_fallback = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
           dal_slot_status_max_fetch_attempts =
             Configuration.default_dal_slot_status_max_fetch_attempts;
@@ -378,7 +378,7 @@ module Internal_for_tests = struct
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
-          no_slow_vm_fallback = false;
+          slow_vm_fallback = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
           dal_slot_status_max_fetch_attempts =
             Configuration.default_dal_slot_status_max_fetch_attempts;
