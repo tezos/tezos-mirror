@@ -10509,7 +10509,8 @@ let test_da_fees_after_execution =
       sequencer
   in
 
-  let* res =
+  let wait_for = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+  let res =
     Lwt.catch
       (fun () ->
         Eth_cli.transaction_send
@@ -10521,8 +10522,138 @@ let test_da_fees_after_execution =
       (fun _exn -> Lwt.return "")
   in
 
+  let* _ = wait_for in
+  let*@ _ = produce_block sequencer in
+
+  let* res in
+
   Check.((res = "") string) ~error_msg:"The transaction should have failed" ;
 
+  unit
+
+(* Regression test for the DA fee reservation vulnerability (F62).
+   The attacker delegates their EOA to a drain contract via EIP-7702,
+   then sends a tx (value=0) calling drain() on their own address,
+   transferring their entire balance to a receiver during execution.
+   Without the fix, the DA fee reserve stays in the balance during
+   execution, the drain succeeds completely, and the post-execution
+   fee settlement fails — reverting the entire block at zero cost.
+   With the fix, the DA fee is deducted before execution, so the
+   drain can only take what remains after the DA fee. *)
+let test_da_fee_drain_via_eip7702 =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "da_fees"; "eip7702"]
+    ~da_fee:(Wei.of_string "4_000_000_000_000")
+    ~title:"DA fee reservation cannot be drained via EIP-7702"
+    ~kernels:[Kernel.Latest]
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let attacker =
+    Eth_account.
+      {
+        address = "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863";
+        private_key =
+          "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
+      }
+  in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+  (* Step 1: Fund the attacker with 1 ETH. *)
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:whale.private_key
+         ~to_public_key:attacker.address
+         ~value:(Wei.of_eth_int 1)
+         ~endpoint)
+      sequencer
+  in
+  (* Deploy the drain contract. *)
+  let* drain = Solidity_contracts.drain_balance evm_version in
+  let* () = Eth_cli.add_abi ~label:drain.label ~abi:drain.abi () in
+  let* drain_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:drain.abi
+         ~bin:drain.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  (* Step 2: The whale sends an EIP-7702 tx that sets the attacker's
+     delegation to the drain contract. The attacker signs the auth
+     but the whale pays for the tx. *)
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:drain_contract
+      ~private_key:attacker.private_key
+      ~endpoint
+      ()
+  in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let* raw_setup =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int whale_nonce)
+      ~gas_price
+        (* EIP-7702 txs carry an authorization list which adds overhead beyond
+         what eth_estimateGas accounts for: PER_AUTH_BASE_COST (25_000 gas per
+         entry) plus DA fee gas for the auth list bytes (~125 bytes/entry).
+         The exact cost observed is 1_146_000 gas. *)
+      ~gas:1_146_000
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~legacy:false
+      ~address:attacker.address
+      ~arguments:[]
+      ()
+  in
+  let*@ _setup_hash = Rpc.send_raw_transaction ~raw_tx:raw_setup sequencer in
+  let*@ _ = produce_block sequencer in
+  (* Step 3: The attacker sends a tx to themselves with value=0.
+     Because their address now has the drain contract's code, this
+     calls drain(receiver), transferring the balance out during
+     execution. The attacker's nonce is 1 (bumped by the auth). *)
+  let*@ attacker_nonce =
+    Rpc.get_transaction_count ~address:attacker.address sequencer
+  in
+  let* raw_attack =
+    Cast.craft_tx
+      ~source_private_key:attacker.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int attacker_nonce)
+      ~gas_price
+      ~gas:1_000_000
+      ~value:Wei.zero
+      ~legacy:true
+      ~address:attacker.address
+      ~signature:"drain(address)"
+      ~arguments:[receiver]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx:raw_attack sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@! Transaction.{status; _} =
+    Rpc.get_transaction_receipt ~tx_hash sequencer
+  in
+  (* The transaction must be included (no block revert). *)
+  Log.info "Transaction included, status = %b" status ;
+  (* The receiver should have received less than 1 ETH: the DA fee
+     was deducted from the attacker before execution. *)
+  let*@ receiver_balance = Rpc.get_balance ~address:receiver sequencer in
+  Check.((receiver_balance < Wei.of_eth_int 1) Wei.typ)
+    ~error_msg:
+      "Receiver should have less than 1 ETH (DA fee was deducted), got %L" ;
+  Log.info
+    "Receiver balance: %s (less than 1 ETH as expected)"
+    (Wei.to_string receiver_balance) ;
   unit
 
 let test_configuration_service =
@@ -15754,6 +15885,7 @@ let () =
   test_batch_eth_send_raw_transaction_sync_rpc () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
+  test_da_fee_drain_via_eip7702 protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
   test_clean_bps protocols ;
