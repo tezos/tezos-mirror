@@ -35,6 +35,18 @@ let chain_id =
     ~msg:"Running baker with chain id: {chain_id}"
     ("chain_id", Chain_id.encoding)
 
+let dal_cache_update_error =
+  declare_2
+    ~section
+    ~name:"dal_cache_update_error"
+    ~level:Warning
+    ~msg:
+      "DAL attestation cache update failed for attested level \
+       {attested_level}, trace: {trace}"
+    ("attested_level", Data_encoding.int32)
+    ("trace", Error_monad.trace_encoding)
+    ~pp2:Error_monad.pp_print_trace
+
 let stalling_rpc =
   declare_2
     ~section

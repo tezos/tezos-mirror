@@ -1077,7 +1077,15 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
           Lwt.return_unit))
     canceler ;
   let get_valid_blocks_stream =
-    let*! vbs = Node_rpc.monitor_valid_proposals cctxt ~cache ~chain () in
+    let*! vbs =
+      Node_rpc.monitor_valid_proposals
+        cctxt
+        ~cache
+        ~dal_included_attestations_cache:
+          initial_state.global_state.dal_included_attestations_cache
+        ~chain
+        ()
+    in
     match vbs with
     | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
     | Ok (vbs, _) -> Lwt.return vbs
