@@ -209,9 +209,10 @@ let test_make_l2_kernel_installer_config chain_family =
   in
   let*! () =
     Evm_node.make_kernel_installer_config
-    (* No need for a real sequencer governance *)
-      ~sequencer_governance:"KT1"
-      ~l2_chain_ids:[chain_id_1; chain_id_2]
+      (Evm_node.make_kernel_setup (* No need for a real sequencer governance *)
+         ~sequencer_governance:"KT1"
+         ~l2_chain_ids:[chain_id_1; chain_id_2]
+         ())
       ~output:rollup_config
       ()
   in
@@ -383,13 +384,13 @@ let test_observer_reset =
   let invalid_config = Temp.file "invalid_config.yaml" in
   let*! () =
     Evm_node.make_kernel_installer_config
-      ~sequencer:valid_sequencer.public_key
+      (Evm_node.make_kernel_setup ~sequencer:valid_sequencer.public_key ())
       ~output:valid_config
       ()
   in
   let*! () =
     Evm_node.make_kernel_installer_config
-      ~sequencer:invalid_sequencer.public_key
+      (Evm_node.make_kernel_setup ~sequencer:invalid_sequencer.public_key ())
       ~output:invalid_config
       ()
   in

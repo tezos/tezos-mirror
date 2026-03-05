@@ -2707,7 +2707,7 @@ let test_cross_runtime_fa12_approve_from_evm =
   in
   (* craft_and_send_evm_transaction asserts status=true. If the Micheline
      encoding in the wrapper were wrong, the FA1.2 contract would FAILWITH
-     and the cross-runtime call would revert. 
+     and the cross-runtime call would revert.
      FIXME: Check the storage and perform a transfer when we have all RPC *)
   unit
 

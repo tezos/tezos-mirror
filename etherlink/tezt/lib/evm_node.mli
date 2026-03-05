@@ -159,6 +159,104 @@ val make_setup :
   unit ->
   node_setup
 
+(** Kernel configuration grouping all parameters accepted by
+    {!make_kernel_installer_config}.  The [kernel] field selects the
+    kernel binary; every other field maps to an optional parameter of
+    [make_kernel_installer_config].  Fields are [option] so each
+    consuming function can apply its own defaults. *)
+type kernel_setup = {
+  kernel : Kernel.t;
+  l2_chain_ids : int list option;
+  max_delayed_inbox_blueprint_length : int option;
+  kernel_compat : string option;
+  remove_whitelist : bool option;
+  kernel_root_hash : string option;
+  chain_id : int option;
+  eth_bootstrap_balance : Wei.t option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_balance : Tez.t option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : string list option;
+  sequencer : string option;
+  delayed_bridge : string option;
+  ticketer : string option;
+  administrator : string option;
+  sequencer_governance : string option;
+  kernel_governance : string option;
+  kernel_security_governance : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  delayed_inbox_timeout : int option;
+  delayed_inbox_min_levels : int option;
+  sequencer_pool_address : string option;
+  maximum_allowed_ticks : int64 option;
+  maximum_gas_per_transaction : int64 option;
+  max_blueprint_lookahead_in_seconds : int64 option;
+  set_account_code : (string * string) list option;
+  enable_fa_bridge : bool option;
+  enable_revm : bool option;
+  enable_dal : bool option;
+  dal_slots : int list option;
+  dal_publishers_whitelist : string list option;
+  disable_legacy_dal_signals : bool option;
+  enable_fast_withdrawal : bool option;
+  enable_fast_fa_withdrawal : bool option;
+  enable_multichain : bool option;
+  evm_version : Evm_version.t option;
+  with_runtimes : Tezosx_runtime.t list option;
+  michelson_runtime_chain_id : string option;
+}
+
+(** [make_kernel_setup ()] creates a [kernel_setup] with [Kernel.Latest] as
+    the default kernel.  [eth_bootstrap_accounts] defaults to
+    {!eth_default_bootstrap_accounts}.  [tez_bootstrap_accounts] defaults to
+    {!tez_default_bootstrap_accounts} when [with_runtimes] includes [Tezos],
+    and to the empty list otherwise.  All other option fields are set to
+    [None] and can be overridden via optional arguments. *)
+val make_kernel_setup :
+  ?kernel:Kernel.t ->
+  ?l2_chain_ids:int list ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?kernel_compat:string ->
+  ?remove_whitelist:bool ->
+  ?kernel_root_hash:string ->
+  ?chain_id:int ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_balance:Tez.t ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:string list ->
+  ?sequencer:string ->
+  ?delayed_bridge:string ->
+  ?ticketer:string ->
+  ?administrator:string ->
+  ?sequencer_governance:string ->
+  ?kernel_governance:string ->
+  ?kernel_security_governance:string ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?da_fee_per_byte:Wei.t ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?sequencer_pool_address:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?set_account_code:(string * string) list ->
+  ?enable_fa_bridge:bool ->
+  ?enable_revm:bool ->
+  ?enable_dal:bool ->
+  ?dal_slots:int list ->
+  ?dal_publishers_whitelist:string list ->
+  ?disable_legacy_dal_signals:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
+  ?enable_multichain:bool ->
+  ?evm_version:Evm_version.t ->
+  ?with_runtimes:Tezosx_runtime.t list ->
+  ?michelson_runtime_chain_id:string ->
+  unit ->
+  kernel_setup
+
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
 
@@ -700,51 +798,12 @@ val make_l2_kernel_installer_config :
   unit ->
   (Process.t, unit) runnable
 
-(** [make_kernel_installer_config ~output ()] create the config needed for the
-    evm kernel used by the installer *)
+(** [make_kernel_installer_config ks ~output ()] creates the config
+    needed for the evm kernel used by the installer.  All kernel
+    parameters are read from [ks]; [None] fields use sensible
+    defaults. *)
 val make_kernel_installer_config :
-  ?l2_chain_ids:int list ->
-  ?max_delayed_inbox_blueprint_length:int ->
-  ?kernel_compat:string ->
-  ?remove_whitelist:bool ->
-  ?kernel_root_hash:string ->
-  ?chain_id:int ->
-  ?eth_bootstrap_balance:Wei.t ->
-  ?eth_bootstrap_accounts:string list ->
-  ?tez_bootstrap_balance:Tez.t ->
-  ?tez_bootstrap_accounts:Account.key list ->
-  ?tez_bootstrap_contracts:string list ->
-  ?michelson_runtime_chain_id:string ->
-  ?sequencer:string ->
-  ?delayed_bridge:string ->
-  ?ticketer:string ->
-  ?administrator:string ->
-  ?sequencer_governance:string ->
-  ?kernel_governance:string ->
-  ?kernel_security_governance:string ->
-  ?minimum_base_fee_per_gas:Wei.t ->
-  ?da_fee_per_byte:Wei.t ->
-  ?delayed_inbox_timeout:int ->
-  ?delayed_inbox_min_levels:int ->
-  ?sequencer_pool_address:string ->
-  ?maximum_allowed_ticks:int64 ->
-  ?maximum_gas_per_transaction:int64 ->
-  ?max_blueprint_lookahead_in_seconds:int64 ->
-  ?set_account_code:(string * string) list ->
-  ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
-  ?enable_dal:bool ->
-  ?dal_slots:int list ->
-  ?dal_publishers_whitelist:string list ->
-  ?disable_legacy_dal_signals:bool ->
-  ?enable_fast_withdrawal:bool ->
-  ?enable_fast_fa_withdrawal:bool ->
-  ?enable_multichain:bool ->
-  ?evm_version:Evm_version.t ->
-  ?with_runtimes:Tezosx_runtime.t list ->
-  output:string ->
-  unit ->
-  (Process.t, unit) Runnable.t
+  kernel_setup -> output:string -> unit -> (Process.t, unit) Runnable.t
 
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t

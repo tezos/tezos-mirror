@@ -362,8 +362,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     let output_config = Temp.file "config.yaml" in
-    let*! () =
-      Evm_node.make_kernel_installer_config
+    let kernel_setup =
+      Evm_node.make_kernel_setup
         ?chain_id
         ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
@@ -380,7 +380,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
                sequencer_governance))
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
-        ~output:output_config
         ~enable_dal
         ~enable_multichain
         ~enable_fa_bridge
@@ -388,6 +387,12 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?dal_slots
         ?evm_version
         ?kernel_compat:(Kernel.name_of kernel)
+        ()
+    in
+    let*! () =
+      Evm_node.make_kernel_installer_config
+        kernel_setup
+        ~output:output_config
         ()
     in
     match additional_config with

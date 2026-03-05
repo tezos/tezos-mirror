@@ -143,9 +143,11 @@ let prepare_kernel () =
   in
   let*! () =
     Evm_node.make_kernel_installer_config
+      (Evm_node.make_kernel_setup
+         ~eth_bootstrap_accounts
+         ~sequencer:Constant.bootstrap1.Account.public_key
+         ())
       ~output:output_config
-      ~eth_bootstrap_accounts
-      ~sequencer:Constant.bootstrap1.Account.public_key
       ()
   in
   let* {output = local_kernel; _} =
