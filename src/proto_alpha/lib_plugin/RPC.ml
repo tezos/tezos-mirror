@@ -3503,6 +3503,20 @@ module Dal = struct
         ~query:RPC_query.empty
         ~output
         RPC_path.(path / "skip_list_cells_of_level")
+
+    let decode_dal_attestation =
+      RPC_service.get_service
+        ~description:
+          "Decodes a DAL attestation bitset into an explicit representation of \
+           attested slots per lag, using the current protocol parameters \
+           (number_of_slots and number_of_lags)."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            list Dal.Attestations.unfolded_lag_attestation_encoding)
+        RPC_path.(
+          open_root / "helpers" / "decode_dal_attestation"
+          /: Dal.Attestations.rpc_arg)
   end
 
   let register_dal_commitments_history () =
@@ -3577,12 +3591,23 @@ module Dal = struct
     let* result = Dal.Slots_storage.find_level_histories ctxt in
     match result with Some l -> return l | None -> return []
 
+  let register_decode_dal_attestation () =
+    Registration.register1
+      ~chunked:false
+      S.decode_dal_attestation
+      (fun ctxt attestation () () ->
+        let number_of_slots = Constants.dal_number_of_slots ctxt in
+        let number_of_lags = Constants.dal_number_of_lags ctxt in
+        Lwt.return
+          (Dal.Attestations.decode attestation ~number_of_slots ~number_of_lags))
+
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
     register_past_parameters () ;
     register_published_slot_headers () ;
-    register_skip_list_cells_of_level ()
+    register_skip_list_cells_of_level () ;
+    register_decode_dal_attestation ()
 end
 
 module Forge = struct
