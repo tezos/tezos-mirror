@@ -14,17 +14,16 @@ alloy-primitives.workspace = true
 http.workspace = true
 alloy-sol-types.workspace = true
 primitive-types.workspace = true
+hex.workspace = true
 revm.workspace = true
 revm-etherlink.workspace = true
+rlp.workspace = true
 
 tezos_ethereum.workspace = true
 tezosx-interfaces.workspace = true
 tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
-
-[dev-dependencies]
-hex.workspace = true
 
 [features]
 testing = ["tezosx-interfaces/testing"]

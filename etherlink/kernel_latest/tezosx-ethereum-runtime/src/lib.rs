@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod headers;
 mod url;
 
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
@@ -144,24 +145,18 @@ where
     Host: StorageV1 + Logging,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
+    let hdrs = headers::parse_request_headers(request.headers())?;
     let call_data = Bytes::from(request.into_body());
 
-    // TODO: Extract from X-Tezos-* headers.
-    let caller = TEZOSX_CALLER_ADDRESS;
-    let amount = AlloyU256::ZERO;
-    let gas_limit = u64::MAX;
-    let timestamp = U256::zero();
-    let block_number = U256::zero();
-
     let context = CrossRuntimeContext {
-        gas_limit,
-        timestamp,
-        block_number,
+        gas_limit: hdrs.gas_limit,
+        timestamp: hdrs.timestamp,
+        block_number: hdrs.block_number,
     };
 
     let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, &context);
-    let gas_data = GasData::new(gas_limit, 0, gas_limit);
+    let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
     run_transaction(
         host,
@@ -169,11 +164,11 @@ where
         evm_version.into(),
         &block_constants,
         None,
-        caller,
+        hdrs.sender,
         Some(parsed.destination),
         call_data,
         gas_data,
-        amount,
+        hdrs.amount,
         revm::context::transaction::AccessList(vec![]),
         None,
         None,
@@ -934,7 +929,18 @@ mod tests {
             "http://ethereum/{}",
             alloy_primitives::hex::encode(contract.0 .0)
         );
-        let request = http::Request::builder().uri(&url).body(vec![]).unwrap();
+        let request = http::Request::builder()
+            .uri(&url)
+            .header(
+                tezosx_interfaces::X_TEZOS_SENDER,
+                format!("0x{}", alloy_primitives::hex::encode(caller_addr.0 .0)),
+            )
+            .header(tezosx_interfaces::X_TEZOS_AMOUNT, "0")
+            .header(tezosx_interfaces::X_TEZOS_GAS_LIMIT, u64::MAX.to_string())
+            .header(tezosx_interfaces::X_TEZOS_TIMESTAMP, "0")
+            .header(tezosx_interfaces::X_TEZOS_BLOCK_NUMBER, "0")
+            .body(vec![])
+            .unwrap();
 
         let resp = runtime.serve(&registry, &mut host, request).unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
