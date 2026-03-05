@@ -58,6 +58,8 @@ Node
   avoiding EPIPE errors and slow shutdown when many external RPC processes are
   running. (MR :gl:`!20476`)
 
+  - Disable backward compatibility of v8 snapshot import (MR :gl:`!19542`)
+
 Client
 ------
 

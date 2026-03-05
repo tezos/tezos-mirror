@@ -632,16 +632,13 @@ module Version = struct
    * - 9: export target predecessor contains metadata
    *)
 
-  let v8_version = 8
-
   (* Used for old snapshot format versions *)
-  let legacy_version = v8_version
+  let _legacy_version = None
 
   let current_version = 9
 
   (* List of versions that are supported *)
-  let supported_versions =
-    [(legacy_version, `Legacy_format); (current_version, `Current)]
+  let supported_versions = [(current_version, `Current)]
 
   let is_supported version =
     match List.assq_opt version supported_versions with
@@ -782,58 +779,6 @@ let pp_snapshot_format ppf = function
 (* To speed up the import of the cemented blocks we increase,
    temporarily the index cache size. *)
 let cemented_import_log_size = 100_000
-
-type block_data_legacy_v8 = {
-  block_header : Block_header.t;
-  operations : Operation.t list list;
-  predecessor_header : Block_header.t;
-  predecessor_block_metadata_hash : Block_metadata_hash.t option;
-  predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-  resulting_context_hash : Context_hash.t;
-}
-
-let block_data_legacy_v8_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           block_header;
-           operations;
-           predecessor_header;
-           predecessor_block_metadata_hash;
-           predecessor_ops_metadata_hash;
-           resulting_context_hash;
-         }
-       ->
-      ( operations,
-        block_header,
-        predecessor_header,
-        predecessor_block_metadata_hash,
-        predecessor_ops_metadata_hash,
-        resulting_context_hash ))
-    (fun ( operations,
-           block_header,
-           predecessor_header,
-           predecessor_block_metadata_hash,
-           predecessor_ops_metadata_hash,
-           resulting_context_hash )
-       ->
-      {
-        block_header;
-        operations;
-        predecessor_header;
-        predecessor_block_metadata_hash;
-        predecessor_ops_metadata_hash;
-        resulting_context_hash;
-      })
-    (obj6
-       (req "operations" (list (list (dynamic_size Operation.encoding))))
-       (req "block_header" (dynamic_size Block_header.encoding))
-       (req "predecessor_header" (dynamic_size Block_header.encoding))
-       (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
-       (opt
-          "predecessor_ops_metadata_hash"
-          Operation_metadata_list_list_hash.encoding)
-       (req " resulting_context_hash" Context_hash.encoding))
 
 type block_data = {
   block_header : Block_header.t;
@@ -2629,7 +2574,7 @@ module type IMPORTER = sig
 
   val snapshot_metadata : t -> Snapshot_metadata.t
 
-  val load_block_data : is_legacy_v8:bool -> t -> block_data tzresult Lwt.t
+  val load_block_data : t -> block_data tzresult Lwt.t
 
   val restore_context : t -> dst_data_dir:string -> unit tzresult Lwt.t
 
@@ -2705,50 +2650,19 @@ module Raw_importer : IMPORTER = struct
         dst_chain_dir;
       }
 
-  let load_block_data ~is_legacy_v8 t =
+  let load_block_data t =
     let open Lwt_result_syntax in
     let file = Naming.(snapshot_block_data_file t.snapshot_dir |> file_path) in
     let*! block_data = Lwt_utils_unix.read_file file in
     match Data_encoding.Binary.of_string_opt block_data_encoding block_data with
     | Some block_data -> return block_data
     | None -> (
-        if is_legacy_v8 then
-          let res =
-            Data_encoding.Binary.of_string_opt
-              block_data_legacy_v8_encoding
-              block_data
-          in
-          match res with
-          | Some
-              {
-                block_header;
-                operations;
-                predecessor_header;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                resulting_context_hash;
-              } ->
-              return
-                {
-                  block_header;
-                  operations;
-                  predecessor_header;
-                  predecessor_max_operations_ttl =
-                    (* This is a rough approximation that is used for backward
-                       compatibility only. *)
-                    Int32.to_int block_header.Block_header.shell.level;
-                  predecessor_block_metadata_hash;
-                  predecessor_ops_metadata_hash;
-                  resulting_context_hash;
-                }
-          | None -> tzfail (Cannot_read {kind = `Block_data; path = file})
-        else
-          let res =
-            Data_encoding.Binary.of_string_opt block_data_encoding block_data
-          in
-          match res with
-          | Some v -> return v
-          | None -> tzfail (Cannot_read {kind = `Block_data; path = file}))
+        let res =
+          Data_encoding.Binary.of_string_opt block_data_encoding block_data
+        in
+        match res with
+        | Some v -> return v
+        | None -> tzfail (Cannot_read {kind = `Block_data; path = file}))
 
   let restore_context t ~dst_data_dir =
     let open Lwt_result_syntax in
@@ -3009,7 +2923,7 @@ module Tar_importer : IMPORTER = struct
         files;
       }
 
-  let load_block_data ~is_legacy_v8 t =
+  let load_block_data t =
     let open Lwt_result_syntax in
     let filename =
       Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
@@ -3017,43 +2931,12 @@ module Tar_importer : IMPORTER = struct
     let*! o = Octez_tar_helpers.load_from_filename t.tar ~filename in
     match o with
     | Some block_data -> (
-        if is_legacy_v8 then
-          let res =
-            Data_encoding.Binary.of_string_opt
-              block_data_legacy_v8_encoding
-              block_data
-          in
-          match res with
-          | Some
-              {
-                block_header;
-                operations;
-                predecessor_header;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                resulting_context_hash;
-              } ->
-              return
-                {
-                  block_header;
-                  operations;
-                  predecessor_header;
-                  predecessor_max_operations_ttl =
-                    (* This is a rough approximation that is used for backward
-                       compatibility only. *)
-                    Int32.to_int block_header.Block_header.shell.level;
-                  predecessor_block_metadata_hash;
-                  predecessor_ops_metadata_hash;
-                  resulting_context_hash;
-                }
-          | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
-        else
-          let res =
-            Data_encoding.Binary.of_string_opt block_data_encoding block_data
-          in
-          match res with
-          | Some v -> return v
-          | None -> tzfail (Cannot_read {kind = `Block_data; path = filename}))
+        let res =
+          Data_encoding.Binary.of_string_opt block_data_encoding block_data
+        in
+        match res with
+        | Some v -> return v
+        | None -> tzfail (Cannot_read {kind = `Block_data; path = filename}))
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t ~dst_data_dir =
@@ -3550,8 +3433,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let restore_and_apply_context snapshot_importer protocol_levels
       ?user_expected_block ~dst_data_dir ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~patch_context ~check_consistency ~is_legacy_v8 snapshot_metadata genesis
-      chain_id =
+      ~patch_context ~check_consistency snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     let* ({
             block_header;
@@ -3562,7 +3444,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
           } as block_data) =
-      Importer.load_block_data ~is_legacy_v8 snapshot_importer
+      Importer.load_block_data snapshot_importer
     in
     (* Checks that the block hash imported from the snapshot is the one
        expected by the user's --block command line option *)
@@ -3728,12 +3610,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         Store_events.(emit import_legacy_snapshot_version snapshot_version)
       else Lwt.return_unit
     in
-    (* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/8005
-       remove the v8 import backward compatibility as soon as v9
-       (and v23) are mandatory.*)
-    let is_v8_import =
-      is_legacy_format && snapshot_version = Version.v8_version
-    in
     let snapshot_metadata = Importer.snapshot_metadata snapshot_importer in
     let* () =
       fail_unless
@@ -3796,7 +3672,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~operation_metadata_size_limit
         ~patch_context
         ~check_consistency
-        ~is_legacy_v8:is_v8_import
         snapshot_metadata
         genesis
         chain_id
@@ -3885,8 +3760,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               validation_store.resulting_context_hash
             ~predecessor_header:block_data.predecessor_header
             ~protocol_levels
-            ~history_mode
-            ~is_v8_import)
+            ~history_mode)
     in
     let* () = reading_thread in
     let*! () = Event.(emit floating_blocks_restored) () in
