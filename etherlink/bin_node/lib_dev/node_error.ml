@@ -17,16 +17,6 @@ let exit_code_when_gcp_kms_auth_error = 104
 
 let exit_code_when_background_task_fails = 105
 
-type error_source = [`Node | `Kernel]
-
-let error_source_encoding =
-  let open Data_encoding in
-  string_enum [("node", `Node); ("kernel", `Kernel)]
-
-let pp_proxy_finalize_multichain_source fmt = function
-  | `Node -> Format.fprintf fmt "Node"
-  | `Kernel -> Format.fprintf fmt "Kernel"
-
 type error +=
   | Diverged of {
       level : Z.t;
@@ -37,7 +27,6 @@ type error +=
   | Out_of_sync of {level_expected : int32; level_received : int32}
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
   | Unexpected_multichain
-  | Proxy_finalize_with_multichain of error_source
   | Singlechain_node_multichain_kernel
   | Mismatched_chain_family of {
       chain_id : L2_types.chain_id;
@@ -122,28 +111,11 @@ let () =
     ~id:"unexpected_multichain"
     ~title:"Multiple chains configured to a single chain node"
     ~description:
-      "Observer, proxy, and rpc nodes follow a single chain. However, the \
+      "Observer and rpc nodes follow a single chain. However, the \
        configuration attempted to configure multiple chains."
     Data_encoding.empty
     (function Unexpected_multichain -> Some () | _ -> None)
     (fun () -> Unexpected_multichain) ;
-  register_error_kind
-    `Permanent
-    ~id:"proxy_finalize_with_multichain"
-    ~title:"Proxy node finalized_view with multichain"
-    ~description:
-      "The `finalized_view` and `l2_chains` features of the proxy node are not \
-       compatible, please configure at most one of them."
-    ~pp:(fun ppf source ->
-      Format.fprintf
-        ppf
-        "The %a was configured in multichain mode, which is incompatible with \
-         the proxy node's finalized_view option."
-        pp_proxy_finalize_multichain_source
-        source)
-    Data_encoding.(obj1 (req "source" error_source_encoding))
-    (function Proxy_finalize_with_multichain src -> Some src | _ -> None)
-    (fun src -> Proxy_finalize_with_multichain src) ;
   register_error_kind
     `Permanent
     ~id:"singlechain_node_multichain_kernel"

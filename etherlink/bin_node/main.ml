@@ -1002,27 +1002,12 @@ let log_filter_chunk_size_arg =
     ~placeholder:"10"
     Params.int
 
-let read_only_arg =
-  Tezos_clic.switch
-    ~doc:"If the flag is set, the node refuses transactions."
-    ~long:"read-only"
-    ()
-
 let finalized_view_arg =
   Tezos_clic.switch
     ~doc:
       "If the flag is set, the node will use the latest final state of the \
        rollup, not its current HEAD, for any read-only operation."
     ~long:"finalized-view"
-    ()
-
-let ignore_block_param_arg =
-  Tezos_clic.switch
-    ~doc:
-      "If the flag is set, the node in proxy mode ignores the block parameter \
-       submitted by the client and defaults to the latest block for \
-       unsupported blocks."
-    ~long:"ignore-block-param"
     ()
 
 let restricted_rpcs_arg =
@@ -1318,61 +1303,6 @@ let set_gc_parameters (config : Configuration.t) =
           let params = Gc.get () in
           let minor_heap_size, space_overhead = performance_gc_params in
           Gc.set {params with minor_heap_size; space_overhead})
-
-let start_proxy ~data_dir ?config_file ~keep_alive ?rpc_timeout ?rpc_addr
-    ?rpc_port ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
-    ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-    ?rollup_node_endpoint ?evm_node_endpoint ?tx_queue_max_lifespan
-    ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?restricted_rpcs ~verbose
-    ?profiling ~read_only ~finalized_view ~ignore_block_param () =
-  let open Lwt_result_syntax in
-  let* config =
-    Cli.create_or_read_config
-      ~data_dir
-      ~keep_alive
-      ?rpc_timeout
-      ?rpc_addr
-      ?rpc_port
-      ?rpc_batch_limit
-      ?cors_origins
-      ?cors_headers
-      ?enable_websocket
-      ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs
-      ?log_filter_chunk_size
-      ?rollup_node_endpoint
-      ?evm_node_endpoint
-      ?tx_queue_max_lifespan
-      ?tx_queue_max_size
-      ?tx_queue_tx_per_addr_limit
-      ?restricted_rpcs
-      ~finalized_view
-      ~proxy_ignore_block_param:ignore_block_param
-      ~verbose
-      ?profiling
-      (config_filename ~data_dir ?config_file ())
-  in
-  (* We patch [config] to take into account the proxy-specific argument
-     [--read-only]. *)
-  let config =
-    {
-      config with
-      experimental_features =
-        {
-          config.experimental_features with
-          enable_send_raw_transaction =
-            (if read_only then false
-             else config.experimental_features.enable_send_raw_transaction);
-        };
-    }
-  in
-  let*! () = init_logs ~daily_logs:true config in
-  let*! () = set_gc_parameters config in
-  let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
-  let* () = Evm_node_lib_dev.Proxy.main config in
-  let wait, _resolve = Lwt.wait () in
-  let* () = wait in
-  return_unit
 
 let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
@@ -2421,10 +2351,9 @@ let init_config_command =
     ~group:Groups.config
     ~desc:
       "Create an initial config with default value.\n\
-       If the <rollup-node-endpoint> is set then adds the configuration for \
-       the proxy mode. If the  <sequencer-key> is set,then adds the \
-       configuration for the sequencer mode. If the <evm-node-endpoint> is set \
-       then adds the configuration for the observer mode."
+       If the <sequencer-key> is set, then adds the configuration for the \
+       sequencer mode. If the <evm-node-endpoint> is set, then adds the \
+       configuration for the observer mode."
     (merge_options
        common_config_args
        (args20
@@ -2945,73 +2874,6 @@ let make_kernel_config_command =
         ~tez_bootstrap_balance
         ?tez_bootstrap_contracts
         ~output
-        ())
-
-let proxy_command =
-  let open Tezos_clic in
-  command
-    ~group:Groups.run
-    ~desc:"Start the EVM node in proxy mode."
-    (merge_options
-       common_config_args
-       (args3 read_only_arg ignore_block_param_arg evm_node_endpoint_arg))
-    (prefixes ["run"; "proxy"] @@ stop)
-    (fun ( ( data_dir,
-             config_file,
-             rpc_addr,
-             rpc_port,
-             rpc_batch_limit,
-             cors_origins,
-             cors_headers,
-             enable_websocket,
-             log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size,
-             keep_alive,
-             rpc_timeout,
-             rollup_node_endpoint,
-             _tx_pool_addr_limit,
-             tx_queue_max_lifespan,
-             tx_queue_max_size,
-             tx_queue_tx_per_addr_limit,
-             verbose,
-             restricted_rpcs,
-             blacklisted_rpcs,
-             whitelisted_rpcs,
-             finalized_view,
-             profiling ),
-           (read_only, ignore_block_param, evm_node_endpoint) )
-         ()
-       ->
-      let open Lwt_result_syntax in
-      let* restricted_rpcs =
-        pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
-      in
-      start_proxy
-        ~data_dir
-        ?config_file
-        ~keep_alive
-        ?rpc_timeout
-        ?rpc_addr
-        ?rpc_port
-        ?rpc_batch_limit
-        ?cors_origins
-        ?cors_headers
-        ?enable_websocket
-        ?log_filter_max_nb_blocks
-        ?log_filter_max_nb_logs
-        ?log_filter_chunk_size
-        ?rollup_node_endpoint
-        ?evm_node_endpoint
-        ?tx_queue_max_lifespan
-        ?tx_queue_max_size
-        ?tx_queue_tx_per_addr_limit
-        ?restricted_rpcs
-        ~verbose
-        ?profiling
-        ~read_only
-        ~finalized_view
-        ~ignore_block_param
         ())
 
 let sequencer_config_args =
@@ -4152,7 +4014,6 @@ let commands =
   [
     sandbox_command;
     tezlink_sandbox_command;
-    proxy_command;
     sequencer_command;
     observer_command;
     rpc_command;

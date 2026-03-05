@@ -32,9 +32,6 @@
     "periodic_snapshot_path": null,
     "preconfirmation_stream_enabled": true
   },
-  "proxy": {
-    "ignore_block_param": false
-  },
   "gcp_kms": {
     "connection_pool_size": 4,
     "authentication_method": "metadata_server",
@@ -126,10 +123,6 @@
     "l2_chains": null,
     "periodic_snapshot_path": null,
     "preconfirmation_stream_enabled": true
-  },
-  "proxy": {
-    "evm_node_endpoint": "hidden",
-    "ignore_block_param": false
   },
   "gcp_kms": {
     "connection_pool_size": 4,

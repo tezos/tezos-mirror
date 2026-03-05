@@ -158,16 +158,6 @@ type observer = {
   fail_on_divergence : bool;
 }
 
-type proxy = {
-  finalized_view : bool option;
-      (** Provide a view on the latest final state of the rollup, not its
-          current HEAD. *)
-  evm_node_endpoint : Uri.t option;
-      (** If provided, the EVM node will inject transactions to this endpoint
-          instead of to its companian rollup node. *)
-  ignore_block_param : bool;
-}
-
 type fee_history_max_count = Unlimited | Limit of int
 
 type fee_history = {max_count : fee_history_max_count; max_past : int option}
@@ -225,7 +215,6 @@ type t = {
   kernel_execution : kernel_execution_config;
   sequencer : sequencer;
   observer : observer option;
-  proxy : proxy;
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
@@ -355,7 +344,6 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
@@ -398,7 +386,6 @@ module Cli : sig
     ?catchup_cooldown:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
@@ -440,7 +427,6 @@ module Cli : sig
     ?log_filter_chunk_size:int ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
-    ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->

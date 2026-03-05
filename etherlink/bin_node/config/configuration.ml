@@ -211,12 +211,6 @@ type observer = {
   fail_on_divergence : bool;
 }
 
-type proxy = {
-  finalized_view : bool option;
-  evm_node_endpoint : Uri.t option;
-  ignore_block_param : bool;
-}
-
 type fee_history_max_count = Unlimited | Limit of int
 
 type fee_history = {max_count : fee_history_max_count; max_past : int option}
@@ -260,7 +254,6 @@ type t = {
   kernel_execution : kernel_execution_config;
   sequencer : sequencer;
   observer : observer option;
-  proxy : proxy;
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
@@ -1156,34 +1149,6 @@ let experimental_features_encoding =
              bool
              default_experimental_features.preconfirmation_stream_enabled)))
 
-let proxy_encoding =
-  let open Data_encoding in
-  conv
-    (fun {finalized_view; evm_node_endpoint; ignore_block_param} ->
-      ( finalized_view,
-        Option.map Uri.to_string evm_node_endpoint,
-        ignore_block_param ))
-    (fun (finalized_view, evm_node_endpoint, ignore_block_param) ->
-      {
-        finalized_view;
-        evm_node_endpoint = Option.map Uri.of_string evm_node_endpoint;
-        ignore_block_param;
-      })
-  @@ obj3
-       (opt
-          ~description:
-            "When enabled, the node only expose blocks that are finalized, \
-             i.e., the `latest` block parameter becomes a synonym for \
-             `finalized`. DEPRECATED: use the top level `finalized_view` \
-             option instead."
-          "finalized_view"
-          bool)
-       (opt "evm_node_endpoint" string)
-       (dft "ignore_block_param" bool false)
-
-let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
-  {finalized_view = None; evm_node_endpoint; ignore_block_param}
-
 (* A chunk is at most 4 KBytes. A transaction is around 150 bytes. Having 4
    connections up gives roughly 100TPS (4 * 4000 / 150), which should cover
    most of traffic for now. *)
@@ -1610,7 +1575,6 @@ let encoding ?network () : t Data_encoding.t =
            log_filter;
            sequencer;
            observer;
-           proxy;
            gcp_kms;
            keep_alive;
            rollup_node_endpoint;
@@ -1633,7 +1597,6 @@ let encoding ?network () : t Data_encoding.t =
             rpc_timeout,
             verbose,
             experimental_features,
-            proxy,
             gcp_kms,
             fee_history ),
           ( kernel_execution,
@@ -1658,7 +1621,6 @@ let encoding ?network () : t Data_encoding.t =
                rpc_timeout,
                verbose,
                experimental_features,
-               proxy,
                gcp_kms,
                fee_history ),
              ( kernel_execution,
@@ -1680,7 +1642,6 @@ let encoding ?network () : t Data_encoding.t =
         log_filter;
         sequencer;
         observer;
-        proxy;
         gcp_kms;
         keep_alive;
         rollup_node_endpoint;
@@ -1729,7 +1690,7 @@ let encoding ?network () : t Data_encoding.t =
                 \"tx_pool.tx_per_addr_limit\" instead."
              int64))
        (merge_objs
-          (obj8
+          (obj7
              (dft
                 "keep_alive"
                 ~description:
@@ -1758,7 +1719,6 @@ let encoding ?network () : t Data_encoding.t =
                 "experimental_features"
                 experimental_features_encoding
                 default_experimental_features)
-             (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
           (obj10
@@ -1854,19 +1814,6 @@ let precheck json =
   Lwt.catch
     (fun () ->
       let open Json_syntax in
-      (* Conflicts between [.proxy.finalized_view] and [.finalized_view] *)
-      let proxy_conf =
-        json |-> ["proxy"; "finalized_view"] |?> Ezjsonm.get_bool
-      in
-      let toplevel_conf = json |-> ["finalized_view"] |?> Ezjsonm.get_bool in
-      let* () =
-        match (proxy_conf, toplevel_conf) with
-        | Some b, Some b' ->
-            when_ (b <> b') @@ fun () ->
-            failwith
-              "`proxy.finalized_view` and `finalized_view` are inconsistent."
-        | _ -> return_unit
-      in
       let next_wasm_runtime_conf =
         json
         |-> ["experimental_features"; "next_wasm_runtime"]
@@ -2040,7 +1987,6 @@ module Cli = struct
       kernel_execution;
       sequencer = sequencer_config_dft ();
       observer;
-      proxy = default_proxy ();
       gcp_kms = default_gcp_kms;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
@@ -2092,8 +2038,8 @@ module Cli = struct
       ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots ?sunset_sec ?rpc_timeout ?fail_on_divergence configuration =
+      ?restricted_rpcs ?finalized_view ?history_mode ?dal_slots ?sunset_sec
+      ?rpc_timeout ?fail_on_divergence configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2211,19 +2157,6 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
-    let proxy =
-      {
-        evm_node_endpoint =
-          Option.either evm_node_endpoint configuration.proxy.evm_node_endpoint;
-        ignore_block_param =
-          Option.value
-            ~default:configuration.proxy.ignore_block_param
-            proxy_ignore_block_param;
-        finalized_view =
-          (if finalized_view then Some true
-           else configuration.proxy.finalized_view);
-      }
-    in
     let log_filter =
       {
         max_nb_blocks =
@@ -2285,7 +2218,6 @@ module Cli = struct
       kernel_execution;
       sequencer;
       observer;
-      proxy;
       gcp_kms = configuration.gcp_kms;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
@@ -2309,9 +2241,8 @@ module Cli = struct
       ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
-      ?rpc_timeout ?fail_on_divergence () =
+      ?catchup_cooldown ?restricted_rpcs ?finalized_view ?dal_slots ?network
+      ?history_mode ?sunset_sec ?rpc_timeout ?fail_on_divergence () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2346,7 +2277,6 @@ module Cli = struct
          ?catchup_cooldown
          ?restricted_rpcs
          ?finalized_view
-         ?proxy_ignore_block_param
          ?dal_slots
          ?history_mode
          ?sunset_sec
@@ -2362,9 +2292,8 @@ module Cli = struct
       ?sequencer_keys ?evm_node_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode ?sunset_sec ?rpc_timeout ?fail_on_divergence
-      config_file =
+      ?restricted_rpcs ?finalized_view ?dal_slots ?network ?history_mode
+      ?sunset_sec ?rpc_timeout ?fail_on_divergence config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2420,7 +2349,6 @@ module Cli = struct
           ?log_filter_chunk_size
           ?restricted_rpcs
           ?finalized_view
-          ?proxy_ignore_block_param
           ?history_mode
           ?dal_slots
           ?sunset_sec
@@ -2464,7 +2392,6 @@ module Cli = struct
           ?log_filter_chunk_size
           ?restricted_rpcs
           ?finalized_view
-          ?proxy_ignore_block_param
           ?dal_slots
           ?network
           ?history_mode

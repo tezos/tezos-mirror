@@ -13,8 +13,4 @@ type local_node_info = {
 }
 
 (** Available modes. *)
-type 'f t =
-  | Sequencer : 'a t
-  | Observer : 'a t
-  | Proxy : 'a t
-  | Rpc : local_node_info -> 'a t
+type 'f t = Sequencer : 'a t | Observer : 'a t | Rpc : local_node_info -> 'a t

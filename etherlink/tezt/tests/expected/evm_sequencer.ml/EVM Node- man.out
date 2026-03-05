@@ -221,65 +221,6 @@ Run commands:
     --fund <edp...>: The address of an account to provide with funds in Tezlink sandbox (can
       be repeated to fund multiple accounts)
   
-  run proxy [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
-      [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
-      [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
-      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--read-only] [--ignore-block-param] [--evm-node-endpoint <url>]
-    Start the EVM node in proxy mode.
-    --data-dir <data-dir>: The path to the EVM node data directory. Default is
-      $HOME/.octez-evm-node.
-      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
-    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
-      data directory of the node.
-      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
-    --rpc-addr <ADDR>: The EVM node server rpc address.
-    --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
-    --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
-    --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
-    --ws [BOOL?]: Enable websockets server when present or set to true.
-      Defaults to ``true` when the switch is present, and is `false` otherwise`.
-    --max-number-blocks <100>: Maximum number of blocks kept in the log.
-    --max-number-logs <1000>: Maximum number of logs kept.
-    --chunk-size <10>: Blocks to be filtered are split in chunks, which will be filtered in
-      sequence. Within each chunk, the block filtering is done concurrently. DEPRECATED: this
-      argument does not have any effect anymore. Use `--maximum-number-logs` and
-      `--maximum-number-blocks` to bound the computations performed by the `eth_getLogs` RPC
-      request.
-    -K --keep-alive: Keep the EVM node process alive even if the connection is lost with the
-      rollup node.
-    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
-    --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
-      instead. Maximum allowed addresses inside the transaction pool.
-    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
-      seconds).
-    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the transaction pool.
-    --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
-      transaction pool.
-    -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
-      expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
-    --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
-      list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
-    --whitelisted-rpcs <whitelist>: Disable the RPC methods which are not part of the provided
-      list. Cannot be used with --restricted-rpcs or --blacklisted-rpcs.
-    --finalized-view: If the flag is set, the node will use the latest final state of the
-      rollup, not its current HEAD, for any read-only operation.
-    --profiling [BOOL]: Enable or disable profiling with opentelemetry
-      Defaults to `true`.
-    --read-only: If the flag is set, the node refuses transactions.
-    --ignore-block-param: If the flag is set, the node in proxy mode ignores the block
-      parameter submitted by the client and defaults to the latest block for unsupported
-      blocks.
-    --evm-node-endpoint <url>: The address of an EVM node to connect to.
-  
   run sequencer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
@@ -562,9 +503,8 @@ Configuration commands:
       [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
       [--dal-slots <slot indices>] [--network <network>] [--sunset-sec <SEC>]
     Create an initial config with default value.
-    If the <rollup-node-endpoint> is set then adds the configuration for the proxy mode. If
-    the  <sequencer-key> is set,then adds the configuration for the sequencer mode. If the
-    <evm-node-endpoint> is set then adds the configuration for the observer mode.
+    If the <sequencer-key> is set, then adds the configuration for the sequencer mode. If the
+    <evm-node-endpoint> is set, then adds the configuration for the observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
