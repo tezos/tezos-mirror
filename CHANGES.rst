@@ -131,6 +131,10 @@ Smart Rollup node
 - The rollup node only monitors finalized L1 heads when used on a RISC-V
   rollup. (MR :gl:`!20448`)
 
+- When the fast WASM execution engine (Wasmer) fails, the node now exits by
+  default instead of falling back to the slow OCaml interpreter. Use
+  ``--slow-vm-fallback`` to opt in to the previous behavior. (MR :gl:`!21069`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
