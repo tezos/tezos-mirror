@@ -210,3 +210,6 @@ node_modules/
 .cache_external
 .cargo/registry
 .cargo_targets
+
+# AI agent files
+.claude/*.local.md
