@@ -76,7 +76,7 @@ let _release_page_base_lib =
   private_lib
     "base_lib"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["base"]
     ~profile:"release-tools-deps"
@@ -86,7 +86,7 @@ let _release_page =
   private_exe
     "release_page"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["release_page"]
     ~profile:"release-tools-deps"
@@ -96,7 +96,7 @@ let _version_manager =
   private_exe
     "version_manager"
     ~opam:""
-    ~path:"ci/bin_release_page"
+    ~path:"ci/bin_release_page/src"
     ~release_status:Unreleased
     ~modules:["version_manager"]
     ~profile:"release-tools-deps"
