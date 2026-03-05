@@ -701,7 +701,8 @@ let rec process_daemon ({node_ctxt; _} as state) =
           | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
           | Disagree_with_cemented _ | Disagree_with_commitment _
           | Inconsistent_inbox _ ))
-      | Purpose.Missing_operators _ )
+      | Purpose.Missing_operators _
+      | Exn (Wasm_2_0_0_utilities.Fast_execution_panic _) )
       :: _ as e ->
         fatal_error_exit e
     | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->

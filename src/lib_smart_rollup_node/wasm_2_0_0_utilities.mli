@@ -20,6 +20,10 @@ val dump_durable_storage :
 val patch_durable_storage :
   data_dir:string -> key:string -> value:string -> unit tzresult Lwt.t
 
+(** Exception raised when the fast execution engine panics and
+    [fallback_to_slow_vm] is [false]. *)
+exception Fast_execution_panic of exn
+
 (** Hooks to be used for the WASM PVM. When [fallback_to_slow_vm] is [false],
     the node will exit instead of falling back to the slow VM interpreter when
     the fast execution engine fails. *)
