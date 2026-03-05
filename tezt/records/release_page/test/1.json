@@ -1,0 +1,89 @@
+[
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: add stable version",
+    "tags": [
+      "version_manager",
+      "add"
+    ],
+    "successful_runs": {
+      "total_time": "10590",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: add release candidate",
+    "tags": [
+      "version_manager",
+      "add",
+      "rc"
+    ],
+    "successful_runs": {
+      "total_time": "10654",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: adding a duplicate version fails",
+    "tags": [
+      "version_manager",
+      "add",
+      "duplicate"
+    ],
+    "successful_runs": {
+      "total_time": "11219",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: set-latest marks one version and clears others",
+    "tags": [
+      "version_manager",
+      "set_latest"
+    ],
+    "successful_runs": {
+      "total_time": "20533",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: set-active and set-inactive",
+    "tags": [
+      "version_manager",
+      "set_active",
+      "set_inactive"
+    ],
+    "successful_runs": {
+      "total_time": "12572",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: update-build-number sets build mark",
+    "tags": [
+      "version_manager",
+      "update_build_number"
+    ],
+    "successful_runs": {
+      "total_time": "16149",
+      "count": "1"
+    }
+  },
+  {
+    "file": "ci/bin_release_page/tezt/test_version_manager.ml",
+    "title": "version_manager: generate-rss",
+    "tags": [
+      "version_manager",
+      "generate_rss"
+    ],
+    "successful_runs": {
+      "total_time": "24957",
+      "count": "1"
+    }
+  }
+]
