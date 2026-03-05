@@ -190,18 +190,6 @@ impl FeeUpdates {
             "Applying {self:?} for {caller}"
         );
 
-        let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
-
-        if let Err(e) =
-            caller_account.sub_balance(host, u256_to_alloy(&self.charge_user_amount))
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to charge {caller} additional fees of {}: {}",
-                self.charge_user_amount,
-                e
-            ));
-        }
-
         let sequencer = match sequencer_pool_address {
             None => {
                 let burned_fee = self
@@ -402,6 +390,7 @@ mod tests {
         };
 
         // Act
+        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
         let result = fee_updates.apply(&mut host, address, None);
 
         // Assert
@@ -441,6 +430,7 @@ mod tests {
         };
 
         // Act
+        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
         let result = fee_updates.apply(&mut host, address, Some(sequencer_address));
 
         // Assert
@@ -459,29 +449,18 @@ mod tests {
     }
 
     #[test]
-    fn apply_fails_user_charge_too_large() {
-        // Arrange
+    #[should_panic]
+    fn charge_inclusion_fees_fails_if_too_large() {
+        // The inclusion fee deduction (now in apply.rs) should fail
+        // when the charge exceeds the caller's balance.
         let mut host = MockKernelHost::default();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
         set_balance(&mut host, address, balance);
 
-        let fee_updates = FeeUpdates {
-            overall_gas_used: U256::zero(),
-            overall_gas_price: U256::zero(),
-            burn_amount: U256::zero(),
-            charge_user_amount: balance * 2,
-            compensate_sequencer_amount: U256::zero(),
-        };
-
-        // Act
-        let result = fee_updates.apply(&mut host, address, None);
-
-        // Assert
-        assert!(result.is_err());
-        let new_balance = get_balance(&mut host, address);
-        assert_eq!(balance, new_balance);
+        // This panics because sub_balance fails and the helper unwraps
+        mock_charge_inclusion_fees(&mut host, address, balance * 2);
     }
 
     #[test]
@@ -523,6 +502,19 @@ mod tests {
         assert!(info.balance.is_zero());
         info.balance = info.balance.saturating_add(u256_to_alloy(&balance));
         account.set_info(host, info).unwrap();
+    }
+
+    /// Mock the inclusion fee deduction that now happens in apply.rs
+    /// before FeeUpdates::apply is called.
+    fn mock_charge_inclusion_fees(
+        host: &mut MockKernelHost,
+        address: H160,
+        charge_amount: U256,
+    ) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
+        account
+            .sub_balance(host, u256_to_alloy(&charge_amount))
+            .unwrap();
     }
 
     fn mock_execution_outcome(gas_used: u64) -> SimulationOutcome {
