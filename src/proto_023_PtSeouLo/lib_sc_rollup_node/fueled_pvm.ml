@@ -212,6 +212,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               PVM_mut_state.eval_many
                 ~check_invalid_kernel:
                   (not node_ctxt.config.unsafe_disable_wasm_kernel_checks)
+                ~fallback_to_slow_vm:(not node_ctxt.config.no_slow_vm_fallback)
                 ~reveal_builtins
                 ~write_debug:(Printer node_ctxt.kernel_debug_logger)
                 ~max_steps

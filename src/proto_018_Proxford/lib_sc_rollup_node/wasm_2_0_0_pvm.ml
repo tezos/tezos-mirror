@@ -166,13 +166,14 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
         "Waiting for DAL parameters"
     | Computing -> "Computing"
 
-  let eval_many ?(check_invalid_kernel = true) ~reveal_builtins ~write_debug
-      ~is_reveal_enabled:_ =
+  let eval_many ?(check_invalid_kernel = true) ?(fallback_to_slow_vm = true)
+      ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
     Backend.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~write_debug
-      ~hooks:(Wasm_2_0_0_utilities.hooks ~check_invalid_kernel)
+      ~hooks:
+        (Wasm_2_0_0_utilities.hooks ~check_invalid_kernel ~fallback_to_slow_vm)
 
   (** WASM PVM Mutable API works by holding a reference to an immutable state
       and wrapping all immutable functionality around the reference *)
@@ -226,12 +227,13 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       state := imm_state ;
       return_unit
 
-    let eval_many ?check_invalid_kernel ~reveal_builtins ~write_debug
-        ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+    let eval_many ?check_invalid_kernel ?fallback_to_slow_vm ~reveal_builtins
+        ~write_debug ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
       let open Lwt_syntax in
       let* imm_state, steps =
         eval_many
           ?check_invalid_kernel
+          ?fallback_to_slow_vm
           ~reveal_builtins
           ~write_debug
           ~is_reveal_enabled

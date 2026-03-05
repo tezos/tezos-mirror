@@ -214,10 +214,12 @@ let patch_durable_storage ~data_dir ~key ~value =
   in
   Store.L2_blocks.store store new_l2_block
 
-let hooks ~check_invalid_kernel =
+let hooks ~check_invalid_kernel ~fallback_to_slow_vm =
   let open Tezos_scoru_wasm.Hooks in
   let hooks =
-    no_hooks |> on_fast_exec_panicked Interpreter_event.fast_exec_panic
+    no_hooks
+    |> on_fast_exec_panicked Interpreter_event.fast_exec_panic
+    |> fast_exec_fallback fallback_to_slow_vm
   in
   if check_invalid_kernel then hooks
   else disable_fast_exec_invalid_kernel_check hooks
