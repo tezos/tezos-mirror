@@ -834,7 +834,7 @@ module Generate_protocol_parameters_file = struct
     let* pk_unrevealed_accounts = to_accounts pkh_aliases in
     let default_balance =
       match default_balance with
-      | None -> string_of_int Protocol.default_bootstrap_balance
+      | None -> Int64.to_string Protocol.default_bootstrap_balance
       | Some str -> str
     in
     let bootstrap_accounts_overrides =

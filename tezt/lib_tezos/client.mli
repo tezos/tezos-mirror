@@ -2663,7 +2663,7 @@ val init_with_protocol :
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
   ?additional_revealed_bootstrap_account_count:int ->
-  ?default_accounts_balance:int ->
+  ?default_accounts_balance:int64 ->
   ?parameter_file:string ->
   ?timestamp:timestamp ->
   ?keys:Account.key list ->

@@ -300,7 +300,7 @@ module Local = struct
       |> List.filter (String.starts_with ~prefix:baker_prefix)
     in
     let* () = Lwt_io.printf "Fetching client accounts from %s\n" output_dir in
-    let bootstrap_amount_mutez = Some 4_000_000_000_000 in
+    let bootstrap_amount_mutez = Some 4_000_000_000_000L in
     let* bootstrap_accounts =
       baker_accounts
       |> Lwt_list.map_s (fun alias ->

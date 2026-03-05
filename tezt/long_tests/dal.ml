@@ -73,7 +73,7 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
           ( Constant.bootstrap2,
             Some
               {
-                Protocol.balance = Some 1000000;
+                Protocol.balance = Some 1000000L;
                 consensus_key = None;
                 delegate = None;
               },

@@ -206,7 +206,7 @@ let pp ~bakers
                 |> Option.value ~default:account.delegate.public_key_hash
               in
               Log.info
-                "%s: Ratio for %s (with stake %d): %a"
+                "%s: Ratio for %s (with stake %Ld): %a"
                 baker_name
                 alias
                 stake

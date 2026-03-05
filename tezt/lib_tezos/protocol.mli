@@ -115,7 +115,7 @@ type bootstrap_contract = {
 }
 
 type bootstrap_parameters = {
-  balance : int option;
+  balance : int64 option;
   consensus_key : Account.key option;
   delegate : Account.key option;
 }
@@ -124,7 +124,7 @@ type bootstrap_parameters = {
 val default_bootstrap_parameters : bootstrap_parameters
 
 (** The value is the same as the one in src/proto_alpha/lib_parameters/default_parameters.ml. *)
-val default_bootstrap_balance : int
+val default_bootstrap_balance : int64
 
 (** Write a protocol parameter file.
 

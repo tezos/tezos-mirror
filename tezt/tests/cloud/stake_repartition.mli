@@ -16,7 +16,7 @@ module Dal : sig
   val typ : t Clap.typ
 
   val parse_arg :
-    stake_arg:t -> simulation_arg:Network_simulation.t -> int list Lwt.t
+    stake_arg:t -> simulation_arg:Network_simulation.t -> int64 list Lwt.t
 end
 
 module Layer1 : sig
