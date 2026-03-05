@@ -1486,4 +1486,407 @@ let () =
       src
   in
   let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+
+  (* Test a zero transfer *)
+  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst 0L in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Int64.sub (Tez.to_mutez amount) transfer_amount)
+      0L
+      b
+      src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ transfer_amount 0L b dst in
+  return_unit
+
+let () =
+  register_test ~title:"Test simple transfer with finite allowance" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst, sender) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* b = Block.bake ~operation:approve_tx b in
+
+  (* Test a zero transfer with an approved sender *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+
+  (* Test a non-zero transfer with an approved sender with sufficient
+     allowance *)
+  let transfer_amount = 30_000_000L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg transfer_amount)
+      b
+      src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+  let* allowance = get_allowance ~owner:src ~spender:sender b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 10_000_000L allowance in
+
+  (* Test a non-zero transfer with an approved sender with
+     insufficient allowance *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let*! b_error = Block.bake ~operation:transfer_tx b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to insufficient allowance"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2.1_INSUFFICIENT_ALLOWANCE"
+          trace
+  in
+
+  (* Test a non-zero transfer with a non-approved sender *)
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender:dst ~src ~dst transfer_amount
+  in
+  let*! b_error = Block.bake ~operation:transfer_tx b in
+  let* () =
+    match b_error with
+    | Ok _ ->
+        Test.fail
+          "Expected to fail as a sender has no permission on src's tokens"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2_NOT_OPERATOR"
+          trace
+  in
+
+  (* Test a zero transfer with a non-approved sender *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender:dst ~src ~dst 0L in
+  let*! b_error = Block.bake ~operation:transfer_tx b in
+  let* () =
+    match b_error with
+    | Ok _ ->
+        Test.fail
+          "Expected to fail as a sender has no permission on src's tokens"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2_NOT_OPERATOR"
+          trace
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test simple transfer with infinite allowance"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst, sender) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* update_operator_tx =
+    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+  in
+  let* b = Block.bake ~operation:update_operator_tx b in
+
+  (* Test a zero transfer with an approved operator *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+
+  (* Test a non-zero transfer with an approved operator *)
+  let transfer_amount = 30_000_000L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg transfer_amount)
+      b
+      src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+
+  (* Test a second non-zero transfer with an approved operator *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Int64.sub (Tez.to_mutez amount) transfer_amount)
+      (Int64.neg transfer_amount)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ transfer_amount transfer_amount b dst
+  in
+
+  (* Test a non-zero transfer with an approved operator but with
+     owner's insufficient balance *)
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender ~src ~dst (Tez.to_mutez amount)
+  in
+  let*! b_error = Block.bake ~operation:transfer_tx b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to insufficient balance"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2_INSUFFICIENT_BALANCE"
+          trace
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test export_ticket entrypoint with finite allowance"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst, sender) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* b = Block.bake ~operation:approve_tx b in
+
+  (* Test a non-zero ticket export with an approved sender with
+     sufficient allowance *)
+  let ticket_amount_export = 30_000_000L in
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+  in
+  let* b = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg ticket_amount_export)
+      b
+      src
+  in
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance)
+      ticket_amount_export
+  in
+
+  (* Test a non-zero ticket export with an approved sender with
+     insufficient allowance *)
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to insufficient allowance"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2.1_INSUFFICIENT_ALLOWANCE"
+          trace
+  in
+
+  (* Test a non-zero ticket export with a non-approved sender *)
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst ticket_amount_export
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    match b_error with
+    | Ok _ ->
+        Test.fail
+          "Expected to fail as a sender has no permission on src's tokens"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2_NOT_OPERATOR"
+          trace
+  in
+
+  (* Test a zero ticket export with an approved sender *)
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
+    | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
+  in
+
+  (* Test a zero ticket export with a non-approved sender *)
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst 0L
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
+  let* () =
+    match b_error with
+    | Ok _ ->
+        Test.fail
+          "Expected to fail as a sender has no permission on src's tokens"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2_NOT_OPERATOR"
+          trace
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test export_ticket entrypoint with infinite allowance"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst, sender) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* update_operator_tx =
+    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+  in
+  let* b = Block.bake ~operation:update_operator_tx b in
+
+  (* Test a non-zero ticket export with an approved operator *)
+  let ticket_amount_export = 30_000_000L in
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+  in
+  let* b = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Tez.to_mutez amount)
+      (Int64.neg ticket_amount_export)
+      b
+      src
+  in
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance)
+      ticket_amount_export
+  in
+
+  (* Test a second non-zero ticket export with an approved operator *)
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+  in
+  let* b = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      (Int64.sub (Tez.to_mutez amount) ticket_amount_export)
+      (Int64.neg ticket_amount_export)
+      b
+      src
+  in
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance)
+      (Int64.mul ticket_amount_export 2L)
+  in
+
+  (* Test a zero ticket export with an approved operator *)
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
+    | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test zero allowance" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst, sender) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 0L in
+  let* b = Block.bake ~operation:approve_tx b in
+
+  (* Test a zero transfer with an approved sender *)
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* b = Block.bake ~operation:transfer_tx b in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+  in
+  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+
+  (* Test a non-zero transfer with an approved sender with insufficient
+     allowance *)
+  let transfer_amount = 30_000_000L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let*! b_error = Block.bake ~operation:transfer_tx b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to insufficient allowance"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2.1_INSUFFICIENT_ALLOWANCE"
+          trace
+  in
+
+  (* Test a non-zero ticket export with an approved sender with
+     insufficient allowance *)
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst transfer_amount
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to insufficient allowance"
+    | Error trace ->
+        Error_helpers.expect_clst_standard_error
+          ~loc:__LOC__
+          ~str:"FA2.1_INSUFFICIENT_ALLOWANCE"
+          trace
+  in
+
+  (* Test a zero ticket export with an approved sender *)
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+  in
+  let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
+    | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
+  in
   return_unit

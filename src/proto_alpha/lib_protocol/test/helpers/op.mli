@@ -984,8 +984,9 @@ val clst_update_operator :
   [< `Add | `Remove] ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_transfer ctxt src dst amount] transfers [amount] clst tokens
-    from [src] to [dst]. *)
+(** [clst_transfer ctxt ?sender src dst amount] transfers [amount]
+    clst tokens from [src] to [dst]. The operation is triggered by
+    [sender], which defaults to [src]. *)
 val clst_transfer :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -995,6 +996,7 @@ val clst_transfer :
   Context.t ->
   src:Contract.t ->
   dst:Contract.t ->
+  ?sender:Contract.t ->
   int64 ->
   Operation.packed tzresult Lwt.t
 
@@ -1002,7 +1004,8 @@ val clst_transfer :
     exports [amount] clst tokens as a clst ticket from [src] to [dst]
     if [destination_contract] is [None]. Otherwise, emits the internal
     transaction to the [destination_contract] entrypoint of [list
-    (pair dst_address (list ticket))] type. *)
+    (pair dst_address (list ticket))] type. The operation is triggered
+    by [sender], which defaults to [src]. *)
 val clst_export_ticket :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -1013,6 +1016,7 @@ val clst_export_ticket :
   Context.t ->
   src:Contract.t ->
   dst:Contract.t ->
+  ?sender:Contract.t ->
   int64 ->
   Operation.packed tzresult Lwt.t
 

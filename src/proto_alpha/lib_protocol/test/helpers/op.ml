@@ -1715,8 +1715,8 @@ let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     Tez.zero
 
 let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) ~(src : Contract.t) ~(dst : Contract.t) (amount : int64)
-    =
+    (ctxt : Context.t) ~(src : Contract.t) ~(dst : Contract.t) ?(sender = src)
+    (amount : int64) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
@@ -1755,13 +1755,13 @@ let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~entrypoint:(Entrypoint.of_string_strict_exn "transfer")
     ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
 let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?(destination_contract = None) (ctxt : Context.t) ~(src : Contract.t)
-    ~(dst : Contract.t) (amount : int64) =
+    ~(dst : Contract.t) ?(sender = src) (amount : int64) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
@@ -1817,7 +1817,7 @@ let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~entrypoint:(Entrypoint.of_string_strict_exn "export_ticket")
     ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
