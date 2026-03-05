@@ -22,6 +22,7 @@ rlp.workspace = true
 tezos_ethereum.workspace = true
 tezosx-interfaces.workspace = true
 tezos-evm-logging.workspace = true
+tezosx-journal.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 

@@ -1171,6 +1171,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
+ "tezosx-journal",
  "thiserror 1.0.69",
  "walkdir",
 ]
@@ -1239,6 +1240,7 @@ dependencies = [
  "tezos_tezlink_latest",
  "tezosx-ethereum-runtime",
  "tezosx-interfaces",
+ "tezosx-journal",
  "tezosx-tezos-runtime",
  "thiserror 1.0.69",
  "tracing",
@@ -2589,6 +2591,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
+ "tezosx-journal",
 ]
 
 [[package]]
@@ -3216,6 +3219,7 @@ dependencies = [
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
  "tezosx-interfaces",
+ "tezosx-journal",
  "thiserror 1.0.69",
  "typed-arena",
 ]
@@ -3528,6 +3532,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
  "tezosx-interfaces",
+ "tezosx-journal",
 ]
 
 [[package]]
@@ -3541,6 +3546,7 @@ dependencies = [
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos-storage-latest",
+ "tezosx-journal",
  "thiserror 1.0.69",
 ]
 
@@ -3576,6 +3582,7 @@ dependencies = [
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
  "tezosx-interfaces",
+ "tezosx-journal",
 ]
 
 [[package]]

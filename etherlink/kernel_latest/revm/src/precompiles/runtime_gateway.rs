@@ -133,7 +133,7 @@ fn inject_tezos_headers(
     Ok(())
 }
 
-pub(crate) fn runtime_gateway_precompile<CTX, DB>(
+pub(crate) fn runtime_gateway_precompile<'j, CTX, DB>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
@@ -142,8 +142,8 @@ where
     DB: DatabasePrecompileStateChanges
         + DatabaseCommitPrecompileStateChanges
         + revm::Database,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
-    Journal<DB>: CrossRuntimeCall,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+    Journal<'j, DB>: CrossRuntimeCall,
 {
     // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
 

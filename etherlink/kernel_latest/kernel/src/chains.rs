@@ -61,6 +61,7 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
@@ -820,9 +821,11 @@ where
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
+            let mut tezosx_journal = TezosXJournal::new();
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
+                &mut tezosx_journal,
                 context,
                 hash.clone(),
                 operation,
@@ -1135,9 +1138,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // During simulation, skip the DA fee check: the client sends fee=0
         // because it doesn't know the fees yet (that's what simulation computes).
         // The OCaml node-side prevalidation also skips DA fees during simulation.
+        let mut tezosx_journal = TezosXJournal::new();
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
+            &mut tezosx_journal,
             &context,
             hash.clone(),
             operation.clone(),

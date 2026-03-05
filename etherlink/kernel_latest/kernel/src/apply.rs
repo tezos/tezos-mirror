@@ -53,6 +53,7 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
+use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
@@ -272,6 +273,7 @@ fn log_transaction_type(host: &impl Logging, to: Option<H160>, data: &[u8]) {
 pub fn revm_run_transaction<Host>(
     host: &mut Host,
     registry: &impl Registry,
+    journal: &mut TezosXJournal,
     block_constants: &BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     caller: H160,
@@ -319,6 +321,7 @@ where
     revm_etherlink::run_transaction(
         host,
         registry,
+        journal,
         *spec_id,
         block_constants,
         transaction_hash,
@@ -422,9 +425,11 @@ where
     let call_data = transaction.data.clone();
     log_transaction_type(host, to, &call_data);
     let value = transaction.value;
+    let mut journal = TezosXJournal::new();
     let execution_outcome = match revm_run_transaction(
         host,
         registry,
+        &mut journal,
         block_constants,
         Some(transaction_hash),
         caller,
@@ -512,9 +517,11 @@ where
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
+    let mut journal = TezosXJournal::new();
     match revm_run_transaction(
         host,
         registry,
+        &mut journal,
         &block_constants,
         Some(transaction_hash),
         caller,
@@ -632,9 +639,11 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
+    let mut journal = TezosXJournal::new();
     match revm_run_transaction(
         host,
         registry,
+        &mut journal,
         &block_constants,
         Some(transaction_hash),
         caller,
@@ -902,9 +911,11 @@ where
             })?;
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
+            let mut tezosx_journal = TezosXJournal::new();
             match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
+                &mut tezosx_journal,
                 &context,
                 op_hash.clone(),
                 // TODO: !20198 avoid this clone.

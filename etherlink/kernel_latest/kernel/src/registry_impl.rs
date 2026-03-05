@@ -24,12 +24,14 @@ use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{CrossCallResult, Registry, RuntimeInterface};
+use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
     fn bridge<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         destination_runtime: tezosx_interfaces::RuntimeId,
         destination_address: &[u8],
         source_address: &[u8],
@@ -44,6 +46,7 @@ impl Registry for RegistryImpl {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.call(
                 self,
                 host,
+                journal,
                 source_address,
                 destination_address,
                 amount,
@@ -53,6 +56,7 @@ impl Registry for RegistryImpl {
             tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.call(
                 self,
                 host,
+                journal,
                 source_address,
                 destination_address,
                 amount,
@@ -65,6 +69,7 @@ impl Registry for RegistryImpl {
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         native_address: &[u8],
         runtime_id: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
@@ -75,11 +80,11 @@ impl Registry for RegistryImpl {
         match runtime_id {
             tezosx_interfaces::RuntimeId::Tezos => {
                 self.tezos
-                    .generate_alias(self, host, native_address, context)
+                    .generate_alias(self, host, journal, native_address, context)
             }
             tezosx_interfaces::RuntimeId::Ethereum => {
                 self.ethereum
-                    .generate_alias(self, host, native_address, context)
+                    .generate_alias(self, host, journal, native_address, context)
             }
         }
     }
@@ -102,15 +107,18 @@ impl Registry for RegistryImpl {
     fn serve<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
         match request.uri().host() {
-            Some(h) if h == self.tezos.host() => self.tezos.serve(self, host, request),
+            Some(h) if h == self.tezos.host() => {
+                self.tezos.serve(self, host, journal, request)
+            }
             Some(h) if h == self.ethereum.host() => {
-                self.ethereum.serve(self, host, request)
+                self.ethereum.serve(self, host, journal, request)
             }
             unknown => Ok(http::Response::builder()
                 .status(http::StatusCode::NOT_FOUND)
@@ -138,7 +146,8 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let response = registry.serve(&mut host, request).unwrap();
+        let mut journal = TezosXJournal::new();
+        let response = registry.serve(&mut host, &mut journal, request).unwrap();
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
         assert!(body.contains("unknown"));
@@ -154,7 +163,8 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let response = registry.serve(&mut host, request).unwrap();
+        let mut journal = TezosXJournal::new();
+        let response = registry.serve(&mut host, &mut journal, request).unwrap();
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
         assert!(body.contains("(none)"));

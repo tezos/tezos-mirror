@@ -22,9 +22,10 @@ use revm::{
         result::{EVMError, ExecutionResult},
         transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
-        BlockEnv, CfgEnv, ContextTr, Evm, TxEnv,
+        BlockEnv, CfgEnv, ContextTr, Evm, LocalContext, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
+    context_interface::journaled_state::JournalTr,
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
@@ -36,6 +37,7 @@ use tezos_evm_logging::{
 };
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
+use tezosx_journal::TezosXJournal;
 
 pub mod helpers;
 pub mod inspectors;
@@ -51,7 +53,7 @@ type EVMInnerContext<'a, Host, R> = Context<
     &'a TxEnv,
     CfgEnv,
     EtherlinkVMDB<'a, Host, R>,
-    Journal<EtherlinkVMDB<'a, Host, R>>,
+    Journal<'a, EtherlinkVMDB<'a, Host, R>>,
 >;
 
 type EvmContext<'a, Host, R> = Evm<
@@ -214,6 +216,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn evm_inspect<'a, Host, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>(
     db: EtherlinkVMDB<'a, Host, R>,
+    journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
@@ -232,24 +235,26 @@ where
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
-    Context::<
-        BlockEnv,
-        TxEnv,
-        CfgEnv,
-        EtherlinkVMDB<'a, Host, R>,
-        Journal<EtherlinkVMDB<'a, Host, R>>,
-    >::new(db, spec_id)
-    .with_block(block)
-    .with_tx(tx)
-    .with_cfg(cfg)
-    .build_mainnet_with_inspector(inspector)
-    .with_precompiles(precompiles)
+    let mut journal = Journal::new_with_inner(db, journal);
+    journal.set_spec_id(spec_id);
+    let ctx = Context {
+        tx,
+        block,
+        cfg,
+        journaled_state: journal,
+        chain: (),
+        local: LocalContext::default(),
+        error: Ok(()),
+    };
+    ctx.build_mainnet_with_inspector(inspector)
+        .with_precompiles(precompiles)
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
 fn evm<'a, Host, R: Registry>(
     db: EtherlinkVMDB<'a, Host, R>,
+    journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
@@ -267,18 +272,18 @@ where
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
-    Context::<
-        BlockEnv,
-        TxEnv,
-        CfgEnv,
-        EtherlinkVMDB<'a, Host, R>,
-        Journal<EtherlinkVMDB<'a, Host, R>>,
-    >::new(db, spec_id)
-    .with_block(block)
-    .with_tx(tx)
-    .with_cfg(cfg)
-    .build_mainnet()
-    .with_precompiles(precompiles)
+    let mut journal = Journal::new_with_inner(db, journal);
+    journal.set_spec_id(spec_id);
+    let ctx = Context {
+        tx,
+        block,
+        cfg,
+        journaled_state: journal,
+        chain: (),
+        local: LocalContext::default(),
+        error: Ok(()),
+    };
+    ctx.build_mainnet().with_precompiles(precompiles)
 }
 
 fn execute_transaction<'a, Host, R: Registry>(
@@ -315,6 +320,7 @@ where
 pub fn run_transaction<'a, Host, R: Registry>(
     host: &'a mut Host,
     registry: &'a R,
+    journal: &'a mut TezosXJournal,
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
@@ -349,6 +355,7 @@ where
     if let Some(tracer_input) = tracer_input {
         let mut evm = evm_inspect(
             db,
+            journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
@@ -384,6 +391,7 @@ where
     } else {
         let mut evm = evm(
             db,
+            journal,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
@@ -438,6 +446,7 @@ mod test {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::Registry as RegistryTrait;
+    use tezosx_journal::TezosXJournal;
 
     use utilities::{
         block_constants_with_fees, block_constants_with_no_fees,
@@ -498,6 +507,7 @@ mod test {
             CrossCallResult, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
             RuntimeInterface, TezosXRuntimeError,
         };
+        use tezosx_journal::TezosXJournal;
 
         use crate::test::GAS_LIMIT;
 
@@ -536,6 +546,7 @@ mod test {
             fn bridge<Host>(
                 &self,
                 host: &mut Host,
+                journal: &mut TezosXJournal,
                 destination_runtime: RuntimeId,
                 destination_address: &[u8],
                 source_address: &[u8],
@@ -550,6 +561,7 @@ mod test {
                     RuntimeId::Tezos => self.mock_tezos.call(
                         self,
                         host,
+                        journal,
                         source_address,
                         destination_address,
                         amount,
@@ -565,6 +577,7 @@ mod test {
             fn generate_alias<Host>(
                 &self,
                 host: &mut Host,
+                journal: &mut TezosXJournal,
                 native_address: &[u8],
                 runtime_id: RuntimeId,
                 context: CrossRuntimeContext,
@@ -576,13 +589,17 @@ mod test {
                     RuntimeId::Tezos => self.mock_tezos.generate_alias(
                         self,
                         host,
+                        journal,
                         native_address,
                         context,
                     ),
-                    RuntimeId::Ethereum => {
-                        self.ethereum
-                            .generate_alias(self, host, native_address, context)
-                    }
+                    RuntimeId::Ethereum => self.ethereum.generate_alias(
+                        self,
+                        host,
+                        journal,
+                        native_address,
+                        context,
+                    ),
                 }
             }
 
@@ -602,6 +619,7 @@ mod test {
             fn serve<Host>(
                 &self,
                 _host: &mut Host,
+                _journal: &mut TezosXJournal,
                 _request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
@@ -653,6 +671,7 @@ mod test {
                 &self,
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
+                _journal: &mut TezosXJournal,
                 native_address: &[u8],
                 _context: CrossRuntimeContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError>
@@ -673,6 +692,7 @@ mod test {
                 &self,
                 _registry: &impl RegistryTrait,
                 host: &mut Host,
+                _journal: &mut TezosXJournal,
                 _from: &[u8],
                 to: &[u8],
                 amount: primitive_types::U256,
@@ -709,6 +729,7 @@ mod test {
                 &self,
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
+                _journal: &mut TezosXJournal,
                 _request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
@@ -803,9 +824,11 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -849,9 +872,11 @@ mod test {
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let alias = registry
             .generate_alias(
                 &mut host,
+                &mut journal,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
@@ -890,9 +915,11 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -926,9 +953,11 @@ mod test {
         let caller = Address::from(&[1; 20]);
         let destination = Address::from(&[2; 20]);
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let alias = registry
             .generate_alias(
                 &mut host,
+                &mut journal,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
@@ -964,9 +993,11 @@ mod test {
         .abi_encode();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1053,9 +1084,11 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1110,9 +1143,11 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1201,12 +1236,14 @@ mod test {
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let ExecutionOutcome {
             result,
             withdrawals,
         } = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1285,9 +1322,11 @@ mod test {
             .abi_encode();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1348,9 +1387,11 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result_create = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1379,9 +1420,11 @@ mod test {
         };
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result_call = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1421,9 +1464,11 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result_create = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1501,12 +1546,14 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let mut journal = TezosXJournal::new();
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1560,9 +1607,11 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CreateAndRevert contract
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result_create = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1596,12 +1645,14 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let mut journal = TezosXJournal::new();
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1674,10 +1725,12 @@ mod test {
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
+        let mut journal = TezosXJournal::new();
         let registry = Registry::new();
         run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1736,9 +1789,11 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1782,9 +1837,11 @@ mod test {
         };
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let outcome = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1802,9 +1859,11 @@ mod test {
 
         assert!(outcome.result.is_success());
 
+        let mut journal = TezosXJournal::new();
         let outcome = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1893,6 +1952,7 @@ mod test {
             ExecutionOutcome, GasData,
         };
         use tezos_data_encoding::enc::BinWriter;
+        use tezosx_journal::TezosXJournal;
 
         fn dummy_ticket() -> FA2_1Ticket {
             use tezos_crypto_rs::hash::HashTrait;
@@ -1979,9 +2039,11 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
+            let mut journal = TezosXJournal::new();
             let outcome = run_transaction(
                 host,
                 &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -2009,10 +2071,12 @@ mod test {
                     },
                 )
                 .unwrap();
+            let mut journal = TezosXJournal::new();
             let registry = Registry::new();
             run_transaction(
                 host,
                 &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -2051,10 +2115,12 @@ mod test {
                     },
                 )
                 .unwrap();
+            let mut journal = TezosXJournal::new();
             let registry = Registry::new();
             run_transaction(
                 host,
                 &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -2087,9 +2153,11 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
+            let mut journal = TezosXJournal::new();
             let result_create = run_transaction(
                 host,
                 &registry,
+                &mut journal,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -2766,9 +2834,11 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -2808,9 +2878,11 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,
+                &mut journal,
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
@@ -2888,9 +2960,11 @@ mod test {
 
         // Create the Ethereum alias - this should forward the pre-existing balance
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,
+                &mut journal,
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
@@ -2937,9 +3011,11 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,
+                &mut journal,
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
@@ -2974,9 +3050,11 @@ mod test {
 
         // Send funds to the alias address
         let registry = Registry::new();
+        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
+            &mut journal,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,

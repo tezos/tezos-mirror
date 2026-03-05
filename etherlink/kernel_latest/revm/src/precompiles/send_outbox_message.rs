@@ -235,13 +235,13 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<CTX, DB>(
+fn send_outbox_methods<'j, CTX, DB>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
     DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
@@ -421,15 +421,14 @@ where
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<CTX, DB>(
+pub(crate) fn send_outbox_message_precompile<'j, CTX, DB>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    CTX: ContextTr,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     DB: DatabasePrecompileStateChanges,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
 {
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,

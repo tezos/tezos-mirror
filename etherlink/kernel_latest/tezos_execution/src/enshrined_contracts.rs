@@ -27,6 +27,7 @@ use tezosx_interfaces::{
     ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
     X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
+use tezosx_journal::TezosXJournal;
 
 use crate::alias::{get_alias, store_alias};
 
@@ -100,6 +101,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     value: Micheline<'a>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     registry: &impl Registry,
+    journal: &mut TezosXJournal,
 ) -> Result<(), TransferError>
 where
     Host: StorageV1 + Logging,
@@ -113,19 +115,19 @@ where
                         "Expected string for default entrypoint".into(),
                     ));
                 };
-                tezosx_cross_runtime_call(registry, ctx, &dest, &[])
+                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])
             } else if entrypoint.as_str() == "call" {
                 let (dest, method_sig, abi_params) = extract_call_params(typed)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
-                tezosx_cross_runtime_call(registry, ctx, &dest, &calldata)
+                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
             } else if entrypoint.as_str() == "http_call" {
                 let mut request = extract_http_call_request(typed)?;
-                inject_context_headers(request.headers_mut(), ctx, registry)?;
+                inject_context_headers(request.headers_mut(), ctx, journal, registry)?;
                 let _ = registry
-                    .serve(ctx.host(), request)
+                    .serve(ctx.host(), journal, request)
                     .map_err(|err| TransferError::GatewayError(err.to_string()))?;
                 Ok(())
             } else {
@@ -148,7 +150,7 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
-            tezosx_cross_runtime_call(registry, ctx, &evm_contract, &calldata)
+            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)
         }
     }
 }
@@ -324,6 +326,7 @@ fn inject_context_headers_raw(
 fn inject_context_headers<'a, Host>(
     headers: &mut http::HeaderMap,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    journal: &mut TezosXJournal,
     registry: &impl Registry,
 ) -> Result<(), TransferError>
 where
@@ -349,8 +352,9 @@ where
         })?;
     let context = cross_runtime_ctx_from_ctx(ctx)?;
     let sender_alias =
-        get_or_create_alias(ctx.host(), &sender, context.clone(), registry)?;
-    let source_alias = get_or_create_alias(ctx.host(), &source, context, registry)?;
+        get_or_create_alias(ctx.host(), journal, &sender, context.clone(), registry)?;
+    let source_alias =
+        get_or_create_alias(ctx.host(), journal, &source, context, registry)?;
     inject_context_headers_raw(
         headers,
         &sender_alias,
@@ -446,6 +450,7 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
 /// `registry`, persist it, and return it.
 fn get_or_create_alias<Host>(
     host: &mut Host,
+    journal: &mut TezosXJournal,
     address: &AddressHash,
     context: CrossRuntimeContext,
     registry: &impl Registry,
@@ -458,7 +463,13 @@ where
     }
     let address_b58 = address.to_base58_check();
     let alias = registry
-        .generate_alias(host, address_b58.as_bytes(), RuntimeId::Ethereum, context)
+        .generate_alias(
+            host,
+            journal,
+            address_b58.as_bytes(),
+            RuntimeId::Ethereum,
+            context,
+        )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
     store_alias(host, address, RuntimeId::Ethereum, &alias)?;
     Ok(alias)
@@ -480,6 +491,7 @@ where
 
 fn tezosx_cross_runtime_call<'a, Host>(
     registry: &impl Registry,
+    journal: &mut TezosXJournal,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     dest: &str,
     data: &[u8],
@@ -495,7 +507,8 @@ where
     }
 
     let context = cross_runtime_ctx_from_ctx(ctx)?;
-    let alias = get_or_create_alias(ctx.host(), &source, context.clone(), registry)?;
+    let alias =
+        get_or_create_alias(ctx.host(), journal, &source, context.clone(), registry)?;
     let destination_contract = registry
         .address_from_string(dest, RuntimeId::Ethereum)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
@@ -506,6 +519,7 @@ where
     let result = registry
         .bridge(
             ctx.host(),
+            journal,
             RuntimeId::Ethereum,
             &destination_contract,
             &alias,
@@ -662,8 +676,10 @@ mod tests {
         calldata.extend_from_slice(&selector);
         calldata.extend_from_slice(&abi_params);
 
+        let mut journal = TezosXJournal::new();
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &calldata);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &calldata);
         assert!(result.is_ok());
 
         let bridge_calls = registry.bridge_calls.borrow();
@@ -687,8 +703,10 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000u64;
 
+        let mut journal = TezosXJournal::new();
         let mut ctx = MockCtx::new(&mut host, source, amount as i64);
-        let result = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result.is_ok());
 
         // Verify generate_alias was called
@@ -722,14 +740,17 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000i64;
 
+        let mut journal = TezosXJournal::new();
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First transfer creates alias
-        let result1 = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
+        let result1 =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result1.is_ok());
 
         // Second transfer should reuse alias
-        let result2 = tezosx_cross_runtime_call(&registry, &mut ctx, dest, &[]);
+        let result2 =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result2.is_ok());
 
         // generate_alias should only have been called once

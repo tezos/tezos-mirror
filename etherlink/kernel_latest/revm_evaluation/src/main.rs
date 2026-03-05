@@ -29,6 +29,7 @@ use std::{
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_journal::TezosXJournal;
 
 mod deserializer;
 mod evalhost;
@@ -408,9 +409,11 @@ pub fn main() {
                             .collect(),
                     );
 
+                    let mut journal = TezosXJournal::new();
                     let execution_result = run_transaction(
                         &mut host,
                         &registry,
+                        &mut journal,
                         spec_id,
                         &block_constants,
                         None,

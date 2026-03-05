@@ -36,6 +36,7 @@ use tezos_tezlink::{
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
 };
+use tezosx_journal::TezosXJournal;
 
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
@@ -134,6 +135,7 @@ fn build_response(
 fn execute_request<Host>(
     registry: &impl Registry,
     host: &mut Host,
+    journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<TransferSuccess, TezosXRuntimeError>
 where
@@ -191,6 +193,7 @@ where
         &mut tc_ctx,
         &mut operation_ctx,
         registry,
+        journal,
         &sender_account,
         &hdrs.amount,
         &parsed.destination,
@@ -206,6 +209,7 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         _registry: &impl Registry,
         _host: &mut Host,
+        _journal: &mut TezosXJournal,
         native_address: &[u8],
         _context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>
@@ -231,6 +235,7 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         from: &[u8],
         to: &[u8],
         amount: U256,
@@ -335,6 +340,7 @@ impl RuntimeInterface for TezosRuntime {
             &mut tc_ctx,
             &mut operation_ctx,
             registry,
+            journal,
             &sender_account,
             &amount,
             &dest,
@@ -350,12 +356,13 @@ impl RuntimeInterface for TezosRuntime {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
-        build_response(execute_request(registry, host, request))
+        build_response(execute_request(registry, host, journal, request))
     }
 
     fn host(&self) -> &'static str {

@@ -39,6 +39,7 @@ ethbloom.workspace = true
 
 revm.workspace = true
 revm-etherlink.workspace = true
+tezosx-journal.workspace = true
 tezos-execution.workspace = true
 tezos_ethereum.workspace = true
 tezos_tezlink.workspace = true

@@ -8,6 +8,7 @@ use primitive_types::U256;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_journal::TezosXJournal;
 use thiserror::Error;
 
 /// Header names for the Tezos cross-runtime execution context.
@@ -81,6 +82,7 @@ pub trait Registry {
     fn bridge<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         destination_runtime: RuntimeId,
         destination_address: &[u8],
         source_address: &[u8],
@@ -94,6 +96,7 @@ pub trait Registry {
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         native_address: &[u8],
         runtime_id: RuntimeId,
         context: CrossRuntimeContext,
@@ -111,6 +114,7 @@ pub trait Registry {
     fn serve<Host>(
         &self,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
@@ -126,6 +130,7 @@ pub trait RuntimeInterface {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         native_address: &[u8],
         context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>
@@ -150,6 +155,7 @@ pub trait RuntimeInterface {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         from: &[u8],
         to: &[u8],
         amount: U256,
@@ -173,6 +179,7 @@ pub trait RuntimeInterface {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
