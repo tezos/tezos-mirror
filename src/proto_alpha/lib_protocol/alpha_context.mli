@@ -2984,6 +2984,8 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
+    val rpc_arg : t RPC_arg.t
+
     val empty : t
 
     val is_empty : t -> bool

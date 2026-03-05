@@ -81,6 +81,10 @@ type t = private Bitset.t
     there is a bound on the size of a generic operation. *)
 val encoding : t Data_encoding.t
 
+(** RPC path argument for parsing a DAL attestation bitset from a
+    decimal integer string in URL paths. *)
+val rpc_arg : t RPC_arg.t
+
 (** [empty] returns an empty attestation structure where all slots at all lags
     are marked as unavailable. *)
 val empty : t

@@ -10,6 +10,21 @@ type t = Bitset.t
 
 let encoding = Bitset.encoding
 
+let rpc_arg =
+  let construct t = Z.to_string (Bitset.to_z t) in
+  let destruct s =
+    match Bitset.from_z (Z.of_string s) with
+    | Ok t -> Ok t
+    | Error _ -> Error "Invalid DAL attestation bitset"
+    | exception _ -> Error "Cannot parse DAL attestation bitset"
+  in
+  RPC_arg.make
+    ~descr:"A DAL attestation bitset as a decimal integer"
+    ~name:"dal_attestation_bitset"
+    ~construct
+    ~destruct
+    ()
+
 let empty = Bitset.empty
 
 let is_empty = Bitset.is_empty
