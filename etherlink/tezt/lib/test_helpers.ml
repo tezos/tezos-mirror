@@ -160,11 +160,8 @@ let check_block_info ~previous_block_info ~current_block_info ~chain_id
   Check.((operations = expected_operations) (list (list string)))
     ~error_msg:"List of operations is expected to be empty for now"
 
-let next_evm_level ~evm_node ~sc_rollup_node ~client =
+let next_evm_level ~evm_node =
   match Evm_node.mode evm_node with
-  | Proxy _ ->
-      let* _l1_level = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-      unit
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ ->
       let open Rpc.Syntax in
       let*@ _l2_level = produce_block evm_node in

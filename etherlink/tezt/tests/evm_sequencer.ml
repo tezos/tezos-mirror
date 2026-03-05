@@ -2797,7 +2797,7 @@ let test_get_block_by_number_block_param =
   let observer_offset = 3l in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
-    next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
+    next_evm_level ~evm_node:sequencer
   in
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* _ =
@@ -2839,10 +2839,7 @@ let test_get_block_by_number_block_param =
       sc_rollup_node
   in
   let* () = Evm_node.run observer_partial_history in
-  let* () =
-    repeat 2 @@ fun () ->
-    next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
-  in
+  let* () = repeat 2 @@ fun () -> next_evm_level ~evm_node:sequencer in
 
   let*@ earliest_block_sequencer =
     Rpc.get_block_by_number ~block:"earliest" sequencer
@@ -6851,13 +6848,13 @@ let test_blueprint_is_limited_in_size =
       (* IC set to false because transaction dropping mechanism from IC workflow invalidates it:
       Remaining transactions are not included in the last block *)
     ~instant_confirmations:false
-  @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
+  @@ fun {sequencer; _} _protocol ->
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, hashes = batch_n_transactions ~evm_node:sequencer txs in
   (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
      will fit in two blueprints of two chunks each. *)
-  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
-  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* () = next_evm_level ~evm_node:sequencer in
+  let* () = next_evm_level ~evm_node:sequencer in
   let first_hash = List.hd hashes in
   let* level_of_first_transaction =
     let*@ receipt = Rpc.get_transaction_receipt ~tx_hash:first_hash sequencer in
@@ -6883,7 +6880,7 @@ let test_blueprint_is_limited_in_size =
         List.length hashes
   in
 
-  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* () = next_evm_level ~evm_node:sequencer in
   (* It's not clear the first transaction of the batch is applied in the first
      blueprint or the second, as it depends how the tx_pool sorts the
      transactions (by caller address). We need to check that either the previous
@@ -6973,9 +6970,9 @@ let test_blueprint_limit_with_delayed_inbox =
   in
   (* Due to the overapproximation of 4096 bytes per delayed transactions, there
      should be only a single delayed transaction per blueprints with 2 chunks. *)
-  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
-  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
-  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* _ = next_evm_level ~evm_node:sequencer in
+  let* _ = next_evm_level ~evm_node:sequencer in
+  let* _ = next_evm_level ~evm_node:sequencer in
   (* Checks the delayed transactions and at least the first transaction from the
      batch have been applied *)
   let* block_numbers =
@@ -7022,18 +7019,14 @@ let test_reset =
   let reset_level = 5 in
   let after_reset_level = 5 in
   Log.info "Producing %d level then syncing" reset_level ;
-  let* () =
-    repeat reset_level (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* () = repeat reset_level (fun () -> next_evm_level ~evm_node:sequencer) in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   Log.info
     "Stopping the rollup node, then produce %d more blocks "
     (reset_level + after_reset_level) ;
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () =
-    repeat after_reset_level (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+    repeat after_reset_level (fun () -> next_evm_level ~evm_node:sequencer)
   in
   let*@ sequencer_level = Rpc.block_number sequencer in
   Check.(
@@ -7096,8 +7089,7 @@ let test_reset =
       "The sequencer (currently at level %L) and observer (currently at level \
        %R) should be at the same level after both being reset." ;
   let* () =
-    repeat after_reset_level (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+    repeat after_reset_level (fun () -> next_evm_level ~evm_node:sequencer)
   in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   (* Check sequencer is at the expected level *)
@@ -7437,10 +7429,7 @@ let test_replay_rpc =
     Rpc.get_transaction_by_hash ~transaction_hash sequencer
   in
   (* Block few levels to ensure we are replaying on an old block. *)
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* () = repeat 2 (fun () -> next_evm_level ~evm_node:sequencer) in
   let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let blockNumber =
     match blockNumber with
@@ -9640,7 +9629,7 @@ let test_trace_call =
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; evm_version; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (* Start a RPC node as well, since we will want to check it returns the
      same result as the sequencer *)
   let* rpc_node = run_new_rpc_endpoint sequencer in
@@ -9667,10 +9656,7 @@ let test_trace_call =
          ~bin:simple_storage_resolved.bin)
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* () = repeat 2 (fun () -> next_evm_level ~evm_node:sequencer) in
 
   let value_in_storage = 10 in
   let* _ =
@@ -9683,10 +9669,7 @@ let test_trace_call =
          ~method_call:(Format.sprintf "set(%d)" value_in_storage))
       sequencer
   in
-  let* () =
-    repeat 2 (fun () ->
-        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
-  in
+  let* () = repeat 2 (fun () -> next_evm_level ~evm_node:sequencer) in
 
   let* abi_string =
     Eth_cli.encode_method

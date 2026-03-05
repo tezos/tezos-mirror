@@ -91,13 +91,9 @@ val check_block_info :
   expected_operations:string list list ->
   unit
 
-(** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
-    [evm_node] to the next L2 level. *)
-val next_evm_level :
-  evm_node:Evm_node.t ->
-  sc_rollup_node:Sc_rollup_node.t ->
-  client:Client.t ->
-  unit Lwt.t
+(** [next_evm_level ~evm_node] moves [evm_node] to the next L2
+    level. *)
+val next_evm_level : evm_node:Evm_node.t -> unit Lwt.t
 
 (** [check_chain_id ~expected_chain_id ~chain_id] checks that
     the value received for chain_id is correct using the appropriate

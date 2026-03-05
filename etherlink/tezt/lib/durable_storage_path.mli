@@ -39,6 +39,9 @@ val delayed_inbox : path
 (** [kernel_root_hash] is the path to the current kernel root hash. *)
 val kernel_root_hash : path
 
+(** [kernel_version] is the path to the current kernel version. *)
+val kernel_version : path
+
 (** [indexes] is the directory with all indexes category. *)
 val indexes : path
 
@@ -48,6 +51,10 @@ val eth_accounts : path
 (** [eth_account addr] is the path to the [addr] account. The address
     is "normalized", i.e. lowered and removed the prefix [0x] if it exists. *)
 val eth_account : string -> path
+
+(** [account_info addr] is the path to the [addr] account's RLP-encoded info
+    (balance, nonce, code_hash). *)
+val account_info : string -> path
 
 (** [balance addr] is the path to the [addr] account's balance. *)
 val balance : string -> path
