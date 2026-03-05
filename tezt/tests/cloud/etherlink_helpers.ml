@@ -11,8 +11,10 @@ open Scenarios_helpers
 open Tezos
 open Yes_crypto
 
+type etherlink_mode = Sequencer | Observer of string
+
 type etherlink_configuration = {
-  etherlink_sequencer : bool;
+  etherlink_sequencer : etherlink_mode;
   etherlink_producers : int;
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
@@ -259,7 +261,9 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
     |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
   in
   let*! () =
-    let sequencer = if is_sequencer then Some account.public_key else None in
+    let sequencer =
+      if is_sequencer = Sequencer then Some account.public_key else None
+    in
     let () = toplog "Init Etherlink: configuring the kernel" in
     let kernel_setup =
       Tezt_etherlink.Evm_node.make_kernel_setup
@@ -361,31 +365,33 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
   let () = toplog "Init Etherlink: launching the rollup node: done" in
   let private_rpc_port = Agent.next_available_port agent in
   let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
-  let sequencer_config : Evm_node.sequencer_config =
-    {
-      time_between_blocks;
-      genesis_timestamp = None;
-      max_number_of_chunks = None;
-      wallet_dir = Some (Client.base_dir client);
-    }
-  in
-  let rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node in
-  let sequencer_mode =
-    Evm_node.Sequencer
-      {
-        rollup_node_endpoint;
-        sequencer_config;
-        sequencer_keys = [account.alias];
-        max_blueprints_lag = Some 300;
-        max_blueprints_ahead = Some 2000;
-        max_blueprints_catchup = None;
-        catchup_cooldown = None;
-        dal_slots;
-        sequencer_sunset_sec = None;
-      }
-  in
   let mode =
-    if is_sequencer then sequencer_mode else Evm_node.Proxy rollup_node_endpoint
+    let rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node in
+    match is_sequencer with
+    | Sequencer ->
+        let sequencer_config : Evm_node.sequencer_config =
+          {
+            time_between_blocks;
+            genesis_timestamp = None;
+            max_number_of_chunks = None;
+            wallet_dir = Some (Client.base_dir client);
+          }
+        in
+        Evm_node.Sequencer
+          {
+            rollup_node_endpoint;
+            sequencer_config;
+            sequencer_keys = [account.alias];
+            max_blueprints_lag = Some 300;
+            max_blueprints_ahead = Some 2000;
+            max_blueprints_catchup = None;
+            catchup_cooldown = None;
+            dal_slots;
+            sequencer_sunset_sec = None;
+          }
+    | Observer evm_node_endpoint ->
+        Evm_node.Observer
+          {rollup_node_endpoint = Some rollup_node_endpoint; evm_node_endpoint}
   in
   let () = toplog "Init Etherlink: launching the EVM node" in
   let* evm_node =
@@ -436,7 +442,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
       client;
       sc_rollup_node;
       evm_node;
-      is_sequencer;
+      is_sequencer = is_sequencer = Sequencer;
       account;
       batching_operators;
       sc_rollup_address;

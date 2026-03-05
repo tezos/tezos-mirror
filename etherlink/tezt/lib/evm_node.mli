@@ -104,7 +104,6 @@ type mode =
       funded_addresses : string list;
       verbose : bool;
     }
-  | Proxy of string
   | Rpc of mode
 
 type history_mode =
@@ -289,7 +288,7 @@ val preimages_dir : t -> string
 val create : ?node_setup:node_setup -> mode:mode -> unit -> t
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
-    EVM state. Fails if [node] is a proxy node. *)
+    EVM state. *)
 val initial_kernel : t -> string option
 
 (** [run ?wait ?extra_arguments evm_node] launches the EVM node server with

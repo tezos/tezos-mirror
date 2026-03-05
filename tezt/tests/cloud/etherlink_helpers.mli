@@ -10,8 +10,10 @@
     and DAL integration within Tezt-cloud scenarios.
 *)
 
+type etherlink_mode = Sequencer | Observer of string
+
 type etherlink_configuration = {
-  etherlink_sequencer : bool;
+  etherlink_sequencer : etherlink_mode;
   etherlink_producers : int;
   etherlink_dal_slots : int list;
   chain_id : int option;

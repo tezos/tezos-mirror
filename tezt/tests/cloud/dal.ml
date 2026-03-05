@@ -1451,7 +1451,11 @@ let register (module Cli : Scenarios_cli.Dal) =
         Some
           Etherlink_helpers.
             {
-              etherlink_sequencer;
+              etherlink_sequencer =
+                (if etherlink_sequencer then Sequencer
+                 else
+                   (*missing option to set the evm node observer upstream node *)
+                   Observer "");
               etherlink_producers;
               etherlink_dal_slots;
               chain_id = etherlink_chain_id;

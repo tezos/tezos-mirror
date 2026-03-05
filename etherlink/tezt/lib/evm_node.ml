@@ -103,7 +103,6 @@ type mode =
       funded_addresses : string list;
       verbose : bool;
     }
-  | Proxy of string
   | Rpc of mode
 
 type node_setup = {
@@ -283,11 +282,11 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ -> true
-  | Observer _ | Proxy _ | Rpc _ -> false
+  | Observer _ | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Proxy _ | Rpc _ -> false
+  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Rpc _ -> false
   | Observer _ -> true
 
 let initial_kernel t = t.persistent_state.initial_kernel
@@ -295,7 +294,7 @@ let initial_kernel t = t.persistent_state.initial_kernel
 let can_apply_blueprint t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Observer _ -> true
-  | Proxy _ | Rpc _ -> false
+  | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -900,7 +899,6 @@ let create ?(node_setup = make_setup ()) ~mode () =
   in
   let mode_prefix =
     match mode with
-    | Proxy _ -> "proxy_"
     | Sequencer _ -> "sequencer_"
     | Sandbox _ -> "sandbox_"
     | Tezlink_sandbox _ -> "tezlink_sandbox_"
@@ -986,7 +984,6 @@ let run_args evm_node =
   in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy _ -> ["run"; "proxy"]
     | Sequencer {sequencer_config; _} ->
         ["run"; "sequencer"]
         @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
@@ -1222,8 +1219,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
   in
   let mode_args =
     match ps.mode with
-    | Proxy rollup_node_endpoint ->
-        ["--rollup-node-endpoint"; rollup_node_endpoint]
     | Rpc _ ->
         Tezt.Test.fail
           ~__LOC__
