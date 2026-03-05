@@ -30,12 +30,11 @@ use tezos_crypto_rs::{
     public_key::PublicKey,
 };
 use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
-use tezos_evm_logging::{log, tracing::instrument, Level};
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_evm_logging::{log, tracing::instrument, Level, Logging};
+use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
 use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
 
-pub struct EtherlinkVMDB<'a, Host: Runtime, R: Registry> {
+pub struct EtherlinkVMDB<'a, Host: StorageV1 + Logging, R: Registry> {
     pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
@@ -61,7 +60,10 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, Host: Runtime, R: Registry> EtherlinkVMDB<'a, Host, R> {
+impl<'a, Host, R: Registry> EtherlinkVMDB<'a, Host, R>
+where
+    Host: StorageV1 + Logging,
+{
     #[instrument(skip_all)]
     pub fn new(
         host: &'a mut Host,
@@ -123,7 +125,10 @@ macro_rules! abort_on_error {
     };
 }
 
-impl<Host: Runtime, R: Registry> EtherlinkVMDB<'_, Host, R> {
+impl<Host, R: Registry> EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1 + Logging,
+{
     #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
         self.commit_status
@@ -201,8 +206,9 @@ impl<Host: Runtime, R: Registry> EtherlinkVMDB<'_, Host, R> {
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
-    for EtherlinkVMDB<'_, Host, R>
+impl<Host, R: Registry> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1 + Logging,
 {
     fn log_node_message(&mut self, level: Level, message: &str) {
         log!(self.host, level, "{message:?}");
@@ -340,7 +346,10 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
     }
 }
 
-impl<Host: Runtime, R: Registry> Database for EtherlinkVMDB<'_, Host, R> {
+impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1 + Logging,
+{
     type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
@@ -382,8 +391,10 @@ impl<Host: Runtime, R: Registry> Database for EtherlinkVMDB<'_, Host, R> {
         }
     }
 }
-impl<Host: Runtime, R: Registry> DatabaseCommitPrecompileStateChanges
+impl<Host, R: Registry> DatabaseCommitPrecompileStateChanges
     for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1 + Logging,
 {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
@@ -427,7 +438,10 @@ impl<Host: Runtime, R: Registry> DatabaseCommitPrecompileStateChanges
     }
 }
 
-impl<Host: Runtime, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R> {
+impl<Host, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R>
+where
+    Host: StorageV1 + Logging,
+{
     fn commit(&mut self, changes: AddressMap<Account>) {
         for (address, account) in changes {
             // The account isn't marked as touched, the changes are not commited

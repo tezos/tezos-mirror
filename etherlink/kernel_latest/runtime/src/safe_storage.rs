@@ -6,19 +6,13 @@
 // SPDX-License-Identifier: MIT
 
 use crate::extensions::WithGas;
-use crate::runtime::{IsEvmNode, Runtime};
-use tezos_evm_logging::Verbosity;
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
+use crate::runtime::IsEvmNode;
+use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::debug::HostDebug;
-use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_host::{
-    input::Message,
-    metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
-    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    runtime::{RuntimeError, ValueType},
 };
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
@@ -40,39 +34,6 @@ impl<Host: HostDebug> HostDebug for SafeStorage<&mut Host> {
     #[inline(always)]
     fn write_debug(&self, msg: &str) {
         self.host.write_debug(msg)
-    }
-}
-
-impl<Host: HostReveal> HostReveal for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
     }
 }
 
@@ -188,57 +149,13 @@ impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: WasmHost> WasmHost for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
-    }
-
-    #[inline(always)]
-    fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
-        self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn last_run_aborted(&self) -> Result<bool, RuntimeError> {
-        self.host.last_run_aborted()
-    }
-
-    #[inline(always)]
-    fn upgrade_failed(&self) -> Result<bool, RuntimeError> {
-        self.host.upgrade_failed()
-    }
-
-    #[inline(always)]
-    fn restart_forced(&self) -> Result<bool, RuntimeError> {
-        self.host.restart_forced()
-    }
-
-    #[inline(always)]
-    fn reboot_left(&self) -> Result<u32, RuntimeError> {
-        self.host.reboot_left()
-    }
-
-    #[inline(always)]
-    fn runtime_version(&self) -> Result<String, RuntimeError> {
-        self.host.runtime_version()
-    }
-}
-
-impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {}
-
-impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
+impl<Host: Logging> Logging for SafeStorage<&mut Host> {
     fn verbosity(&self) -> tezos_evm_logging::Level {
         self.host.verbosity()
     }
 }
 
-impl<Host: Runtime> SafeStorage<&mut Host> {
+impl<Host: StorageV1> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
         // Clean up any leftover data in /tmp from a previous run.
         // This is safe because start() is only called when no
@@ -275,7 +192,7 @@ impl<Host: Runtime> SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
+impl<Host: WithGas> WithGas for SafeStorage<&mut Host> {
     fn add_execution_gas(&mut self, gas: u64) {
         self.host.add_execution_gas(gas)
     }
@@ -285,7 +202,7 @@ impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> IsEvmNode for SafeStorage<&mut Host> {
+impl<Host: IsEvmNode> IsEvmNode for SafeStorage<&mut Host> {
     fn is_evm_node(&self) -> bool {
         self.host.is_evm_node()
     }

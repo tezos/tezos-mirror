@@ -13,11 +13,13 @@ use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 const CONFIG_PATH: RefPath = RefPath::assert_from(b"/__tmp/reveal_config");
 
@@ -56,18 +58,20 @@ impl Decodable for Sets {
     }
 }
 
-pub fn is_revealed_storage(host: &impl Runtime) -> bool {
+pub fn is_revealed_storage(host: &impl StorageV1) -> bool {
     matches!(
         host.store_has(&CONFIG_PATH).unwrap_or_default(),
         Some(ValueType::Value)
     )
 }
 
-pub fn reveal_storage(
-    host: &mut impl Runtime,
+pub fn reveal_storage<Host>(
+    host: &mut Host,
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
-) {
+) where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     log!(host, Info, "Starting the reveal dump");
 
     let config_bytes = host

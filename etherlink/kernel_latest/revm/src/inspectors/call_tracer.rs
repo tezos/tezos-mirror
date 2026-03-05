@@ -30,8 +30,8 @@ use tezos_ethereum::{
     rlp_helpers::{check_list, decode_field, decode_option, next},
     Log as RlpLog,
 };
-use tezos_evm_logging::{log, Level::Debug};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::Debug, Logging};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
@@ -120,8 +120,10 @@ impl Encodable for CallTrace {
     }
 }
 
-impl<'a, Host: Runtime + 'a, R: Registry + 'a> EtherlinkInspector<'a, Host, R>
-    for CallTracer
+impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for CallTracer
+where
+    Host: StorageV1 + Logging + 'a,
+    R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool {
         false
@@ -250,18 +252,17 @@ impl CallTracer {
         self.initial_gas = initial_gas;
     }
 
-    fn end_transaction_layer<
-        'a,
-        Host: Runtime + 'a,
-        R: Registry + 'a,
-        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
-    >(
+    fn end_transaction_layer<'a, Host, R, CTX>(
         &mut self,
         context: &mut CTX,
         gas_spent: u64,
         output: &Bytes,
         instruction_result: &InstructionResult,
-    ) {
+    ) where
+        Host: StorageV1 + Logging + 'a,
+        R: Registry + 'a,
+        CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
+    {
         let depth = context.journal().depth() as u16;
 
         if self.config.only_top_call && depth > 0 {
@@ -298,7 +299,7 @@ impl CallTracer {
 
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    Host: Runtime + 'a,
+    Host: StorageV1 + Logging + 'a,
     R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,

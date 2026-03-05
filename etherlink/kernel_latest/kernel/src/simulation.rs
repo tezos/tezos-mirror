@@ -36,9 +36,12 @@ use tezos_ethereum::rlp_helpers::{
     decode_timestamp, next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+
 use tezos_smart_rollup::types::Timestamp;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezosx_interfaces::Registry;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
@@ -374,13 +377,16 @@ impl Evaluation {
     }
 
     /// Execute the simulation
-    pub fn run<Host: Runtime>(
+    pub fn run<Host>(
         &self,
         host: &mut Host,
         registry: &impl Registry,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
-    ) -> Result<SimulationResult<CallResult, String>, Error> {
+    ) -> Result<SimulationResult<CallResult, String>, Error>
+    where
+        Host: StorageV1 + Logging,
+    {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
@@ -598,10 +604,7 @@ impl Input {
     }
 }
 
-fn read_chunks<Host: Runtime>(
-    host: &mut Host,
-    num_chunks: u16,
-) -> Result<Message, Error> {
+fn read_chunks(host: &mut impl WasmHost, num_chunks: u16) -> Result<Message, Error> {
     let mut buffer: Vec<u8> = Vec::new();
     for n in 0..num_chunks {
         match read_input(host)? {
@@ -618,14 +621,14 @@ fn read_chunks<Host: Runtime>(
     Ok(buffer.as_slice().try_into()?)
 }
 
-fn read_input<Host: Runtime>(host: &mut Host) -> Result<Input, Error> {
+fn read_input(host: &mut impl WasmHost) -> Result<Input, Error> {
     match host.read_input()? {
         Some(input) => Ok(Input::parse(input.as_ref())),
         None => Ok(Input::Unparsable),
     }
 }
 
-fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
+fn parse_inbox(host: &mut impl WasmHost) -> Result<Message, Error> {
     // we just received simulation tag
     // next message is either a simulation or the nb of chunks needed
     match read_input(host)? {
@@ -648,11 +651,14 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
     }
 }
 
-pub fn start_simulation_mode<Host: Runtime>(
+pub fn start_simulation_mode<Host>(
     host: &mut Host,
     registry: &impl Registry,
     spec_id: &SpecId,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + WasmHost + Logging,
+{
     log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
@@ -748,7 +754,10 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
-    fn create_contract<Host: Runtime>(host: &mut Host) -> H160 {
+    fn create_contract<Host>(host: &mut Host) -> H160
+    where
+        Host: StorageV1 + Logging,
+    {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());

@@ -31,10 +31,12 @@ use tezos_ethereum::transaction::{
     TransactionStatus, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::extensions::WithGas;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
 
 #[derive(Debug, PartialEq)]
@@ -378,11 +380,14 @@ impl BlockInProgress {
     }
 
     #[instrument(skip_all)]
-    pub fn register_valid_transaction<Host: Runtime>(
+    pub fn register_valid_transaction<Host>(
         &mut self,
         execution_info: RuntimeExecutionInfo,
         host: &mut Host,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), anyhow::Error>
+    where
+        Host: WithGas + Logging,
+    {
         match execution_info {
             RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
                 receipt_info,
@@ -421,8 +426,8 @@ impl BlockInProgress {
         Ok(())
     }
 
-    fn safe_store_get_hash<Host: Runtime>(
-        host: &mut Host,
+    fn safe_store_get_hash(
+        host: &mut impl StorageV1,
         path: &RefPath,
     ) -> Result<Vec<u8>, anyhow::Error> {
         match host.store_get_hash(path) {
@@ -458,12 +463,15 @@ impl BlockInProgress {
     }
 
     #[cfg_attr(feature = "benchmark", inline(never))]
-    pub fn finalize_and_store<Host: Runtime>(
+    pub fn finalize_and_store<Host>(
         self,
         host: &mut Host,
         block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
-    ) -> Result<L2Block, anyhow::Error> {
+    ) -> Result<L2Block, anyhow::Error>
+    where
+        Host: StorageV1 + Logging,
+    {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(

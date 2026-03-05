@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use std::marker::PhantomData;
 use tezos_ethereum::rlp_helpers::{append_option, decode_field, decode_option, next};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
 
 use crate::migration::allow_path_not_found;
@@ -149,8 +149,10 @@ where
 }
 
 #[allow(dead_code)]
-impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
-    Pointer<Id, Elt>
+impl<Id, Elt> Pointer<Id, Elt>
+where
+    Id: Decodable + Encodable + AsRef<[u8]>,
+    Elt: Encodable + Decodable,
 {
     fn pointer_path(id: &Id, prefix: &impl Path) -> Result<OwnedPath> {
         let path = hex::encode(id);
@@ -178,7 +180,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
 
     fn save_data(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         prefix: &impl Path,
         data: &Elt,
     ) -> Result<()> {
@@ -186,18 +188,18 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
         store_rlp(data, host, &path).context("cannot save the pointer's data")
     }
 
-    fn get_data(&self, host: &impl Runtime, prefix: &impl Path) -> Result<Elt> {
+    fn get_data(&self, host: &impl StorageV1, prefix: &impl Path) -> Result<Elt> {
         let path = self.data_path(prefix)?;
         read_rlp(host, &path).context("cannot read the pointer's data")
     }
 
     /// Load the pointer from the durable storage
-    fn read(host: &impl Runtime, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
+    fn read(host: &impl StorageV1, prefix: &impl Path, id: &Id) -> Result<Option<Self>> {
         read_optional_rlp(host, &Self::pointer_path(id, prefix)?)
     }
 
     /// Save the pointer in the durable storage
-    fn save(&self, host: &mut impl Runtime, prefix: &impl Path) -> Result<()> {
+    fn save(&self, host: &mut impl StorageV1, prefix: &impl Path) -> Result<()> {
         store_rlp(self, host, &self.path(prefix)?)
             .context("cannot save pointer to storage")
     }
@@ -205,7 +207,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
     /// Removes the pointer and its data frm the durable storage.
     fn remove_with_data(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         prefix: &impl Path,
     ) -> Result<()> {
         let pointer_path = self.path(prefix)?;
@@ -226,7 +228,7 @@ where
     /// Load a list from the storage.
     /// If the list does not exist, a new empty list is created.
     /// Otherwise the existing list is read from the storage.
-    pub fn new(path: &impl Path, host: &impl Runtime) -> Result<Self> {
+    pub fn new(path: &impl Path, host: &impl StorageV1) -> Result<Self> {
         let list = Self::read(host, path)?.unwrap_or(Self {
             path: path.into(),
             pointers: None,
@@ -246,13 +248,13 @@ where
     /// Saves the LinkedList in the durable storage.
     ///
     /// Only save the back and front pointers.
-    fn save(&self, host: &mut impl Runtime) -> Result<()> {
+    fn save(&self, host: &mut impl StorageV1) -> Result<()> {
         let path = Self::metadata_path(&self.path)?;
         store_rlp(self, host, &path).context("cannot save linked list from the storage")
     }
 
     /// Load the LinkedList from the durable storage.
-    fn read(host: &impl Runtime, path: &impl Path) -> Result<Option<Self>> {
+    fn read(host: &impl StorageV1, path: &impl Path) -> Result<Option<Self>> {
         let path = Self::metadata_path(path)?;
         read_optional_rlp(host, &path)
     }
@@ -268,7 +270,7 @@ where
     /// The Id has to be unique by element.
     /// The Id will be later use to retrieve the element
     /// (example: it can be the hash of the element).
-    pub fn push(&mut self, host: &mut impl Runtime, id: &Id, elt: &Elt) -> Result<()> {
+    pub fn push(&mut self, host: &mut impl StorageV1, id: &Id, elt: &Elt) -> Result<()> {
         // Check if the path already exist
         if (Pointer::read(host, &self.path, id)? as Option<Pointer<Id, Elt>>).is_some() {
             return Ok(());
@@ -336,7 +338,7 @@ where
     /// Returns an element at a given index.
     ///
     /// Returns None if the element is not present
-    pub fn find(&self, host: &impl Runtime, id: &Id) -> Result<Option<Elt>> {
+    pub fn find(&self, host: &impl StorageV1, id: &Id) -> Result<Option<Elt>> {
         let Some::<Pointer<Id, Elt>>(pointer) = Pointer::read(host, &self.path, id)?
         else {
             return Ok(None);
@@ -345,7 +347,7 @@ where
     }
 
     /// Removes and returns the element at position index within the vector.
-    pub fn remove(&mut self, host: &mut impl Runtime, id: &Id) -> Result<Option<Elt>> {
+    pub fn remove(&mut self, host: &mut impl StorageV1, id: &Id) -> Result<Option<Elt>> {
         // Check if the list is empty
         let Some(LinkedListPointer { front, back }) = &self.pointers else {
             return Ok(None);
@@ -468,7 +470,7 @@ where
 
     /// Returns the first element of the list
     /// or `None` if it is empty.
-    pub fn first(&self, host: &impl Runtime) -> Result<Option<Elt>> {
+    pub fn first(&self, host: &impl StorageV1) -> Result<Option<Elt>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
@@ -477,7 +479,7 @@ where
 
     /// Returns the first element of the list alongside its id
     /// or `None` if it is empty.
-    pub fn first_with_id(&self, host: &impl Runtime) -> Result<Option<(Id, Elt)>> {
+    pub fn first_with_id(&self, host: &impl StorageV1) -> Result<Option<(Id, Elt)>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
@@ -485,7 +487,7 @@ where
     }
 
     /// Removes the first element of the list and returns it
-    pub fn pop_first(&mut self, host: &mut impl Runtime) -> Result<Option<Elt>> {
+    pub fn pop_first(&mut self, host: &mut impl StorageV1) -> Result<Option<Elt>> {
         let Some(LinkedListPointer { front, .. }) = &self.pointers else {
             return Ok(None);
         };
@@ -494,7 +496,7 @@ where
     }
 
     /// Deletes the entire list
-    pub fn delete(&mut self, host: &mut impl Runtime) -> Result<()> {
+    pub fn delete(&mut self, host: &mut impl StorageV1) -> Result<()> {
         let metadata_path = Self::metadata_path(&self.path)?;
         allow_path_not_found(host.store_delete(&metadata_path))?;
         while self.pop_first(host)?.is_some() {}

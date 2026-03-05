@@ -31,10 +31,9 @@ use revm::{
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
-    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
+    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, Logging, OTelAttrValue,
 };
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
 use tezosx_interfaces::{Registry, TezosXRuntimeError};
 use thiserror::Error;
 
@@ -165,8 +164,8 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn tx_env<Host: Runtime>(
-    host: &'_ mut Host,
+fn tx_env(
+    host: &'_ mut impl StorageV1,
     caller: Address,
     destination: Option<Address>,
     gas_data: &GasData,
@@ -220,11 +219,15 @@ fn tx_env<Host: Runtime>(
 }
 
 #[instrument(skip_all)]
-fn get_inspector_from<'a, Host: Runtime + 'a, R: Registry + 'a>(
+fn get_inspector_from<'a, Host, R>(
     tracer_input: TracerInput,
     precompiles: EtherlinkPrecompiles,
     spec_id: SpecId,
-) -> Box<dyn EtherlinkInspector<'a, Host, R>> {
+) -> Box<dyn EtherlinkInspector<'a, Host, R>>
+where
+    Host: StorageV1 + Logging + 'a,
+    R: Registry + 'a,
+{
     match tracer_input {
         TracerInput::CallTracer(CallTracerInput {
             config,
@@ -245,7 +248,7 @@ fn get_inspector_from<'a, Host: Runtime + 'a, R: Registry + 'a>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm_inspect<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>(
+fn evm_inspect<'a, Host, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>(
     db: EtherlinkVMDB<'a, Host, R>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -255,7 +258,10 @@ fn evm_inspect<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host
     spec_id: SpecId,
     inspector: INSP,
     is_simulation: bool,
-) -> EvmInspection<'a, Host, INSP, R> {
+) -> EvmInspection<'a, Host, INSP, R>
+where
+    Host: StorageV1 + Logging,
+{
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
         .with_spec_and_mainnet_gas_params(spec_id);
@@ -278,7 +284,7 @@ fn evm_inspect<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm<'a, Host: Runtime, R: Registry>(
+fn evm<'a, Host, R: Registry>(
     db: EtherlinkVMDB<'a, Host, R>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -287,7 +293,10 @@ fn evm<'a, Host: Runtime, R: Registry>(
     chain_id: u64,
     spec_id: SpecId,
     is_simulation: bool,
-) -> EvmContext<'a, Host, R> {
+) -> EvmContext<'a, Host, R>
+where
+    Host: StorageV1 + Logging,
+{
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
         .with_spec_and_mainnet_gas_params(spec_id);
@@ -308,11 +317,14 @@ fn evm<'a, Host: Runtime, R: Registry>(
     .with_precompiles(precompiles)
 }
 
-fn execute_transaction<'a, Host: Runtime, R: Registry>(
+fn execute_transaction<'a, Host, R: Registry>(
     evm: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
-) -> Result<ExecutionResult, EVMError<Error>> {
+) -> Result<ExecutionResult, EVMError<Error>>
+where
+    Host: Logging + StorageV1,
+{
     let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
         if transaction_hash.is_some() && cfg!(feature = "tracing") {
             // The following unwrap is safe, see condition above.
@@ -336,7 +348,7 @@ fn execute_transaction<'a, Host: Runtime, R: Registry>(
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn run_transaction<'a, Host: Runtime, R: Registry>(
+pub fn run_transaction<'a, Host, R: Registry>(
     host: &'a mut Host,
     registry: &'a R,
     spec_id: SpecId,
@@ -351,7 +363,10 @@ pub fn run_transaction<'a, Host: Runtime, R: Registry>(
     authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
-) -> Result<ExecutionOutcome, EVMError<Error>> {
+) -> Result<ExecutionOutcome, EVMError<Error>>
+where
+    Host: StorageV1 + Logging,
+{
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
@@ -509,8 +524,11 @@ mod test {
         use primitive_types::{H160 as PH160, U256 as PU256};
         use revm::primitives::hardfork::SpecId;
         use tezos_ethereum::block::{BlockConstants, BlockFees};
-        use tezos_evm_runtime::runtime::Runtime;
-        use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+        use tezos_evm_logging::Logging;
+        use tezos_smart_rollup_host::{
+            path::{concat, OwnedPath, RefPath},
+            storage::StorageV1,
+        };
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
             CrossCallResult, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
@@ -535,9 +553,9 @@ mod test {
                 }
             }
 
-            pub(crate) fn get_balance<Host: Runtime>(
+            pub(crate) fn get_balance(
                 &self,
-                host: &mut Host,
+                host: &mut impl StorageV1,
                 address: &[u8],
                 runtime_id: RuntimeId,
             ) -> Result<primitive_types::U256, TezosXRuntimeError> {
@@ -551,7 +569,7 @@ mod test {
         }
 
         impl RegistryTrait for Registry {
-            fn bridge<Host: Runtime>(
+            fn bridge<Host>(
                 &self,
                 host: &mut Host,
                 destination_runtime: RuntimeId,
@@ -560,7 +578,10 @@ mod test {
                 amount: primitive_types::U256,
                 data: &[u8],
                 context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError> {
+            ) -> Result<CrossCallResult, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
                 match destination_runtime {
                     RuntimeId::Tezos => self.mock_tezos.call(
                         self,
@@ -577,13 +598,16 @@ mod test {
                 }
             }
 
-            fn generate_alias<Host: Runtime>(
+            fn generate_alias<Host>(
                 &self,
                 host: &mut Host,
                 native_address: &[u8],
                 runtime_id: RuntimeId,
                 context: CrossRuntimeContext,
-            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
                 match runtime_id {
                     RuntimeId::Tezos => self.mock_tezos.generate_alias(
                         self,
@@ -611,11 +635,14 @@ mod test {
                 }
             }
 
-            fn serve<Host: Runtime>(
+            fn serve<Host>(
                 &self,
                 _host: &mut Host,
                 _request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
                 unimplemented!("not needed for this test")
             }
         }
@@ -658,13 +685,16 @@ mod test {
         pub(crate) struct MockTezosRuntime;
 
         impl RuntimeInterface for MockTezosRuntime {
-            fn generate_alias<Host: Runtime>(
+            fn generate_alias<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 native_address: &[u8],
                 _context: CrossRuntimeContext,
-            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
                 // Simple mock: prefix with "tz1_" marker and return a hash-like alias
                 let mut alias = vec![0u8; 22]; // tz1 address size
                 alias[0] = 0x00; // tz1 tag
@@ -675,7 +705,7 @@ mod test {
                 Ok(alias)
             }
 
-            fn call<Host: Runtime>(
+            fn call<Host: StorageV1>(
                 &self,
                 _registry: &impl RegistryTrait,
                 host: &mut Host,
@@ -711,12 +741,15 @@ mod test {
                 Ok(CrossCallResult::Success(vec![]))
             }
 
-            fn serve<Host: Runtime>(
+            fn serve<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 _request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
                 todo!("MockTezosRuntime::serve")
             }
 
@@ -741,9 +774,9 @@ mod test {
                     .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))
             }
 
-            fn get_balance<Host: Runtime>(
+            fn get_balance(
                 &self,
-                host: &mut Host,
+                host: &mut impl StorageV1,
                 address: &[u8],
             ) -> Result<primitive_types::U256, TezosXRuntimeError> {
                 let address_hex = hex::encode(address);

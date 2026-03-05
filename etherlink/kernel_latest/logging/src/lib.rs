@@ -8,6 +8,7 @@ pub use tezos_smart_rollup_debug::debug_str;
 
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use tezos_smart_rollup_host::debug::HostDebug;
 
 #[repr(u8)]
 #[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
@@ -52,19 +53,16 @@ impl std::fmt::Display for Level {
     }
 }
 
-pub trait Verbosity {
-    fn verbosity(&self) -> Level;
-}
-
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
-    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {
+    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {{
+        use $crate::Logging as _;
         if $host.verbosity() >= $level {
             let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
             $crate::debug_str!($host, &msg);
         }
-    };
+    }};
 }
 
 #[cfg(all(feature = "tracing", feature = "alloc"))]
@@ -121,7 +119,7 @@ macro_rules! __trace_kernel_add_attrs {
 #[cfg(feature = "tracing")]
 pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
 where
-    H: tezos_smart_rollup_host::runtime::Runtime,
+    H: HostDebug,
     F: FnOnce(&mut H) -> R,
 {
     let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
@@ -182,4 +180,8 @@ pub mod tracing {
             $f
         }};
     }
+}
+
+pub trait Logging: HostDebug {
+    fn verbosity(&self) -> Level;
 }

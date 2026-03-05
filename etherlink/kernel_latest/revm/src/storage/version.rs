@@ -4,8 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm::primitives::hardfork::SpecId;
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError};
+use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, storage::StorageV1};
 
 // Path to the EVM version.
 const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
@@ -48,13 +47,13 @@ impl From<EVMVersion> for SpecId {
 }
 
 pub fn store_evm_version(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     evm_version: &EVMVersion,
 ) -> Result<(), RuntimeError> {
     host.store_write(&EVM_VERSION, &evm_version.to_le_bytes(), 0)
 }
 
-pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {
+pub fn read_evm_version(host: &mut impl StorageV1) -> EVMVersion {
     let evm_version = host.store_read_all(&EVM_VERSION);
     match evm_version {
         Ok(evm_version) => match evm_version.as_slice().try_into().ok() {

@@ -29,12 +29,17 @@ use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
-use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
+use tezos_evm_logging::Logging;
+use tezos_evm_logging::{__trace_kernel, log, Level::*};
+use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
 
@@ -98,7 +103,7 @@ pub fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn compute<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     registry: &impl Registry,
     chain_config: &ChainConfig,
@@ -107,7 +112,10 @@ pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
     block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-) -> Result<BlockInProgressComputationResult, anyhow::Error> {
+) -> Result<BlockInProgressComputationResult, anyhow::Error>
+where
+    Host: StorageV1 + Logging + WithGas,
+{
     log!(
         host,
         Debug,
@@ -178,14 +186,17 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn bip_from_blueprint<Host, ChainConfig: ChainConfigTrait>(
     host: &Host,
     chain_config: &ChainConfig,
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
     blueprint: Blueprint,
-) -> BlockInProgress {
+) -> BlockInProgress
+where
+    Host: StorageV1 + Logging,
+{
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
@@ -201,12 +212,15 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
-fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> anyhow::Result<BlueprintParsing<BlockInProgress>> {
+) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
+where
+    Host: HostReveal + StorageV1 + WasmHost + Logging,
+{
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -262,7 +276,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     registry: &impl Registry,
     chain_config: &ChainConfig,
@@ -272,7 +286,10 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
     coinbase: H160,
-) -> anyhow::Result<BlockComputationResult> {
+) -> anyhow::Result<BlockComputationResult>
+where
+    Host: StorageV1 + Logging + WithGas,
+{
     let constants: ChainConfig::BlockConstants =
         chain_config.constants(&block_in_progress, da_fee_per_byte, coinbase)?;
     let result = compute(
@@ -311,12 +328,15 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     }
 }
 
-fn revert_block<Host: Runtime>(
+fn revert_block<Host>(
     safe_host: &mut SafeStorage<&mut Host>,
     block_in_progress_provenance: &BlockInProgressProvenance,
     number: U256,
     error: anyhow::Error,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     log!(
         safe_host,
         Error,
@@ -337,25 +357,31 @@ fn revert_block<Host: Runtime>(
     Ok(())
 }
 
-fn clean_delayed_transactions(
-    host: &mut impl Runtime,
+fn clean_delayed_transactions<Host>(
+    host: &mut Host,
     delayed_inbox: &mut DelayedInbox,
     delayed_txs: Vec<TransactionHash>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     for hash in delayed_txs {
         delayed_inbox.delete(host, hash.into())?;
     }
     Ok(())
 }
 
-pub fn promote_block<Host: Runtime>(
+pub fn promote_block<Host>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
     block_header: BlockHeader<ChainHeader>,
     config: &mut Configuration,
     delayed_txs: Vec<TransactionHash>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + WasmHost + IsEvmNode,
+{
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
     }
@@ -386,13 +412,16 @@ pub fn promote_block<Host: Runtime>(
 }
 
 #[trace_kernel("stage_two")]
-pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
+pub fn produce<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,
     config: &mut Configuration,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-) -> Result<ComputationResult, anyhow::Error> {
+) -> Result<ComputationResult, anyhow::Error>
+where
+    Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+{
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
@@ -551,7 +580,7 @@ mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_evm_runtime::runtime::Runtime;
+
     use tezos_execution::account_storage::TezlinkAccount;
     use tezos_execution::account_storage::{
         Manager, TezosImplicitAccount, TezosOriginatedAccount,
@@ -566,7 +595,10 @@ mod tests {
     use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameters;
 
-    fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
+    fn read_current_number<Host>(host: &Host) -> anyhow::Result<U256>
+    where
+        Host: StorageV1 + Logging,
+    {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
 
@@ -754,14 +786,14 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
-    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+    fn set_balance(host: &mut impl StorageV1, address: &H160, balance: U256) {
         let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);
         account.set_info(host, info).unwrap();
     }
 
-    fn get_balance<Host: Runtime>(host: &mut Host, address: &H160) -> U256 {
+    fn get_balance(host: &mut impl StorageV1, address: &H160) -> U256 {
         let account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let info = account.info(host).unwrap();
         alloy_to_u256(&info.balance)
@@ -913,18 +945,20 @@ mod tests {
         )
     }
 
-    fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+    fn store_blueprints<Host, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
         blueprints: Vec<Blueprint>,
-    ) {
+    ) where
+        Host: StorageV1 + Logging,
+    {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
                 .expect("Should have stored blueprint");
         }
     }
 
-    fn store_block_fees<Host: Runtime>(
-        host: &mut Host,
+    fn store_block_fees(
+        host: &mut impl StorageV1,
         block_fees: &BlockFees,
     ) -> anyhow::Result<()> {
         storage::store_minimum_base_fee_per_gas(
@@ -935,7 +969,10 @@ mod tests {
         Ok(())
     }
 
-    fn produce_block_with_several_valid_txs<Host: Runtime>(host: &mut Host) {
+    fn produce_block_with_several_valid_txs<Host>(host: &mut Host)
+    where
+        Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+    {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
 
@@ -966,7 +1003,7 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
+    fn assert_current_block_reading_validity(host: &mut impl StorageV1) {
         match block_storage::read_current_etherlink_block(host) {
             Ok(_) => (),
             Err(e) => {
@@ -1074,7 +1111,7 @@ mod tests {
         assert_eq!(Manager::Revealed(pk), manager);
     }
 
-    fn dummy_evm_config_with_tezos_runtime(host: &mut impl Runtime) -> EvmChainConfig {
+    fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
@@ -1799,7 +1836,10 @@ mod tests {
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
-    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> TezosXBlockConstants {
+    fn first_block<MockHost>(host: &mut MockHost) -> TezosXBlockConstants
+    where
+        MockHost: StorageV1 + Logging,
+    {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -1970,7 +2010,10 @@ mod tests {
         blueprint(transactions)
     }
 
-    fn check_current_block_number<Host: Runtime>(host: &mut Host, nb: usize) {
+    fn check_current_block_number<Host>(host: &mut Host, nb: usize)
+    where
+        Host: StorageV1 + Logging,
+    {
         let current_nb =
             read_current_number(host).expect("Should have manage to check block number");
         assert_eq!(current_nb, U256::from(nb), "Incorrect block number");

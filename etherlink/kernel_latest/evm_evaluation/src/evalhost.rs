@@ -4,7 +4,7 @@
 
 use std::{cell::RefCell, io::Write};
 
-use tezos_evm_logging::Verbosity;
+use tezos_evm_logging::Logging;
 use tezos_evm_runtime::{
     extensions::WithGas,
     runtime::{IsEvmNode, MockKernelHost},
@@ -16,7 +16,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::Path,
     reveal::HostReveal,
-    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    runtime::{RuntimeError, ValueType},
     storage::StorageV1,
     wasm::WasmHost,
 };
@@ -219,9 +219,7 @@ impl WasmHost for EvalHost {
     }
 }
 
-impl SdkRuntime for EvalHost {}
-
-impl Verbosity for EvalHost {
+impl Logging for EvalHost {
     fn verbosity(&self) -> tezos_evm_logging::Level {
         self.host.verbosity()
     }

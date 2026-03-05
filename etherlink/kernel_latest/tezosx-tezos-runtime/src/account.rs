@@ -9,11 +9,11 @@ use tezos_data_encoding::types::Narith;
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::account_storage::{
     Manager, TezlinkAccount, TezosImplicitAccount as TezosImplicitAccountTrait,
 };
 use tezos_protocol::contract::Contract;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, RefPath},
     runtime::RuntimeError,
@@ -113,7 +113,7 @@ pub fn path_to_tezos_account(
 }
 
 pub fn get_tezos_account_info(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     pub_key_hash: &PublicKeyHash,
 ) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
     let path =
@@ -130,7 +130,7 @@ pub fn get_tezos_account_info(
 }
 
 pub fn get_tezos_account_info_or_init(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     pub_key_hash: &PublicKeyHash,
 ) -> Result<TezosAccountInfo, TezosXRuntimeError> {
     match get_tezos_account_info(host, pub_key_hash)? {
@@ -140,7 +140,7 @@ pub fn get_tezos_account_info_or_init(
 }
 
 pub fn set_tezos_account_info(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     pub_key_hash: &PublicKeyHash,
     info: TezosAccountInfo,
 ) -> Result<(), TezosXRuntimeError> {
@@ -166,7 +166,7 @@ impl TezlinkAccount for TezosImplicitAccount {
 
     fn balance(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         match get_tezos_account_info(host, &self.pkh) {
             Ok(Some(info)) => Ok(u256_to_narith(&info.balance)),
@@ -177,7 +177,7 @@ impl TezlinkAccount for TezosImplicitAccount {
 
     fn set_balance(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let mut info = get_tezos_account_info_or_init(host, &self.pkh)
@@ -196,7 +196,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn counter(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         match get_tezos_account_info(host, &self.pkh) {
             Ok(Some(info)) => Ok(Narith::from(info.nonce)),
@@ -207,7 +207,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn set_counter(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let mut info = get_tezos_account_info_or_init(host, &self.pkh)
@@ -223,7 +223,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn manager(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
         let info = get_tezos_account_info(host, &self.pkh)
             .map_err(|e| tezos_storage::error::Error::NomReadError(format!("{e}")))?;
@@ -238,7 +238,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn set_manager_pk_hash_internal(
         &self,
-        _host: &mut impl Runtime,
+        _host: &mut impl StorageV1,
         _public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
         // In TezosX, we do not need this function which is used in Tezlink
@@ -248,7 +248,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn set_manager_public_key(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         public_key: &tezos_smart_rollup::types::PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
         let mut info = get_tezos_account_info_or_init(host, &self.pkh)
@@ -260,7 +260,7 @@ impl TezosImplicitAccountTrait for TezosImplicitAccount {
 
     fn allocated(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
         match get_tezos_account_info(host, &self.pkh) {
             Ok(Some(_)) => Ok(true),

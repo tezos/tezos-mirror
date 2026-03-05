@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::{AddressHash, ByteReprTrait};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::RuntimeId;
 
@@ -29,8 +29,8 @@ fn alias_path(
         .map_err(|e| TransferError::GatewayError(e.to_string()))
 }
 
-pub fn store_alias<Host: Runtime>(
-    host: &mut Host,
+pub fn store_alias(
+    host: &mut impl StorageV1,
     source: &AddressHash,
     runtime: RuntimeId,
     alias: &[u8],
@@ -43,8 +43,8 @@ pub fn store_alias<Host: Runtime>(
     Ok(())
 }
 
-pub fn get_alias<Host: Runtime>(
-    host: &mut Host,
+pub fn get_alias(
+    host: &mut impl StorageV1,
     source: &AddressHash,
     runtime: RuntimeId,
 ) -> Result<Option<Vec<u8>>, TransferError> {

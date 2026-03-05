@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 use thiserror::Error;
 
 /// Header names for the Tezos cross-runtime execution context.
@@ -68,7 +69,7 @@ pub enum TezosXRuntimeError {
 }
 pub trait Registry {
     #[allow(clippy::too_many_arguments)]
-    fn bridge<Host: Runtime>(
+    fn bridge<Host>(
         &self,
         host: &mut Host,
         destination_runtime: RuntimeId,
@@ -77,15 +78,19 @@ pub trait Registry {
         amount: U256,
         data: &[u8],
         context: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError>;
+    ) -> Result<CrossCallResult, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 
-    fn generate_alias<Host: Runtime>(
+    fn generate_alias<Host>(
         &self,
         host: &mut Host,
         native_address: &[u8],
         runtime_id: RuntimeId,
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 
     fn address_from_string(
         &self,
@@ -94,11 +99,13 @@ pub trait Registry {
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     /// Route an HTTP request to the appropriate runtime based on the URL host.
-    fn serve<Host: Runtime>(
+    fn serve<Host>(
         &self,
         host: &mut Host,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>;
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 }
 
 pub trait RuntimeInterface {
@@ -106,13 +113,15 @@ pub trait RuntimeInterface {
     ///
     /// This function creates an alias that allows the native address to receive
     /// funds in this runtime and have them forwarded to the original address.
-    fn generate_alias<Host: Runtime>(
+    fn generate_alias<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         native_address: &[u8],
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 
     /// Execute a cross-runtime call into this runtime.
     ///
@@ -128,7 +137,7 @@ pub trait RuntimeInterface {
     /// `to` is the destination address, encoded in this runtime's native
     /// format.
     #[allow(clippy::too_many_arguments)]
-    fn call<Host: Runtime>(
+    fn call<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
@@ -137,7 +146,9 @@ pub trait RuntimeInterface {
         amount: U256,
         data: &[u8],
         context: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError>;
+    ) -> Result<CrossCallResult, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 
     /// Handle an incoming cross-runtime HTTP request.
     ///
@@ -149,12 +160,14 @@ pub trait RuntimeInterface {
     ///
     /// Returns an HTTP response with a status code indicating success (200) or
     /// failure (4xx/5xx), along with runtime-specific response headers and body.
-    fn serve<Host: Runtime>(
+    fn serve<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>;
+    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging;
 
     /// The URL host that identifies this runtime in HTTP requests routed
     /// by the registry (e.g. `"tezos"`, `"ethereum"`).
@@ -169,9 +182,9 @@ pub trait RuntimeInterface {
     fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
 
     #[cfg(feature = "testing")]
-    fn get_balance<Host: Runtime>(
+    fn get_balance(
         &self,
-        host: &mut Host,
+        host: &mut impl StorageV1,
         address: &[u8],
     ) -> Result<U256, TezosXRuntimeError>;
 }

@@ -20,13 +20,14 @@ impl RegistryImpl {
 
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ChainId;
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{CrossCallResult, Registry, RuntimeInterface};
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
-    fn bridge<Host: Runtime>(
+    fn bridge<Host>(
         &self,
         host: &mut Host,
         destination_runtime: tezosx_interfaces::RuntimeId,
@@ -35,7 +36,10 @@ impl Registry for RegistryImpl {
         amount: U256,
         data: &[u8],
         context: tezosx_interfaces::CrossRuntimeContext,
-    ) -> Result<CrossCallResult, tezosx_interfaces::TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, tezosx_interfaces::TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         match destination_runtime {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.call(
                 self,
@@ -58,13 +62,16 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn generate_alias<Host: Runtime>(
+    fn generate_alias<Host>(
         &self,
         host: &mut Host,
         native_address: &[u8],
         runtime_id: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
-    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         match runtime_id {
             tezosx_interfaces::RuntimeId::Tezos => {
                 self.tezos
@@ -92,11 +99,14 @@ impl Registry for RegistryImpl {
         }
     }
 
-    fn serve<Host: Runtime>(
+    fn serve<Host>(
         &self,
         host: &mut Host,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError> {
+    ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError>
+    where
+        Host: StorageV1 + Logging,
+    {
         match request.uri().host() {
             Some(h) if h == self.tezos.host() => self.tezos.serve(self, host, request),
             Some(h) if h == self.ethereum.host() => {

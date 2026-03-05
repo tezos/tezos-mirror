@@ -27,12 +27,13 @@ use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
 };
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::Error, Level::Info};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::account_storage::{TezlinkAccount, TezosImplicitAccount};
 use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::operation::{
     ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
@@ -387,7 +388,7 @@ pub struct DepositResult<Outcome> {
 
 #[allow(clippy::too_many_arguments)]
 #[trace_kernel]
-pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
+pub fn apply_tezosx_xtz_deposit<Host>(
     host: &mut Host,
     registry: &impl Registry,
     deposit: &Deposit,
@@ -396,7 +397,10 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
+where
+    Host: StorageV1 + Logging,
+{
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {
             let execution_outcome = pure_xtz_deposit(
@@ -490,12 +494,15 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
 
 pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
 
-fn tezlink_deposit<Host: Runtime, C: Context>(
+fn tezlink_deposit<Host, C: Context>(
     host: &mut Host,
     context: &C,
     amount: u64,
     receiver: Contract,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<TransferSuccess, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let to_account = context
         .implicit_from_contract(&receiver)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
@@ -522,11 +529,14 @@ fn tezlink_deposit<Host: Runtime, C: Context>(
 
 type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
 
-pub fn execute_tezlink_deposit<Host: Runtime, C: Context>(
+pub fn execute_tezlink_deposit<Host, C: Context>(
     host: &mut Host,
     context: &C,
     deposit: &Deposit,
-) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
+) -> Result<DepositResult<TezlinkOutcome>, BridgeError>
+where
+    Host: StorageV1 + Logging,
+{
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_contract()?;

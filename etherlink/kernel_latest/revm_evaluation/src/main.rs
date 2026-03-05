@@ -28,7 +28,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 mod deserializer;
 mod evalhost;
@@ -203,7 +203,7 @@ fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P, report: &mut Report) -> Fi
     fixtures
 }
 
-fn fill_state(host: &mut impl Runtime, state: HashMap<Address, Account>) {
+fn fill_state(host: &mut impl StorageV1, state: HashMap<Address, Account>) {
     for (address, info) in state {
         let mut storage_account = StorageAccount::from_address(&address).unwrap();
         for (index, value) in &info.storage {
@@ -214,7 +214,7 @@ fn fill_state(host: &mut impl Runtime, state: HashMap<Address, Account>) {
 }
 
 fn check_result(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     state: HashMap<Address, Account>,
     output_file: &mut Option<File>,
     total_gas_refunded: U256,

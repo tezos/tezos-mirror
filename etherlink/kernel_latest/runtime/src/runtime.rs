@@ -5,16 +5,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The kernel runtime requires both the standard Runtime and the
-// new Extended one.
-
 use std::{
     borrow::{Borrow, BorrowMut},
     marker::PhantomData,
 };
 
 use crate::extensions::WithGas;
-use tezos_evm_logging::{tracing::instrument, Level, Verbosity};
+use tezos_evm_logging::{tracing::instrument, Level, Logging};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -24,7 +21,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::{Path, RefPath},
     reveal::HostReveal,
-    runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    runtime::{RuntimeError, ValueType},
     storage::StorageV1,
     wasm::WasmHost,
 };
@@ -37,11 +34,6 @@ pub trait IsEvmNode {
     fn is_evm_node(&self) -> bool;
 }
 
-pub trait Runtime: SdkRuntime + Verbosity + WithGas + IsEvmNode {}
-
-// If a type implements the Runtime trait, it also implements the kernel Runtime.
-impl<T: SdkRuntime + Verbosity + WithGas + IsEvmNode> Runtime for T {}
-
 // This type has two interesting parts:
 // 1. Host: BorrowMut<R> + Borrow<R>
 //
@@ -49,16 +41,16 @@ impl<T: SdkRuntime + Verbosity + WithGas + IsEvmNode> Runtime for T {}
 //    KernelHost::default()) as long as this host can be borrowed. It makes it
 //    compatible with type `KernelHost<&mut Host, _>`, which is the type built
 //    in the kernel as the entrypoint only gives a mutable reference to the
-//    host. As such, the implementation of the *Runtime traits work for both.
+//    host. As such, the individual trait implementations work for both.
 //
 // 2. _pd: PhantomData<R>
 //
-//    SdkRuntime cannot be used directly as parameter of Borrow and BorrowMut as
-//    it is a trait, it needs to be a parameter itself of the type.
+//    The host runtime type cannot be used directly as parameter of Borrow and
+//    BorrowMut as it is a trait, it needs to be a parameter itself of the type.
 //    However it is never used in the type itself, which will be rejected by the
 //    compiler. PhantomData associates `R` to the struct with no cost at
 //    runtime.
-pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> {
+pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub host: Host,
     pub logs_verbosity: Level,
     pub execution_gas_used: u64,
@@ -66,14 +58,14 @@ pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> {
     pub _pd: PhantomData<R>,
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> HostDebug for KernelHost<R, Host> {
+impl<R: HostDebug, Host: BorrowMut<R> + Borrow<R>> HostDebug for KernelHost<R, Host> {
     #[inline(always)]
     fn write_debug(&self, msg: &str) {
         self.host.borrow().write_debug(msg)
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R, Host> {
+impl<R: HostReveal, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R, Host> {
     #[inline(always)]
     fn reveal_preimage(
         &self,
@@ -110,7 +102,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R,
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> StorageV1 for KernelHost<R, Host> {
+impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> StorageV1 for KernelHost<R, Host> {
     #[instrument(skip(self), fields(res))]
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
@@ -241,7 +233,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> StorageV1 for KernelHost<R, 
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Host> {
+impl<R: WasmHost, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Host> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.borrow_mut().write_output(from)
@@ -290,9 +282,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, H
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> SdkRuntime for KernelHost<R, Host> {}
-
-impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>> KernelHost<R, Host>
+impl<R, Host: Borrow<R> + BorrowMut<R>> KernelHost<R, Host>
 where
     for<'a> &'a mut Host: BorrowMut<R>,
 {
@@ -307,15 +297,13 @@ where
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> Verbosity for KernelHost<R, Host> {
+impl<R: HostDebug, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {
     fn verbosity(&self) -> Level {
         self.logs_verbosity
     }
 }
 
-pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
-    host: &Host,
-) -> Level {
+pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
     match host.store_read(&VERBOSITY_PATH, 0, 1) {
         Ok(value) if value.len() == 1 => {
             Level::try_from(value[0]).unwrap_or(Level::default())
@@ -327,13 +315,11 @@ pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
 // If the flag is set, the kernel consider that this is local evm node execution.
 const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
-pub fn evm_node_flag<Host: tezos_smart_rollup_host::runtime::Runtime>(
-    host: &Host,
-) -> bool {
+pub fn evm_node_flag(host: &impl StorageV1) -> bool {
     Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {
+impl<R, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {
     fn add_execution_gas(&mut self, gas: u64) {
         self.execution_gas_used += gas;
     }
@@ -343,13 +329,13 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Ho
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> IsEvmNode for KernelHost<R, Host> {
+impl<R, Host: BorrowMut<R> + Borrow<R>> IsEvmNode for KernelHost<R, Host> {
     fn is_evm_node(&self) -> bool {
         self.is_evm_node
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
+impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
     pub fn init(host: Host) -> Self {
         let logs_verbosity = read_logs_verbosity(host.borrow());
         let is_evm_node = evm_node_flag(host.borrow());

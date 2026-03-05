@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use crate::storage::world_state_handler::{KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH};
 
@@ -13,7 +13,7 @@ pub mod sequencer_key_change;
 pub mod version;
 pub mod world_state_handler;
 
-pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
+pub fn read_ticketer(host: &impl StorageV1) -> Option<ContractKt1Hash> {
     let ticketer = host
         .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)
         .ok()?;

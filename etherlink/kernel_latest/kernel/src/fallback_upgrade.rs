@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, KERNEL_BOOT_PATH};
 
 use crate::upgrade::KERNEL_ROOT_HASH;
@@ -15,7 +15,10 @@ const BACKUP_KERNEL_BOOT_PATH: RefPath =
 const BACKUP_KERNEL_ROOT_HASH: RefPath =
     RefPath::assert_from(b"/__backup_kernel/root_hash");
 
-pub fn backup_current_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
+pub fn backup_current_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+where
+    Host: StorageV1 + Logging,
+{
     // Fallback preparation detected
     // Storing the current kernel boot path under a temporary path in
     // order to fallback on it if something goes wrong in the upcoming
@@ -46,7 +49,10 @@ pub fn backup_current_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError
     }
 }
 
-pub fn fallback_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
+pub fn fallback_backup_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
+where
+    Host: StorageV1 + Logging,
+{
     log!(
         host,
         Error,

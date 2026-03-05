@@ -35,11 +35,16 @@ use tezos_ethereum::{
         FromRlpBytes,
     },
 };
+use tezos_evm_logging::Logging;
 use tezos_evm_logging::__trace_kernel_add_attrs;
-use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
+use tezos_evm_runtime::extensions::WithGas;
+use tezos_evm_runtime::runtime::IsEvmNode;
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_execution::context::Context;
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
@@ -110,8 +115,8 @@ impl Decodable for AssembleBlockInput {
     }
 }
 
-pub fn read_assemble_block_input<Host: Runtime>(
-    host: &mut Host,
+pub fn read_assemble_block_input(
+    host: &mut impl StorageV1,
 ) -> Result<Option<AssembleBlockInput>, Error> {
     match host.store_read_all(&ASSEMBLE_BLOCK_INPUT) {
         Ok(bytes) => {
@@ -124,8 +129,8 @@ pub fn read_assemble_block_input<Host: Runtime>(
     }
 }
 
-pub fn read_single_tx_execution_input<Host: Runtime>(
-    host: &mut Host,
+pub fn read_single_tx_execution_input(
+    host: &mut impl StorageV1,
 ) -> Result<Option<SingleTxExecutionInput>, Error> {
     match host.store_read_all(&SINGLE_TX_EXECUTION_INPUT) {
         Ok(bytes) => {
@@ -138,17 +143,23 @@ pub fn read_single_tx_execution_input<Host: Runtime>(
     }
 }
 
-fn get_evm_config<Host: Runtime>(host: &mut Host) -> Result<EvmChainConfig, Error> {
+fn get_evm_config<Host>(host: &mut Host) -> Result<EvmChainConfig, Error>
+where
+    Host: StorageV1 + Logging,
+{
     let chain_id = retrieve_chain_id(host)?;
     Ok(fetch_pure_evm_config(host, chain_id))
 }
 
-fn block_constants<Host: Runtime>(
+fn block_constants<Host>(
     host: &mut Host,
     config: &EvmChainConfig,
     timestamp: Timestamp,
     number: U256,
-) -> Result<TezosXBlockConstants, Error> {
+) -> Result<TezosXBlockConstants, Error>
+where
+    Host: StorageV1 + Logging,
+{
     let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
     let da_fee_per_byte = retrieve_da_fee(host)?;
     let minimum_base_fee_per_gas = config.get_limits().minimum_base_fee_per_gas;
@@ -178,10 +189,13 @@ fn block_constants<Host: Runtime>(
 }
 
 #[trace_kernel]
-pub fn handle_run_transaction<Host: Runtime>(
+pub fn handle_run_transaction<Host>(
     host: &mut Host,
     input_data: SingleTxExecutionInput,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + Logging + WithGas,
+{
     let __attrs = [
         (
             "etherlink.transaction.hash".to_string(),
@@ -292,7 +306,7 @@ pub fn handle_run_transaction<Host: Runtime>(
     }
 }
 
-fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
+fn read_current_block_hash(host: &impl StorageV1) -> Result<H256, Error> {
     match block_storage::read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH) {
         Ok(block_hash) => Ok(block_hash),
         Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
@@ -303,10 +317,13 @@ fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
 }
 
 #[trace_kernel]
-pub fn assemble_block<Host: Runtime>(
+pub fn assemble_block<Host>(
     host: &mut Host,
     input_data: AssembleBlockInput,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + Logging + WasmHost + IsEvmNode,
+{
     let __attrs = [
         (
             "etherlink.block.number".to_string(),

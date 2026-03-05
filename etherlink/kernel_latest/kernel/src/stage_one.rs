@@ -20,19 +20,26 @@ use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
-pub fn fetch_proxy_blueprints<Host: Runtime>(
+pub fn fetch_proxy_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
     chain_configuration: &EvmChainConfig,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+{
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
         smart_rollup_address,
@@ -54,10 +61,13 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     }
 }
 
-fn fetch_delayed_transactions<Host: Runtime>(
+fn fetch_delayed_transactions<Host>(
     host: &mut Host,
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
     let (base, minimal_timestamp) = match read_current_blueprint_header(host) {
@@ -114,7 +124,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
+fn fetch_sequencer_blueprints<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
@@ -125,7 +135,10 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
     chain_configuration: &ChainConfig,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+{
     match read_sequencer_inbox(
         host,
         smart_rollup_address,
@@ -157,12 +170,15 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn fetch_blueprints<Host: Runtime>(
+pub fn fetch_blueprints<Host>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     chain_config: &crate::chains::ChainConfig,
     config: &mut Configuration,
-) -> Result<StageOneStatus, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+{
     match (chain_config, &mut config.mode) {
         (
             ChainConfig::Evm(chain_config),
@@ -243,6 +259,7 @@ mod tests {
     use rlp::Encodable;
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::types::Bytes;
+    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
@@ -253,10 +270,8 @@ mod tests {
         types::PublicKeyHash,
     };
     use tezos_smart_rollup_host::reveal::HostReveal;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
-    // SdkRuntime is not used directly but necessary to add the Runtime trait in
-    // context for typechecking. Feel free to remove it and look at rustc
-    // errors.
 
     use crate::{
         block_storage::internal_for_tests::store_current_number,
@@ -414,7 +429,7 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<Host: Runtime>(
+    fn delayed_inbox_is_empty<Host: StorageV1 + Logging>(
         conf: &Configuration,
         host: &mut Host,
     ) -> bool {

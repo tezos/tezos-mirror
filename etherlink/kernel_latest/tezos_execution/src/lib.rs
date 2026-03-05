@@ -22,13 +22,11 @@ use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::{
-    runtime::Runtime,
-    safe_storage::{safe_path, SafeStorage},
-};
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::safe_storage::{safe_path, SafeStorage};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
     ManagerOperationContentConv, Operation, OriginationContent, Script,
@@ -68,11 +66,14 @@ mod gas;
 pub mod mir_ctx;
 mod validate;
 
-fn reveal<Host: Runtime, C: Context>(
+fn reveal<Host, C: Context>(
     tc_ctx: &mut TcCtx<'_, Host, C>,
     source_account: &C::ImplicitAccountType,
     public_key: &PublicKey,
-) -> Result<RevealSuccess, RevealError> {
+) -> Result<RevealSuccess, RevealError>
+where
+    Host: StorageV1 + Logging,
+{
     log!(tc_ctx.host, Debug, "Applying a reveal operation");
     let manager = source_account
         .manager(tc_ctx.host)
@@ -114,12 +115,15 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
     }
 }
 
-fn transfer_tez<Host: Runtime>(
+fn transfer_tez<Host>(
     host: &mut Host,
     giver_account: &impl TezlinkAccount,
     amount: &Narith,
     receiver_account: &impl TezlinkAccount,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<TransferSuccess, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let balance_updates =
         compute_balance_updates(giver_account, receiver_account, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
@@ -145,7 +149,7 @@ fn transfer_tez<Host: Runtime>(
 /// Assumption: this path is enabled from a foreign calling runtime,
 /// and the sender was already debited in that runtime.
 fn credit_destination_without_debiting_sender(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     amount: &Narith,
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
@@ -192,7 +196,7 @@ fn credit_destination_without_debiting_sender(
 }
 
 fn burn_tez(
-    host: &mut impl Runtime,
+    host: &mut impl StorageV1,
     account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
@@ -215,7 +219,7 @@ fn burn_tez(
     Ok(new_balance)
 }
 
-fn execute_internal_operations<'a, Host: Runtime, C: Context>(
+fn execute_internal_operations<'a, Host, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
@@ -223,7 +227,10 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
     sender_account: &C::OriginatedAccountType,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-) -> Result<(), ApplyOperationError> {
+) -> Result<(), ApplyOperationError>
+where
+    Host: StorageV1 + Logging,
+{
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
         internal_operations.into_iter().enumerate()
@@ -439,7 +446,7 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
 /// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
 /// where the sender's balance was already debited by the calling runtime.
 #[allow(clippy::too_many_arguments)]
-fn transfer<'a, Host: Runtime, C: Context>(
+fn transfer<'a, Host, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
@@ -451,7 +458,10 @@ fn transfer<'a, Host: Runtime, C: Context>(
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     skip_sender_debit: bool,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<TransferSuccess, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     match dest_contract {
         Contract::Implicit(pkh) => {
             tc_ctx
@@ -583,7 +593,7 @@ fn get_originated_contract_entrypoint(
 }
 
 fn get_contract_entrypoint<C: Context>(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     context: &C,
     address: &AddressHash,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
@@ -598,7 +608,7 @@ fn get_contract_entrypoint<C: Context>(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<'a, Host: Runtime, C: Context>(
+fn transfer_external<'a, Host, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
@@ -607,7 +617,10 @@ fn transfer_external<'a, Host: Runtime, C: Context>(
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
-) -> Result<TransferTarget, TransferError> {
+) -> Result<TransferTarget, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     log!(
         tc_ctx.host,
         Debug,
@@ -641,7 +654,7 @@ fn transfer_external<'a, Host: Runtime, C: Context>(
 /// (e.g. Michelson `FAILWITH`).
 // TODO: L2-888 replace the low level revert mechanism by more general one
 #[allow(clippy::too_many_arguments)]
-pub fn cross_runtime_transfer<'a, Host: Runtime, C: Context>(
+pub fn cross_runtime_transfer<'a, Host, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
@@ -650,7 +663,10 @@ pub fn cross_runtime_transfer<'a, Host: Runtime, C: Context>(
     dest: &Contract,
     parameters: &Parameters,
     parser: &'a Parser<'a>,
-) -> Result<TransferTarget, TransferError> {
+) -> Result<TransferTarget, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let entrypoint = &parameters.entrypoint;
     let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
 
@@ -693,7 +709,7 @@ pub fn cross_runtime_transfer<'a, Host: Runtime, C: Context>(
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-fn typecheck_code_and_storage<'a, Host: Runtime, C: Context>(
+fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     parser: &'a Parser<'a>,
     script: &Script,
@@ -715,7 +731,7 @@ fn typecheck_code_and_storage<'a, Host: Runtime, C: Context>(
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
-fn handle_storage_with_big_maps<'a, Host: Runtime, C: Context>(
+fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     mut storage: TypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
@@ -741,7 +757,7 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
-fn originate_contract<'a, Host: Runtime, C: Context>(
+fn originate_contract<'a, Host, C: Context>(
     ctx: &mut TcCtx<'a, Host, C>,
     contract: ContractKt1Hash,
     source_account: &C::ImplicitAccountType,
@@ -749,7 +765,10 @@ fn originate_contract<'a, Host: Runtime, C: Context>(
     initial_balance: &Narith,
     script_code: &[u8],
     script_storage: TypedValue<'a>,
-) -> Result<OriginationSuccess, OriginationError> {
+) -> Result<OriginationSuccess, OriginationError>
+where
+    Host: StorageV1 + Logging,
+{
     // If the origination is internal the big map are handled by the first transfer
     // The big_maps vector will be filled only if the origination is "external"
 
@@ -878,12 +897,15 @@ fn compute_storage_balance_updates(
 }
 
 /// Applies balance changes by updating both source and destination accounts.
-fn apply_balance_changes(
-    host: &mut impl Runtime,
+fn apply_balance_changes<Host>(
+    host: &mut Host,
     giver_account: &impl TezlinkAccount,
     receiver_account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
-) -> Result<(), TransferError> {
+) -> Result<(), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let giver_balance = giver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
@@ -988,7 +1010,7 @@ where
     }
 }
 
-fn execute_smart_contract<'a, Host: Runtime>(
+fn execute_smart_contract<'a, Host>(
     code: account_storage::Code,
     storage: Vec<u8>,
     entrypoint: &Entrypoint,
@@ -996,7 +1018,10 @@ fn execute_smart_contract<'a, Host: Runtime>(
     parser: &'a Parser<'a>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     registry: &impl Registry,
-) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     match code {
         Code::Code(code) => {
             // Parse and typecheck the contract
@@ -1031,7 +1056,7 @@ pub fn get_required_da_fees(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
+pub fn validate_and_apply_operation<Host, C: Context>(
     host: &mut Host,
     registry: &impl Registry,
     context: &C,
@@ -1040,7 +1065,10 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
     required_da_fees: Option<u64>,
-) -> Result<Vec<OperationWithMetadata>, OperationError> {
+) -> Result<Vec<OperationWithMetadata>, OperationError>
+where
+    Host: StorageV1 + Logging,
+{
     let mut safe_host = SafeStorage {
         host,
         world_states: vec![context.path()],
@@ -1106,14 +1134,17 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     Ok(receipts)
 }
 
-fn apply_batch<Host: Runtime, C: Context>(
+fn apply_batch<Host, C: Context>(
     host: &mut Host,
     registry: &impl Registry,
     context: &C,
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
     block_ctx: &BlockCtx,
-) -> (Vec<OperationWithMetadata>, bool) {
+) -> (Vec<OperationWithMetadata>, bool)
+where
+    Host: StorageV1 + Logging,
+{
     let validate::ValidatedBatch {
         source_account,
         validated_operations,
@@ -1180,7 +1211,7 @@ fn apply_batch<Host: Runtime, C: Context>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_operation<Host: Runtime, C: Context>(
+fn apply_operation<Host, C: Context>(
     host: &mut Host,
     registry: &impl Registry,
     context: &C,
@@ -1189,7 +1220,10 @@ fn apply_operation<Host: Runtime, C: Context>(
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
-) -> OperationWithMetadata {
+) -> OperationWithMetadata
+where
+    Host: StorageV1 + Logging,
+{
     let mut internal_operations_receipts = Vec::new();
     let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
@@ -1308,7 +1342,8 @@ fn apply_operation<Host: Runtime, C: Context>(
 pub(crate) mod test_utils {
     use primitive_types::U256;
     use std::cell::RefCell;
-    use tezos_evm_runtime::runtime::Runtime;
+    use tezos_evm_logging::Logging;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
         CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
@@ -1332,7 +1367,7 @@ pub(crate) mod test_utils {
     }
 
     impl Registry for MockRegistry {
-        fn bridge<Host: Runtime>(
+        fn bridge<Host>(
             &self,
             _host: &mut Host,
             destination_runtime: RuntimeId,
@@ -1341,7 +1376,10 @@ pub(crate) mod test_utils {
             amount: U256,
             data: &[u8],
             _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError> {
+        ) -> Result<CrossCallResult, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             self.bridge_calls.borrow_mut().push((
                 destination_runtime,
                 destination_address.to_vec(),
@@ -1352,13 +1390,16 @@ pub(crate) mod test_utils {
             Ok(CrossCallResult::Success(vec![]))
         }
 
-        fn generate_alias<Host: Runtime>(
+        fn generate_alias<Host>(
             &self,
             _host: &mut Host,
             native_address: &[u8],
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             self.generate_alias_calls
                 .borrow_mut()
                 .push((native_address.to_vec(), runtime_id));
@@ -1373,11 +1414,14 @@ pub(crate) mod test_utils {
             Ok(address_str.as_bytes().to_vec())
         }
 
-        fn serve<Host: Runtime>(
+        fn serve<Host>(
             &self,
             _host: &mut Host,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             unimplemented!("not needed for this test")
         }
     }
@@ -1407,9 +1451,11 @@ mod tests {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
-    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_evm_logging::Logging;
+    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_tezlink::{
         block::TezBlock,
         operation::{
@@ -1444,7 +1490,7 @@ mod tests {
     struct MockRegistry;
 
     impl Registry for MockRegistry {
-        fn bridge<Host: Runtime>(
+        fn bridge<Host>(
             &self,
             _host: &mut Host,
             destination_runtime: RuntimeId,
@@ -1453,17 +1499,23 @@ mod tests {
             _amount: primitive_types::U256,
             _data: &[u8],
             _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError> {
+        ) -> Result<CrossCallResult, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
         }
 
-        fn generate_alias<Host: Runtime>(
+        fn generate_alias<Host>(
             &self,
             _host: &mut Host,
             _native_address: &[u8],
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }
 
@@ -1475,11 +1527,14 @@ mod tests {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }
 
-        fn serve<Host: Runtime>(
+        fn serve<Host>(
             &self,
             _host: &mut Host,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
             unimplemented!("not needed for this test")
         }
     }
@@ -1752,7 +1807,7 @@ mod tests {
 
     // This function setups an account that will pass the validity checks
     fn init_account(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         src: &PublicKeyHash,
         amount: u64,
     ) -> TezlinkImplicitAccount {
@@ -1779,7 +1834,7 @@ mod tests {
         account
     }
 
-    fn reveal_account(host: &mut impl Runtime, source: &Bootstrap) {
+    fn reveal_account(host: &mut impl StorageV1, source: &Bootstrap) {
         let context = context::TezlinkContext::init_context();
         let account = context
             .implicit_from_public_key_hash(&source.pkh)
@@ -1789,7 +1844,7 @@ mod tests {
 
     // This function sets up an account that will pass the validity checks
     fn init_contract(
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         src: &ContractKt1Hash,
         script: &str,
         storage_micheline: &Micheline,
@@ -5055,7 +5110,7 @@ mod tests {
             .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
     }
 
-    fn big_map_was_removed<Host: Runtime, C: Context>(
+    fn big_map_was_removed<Host: StorageV1, C: Context>(
         ctx: &mut TcCtx<'_, Host, C>,
         id: BigMapId,
     ) {
@@ -5071,14 +5126,17 @@ mod tests {
         receipts: Vec<OperationWithMetadata>,
     }
 
-    fn transfer_big_map<C: Context>(
-        ctx: &mut TcCtx<'_, impl Runtime, C>,
+    fn transfer_big_map<Host, C: Context>(
+        ctx: &mut TcCtx<'_, Host, C>,
         tz1: &Bootstrap,
         script_sender: &str,
         init_sender: &str,
         script_receiver: &str,
         init_receiver: &str,
-    ) -> BigMapTransfer {
+    ) -> BigMapTransfer
+    where
+        Host: StorageV1 + Logging,
+    {
         let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)

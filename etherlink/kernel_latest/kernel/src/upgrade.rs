@@ -23,14 +23,17 @@ use tezos_ethereum::rlp_helpers::decode_field;
 use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 use tezos_storage::read_optional_rlp;
 
@@ -80,10 +83,13 @@ impl Encodable for KernelUpgrade {
     }
 }
 
-pub fn store_kernel_upgrade<Host: Runtime>(
+pub fn store_kernel_upgrade<Host>(
     host: &mut Host,
     kernel_upgrade: &KernelUpgrade,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     log!(
         host,
         Info,
@@ -99,22 +105,25 @@ pub fn store_kernel_upgrade<Host: Runtime>(
 }
 
 fn read_kernel_upgrade_at(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
 ) -> anyhow::Result<Option<KernelUpgrade>> {
     read_optional_rlp(host, path).context("Failed to decode kernel upgrade")
 }
 
-pub fn read_kernel_upgrade<Host: Runtime>(
-    host: &Host,
+pub fn read_kernel_upgrade(
+    host: &impl StorageV1,
 ) -> anyhow::Result<Option<KernelUpgrade>> {
     read_kernel_upgrade_at(host, &KERNEL_UPGRADE)
 }
 
-pub fn upgrade<Host: Runtime>(
+pub fn upgrade<Host>(
     host: &mut Host,
     root_hash: [u8; PREIMAGE_HASH_SIZE],
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + HostReveal + WasmHost,
+{
     log!(host, Info, "Kernel upgrade initialisation.");
 
     backup_current_kernel(host)?;
@@ -187,10 +196,13 @@ impl Encodable for SequencerUpgrade {
     }
 }
 
-pub fn store_sequencer_upgrade<Host: Runtime>(
+pub fn store_sequencer_upgrade<Host>(
     host: &mut Host,
     sequencer_upgrade: SequencerUpgrade,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging + IsEvmNode,
+{
     log!(
         host,
         Info,
@@ -205,23 +217,26 @@ pub fn store_sequencer_upgrade<Host: Runtime>(
         .context("Failed to store sequencer upgrade")
 }
 
-pub fn read_sequencer_upgrade<Host: Runtime>(
-    host: &Host,
+pub fn read_sequencer_upgrade(
+    host: &impl StorageV1,
 ) -> anyhow::Result<Option<SequencerUpgrade>> {
     let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     read_optional_rlp(host, &path).context("Failed to decode sequencer upgrade")
 }
 
-fn delete_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+fn delete_sequencer_upgrade(host: &mut impl StorageV1) -> anyhow::Result<()> {
     host.store_delete(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
         .context("Failed to delete sequencer upgrade")
 }
 
-fn sequencer_upgrade<Host: Runtime>(
+fn sequencer_upgrade<Host>(
     host: &mut Host,
     pool_address: H160,
     sequencer: &PublicKey,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     log!(host, Info, "sequencer upgrade initialisation.");
 
     store_sequencer(host, sequencer)?;
@@ -232,7 +247,10 @@ fn sequencer_upgrade<Host: Runtime>(
     Ok(())
 }
 
-pub fn possible_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+pub fn possible_sequencer_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
@@ -246,22 +264,25 @@ pub fn possible_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Res
 
 pub use revm_etherlink::storage::sequencer_key_change::SequencerKeyChange as EVMBasedSequencerKeyChange;
 
-pub fn read_sequencer_key_change<Host: Runtime>(
-    host: &Host,
+pub fn read_sequencer_key_change(
+    host: &impl StorageV1,
 ) -> anyhow::Result<Option<EVMBasedSequencerKeyChange>> {
     let path = OwnedPath::from(SEQUENCER_KEY_CHANGE_PATH);
     read_optional_rlp(host, &path).context("Failed to decode sequencer key change")
 }
 
-fn delete_sequencer_key_change<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+fn delete_sequencer_key_change(host: &mut impl StorageV1) -> anyhow::Result<()> {
     host.store_delete(&SEQUENCER_KEY_CHANGE_PATH)
         .context("Failed to delete sequencer key change")
 }
 
-fn sequencer_key_change<Host: Runtime>(
+fn sequencer_key_change<Host>(
     host: &mut Host,
     key_change: EVMBasedSequencerKeyChange,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     log!(host, Info, "EVM based sequencer key change initialisation.");
 
     store_sequencer(host, key_change.sequencer_key())?;
@@ -271,10 +292,13 @@ fn sequencer_key_change<Host: Runtime>(
     Ok(())
 }
 
-pub fn possible_sequencer_key_change<Host: Runtime>(
+pub fn possible_sequencer_key_change<Host>(
     host: &mut Host,
     evm_timestamp: Timestamp,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    Host: StorageV1 + Logging,
+{
     let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {
         if evm_timestamp >= upgrade.activation_timestamp() {

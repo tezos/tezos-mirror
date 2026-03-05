@@ -12,13 +12,13 @@ use crate::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
-use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -44,7 +44,7 @@ pub trait TezlinkAccount {
     /// Get the **balance** of an account in Mutez held by the account.
     fn balance(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
@@ -53,7 +53,7 @@ pub trait TezlinkAccount {
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
@@ -63,7 +63,7 @@ pub trait TezlinkAccount {
     /// Add amount (in Mutez) to the **balance** held by the account.
     fn add_balance(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         amount: u64,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
@@ -102,7 +102,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// Get the **counter** for the Tezlink account.
     fn counter(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Narith, tezos_storage::error::Error> {
         let path = context::account::counter_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
@@ -111,7 +111,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// Set the **counter** for the Tezlink account.
     fn set_counter(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::counter_path(self)?;
@@ -121,7 +121,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// Set the **counter** for the Tezlink account to the successor of the current value.
     fn increment_counter(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         validated_operations_count: usize,
     ) -> Result<(), tezos_storage::error::Error> {
         self.set_counter(
@@ -132,7 +132,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
 
     fn manager(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Manager, tezos_storage::error::Error> {
         let path = context::account::manager_path(self)?;
         let manager: Manager = read_nom_value(host, &path)?;
@@ -141,7 +141,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
 
     fn set_manager_public_key_hash(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> Result<(), tezos_storage::error::Error> {
         self.set_manager_pk_hash_internal(host, self.pkh())
     }
@@ -151,7 +151,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// the public key hash to build a [Manager] object
     fn set_manager_pk_hash_internal(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::manager_path(self)?;
@@ -169,7 +169,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     #[cfg(test)]
     fn force_set_manager_public_key_hash(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         pkh: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
         self.set_manager_pk_hash_internal(host, pkh)
@@ -180,7 +180,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// the public key hash to build a [Manager] object
     fn set_manager_public_key(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::manager_path(self)?;
@@ -197,7 +197,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// already allocated.
     fn allocate(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
         if self.allocated(host)? {
             return Ok(true);
@@ -214,7 +214,7 @@ pub trait TezosImplicitAccount: TezlinkAccount + Sized {
     /// Verify if an account is allocated by attempting to read its balance
     fn allocated(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<bool, tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
         Ok(Some(ValueType::Value) == host.store_has(&path)?)
@@ -251,7 +251,7 @@ pub enum Code {
 pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
-    fn code(&self, host: &impl Runtime) -> Result<Code, tezos_storage::error::Error> {
+    fn code(&self, host: &impl StorageV1) -> Result<Code, tezos_storage::error::Error> {
         match enshrined_contracts::from_kt1(self.kt1()) {
             Some(c) => Ok(Code::Enshrined(c)),
             None => {
@@ -264,7 +264,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_code_size(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::code_size_path(self)?;
@@ -273,7 +273,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_code(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
         let path = context::code::code_path(self)?;
@@ -285,7 +285,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn storage(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
             return Ok(vec![]);
@@ -297,7 +297,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_storage_size(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::storage_size_path(self)?;
@@ -306,7 +306,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_storage(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
         if enshrined_contracts::is_enshrined(self.kt1()) {
@@ -321,7 +321,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_paid_bytes(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         paid: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::paid_bytes_path(self)?;
@@ -330,7 +330,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn set_used_bytes(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         used: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::used_bytes_path(self)?;
@@ -339,7 +339,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
 
     fn init(
         &self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         code: &[u8],
         storage: &[u8],
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -375,10 +375,10 @@ mod test {
     use super::*;
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup::host::Runtime;
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     /// obtained by `octez-client show address bootstrap1` in mockup mode
     const BOOTSTRAP1_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
@@ -396,7 +396,11 @@ mod test {
     /// Set a key of bootstrap1 account according to the structure of a Tezos context
     /// We don't use function from [TezlinkImplicitAccount] on purpose to verify that
     /// it reads at the right path
-    fn set_bootstrap1_key(host: &mut impl Runtime, value_path: &impl Path, value: &[u8]) {
+    fn set_bootstrap1_key(
+        host: &mut impl StorageV1,
+        value_path: &impl Path,
+        value: &[u8],
+    ) {
         let index = RefPath::assert_from(b"/tezlink/context/contracts/index");
         let contract = concat(&index, &BOOTSTRAP1_CONTRACT)
             .expect("Concatenation should have succeeded");
