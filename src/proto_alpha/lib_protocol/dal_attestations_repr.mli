@@ -108,6 +108,8 @@ val is_attested :
 (** The decoded representation of the slots attested for a given lag_index. *)
 type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
 
+val unfolded_lag_attestation_encoding : unfolded_lag_attestation Data_encoding.t
+
 (** [decode t ~number_of_slots ~number_of_lags] decodes the attestation bitset
     [t] into an explicit representation. Returns a list of
     [unfolded_lag_attestation], one entry per non-empty lag, in increasing lag

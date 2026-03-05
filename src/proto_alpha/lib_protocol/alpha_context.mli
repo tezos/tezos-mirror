@@ -3008,6 +3008,9 @@ module Dal : sig
 
     type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
 
+    val unfolded_lag_attestation_encoding :
+      unfolded_lag_attestation Data_encoding.t
+
     val decode :
       t ->
       number_of_slots:int ->

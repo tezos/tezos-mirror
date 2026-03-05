@@ -234,6 +234,13 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
 
 type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
 
+let unfolded_lag_attestation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {lag_index; slot_indices} -> (lag_index, slot_indices))
+    (fun (lag_index, slot_indices) -> {lag_index; slot_indices})
+    (obj2 (req "lag_index" int31) (req "slot_indices" (list int31)))
+
 let decode t ~number_of_slots ~number_of_lags =
   let open Result_syntax in
   let max_chunks = max_chunks ~number_of_slots in
