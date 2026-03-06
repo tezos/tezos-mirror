@@ -7763,6 +7763,63 @@ let register_riscv_kernel ~protocols ~kernel =
        ~priority:`No_priority)
     protocols
 
+let test_slow_vm_fallback ~kind =
+  let boot_sector () =
+    Sc_rollup_helpers.read_kernel
+      ~base:"tezt/tests/kernels"
+      "unreachable_kernel"
+  in
+  test_full_scenario
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["slow_vm_fallback"];
+      description =
+        "rollup node exits on fast VM panic without --slow-vm-fallback";
+    }
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  (* Node without --slow-vm-fallback: should crash on fast exec panic *)
+  let node_no_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap2.public_key_hash
+      ~name:"no_fallback"
+  in
+  (* Node with --slow-vm-fallback: falls back to slow VM, continues *)
+  let node_with_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap3.public_key_hash
+      ~name:"with_fallback"
+  in
+  let* () = Sc_rollup_node.run node_no_fallback sc_rollup []
+  and* () =
+    Sc_rollup_node.run node_with_fallback sc_rollup [Slow_vm_fallback]
+  in
+  let no_fallback_crash =
+    (* Node without fallback should crashed *)
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Wasmer fast execution panicked")
+      node_no_fallback
+  in
+  (* Bake block to trigger PVM evaluation *)
+  let* () = Client.bake_for_and_wait tezos_client in
+  (* Node without fallback should have crashed *)
+  let* () = no_fallback_crash in
+  (* Node with fallback should still be running *)
+  let* _level =
+    Sc_rollup_node.wait_for_level ~timeout:30. node_with_fallback 3
+  in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -8043,4 +8100,5 @@ let register_protocol_independent () =
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
-  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols
+  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols ;
+  test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols
