@@ -142,6 +142,68 @@ let single_chain_id_and_family ctxt ~(config : Configuration.t)
              })
   | _ -> tzfail Node_error.Unexpected_multichain
 
+(* Block storage operations (store-backed) *)
+
+let current_block_number ctxt =
+  block_param_to_block_number
+    ctxt
+    ~chain_family:(L2_types.Ex_chain_family EVM)
+    (Block_parameter Latest)
+
+let nth_block ctxt ~full_transaction_object level =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* block_opt =
+    Evm_store.Blocks.find_with_level ~full_transaction_object conn (Qty level)
+  in
+  match block_opt with
+  | None -> failwith "Block %a not found" Z.pp_print level
+  | Some block -> return block
+
+let block_by_hash ctxt ~full_transaction_object hash =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* block_opt =
+    Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
+  in
+  match block_opt with
+  | None -> failwith "Block %a not found" Ethereum_types.pp_block_hash hash
+  | Some block -> return block
+
+let block_receipts ctxt level =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* found = Evm_store.Blocks.find_hash_of_number conn (Qty level) in
+  match found with
+  | None -> failwith "Block %a not found" Z.pp_print level
+  | Some _hash ->
+      Evm_store.Transactions.receipts_of_block_number conn (Qty level)
+
+let block_range_receipts ctxt ?mask level len =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let start = Ethereum_types.Qty level in
+  let finish = Ethereum_types.Qty Z.(pred (level + of_int len)) in
+  let* found1 = Evm_store.Blocks.find_hash_of_number conn start in
+  let* found2 = Evm_store.Blocks.find_hash_of_number conn finish in
+  match (found1, found2) with
+  | None, _ | _, None ->
+      failwith
+        "Block range [%a, %a] unavailable"
+        Ethereum_types.pp_quantity
+        start
+        Ethereum_types.pp_quantity
+        finish
+  | _ -> Evm_store.Transactions.receipts_of_block_range ?mask conn start len
+
+let transaction_receipt ctxt hash =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Transactions.find_receipt conn hash
+
+let transaction_object ctxt hash =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Transactions.find_object conn hash
+
 let network_sanity_check ~network ctxt =
   let open Lwt_result_syntax in
   let expected_smart_rollup_address = Constants.rollup_address network in

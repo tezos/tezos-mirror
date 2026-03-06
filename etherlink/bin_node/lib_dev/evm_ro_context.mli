@@ -109,6 +109,38 @@ val single_chain_id_and_family :
   enable_multichain:bool ->
   (L2_types.chain_id option * L2_types.ex_chain_family) tzresult Lwt.t
 
+(** {2 Block storage operations (store-backed)} *)
+
+(** [current_block_number ctxt] returns the most recent stored block number. *)
+val current_block_number : t -> Ethereum_types.quantity tzresult Lwt.t
+
+val nth_block :
+  t ->
+  full_transaction_object:bool ->
+  Z.t ->
+  Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
+val block_by_hash :
+  t ->
+  full_transaction_object:bool ->
+  Ethereum_types.block_hash ->
+  Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
+val block_receipts : t -> Z.t -> Transaction_receipt.t list tzresult Lwt.t
+
+val block_range_receipts :
+  t ->
+  ?mask:Ethbloom.t ->
+  Z.t ->
+  int ->
+  Transaction_receipt.t list tzresult Lwt.t
+
+val transaction_receipt :
+  t -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
+
+val transaction_object :
+  t -> Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 val ro_backend :
