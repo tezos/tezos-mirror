@@ -405,7 +405,11 @@ let select_distribution_for_cycle ctxt cycle =
    *)
   let* ctxt =
     if Constants_storage.swrr_new_baker_lottery_enable ctxt then
-      Swrr_sampler.select_bakers_at_cycle_end ctxt ~target_cycle:cycle
+      Swrr_sampler.select_bakers_at_cycle_end
+        ctxt
+        ~target_cycle:cycle
+        ~stakes_pk
+        ~total_stake_weight
     else
       let state = Sampler.create stakes_pk in
       let* ctxt = Delegate_sampler_state.init ctxt cycle state in

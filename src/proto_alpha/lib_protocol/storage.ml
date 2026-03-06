@@ -1337,9 +1337,9 @@ module Cycle = struct
         let name = ["selected_bakers"]
       end)
       (struct
-        type t = Signature.Public_key_hash.t FallbackArray.t
+        type t = Raw_context.consensus_pk FallbackArray.t
 
-        let encoding = FallbackArray.encoding Signature.Public_key_hash.encoding
+        let encoding = FallbackArray.encoding Raw_context.consensus_pk_encoding
       end)
 
   module Total_active_stake =
