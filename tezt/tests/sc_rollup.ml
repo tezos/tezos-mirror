@@ -6085,7 +6085,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation ~kind =
       client
   in
   let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
-  let* () = Sc_rollup_node.run rollup_node rollup_address [Slow_vm_fallback] in
+  let* () = Sc_rollup_node.run rollup_node rollup_address [] in
   let* () = Client.bake_for_and_wait client
   and* () =
     Sc_rollup_node.check_error
