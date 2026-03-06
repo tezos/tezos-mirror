@@ -227,8 +227,8 @@ end
 (** [baking_rights_owner ctxt level round] returns the delegate with baking
     rights for [level] at [round]. This function should be constant time.
 
-    Fallback chain: SWRR → Alias sampling 
-    1. Try SWRR first: deterministic precomputed selection 
+    Fallback chain: SWRR → Alias sampling
+    1. Try SWRR first: deterministic precomputed selection
     2. If SWRR returns None: fall back to Alias sampling (stake-weighted lottery)
 
     SWRR returns None when:
@@ -246,10 +246,12 @@ let baking_rights_owner ctxt (level : Level_repr.t) ~round =
      (it should loop after some time) *)
   let*? slot = Round_repr.to_slot ~committee_size round in
   let* ctxt, pk =
-    let* ctxt, baker_opt = Swrr_sampler.get_baker ctxt level round in
-    match baker_opt with
-    | Some pk -> return (ctxt, pk)
-    | None -> Random.owner ctxt level (Slot_repr.to_int slot)
+    if Constants_storage.swrr_new_baker_lottery_enable ctxt then
+      let* ctxt, baker_opt = Swrr_sampler.get_baker ctxt level round in
+      match baker_opt with
+      | Some pk -> return (ctxt, pk)
+      | None -> Random.owner ctxt level (Slot_repr.to_int slot)
+    else Random.owner ctxt level (Slot_repr.to_int slot)
   in
   return (ctxt, slot, pk)
 
@@ -451,7 +453,7 @@ let select_new_distribution_at_cycle_end ctxt ~new_cycle =
 
 (* Clean up old cycle data for both SWRR and alias sampler.
 
-   Alias sampler cleanup: [Delegate_sampler_state.remove] 
+   Alias sampler cleanup: [Delegate_sampler_state.remove]
    is used because when SWRR is enabled, new cycles don't create alias sampler state.
    However, old cycles (before SWRR activation) still have alias sampler state.
    Using [remove] allows safe cleanup of both:
