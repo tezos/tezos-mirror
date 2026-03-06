@@ -764,6 +764,44 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
+  let import_one_ticket (step_constants : Script_typed_ir.step_constants)
+      entrypoint_str (ctxt, storage) to_ ticket =
+    let open Lwt_result_syntax in
+    let {ticketer; contents = token_id, _option_bytes; amount} = ticket in
+    let*? () =
+      error_unless
+        (Contract.equal (Contract.Originated step_constants.self) ticketer)
+        (standard_error ~mnemonic:"FA2.1_INVALID_TICKET")
+    in
+    let*? () = check_token_id token_id in
+    let*? () =
+      error_unless
+        (is_implicit to_.destination)
+        (Non_implicit_contract to_.destination)
+    in
+    let* balance_to, ctxt =
+      Clst_contract_storage.get_balance_from_storage ctxt storage to_
+    in
+    let amount = Ticket_amount.to_n amount in
+    let new_balance_to = Script_int.(add_n balance_to amount) in
+    let* storage, ctxt =
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        to_
+        new_balance_to
+    in
+    let* op_balance_event_dest, ctxt =
+      Clst_events.balance_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner:to_
+        ~token_id:Clst_contract_storage.token_id
+        ~new_balance:new_balance_to
+        ~diff:(Script_int.int amount)
+    in
+    return (ctxt, storage, op_balance_event_dest)
+
   let execute_import_ticket
       (ctxt, (step_constants : Script_typed_ir.step_constants))
       (import_ticket : import_ticket) (storage : Clst_contract_storage.t) :
@@ -775,53 +813,57 @@ module CLST_contract = struct
         Tez.(step_constants.amount = zero)
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
-    let import_one_ticket (ctxt, storage, ops) to_ ticket =
-      let {ticketer; contents = token_id, _option_bytes; amount} = ticket in
-      let*? () =
-        error_unless
-          (Contract.equal (Contract.Originated step_constants.self) ticketer)
-          (standard_error ~mnemonic:"FA2.1_INVALID_TICKET")
-      in
-      let*? () = check_token_id token_id in
-      let*? () =
-        error_unless
-          (is_implicit to_.destination)
-          (Non_implicit_contract to_.destination)
-      in
-      let* balance_to, ctxt =
-        Clst_contract_storage.get_balance_from_storage ctxt storage to_
-      in
-      let amount = Ticket_amount.to_n amount in
-      let new_balance_to = Script_int.(add_n balance_to amount) in
-      let* storage, ctxt =
-        Clst_contract_storage.set_balance_from_storage
-          ctxt
-          storage
-          to_
-          new_balance_to
-      in
-      let* op_balance_event_dest, ctxt =
-        Clst_events.balance_update_event
-          (ctxt, step_constants)
-          ~entrypoint:entrypoint_str
-          ~owner:to_
-          ~token_id:Clst_contract_storage.token_id
-          ~new_balance:new_balance_to
-          ~diff:(Script_int.int amount)
-      in
-      return (ctxt, storage, op_balance_event_dest :: ops)
-    in
     let* ctxt, storage, rev_ops =
       List.fold_left_es
         (fun (ctxt, storage, ops) (to_, tickets) ->
           List.fold_left_es
-            (fun acc ticket -> import_one_ticket acc to_ ticket)
+            (fun (ctxt, storage, ops) ticket ->
+              let* ctxt, storage, op_balance_event =
+                import_one_ticket
+                  step_constants
+                  entrypoint_str
+                  (ctxt, storage)
+                  to_
+                  ticket
+              in
+              return (ctxt, storage, op_balance_event :: ops))
             (ctxt, storage, ops)
             (Script_list.to_list tickets))
         (ctxt, storage, [])
         (Script_list.to_list import_ticket)
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+
+  let execute_import_ticket_from_implicit
+      (ctxt, (step_constants : Script_typed_ir.step_constants))
+      (ticket : import_ticket_from_implicit) (storage : Clst_contract_storage.t)
+      : entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? entrypoint_str =
+      Entrypoint.of_string_lax "import_ticket_from_implicit"
+    in
+    let*? () =
+      error_unless
+        Tez.(step_constants.amount = zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let*? () =
+      error_unless
+        (is_implicit step_constants.sender)
+        (Non_implicit_contract step_constants.sender)
+    in
+    let sender_address =
+      {destination = step_constants.sender; entrypoint = Entrypoint.default}
+    in
+    let* ctxt, storage, op_balance_event =
+      import_one_ticket
+        step_constants
+        entrypoint_str
+        (ctxt, storage)
+        sender_address
+        ticket
+    in
+    return (Script_list.of_list [op_balance_event], storage, [], ctxt)
 
   let execute_lambda_export
       (_ctxt, (_step_constants : Script_typed_ir.step_constants))
@@ -949,7 +991,11 @@ module CLST_contract = struct
         execute_import_ticket (ctxt, step_constants) tickets storage
     | Lambda_export lambda_export ->
         execute_lambda_export (ctxt, step_constants) lambda_export storage
-    | Import_ticket_from_implicit _ticket -> assert false
+    | Import_ticket_from_implicit ticket ->
+        execute_import_ticket_from_implicit
+          (ctxt, step_constants)
+          ticket
+          storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
