@@ -74,11 +74,7 @@ module Dal = struct
     match simulation_arg with
     | Network_simulation.Disabled -> (
         match stake_arg with
-        | Custom distrib ->
-            return
-              (List.map
-                 (fun x -> Int64.(mul (of_int x) 1_000_000_000L))
-                 distrib)
+        | Custom distrib -> return (List.map Int64.of_int distrib)
         | Mimic {network; max_nb_bakers} ->
             let network_string =
               match network with
@@ -117,7 +113,7 @@ module Dal = struct
               JSON.(
                 (stake |-> "frozen" |> as_int)
                 + (stake |-> "delegated" |> as_int))
-              |> Int64.of_int
+              |> fun x -> Int64.div (Int64.of_int x) 1_000_000_000L
             in
             let decoder json =
               json |> JSON.as_list
