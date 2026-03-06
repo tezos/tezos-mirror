@@ -154,6 +154,11 @@ val get_state :
 val read_state :
   Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
 
+(** [subkeys state path] returns the list of subkeys under [path] in the
+    durable storage of [state]. *)
+val subkeys :
+  Evm_state.t -> Durable_storage_path.path -> string list tzresult Lwt.t
+
 (** {2 Etherlink backend operations} *)
 
 module Etherlink : sig

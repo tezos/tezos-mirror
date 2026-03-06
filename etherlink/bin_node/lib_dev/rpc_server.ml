@@ -255,7 +255,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
   let directory =
     register_tezos_services
-    |> Services.directory ~rpc_server_family mode rpc config ctxt ~tick
+    |> Services.directory ~rpc_server_family mode rpc config (snd ctxt) ~tick
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
@@ -283,7 +283,7 @@ let start_private_server ~mode
           private_rpc
           ~block_production
           config
-          ctxt
+          (snd ctxt)
           ~tick
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe

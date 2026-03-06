@@ -212,35 +212,33 @@ let health_check config mode db_liveness_check dir =
   Evm_directory.register0 dir health_check_service (fun query () ->
       health_check_handler config mode db_liveness_check query)
 
-let get_block_by_number ~full_transaction_object block_param
-    (module Rollup_node_rpc : Services_backend_sig.S) =
+let get_block_by_number ~full_transaction_object block_param ro_ctxt =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number
+    Evm_ro_context.block_param_to_block_number
+      ro_ctxt
       ~chain_family:L2_types.EVM
       (Block_parameter block_param)
   in
-  Rollup_node_rpc.Etherlink_block_storage.nth_block ~full_transaction_object n
+  Evm_ro_context.nth_block ro_ctxt ~full_transaction_object n
 
-let get_block_receipts block_param
-    (module Rollup_node_rpc : Services_backend_sig.S) =
+let get_block_receipts block_param ro_ctxt =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number
+    Evm_ro_context.block_param_to_block_number
+      ro_ctxt
       ~chain_family:L2_types.EVM
       (Block_parameter block_param)
   in
-  Rollup_node_rpc.Etherlink_block_storage.block_receipts n
+  Evm_ro_context.block_receipts ro_ctxt n
 
-let get_transaction_from_index block index
-    (module Rollup_node_rpc : Services_backend_sig.S) =
+let get_transaction_from_index block index ro_ctxt =
   let open Lwt_result_syntax in
   match block.Ethereum_types.transactions with
   | TxHash l -> (
       match List.nth_opt l index with
       | None -> return_none
-      | Some hash ->
-          Rollup_node_rpc.Etherlink_block_storage.transaction_object hash)
+      | Some hash -> Evm_ro_context.transaction_object ro_ctxt hash)
   | TxFull l -> return @@ List.nth_opt l index
 
 let block_transaction_count block =
@@ -307,8 +305,7 @@ let produce_logs_stream ~bloom_filter stream =
       |> List.map (fun l -> Ethereum_types.Subscription.Logs l))
     stream
 
-let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
-    (module Backend_rpc : Services_backend_sig.S) =
+let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind) ro_ctxt =
   let open Lwt_result_syntax in
   let* stream, stopper =
     match kind with
@@ -370,7 +367,9 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
           match from_l1_level with
           | None -> return_nil
           | Some from_l1_level ->
-              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              let+ l1_l2 =
+                Evm_ro_context.list_l1_l2_levels ro_ctxt ~from_l1_level
+              in
               List.rev_map
                 (fun ( l1_level,
                        {
@@ -495,8 +494,7 @@ let get_proxied_subscription ws_client ~timeout
    `eth_subscribe`. There is at most one subscription active per kind on the
    server. *)
 let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
-    (ws_client : Websocket_client.t)
-    (module Backend_rpc : Services_backend_sig.S) =
+    (ws_client : Websocket_client.t) ro_ctxt =
   let open Lwt_result_syntax in
   let* proxied = get_proxied_subscription ws_client ~timeout kind in
   let* stream, stopper =
@@ -525,7 +523,9 @@ let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
           match from_l1_level with
           | None -> return_nil
           | Some from_l1_level ->
-              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              let+ l1_l2 =
+                Evm_ro_context.list_l1_l2_levels ro_ctxt ~from_l1_level
+              in
               List.rev_map
                 (fun ( l1_level,
                        {
@@ -684,8 +684,7 @@ let build_with_input_and_lazy_output method_ ~f parameters =
     ~f:(fun input -> expect_input input f)
     parameters
 
-let get_fee_history block_count block_parameter config
-    (module Backend_rpc : Services_backend_sig.S) =
+let get_fee_history block_count block_parameter config ro_ctxt =
   (* TODO: exclude 0 blocks *)
   let open Lwt_result_syntax in
   let open Ethereum_types in
@@ -695,9 +694,7 @@ let get_fee_history block_count block_parameter config
     | Unlimited -> block_count
     | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
-  let* nb_latest =
-    Backend_rpc.Etherlink_block_storage.current_block_number ()
-  in
+  let* nb_latest = Evm_ro_context.current_block_number ro_ctxt in
   let is_reachable nb =
     match Configuration.(config.fee_history.max_past) with
     | None -> true
@@ -706,21 +703,18 @@ let get_fee_history block_count block_parameter config
         Z.(gt (Qty.to_z nb) oldest_reachable)
   in
   let* newest_block =
-    get_block_by_number
-      ~full_transaction_object:false
-      block_parameter
-      (module Backend_rpc)
+    get_block_by_number ~full_transaction_object:false block_parameter ro_ctxt
   in
   let* base_fee_per_gas_next_block =
     if newest_block.number = nb_latest then
-      Backend_rpc.Etherlink.base_fee_per_gas ()
+      Evm_ro_context.Etherlink.base_fee_per_gas ro_ctxt
     else
       let next_block_number = Qty.next newest_block.number in
       let* next_block =
         get_block_by_number
           ~full_transaction_object:false
           (Block_parameter.Number next_block_number)
-          (module Backend_rpc)
+          ro_ctxt
       in
       return (Option.value next_block.baseFeePerGas ~default:Qty.zero)
   in
@@ -735,7 +729,7 @@ let get_fee_history block_count block_parameter config
         get_block_by_number
           ~full_transaction_object:false
           block_parameter
-          (module Backend_rpc)
+          ro_ctxt
       in
       let gas_used_ratio =
         Float.div
@@ -987,8 +981,7 @@ let send_raw_tezlink_operation (type f) (config : Configuration.t)
 let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (config : Configuration.t) (mode : f Mode.t)
-    ((module Backend_rpc : Services_backend_sig.S), ro_ctxt)
-    ({method_; parameters; id} as request : JSONRPC.request) :
+    ro_ctxt ({method_; parameters; id} as request : JSONRPC.request) :
     JSONRPC.return_response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
@@ -1021,26 +1014,28 @@ let dispatch_request (type f) ~websocket
         | Network_id.Method ->
             let f (_ : unit option) =
               let open Lwt_result_syntax in
-              let* (Chain_id chain_id) = Backend_rpc.chain_id () in
+              let* (Chain_id chain_id) = Evm_ro_context.chain_id ro_ctxt in
               rpc_ok (Z.to_string chain_id)
             in
             build ~f module_ parameters
         | Rpc_encodings.Chain_id.Method ->
             let f (_ : unit option) =
-              let* chain_id = Backend_rpc.chain_id () in
+              let* chain_id = Evm_ro_context.chain_id ro_ctxt in
               rpc_ok chain_id
             in
             build ~f module_ parameters
         | Rpc_encodings.Chain_family.Method ->
             let f chain_id =
-              let* chain_family = Backend_rpc.chain_family chain_id in
+              let* chain_family =
+                Evm_ro_context.read_chain_family ro_ctxt chain_id
+              in
               rpc_ok chain_family
             in
             build_with_input ~f module_ parameters
         | Get_balance.Method ->
             let f (address, block_param) =
               let* balance =
-                Backend_rpc.Etherlink.balance address block_param
+                Evm_ro_context.Etherlink.balance ro_ctxt address block_param
               in
               rpc_ok balance
             in
@@ -1060,7 +1055,11 @@ let dispatch_request (type f) ~websocket
         | Get_storage_at.Method ->
             let f (address, position, block_param) =
               let* value =
-                Backend_rpc.Etherlink.storage_at address position block_param
+                Evm_ro_context.Etherlink.storage_at
+                  ro_ctxt
+                  address
+                  position
+                  block_param
               in
               rpc_ok value
             in
@@ -1074,25 +1073,22 @@ let dispatch_request (type f) ~websocket
               let root =
                 Durable_storage_path.root_of_chain_family chain_family
               in
-              let* block_number = Backend_rpc.current_block_number ~root in
+              let* block_number =
+                Evm_ro_context.current_block_number_durable ro_ctxt ~root
+              in
               rpc_ok block_number
             in
             build ~f module_ parameters
         | Block_number.Method ->
             let f (_ : unit option) =
-              let* block_number =
-                Backend_rpc.Etherlink_block_storage.current_block_number ()
-              in
+              let* block_number = Evm_ro_context.current_block_number ro_ctxt in
               rpc_ok block_number
             in
             build ~f module_ parameters
         | Get_block_by_number.Method ->
             let f (block_param, full_transaction_object) =
               let* block =
-                get_block_by_number
-                  ~full_transaction_object
-                  block_param
-                  (module Backend_rpc)
+                get_block_by_number ~full_transaction_object block_param ro_ctxt
               in
               rpc_ok block
             in
@@ -1100,7 +1096,8 @@ let dispatch_request (type f) ~websocket
         | Get_block_by_hash.Method ->
             let f (block_hash, full_transaction_object) =
               let* block =
-                Backend_rpc.Etherlink_block_storage.block_by_hash
+                Evm_ro_context.block_by_hash
+                  ro_ctxt
                   ~full_transaction_object
                   block_hash
               in
@@ -1109,15 +1106,15 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Get_block_receipts.Method ->
             let f block_param =
-              let* receipts =
-                get_block_receipts block_param (module Backend_rpc)
-              in
+              let* receipts = get_block_receipts block_param ro_ctxt in
               rpc_ok receipts
             in
             build_with_input ~f module_ parameters
         | Get_code.Method ->
             let f (address, block_param) =
-              let* code = Backend_rpc.Etherlink.code address block_param in
+              let* code =
+                Evm_ro_context.Etherlink.code ro_ctxt address block_param
+              in
               rpc_ok code
             in
             build_with_input ~f module_ parameters
@@ -1143,13 +1140,13 @@ let dispatch_request (type f) ~websocket
                  of 1.5Gwei, the result of `eth_gasPrice` cannot be larger than
                  2 Gwei (¾ * 1.5). *)
               let* minimum =
-                Backend_rpc.Etherlink.minimum_base_fee_per_gas ()
+                Evm_ro_context.Etherlink.minimum_base_fee_per_gas ro_ctxt
               in
               let* (Qty latest_price) =
-                Backend_rpc.Etherlink.base_fee_per_gas ()
+                Evm_ro_context.Etherlink.base_fee_per_gas ro_ctxt
               in
-              let* backlog = Backend_rpc.Etherlink.backlog () in
-              let* storage_version = Backend_rpc.storage_version () in
+              let* backlog = Evm_ro_context.Etherlink.backlog ro_ctxt in
+              let* storage_version = Evm_ro_context.storage_version ro_ctxt in
               let base_fee =
                 let open Z in
                 min
@@ -1171,7 +1168,10 @@ let dispatch_request (type f) ~websocket
                     ~on_rpc:(inject_rpc_call config request module_)
                     ~on_stateful:(fun () ->
                       let* next_nonce =
-                        Backend_rpc.Etherlink.nonce address block_param
+                        Evm_ro_context.Etherlink.nonce
+                          ro_ctxt
+                          address
+                          block_param
                       in
                       let next_nonce =
                         Option.value ~default:Qty.zero next_nonce
@@ -1184,7 +1184,7 @@ let dispatch_request (type f) ~websocket
                       rpc_ok nonce)
               | _ ->
                   let* nonce =
-                    Backend_rpc.Etherlink.nonce address block_param
+                    Evm_ro_context.Etherlink.nonce ro_ctxt address block_param
                   in
                   let nonce = Option.value ~default:Qty.zero nonce in
                   rpc_ok nonce
@@ -1193,7 +1193,8 @@ let dispatch_request (type f) ~websocket
         | Get_block_transaction_count_by_hash.Method ->
             let f block_hash =
               let* block =
-                Backend_rpc.Etherlink_block_storage.block_by_hash
+                Evm_ro_context.block_by_hash
+                  ro_ctxt
                   ~full_transaction_object:false
                   block_hash
               in
@@ -1206,7 +1207,7 @@ let dispatch_request (type f) ~websocket
                 get_block_by_number
                   ~full_transaction_object:false
                   block_param
-                  (module Backend_rpc)
+                  ro_ctxt
               in
               rpc_ok (block_transaction_count block)
             in
@@ -1223,7 +1224,7 @@ let dispatch_request (type f) ~websocket
                   Telemetry.Attributes.[Transaction.hash tx_hash]) ;
 
               let* receipt =
-                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
+                Evm_ro_context.transaction_receipt ro_ctxt tx_hash
               in
               rpc_ok receipt
             in
@@ -1231,10 +1232,10 @@ let dispatch_request (type f) ~websocket
         | Get_transaction_gas_info.Method ->
             let f tx_hash =
               let* receipt =
-                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
+                Evm_ro_context.transaction_receipt ro_ctxt tx_hash
               in
               let* object_ =
-                Backend_rpc.Etherlink_block_storage.transaction_object tx_hash
+                Evm_ro_context.transaction_object ro_ctxt tx_hash
               in
               match (receipt, object_) with
               | Some receipt, Some object_ -> (
@@ -1244,13 +1245,14 @@ let dispatch_request (type f) ~websocket
                   in
                   let* block =
                     let (Qty number) = receipt.blockNumber in
-                    Backend_rpc.Etherlink_block_storage.nth_block
+                    Evm_ro_context.nth_block
+                      ro_ctxt
                       ~full_transaction_object:false
                       number
                   in
-                  let* state = Backend_rpc.Reader.get_state () in
+                  let* state = Evm_ro_context.get_state ro_ctxt () in
                   let* da_fee_per_byte_bytes =
-                    Backend_rpc.Reader.read
+                    Evm_ro_context.read_state
                       state
                       Durable_storage_path.da_fee_per_byte
                   in
@@ -1299,8 +1301,7 @@ let dispatch_request (type f) ~websocket
                             GetTransactionByHash")
                   | None ->
                       let* transaction_object =
-                        Backend_rpc.Etherlink_block_storage.transaction_object
-                          tx_hash
+                        Evm_ro_context.transaction_object ro_ctxt tx_hash
                       in
                       rpc_ok transaction_object)
             in
@@ -1308,15 +1309,13 @@ let dispatch_request (type f) ~websocket
         | Get_transaction_by_block_hash_and_index.Method ->
             let f (block_hash, Qty index) =
               let* block =
-                Backend_rpc.Etherlink_block_storage.block_by_hash
+                Evm_ro_context.block_by_hash
+                  ro_ctxt
                   ~full_transaction_object:false
                   block_hash
               in
               let* transaction_object =
-                get_transaction_from_index
-                  block
-                  (Z.to_int index)
-                  (module Backend_rpc)
+                get_transaction_from_index block (Z.to_int index) ro_ctxt
               in
               rpc_ok transaction_object
             in
@@ -1327,13 +1326,10 @@ let dispatch_request (type f) ~websocket
                 get_block_by_number
                   ~full_transaction_object:false
                   block_number
-                  (module Backend_rpc)
+                  ro_ctxt
               in
               let* transaction_object =
-                get_transaction_from_index
-                  block
-                  (Z.to_int index)
-                  (module Backend_rpc)
+                get_transaction_from_index block (Z.to_int index) ro_ctxt
               in
               rpc_ok transaction_object
             in
@@ -1467,8 +1463,7 @@ let dispatch_request (type f) ~websocket
                   in
                   let receipt_from_backend hash =
                     let* receipt =
-                      Backend_rpc.Etherlink_block_storage.transaction_receipt
-                        hash
+                      Evm_ro_context.transaction_receipt ro_ctxt hash
                     in
                     match receipt with
                     | Some receipt -> rpc_ok receipt
@@ -1501,7 +1496,8 @@ let dispatch_request (type f) ~websocket
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
-                Backend_rpc.Etherlink.simulate_call
+                Evm_ro_context.Etherlink.simulate_call
+                  ro_ctxt
                   ~overwrite_tick_limit:
                     config.experimental_features.overwrite_simulation_tick_limit
                   call
@@ -1528,7 +1524,8 @@ let dispatch_request (type f) ~websocket
         | Get_estimate_gas.Method ->
             let f (call, block_param, state_override) =
               let* result =
-                Backend_rpc.Etherlink.estimate_gas
+                Evm_ro_context.Etherlink.estimate_gas
+                  ro_ctxt
                   call
                   block_param
                   state_override
@@ -1584,13 +1581,13 @@ let dispatch_request (type f) ~websocket
         (* Internal RPC methods *)
         | Kernel_version.Method ->
             let f (_ : unit option) =
-              let* kernel_version = Backend_rpc.kernel_version () in
+              let* kernel_version = Evm_ro_context.kernel_version ro_ctxt in
               rpc_ok kernel_version
             in
             build ~f module_ parameters
         | Kernel_root_hash.Method ->
             let f (_ : unit option) =
-              let* kernel_root_hash = Backend_rpc.kernel_root_hash () in
+              let* kernel_root_hash = Evm_ro_context.kernel_root_hash ro_ctxt in
               rpc_ok kernel_root_hash
             in
             build ~f module_ parameters
@@ -1601,9 +1598,9 @@ let dispatch_request (type f) ~websocket
                   ~default:(Block_parameter.Block_parameter Latest)
                   block_param
               in
-              let* state = Backend_rpc.Reader.get_state ~block () in
+              let* state = Evm_ro_context.get_state ro_ctxt ~block () in
               let* pk =
-                Durable_storage.sequencer (Backend_rpc.Reader.read state)
+                Durable_storage.sequencer (Evm_ro_context.read_state state)
               in
               rpc_ok pk
             in
@@ -1614,7 +1611,10 @@ let dispatch_request (type f) ~websocket
         | Trace_transaction.Method ->
             let f ((hash, config) : Tracer_types.input) =
               let*! trace =
-                Backend_rpc.Tracer_etherlink.trace_transaction hash config
+                Evm_ro_context.Tracer_etherlink.trace_transaction
+                  ro_ctxt
+                  hash
+                  config
               in
               process_trace_result trace
             in
@@ -1627,11 +1627,7 @@ let dispatch_request (type f) ~websocket
                      "Number of block should be greater than 0.")
               else
                 let* fee_history_result =
-                  get_fee_history
-                    block_count
-                    newest_block
-                    config
-                    (module Backend_rpc)
+                  get_fee_history block_count newest_block config ro_ctxt
                 in
                 rpc_ok fee_history_result
             in
@@ -1639,14 +1635,18 @@ let dispatch_request (type f) ~websocket
         | Coinbase.Method ->
             let f (_ : unit option) =
               let open Lwt_result_syntax in
-              let* coinbase = Backend_rpc.Etherlink.coinbase () in
+              let* coinbase = Evm_ro_context.Etherlink.coinbase ro_ctxt in
               rpc_ok coinbase
             in
             build ~f module_ parameters
         | Trace_call.Method ->
             let f (((call, block), config) : Tracer_types.call_input) =
               let*! trace =
-                Backend_rpc.Tracer_etherlink.trace_call call block config
+                Evm_ro_context.Tracer_etherlink.trace_call
+                  ro_ctxt
+                  call
+                  block
+                  config
               in
               process_trace_result trace
             in
@@ -1654,12 +1654,14 @@ let dispatch_request (type f) ~websocket
         | Trace_block.Method ->
             let f ((block_param, config) : Tracer_types.block_input) =
               let* (Ethereum_types.Qty block_number) =
-                Backend_rpc.block_param_to_block_number
+                Evm_ro_context.block_param_to_block_number
+                  ro_ctxt
                   ~chain_family:L2_types.EVM
                   (Block_parameter block_param)
               in
               let*! traces =
-                Backend_rpc.Tracer_etherlink.trace_block
+                Evm_ro_context.Tracer_etherlink.trace_block
+                  ro_ctxt
                   (Qty block_number)
                   config
               in
@@ -1670,7 +1672,9 @@ let dispatch_request (type f) ~websocket
         | Get_finalized_blocks_of_l1_level.Method ->
             let f l1_level =
               let open Lwt_result_syntax in
-              let* l2_levels = Backend_rpc.l2_levels_of_l1_level l1_level in
+              let* l2_levels =
+                Evm_ro_context.l2_levels_of_l1_level ro_ctxt l1_level
+              in
               match l2_levels with
               | Some {start_l2_level; end_l2_level} ->
                   rpc_ok Rpc_encodings.{start_l2_level; end_l2_level}
@@ -1688,8 +1692,7 @@ let dispatch_request (type f) ~websocket
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (_config : Configuration.t) (mode : f Mode.t)
-    ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
-    ({method_; parameters; id} : JSONRPC.request) :
+    ro_ctxt ~block_production ({method_; parameters; id} : JSONRPC.request) :
     JSONRPC.return_response Lwt.t =
   let open Lwt_syntax in
   Telemetry.Jsonrpc.trace_dispatch_with
@@ -1811,8 +1814,7 @@ let dispatch_private_request (type f) ~websocket
               let callback = function
                 | `Missing ->
                     let*! receipt =
-                      Backend_rpc.Etherlink_block_storage.transaction_receipt
-                        hash
+                      Evm_ro_context.transaction_receipt ro_ctxt hash
                     in
                     let wakup_value =
                       Result.map
@@ -1862,7 +1864,8 @@ let dispatch_private_request (type f) ~websocket
 
           let* next_nonce =
             let* next_nonce =
-              Backend_rpc.Etherlink.nonce
+              Evm_ro_context.Etherlink.nonce
+                ro_ctxt
                 (Transaction_object.sender transaction_object)
                 (Block_parameter Latest)
             in
@@ -1954,16 +1957,16 @@ let dispatch_private_request (type f) ~websocket
     | Method (Durable_state_value.Method, module_) ->
         let f (path, block) =
           let open Lwt_result_syntax in
-          let* state = Backend_rpc.Reader.get_state ~block () in
-          let* value = Backend_rpc.Reader.read state path in
+          let* state = Evm_ro_context.get_state ro_ctxt ~block () in
+          let* value = Evm_ro_context.read_state state path in
           rpc_ok value
         in
         build_with_input ~f module_ parameters
     | Method (Durable_state_subkeys.Method, module_) ->
         let f (path, block) =
           let open Lwt_result_syntax in
-          let* state = Backend_rpc.Reader.get_state ~block () in
-          let* value = Backend_rpc.Reader.subkeys state path in
+          let* state = Evm_ro_context.get_state ro_ctxt ~block () in
+          let* value = Evm_ro_context.subkeys state path in
           rpc_ok value
         in
         build_with_input ~f module_ parameters
@@ -1975,7 +1978,7 @@ let dispatch_private_request (type f) ~websocket
               ~none:[error_of_fmt "missing block number"]
               block_number
           in
-          let* block = Backend_rpc.Etherlink.replay block_number in
+          let* block = Evm_ro_context.Etherlink.replay ro_ctxt block_number in
           rpc_ok block
         in
         build ~f module_ parameters
@@ -2051,7 +2054,7 @@ let empty_stream =
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
 let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config mode ctx (input : JSONRPC.request) =
+    (rpc : Configuration.rpc) config mode ro_ctxt (input : JSONRPC.request) =
   let open Lwt_syntax in
   match
     map_method_name
@@ -2064,7 +2067,7 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
         let open Lwt_result_syntax in
-        let* id, stream = eth_subscribe config mode ~kind (fst ctx) in
+        let* id, stream = eth_subscribe config mode ~kind ro_ctxt in
         (* This is an optimization to avoid having to search in the map
            of subscriptions for `stream` and `id`. *)
         sub_stream := stream ;
@@ -2106,7 +2109,7 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
           rpc
           config
           mode
-          ctx
+          ro_ctxt
           input
       in
       let+ response =
@@ -2120,7 +2123,7 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
 
 let dispatch_private_websocket
     (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
-    (rpc : Configuration.rpc) config mode ctx (input : JSONRPC.request) =
+    (rpc : Configuration.rpc) config mode ro_ctxt (input : JSONRPC.request) =
   let open Lwt_syntax in
   let* {return_value; id} =
     dispatch_private_request
@@ -2130,7 +2133,7 @@ let dispatch_private_websocket
       rpc
       config
       mode
-      ctx
+      ro_ctxt
       input
   in
   let+ response =
@@ -2213,30 +2216,28 @@ let dispatch_websocket_private
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
 let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
-    (mode : f Mode.t) rpc config backend dir ~tick =
+    (mode : f Mode.t) rpc config ro_ctxt dir ~tick =
   let db_liveness_check () =
     let open Lwt_result_syntax in
-    let (module Backend : Services_backend_sig.S) = fst backend in
     match rpc_server_family with
     | Rpc_types.Multichain_sequencer_rpc_server -> return_unit
     | Rpc_types.Single_chain_node_rpc_server f -> (
         match f with
         | EVM ->
-            let* _ = Backend.Etherlink_block_storage.current_block_number () in
+            let* _ = Evm_ro_context.current_block_number ro_ctxt in
             return_unit
         | Michelson ->
-            let* _ =
-              Backend.Tezlink.current_level `Main (`Head 0l) ~offset:0l
-            in
+            let (module Tezlink) = Evm_ro_context.tezlink_backend ro_ctxt in
+            let* _ = Tezlink.current_level `Main (`Head 0l) ~offset:0l in
             return_unit)
   in
 
   dir |> version |> configuration config |> evm_mode config mode
   |> health_check config mode db_liveness_check
-  |> dispatch_public rpc_server_family rpc config mode backend ~tick
-  |> dispatch_websocket_public rpc_server_family rpc config mode backend
+  |> dispatch_public rpc_server_family rpc config mode ro_ctxt ~tick
+  |> dispatch_websocket_public rpc_server_family rpc config mode ro_ctxt
 
-let private_directory ~rpc_server_family mode rpc config backend
+let private_directory ~rpc_server_family mode rpc config ro_ctxt
     ~block_production ~tick =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version |> evm_mode config mode
@@ -2245,7 +2246,7 @@ let private_directory ~rpc_server_family mode rpc config backend
        rpc
        config
        mode
-       backend
+       ro_ctxt
        ~block_production
        ~tick
   |> dispatch_websocket_private
@@ -2253,5 +2254,5 @@ let private_directory ~rpc_server_family mode rpc config backend
        rpc
        config
        mode
-       backend
+       ro_ctxt
        ~block_production
