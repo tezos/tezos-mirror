@@ -345,32 +345,13 @@ Docker compose files
 ~~~~~~~~~~~~~~~~~~~~
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
-A working example of a simple Docker compose file is available at :src:`scripts/docker/bake.yml`.
-The compose file is able to launch services for an Octez node, a DAL node, a baker, and an accuser.
+A predefined Docker compose file is available at :src:`scripts/docker/bake.yml`.
+It aims at helping you to easily launch services for an Octez node, a DAL node, a baker, and an accuser.
+You may copy the compose file in the directory where you want to run the baker::
 
-First, you have to make some choices:
+    wget https://gitlab.com/tezos/tezos/-/blob/master/scripts/docker/bake.yml
 
-- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``)
-- choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
-- specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
-
-For instance, to configure and run the node on the active protocol on :ref:`currentnet <network_aliases>` from a snapshot, in Rolling history mode::
-
-    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
-    export LIQUIDITY_BAKING_VOTE=pass
-    docker compose -f bake.yml run --rm -it node octez-node config init \
-       --network https://teztnets.com/currentnet --history-mode rolling \
-       --data-dir /var/run/tezos/node/data \
-       --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
-    wget -O $HOME/rolling https://snapshots.tzinit.org/currentnet/rolling
-    docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
-      node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
-    docker compose -f bake.yml up node
-
-Note in the commands above that ``node`` is the name of the service running the ``octez-node`` executable.
-You may ignore possible warnings about environment variable ``BAKER_ADDRESS``, that we will set later on for the DAL node.
-
-The client and node data are stored in local subdirectories of your current directory, respectively ``./client_data/`` and ``./node_data/``.
+The client, node, and DAL data are stored in the following subdirectories of your current directory, respectively: ``./client_data/``, ``./node_data/``, and ``./dal_data``.
 You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
 
 .. note::
@@ -381,37 +362,113 @@ You may want to start with empty (or non-existent) directories in the beginning,
 
         rm ./node_data/data/config.json
 
-You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
+First, you have to make some choices:
 
-    docker compose -f bake.yml exec node octez-client bootstrapped
+- choose a :doc:`network <../user/multinetwork>` to connect to (by default, ``shadownet``)
+- specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``off``, or ``pass``)
 
-You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
+
+Note that you must have already:
+
+- a baker key on the network you chose, which is sufficiently funded, staked enough tez, and is registered as a delegate,
+- a consensus key and a companion key associated with the baker key (but see next section for how to omit them).
+
+.. note::
+
+	If you don't have yet configured the baker keys, you can first start just the node::
+
+		docker compose -f bake.yml up node
+
+	wait until the node is bootstraped from the snapshot, and then open a new terminal, placed in the same directory::
+
+		docker compose -f bake.yml exec node sh
+
+	and then in the shell set up the baker keys::
+
+		export TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+		octez-client gen keys mybaker
+		octez-client show address mybaker -S
+		# Note down the address and secret of mybaker
+		# Fund mybaker with > 6000 tez, e.g. at https://faucet.shadownet.teztnets.com
+		octez-client register key mybaker as delegate
+		octez-client stake 6000 for mybaker
+		octez-client gen keys myconsensus -s bls
+		octez-client show address myconsensus -S
+		# Note down the address and secret of the consensus key
+		octez-client set consensus key for mybaker to myconsensus
+		octez-client gen keys mycompanion -s bls
+		octez-client show address mycompanion -S
+		# Note down the address and secret of the companion key
+		octez-client set companion key for mybaker to mycompanion
+		exit
+
+	and finally stop the node service with Ctrl-C in the node's terminal).
+
+Create an environment file called ``.env`` in your current directory with a content of the following form::
+
+    BAKER_ADDRESS='<address of your baker>'
+    CONSENSUS_SECRET_KEY='<secret key>' # the secret key looks like: unencrypted:...
+    COMPANION_SECRET_KEY='<secret key>' # the secret key looks like: unencrypted:...
+    LIQUIDITY_BAKING_VOTE='pass'
+    NETWORK='tallinnnet'
+
+and build the compose file::
+
+    docker compose --file bake.yml build
+
+Now, you just have to start all the services::
+
+    docker compose --file bake.yml up -d
+
+You can see the logs by doing in another terminal (in the same directory)::
+
+    docker compose --file bake.yml logs -f
+
+(add a service such as ``node`` or ``baker`` at the end to see only its log).
+
+You should have now running together: the node, the DAL node, the baker and the accuser.
+
+You can stop the services with::
+
+    docker compose --file bake.yml down
+
+Alternatively, you may stop and restart only one service. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
 
     docker compose -f bake.yml stop node
     docker compose -f bake.yml run --rm node octez-node upgrade storage --data-dir /var/run/tezos/node/data
     docker compose -f bake.yml up node
 
-To run the baker, you must configure a baking key (if you have one you may skip this step.
-While the node is running, do (in another window if needed)::
+Further customization
+^^^^^^^^^^^^^^^^^^^^^
 
-    docker compose -f bake.yml exec node sh
+Beyond the usage shown above, you can use the following variables in the environment file to customize the behavior of the compose file:
 
-and in the shell do::
+- BAKER_SECRET_KEY: secret key of the baker (only if there is no CONSENSUS_SECRET_KEY)
+- CONSENSUS_SECRET_KEY: secret key of the companion address (not needed if you defined BAKER_SECRET_KEY)
+- COMPANION_SECRET_KEY: secret key of the consensus address (optional, unless CONSENSUS_SECRET_KEY is defined and is a tz4 address)
+- CHECK_SNAPSHOT (default: false): if false, import the snapshot with option --no-check
+- FORCE_DOWNLOAD_SNAPSHOT (default: false): if true, download the snapshot even if it has been found localy (see SNAPSHOT_URL)
+- FORCE_IMPORT_SNAPSHOT (default: false): import the snapshot even if the node has recent data (same day)
+- HISTORY_MODE (default: rolling): set the :doc:`history mode <../user/history_modes>` of your node
+- NETWORK (default: shadownet): network to connect to
+- NETWORK_URL (default: ``https://teztnets.com/$NETWORK``) : URL to get the network configuration
+- SNAPSHOT_URL: URL where download the snapshot if not found localy (see SNAPSHOT_NAME)
+- SNAPSHOT_NAME: name of a local snapshot file
 
-    export TEZOS_CLIENT_DIR=/var/run/tezos/client
-    octez-client gen keys mybaker
-    octez-client show address mybaker
-    # Note down the address of mybaker
-    # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
-    octez-client register key mybaker as delegate
-    octez-client stake 6000 for mybaker
+For example, if you don't want to use auxiliary keys (consensus key and companion key) for baking on a testnet, you may define ``BAKER_SECRET_KEY`` instead of ``CONSENSUS_SECRET_KEY`` and ``COMPANION_SECRET_KEY`` in the environment file.
 
-Once the baking key is configured, stop the node and then run all the services::
+.. note::
 
-    export BAKER_ADDRESS=tz...
-    docker compose -f bake.yml up
+	If you want to manually configure the node, open a new terminal
+	while the node is running, from within the same directory::
 
-Now you should have running together: the node, the DAL node, the baker and the accuser.
+		docker compose -f bake.yml exec node sh
+
+	then in the shell interact with the node directly::
+
+		export TEZOS_NODE_DIR=/var/run/tezos/node/data
+		octez-node config show
+		octez-node config update ...
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

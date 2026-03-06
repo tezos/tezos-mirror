@@ -27,9 +27,9 @@ services:
     command:  >-
       /bin/sh -c "if [ $$HISTORY_MODE = \"archive\" ]; then SNAPSHOT_MODE=\"full\"; fi; \
       export SNAPSHOT_NAME=${SNAPSHOT_NAME:-$${NETWORK}.$${SNAPSHOT_MODE:-$$HISTORY_MODE}}; \
-      export SNAPSHOT_ADDR=${SNAPSHOT_ADDR:-https://snapshots.tzinit.org/$${NETWORK}/$${SNAPSHOT_MODE:-$$HISTORY_MODE}};
+      export SNAPSHOT_URL=${SNAPSHOT_URL:-https://snapshots.tzinit.org/$${NETWORK}/$${SNAPSHOT_MODE:-$$HISTORY_MODE}};
       if [[ ! -f /var/run/tezos/node/data/daily_logs/daily-$$(date +%Y%m%d).log ]] || ${FORCE_IMPORT_SNAPSHOT:-${FORCE_DOWNLOAD_SNAPSHOT:-false}}; then
-      if [[ ! -f $$SNAPSHOT_ADDR ]] || ${FORCE_DOWNLOAD_SNAPSHOT:-false}; then wget -O $$SNAPSHOT_NAME $$SNAPSHOT_ADDR; fi; \
+      if [[ ! -f $$SNAPSHOT_URL ]] || ${FORCE_DOWNLOAD_SNAPSHOT:-false}; then wget -O $$SNAPSHOT_NAME $$SNAPSHOT_URL; fi; \
       octez-node snapshot import --force $$(if [ ! ${CHECK_SNAPSHOT:-false} ]; then echo -n --no-check; fi) --data-dir /var/run/tezos/node/data $$SNAPSHOT_NAME; \
       fi"
     depends_on:
@@ -47,6 +47,7 @@ services:
       - 9732:9732
       - 8732:8732
     volumes:
+      - ./client_data:/var/run/tezos/client
       - ./node_data:/var/run/tezos/node
     depends_on:
       snapshot-downloader:
