@@ -76,7 +76,11 @@ let add_account ?algo name : (t, t) scenarios =
       Log.info ~color:action_color "[Add account \"%s\"]" name ;
       let new_account = Account.new_account ?algo () in
       let pkh = new_account.pkh in
-      let contract = Protocol.Alpha_context.Contract.Implicit pkh in
+      (* FIXME-PA *)
+      let contract =
+        Protocol.Alpha_context.Contract.Implicit
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh)
+      in
       let account_state =
         init_account ~name ~pkh ~contract ~parameters:default_params ()
       in
@@ -148,7 +152,15 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       in
       let current_cycle = current_cycle block in
       let* operation =
-        Op.delegation ~fee:Tez.zero (B block) src.contract delegate_pkh_opt
+        (* FIXME-PA *)
+        Op.delegation
+          ~fee:Tez.zero
+          (B block)
+          src.contract
+          (* FIXME-PA *)
+          (Option.map
+             Protocol.Implicit_account_repr.Forbidden.of_pkh
+             delegate_pkh_opt)
       in
       let balance = balance_of_account src_name state.account_map in
       let state =
@@ -249,7 +261,10 @@ let update_consensus_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
     | false, Some proof_signer_name, _ ->
         Some (State.find_account proof_signer_name state).contract
     | false, None, Signature.Bls _ ->
-        Some (Protocol.Alpha_context.Contract.Implicit consensus_pkh)
+        (* FIXME-PA *)
+        Some
+          (Protocol.Alpha_context.Contract.Implicit
+             (Protocol.Implicit_account_repr.Forbidden.of_pkh consensus_pkh))
     | _ -> None
   in
   let* operation =
@@ -291,7 +306,10 @@ let update_companion_key_ ?proof_signer ?(force_no_signer = false) ~ck_name
     | false, Some proof_signer_name, _ ->
         Some (State.find_account proof_signer_name state).contract
     | false, None, Signature.Bls _ ->
-        Some (Protocol.Alpha_context.Contract.Implicit companion_pkh)
+        (* FIXME-PA *)
+        Some
+          (Protocol.Alpha_context.Contract.Implicit
+             (Protocol.Implicit_account_repr.Forbidden.of_pkh companion_pkh))
     | _ -> None
   in
   let* operation =
@@ -317,6 +335,13 @@ let update_companion_key ?proof_signer ?(force_no_signer = false) ~ck_name
 let check_pending_slashings ~loc (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* denunciations_rpc = Context.get_denunciations (B block) in
+  (* FIXME-PA *)
+  let denunciations_rpc =
+    List.map
+      (fun (pkh, item) ->
+        (Protocol.Implicit_account_repr.Forbidden.to_pkh pkh, item))
+      denunciations_rpc
+  in
   Slashing_helpers.Full_denunciation.check_same_lists_any_order
     ~loc
     denunciations_rpc
@@ -381,10 +406,21 @@ let double_bake_op delegate_names (block, state) =
             Tez.one_mutez
         in
         let* forked_block1 =
-          Block.bake ~policy:(By_account delegate.pkh) block
+          (* FIXME-PA *)
+          Block.bake
+            ~policy:
+              (By_account
+                 (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh))
+            block
         in
         let* forked_block2 =
-          Block.bake ~policy:(By_account delegate.pkh) ~operation block
+          (* FIXME-PA *)
+          Block.bake
+            ~policy:
+              (By_account
+                 (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh))
+            ~operation
+            block
         in
         (* includes pending operations *)
         let evidence =
@@ -443,22 +479,31 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
   let* baker, _, _, _ =
     Block.get_next_baker ?policy:state.baking_policy block
   in
-  Log.info "Baker: %a" Signature.Public_key_hash.pp baker ;
+  (* FIXME-PA *)
+  Log.info "Baker: %a" Protocol.Implicit_account_repr.pp baker ;
   let* other_baker1, other_baker2 =
     match other_bakers with
     | Some (ob1, ob2) ->
-        let ob1 = (State.find_account ob1 state).pkh in
-        let ob2 = (State.find_account ob2 state).pkh in
+        (* FIXME-PA *)
+        let ob1 =
+          Protocol.Implicit_account_repr.Forbidden.of_pkh
+            (State.find_account ob1 state).pkh
+        in
+        let ob2 =
+          (* FIXME-PA *)
+          Protocol.Implicit_account_repr.Forbidden.of_pkh
+            (State.find_account ob2 state).pkh
+        in
         return (ob1, ob2)
     | None -> Context.get_first_different_bakers (B block)
   in
   let other_baker =
-    if not (Signature.Public_key_hash.equal baker other_baker2) then
+    if not Protocol.Implicit_account_repr.(baker = other_baker2) then
       other_baker2
     else other_baker1
   in
-  Log.info "Other baker: %a" Signature.Public_key_hash.pp other_baker ;
-  Log.info "Bake 1 block with %a" Signature.Public_key_hash.pp baker ;
+  Log.info "Other baker: %a" Protocol.Implicit_account_repr.pp other_baker ;
+  Log.info "Bake 1 block with %a" Protocol.Implicit_account_repr.pp baker ;
   let* forked_block = Block.bake ~policy:(By_account other_baker) block in
   Log.info "Bake 1 block " ;
   let* forked_block = Block.bake ?policy:state.baking_policy forked_block in
@@ -492,7 +537,11 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
 let double_attest_ =
   double_attest_op
     ~op:(fun ~manager_pkh ~attested_block ->
-      Op.raw_attestation ~manager_pkh attested_block)
+      (* FIXME-PA *)
+      Op.raw_attestation
+        ~manager_pkh:
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh manager_pkh)
+        attested_block)
     ~op_evidence:op_double_attestation
     ~kind:Double_attesting
 
@@ -506,7 +555,11 @@ let double_attest ?other_bakers delegate_name : (t, t) scenarios =
 let double_preattest_ =
   double_attest_op
     ~op:(fun ~manager_pkh ~attested_block ->
-      Op.raw_preattestation ~manager_pkh attested_block)
+      (* FIXME-PA *)
+      Op.raw_preattestation
+        ~manager_pkh:
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh manager_pkh)
+        attested_block)
     ~op_evidence:op_double_preattestation
     ~kind:Double_preattesting
 

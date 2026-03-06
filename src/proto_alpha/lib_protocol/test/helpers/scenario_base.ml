@@ -39,8 +39,12 @@ let set_baker ?min_round baker : (t, t) scenarios =
       let {pkh; _} = State.find_account baker state in
       match min_round with
       | None ->
+          (* FIXME-PA *)
+          let pkh = Protocol.Implicit_account_repr.Forbidden.of_pkh pkh in
           return {state with State.baking_policy = Some (Block.By_account pkh)}
       | Some min_round ->
+          (* FIXME-PA *)
+          let pkh = Protocol.Implicit_account_repr.Forbidden.of_pkh pkh in
           return
             {
               state with
@@ -65,6 +69,10 @@ let exclude_bakers bakers : (t, t) scenarios =
         ~color:event_color
         "Excluding bakers: [ %s ]"
         (String.concat ", " log_list) ;
+      (* FIXME-PA *)
+      let bakers_pkh =
+        List.map Protocol.Implicit_account_repr.Forbidden.of_pkh bakers_pkh
+      in
       return
         {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
 

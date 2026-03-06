@@ -548,7 +548,10 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
     Tezos_dal_node_services.Controller_profiles.make
       ~attesters:
         (List.map
-           (fun pkh -> Tezos_crypto.Signature.Of_V3.public_key_hash pkh)
+           (fun pkh ->
+             (* FIXME-PA *)
+             Tezos_crypto.Signature.Of_V3.public_key_hash
+               (Protocol.Implicit_account_repr.Forbidden.to_pkh pkh))
            delegates)
       ()
   in

@@ -103,8 +103,8 @@ type slot_attestation = {
 (** Published level indexed map of per-slot attestation info. *)
 type published_level_cache = slot_attestation SlotMap.t Level_map.t
 
-(** Committee lookup function: given a slot, returns the delegate pkh. *)
-type committee_lookup = Slot.t -> Signature.Public_key_hash.t option
+(** Committee lookup function: given a slot, returns the delegate address. *)
+type committee_lookup = Slot.t -> Protocol.Implicit_account_repr.t option
 
 type t = {
   cache : published_level_cache Delegate_id.Table.t;
@@ -249,6 +249,11 @@ let extract_dal_attestations_from_operations t ~attested_level operations =
                       (Slot_to_delegate_lookup_failed
                          {slot = consensus_content.slot; committee_level})
                 | Some delegate_pkh ->
+                    (* FIXME-PA *)
+                    let delegate_pkh =
+                      Protocol.Implicit_account_repr.Forbidden.to_pkh
+                        delegate_pkh
+                    in
                     let delegate_id = Delegate_id.of_pkh delegate_pkh in
                     let* attested_pairs =
                       extract_attested_pairs
@@ -274,6 +279,11 @@ let extract_dal_attestations_from_operations t ~attested_level operations =
                               (Slot_to_delegate_lookup_failed
                                  {slot; committee_level})
                         | Some delegate_pkh ->
+                            (* FIXME-PA *)
+                            let delegate_pkh =
+                              Protocol.Implicit_account_repr.Forbidden.to_pkh
+                                delegate_pkh
+                            in
                             let delegate_id = Delegate_id.of_pkh delegate_pkh in
                             let* attested_pairs =
                               extract_attested_pairs

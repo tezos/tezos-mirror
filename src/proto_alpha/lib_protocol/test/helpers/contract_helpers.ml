@@ -74,7 +74,7 @@ let fake_KT1 =
 
 let default_self = fake_KT1
 
-let default_payer = Signature.Public_key_hash.zero
+let default_payer = Implicit_account_repr.zero
 
 let default_sender = Contract.Implicit default_payer
 

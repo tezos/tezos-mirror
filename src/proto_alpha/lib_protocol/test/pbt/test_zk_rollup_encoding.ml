@@ -96,8 +96,9 @@ let gen_ticket_hash =
   Ticket_hash_repr.of_bytes_exn bytes
 
 let gen_pkh =
-  let pkh, _, _ = Signature.generate_key ~algo:Ed25519 () in
-  Gen.return pkh
+  let pkh_sig, _, _ = Signature.generate_key ~algo:Ed25519 () in
+  (* FIXME-PA *)
+  Gen.return (Implicit_account_repr.Forbidden.of_pkh pkh_sig)
 
 let gen_z =
   let open Gen in

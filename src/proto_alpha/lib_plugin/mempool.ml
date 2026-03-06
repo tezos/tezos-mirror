@@ -767,9 +767,9 @@ module Conflict_map = struct
      outcome of the {!conflict_handler}, so
      [fee_needed_to_replace_by_fee] will always return [None] when
      they are involved anyway. *)
-  type t = packed_operation Signature.Public_key_hash.Map.t
+  type t = packed_operation Implicit_account_repr.Map.t
 
-  let empty = Signature.Public_key_hash.Map.empty
+  let empty = Implicit_account_repr.Map.empty
 
   (* Remove all the [replacements] from the state, then add
      [new_operation]. Non-manager operations are ignored.
@@ -783,21 +783,21 @@ module Conflict_map = struct
         (fun conflict_map op ->
           match find_manager op with
           | Some manager ->
-              Signature.Public_key_hash.Map.remove manager conflict_map
+              Implicit_account_repr.Map.remove manager conflict_map
           | None -> (* Non-manager operation: ignore it. *) conflict_map)
         conflict_map
         replacements
     in
     match find_manager new_operation with
     | Some manager ->
-        Signature.Public_key_hash.Map.add manager new_operation conflict_map
+        Implicit_account_repr.Map.add manager new_operation conflict_map
     | None -> (* Non-manager operation: ignore it. *) conflict_map
 
   let fee_needed_to_replace_by_fee config ~candidate_op ~conflict_map =
     match find_manager candidate_op with
     | None -> (* Non-manager operation. *) None
     | Some manager -> (
-        match Signature.Public_key_hash.Map.find manager conflict_map with
+        match Implicit_account_repr.Map.find manager conflict_map with
         | None ->
             (* This can only happen when the pre-existing conflicting
                operation is a [Drain_delegate], which cannot be replaced by a
@@ -863,7 +863,8 @@ let sources_from_level_and_slot ctxt ~attested_level slot =
           companion_pkh = _;
           companion_pk = _;
         } ) ->
-      return [delegate; consensus_pkh]
+      (* FIXME-PA *)
+      return [delegate; Implicit_account_repr.Forbidden.of_pkh consensus_pkh]
   | Error _ -> return_nil
 
 let sources_from_aggregate ctxt
@@ -920,8 +921,8 @@ let sources_from_operation ctxt
     | Single (Manager_operation {source; _}) -> return [source]
     | Cons (Manager_operation {source; _}, _) -> return [source]
   in
-  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V3.public_key_hash in
-  return @@ map_pkh_env sources
+  (* FIXME-PA *)
+  return @@ List.map Implicit_account_repr.Forbidden.to_pkh sources
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =

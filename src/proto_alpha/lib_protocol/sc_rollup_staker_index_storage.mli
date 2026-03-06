@@ -33,7 +33,7 @@ val init : Raw_context.t -> Sc_rollup_repr.t -> Raw_context.t tzresult Lwt.t
 val fresh_staker_index :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   (Raw_context.t * t) tzresult Lwt.t
 
 (** [find_staker_index_unsafe ctxt rollup staker] returns the index for the
@@ -44,14 +44,14 @@ val fresh_staker_index :
 val find_staker_index_unsafe :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   (Raw_context.t * t option) tzresult Lwt.t
 
 (** Same as {!find_staker_index_unsafe} but fails if the value is absent. *)
 val get_staker_index_unsafe :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   (Raw_context.t * t) tzresult Lwt.t
 
 (** [remove_staker ctxt rollup staker] cleans every storage associated
@@ -61,13 +61,13 @@ val get_staker_index_unsafe :
 val remove_staker :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [list_stakers_uncarbonated ctxt rollup] lists the active stakers on
     [rollup]. *)
 val list_stakers_uncarbonated :
-  Raw_context.t -> Sc_rollup_repr.t -> Signature.public_key_hash list Lwt.t
+  Raw_context.t -> Sc_rollup_repr.t -> Implicit_account_repr.t list Lwt.t
 
 (** [is_active ctxt rollup staker_index] returns true iff [staker_index]
     is an active staker. *)

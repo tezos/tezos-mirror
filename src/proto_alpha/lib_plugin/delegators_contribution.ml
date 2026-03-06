@@ -178,6 +178,8 @@ let delegated_breakdown_from_sampling_level_ctxt ctxt pkh =
 let delegated_breakdown_at_sampling context ~cycle ~delegate_pkh =
   let open Lwt_result_syntax in
   let* ctxt = init_ctxt context in
+  (* FIXME-PA *)
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh delegate_pkh in
   let* sampling_level = find_sampling_level ctxt cycle in
   match sampling_level with
   | `Already_at_sampling_level ->
@@ -204,7 +206,7 @@ let delegator_contribution ctxt ~delegate_pkh delegator =
     match current_delegate with
     | None -> false
     | Some current_delegate ->
-        Signature.Public_key_hash.(current_delegate = delegate_pkh)) ;
+        Implicit_account_repr.(current_delegate = delegate_pkh)) ;
   let* full_balance =
     Alpha_context.Contract.For_RPC.get_full_balance ctxt delegator
   in
@@ -227,15 +229,14 @@ let delegator_contribution ctxt ~delegate_pkh delegator =
             (fun acc
                  (request_delegate, _cycle, (amount : Alpha_context.Tez.t))
                ->
-              if Signature.Public_key_hash.(request_delegate <> delegate_pkh)
-              then Alpha_context.Tez.(acc +? amount)
+              if Implicit_account_repr.(request_delegate <> delegate_pkh) then
+                Alpha_context.Tez.(acc +? amount)
               else return acc)
             Alpha_context.Tez.zero
             finalizable
         in
         let* unfinalizable_sum =
-          if Signature.Public_key_hash.(unfinalizable.delegate <> delegate_pkh)
-          then
+          if Implicit_account_repr.(unfinalizable.delegate <> delegate_pkh) then
             List.fold_left_e
               (fun acc (_cycle, amount) -> Alpha_context.Tez.(acc +? amount))
               Alpha_context.Tez.zero
@@ -268,6 +269,8 @@ let min_delegated_breakdown context ~delegate_pkh =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt = init_ctxt context in
+  (* FIXME-PA *)
+  let delegate_pkh = Implicit_account_repr.Forbidden.of_pkh delegate_pkh in
   let* total_delegated =
     Delegate_services.Implem.total_delegated ctxt delegate_pkh
   in
@@ -280,8 +283,7 @@ let min_delegated_breakdown context ~delegate_pkh =
   let external_delegators =
     List.filter
       (function
-        | Contract.Implicit pkh ->
-            Signature.Public_key_hash.(pkh <> delegate_pkh)
+        | Contract.Implicit pkh -> Implicit_account_repr.(pkh <> delegate_pkh)
         | Originated _ -> true)
       delegators
   in

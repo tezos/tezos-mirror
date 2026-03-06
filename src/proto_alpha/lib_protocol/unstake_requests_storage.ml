@@ -44,8 +44,7 @@ let () =
     (fun () ->
       Cannot_unstake_with_unfinalizable_unstake_requests_to_another_delegate)
 
-type finalizable =
-  (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
+type finalizable = (Implicit_account_repr.t * Cycle_repr.t * Tez_repr.t) list
 
 type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
 
@@ -53,14 +52,14 @@ let finalizable_encoding =
   let open Data_encoding in
   let elt_encoding =
     obj3
-      (req "delegate" Signature.Public_key_hash.encoding)
+      (req "delegate" Implicit_account_repr.encoding)
       (req "cycle" Cycle_repr.encoding)
       (req "amount" Tez_repr.encoding)
   in
   list elt_encoding
 
 type stored_requests = Storage.Unstake_request.t = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   requests : (Cycle_repr.t * Tez_repr.t) list;
 }
 
@@ -73,7 +72,7 @@ let stored_requests_encoding =
     (fun {delegate; requests} -> (delegate, requests))
     (fun (delegate, requests) -> {delegate; requests})
     (obj2
-       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "delegate" Implicit_account_repr.encoding)
        (req "requests" (list request_encoding)))
 
 type prepared_finalize_unstake = {
@@ -246,7 +245,7 @@ let finalize_and_add ctxt ~contract ~delegate ~handle_finalizable cycle amount =
   let* ctxt, prepared_opt =
     prepare_finalize_unstake
       ~check_delegate_of_unfinalizable_requests:(fun request_delegate ->
-        if Signature.Public_key_hash.(delegate <> request_delegate) then
+        if Implicit_account_repr.(delegate <> request_delegate) then
           (* This would happen if the staker was allowed to stake towards
              a new delegate while having unfinalizable unstake requests,
              which is not allowed: it will fail earlier. Also, unstaking
@@ -309,7 +308,7 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
     ~(transfer_from_unstake :
        Raw_context.t ->
        Cycle_repr.t ->
-       Signature.public_key_hash ->
+       Implicit_account_repr.t ->
        Contract_repr.t ->
        Tez_repr.t ->
        (Raw_context.t * 'a list) tzresult Lwt.t)
@@ -320,7 +319,7 @@ let remove_from_unfinalizable_requests_and_finalize ctxt ~contract ~delegate
   let* allowed =
     match contract with
     | Contract_repr.Implicit contract
-      when Signature.Public_key_hash.(contract = delegate) ->
+      when Implicit_account_repr.(contract = delegate) ->
         can_stake_from_unstake ctxt ~delegate
     | Contract_repr.Originated _ | Contract_repr.Implicit _ -> return false
   in
@@ -437,7 +436,7 @@ module For_RPC = struct
   }
 
   type nonrec stored_requests = stored_requests = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     requests : (Cycle_repr.t * Tez_repr.t) list;
   }
 

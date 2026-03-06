@@ -19,7 +19,7 @@ type shared = {
 val share :
   rounding:[`Towards_stakers | `Towards_baker] ->
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Tez_repr.t ->
   shared tzresult Lwt.t
 
@@ -36,6 +36,6 @@ val pay_rewards :
   Raw_context.t ->
   ?active_stake:Stake_repr.t ->
   source:[< Token.giver] ->
-  delegate:Signature.public_key_hash ->
+  delegate:Implicit_account_repr.t ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

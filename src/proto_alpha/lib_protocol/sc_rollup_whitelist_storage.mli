@@ -48,14 +48,14 @@ val init :
 val check_access_to_private_rollup :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 (** [find_whitelist_uncarbonated context rollup] returns the whitelist from the storage. *)
 val find_whitelist_uncarbonated :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Signature.public_key_hash list option tzresult Lwt.t
+  Implicit_account_repr.t list option tzresult Lwt.t
 
 (** [replace context rollup ~whitelist] replaces the whitelist of
     [rollup] in the storage by [whitelist]. Returns the resulting

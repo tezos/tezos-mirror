@@ -361,18 +361,24 @@ let timeout_reached node_ctxt ~self ~opponent =
   let Node_context.{config; cctxt; _} = node_ctxt in
   let*? self = Signature.Of_V_latest.get_public_key_hash self in
   let*? opponent = Signature.Of_V_latest.get_public_key_hash opponent in
+  (* FIXME-PA *)
+  let self_implicit = Protocol.Implicit_account_repr.Forbidden.of_pkh self in
+  let opponent_implicit =
+    Protocol.Implicit_account_repr.Forbidden.of_pkh opponent
+  in
   let+ game_result =
     Plugin.RPC.Sc_rollup.timeout_reached
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Head 0)
       config.sc_rollup_address
-      self
-      opponent
+      self_implicit
+      opponent_implicit
   in
   let open Sc_rollup.Game in
   match game_result with
   | Some (Loser {loser; _}) ->
-      let is_it_me = Environment.Signature.Public_key_hash.(self = loser) in
+      (* FIXME-PA *)
+      let is_it_me = Protocol.Implicit_account_repr.(self_implicit = loser) in
       not is_it_me
   | _ -> false
 
@@ -386,8 +392,9 @@ let timeout node_ctxt ~self ~opponent =
       (new Protocol_client_context.wrap_full cctxt)
       (cctxt#chain, `Head 0)
       config.sc_rollup_address
-      self
-      opponent
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh self)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh opponent)
   in
   Option.map Sc_rollup_proto_types.Game.timeout_to_octez timeout
 
@@ -396,7 +403,12 @@ let get_conflicts cctxt rollup staker =
   let cctxt = new Protocol_client_context.wrap_full cctxt in
   let*? staker = Signature.Of_V_latest.get_public_key_hash staker in
   let+ conflicts =
-    Plugin.RPC.Sc_rollup.conflicts cctxt (cctxt#chain, `Head 0) rollup staker
+    Plugin.RPC.Sc_rollup.conflicts
+      cctxt
+      (cctxt#chain, `Head 0)
+      rollup
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh staker)
   in
   List.map Sc_rollup_proto_types.Game.conflict_to_octez conflicts
 
@@ -409,13 +421,17 @@ let get_ongoing_games cctxt rollup staker =
       cctxt
       (cctxt#chain, `Head 0)
       rollup
-      staker
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh staker)
   in
   List.map
     (fun (game, staker1, staker2) ->
       ( Sc_rollup_proto_types.Game.to_octez game,
-        Tezos_crypto.Signature.Of_V3.public_key_hash staker1,
-        Tezos_crypto.Signature.Of_V3.public_key_hash staker2 ))
+        (* FIXME-PA *)
+        Tezos_crypto.Signature.Of_V3.public_key_hash
+          (Protocol.Implicit_account_repr.Forbidden.to_pkh staker1),
+        Tezos_crypto.Signature.Of_V3.public_key_hash
+          (Protocol.Implicit_account_repr.Forbidden.to_pkh staker2) ))
     games
 
 let filter_conflicts_ready_to_start ~current_level ~commitment_period_in_blocks

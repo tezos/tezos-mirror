@@ -31,7 +31,7 @@
     is actually revealed, the contract store is updated with the public key
     instead of the hash of the key. *)
 type manager_key =
-  | Hash of Signature.Public_key_hash.t
+  | Hash of Implicit_account_repr.t
   | Public_key of Signature.Public_key.t
 
 type t = manager_key

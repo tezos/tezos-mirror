@@ -45,10 +45,10 @@ type error +=
       Contract_repr.t
   | (* `Branch *)
       Empty_implicit_contract of
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
   | (* `Branch *)
       Empty_implicit_delegated_contract of
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
   | (* `Permanent *)
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
@@ -185,9 +185,9 @@ let () =
       Format.fprintf
         ppf
         "Empty implicit contract (%a)"
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         implicit)
-    Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "implicit" Implicit_account_repr.encoding))
     (function Empty_implicit_contract c -> Some c | _ -> None)
     (fun c -> Empty_implicit_contract c) ;
   register_error_kind
@@ -199,9 +199,9 @@ let () =
       Format.fprintf
         ppf
         "Emptying implicit delegated contract (%a)"
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         implicit)
-    Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "implicit" Implicit_account_repr.encoding))
     (function Empty_implicit_delegated_contract c -> Some c | _ -> None)
     (fun c -> Empty_implicit_delegated_contract c) ;
   register_error_kind
@@ -683,7 +683,7 @@ let check_emptiable c contract =
       let* delegate = Contract_delegate_storage.find c contract in
       match delegate with
       | Some pkh' ->
-          if Signature.Public_key_hash.equal pkh pkh' then return_unit
+          if Implicit_account_repr.equal pkh pkh' then return_unit
           else
             (* Delegated implicit accounts cannot be emptied *)
             tzfail (Empty_implicit_delegated_contract pkh)

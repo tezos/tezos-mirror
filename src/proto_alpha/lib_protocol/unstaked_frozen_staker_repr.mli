@@ -10,13 +10,13 @@
     once. We need to distinguish these cases to enforce the staking
     over baking limit. *)
 type t =
-  | Single of Contract_repr.t * Signature.public_key_hash
+  | Single of Contract_repr.t * Implicit_account_repr.t
       (** A single staker, either the delegate itself or one of its staker. *)
-  | Shared of Signature.public_key_hash
+  | Shared of Implicit_account_repr.t
       (** The delegate and all its stakers simultaneously. *)
 
 val encoding : t Data_encoding.t
 
 val compare : t -> t -> int
 
-val delegate : t -> Signature.public_key_hash
+val delegate : t -> Implicit_account_repr.t

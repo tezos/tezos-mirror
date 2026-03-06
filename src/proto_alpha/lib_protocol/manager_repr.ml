@@ -71,7 +71,7 @@ let encoding_legacy =
   union [hash_case (Tag 0); pubkey_case (Tag 1); pubkey_ok_case (Tag 2)]
 
 type manager_key =
-  | Hash of Signature.Public_key_hash.t
+  | Hash of Implicit_account_repr.t
   | Public_key of Signature.Public_key.t
 
 type t = manager_key
@@ -79,13 +79,22 @@ type t = manager_key
 let encoding =
   conv
     (function
-      | Hash hash -> (Hash hash : manager_key_storage_type)
+      | Hash hash ->
+          (* FIXME-PA *)
+          (Hash (Implicit_account_repr.Forbidden.to_pkh hash)
+            : manager_key_storage_type)
       (* This encoding change only takes effect after S, so newly registered public keys
          are stored as [Public_key_after_S] *)
       | Public_key pk -> Public_key_after_S pk)
     (function
-      | Hash hash -> Hash hash
-      | Public_key_before_S (Bls _ as pk) -> Hash (Signature.Public_key.hash pk)
+      | Hash hash ->
+          (* FIXME-PA *)
+          Hash (Implicit_account_repr.Forbidden.of_pkh hash)
+      | Public_key_before_S (Bls _ as pk) ->
+          (* FIXME-PA *)
+          Hash
+            (Implicit_account_repr.Forbidden.of_pkh
+               (Signature.Public_key.hash pk))
       | Public_key_before_S pk -> Public_key pk
       | Public_key_after_S pk -> Public_key pk)
     encoding_legacy

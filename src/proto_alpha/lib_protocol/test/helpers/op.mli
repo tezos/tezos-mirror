@@ -61,7 +61,7 @@ val create_proof : Signature.secret_key -> Signature.Bls.t option
 (** Information needed on the author of a (pre)attestation: slot
     (written into the (pre)attestation) and consensus key (required
     for signing). *)
-type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
+type attesting_slot = {slot : Slot.t; consensus_pkh : Signature.public_key_hash}
 
 (** Builds an {!attesting_slot} with the attester's consensus key and
     canonical slot, that is, its first slot. *)
@@ -75,7 +75,7 @@ val get_attesting_slot : attested_block:Block.t -> attesting_slot tzresult Lwt.t
     for [attested_block]. Fails if it doesn't have any attesting
     rights for this block. *)
 val get_attesting_slot_of_delegate :
-  manager_pkh:public_key_hash ->
+  manager_pkh:Implicit_account_repr.t ->
   attested_block:Block.t ->
   attesting_slot tzresult Lwt.t
 
@@ -83,7 +83,7 @@ val get_attesting_slot_of_delegate :
     returned by {!Plugin.RPC.Validators.S.validators} whose consensus
     key is different from [consensus_pkh_to_avoid]. *)
 val get_different_attesting_slot :
-  consensus_pkh_to_avoid:public_key_hash ->
+  consensus_pkh_to_avoid:Signature.public_key_hash ->
   attested_block:Block.t ->
   attesting_slot tzresult Lwt.t
 
@@ -140,7 +140,7 @@ val attesting_slot_of_delegate_rights :
     predecessor of the attested block. *)
 val raw_attestation :
   ?attesting_slot:attesting_slot ->
-  ?manager_pkh:public_key_hash ->
+  ?manager_pkh:Implicit_account_repr.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -155,7 +155,7 @@ val raw_attestation :
     Optional parameters are the same than {!raw_attestation}. *)
 val raw_preattestation :
   ?attesting_slot:attesting_slot ->
-  ?manager_pkh:public_key_hash ->
+  ?manager_pkh:Implicit_account_repr.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -167,7 +167,7 @@ val raw_preattestation :
     [Block.t] by packing the result of {!raw_attestation}. *)
 val attestation :
   ?attesting_slot:attesting_slot ->
-  ?manager_pkh:public_key_hash ->
+  ?manager_pkh:Implicit_account_repr.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -213,7 +213,7 @@ val attestations_aggregate :
     [Block.t] by packing the result of {!raw_preattestation}. *)
 val preattestation :
   ?attesting_slot:attesting_slot ->
-  ?manager_pkh:public_key_hash ->
+  ?manager_pkh:Implicit_account_repr.t ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -348,7 +348,7 @@ val delegation :
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  public_key_hash option ->
+  Implicit_account_repr.t option ->
   Operation.packed tzresult Lwt.t
 
 val set_deposits_limit :
@@ -401,14 +401,17 @@ val revelation :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?counter:Manager_counter.t ->
-  ?forge_pkh:public_key_hash option ->
+  ?forge_pkh:Implicit_account_repr.t option ->
   ?forge_proof:Signature.Bls.t option ->
   Context.t ->
   public_key ->
   (packed_operation, tztrace) result Lwt.t
 
 val failing_noop :
-  Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
+  Context.t ->
+  Implicit_account_repr.t ->
+  string ->
+  Operation.packed tzresult Lwt.t
 
 (** [contract_origination ctxt source] Create a new contract origination
     operation, sign it with [source] and returns it alongside the contract
@@ -425,7 +428,7 @@ val failing_noop :
 val contract_origination :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?delegate:public_key_hash ->
+  ?delegate:Implicit_account_repr.t ->
   script:Script.michelson_with_storage ->
   ?public_key:public_key ->
   ?credit:Tez.t ->
@@ -439,7 +442,7 @@ val contract_origination :
 val contract_origination_hash :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
-  ?delegate:public_key_hash ->
+  ?delegate:Implicit_account_repr.t ->
   script:Script.michelson_with_storage ->
   ?public_key:public_key ->
   ?credit:Tez.t ->
@@ -709,7 +712,7 @@ val sc_rollup_recover_bond :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_add_messages :
@@ -732,7 +735,7 @@ val sc_rollup_refute :
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Sc_rollup.Game.refutation ->
   Operation.packed tzresult Lwt.t
 
@@ -809,8 +812,8 @@ val update_companion_key :
 val drain_delegate :
   Context.t ->
   consensus_key:Signature.Public_key_hash.t ->
-  delegate:Signature.Public_key_hash.t ->
-  destination:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
+  destination:Implicit_account_repr.t ->
   packed_operation tzresult Lwt.t
 
 (** [zk_rollup_publish ctxt source ~zk_rollup ~op] tries to add an operation
@@ -946,7 +949,7 @@ val clst_finalize_redeem :
   ?storage_limit:Z.t ->
   Context.t ->
   sender:Contract.t ->
-  redeemer:Signature.Public_key_hash.t ->
+  redeemer:Implicit_account_repr.t ->
   Operation.packed tzresult Lwt.t
 
 (** [clst_approve ctxt sender batch] increases or decreases allowances

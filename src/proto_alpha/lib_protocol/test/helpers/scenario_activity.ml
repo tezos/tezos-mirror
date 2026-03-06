@@ -55,7 +55,12 @@ let check_is_active ~loc src_name =
     "Check baker activity: [active] \"%s\""
     src_name ;
   let src = State.find_account src_name state in
-  let* b = Context.Delegate.deactivated (B block) src.pkh in
+  (* FIXME-PA *)
+  let* b =
+    Context.Delegate.deactivated
+      (B block)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh src.pkh)
+  in
   Assert.is_true ~loc (not b)
 
 let check_is_not_active ~loc src_name =
@@ -66,5 +71,10 @@ let check_is_not_active ~loc src_name =
     "Check baker activity: [not active] \"%s\""
     src_name ;
   let src = State.find_account src_name state in
-  let* b = Context.Delegate.deactivated (B block) src.pkh in
+  (* FIXME-PA *)
+  let* b =
+    Context.Delegate.deactivated
+      (B block)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh src.pkh)
+  in
   Assert.is_true ~loc b

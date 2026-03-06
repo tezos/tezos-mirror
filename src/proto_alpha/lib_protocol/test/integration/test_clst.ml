@@ -131,7 +131,11 @@ let is_operator_view ~owner ~operator b =
 let create_funded_account ~funder ~amount_mutez b =
   let open Lwt_result_wrap_syntax in
   let account = Account.new_account () in
-  let account = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let account =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* op =
     Op.transaction (B b) funder account (Tez.of_mutez_exn amount_mutez)
   in
@@ -1544,7 +1548,11 @@ let () =
   in
   let account = Account.new_account () in
   let pk = account.Account.pk in
-  let account = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let account =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* funding =
     Op.transaction
       (Context.B b)
@@ -3018,7 +3026,7 @@ let () =
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
   (* Collect allocations sorted by pkh order (same as greedy order) *)
-  let pkhs_sorted = List.sort Signature.Public_key_hash.compare pkhs in
+  let pkhs_sorted = List.sort Implicit_account_repr.compare pkhs in
   let* allocs =
     List.map_es
       (fun pkh -> Delegate_services.stez_staking_power Block.rpc_ctxt b pkh)

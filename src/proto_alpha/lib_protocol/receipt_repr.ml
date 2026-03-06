@@ -87,11 +87,9 @@ type 'token balance =
   | Storage_fees : Tez_repr.t balance
   | Double_signing_punishments : Tez_repr.t balance
   | Lost_attesting_rewards :
-      Signature.Public_key_hash.t * bool * bool
+      Implicit_account_repr.t * bool * bool
       -> Tez_repr.t balance
-  | Lost_dal_attesting_rewards :
-      Signature.Public_key_hash.t
-      -> Tez_repr.t balance
+  | Lost_dal_attesting_rewards : Implicit_account_repr.t -> Tez_repr.t balance
   | Liquidity_baking_subsidies : Tez_repr.t balance
   | Burned : Tez_repr.t balance
   | Commitments : Blinded_public_key_hash.t -> Tez_repr.t balance
@@ -107,7 +105,7 @@ type 'token balance =
     }
       -> Staking_pseudotoken_repr.t balance
   | Staking_delegate_denominator : {
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
     }
       -> Staking_pseudotoken_repr.t balance
 
@@ -156,13 +154,13 @@ let compare_balance : type token1 token2.
           Cycle_repr.compare cya cyb)
   | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
     ->
-      let c = Signature.Public_key_hash.compare pkha pkhb in
+      let c = Implicit_account_repr.compare pkha pkhb in
       if is_not_zero c then c
       else
         let c = Compare.Bool.compare pa pb in
         if is_not_zero c then c else Compare.Bool.compare ra rb
   | Lost_dal_attesting_rewards pkha, Lost_dal_attesting_rewards pkhb ->
-      Signature.Public_key_hash.compare pkha pkhb
+      Implicit_account_repr.compare pkha pkhb
   | Commitments bpkha, Commitments bpkhb ->
       Blinded_public_key_hash.compare bpkha bpkhb
   | Frozen_bonds (ca, ra), Frozen_bonds (cb, rb) ->
@@ -173,7 +171,7 @@ let compare_balance : type token1 token2.
       Contract_repr.compare ca cb
   | ( Staking_delegate_denominator {delegate = pkha},
       Staking_delegate_denominator {delegate = pkhb} ) ->
-      Signature.Public_key_hash.compare pkha pkhb
+      Implicit_account_repr.compare pkha pkhb
   | _, _ ->
       let index : type token. token balance -> int = function
         | Contract _ -> 0
@@ -354,7 +352,7 @@ let balance_and_update_encoding =
            (obj5
               (req "kind" (constant "burned"))
               (req "category" (constant "lost attesting rewards"))
-              (req "delegate" Signature.Public_key_hash.encoding)
+              (req "delegate" Implicit_account_repr.encoding)
               (req "participation" Data_encoding.bool)
               (req "revelation" Data_encoding.bool))
            (function
@@ -476,7 +474,7 @@ let balance_and_update_encoding =
            (obj3
               (req "kind" (constant "staking"))
               (req "category" (constant "delegate_denominator"))
-              (req "delegate" Signature.Public_key_hash.encoding))
+              (req "delegate" Implicit_account_repr.encoding))
            (function
              | Staking_delegate_denominator {delegate} -> Some ((), (), delegate)
              | _ -> None)
@@ -495,7 +493,7 @@ let balance_and_update_encoding =
            (obj3
               (req "kind" (constant "burned"))
               (req "category" (constant "lost DAL attesting rewards"))
-              (req "delegate" Signature.Public_key_hash.encoding))
+              (req "delegate" Implicit_account_repr.encoding))
            (function
              | Lost_dal_attesting_rewards delegate -> Some ((), (), delegate)
              | _ -> None)

@@ -48,7 +48,10 @@ let test_baking_rights () =
   (* filtering by delegate *)
   let d = Context.Contract.pkh c1 in
   let* rights = get Block.rpc_ctxt b ~all:true ~delegates:[d] in
-  assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
+  assert (
+    List.for_all
+      (fun {delegate; _} -> Protocol.Implicit_account_repr.(delegate = d))
+      rights) ;
   (* filtering by cycle *)
   let* {cycle; _} = Plugin.RPC.current_level Block.rpc_ctxt b in
   let* rights = get Block.rpc_ctxt b ~all:true ~cycle in

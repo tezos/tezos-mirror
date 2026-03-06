@@ -46,7 +46,7 @@ module S = struct
         Data_encoding.(
           list
             (obj2
-               (req "pkh" Signature.Public_key_hash.encoding)
+               (req "pkh" Implicit_account_repr.encoding)
                (req "ballot" Vote.ballot_encoding)))
       RPC_path.(path / "ballot_list")
 
@@ -109,7 +109,7 @@ module S = struct
       ~description:"Number of votes casted during the current period."
       ~query:RPC_query.empty
       ~output:Data_encoding.int31
-      RPC_path.(path / "proposal_count" /: Signature.Public_key_hash.rpc_arg)
+      RPC_path.(path / "proposal_count" /: Implicit_account_repr.rpc_arg)
 end
 
 let register () =

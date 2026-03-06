@@ -150,30 +150,37 @@ let random_keys =
 let random_tz1 =
   let open QCheck2.Gen in
   let+ str = string_size (pure Signature.Ed25519.Public_key_hash.size) in
-  (Ed25519 (Signature.Ed25519.Public_key_hash.of_string_exn str)
-    : public_key_hash)
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh
+    (Ed25519 (Signature.Ed25519.Public_key_hash.of_string_exn str))
 
 let random_tz2 =
   let open QCheck2.Gen in
   let+ str = string_size (pure Signature.Secp256k1.Public_key_hash.size) in
-  (Secp256k1 (Signature.Secp256k1.Public_key_hash.of_string_exn str)
-    : public_key_hash)
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh
+    (Secp256k1 (Signature.Secp256k1.Public_key_hash.of_string_exn str))
 
 let random_tz3 =
   let open QCheck2.Gen in
   let+ str = string_size (pure Signature.P256.Public_key_hash.size) in
-  (P256 (Signature.P256.Public_key_hash.of_string_exn str) : public_key_hash)
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh
+    (P256 (Signature.P256.Public_key_hash.of_string_exn str))
 
 let random_tz4 =
   let open QCheck2.Gen in
   let+ str = string_size (pure Signature.Bls.Public_key_hash.size) in
-  (Bls (Signature.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh
+    (Bls (Signature.Bls.Public_key_hash.of_string_exn str))
 
 let random_tz5 =
   let open QCheck2.Gen in
   let+ str = string_size (pure Signature.Mldsa44.Public_key_hash.size) in
-  (Mldsa44 (Signature.Mldsa44.Public_key_hash.of_string_exn str)
-    : public_key_hash)
+  (* FIXME-PA *)
+  Implicit_account_repr.Forbidden.of_pkh
+    (Mldsa44 (Signature.Mldsa44.Public_key_hash.of_string_exn str))
 
 let random_pkh =
   let open QCheck2.Gen in
@@ -429,7 +436,12 @@ let generate_activate_account =
   let open QCheck2.Gen in
   let* activation_code = random_code in
   let+ id = random_tz1 in
-  let id = match id with Signature.Ed25519 pkh -> pkh | _ -> assert false in
+  (* FIXME-PA *)
+  let id =
+    match Implicit_account_repr.Forbidden.to_pkh id with
+    | Signature.Ed25519 pkh -> pkh
+    | _ -> assert false
+  in
   Activate_account {id; activation_code}
 
 let random_period =

@@ -23,7 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Selected_distribution_storage
+module Private_selected_distribution = Selected_distribution_storage
+
+let set_selected_distribution_for_cycle ctxt cycle distrib total_stake =
+  Private_selected_distribution.set_selected_distribution_for_cycle
+    ctxt
+    cycle
+    distrib
+    total_stake
+
+let get_selected_distribution ctxt cycle =
+  Private_selected_distribution.get_selected_distribution ctxt cycle
+
+let find_selected_distribution ctxt cycle =
+  Private_selected_distribution.find_selected_distribution ctxt cycle
+
+let get_selected_distribution_as_map ctxt cycle =
+  Private_selected_distribution.get_selected_distribution_as_map ctxt cycle
+
+let prepare_stake_distribution =
+  Private_selected_distribution.prepare_stake_distribution
+
+let get_total_active_stake =
+  Private_selected_distribution.get_total_active_stake
+
+let clear_at_cycle_end ctxt ~new_cycle =
+  let open Lwt_result_syntax in
+  match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
+  | None -> return ctxt
+  | Some cycle_to_clear ->
+      let* ctxt =
+        Storage.Stake.Total_active_stake.remove_existing ctxt cycle_to_clear
+      in
+      Private_selected_distribution.Selected_distribution_for_cycle
+      .remove_existing
+        ctxt
+        cycle_to_clear
 
 let get_full_staking_balance = Storage.Stake.Staking_balance.get
 
@@ -182,16 +217,6 @@ let fold_on_active_delegates_with_minimal_stake_es ctxt ~f ~order ~init =
     ~f:(fun delegate acc ->
       let*? acc in
       f delegate acc)
-
-let clear_at_cycle_end ctxt ~new_cycle =
-  let open Lwt_result_syntax in
-  match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
-  | None -> return ctxt
-  | Some cycle_to_clear ->
-      let* ctxt =
-        Storage.Stake.Total_active_stake.remove_existing ctxt cycle_to_clear
-      in
-      Selected_distribution_for_cycle.remove_existing ctxt cycle_to_clear
 
 let fold_on_active_delegates_with_minimal_stake_s =
   Storage.Stake.Active_delegates_with_minimal_stake.fold

@@ -154,8 +154,7 @@ let is_delegate (cctxt : #full) ?chain ?block pkh =
       (Contract.Implicit pkh)
   in
   match delegate_opt with
-  | Some address when Signature.Public_key_hash.(equal address pkh) ->
-      return true
+  | Some address when Implicit_account_repr.(address = pkh) -> return true
   | _ -> return false
 
 let parse_expression arg =
@@ -375,7 +374,12 @@ let list_contract_labels cctxt ~chain ~block =
         let* nm =
           match (h : Contract.t) with
           | Implicit m -> (
-              let* nm_opt = Public_key_hash.rev_find cctxt m in
+              (* FIXME-PA *)
+              let* nm_opt =
+                Public_key_hash.rev_find
+                  cctxt
+                  (Implicit_account_repr.Forbidden.to_pkh m)
+              in
               match nm_opt with
               | None -> return ""
               | Some nm -> (
@@ -443,7 +447,10 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_keys
     ?companion_keys ?amount src_pk =
   let open Lwt_result_syntax in
-  let source = Signature.Public_key.hash src_pk in
+  (* FIXME-PA *)
+  let source =
+    Implicit_account_repr.Forbidden.of_pkh (Signature.Public_key.hash src_pk)
+  in
   let delegate_op =
     let op = build_delegate_operation ?fee (Some source) in
     Annotated_manager_operation.Annotated_manager_operation op
@@ -522,7 +529,10 @@ let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?pop_material ~public_key
     ~manager_sk ~fee_parameter src_pk =
   let open Lwt_result_syntax in
-  let source = Signature.Public_key.hash src_pk in
+  (* FIXME-PA *)
+  let source =
+    Implicit_account_repr.Forbidden.of_pkh (Signature.Public_key.hash src_pk)
+  in
   let* operation =
     build_update_consensus_key cctxt ?fee ?pop_material ~kind public_key
   in
@@ -557,8 +567,7 @@ let update_companion_key cctxt =
   update_consensus_or_companion_key ~kind:Companion cctxt
 
 let drain_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
-    ?simulation ~consensus_sk ~consensus_pkh ?(destination = consensus_pkh)
-    ~delegate () =
+    ?simulation ~consensus_sk ~consensus_pkh ~destination ~delegate () =
   let open Lwt_result_syntax in
   let operation =
     Single
@@ -900,7 +909,9 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
           Alpha_services.Contract.balance
             cctxt
             (chain, block)
-            (Contract.Implicit (Ed25519 pkh))
+            (* FIXME-PA *)
+            (Contract.Implicit
+               (Protocol.Implicit_account_repr.Forbidden.of_pkh (Ed25519 pkh)))
         in
         let*! () =
           cctxt#message

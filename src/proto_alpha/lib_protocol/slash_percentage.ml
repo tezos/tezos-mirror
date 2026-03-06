@@ -13,7 +13,7 @@ let for_double_attestation ctxt ~committee_size rights denounced =
     List.fold_left
       (fun total delegate ->
         Option.value
-          (Signature.Public_key_hash.Map.find delegate rights)
+          (Implicit_account_repr.Map.find delegate rights)
           ~default:0L
         |> Int64.add total)
       0L
@@ -39,7 +39,7 @@ let for_double_attestation ctxt ~committee_size rights denounced =
     let den_z = Z.(pow (of_int64 threshold_max) 2) in
     Percentage.mul_q_bounded ~round:`Up max_slashing Q.(num_z /// den_z)
 
-let get ctxt misbehaviour (denounced : Signature.public_key_hash list) =
+let get ctxt misbehaviour (denounced : Implicit_account_repr.t list) =
   let open Lwt_result_syntax in
   match misbehaviour.Misbehaviour_repr.kind with
   | Double_baking -> return (ctxt, for_double_baking ctxt)

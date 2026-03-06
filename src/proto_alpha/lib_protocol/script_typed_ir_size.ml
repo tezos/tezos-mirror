@@ -135,7 +135,7 @@ let signature_size (Script_signature.Signature_tag x) =
 (* Return the size of the OCaml object in memory corresponding to the
    {public_key_hash}. The in memory size is retrieved with a call to
    Obj.reachable_words function. *)
-let key_hash_size (_x : Signature.public_key_hash) = !!64
+let key_hash_size (_x : Signature.Public_key_hash.t) = !!64
 (* By Obj.reachable_words. *)
 
 (* Return the addition of a constant and the size of the OCaml object in memory

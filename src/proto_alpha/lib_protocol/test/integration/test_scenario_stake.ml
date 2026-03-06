@@ -609,7 +609,12 @@ let test_deactivation_after_unstake_all =
     let open Lwt_result_syntax in
     exec_unit (fun (block, state) ->
         let dlgt = State.find_account delegate state in
-        let* deactivated = Context.Delegate.deactivated (B block) dlgt.pkh in
+        (* FIXME-PA *)
+        let* deactivated =
+          Context.Delegate.deactivated
+            (B block)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh dlgt.pkh)
+        in
         Assert.equal_bool ~loc deactivated expected)
   in
   let check_is_deactivated = check_deactivated_status ~expected:true in
@@ -643,9 +648,10 @@ let test_deactivation_after_unstake_all =
   --> assert_failure
         ~expected_error:(fun (_, state) errs ->
           let delegate = State.find_account "delegate" state in
+          (* FIXME-PA *)
           Error_helpers.expect_no_slots_found_for
             ~loc:__LOC__
-            ~pkh:delegate.pkh
+            ~pkh:(Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
             errs)
         (next_block_with_baker "delegate")
   (* The stakers still have stake, and can still stake/unstake *)
@@ -682,9 +688,10 @@ let test_deactivation_after_unstake_all =
   --> assert_failure
         ~expected_error:(fun (_, state) errs ->
           let delegate = State.find_account "delegate" state in
+          (* FIXME-PA *)
           Error_helpers.expect_no_slots_found_for
             ~loc:__LOC__
-            ~pkh:delegate.pkh
+            ~pkh:(Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
             errs)
         (next_block_with_baker "delegate")
   --> wait_n_cycles_f (fun (_, state) ->
@@ -693,9 +700,10 @@ let test_deactivation_after_unstake_all =
   --> assert_failure
         ~expected_error:(fun (_, state) errs ->
           let delegate = State.find_account "delegate" state in
+          (* FIXME-PA *)
           Error_helpers.expect_no_slots_found_for
             ~loc:__LOC__
-            ~pkh:delegate.pkh
+            ~pkh:(Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
             errs)
         (next_block_with_baker "delegate")
   --> next_cycle

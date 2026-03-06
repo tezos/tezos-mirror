@@ -27,7 +27,7 @@
     for the given misbehaviour kind at the given level and round. *)
 val already_denounced :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Misbehaviour_repr.t ->
   bool tzresult Lwt.t
 
@@ -47,7 +47,7 @@ val already_denounced :
     [Anonymous.check_denunciation_age]. *)
 val add_denunciation :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Misbehaviour_repr.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 

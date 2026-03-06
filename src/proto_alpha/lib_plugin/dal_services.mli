@@ -33,4 +33,4 @@ open Error_monad
 val shards :
   Alpha_context.t ->
   level:Alpha_context.Level.t ->
-  (Alpha_context.t * int list Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (Alpha_context.t * int list Implicit_account_repr.Map.t) tzresult Lwt.t

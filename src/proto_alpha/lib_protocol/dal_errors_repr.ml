@@ -42,7 +42,7 @@ type error +=
       commitment_proof : Dal.commitment_proof;
     }
   | Dal_data_availibility_attester_not_in_committee of {
-      attester : Signature.Public_key_hash.t;
+      attester : Implicit_account_repr.t;
       committee_level : Raw_level_repr.t;
       attested_level : Raw_level_repr.t;
       lag_index : int;
@@ -218,7 +218,7 @@ let () =
         "The attester %a is not part of the DAL committee for the committee \
          level %a and included a non-empty DAL attestation at attested level \
          %a and lag index %d."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         attester
         Raw_level_repr.pp
         committee_level
@@ -227,7 +227,7 @@ let () =
         lag_index)
     Data_encoding.(
       obj4
-        (req "attester" Signature.Public_key_hash.encoding)
+        (req "attester" Implicit_account_repr.encoding)
         (req "committee_level" Raw_level_repr.encoding)
         (req "attested_level" Raw_level_repr.encoding)
         (req "lag_index" int8))

@@ -59,11 +59,11 @@ val constants_test : Constants.Parametric.t
 val test_commitments : Commitment.t list lazy_t
 
 val make_bootstrap_account :
-  Signature.public_key_hash
-  * Signature.public_key
+  Signature.Public_key_hash.t
+  * Signature.Public_key.t
   * Tez.t
-  * Signature.public_key_hash option
-  * Signature.public_key option ->
+  * Signature.Public_key_hash.t option
+  * Signature.Public_key.t option ->
   Parameters.bootstrap_account
 
 val parameters_of_constants :

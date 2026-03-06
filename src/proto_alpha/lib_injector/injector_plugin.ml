@@ -94,7 +94,7 @@ module Proto_client = struct
     let contents =
       Manager_operation
         {
-          source = Signature.Public_key_hash.zero;
+          source = Implicit_account_repr.zero;
           operation;
           fee = Tez.zero;
           counter = Manager_counter.Internal_for_tests.of_int 0;
@@ -126,7 +126,7 @@ module Proto_client = struct
     let dummy_contents =
       Manager_operation
         {
-          source = Signature.Public_key_hash.zero;
+          source = Implicit_account_repr.zero;
           operation = dummy_operation;
           fee = Tez.of_mutez_exn 3_000_000L;
           counter = Manager_counter.Internal_for_tests.of_int 500_000;
@@ -276,8 +276,10 @@ module Proto_client = struct
     in
     let safety_guard = Option.map Gas.Arith.integral_of_int_exn safety_guard in
     let*! simulation_result =
-      let*? source = Signature.Of_V_latest.get_public_key_hash source in
+      let*? source_sig = Signature.Of_V_latest.get_public_key_hash source in
       let*? src_pk = Signature.Of_V_latest.get_public_key src_pk in
+      (* FIXME-PA *)
+      let source = Implicit_account_repr.Forbidden.of_pkh source_sig in
       Injection.inject_manager_operation
         cctxt
         ~simulation:true (* Only simulation here *)
@@ -452,7 +454,9 @@ module Proto_client = struct
     let cctxt =
       new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
     in
-    let*? pkh = Signature.Of_V_latest.get_public_key_hash pkh in
+    let*? pkh_sig = Signature.Of_V_latest.get_public_key_hash pkh in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let+ balance =
       Plugin.Alpha_services.Contract.balance
         cctxt

@@ -45,8 +45,18 @@ open Tez_helpers
    has the minimal required stake. *)
 let check_stake ~loc (b : Block.t) (account : Account.t) =
   let open Lwt_result_wrap_syntax in
-  let* staking_balance = Context.Delegate.staking_balance (B b) account.pkh in
-  let* full_balance = Context.Delegate.full_balance (B b) account.pkh in
+  (* FIXME-PA *)
+  let* staking_balance =
+    Context.Delegate.staking_balance
+      (B b)
+      (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+  in
+  let* full_balance =
+    Context.Delegate.full_balance
+      (B b)
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+  in
   let* () = Assert.equal_tez ~loc full_balance staking_balance in
   let*@ ctxt =
     Raw_context.prepare
@@ -56,7 +66,12 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
       ~timestamp:b.header.shell.timestamp
       ~all_bakers_attest_first_level:None
   in
-  let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
+  let*@ stake =
+    Stake_storage.Internal_for_tests.get
+      ctxt
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+  in
   Assert.equal_int64
     ~loc
     (Tez_repr.to_mutez stake)
@@ -79,7 +94,12 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
       ~timestamp:b.header.shell.timestamp
       ~all_bakers_attest_first_level:None
   in
-  let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
+  let*@ stake =
+    Stake_storage.Internal_for_tests.get
+      ctxt
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+  in
   Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L
 
 (** Create a block with two initialized contracts/accounts. Assert
@@ -97,7 +117,10 @@ let test_simple_staking_rights () =
       Account.default_initial_spendable_balance
   in
   let* m1 = Context.Contract.manager (B b) a1 in
-  let* info = Context.Delegate.info (B b) m1.pkh in
+  (* FIXME-PA *)
+  let* info =
+    Context.Delegate.info (B b) (Implicit_account_repr.Forbidden.of_pkh m1.pkh)
+  in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
@@ -115,21 +138,33 @@ let test_simple_staking_rights_after_baking () =
   let* b, (a1, a2) = Context.init2 ~consensus_threshold_size:0 () in
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
-  let* b = Block.bake_n ~policy:(By_account m2.pkh) 5 b in
+  (* FIXME-PA *)
+  let* b =
+    Block.bake_n
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      5
+      b
+  in
   let* balance = Context.Contract.balance (B b) a1 in
   let delegate1 = Context.Contract.pkh a1 in
   let* frozen_deposits =
     Context.Delegate.current_frozen_deposits (B b) delegate1
   in
   let*? full_balance = balance +? frozen_deposits in
-  let* info = Context.Delegate.info (B b) m1.pkh in
+  (* FIXME-PA *)
+  let* info =
+    Context.Delegate.info (B b) (Implicit_account_repr.Forbidden.of_pkh m1.pkh)
+  in
   let* () = Assert.equal_tez ~loc:__LOC__ full_balance info.staking_balance in
   let* () = check_stake ~loc:__LOC__ b m1 in
   check_stake ~loc:__LOC__ b m2
 
 let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
   let open Lwt_result_syntax in
-  let* info = Context.Delegate.info (B b) m.pkh in
+  (* FIXME-PA *)
+  let* info =
+    Context.Delegate.info (B b) (Implicit_account_repr.Forbidden.of_pkh m.pkh)
+  in
   let* () = Assert.equal_bool ~loc info.deactivated deactivated in
   if deactivated then check_no_stake ~loc b m else check_stake ~loc b m
 
@@ -140,12 +175,22 @@ let run_until_deactivation () =
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
   let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1 in
-  let* info = Context.Delegate.info (B b) m1.pkh in
+  (* FIXME-PA *)
+  let* info =
+    Context.Delegate.info (B b) (Implicit_account_repr.Forbidden.of_pkh m1.pkh)
+  in
   let* b =
-    Block.bake_until_cycle ~policy:(By_account m2.pkh) info.grace_period b
+    Block.bake_until_cycle (* FIXME-PA *)
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      info.grace_period
+      b
   in
   let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m1 in
-  let* b = Block.bake_until_cycle_end ~policy:(By_account m2.pkh) b in
+  let* b =
+    Block.bake_until_cycle_end (* FIXME-PA *)
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      b
+  in
   let+ () = check_active_staking_balance ~loc:__LOC__ ~deactivated:true b m1 in
   (b, ((a1, m1), balance_start), (a2, m2))
 
@@ -159,7 +204,14 @@ let test_deactivation_then_bake () =
          (_a2, _m2) ) =
     run_until_deactivation ()
   in
-  let* b = Block.bake ~policy:(By_account deactivated_account.pkh) b in
+  (* FIXME-PA *)
+  let* b =
+    Block.bake
+      ~policy:
+        (By_account
+           (Implicit_account_repr.Forbidden.of_pkh deactivated_account.pkh))
+      b
+  in
   check_active_staking_balance
     ~loc:__LOC__
     ~deactivated:false
@@ -182,14 +234,15 @@ let test_a_really_deactivated_account_is_not_in_the_committee () =
   let constants = Default_parameters.constants_test in
   let* b =
     Block.bake_until_n_cycle_end
-      (constants.consensus_rights_delay + 1)
-      ~policy:(By_account m2.pkh)
+      (constants.consensus_rights_delay + 1) (* FIXME-PA *)
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
       b
   in
   let* bakers =
     Plugin.RPC.Baking_rights.get
-      Block.rpc_ctxt
-      ~delegates:[deactivated_account.pkh]
+      Block.rpc_ctxt (* FIXME-PA *)
+      ~delegates:
+        [Implicit_account_repr.Forbidden.of_pkh deactivated_account.pkh]
       b
   in
   match List.hd bakers with Some _ -> assert false | None -> return_unit
@@ -205,10 +258,18 @@ let test_deactivation_then_self_delegation () =
     run_until_deactivation ()
   in
   let* self_delegation =
-    Op.delegation (B b) deactivated_contract (Some deactivated_account.pkh)
+    (* FIXME-PA *)
+    Op.delegation
+      (B b)
+      deactivated_contract
+      (Some (Implicit_account_repr.Forbidden.of_pkh deactivated_account.pkh))
   in
   let* b =
-    Block.bake ~policy:(By_account m2.pkh) b ~operation:self_delegation
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      b
+      ~operation:self_delegation
   in
   let* () =
     check_active_staking_balance
@@ -232,7 +293,10 @@ let test_deactivation_then_empty_then_self_delegation () =
   (* empty the contract *)
   let* balance = Context.Contract.balance (B b) deactivated_contract in
   let sink_account = Account.new_account () in
-  let sink_contract = Contract.Implicit sink_account.pkh in
+  (* FIXME-PA *)
+  let sink_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh sink_account.pkh)
+  in
   let* {parametric = {origination_size; cost_per_byte; _}; _} =
     Context.get_constants (B b)
   in
@@ -244,16 +308,28 @@ let test_deactivation_then_empty_then_self_delegation () =
     Op.transaction (B b) deactivated_contract sink_contract amount
   in
   let* b1 =
-    Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      ~operation:empty_contract
+      b
   in
   (* the account is deactivated, the stake is 0. *)
   let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
   (* self delegation *)
   let* self_delegation =
-    Op.delegation (B b1) deactivated_contract (Some deactivated_account.pkh)
+    (* FIXME-PA *)
+    Op.delegation
+      (B b1)
+      deactivated_contract
+      (Some (Implicit_account_repr.Forbidden.of_pkh deactivated_account.pkh))
   in
   let* b2 =
-    Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b1
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      ~operation:self_delegation
+      b1
   in
   let* () =
     check_active_staking_balance
@@ -279,7 +355,10 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   (* empty the contract *)
   let* balance = Context.Contract.balance (B b) deactivated_contract in
   let sink_account = Account.new_account () in
-  let sink_contract = Contract.Implicit sink_account.pkh in
+  (* FIXME-PA *)
+  let sink_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh sink_account.pkh)
+  in
   let* {parametric = {origination_size; cost_per_byte; _}; _} =
     Context.get_constants (B b)
   in
@@ -296,16 +375,28 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
       amount
   in
   let* b0 =
-    Block.bake ~policy:(By_account m2.pkh) ~operation:empty_contract b
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      ~operation:empty_contract
+      b
   in
   (* the account is deactivated, the stake is 0. *)
   let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
   (**** self delegation *)
   let* self_delegation =
-    Op.delegation (B b0) deactivated_contract (Some deactivated_account.pkh)
+    (* FIXME-PA *)
+    Op.delegation
+      (B b0)
+      deactivated_contract
+      (Some (Implicit_account_repr.Forbidden.of_pkh deactivated_account.pkh))
   in
   let* b1 =
-    Block.bake ~policy:(By_account m2.pkh) ~operation:self_delegation b0
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      ~operation:self_delegation
+      b0
   in
   (* the account is still deactivated *)
   let* () = check_no_stake ~loc:__LOC__ b deactivated_account in
@@ -319,7 +410,11 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
       amount
   in
   let* b2 =
-    Block.bake ~policy:(By_account m2.pkh) ~operation:recredit_contract b1
+    (* FIXME-PA *)
+    Block.bake
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      ~operation:recredit_contract
+      b1
   in
   let* () =
     check_active_staking_balance
@@ -346,24 +441,44 @@ let test_delegation () =
   Account.add_account m3 ;
   let* m1 = Context.Contract.manager (B b) a1 in
   let* m2 = Context.Contract.manager (B b) a2 in
-  let a3 = Contract.Implicit m3.pkh in
+  (* FIXME-PA *)
+  let a3 = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh m3.pkh) in
   let* delegate = Context.Contract.delegate_opt (B b) a1 in
   (match delegate with
   | None -> assert false
-  | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
+  (* FIXME-PA *)
+  | Some pkh -> assert (pkh = Implicit_account_repr.Forbidden.of_pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
   let minimal_stake = constants.minimal_stake in
   let* transact = Op.transaction ~force_reveal:true (B b) a1 a3 minimal_stake in
-  let* b = Block.bake ~policy:(By_account m2.pkh) b ~operation:transact in
+  let* b =
+    Block.bake (* FIXME-PA *)
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      b
+      ~operation:transact
+  in
   let* delegate = Context.Contract.delegate_opt (B b) a3 in
   (match delegate with None -> () | Some _ -> assert false) ;
   let* () = check_no_stake ~loc:__LOC__ b m3 in
-  let* delegation = Op.delegation ~force_reveal:true (B b) a3 (Some m3.pkh) in
-  let* b = Block.bake ~policy:(By_account m2.pkh) b ~operation:delegation in
+  let* delegation =
+    Op.delegation
+      ~force_reveal:true
+      (B b)
+      a3
+      (* FIXME-PA *)
+      (Some (Implicit_account_repr.Forbidden.of_pkh m3.pkh))
+  in
+  let* b =
+    Block.bake (* FIXME-PA *)
+      ~policy:(By_account (Implicit_account_repr.Forbidden.of_pkh m2.pkh))
+      b
+      ~operation:delegation
+  in
   let* delegate = Context.Contract.delegate_opt (B b) a3 in
   (match delegate with
   | None -> assert false
-  | Some pkh -> assert (Signature.Public_key_hash.equal pkh m3.pkh)) ;
+  (* FIXME-PA *)
+  | Some pkh -> assert (pkh = Implicit_account_repr.Forbidden.of_pkh m3.pkh)) ;
   let* () = check_active_staking_balance ~loc:__LOC__ ~deactivated:false b m3 in
   let* () = check_stake ~loc:__LOC__ b m3 in
   check_stake ~loc:__LOC__ b m1

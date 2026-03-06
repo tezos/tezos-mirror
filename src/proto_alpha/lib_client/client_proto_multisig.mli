@@ -40,7 +40,7 @@ type multisig_action =
       parameter_type : Script.expr;
       parameter : Script.expr;
     }
-  | Change_delegate of public_key_hash option
+  | Change_delegate of Implicit_account_repr.t option
   | Lambda of Script.expr
   | Change_keys of Z.t * public_key list
 
@@ -78,11 +78,11 @@ val originate_multisig :
   ?safety_guard:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?verbose_signing:bool ->
-  delegate:public_key_hash option ->
+  delegate:Implicit_account_repr.t option ->
   threshold:Z.t ->
   keys:public_key list ->
   balance:Tez.t ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
@@ -108,7 +108,7 @@ val call_multisig :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?branch:int ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   multisig_contract:Contract_hash.t ->
@@ -136,7 +136,7 @@ val call_multisig_on_bytes :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?branch:int ->
-  source:public_key_hash ->
+  source:Implicit_account_repr.t ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   multisig_contract:Contract_hash.t ->

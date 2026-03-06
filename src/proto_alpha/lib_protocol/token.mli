@@ -99,9 +99,9 @@ type giver = [infinite_source | container]
 type infinite_sink =
   [ `Storage_fees  (** Fees burnt to compensate storage usage *)
   | `Double_signing_punishments  (** Consensus slashing *)
-  | `Lost_attesting_rewards of Signature.Public_key_hash.t * bool * bool
+  | `Lost_attesting_rewards of Implicit_account_repr.t * bool * bool
     (** Consensus rewards not distributed because the participation of the delegate was too low. *)
-  | `Lost_dal_attesting_rewards of Signature.Public_key_hash.t
+  | `Lost_dal_attesting_rewards of Implicit_account_repr.t
     (** DAL rewards not distributed because the participation of the delegate was too low. *)
   | `Sc_rollup_refutation_punishments  (** Smart rollups refutation slashing *)
   | `Burned  (** Generic sink mainly for test purpose *) ]

@@ -119,7 +119,7 @@ type 'a typed_kind =
   | Companion : Bls.Public_key.t option typed_kind
 
 type pk = Raw_context.consensus_pk = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
   companion_pk : Bls.Public_key.t option;
@@ -132,7 +132,7 @@ type power = Raw_context.consensus_power = {
 }
 
 type t = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pkh : Signature.Public_key_hash.t;
 }
 
@@ -142,7 +142,7 @@ let encoding =
     (fun {delegate; consensus_pkh} -> (delegate, consensus_pkh))
     (fun (delegate, consensus_pkh) -> {delegate; consensus_pkh})
   @@ obj2
-       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "delegate" Implicit_account_repr.encoding)
        (req "consensus_pkh" Signature.Public_key_hash.encoding)
 
 let pkh
@@ -158,12 +158,18 @@ let pkh
 let zero =
   {
     consensus_pkh = Signature.Public_key_hash.zero;
-    delegate = Signature.Public_key_hash.zero;
+    delegate = Implicit_account_repr.zero;
   }
 
 let pp ppf {delegate; consensus_pkh} =
-  Format.fprintf ppf "@[<v 2>%a" Signature.Public_key_hash.pp delegate ;
-  if not (Signature.Public_key_hash.equal delegate consensus_pkh) then
+  Format.fprintf ppf "@[<v 2>%a" Implicit_account_repr.pp delegate ;
+  (* FIXME-PA *)
+  if
+    not
+      (Signature.Public_key_hash.equal
+         (Implicit_account_repr.Forbidden.to_pkh delegate)
+         consensus_pkh)
+  then
     Format.fprintf
       ppf
       "@,Active key: %a"
@@ -194,9 +200,17 @@ let check_not_tz5 kind : Signature.Public_key.t -> unit tzresult =
 
 let check_is_not_another_delegate ctxt kind pkh delegate =
   let open Lwt_result_syntax in
-  if Signature.Public_key_hash.equal pkh delegate then return_unit
+  (* FIXME-PA *)
+  if
+    Signature.Public_key_hash.equal
+      pkh
+      (Implicit_account_repr.Forbidden.to_pkh delegate)
+  then return_unit
   else
-    let*! is_another_delegate = Storage.Delegates.mem ctxt pkh in
+    let*! is_another_delegate =
+      (* FIXME-PA *)
+      Storage.Delegates.mem ctxt (Implicit_account_repr.Forbidden.of_pkh pkh)
+    in
     fail_when
       is_another_delegate
       (Invalid_consensus_key_update_another_delegate (pkh, kind))
@@ -215,7 +229,10 @@ let init ctxt delegate pk =
 let init_bootstrap ctxt delegate pk =
   let open Lwt_result_syntax in
   (* bootstrap account should be self delegate *)
-  let*! ctxt = set_unused ctxt delegate in
+  (* FIXME-PA *)
+  let*! ctxt =
+    set_unused ctxt (Implicit_account_repr.Forbidden.to_pkh delegate)
+  in
   let pkh = Signature.Public_key.hash pk in
   let* () = check_unused ctxt Consensus pkh in
   let*! ctxt = set_used ctxt pkh in

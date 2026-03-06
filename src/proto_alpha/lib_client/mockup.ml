@@ -103,7 +103,11 @@ module Parsed_account = struct
     let open Lwt_result_syntax in
     let* pk_uri = Client_keys.neuterize repr.sk_uri in
     let* public_key = Client_keys.public_key pk_uri in
-    let public_key_hash = Signature.Public_key.hash public_key in
+    (* FIXME-PA *)
+    let public_key_hash =
+      Implicit_account_repr.Forbidden.of_pkh
+        (Signature.Public_key.hash public_key)
+    in
     return
       Parameters.
         {
@@ -126,7 +130,10 @@ module Parsed_account = struct
       List.iter_s
         (function
           | name, pkh, _pk_opt, Some sk_uri -> (
-              let contract = Contract.Implicit pkh in
+              (* FIXME-PA *)
+              let contract =
+                Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+              in
               let*! tz_balance =
                 Client_proto_context.get_balance
                   rpc_context
@@ -172,10 +179,10 @@ module Bootstrap_account = struct
       (fun (public_key_hash, public_key, amount, delegate_to, consensus_key) ->
         {public_key_hash; public_key; amount; delegate_to; consensus_key})
       (obj5
-         (req "public_key_hash" Signature.Public_key_hash.encoding)
+         (req "public_key_hash" Implicit_account_repr.encoding)
          (opt "public_key" Signature.Public_key.encoding)
          (req "amount" Tez.encoding)
-         (opt "delegate_to" Signature.Public_key_hash.encoding)
+         (opt "delegate_to" Implicit_account_repr.encoding)
          (opt "consensus_key" Signature.Public_key.encoding))
 end
 
@@ -187,7 +194,7 @@ module Bootstrap_contract = struct
       (fun {delegate; amount; script; hash} -> (delegate, amount, script, hash))
       (fun (delegate, amount, script, hash) -> {delegate; amount; script; hash})
       (obj4
-         (opt "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate" Implicit_account_repr.encoding)
          (req "amount" Tez.encoding)
          (req "script" Script.michelson_with_storage_encoding)
          (opt "hash" Contract_hash.encoding))

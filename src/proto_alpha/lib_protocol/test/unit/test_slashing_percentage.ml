@@ -50,16 +50,18 @@ let make_fake_culprits_with_rights_from_int_list il =
   let open Result_syntax in
   let n = List.length il in
   let* accounts_list = Account.generate_accounts n in
-  let pkh_list = List.map (fun x -> x.Account.pkh) accounts_list in
+  (* FIXME-PA *)
+  let pkh_list =
+    List.map
+      (fun x -> Implicit_account_repr.Forbidden.of_pkh x.Account.pkh)
+      accounts_list
+  in
   let pkh_rights_list = Stdlib.List.combine pkh_list il in
   let map =
     List.fold_left
       (fun map (pkh, rights) ->
-        Environment.Signature.Public_key_hash.Map.add
-          pkh
-          (Int64.of_int rights)
-          map)
-      Environment.Signature.Public_key_hash.Map.empty
+        Implicit_account_repr.Map.add pkh (Int64.of_int rights) map)
+      Implicit_account_repr.Map.empty
       pkh_rights_list
   in
   return (map, pkh_list)

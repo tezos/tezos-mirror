@@ -295,8 +295,6 @@ module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t
 
-type public_key_hash = Signature.Public_key_hash.t
-
 type signature = Signature.t
 
 module Voting_period = struct
@@ -461,7 +459,7 @@ module Contract = struct
 
   type delegate_status = Contract_delegate_storage.delegate_status =
     | Delegate
-    | Delegated of public_key_hash
+    | Delegated of Implicit_account_repr.t
     | Undelegated
 
   let get_delegate_status = Contract_delegate_storage.get_delegate_status
@@ -624,17 +622,17 @@ end
 
 module Receipt = struct
   type unstaked_frozen_staker = Unstaked_frozen_staker_repr.t =
-    | Single of Contract_repr.t * Signature.public_key_hash
-    | Shared of Signature.public_key_hash
+    | Single of Contract_repr.t * Implicit_account_repr.t
+    | Shared of Implicit_account_repr.t
 
   type frozen_staker = Frozen_staker_repr.t = private
-    | Baker of Signature.public_key_hash
+    | Baker of Implicit_account_repr.t
     | Single_staker of {
         staker : Contract_repr.t;
-        delegate : Signature.public_key_hash;
+        delegate : Implicit_account_repr.t;
       }
-    | Shared_between_stakers of {delegate : Signature.public_key_hash}
-    | Baker_edge of Signature.public_key_hash
+    | Shared_between_stakers of {delegate : Implicit_account_repr.t}
+    | Baker_edge of Implicit_account_repr.t
 
   let frozen_baker = Frozen_staker_repr.baker
 

@@ -332,13 +332,17 @@ module Game = struct
 
   let index_of_octez Octez_smart_rollup.Game.{alice; bob} =
     Sc_rollup.Game.Index.make
-      (Signature.V3.Of_V_latest.get_public_key_hash_exn alice)
-      (Signature.V3.Of_V_latest.get_public_key_hash_exn bob)
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.of_pkh
+         (Signature.V3.Of_V_latest.get_public_key_hash_exn alice))
+      (Implicit_account_repr.Forbidden.of_pkh
+         (Signature.V3.Of_V_latest.get_public_key_hash_exn bob))
 
   let index_to_octez Sc_rollup.Game.Index.{alice; bob} =
     Octez_smart_rollup.Game.make_index
-      (Signature.Of_V3.public_key_hash alice)
-      (Signature.Of_V3.public_key_hash bob)
+      (* FIXME-PA *)
+      (Implicit_account_repr.Forbidden.to_pkh alice)
+      (Implicit_account_repr.Forbidden.to_pkh bob)
 
   let player_of_octez : Octez_smart_rollup.Game.player -> player = function
     | Alice -> Alice
@@ -438,7 +442,8 @@ module Game = struct
         {other; their_commitment; our_commitment; parent_commitment} : conflict
       =
     {
-      other = Signature.V3.Of_V_latest.get_public_key_hash_exn other;
+      (* FIXME-PA *)
+      other = Implicit_account_repr.Forbidden.of_pkh other;
       their_commitment = Commitment.of_octez their_commitment;
       our_commitment = Commitment.of_octez our_commitment;
       parent_commitment;
@@ -449,7 +454,8 @@ module Game = struct
         {other; their_commitment; our_commitment; parent_commitment} :
       Octez_smart_rollup.Game.conflict =
     {
-      other = Signature.Of_V3.public_key_hash other;
+      (* FIXME-PA *)
+      other = Implicit_account_repr.Forbidden.to_pkh other;
       their_commitment = Commitment.to_octez their_commitment;
       our_commitment = Commitment.to_octez our_commitment;
       parent_commitment;

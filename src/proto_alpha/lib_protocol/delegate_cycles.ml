@@ -50,7 +50,7 @@ let update_activity ctxt last_cycle =
           else return (ctxt, deactivated))
 
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
-  not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
+  not (Implicit_account_repr.Set.mem delegate unrevelead_nonces_set)
 
 let distribute_dal_attesting_rewards ctxt delegate ~gets_consensus_rewards
     ~dal_attesting_reward_per_shard ~total_active_stake_weight
@@ -146,9 +146,9 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   in
   let unrevealed_nonces_set =
     List.fold_left
-      (fun set {Storage.Seed.nonce_hash = _; delegate} ->
-        Signature.Public_key_hash.Set.add delegate set)
-      Signature.Public_key_hash.Set.empty
+      (fun set {Nonce_storage.nonce_hash = _; delegate} ->
+        Implicit_account_repr.Set.add delegate set)
+      Implicit_account_repr.Set.empty
       unrevealed_nonces
   in
   let* dal_attesting_reward_per_shard =

@@ -23,7 +23,7 @@
 val slashing_percentage :
   block_before_slash:Block.t ->
   Protocol.Misbehaviour_repr.t ->
-  all_culprits:Signature.public_key_hash list ->
+  all_culprits:Protocol.Implicit_account_repr.t list ->
   Protocol.Percentage.t tzresult Lwt.t
 
 (** Helpers related to {!Protocol.Misbehaviour_repr}. *)

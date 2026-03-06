@@ -43,7 +43,7 @@ module Consensus : sig
 
   (** Errors for preattestations and attestations. *)
   type error +=
-    | Forbidden_delegate of Signature.Public_key_hash.t
+    | Forbidden_delegate of Implicit_account_repr.t
     | Consensus_operation_not_allowed
     | Consensus_operation_for_old_level of {
         kind : consensus_operation_kind;
@@ -115,14 +115,14 @@ module Voting : sig
     | Too_many_proposals of {previous_count : int; operation_count : int}
     | Conflicting_proposals of operation_conflict
     | Testnet_dictator_multiple_proposals
-    | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Proposals_from_unregistered_delegate of Implicit_account_repr.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
-    | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Ballot_from_unregistered_delegate of Implicit_account_repr.t
     | Conflicting_ballot of operation_conflict
 end
 
@@ -147,12 +147,12 @@ module Anonymous : sig
       }
     | Inconsistent_denunciation of {
         kind : denunciation_kind;
-        delegate1 : Signature.Public_key_hash.t;
-        delegate2 : Signature.Public_key_hash.t;
+        delegate1 : Implicit_account_repr.t;
+        delegate2 : Implicit_account_repr.t;
       }
     | Already_denounced of {
         kind : denunciation_kind;
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Level.t;
       }
     | Conflicting_denunciation of {
@@ -176,7 +176,7 @@ module Anonymous : sig
     | Invalid_shard_index of {given : int; min : int; max : int}
     | Invalid_lag_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
       }
     | Invalid_accusation_no_dal_content of {
@@ -198,34 +198,34 @@ module Anonymous : sig
         lag_index_opt : int option;
       }
     | Invalid_accusation_shard_is_not_trap of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
         shard_index : int;
       }
     | Invalid_accusation_wrong_shard_owner of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
         shard_index : int;
-        shard_owner : Signature.Public_key_hash.t;
+        shard_owner : Implicit_account_repr.t;
       }
     | Invalid_accusation_slot_not_published of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
       }
     | Accusation_validity_error_cannot_get_slot_headers of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
       }
     | Accusation_validity_error_levels_mismatch of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
@@ -235,21 +235,21 @@ module Anonymous : sig
     | Conflicting_dal_entrapment of operation_conflict
     | Conflicting_nonce_revelation of operation_conflict
     | Conflicting_vdf_revelation of operation_conflict
-    | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
+    | Drain_delegate_on_unregistered_delegate of Implicit_account_repr.t
     | Invalid_drain_delegate_inactive_key of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         consensus_key : Signature.Public_key_hash.t;
         active_consensus_key : Signature.Public_key_hash.t;
       }
-    | Invalid_drain_delegate_no_consensus_key of Signature.Public_key_hash.t
-    | Invalid_drain_delegate_noop of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_no_consensus_key of Implicit_account_repr.t
+    | Invalid_drain_delegate_noop of Implicit_account_repr.t
     | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees of {
-        delegate : Signature.Public_key_hash.t;
-        destination : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
+        destination : Implicit_account_repr.t;
         min_amount : Tez.t;
       }
     | Conflicting_drain_delegate of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         conflict : operation_conflict;
       }
     | Aggregate_denunciation_not_implemented
@@ -259,22 +259,22 @@ end
 module Manager : sig
   type error +=
     | Manager_restriction of {
-        source : Signature.Public_key_hash.t;
+        source : Implicit_account_repr.t;
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        expected_source : public_key_hash;
-        source : public_key_hash;
+        expected_source : Implicit_account_repr.t;
+        source : Implicit_account_repr.t;
       }
     | Inconsistent_counters of {
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         previous_counter : Manager_counter.t;
         counter : Manager_counter.t;
       }
     | Incorrect_reveal_position
     | Missing_bls_proof of {
         kind : Operation_repr.public_key_kind;
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Incorrect_bls_proof of {
@@ -284,11 +284,11 @@ module Manager : sig
       }
     | Unused_bls_proof of {
         kind : Operation_repr.public_key_kind;
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Update_companion_key_not_tz4 of {
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Insufficient_gas_for_manager

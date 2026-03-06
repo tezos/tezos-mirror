@@ -195,7 +195,11 @@ module Delegate = struct
     match Key.Set.find_pkh consensus_pkh known_keys with
     | None -> return_none
     | Some consensus_key ->
-        let manager_key = Maybe_known_key.make ~known_keys manager_pkh in
+        (* FIXME-PA *)
+        let manager_pkh_sig =
+          Implicit_account_repr.Forbidden.to_pkh manager_pkh
+        in
+        let manager_key = Maybe_known_key.make ~known_keys manager_pkh_sig in
         let* companion_key =
           match companion_bls_pkh_opt with
           | None -> return_none

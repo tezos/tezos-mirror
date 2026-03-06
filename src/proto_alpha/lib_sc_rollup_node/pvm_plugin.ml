@@ -155,7 +155,8 @@ let outbox_message_summary (output : Sc_rollup.output) =
     | {message = Whitelist_update pkhs; _} ->
         Outbox_message.Whitelist_update
           (Option.map
-             (List.map Tezos_crypto.Signature.Of_V3.public_key_hash)
+             (* FIXME-PA *)
+             (List.map Protocol.Implicit_account_repr.Forbidden.to_pkh)
              pkhs)
     | {message = Atomic_transaction_batch {transactions}; _} ->
         let transactions = List.map outbox_transaction_summary transactions in

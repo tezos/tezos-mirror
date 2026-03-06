@@ -212,7 +212,8 @@ let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
       portion_of_rewards_to_liquid_for_cycle
         (B block)
         current_cycle
-        pkh
+        (* FIXME-PA *)
+        (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh)
         delta_rewards
     in
     let to_frozen = Tez.(delta_rewards -! to_liquid) in

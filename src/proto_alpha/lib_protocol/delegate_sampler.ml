@@ -271,7 +271,7 @@ let sort_stakes_pk_for_stake_info stakes_pk =
     (fun (del1 : Raw_context.delegate_stake_info)
          (del2 : Raw_context.delegate_stake_info)
        ->
-      Signature.Public_key_hash.compare
+      Implicit_account_repr.compare
         del1.consensus_pk.delegate
         del2.consensus_pk.delegate)
     (stakes_pk : Raw_context.delegate_stake_info list)
@@ -494,11 +494,11 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
     let map =
       List.fold_left
         (fun map_acc Raw_context.{consensus_pk : consensus_pk; stake_weight} ->
-          Signature.Public_key_hash.Map.add
+          Implicit_account_repr.Map.add
             consensus_pk.delegate
             stake_weight
             map_acc)
-        Signature.Public_key_hash.Map.empty
+        Implicit_account_repr.Map.empty
         delegates
     in
     return (ctxt, map)
@@ -516,14 +516,14 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
           attestation_slot_owner ~all_bakers_attest_enabled ctxt level slot
         in
         let map =
-          Signature.Public_key_hash.Map.update
+          Implicit_account_repr.Map.update
             consensus_pk.delegate
             (function
               | None -> Some 1L | Some slots_n -> Some (Int64.succ slots_n))
             map
         in
         return (ctxt, map))
-      (ctxt, Signature.Public_key_hash.Map.empty)
+      (ctxt, Implicit_account_repr.Map.empty)
       slots
 
 module For_RPC = struct

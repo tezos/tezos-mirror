@@ -29,16 +29,16 @@
 
 (** An implict contract (account) initially existing on a chain since genesis. *)
 type bootstrap_account = {
-  public_key_hash : Signature.Public_key_hash.t;
+  public_key_hash : Implicit_account_repr.t;
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
-  delegate_to : Signature.Public_key_hash.t option;
+  delegate_to : Implicit_account_repr.t option;
   consensus_key : Signature.Public_key.t option;
 }
 
 (** An originated contract initially existing on a chain since genesis. *)
 type bootstrap_contract = {
-  delegate : Signature.Public_key_hash.t option;
+  delegate : Implicit_account_repr.t option;
   amount : Tez_repr.t;
   script : Script_repr.t;
   hash : Contract_hash.t option;

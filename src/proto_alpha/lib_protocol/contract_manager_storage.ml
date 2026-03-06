@@ -28,8 +28,8 @@ type error +=
   | (* `Permanent *)
       Inconsistent_hash of {
       public_key : Signature.Public_key.t;
-      expected_hash : Signature.Public_key_hash.t;
-      provided_hash : Signature.Public_key_hash.t;
+      expected_hash : Implicit_account_repr.t;
+      provided_hash : Implicit_account_repr.t;
     }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
   | (* `Branch *) Missing_manager_contract of Contract_repr.t
@@ -62,15 +62,15 @@ let () =
         ppf
         "The hash of the manager public key %s is not %a as announced but %a"
         (Signature.Public_key.to_b58check k)
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         ph
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         eh)
     Data_encoding.(
       obj3
         (req "public_key" Signature.Public_key.encoding)
-        (req "expected_hash" Signature.Public_key_hash.encoding)
-        (req "provided_hash" Signature.Public_key_hash.encoding))
+        (req "expected_hash" Implicit_account_repr.encoding)
+        (req "provided_hash" Implicit_account_repr.encoding))
     (function
       | Inconsistent_hash {public_key; expected_hash; provided_hash} ->
           Some (public_key, expected_hash, provided_hash)
@@ -118,9 +118,13 @@ let is_manager_key_revealed c manager =
   | Some (Manager_repr.Public_key _) -> return_true
 
 let check_public_key public_key expected_hash =
-  let provided_hash = Signature.Public_key.hash public_key in
+  (* FIXME-PA *)
+  let provided_hash =
+    Implicit_account_repr.Forbidden.of_pkh
+      (Signature.Public_key.hash public_key)
+  in
   error_unless
-    (Signature.Public_key_hash.equal provided_hash expected_hash)
+    (Implicit_account_repr.equal provided_hash expected_hash)
     (Inconsistent_hash {public_key; expected_hash; provided_hash})
 
 let reveal_manager_key ?(check_consistency = true) c manager public_key =
@@ -133,7 +137,7 @@ let reveal_manager_key ?(check_consistency = true) c manager public_key =
       (* Ensure that the manager is equal to the retrieved hash. *)
       let*? () =
         error_unless
-          (Signature.Public_key_hash.equal manager expected_hash)
+          (Implicit_account_repr.equal manager expected_hash)
           (Inconsistent_hash
              {public_key; expected_hash; provided_hash = manager})
       in

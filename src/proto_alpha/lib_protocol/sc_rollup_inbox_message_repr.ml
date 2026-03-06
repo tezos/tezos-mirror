@@ -58,7 +58,7 @@ type internal_inbox_message =
   | Transfer of {
       payload : Script_repr.expr;
       sender : Contract_hash.t;
-      source : Signature.public_key_hash;
+      source : Implicit_account_repr.t;
       destination : Sc_rollup_repr.Address.t;
     }
   | Start_of_level
@@ -74,7 +74,7 @@ type internal_inbox_message =
       slot_size : int;
       page_size : int;
       slots_by_publisher :
-        Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t;
+        Dal_slot_index_repr.t list Implicit_account_repr.Map.t;
     }
 
 let internal_inbox_message_encoding =
@@ -89,7 +89,7 @@ let internal_inbox_message_encoding =
            (kind "transfer")
            (req "payload" Script_repr.expr_encoding)
            (req "sender" Contract_hash.encoding)
-           (req "source" Signature.Public_key_hash.encoding)
+           (req "source" Implicit_account_repr.encoding)
            (req "destination" Sc_rollup_repr.Address.encoding))
         (function
           | Transfer {payload; sender; source; destination} ->
@@ -139,7 +139,7 @@ let internal_inbox_message_encoding =
            (req "page_size" uint16)
            (req
               "slots_by_publisher"
-              (Signature.Public_key_hash.Map.encoding Bitset.encoding)))
+              (Implicit_account_repr.Map.encoding Bitset.encoding)))
         (function
           | Dal_attested_slots
               {
@@ -157,7 +157,7 @@ let internal_inbox_message_encoding =
                 | Ok v -> v
               in
               let slots_by_publisher =
-                Signature.Public_key_hash.Map.map
+                Implicit_account_repr.Map.map
                   (List.fold_left add Bitset.empty)
                   slots_by_publisher
               in
@@ -178,7 +178,7 @@ let internal_inbox_message_encoding =
            ->
           (* Convert bitset back to list for internal representation *)
           let slots_by_publisher =
-            Signature.Public_key_hash.Map.map
+            Implicit_account_repr.Map.map
               (fun bitset ->
                 (* Iterate through possible slot indices and collect attested ones *)
                 let rec collect acc i =
@@ -332,7 +332,7 @@ let dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
 let dal_attested_slots_messages_for_level ~published_level ~number_of_slots
     ~slot_size ~page_size ~slots_by_publisher =
   let open Result_syntax in
-  let module Pkh_map = Signature.Public_key_hash.Map in
+  let module Ir_map = Implicit_account_repr.Map in
   let mk_message slots_by_publisher =
     Dal_attested_slots
       {
@@ -350,21 +350,21 @@ let dal_attested_slots_messages_for_level ~published_level ~number_of_slots
     | Error _ -> tzfail Error_encode_inbox_message
   in
   let add_or_split pkh slots (messages, current_chunk) =
-    let candidate_chunk = Pkh_map.add pkh slots current_chunk in
+    let candidate_chunk = Ir_map.add pkh slots current_chunk in
     let candidate_msg = mk_message candidate_chunk in
     match serialize (Internal candidate_msg) with
     | Ok _ -> return (messages, candidate_chunk)
     | Error _ ->
-        if Pkh_map.is_empty current_chunk then tzfail Error_encode_inbox_message
+        if Ir_map.is_empty current_chunk then tzfail Error_encode_inbox_message
         else
           let* messages = flush_chunk messages current_chunk in
-          return (messages, Pkh_map.singleton pkh slots)
+          return (messages, Ir_map.singleton pkh slots)
   in
   let* messages, current_chunk =
-    Pkh_map.fold_e add_or_split slots_by_publisher ([], Pkh_map.empty)
+    Ir_map.fold_e add_or_split slots_by_publisher ([], Ir_map.empty)
   in
   let* messages =
-    if Pkh_map.is_empty current_chunk then return messages
+    if Ir_map.is_empty current_chunk then return messages
     else flush_chunk messages current_chunk
   in
   return (List.rev messages)
@@ -372,7 +372,7 @@ let dal_attested_slots_messages_for_level ~published_level ~number_of_slots
 let dal_attested_slots_messages_of_cells fetch_dal_params cells =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
-  let module Pkh_map = Signature.Public_key_hash.Map in
+  let module Pkh_map = Implicit_account_repr.Map in
   let module Level_map = Raw_level_repr.Map in
   (* Group cells by [published_level] *)
   let by_level =
@@ -440,7 +440,7 @@ let (_dummy_serialized_dal_attested_slots : serialized) =
     ~number_of_slots:32
     ~slot_size:126944
     ~page_size:3967
-    ~slots_by_publisher:Signature.Public_key_hash.Map.empty
+    ~slots_by_publisher:Implicit_account_repr.Map.empty
 
 module Internal_for_tests = struct
   let dal_attested_slots_messages_for_level =

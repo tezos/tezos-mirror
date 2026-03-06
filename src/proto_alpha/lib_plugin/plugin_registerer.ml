@@ -57,7 +57,6 @@ module Delegators_contribution_plugin = struct
     let*? delegate_pkh =
       Signature.Of_V_latest.get_public_key_hash delegate_pkh
     in
-
     let* output =
       Delegators_contribution.delegated_breakdown_at_sampling
         context

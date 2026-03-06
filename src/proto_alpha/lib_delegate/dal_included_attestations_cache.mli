@@ -34,10 +34,13 @@ val create : attestation_lags:int list -> number_of_slots:int -> t
 
 (** [set_committee t ~level lookup_fn] stores the committee lookup function
     for the given level. The lookup function maps attestation slots to delegate
-    public key hashes and is used when extracting attestations from operations
+    addresses and is used when extracting attestations from operations
     without receipts. *)
 val set_committee :
-  t -> level:int32 -> (Slot.t -> Signature.Public_key_hash.t option) -> unit
+  t ->
+  level:int32 ->
+  (Slot.t -> Protocol.Implicit_account_repr.t option) ->
+  unit
 
 (** [filter_attestable_slots t ~delegate_id ~published_level ~attestable_slots
     ~head_level ~head_hash ~predecessor_hash] filters out slots that have

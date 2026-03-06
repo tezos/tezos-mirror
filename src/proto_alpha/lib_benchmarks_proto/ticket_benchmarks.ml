@@ -234,7 +234,10 @@ let () = Registration.register (module Has_tickets_type_benchmark)
 let ticket_sampler rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
   let pkh, _, _ = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
-  let ticketer = Alpha_context.Contract.Implicit pkh in
+  (* FIXME-PA *)
+  let ticketer =
+    Alpha_context.Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh pkh)
+  in
   Script_typed_ir.
     {ticketer; contents = Script_int.zero; amount = Ticket_amount.one}
 

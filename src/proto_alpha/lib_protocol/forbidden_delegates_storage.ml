@@ -7,7 +7,7 @@
 
 let is_forbidden ctxt delegate =
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
-  Signature.Public_key_hash.Set.mem delegate forbidden_delegates
+  Implicit_account_repr.Set.mem delegate forbidden_delegates
 
 let forbid ctxt delegate =
   let ctxt = Raw_context.Consensus.forbid_delegate ctxt delegate in
@@ -28,7 +28,7 @@ let load ctxt =
     | None ->
         Raw_context.Consensus.set_forbidden_delegates
           ctxt
-          Signature.Public_key_hash.Set.empty
+          Implicit_account_repr.Set.empty
   in
   return ctxt
 
@@ -66,9 +66,7 @@ let should_unforbid ctxt delegate ~selection_for_new_cycle =
        frozen balances from the delegate and their stakers, but
        excludes any overstaked funds (as enforced by
        {!Stake_context.apply_limits}). *)
-    match
-      Signature.Public_key_hash.Map.find delegate selection_for_new_cycle
-    with
+    match Implicit_account_repr.Map.find delegate selection_for_new_cycle with
     | None -> return_true
     | Some {Stake_repr.frozen; _} ->
         let* current_frozen_deposits =
@@ -79,13 +77,13 @@ let should_unforbid ctxt delegate ~selection_for_new_cycle =
 let update_at_cycle_end_after_slashing ctxt ~new_cycle =
   let open Lwt_result_syntax in
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
-  if Signature.Public_key_hash.Set.is_empty forbidden_delegates then return ctxt
+  if Implicit_account_repr.Set.is_empty forbidden_delegates then return ctxt
   else
     let* ctxt, selection_for_new_cycle =
       Stake_storage.get_selected_distribution_as_map ctxt new_cycle
     in
     let* forbidden_delegates =
-      Signature.Public_key_hash.Set.fold_es
+      Implicit_account_repr.Set.fold_es
         (fun delegate acc ->
           let* should_unforbid =
             should_unforbid ctxt delegate ~selection_for_new_cycle
@@ -97,7 +95,7 @@ let update_at_cycle_end_after_slashing ctxt ~new_cycle =
               | `Changed forbidden_delegates -> forbidden_delegates
             in
             let new_forbidden =
-              Signature.Public_key_hash.Set.remove delegate old_forbidden
+              Implicit_account_repr.Set.remove delegate old_forbidden
             in
             return (`Changed new_forbidden)
           else return acc)
@@ -113,4 +111,4 @@ let update_at_cycle_end_after_slashing ctxt ~new_cycle =
 let init_for_genesis ctxt =
   Storage.Tenderbake.Forbidden_delegates.init
     ctxt
-    Signature.Public_key_hash.Set.empty
+    Implicit_account_repr.Set.empty

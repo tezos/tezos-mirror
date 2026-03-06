@@ -103,7 +103,7 @@ let bonus_baking_reward ctxt ~attested_level ~attesting_power =
   return (ctxt, reward)
 
 type ordered_slots = {
-  delegate : Signature.public_key_hash;
+  delegate : Implicit_account_repr.t;
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   rounds : Round.t list;
@@ -129,14 +129,14 @@ let attesting_rights (ctxt : t) ~attested_level =
              {consensus_pk : Consensus_key.pk; stake_weight = power}
          ->
         let acc_map =
-          Signature.Public_key_hash.Map.add
+          Implicit_account_repr.Map.add
             consensus_pk.delegate
             (power, i, consensus_pk)
             acc_map
         in
         let*? succ_i = Slot.succ i in
         return (acc_map, succ_i))
-      (Signature.Public_key_hash.Map.empty, Slot.zero)
+      (Implicit_account_repr.Map.empty, Slot.zero)
       delegates
   in
   let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
@@ -148,7 +148,7 @@ let attesting_rights (ctxt : t) ~attested_level =
           Stake_distribution.baking_rights_owner ctxt attested_level ~round
         in
         let map =
-          Signature.Public_key_hash.Map.update
+          Implicit_account_repr.Map.update
             consensus_pk.delegate
             (function
               | None ->
@@ -172,16 +172,14 @@ let attesting_rights (ctxt : t) ~attested_level =
             map
         in
         return (ctxt, map))
-      (ctxt, Signature.Public_key_hash.Map.empty)
+      (ctxt, Implicit_account_repr.Map.empty)
       slots
   in
   let map =
-    Signature.Public_key_hash.Map.map
+    Implicit_account_repr.Map.map
       (fun ({rounds; delegate; _} as t) ->
         if all_bakers_attest_enabled then
-          match
-            Signature.Public_key_hash.Map.find delegate attesting_power_map
-          with
+          match Implicit_account_repr.Map.find delegate attesting_power_map with
           | Some (attesting_power, attestation_slot, _) ->
               (* We override the attestation slot to be accurate wrt the feature flag *)
               {t with attesting_power; attestation_slot}
@@ -194,17 +192,17 @@ let attesting_rights (ctxt : t) ~attested_level =
   (* Add delegates without rounds *)
   let map =
     if all_bakers_attest_enabled then
-      Signature.Public_key_hash.Map.fold
+      Implicit_account_repr.Map.fold
         (fun pkh
              ( attesting_power,
                attestation_slot,
                (consensus_pk : Consensus_key.pk) )
              acc
            ->
-          match Signature.Public_key_hash.Map.find pkh map with
+          match Implicit_account_repr.Map.find pkh map with
           | Some _ -> acc
           | None ->
-              Signature.Public_key_hash.Map.add
+              Implicit_account_repr.Map.add
                 pkh
                 {
                   delegate = consensus_pk.delegate;
@@ -240,13 +238,11 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
         in
         let initial_slot, delegates_map =
           match
-            Signature.Public_key_hash.Map.find
-              consensus_key.delegate
-              delegates_map
+            Implicit_account_repr.Map.find consensus_key.delegate delegates_map
           with
           | None ->
               ( slot,
-                Signature.Public_key_hash.Map.add
+                Implicit_account_repr.Map.add
                   consensus_key.delegate
                   slot
                   delegates_map )
@@ -270,7 +266,7 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
             slots_map
         in
         (ctxt, (delegates_map, slots_map)))
-      (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
+      (ctxt, (Implicit_account_repr.Map.empty, Slot.Map.empty))
       slots
   in
   let all_bakers_attest_enabled =
@@ -286,7 +282,7 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
              Stake_distribution.delegate_stake_info)
          ->
         match
-          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
+          Implicit_account_repr.Map.find consensus_pk.delegate delegates_map
         with
         | None ->
             if all_bakers_attest_enabled then
@@ -340,14 +336,14 @@ let delegate_to_shard_count ctxt level =
           Stake_distribution.baking_rights_owner ctxt level ~round
         in
         let map =
-          Signature.Public_key_hash.Map.update
+          Implicit_account_repr.Map.update
             consensus_pk.delegate
             (function
               | None -> Some 1 | Some num_shards -> Some (num_shards + 1))
             map
         in
         return (ctxt, map))
-      (ctxt, Signature.Public_key_hash.Map.empty)
+      (ctxt, Implicit_account_repr.Map.empty)
       slots
   in
   return (ctxt, map)

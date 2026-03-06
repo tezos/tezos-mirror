@@ -26,9 +26,9 @@ let check_error_constructor_name ~loc ~expected errs =
 (** Identifies the [Inconsistent_sources] error. *)
 let check_inconsistent_sources ~first_source ~source = function
   | [Inconsistent_sources {expected_source; source = s}] ->
-      Signature.Public_key_hash.(
-        expected_source = Account.pkh_of_contract_exn first_source
-        && s = Account.pkh_of_contract_exn source)
+      Implicit_account_repr.(
+        equal expected_source (Account.pkh_of_contract_exn first_source)
+        && equal s (Account.pkh_of_contract_exn source))
   | _ -> false
 
 (** To be used as the [expect_failure] argument of
@@ -43,7 +43,7 @@ let expect_inconsistent_sources ~loc ~first_source ~source errs =
 (** Identifies the [Inconsistent_counters] error. *)
 let check_inconsistent_counters ~source ~previous_counter ~counter = function
   | [Inconsistent_counters {source = s; previous_counter = pc; counter = c}] ->
-      Signature.Public_key_hash.(s = Account.pkh_of_contract_exn source)
+      Implicit_account_repr.equal s (Account.pkh_of_contract_exn source)
       && Manager_counter.(c = counter && pc = previous_counter)
   | _ -> false
 
@@ -77,7 +77,7 @@ let expect_incorrect_reveal_position ~loc errs =
 let expect_forbidden_delegate ~loc ~delegate errs =
   Assert.expect_error ~loc errs (function
     | [Validate_errors.Consensus.Forbidden_delegate d] ->
-        Signature.Public_key_hash.(d = Account.pkh_of_contract_exn delegate)
+        Implicit_account_repr.equal d (Account.pkh_of_contract_exn delegate)
     | _ -> false)
 
 let expect_outdated_denunciation ~loc ?kind ?level ?last_cycle errs =
@@ -127,7 +127,7 @@ let expect_outdated_denunciation_state ~loc ~state errs =
 
 let expect_no_slots_found_for ~loc ~pkh err =
   Assert.error ~loc (Error err) (function
-    | Block.No_slots_found_for p -> Signature.Public_key_hash.(p = pkh)
+    | Block.No_slots_found_for p -> Implicit_account_repr.(p = pkh)
     | _ -> false)
 
 let expect_empty_transaction ~loc ~contract errs =
@@ -157,7 +157,7 @@ let expect_failwith ~loc ?str err =
 let expect_empty_implicit_delegated_contract ~loc ~contract errs =
   Assert.expect_error ~loc errs (function
     | [Contract_storage.Empty_implicit_delegated_contract c] ->
-        Signature.Public_key_hash.(c = Account.pkh_of_contract_exn contract)
+        Implicit_account_repr.equal c (Account.pkh_of_contract_exn contract)
     | _ -> false)
 
 let expect_incorrect_bls_proof ~loc ~kind_pk ~pk errs =
@@ -180,7 +180,9 @@ let expect_missing_bls_proof ~loc ~kind_pk ~pk ~source_pkh errs =
       ] ->
         err_kind = kind_pk
         && Signature.Public_key.(err_pk = pk)
-        && Signature.Public_key_hash.(err_source = source_pkh)
+        (* FIXME-PA *)
+        && Protocol.Implicit_account_repr.(
+             err_source = Forbidden.of_pkh source_pkh)
     | _ -> false)
 
 let invalid_signature = function

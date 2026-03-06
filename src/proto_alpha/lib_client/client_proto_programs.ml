@@ -226,6 +226,8 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
+  (* FIXME-PA *)
+  let payer = Option.map Implicit_account_repr.Forbidden.of_pkh payer in
   Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
@@ -265,6 +267,8 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   let* chain_id = Chain_services.chain_id cctxt ~chain () in
+  (* FIXME-PA *)
+  let payer = Option.map Implicit_account_repr.Forbidden.of_pkh payer in
   Plugin.RPC.Scripts.run_script_view
     cctxt
     (chain, block)
@@ -310,6 +314,8 @@ let run (cctxt : #Protocol_client_context.rpc_context)
   in
   let amount = Option.value ~default:Tez.fifty_cents amount in
   let entrypoint = Option.value ~default:Entrypoint.default entrypoint in
+  (* FIXME-PA *)
+  let payer = Option.map Implicit_account_repr.Forbidden.of_pkh payer in
   Plugin.RPC.Scripts.run_code
     cctxt
     (chain, block)
@@ -358,6 +364,8 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
   in
   let amount = Option.value ~default:Tez.fifty_cents amount in
   let entrypoint = Option.value ~default:Entrypoint.default entrypoint in
+  (* FIXME-PA *)
+  let payer = Option.map Implicit_account_repr.Forbidden.of_pkh payer in
   Plugin.RPC.Scripts.trace_code
     cctxt
     (chain, block)
@@ -398,6 +406,8 @@ let run_instr (cctxt : #Protocol_client_context.rpc_context)
   } =
     shared_params
   in
+  (* FIXME-PA *)
+  let payer = Option.map Implicit_account_repr.Forbidden.of_pkh payer in
   Plugin.RPC.Scripts.run_instr
     ~gas
     ~legacy

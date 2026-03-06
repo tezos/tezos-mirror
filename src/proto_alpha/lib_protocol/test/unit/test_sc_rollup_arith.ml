@@ -568,9 +568,9 @@ let dummy_internal_transfer address =
     Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
   in
   let source =
-    WithExceptions.Result.get_ok
+    WithExceptions.Option.get
       ~loc:__LOC__
-      (Signature.Public_key_hash.of_b58check
+      (Implicit_account_repr.of_b58check_opt
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
   let payload = Bytes.of_string "foo" in

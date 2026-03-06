@@ -49,7 +49,7 @@ let delegate_encoding =
       case
         ~title:"Public key hash"
         (Tag 0)
-        Signature.Public_key_hash.encoding
+        Implicit_account_repr.encoding
         (function `Pkh p -> Some p | _ -> None)
         (fun p -> `Pkh p);
       case
@@ -96,11 +96,13 @@ let selection_to_pkhs bootstrap_accounts_json selection =
           (fun (round, d) ->
             ( round,
               match d with
-              | `Pkh d -> d
+              (* FIXME-PA *)
+              | `Pkh d -> Implicit_account_repr.Forbidden.to_pkh d
               | `Alias a -> (
                   match List.assoc ~equal:String.equal a bootstrap_aliases with
                   | None -> Stdlib.failwith @@ "Unknown alias " ^ a
-                  | Some d -> d) ))
+                  (* FIXME-PA *)
+                  | Some d -> Implicit_account_repr.Forbidden.to_pkh d) ))
           l ))
     selection
 

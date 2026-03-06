@@ -99,13 +99,13 @@ let test_roundtrip_conversion () =
   (* Create an attester set with some delegates *)
   let attesters =
     match delegates with
-    | [] -> Signature.Public_key_hash.Set.empty
+    | [] -> Implicit_account_repr.Set.empty
     | first :: rest ->
         (* Take first 3 delegates if available *)
         let to_take = List.take_n 3 (first :: rest) in
         List.fold_left
-          (fun acc pkh -> Signature.Public_key_hash.Set.add pkh acc)
-          Signature.Public_key_hash.Set.empty
+          (fun acc pkh -> Implicit_account_repr.Set.add pkh acc)
+          Implicit_account_repr.Set.empty
           to_take
   in
 
@@ -123,13 +123,13 @@ let test_roundtrip_conversion () =
   let* () =
     Assert.equal
       ~loc:__LOC__
-      Signature.Public_key_hash.Set.equal
+      Implicit_account_repr.Set.equal
       "Round-trip attesters"
       (fun ppf set ->
         Format.fprintf
           ppf
           "{%d delegates}"
-          (Signature.Public_key_hash.Set.cardinal set))
+          (Implicit_account_repr.Set.cardinal set))
       attesters
       recovered_attesters
   in
@@ -146,7 +146,7 @@ let test_empty_attesters () =
   let ctxt = Incremental.alpha_ctxt inc in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
-  let empty_attesters = Signature.Public_key_hash.Set.empty in
+  let empty_attesters = Implicit_account_repr.Set.empty in
   let committee_level = Raw_level_repr.of_int32_exn 5l in
 
   (* Convert empty set to bitset *)
@@ -172,8 +172,7 @@ let test_empty_attesters () =
   in
 
   let* () =
-    if Signature.Public_key_hash.Set.is_empty recovered_attesters then
-      return_unit
+    if Implicit_account_repr.Set.is_empty recovered_attesters then return_unit
     else failwith "Recovered attesters should be empty"
   in
 
@@ -199,8 +198,8 @@ let test_all_delegates_attest () =
   (* Create set with all delegates *)
   let all_attesters =
     List.fold_left
-      (fun acc pkh -> Signature.Public_key_hash.Set.add pkh acc)
-      Signature.Public_key_hash.Set.empty
+      (fun acc pkh -> Implicit_account_repr.Set.add pkh acc)
+      Implicit_account_repr.Set.empty
       delegates
   in
 
@@ -225,13 +224,13 @@ let test_all_delegates_attest () =
   let* () =
     Assert.equal
       ~loc:__LOC__
-      Signature.Public_key_hash.Set.equal
+      Implicit_account_repr.Set.equal
       "All delegates round-trip"
       (fun ppf set ->
         Format.fprintf
           ppf
           "<%d delegates>"
-          (Signature.Public_key_hash.Set.cardinal set))
+          (Implicit_account_repr.Set.cardinal set))
       all_attesters
       recovered_attesters
   in
@@ -256,8 +255,8 @@ let test_single_attester () =
   (* Create set with single delegate (first one) *)
   let single_attester =
     match delegates with
-    | [] -> Signature.Public_key_hash.Set.empty
-    | first :: _ -> Signature.Public_key_hash.Set.singleton first
+    | [] -> Implicit_account_repr.Set.empty
+    | first :: _ -> Implicit_account_repr.Set.singleton first
   in
 
   (* Convert to bitset *)
@@ -268,7 +267,7 @@ let test_single_attester () =
   (* Should have exactly 1 set bit (unless empty) *)
   let set_bit_count = count_set_bits bitset in
   let expected_count =
-    if Signature.Public_key_hash.Set.is_empty single_attester then 0 else 1
+    if Implicit_account_repr.Set.is_empty single_attester then 0 else 1
   in
   let* () =
     Assert.equal
@@ -288,13 +287,13 @@ let test_single_attester () =
   let* () =
     Assert.equal
       ~loc:__LOC__
-      Signature.Public_key_hash.Set.equal
+      Implicit_account_repr.Set.equal
       "Single attester round-trip"
       (fun ppf set ->
         Format.fprintf
           ppf
           "<%d delegates>"
-          (Signature.Public_key_hash.Set.cardinal set))
+          (Implicit_account_repr.Set.cardinal set))
       single_attester
       recovered_attesters
   in
@@ -330,8 +329,8 @@ let test_bitset_attested_shards () =
   let attesters =
     let to_take = List.take_n 3 delegates in
     List.fold_left
-      (fun acc pkh -> Signature.Public_key_hash.Set.add pkh acc)
-      Signature.Public_key_hash.Set.empty
+      (fun acc pkh -> Implicit_account_repr.Set.add pkh acc)
+      Implicit_account_repr.Set.empty
       to_take
   in
 
@@ -391,7 +390,7 @@ let test_bitset_is_attested () =
   in
 
   (* Test with no attesters - should not reach threshold *)
-  let empty_attesters = Signature.Public_key_hash.Set.empty in
+  let empty_attesters = Implicit_account_repr.Set.empty in
   let* ctxt, empty_bitset =
     Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:empty_attesters
   in
@@ -420,8 +419,8 @@ let test_bitset_is_attested () =
 
   let all_attesters =
     List.fold_left
-      (fun acc pkh -> Signature.Public_key_hash.Set.add pkh acc)
-      Signature.Public_key_hash.Set.empty
+      (fun acc pkh -> Implicit_account_repr.Set.add pkh acc)
+      Implicit_account_repr.Set.empty
       delegates
   in
 
@@ -484,7 +483,7 @@ let test_empty_bitset () =
   in
 
   let* () =
-    if Signature.Public_key_hash.Set.is_empty empty_attesters then return_unit
+    if Implicit_account_repr.Set.is_empty empty_attesters then return_unit
     else failwith "Empty bitset should yield empty attesters"
   in
 

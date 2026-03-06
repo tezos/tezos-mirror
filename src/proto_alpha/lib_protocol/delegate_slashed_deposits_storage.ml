@@ -119,7 +119,7 @@ let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
     Delegate_storage.initial_frozen_deposits
   else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
     Delegate_storage.initial_frozen_deposits_of_previous_cycle
-  else fun (ctxt : Raw_context.t) (_ : Signature.public_key_hash) ->
+  else fun (ctxt : Raw_context.t) (_ : Implicit_account_repr.t) ->
     (* Denunciation applied too late.
        We could assert false, but we can also be permissive
        while keeping the same invariants. *)
@@ -133,11 +133,10 @@ let update_block_denunciations_map_with delegate denunciations initial_block_map
         denunciation.Denunciations_repr.misbehaviour
         (function
           | None ->
-              Some
-                (Signature.Public_key_hash.Map.singleton delegate denunciation)
+              Some (Implicit_account_repr.Map.singleton delegate denunciation)
           | Some map ->
               Some
-                (Signature.Public_key_hash.Map.update
+                (Implicit_account_repr.Map.update
                    delegate
                    (function
                      | None -> Some denunciation | Some old_d -> Some old_d)
@@ -197,7 +196,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
       let misbehaviour_level = Level_storage.from_raw ctxt miskey.level in
       let misbehaviour_cycle = misbehaviour_level.cycle in
       let denunciations =
-        Signature.Public_key_hash.Map.bindings denunciations_map
+        Implicit_account_repr.Map.bindings denunciations_map
       in
       let denounced = List.map fst denunciations in
       let* ctxt, slashing_percentage =
@@ -524,7 +523,7 @@ module For_RPC = struct
                 let denounced_pkhs =
                   List.map
                     fst
-                    (Signature.Public_key_hash.Map.bindings denunciations)
+                    (Implicit_account_repr.Map.bindings denunciations)
                 in
                 let* ctxt, slashing_percentage =
                   Slash_percentage.get ctxt misbehaviour_key denounced_pkhs

@@ -139,7 +139,7 @@ let rpc_ctxt =
   end
 
 type attester = Plugin.RPC.Validators.delegate = {
-  delegate : Signature.public_key_hash;
+  delegate : Implicit_account_repr.t;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
   rounds : Round.t list;
@@ -161,8 +161,7 @@ let get_attester ?manager_pkh ctxt =
   | None -> return (WithExceptions.Option.get ~loc:__LOC__ (List.hd attesters))
   | Some manager_pkh ->
       List.find_opt
-        (fun {delegate; _} ->
-          Signature.Public_key_hash.equal delegate manager_pkh)
+        (fun {delegate; _} -> Implicit_account_repr.equal delegate manager_pkh)
         attesters
       |> WithExceptions.Option.get ~loc:__LOC__
       |> return
@@ -179,7 +178,7 @@ let get_attester_n ctxt n =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
   (* TODO ABAAB: check the rounds are used as rounds, not as attestation slots *)
-  (attester.consensus_key, attester.rounds)
+  (attester.delegate, attester.rounds)
 
 let attester_has_bls_key {consensus_key; _} =
   Signature.Public_key_hash.is_bls consensus_key
@@ -205,7 +204,7 @@ let get_attesting_power_for_delegate ctxt ?level pkh =
       let rec find_slots_for_delegate = function
         | [] -> return 0L
         | {Plugin.RPC.Validators.delegate; attesting_power; _} :: t ->
-            if Signature.Public_key_hash.equal delegate pkh then
+            if Protocol.Implicit_account_repr.(delegate = pkh) then
               return attesting_power
             else find_slots_for_delegate t
       in
@@ -246,7 +245,7 @@ let get_baker ctxt ~round =
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__
   @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       (fun baker' -> Protocol.Implicit_account_repr.( <> ) baker baker')
        bakers
 
 let get_first_different_bakers ?(excluding = []) ctxt =
@@ -529,7 +528,9 @@ module Contract = struct
   let manager _ (contract : Contract.t) =
     match contract with
     | Originated _ -> invalid_arg "Helpers.Context.manager"
-    | Implicit pkh -> Account.find pkh
+    (* FIXME-PA *)
+    | Implicit pkh ->
+        Account.find (Protocol.Implicit_account_repr.Forbidden.to_pkh pkh)
 
   let is_manager_key_revealed ctxt (contract : Contract.t) =
     let open Lwt_result_syntax in
@@ -550,7 +551,7 @@ module Contract = struct
     let* delegate_opt = delegate_opt ctxt contract in
     match (contract, delegate_opt) with
     | Contract.Implicit pkh, Some pkh'
-      when Signature.Public_key_hash.equal pkh pkh' ->
+      when Protocol.Implicit_account_repr.( = ) pkh pkh' ->
         (* Contract is a delegate. *)
         get_delegate_own_full_balance_and_check ~__LOC__ ctxt pkh
     | _ -> Alpha_services.Contract.full_balance rpc_ctxt ctxt contract
@@ -652,7 +653,7 @@ module Delegate = struct
         cycle
     in
     let stake_opt =
-      List.assoc ~equal:Signature.Public_key_hash.equal pkh stakes
+      List.assoc ~equal:Protocol.Implicit_account_repr.( = ) pkh stakes
     in
     let Protocol.Stake_repr.{frozen; weighted_delegated} =
       Option.value ~default:Protocol.Stake_repr.zero stake_opt
@@ -672,7 +673,7 @@ module Delegate = struct
       List.map (fun (ck, stake) -> (ck.Consensus_key.delegate, stake)) stakes
     in
     let stake_opt =
-      List.assoc ~equal:Signature.Public_key_hash.equal manager_pkh stakes
+      List.assoc ~equal:Protocol.Implicit_account_repr.( = ) manager_pkh stakes
     in
     return (total_stake, stake_opt)
 end
@@ -784,7 +785,12 @@ let init_gen tup ?rng_state ?commitments ?bootstrap_balances
   let n = tup_n tup in
   let*? accounts = Account.generate_accounts ?rng_state n in
   let contracts =
-    List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
+    (* FIXME-PA *)
+    List.map
+      (fun a ->
+        Alpha_context.Contract.Implicit
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh Account.(a.pkh)))
+      accounts
   in
   let bootstrap_accounts =
     Account.make_bootstrap_accounts
@@ -834,7 +840,12 @@ let create_bootstrap_accounts ?algo n =
   let open Result_syntax in
   let* accounts = Account.generate_accounts ?algo n in
   let contracts =
-    List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
+    (* FIXME-PA *)
+    List.map
+      (fun a ->
+        Alpha_context.Contract.Implicit
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh Account.(a.pkh)))
+      accounts
   in
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   return (bootstrap_accounts, contracts)
@@ -842,7 +853,12 @@ let create_bootstrap_accounts ?algo n =
 let create_bootstrap_accounts_algo_list algo_list =
   let accounts = Account.generate_accounts_with_algo_list algo_list in
   let contracts =
-    List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
+    (* FIXME-PA *)
+    List.map
+      (fun a ->
+        Alpha_context.Contract.Implicit
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh Account.(a.pkh)))
+      accounts
   in
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   (bootstrap_accounts, contracts)

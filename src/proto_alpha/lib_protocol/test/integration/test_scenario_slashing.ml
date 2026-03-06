@@ -129,17 +129,25 @@ let check_is_not_forbidden baker =
   let open Lwt_result_syntax in
   exec (fun ((block, state) as input) ->
       let baker = State.find_account baker state in
-      let* _ = Block.bake ~policy:(By_account baker.pkh) block in
+      (* FIXME-PA *)
+      let* _ =
+        Block.bake
+          ~policy:
+            (By_account
+               (Protocol.Implicit_account_repr.Forbidden.of_pkh baker.pkh))
+          block
+      in
       return input)
 
 let check_has_no_slots ~loc baker_name =
   let open Lwt_result_syntax in
   exec (fun ((block, state) as input) ->
       let baker = State.find_account baker_name state in
+      (* FIXME-PA *)
       let* rights =
         Plugin.RPC.Attestation_rights.get
           Block.rpc_ctxt
-          ~delegates:[baker.pkh]
+          ~delegates:[Protocol.Implicit_account_repr.Forbidden.of_pkh baker.pkh]
           block
       in
       match rights with
@@ -153,7 +161,7 @@ let check_has_no_slots ~loc baker_name =
                  has %i slots."
                 loc
                 baker_name
-                Signature.Public_key_hash.pp
+                Protocol.Implicit_account_repr.pp
                 delegate
                 attesting_power
           | _ ->
@@ -167,10 +175,11 @@ let check_has_slots ~loc baker_name =
   let open Lwt_result_syntax in
   exec (fun ((block, state) as input) ->
       let baker = State.find_account baker_name state in
+      (* FIXME-PA *)
       let* rights =
         Plugin.RPC.Attestation_rights.get
           Block.rpc_ctxt
-          ~delegates:[baker.pkh]
+          ~delegates:[Protocol.Implicit_account_repr.Forbidden.of_pkh baker.pkh]
           block
       in
       match rights with

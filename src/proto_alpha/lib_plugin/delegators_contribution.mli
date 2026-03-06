@@ -25,7 +25,7 @@ type delegated_breakdown_at_sampling = {
 val delegated_breakdown_at_sampling :
   Block_header.shell_header * Environment.Context.t ->
   cycle:int32 ->
-  delegate_pkh:Environment.Signature.public_key_hash ->
+  delegate_pkh:Signature.Public_key_hash.t ->
   [ `Ok of delegated_breakdown_at_sampling
   | `Retry_at_level of int32
   | `Cycle_too_far_in_future ]
@@ -41,5 +41,5 @@ type min_delegated_breakdown = {
 
 val min_delegated_breakdown :
   Block_header.shell_header * Environment.Context.t ->
-  delegate_pkh:Environment.Signature.public_key_hash ->
+  delegate_pkh:Signature.Public_key_hash.t ->
   min_delegated_breakdown Environment.Error_monad.shell_tzresult Lwt.t

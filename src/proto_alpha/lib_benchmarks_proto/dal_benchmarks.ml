@@ -113,7 +113,7 @@ module Publish_commitment : Benchmark.S = struct
             op
             ~source:
               (Protocol.Alpha_context.Contract.Implicit
-                 Environment.Signature.Public_key_hash.zero)
+                 Protocol.Implicit_account_repr.zero)
         with
         | Error errs ->
             Format.eprintf "%a@." Environment.Error_monad.pp_trace errs ;

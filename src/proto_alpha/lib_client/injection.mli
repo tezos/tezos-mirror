@@ -104,7 +104,7 @@ val inject_manager_operation :
   ?simulation:bool ->
   ?force:bool ->
   ?safety_guard:Gas.Arith.integral ->
-  source:Signature.Public_key_hash.t ->
+  source:Implicit_account_repr.t ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee:Tez.t Limit.t ->

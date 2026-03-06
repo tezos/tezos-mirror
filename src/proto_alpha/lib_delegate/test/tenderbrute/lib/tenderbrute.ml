@@ -125,8 +125,13 @@ let check ctxt ~selection =
               in
               Lwt.return @@ Environment.wrap_tzresult result
             in
-            if not (Signature.Public_key_hash.equal delegate pk.delegate) then
-              raise Exit
+            if
+              not
+                (Signature.Public_key_hash.equal
+                   delegate
+                   (* FIXME-PA *)
+                   (Implicit_account_repr.Forbidden.to_pkh pk.delegate))
+            then raise Exit
             else return ctxt)
           selection
           ctxt

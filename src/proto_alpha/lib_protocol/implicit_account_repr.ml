@@ -13,6 +13,7 @@
 
 include Account_hash
 
+(* WARNING: The path MUST be compatible before and after Stateful Activation for tz1-5 *)
 module Index = struct
   type nonrec t = t
 

@@ -97,13 +97,13 @@ val attesting_power :
   all_bakers_attest_enabled:bool ->
   Raw_context.t ->
   Level_repr.t ->
-  (Raw_context.t * int64 Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (Raw_context.t * int64 Implicit_account_repr.Map.t) tzresult Lwt.t
 
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)
   val delegate_current_baking_power :
-    Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
+    Raw_context.t -> Implicit_account_repr.t -> int64 tzresult Lwt.t
 
   val total_baking_power : Raw_context.t -> Cycle_repr.t -> int64 tzresult Lwt.t
 end

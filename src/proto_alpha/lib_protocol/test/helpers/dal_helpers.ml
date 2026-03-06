@@ -90,11 +90,14 @@ let dal_attestations slot_indexes =
 
 let has_assigned_shards ctxt ?level pkh =
   let open Lwt_result_syntax in
-  let* dal_committee = Context.Dal.shards ctxt ?level ~delegates:[pkh] () in
+  (* FIXME-PA *)
+  let pkh_sig = Implicit_account_repr.Forbidden.to_pkh pkh in
+  let* dal_committee = Context.Dal.shards ctxt ?level ~delegates:[pkh_sig] () in
   match dal_committee with
   | [] -> return_false
   | [({delegate; _} : Plugin.RPC.Dal.S.shards_assignment)] ->
-      assert (Signature.Public_key_hash.equal pkh delegate) ;
+      (* FIXME-PA *)
+      assert (Signature.Public_key_hash.equal pkh_sig delegate) ;
       return_true
   | _ -> fail [Test_failure "unexpected Dal.shards RPC result"]
 

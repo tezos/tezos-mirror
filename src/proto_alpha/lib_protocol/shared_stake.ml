@@ -197,7 +197,7 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
         in
         return
           (Option.value
-             (Signature.Public_key_hash.Map.find delegate stake_distrib)
+             (Implicit_account_repr.Map.find delegate stake_distrib)
              ~default:Stake_repr.zero)
   in
   let* {

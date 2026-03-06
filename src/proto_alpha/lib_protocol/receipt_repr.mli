@@ -61,11 +61,9 @@ type 'token balance =
   | Storage_fees : Tez_repr.t balance
   | Double_signing_punishments : Tez_repr.t balance
   | Lost_attesting_rewards :
-      Signature.Public_key_hash.t * bool * bool
+      Implicit_account_repr.t * bool * bool
       -> Tez_repr.t balance
-  | Lost_dal_attesting_rewards :
-      Signature.Public_key_hash.t
-      -> Tez_repr.t balance
+  | Lost_dal_attesting_rewards : Implicit_account_repr.t -> Tez_repr.t balance
   | Liquidity_baking_subsidies : Tez_repr.t balance
   | Burned : Tez_repr.t balance
   | Commitments : Blinded_public_key_hash.t -> Tez_repr.t balance
@@ -81,7 +79,7 @@ type 'token balance =
     }
       -> Staking_pseudotoken_repr.t balance
   | Staking_delegate_denominator : {
-      delegate : Signature.public_key_hash;
+      delegate : Implicit_account_repr.t;
     }
       -> Staking_pseudotoken_repr.t balance
 

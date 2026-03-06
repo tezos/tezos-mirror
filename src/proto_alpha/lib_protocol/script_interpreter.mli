@@ -51,7 +51,7 @@ type execution_result = {
 
 type step_constants = Script_typed_ir.step_constants = {
   sender : Destination.t;
-  payer : Signature.public_key_hash;
+  payer : Implicit_account_repr.t;
   self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;

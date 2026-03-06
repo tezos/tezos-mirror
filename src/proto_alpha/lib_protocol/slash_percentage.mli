@@ -19,14 +19,14 @@
 val get :
   Raw_context.t ->
   Misbehaviour_repr.t ->
-  Signature.public_key_hash list ->
+  Implicit_account_repr.t list ->
   (Raw_context.t * Percentage.t) tzresult Lwt.t
 
 module Internal_for_tests : sig
   val for_double_attestation :
     Raw_context.t ->
     committee_size:int64 ->
-    int64 Signature.Public_key_hash.Map.t ->
-    Signature.Public_key_hash.t list ->
+    int64 Implicit_account_repr.Map.t ->
+    Implicit_account_repr.t list ->
     Percentage.t
 end

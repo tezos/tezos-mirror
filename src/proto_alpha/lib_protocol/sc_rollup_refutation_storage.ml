@@ -550,7 +550,7 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
         let losing_staker = loser in
         let winning_staker =
           let Sc_rollup_game_repr.Index.{alice; bob} = stakers in
-          if Signature.Public_key_hash.(alice = loser) then bob else alice
+          if Implicit_account_repr.(alice = loser) then bob else alice
         in
         let* ctxt = remove_game ctxt rollup stakers in
         let* ctxt, balance_updates_loser =

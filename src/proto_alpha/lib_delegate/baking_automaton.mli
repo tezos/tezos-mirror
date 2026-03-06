@@ -51,7 +51,10 @@ val retry :
     - Falls back to returning the PKH of [key] if no rights are found, or if
       [key] is neither a registered delegate nor a consensus key. *)
 val try_resolve_consensus_keys :
-  #Protocol_client_context.rpc_context -> Key.t -> public_key_hash Lwt.t
+  #Protocol_client_context.rpc_context ->
+  Key.t ->
+  (* FIXME-PA: pkh or account? *)
+  Signature.Public_key_hash.t Lwt.t
 
 (** {2 Functions only needed for the baking_lib} *)
 

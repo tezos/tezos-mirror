@@ -109,7 +109,7 @@ let mk_block_payload_hash (b : Block.t) =
     ~payload_round
     hashes
 
-type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
+type attesting_slot = {slot : Slot.t; consensus_pkh : Signature.public_key_hash}
 
 let attesting_slot_of_attester
     {Plugin.RPC.Validators.consensus_key; attestation_slot; _} =
@@ -139,7 +139,9 @@ let get_delegate_of_attesting_slot ~attesting_slot ~attested_block =
   match attester with
   | None ->
       (* Should not happen, unless the attesting slot is malformed *)
-      return attesting_slot.consensus_pkh
+      (* FIXME-PA *)
+      return
+        (Implicit_account_repr.Forbidden.of_pkh attesting_slot.consensus_pkh)
   | Some attester -> return attester.delegate
 
 let get_different_attesting_slot ~consensus_pkh_to_avoid ~attested_block =
@@ -504,7 +506,7 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
   in
   let* operations =
     if recompute_counters then
-      let module CounterMap = Signature.Public_key_hash.Map in
+      let module CounterMap = Implicit_account_repr.Map in
       let* source_counter = Context.Contract.counter ctxt source in
       let pkh = Context.Contract.pkh in
       let counter_map =
@@ -640,7 +642,10 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         let reveal_op =
           Manager_operation
             {
-              source = Signature.Public_key.hash public_key;
+              (* FIXME-PA *)
+              source =
+                Protocol.Implicit_account_repr.Forbidden.of_pkh
+                  (Signature.Public_key.hash public_key);
               fee = Tez.zero;
               counter;
               operation = Reveal {public_key; proof = create_proof account.sk};
@@ -711,7 +716,10 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
     let op =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          (* FIXME-PA *)
+          source =
+            Protocol.Implicit_account_repr.Forbidden.of_pkh
+              (Signature.Public_key.hash public_key);
           fee;
           counter;
           operation;
@@ -727,7 +735,10 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
     let op_reveal =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          (* FIXME-PA *)
+          source =
+            Protocol.Implicit_account_repr.Forbidden.of_pkh
+              (Signature.Public_key.hash public_key);
           fee = Tez.zero;
           counter;
           operation = Reveal {public_key; proof = create_proof account.sk};
@@ -738,7 +749,10 @@ let manager_operation_with_fixed_gas_limit ?(force_reveal = false) ?counter
     let op =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          (* FIXME-PA *)
+          source =
+            Protocol.Implicit_account_repr.Forbidden.of_pkh
+              (Signature.Public_key.hash public_key);
           fee;
           counter = Manager_counter.succ counter;
           operation;
@@ -799,7 +813,10 @@ let revelation_with_fixed_gas_limit ?(fee = Tez.zero) ~gas_limit
   let pkh =
     match forge_pkh with
     | Some pkh -> pkh
-    | None -> Signature.Public_key.hash public_key
+    | None ->
+        (* FIXME-PA *)
+        Protocol.Implicit_account_repr.Forbidden.of_pkh
+          (Signature.Public_key.hash public_key)
   in
   let source = Contract.Implicit pkh in
   let* counter =
@@ -867,7 +884,10 @@ let revelation ?fee ?(gas_limit = High) ?storage_limit ?counter ?forge_pkh
 let failing_noop ctxt source arbitrary =
   let open Lwt_result_syntax in
   let op = Contents_list (Single (Failing_noop arbitrary)) in
-  let* account = Account.find source in
+  (* FIXME-PA *)
+  let* account =
+    Account.find (Protocol.Implicit_account_repr.Forbidden.to_pkh source)
+  in
   sign ctxt account.sk (Context.branch ctxt) op
 
 let originated_contract_hash op =
@@ -1125,7 +1145,12 @@ let proposals_contents ctxt proposer ?period proposals =
 let proposals ctxt proposer ?period proposals =
   let open Lwt_result_syntax in
   let* contents = proposals_contents ctxt proposer ?period proposals in
-  let* account = Account.find (Context.Contract.pkh proposer) in
+  (* FIXME-PA *)
+  let* account =
+    Account.find
+      (Protocol.Implicit_account_repr.Forbidden.to_pkh
+         (Context.Contract.pkh proposer))
+  in
   sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
 let ballot_contents ctxt voter ?period proposal ballot =
@@ -1137,7 +1162,12 @@ let ballot_contents ctxt voter ?period proposal ballot =
 let ballot ctxt voter ?period proposal ballot =
   let open Lwt_result_syntax in
   let* contents = ballot_contents ctxt voter ?period proposal ballot in
-  let* account = Account.find (Context.Contract.pkh voter) in
+  (* FIXME-PA *)
+  let* account =
+    Account.find
+      (Protocol.Implicit_account_repr.Forbidden.to_pkh
+         (Context.Contract.pkh voter))
+  in
   sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
 let dummy_script =
@@ -1272,7 +1302,7 @@ let sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
 
 let sc_rollup_recover_bond ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     ctxt (source : Contract.t) (sc_rollup : Sc_rollup.t)
-    (staker : public_key_hash) =
+    (staker : Implicit_account_repr.t) =
   let open Lwt_result_syntax in
   let* to_sign_op =
     manager_operation
@@ -1425,7 +1455,11 @@ let drain_delegate ctxt ~consensus_key ~delegate ~destination =
     Single (Drain_delegate {consensus_key; delegate; destination})
   in
   let* account =
-    Context.Contract.manager ctxt (Contract.Implicit consensus_key)
+    (* FIXME-PA *)
+    Context.Contract.manager
+      ctxt
+      (Contract.Implicit
+         (Protocol.Implicit_account_repr.Forbidden.of_pkh consensus_key))
   in
   sign ctxt account.sk (Context.branch ctxt) (Contents_list contents)
 
@@ -1605,14 +1639,14 @@ let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
 
 let clst_finalize_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (ctxt : Context.t) ~(sender : Contract.t)
-    ~(redeemer : Signature.Public_key_hash.t) =
+    ~(redeemer : Implicit_account_repr.t) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
   let parameters =
     Alpha_context.Script.lazy_expr
       Environment.Micheline.(
-        String (dummy_location, Signature.Public_key_hash.to_b58check redeemer)
+        String (dummy_location, Implicit_account_repr.to_b58check redeemer)
         |> strip_locations)
   in
   unsafe_transaction

@@ -238,12 +238,12 @@ end
 
 module Denunciations = struct
   type denunciations_with_key =
-    Signature.Public_key_hash.t * Denunciations_repr.item
+    Implicit_account_repr.t * Denunciations_repr.item
 
   let denunciations_with_key_encoding : denunciations_with_key Data_encoding.t =
     let open Data_encoding in
     merge_objs
-      (obj1 (req "slashed_delegate" Signature.Public_key_hash.encoding))
+      (obj1 (req "slashed_delegate" Implicit_account_repr.encoding))
       Denunciations_repr.item_encoding
 
   module S = struct

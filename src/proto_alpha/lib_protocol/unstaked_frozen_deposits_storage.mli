@@ -62,7 +62,7 @@
     amount of all the unslashable cycles. *)
 val balance :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Cycle_repr.t ->
   Tez_repr.t tzresult Lwt.t
 
@@ -70,7 +70,7 @@ val balance :
     current amount. *)
 val get :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Cycle_repr.t ->
   Deposits_repr.t tzresult Lwt.t
 
@@ -105,7 +105,7 @@ val spend_only_call_from_token :
 *)
 val decrease_initial_amount_only_for_stake_from_unstake :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t

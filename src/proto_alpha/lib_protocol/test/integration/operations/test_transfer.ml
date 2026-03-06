@@ -123,7 +123,11 @@ let test_transfer_zero_implicit () =
   let* b, dest = Context.init1 () in
   let account = Account.new_account () in
   let* i = Incremental.begin_construction b in
-  let src = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* op = Op.transaction (I i) src dest Tez.zero in
   let*! res = Incremental.add_operation i op in
   Assert.proto_error ~loc:__LOC__ res (function
@@ -219,7 +223,10 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
   let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
   let src_pkh = account.Account.pkh in
-  let src = Contract.Implicit src_pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh src_pkh)
+  in
   let* operation =
     Op.transaction ~force_reveal:true (B b) dest src (Tez.of_mutez_exn 100L)
   in
@@ -235,7 +242,8 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
     | [
         Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
       ]
-      when pkh = src_pkh ->
+    (* FIXME-PA *)
+      when Implicit_account_repr.(pkh = Forbidden.of_pkh src_pkh) ->
         return_unit
     | _ -> assert false
   in
@@ -255,7 +263,11 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   let open Lwt_result_syntax in
   let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let src = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* operation = Op.transaction (B b) dest src (Tez.of_mutez_exn 100L) in
   let* b = Block.bake ~operation b in
   let* operation, new_contract =
@@ -277,7 +289,11 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   let open Lwt_result_syntax in
   let* b, dest = Context.init1 ~consensus_threshold_size:0 () in
   let account = Account.new_account () in
-  let src = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* operation = Op.transaction (B b) dest src (Tez.of_mutez_exn 100L) in
   let* b = Block.bake ~operation b in
   let* bal_src = Context.Contract.balance (B b) src in
@@ -311,7 +327,11 @@ let test_transfer_from_implicit_to_implicit_contract () =
   let* b, bootstrap_contract = Context.init1 ~consensus_threshold_size:0 () in
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
-  let src = Contract.Implicit account_a.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account_a.Account.pkh)
+  in
   let* amount1 = two_over_n_of_balance (B b) bootstrap_contract 3L in
   let* fee1 = two_over_n_of_balance (B b) bootstrap_contract 10L in
   let* i = Incremental.begin_construction b in
@@ -328,7 +348,10 @@ let test_transfer_from_implicit_to_implicit_contract () =
   let* b = Incremental.finalize_block i in
   let* i = Incremental.begin_construction b in
   (* Create an implicit contract as a destination contract. *)
-  let dest = Contract.Implicit account_b.pkh in
+  (* FIXME-PA *)
+  let dest =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh account_b.pkh)
+  in
   let* amount2 = two_over_n_of_balance (I i) bootstrap_contract 4L in
   let* fee2 = two_over_n_of_balance (I i) bootstrap_contract 10L in
   (* Transfer from implicit contract to another implicit contract. *)
@@ -351,7 +374,11 @@ let test_transfer_from_implicit_to_originated_contract () =
   let* b, bootstrap_contract = Context.init1 ~consensus_threshold_size:0 () in
   let contract = bootstrap_contract in
   let account = Account.new_account () in
-  let src = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* amount1 = two_over_n_of_balance (B b) bootstrap_contract 3L in
   let* i = Incremental.begin_construction b in
   (* transfer the money to implicit contract *)
@@ -469,7 +496,11 @@ let test_empty_implicit () =
   let open Lwt_result_syntax in
   let* b, dest = Context.init1 () in
   let account = Account.new_account () in
-  let src = Contract.Implicit account.Account.pkh in
+  (* FIXME-PA *)
+  let src =
+    Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh account.Account.pkh)
+  in
   let* amount = two_over_n_of_balance (B b) dest 3L in
   (* Transfer zero tez from an implicit contract. *)
   let* op = Op.transaction (B b) src dest amount in
@@ -626,7 +657,11 @@ let test_ownership_sender () =
   let* b = Incremental.begin_construction b in
   (* get the manager of the contract_1 as a sender *)
   let* manager = Context.Contract.manager (I b) contract_1 in
-  let imcontract_1 = Alpha_context.Contract.Implicit manager.pkh in
+  (* FIXME-PA *)
+  let imcontract_1 =
+    Alpha_context.Contract.Implicit
+      (Implicit_account_repr.Forbidden.of_pkh manager.pkh)
+  in
   let* b, _ =
     transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   in
@@ -835,8 +870,9 @@ let test_storage_fees_and_internal_operation () =
     transfer
       ~block:initial_block
       ~baker:(Context.Contract.pkh contract)
-      ~source:contract
-      ~destination:(Contract.Implicit caller.pkh)
+      ~source:contract (* FIXME-PA *)
+      ~destination:
+        (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh caller.pkh))
       Tez.one_mutez
   in
   (* [originate_and_call] first, originates a contract with an empty string as
@@ -858,8 +894,9 @@ let test_storage_fees_and_internal_operation () =
       ~force_reveal:true
       ~parameters:(Alpha_context.Script.lazy_expr random_string)
       ~block
-      ~baker:(Context.Contract.pkh contract)
-      ~source:(Contract.Implicit caller.pkh)
+      ~baker:(Context.Contract.pkh contract) (* FIXME-PA *)
+      ~source:
+        (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh caller.pkh))
       ~destination:(Contract.Originated contract_hash)
       Tez.zero
   in
@@ -882,7 +919,10 @@ let test_disabled_tz5_account () =
     Context.init1 ~tz5_account_enable:false ~consensus_threshold_size:0 ()
   in
   let new_c = Account.new_account ~algo:Mldsa44 () in
-  let new_contract = Contract.Implicit new_c.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_c.pkh)
+  in
   let* op_transaction =
     Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 10_000_000L)
   in

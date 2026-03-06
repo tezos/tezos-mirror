@@ -51,7 +51,7 @@ val dal_attestations :
 val has_assigned_shards :
   Context.t ->
   ?level:Protocol.Alpha_context.Raw_level.t ->
-  Alpha_context.public_key_hash ->
+  Implicit_account_repr.t ->
   bool tzresult Lwt.t
 
 module Make (P : sig

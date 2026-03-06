@@ -175,12 +175,13 @@ val get_token_info :
 
 (** [is_delegate_registered ctxt delegate] returns [true] if
     [delegate] has active parameters. *)
-val is_delegate_registered : context -> public_key_hash -> bool tzresult Lwt.t
+val is_delegate_registered :
+  context -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
 (** [is_delegate_eventually_registered ctxt delegate] returns [true] if
     [delegate] has active or pending parameters that will eventually be activated. Returns false *)
 val is_delegate_eventually_registered :
-  context -> public_key_hash -> bool tzresult Lwt.t
+  context -> Implicit_account_repr.t -> bool tzresult Lwt.t
 
 (** [register_delegate context ~delegate
     ~edge_of_clst_staking_over_baking_millionth
@@ -189,10 +190,12 @@ val is_delegate_eventually_registered :
     {!Constants_storage.consensus_rights_delay} cycles. *)
 val register_delegate :
   context ->
-  delegate:public_key_hash ->
+  delegate:Implicit_account_repr.t ->
   edge_of_clst_staking_over_baking_millionth:CLST_types.nat ->
   ratio_of_clst_staking_over_direct_staking_billionth:CLST_types.nat ->
   (context, error trace) result Lwt.t
 
 val unregister_delegate :
-  context -> delegate:public_key_hash -> (context, error trace) result Lwt.t
+  context ->
+  delegate:Implicit_account_repr.t ->
+  (context, error trace) result Lwt.t

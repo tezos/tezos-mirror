@@ -399,7 +399,12 @@ let check_overstaked_status ~loc ~expected delegate =
   let open Lwt_result_syntax in
   exec_unit (fun (block, state) ->
       let dlgt = State.find_account delegate state in
-      let* info = Context.Delegate.info (B block) dlgt.pkh in
+      (* FIXME-PA *)
+      let* info =
+        Context.Delegate.info
+          (B block)
+          (Protocol.Implicit_account_repr.Forbidden.of_pkh dlgt.pkh)
+      in
       let* staked_balance =
         Context.Contract.staked_balance (B block) dlgt.contract
       in

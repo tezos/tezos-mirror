@@ -689,7 +689,12 @@ let try_resolve_consensus_keys cctxt key =
   let levels_to_inspect = 50 in
   let pkh = Key_id.to_pkh key.Key.id in
   let* res =
-    Node_rpc.delegate_deactivated cctxt ~chain:`Main ~block:(`Head 0) pkh
+    Node_rpc.delegate_deactivated
+      cctxt
+      ~chain:`Main
+      ~block:(`Head 0)
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh)
   in
   match res with
   | Ok _deactivated ->
@@ -732,7 +737,8 @@ let try_resolve_consensus_keys cctxt key =
                   };
                 ] ->
               (* The primary registered key as delegate found. Return it. *)
-              return delegate
+              (* FIXME-PA *)
+              return (Protocol.Implicit_account_repr.Forbidden.to_pkh delegate)
           | Ok (_ :: _ :: _) -> assert false
         (* we query only one level, the returned list length must be 1 *)
       in
@@ -742,6 +748,10 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
     delegates =
   let open Lwt_result_syntax in
   let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
+  (* FIXME-PA: only have one delegates list *)
+  let delegates_impl =
+    List.map Protocol.Implicit_account_repr.Forbidden.of_pkh delegates
+  in
   let register dal_ctxt =
     let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
     let warn =
@@ -759,7 +769,7 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
             warn ()
           else Lwt.return_unit
     in
-    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
+    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates_impl in
     let delegate_ids = List.map Delegate_id.of_pkh delegates in
     let*! () =
       (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)

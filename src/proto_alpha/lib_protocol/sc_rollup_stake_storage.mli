@@ -140,15 +140,13 @@ val stakers_ids_uncarbonated :
 val staker_id_uncarbonated :
   Raw_context.t ->
   rollup:Sc_rollup_repr.t ->
-  pkh:Signature.public_key_hash ->
+  pkh:Implicit_account_repr.t ->
   Sc_rollup_staker_index_repr.t tzresult Lwt.t
 
 (** [stakers_pkhs_uncarbonated ctxt ~rollup] returns the public key hashes 
     of stakers that are currently actively staking on [rollup] *)
 val stakers_pkhs_uncarbonated :
-  Raw_context.t ->
-  rollup:Sc_rollup_repr.t ->
-  Signature.public_key_hash list Lwt.t
+  Raw_context.t -> rollup:Sc_rollup_repr.t -> Implicit_account_repr.t list Lwt.t
 
 (** [withdraw_stake context rollup staker] removes [staker] and cleans
     its metadata. [staker] is allowed to withdraw if it latest staked

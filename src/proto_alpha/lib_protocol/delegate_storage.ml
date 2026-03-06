@@ -44,8 +44,7 @@
   to unregister.
 *)
 
-type error +=
-  | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
+type error += (* `Permanent *) Unregistered_delegate of Implicit_account_repr.t
 
 let () =
   (* Unregistered delegate *)
@@ -59,9 +58,9 @@ let () =
         ppf
         "The provided public key (with hash %a) is not registered as valid \
          delegate key."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         k)
-    Data_encoding.(obj1 (req "hash" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Implicit_account_repr.encoding))
     (function Unregistered_delegate k -> Some k | _ -> None)
     (fun k -> Unregistered_delegate k)
 
@@ -86,7 +85,7 @@ module Contract = struct
 
   type error +=
     | (* `Temporary *) Active_delegate
-    | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
+    | (* `Permanent *) Empty_delegate_account of Implicit_account_repr.t
     | (* `Permanent *) Tz5_cannot_be_a_delegate of Mldsa44.Public_key_hash.t
 
   let () =
@@ -111,9 +110,9 @@ module Contract = struct
           ppf
           "Delegate registration is forbidden when the delegate\n\
           \           implicit account is empty (%a)"
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function Empty_delegate_account c -> Some c | _ -> None)
       (fun c -> Empty_delegate_account c) ;
     register_error_kind
@@ -133,11 +132,15 @@ module Contract = struct
       (function Tz5_cannot_be_a_delegate d -> Some d | _ -> None)
       (fun d -> Tz5_cannot_be_a_delegate d)
 
-  let check_not_tz5 : Signature.Public_key_hash.t -> unit tzresult =
+  let check_not_tz5 : Implicit_account_repr.t -> unit tzresult =
     let open Result_syntax in
-    function
-    | Mldsa44 tz5 -> tzfail (Tz5_cannot_be_a_delegate tz5)
-    | Ed25519 _ | Secp256k1 _ | P256 _ | Bls _ -> return_unit
+    fun delegate ->
+      if Implicit_account_repr.is_tz5 delegate then
+        (* FIXME-PA *)
+        match Implicit_account_repr.Forbidden.to_pkh delegate with
+        | Mldsa44 tz5 -> tzfail (Tz5_cannot_be_a_delegate tz5)
+        | Ed25519 _ | Secp256k1 _ | P256 _ | Bls _ -> return_unit
+      else return_unit
 
   let set_self_delegate c delegate =
     let open Lwt_result_syntax in
@@ -182,7 +185,7 @@ module Contract = struct
       return c
 
   type error +=
-    | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
+    | (* `Permanent *) No_deletion of Implicit_account_repr.t
     | (* `Temporary *) Current_delegate
 
   let () =
@@ -195,9 +198,9 @@ module Contract = struct
         Format.fprintf
           ppf
           "Delegate deletion is forbidden (%a)"
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function No_deletion c -> Some c | _ -> None)
       (fun c -> No_deletion c) ;
     register_error_kind
@@ -230,7 +233,7 @@ module Contract = struct
              existing smart contracts. *)
           return_unit
       | Some delegate, Some current_delegate
-        when Signature.Public_key_hash.equal delegate current_delegate ->
+        when Implicit_account_repr.equal delegate current_delegate ->
           tzfail Current_delegate
       | _ -> return_unit
     in
@@ -264,7 +267,7 @@ module Contract = struct
   let set c contract delegate =
     match (delegate, contract) with
     | Some delegate, Contract_repr.Implicit source
-      when Signature.Public_key_hash.equal source delegate ->
+      when Implicit_account_repr.equal source delegate ->
         set_self_delegate c delegate
     | _ -> set_delegate c contract delegate
 end
@@ -278,7 +281,7 @@ let initial_frozen_deposits ctxt delegate =
   let* ctxt, stake_opt =
     match Raw_context.find_stake_distribution_for_current_cycle ctxt with
     | Some distribution ->
-        return (ctxt, Signature.Public_key_hash.Map.find delegate distribution)
+        return (ctxt, Implicit_account_repr.Map.find delegate distribution)
     | None ->
         (* This branch happens when the stake distribution is not initialized in
            [ctxt], e.g. when RPCs are called or operations are simulated. *)
@@ -286,7 +289,7 @@ let initial_frozen_deposits ctxt delegate =
         let+ ctxt, stakes =
           Stake_storage.get_selected_distribution ctxt current_cycle
         in
-        (ctxt, List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes)
+        (ctxt, List.assoc ~equal:Implicit_account_repr.equal delegate stakes)
   in
   match stake_opt with
   | None -> return (ctxt, Tez_repr.zero)
@@ -301,9 +304,7 @@ let initial_frozen_deposits_of_previous_cycle ctxt delegate =
       let+ ctxt, stakes =
         Stake_storage.get_selected_distribution ctxt previous_cycle
       in
-      match
-        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
-      with
+      match List.assoc ~equal:Implicit_account_repr.equal delegate stakes with
       | None -> (ctxt, Tez_repr.zero)
       | Some {frozen; weighted_delegated = _} -> (ctxt, frozen))
 

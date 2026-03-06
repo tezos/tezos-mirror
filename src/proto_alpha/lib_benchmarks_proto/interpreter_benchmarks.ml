@@ -3696,9 +3696,7 @@ module Registration_section = struct
       let one = Script_int.one_n in
       let ticket =
         {
-          ticketer =
-            Alpha_context.Contract.Implicit
-              Environment.Signature.Public_key_hash.zero;
+          ticketer = Alpha_context.Contract.Implicit Implicit_account_repr.zero;
           contents = ();
           amount = Ticket_amount.(add one one);
         }
@@ -3932,8 +3930,8 @@ module Registration_section = struct
           let open Alpha_context in
           let step_constants =
             {
-              sender = Contract (Implicit Signature.Public_key_hash.zero);
-              payer = Signature.Public_key_hash.zero;
+              sender = Contract (Implicit Implicit_account_repr.zero);
+              payer = Implicit_account_repr.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
               balance = Tez.zero;

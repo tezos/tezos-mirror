@@ -519,14 +519,12 @@ let verify_execute_outbox_message_operations ctxt rollup ~loc ~operations
 let verify_whitelist ~loc ~expected_whitelist rollup ctxt =
   let open Lwt_result_syntax in
   let* found_whitelist = Context.Sc_rollup.whitelist ctxt rollup in
-  let sort_whitelist =
-    Option.map (List.sort Signature.Public_key_hash.compare)
-  in
+  let sort_whitelist = Option.map (List.sort Implicit_account_repr.compare) in
   let found_sorted = sort_whitelist found_whitelist in
   let expected_sorted = sort_whitelist expected_whitelist in
-  Assert.(assert_equal_list_opt ~loc Signature.Public_key_hash.equal)
+  Assert.(assert_equal_list_opt ~loc Implicit_account_repr.equal)
     "whitelist"
-    Signature.Public_key_hash.pp
+    Implicit_account_repr.pp
     expected_sorted
     found_sorted
 
@@ -1915,8 +1913,7 @@ let test_number_of_parallel_games_bounded () =
         (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached xstaker)
       :: _ ->
         assert (
-          Signature.Public_key_hash.(
-            xstaker = Account.pkh_of_contract_exn staker)) ;
+          Implicit_account_repr.(xstaker = Account.pkh_of_contract_exn staker)) ;
         return_unit
     | _ ->
         failwith

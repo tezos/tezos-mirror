@@ -84,9 +84,11 @@ val pp : Format.formatter -> t -> unit
     uses in RAM. *)
 val in_memory_size : t -> Cache_memory_helpers.sint
 
-(** A [Staker] is an implicit account, identified by its public key hash. *)
+(** A [Staker] is an implicit account, identified by its account hash. *)
 module Staker : sig
-  include S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+  include module type of struct
+    include Implicit_account_repr
+  end
 
   (** Classic RPC argument with name ["pkh"]. *)
   val rpc_arg : t RPC_arg.t

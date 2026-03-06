@@ -47,7 +47,11 @@ let injector_operation_to_manager :
       let refutation =
         Sc_rollup_proto_types.Game.refutation_of_octez refutation
       in
-      let opponent = Signature.Of_V_latest.get_public_key_hash_exn opponent in
+      (* FIXME-PA *)
+      let opponent =
+        Protocol.Implicit_account_repr.Forbidden.of_pkh
+          (Signature.Of_V_latest.get_public_key_hash_exn opponent)
+      in
       Manager (Sc_rollup_refute {rollup; opponent; refutation})
   | Timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
@@ -55,7 +59,11 @@ let injector_operation_to_manager :
       Manager (Sc_rollup_timeout {rollup; stakers})
   | Recover_bond {rollup; staker} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
-      let staker = Signature.Of_V_latest.get_public_key_hash_exn staker in
+      (* FIXME-PA *)
+      let staker =
+        Protocol.Implicit_account_repr.Forbidden.of_pkh
+          (Signature.Of_V_latest.get_public_key_hash_exn staker)
+      in
       Manager (Sc_rollup_recover_bond {sc_rollup = rollup; staker})
   | Execute_outbox_message {rollup; cemented_commitment; output_proof} ->
       let rollup = Sc_rollup_proto_types.Address.of_octez rollup in
@@ -103,7 +111,11 @@ let injector_operation_of_manager : type kind.
       let refutation =
         Sc_rollup_proto_types.Game.refutation_to_octez refutation
       in
-      let opponent = Tezos_crypto.Signature.Of_V3.public_key_hash opponent in
+      (* FIXME-PA *)
+      let opponent =
+        Tezos_crypto.Signature.Of_V3.public_key_hash
+          (Protocol.Implicit_account_repr.Forbidden.to_pkh opponent)
+      in
       Some (Refute {rollup; opponent; refutation})
   | Sc_rollup_timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in
@@ -145,7 +157,7 @@ module Proto_client = struct
     let contents =
       Manager_operation
         {
-          source = Signature.Public_key_hash.zero;
+          source = Protocol.Implicit_account_repr.zero;
           operation;
           fee = Tez.zero;
           counter = Manager_counter.Internal_for_tests.of_int 0;
@@ -178,7 +190,7 @@ module Proto_client = struct
     let dummy_contents =
       Manager_operation
         {
-          source = Signature.Public_key_hash.zero;
+          source = Protocol.Implicit_account_repr.zero;
           operation = dummy_operation;
           fee = Tez.of_mutez_exn 3_000_000L;
           counter = Manager_counter.Internal_for_tests.of_int 500_000;
@@ -335,8 +347,8 @@ module Proto_client = struct
         ~simulation:true (* Only simulation here *)
         ~force
         ~chain:cctxt#chain
-        ~block:(`Head 0)
-        ~source
+        ~block:(`Head 0) (* FIXME-PA *)
+        ~source:(Protocol.Implicit_account_repr.Forbidden.of_pkh source)
         ~src_pk
         ~src_sk:dummy_sk_uri
           (* Use dummy secret key as it is not used by simulation *)
@@ -520,7 +532,8 @@ module Proto_client = struct
       Plugin.Alpha_services.Contract.balance
         cctxt
         (cctxt#chain, block)
-        (Implicit pkh)
+        (* FIXME-PA *)
+        (Implicit (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh))
     in
     Protocol.Alpha_context.Tez.to_mutez balance
 end

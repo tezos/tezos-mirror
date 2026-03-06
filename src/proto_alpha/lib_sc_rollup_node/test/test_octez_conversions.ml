@@ -232,9 +232,12 @@ let gen_slot_header_with_status =
     let attested_shards, attesters =
       if status then
         let attester = Signature.Of_V_latest.get_public_key_hash_exn attester in
-        ( total_shards,
-          Environment.Signature.Public_key_hash.Set.singleton attester )
-      else (0, Environment.Signature.Public_key_hash.Set.empty)
+        (* FIXME-PA *)
+        let attester =
+          Protocol.Implicit_account_repr.Forbidden.of_pkh attester
+        in
+        (total_shards, Protocol.Implicit_account_repr.Set.singleton attester)
+      else (0, Protocol.Implicit_account_repr.Set.empty)
     in
     Dal.Attestations.
       {total_shards; attested_shards; is_proto_attested = status; attesters}
@@ -279,7 +282,9 @@ let gen_slot_history =
           List.map
             (fun (h, publisher, status) ->
               let publisher =
-                Signature.Of_V_latest.get_public_key_hash_exn publisher
+                (* FIXME-PA *)
+                Protocol.Implicit_account_repr.Forbidden.of_pkh
+                  (Signature.Of_V_latest.get_public_key_hash_exn publisher)
               in
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
                 Contract.Implicit publisher,
@@ -326,7 +331,9 @@ let gen_slot_history_cache =
           List.map
             (fun (h, publisher, status) ->
               let publisher =
-                Signature.Of_V_latest.get_public_key_hash_exn publisher
+                (* FIXME-PA *)
+                Protocol.Implicit_account_repr.Forbidden.of_pkh
+                  (Signature.Of_V_latest.get_public_key_hash_exn publisher)
               in
               ( Sc_rollup_proto_types.Dal.Slot_header.of_octez ~number_of_slots h,
                 Contract.Implicit publisher,

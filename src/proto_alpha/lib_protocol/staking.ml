@@ -110,7 +110,7 @@ let may_stake_from_unstake_for_delegate_and_finalize ctxt ~delegate
     ~sender_contract amount =
   let open Lwt_result_syntax in
   let check_delegate_of_unfinalizable_requests requests_delegate =
-    if Signature.Public_key_hash.(delegate <> requests_delegate) then
+    if Implicit_account_repr.(delegate <> requests_delegate) then
       tzfail
         Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate
     else return_unit
@@ -136,7 +136,7 @@ let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
   in
   (* Issue pseudotokens for delegators *)
   let* ctxt, stake_balance_updates2 =
-    if Signature.Public_key_hash.(sender <> delegate) then
+    if Implicit_account_repr.(sender <> delegate) then
       Staking_pseudotokens_storage.stake
         ctxt
         ~contract:sender_contract

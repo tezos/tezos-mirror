@@ -61,7 +61,7 @@ let in_memory_size (_ : t) =
   h1w +! string_size_gen Address.size
 
 module Staker = struct
-  include Signature.Public_key_hash
+  include Implicit_account_repr
 
   let rpc_arg_staker1 =
     RPC_arg.like rpc_arg ?descr:(RPC_arg.descr rpc_arg).descr "staker1_pkh"

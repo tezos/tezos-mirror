@@ -34,7 +34,7 @@ open Environment.Error_monad
 open Protocol
 open Protocol.Alpha_context
 
-type error += (* `Temporary *) Not_registered of Signature.Public_key_hash.t
+type error += (* `Temporary *) Not_registered of Implicit_account_repr.t
 
 val list :
   'a #RPC_context.simple ->
@@ -44,7 +44,7 @@ val list :
   ?with_minimal_stake:bool ->
   ?without_minimal_stake:bool ->
   unit ->
-  Signature.Public_key_hash.t list shell_tzresult Lwt.t
+  Implicit_account_repr.t list shell_tzresult Lwt.t
 
 type consensus_key = {
   consensus_key_pkh : Signature.Public_key_hash.t;
@@ -92,151 +92,178 @@ type info = {
 }
 
 val is_forbidden :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> bool shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  bool shell_tzresult Lwt.t
 
 val full_balance :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez.t shell_tzresult Lwt.t
 
 val current_frozen_deposits :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez.t shell_tzresult Lwt.t
 
 val frozen_deposits :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez.t shell_tzresult Lwt.t
 
 val unstaked_frozen_deposits :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   deposit_per_cycle list shell_tzresult Lwt.t
 
 val staking_balance :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez.t shell_tzresult Lwt.t
 
 val frozen_deposits_limit :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez.t option shell_tzresult Lwt.t
 
 val delegated_contracts :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Contract.t list shell_tzresult Lwt.t
 
 val total_delegated_stake :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  Tez.t shell_tzresult Lwt.t
 
 val staking_denominator :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Staking_pseudotoken.t shell_tzresult Lwt.t
 
 val deactivated :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   bool shell_tzresult Lwt.t
 
 val grace_period :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Cycle.t shell_tzresult Lwt.t
 
 val current_voting_power :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  int64 shell_tzresult Lwt.t
 
 val voting_power :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  int64 shell_tzresult Lwt.t
 
 val current_baking_power :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  int64 shell_tzresult Lwt.t
 
 val voting_info :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Vote.delegate_info shell_tzresult Lwt.t
 
 val consensus_key :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   consensus_keys_info shell_tzresult Lwt.t
 
 val companion_key :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   companion_keys_info shell_tzresult Lwt.t
 
 val participation :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Delegate.For_RPC.participation_info shell_tzresult Lwt.t
 
 val dal_participation :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Delegate.For_RPC.dal_participation_info shell_tzresult Lwt.t
 
 val active_staking_parameters :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Staking_parameters_repr.t shell_tzresult Lwt.t
 
 val pending_staking_parameters :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   (Cycle.t * Staking_parameters_repr.t) list shell_tzresult Lwt.t
 
 val clst_registered :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> bool shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  bool shell_tzresult Lwt.t
 
 val active_clst_staking_parameters :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Clst_delegates_parameters_repr.t option shell_tzresult Lwt.t
 
 val pending_clst_staking_parameters :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   (Cycle.t * Clst_delegates_parameters_repr.update) list shell_tzresult Lwt.t
 
 val stez_staking_power :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  Tez.t shell_tzresult Lwt.t
 
 val pending_denunciations :
   'a #RPC_context.simple ->
   'a ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   Denunciations_repr.t shell_tzresult Lwt.t
 
 val estimated_shared_pending_slashed_amount :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  Tez.t shell_tzresult Lwt.t
 
 val info :
-  'a #RPC_context.simple -> 'a -> public_key_hash -> info shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Implicit_account_repr.t ->
+  info shell_tzresult Lwt.t
 
 val register : unit -> unit
 
@@ -247,18 +274,19 @@ val register : unit -> unit
 module Implem : sig
   val check_delegate_registered :
     Alpha_context.t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     unit Environment.Error_monad.tzresult Lwt.t
 
   val total_delegated :
     Alpha_context.t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     Tez.t Environment.Error_monad.tzresult Lwt.t
 
   val own_delegated :
     Alpha_context.t ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     Tez.t Environment.Error_monad.tzresult Lwt.t
 
-  val delegators : Alpha_context.t -> public_key_hash -> Contract.t list Lwt.t
+  val delegators :
+    Alpha_context.t -> Implicit_account_repr.t -> Contract.t list Lwt.t
 end

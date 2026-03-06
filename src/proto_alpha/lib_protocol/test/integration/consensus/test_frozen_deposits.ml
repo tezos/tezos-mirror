@@ -92,8 +92,11 @@ let test_invariants () =
      N.B. account2 represents a delegate so it cannot delegate to account1; this is
      why we go through new_account as an intermediate *)
   let* spendable_balance2 = Context.Contract.balance (B genesis) contract2 in
+  (* FIXME-PA *)
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.Implicit new_account in
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_account)
+  in
   (* we first put some money in new_account *)
   let* transfer =
     Op.transaction
@@ -181,8 +184,11 @@ let test_limit_with_overdelegation () =
   let amount = Tez_helpers.(initial_staking_balance *! 8L /! 10L) in
   let amount' = Tez_helpers.(initial_staking_balance' *! 8L /! 10L) in
   let limit = Tez_helpers.(initial_staking_balance *! 15L /! 100L) in
+  (* FIXME-PA *)
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.Implicit new_account in
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_account)
+  in
   let* transfer1 =
     Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
   in
@@ -502,7 +508,10 @@ let test_frozen_deposits_with_delegation () =
   in
   let* delegated_amount = Context.Contract.balance (B genesis) contract2 in
   let new_account = Account.new_account () in
-  let new_contract = Contract.Implicit new_account.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_account.pkh)
+  in
   let* transfer =
     Op.transaction
       ~force_reveal:true
@@ -583,8 +592,11 @@ let test_frozen_deposits_with_overdelegation () =
   in
   let* amount = Context.Contract.balance (B genesis) contract1 in
   let* amount' = Context.Contract.balance (B genesis) contract2 in
+  (* FIXME-PA *)
   let new_account = (Account.new_account ()).pkh in
-  let new_contract = Contract.Implicit new_account in
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_account)
+  in
   let* transfer1 =
     Op.transaction ~force_reveal:true (B genesis) contract1 new_contract amount
   in
@@ -687,7 +699,10 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
      than [new_cycle + consensus_rights_delay]. *)
   let* delegated_amount = Context.Contract.balance (B genesis) contract2 in
   let new_account = Account.new_account () in
-  let new_contract = Contract.Implicit new_account.pkh in
+  (* FIXME-PA *)
+  let new_contract =
+    Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh new_account.pkh)
+  in
   let* transfer =
     Op.transaction
       ~force_reveal:true

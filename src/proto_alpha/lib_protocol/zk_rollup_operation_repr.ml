@@ -28,7 +28,7 @@ type price = {id : Ticket_hash_repr.t; amount : Z.t}
 type t = {
   op_code : int;
   price : price;
-  l1_dst : Signature.Public_key_hash.t;
+  l1_dst : Implicit_account_repr.t;
   rollup_id : Zk_rollup_repr.t;
   payload : Zk_rollup_scalar.t array;
 }
@@ -36,8 +36,12 @@ type t = {
 let int_to_scalar x = Zk_rollup_scalar.of_z (Z.of_int x)
 
 let pkh_to_scalar x =
+  (* FIXME-PA: to_scalar_array is fed to the Plonk verifier; changing the
+     encoding here would break existing ZK proofs. *)
   Zk_rollup_scalar.of_bits
-    (Data_encoding.Binary.to_string_exn Signature.Public_key_hash.encoding x)
+    (Data_encoding.Binary.to_string_exn
+       Signature.Public_key_hash.encoding
+       (Implicit_account_repr.Forbidden.to_pkh x))
 
 let ticket_hash_to_scalar ticket_hash =
   Zk_rollup_scalar.of_bits
@@ -73,6 +77,6 @@ let encoding =
       (obj5
          (req "op_code" int31)
          (req "price" price_encoding)
-         (req "l1_dst" Signature.Public_key_hash.encoding)
+         (req "l1_dst" Implicit_account_repr.encoding)
          (req "rollup_id" Zk_rollup_repr.Address.encoding)
          (req "payload" Plonk.scalar_array_encoding)))

@@ -38,8 +38,8 @@ type dbl_attestation_state = {
 type state = {
   block : Block.t;
   pred : Block.t option;
-  bootstraps : public_key_hash list;
-  delegates : (public_key_hash * public_key_hash option) list;
+  bootstraps : Implicit_account_repr.t list;
+  delegates : (Implicit_account_repr.t * Implicit_account_repr.t option) list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
   protocol_hashes : Protocol_hash.t list;
@@ -356,7 +356,8 @@ let dbl_attestation_prelude state =
   let open Lwt_result_syntax in
   let* head_A = Block.bake ~policy:(By_round 0) state.block in
   let* addr = pick_addr_attester (B state.block) in
-  let ctr = Contract.Implicit addr in
+  (* FIXME-PA *)
+  let ctr = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh addr) in
   let* operation = Op.transaction (B state.block) ctr ctr Tez.one_mutez in
   let* head_B = Block.bake ~policy:(By_round 0) state.block ~operation in
   let heads, state = register_temporary head_A head_B state in
@@ -471,7 +472,10 @@ let double_baking_descriptor =
               Context.get_first_different_bakers (B state.block)
             in
             let* addr = pick_addr_attester (B state.block) in
-            let ctr = Contract.Implicit addr in
+            (* FIXME-PA *)
+            let ctr =
+              Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh addr)
+            in
             let* operation =
               Op.transaction (B state.block) ctr ctr Tez.one_mutez
             in
@@ -517,7 +521,8 @@ let drain_delegate_prelude state =
           | (delegate, None) as del ->
               if i mod 2 = 0 then
                 let acc = Account.new_account () in
-                (delegate, Some acc.pkh)
+                (* FIXME-PA *)
+                (delegate, Some (Implicit_account_repr.Forbidden.of_pkh acc.pkh))
               else del
           | del -> del (* should not happen but apparently does...*))
         state.delegates
@@ -530,7 +535,10 @@ let drain_delegate_prelude state =
     let* ops =
       List.fold_left_es
         (fun ops (del, ck) ->
-          let* {Account.pk; _} = Account.find ck in
+          (* FIXME-PA *)
+          let* {Account.pk; _} =
+            Account.find (Implicit_account_repr.Forbidden.to_pkh ck)
+          in
           let* op =
             Op.update_consensus_key (B state.block) (Contract.Implicit del) pk
           in
@@ -560,8 +568,9 @@ let drain_delegate_descriptor =
           | Some consensus_key ->
               let* op =
                 Op.drain_delegate
-                  (B state.block)
-                  ~consensus_key
+                  (B state.block) (* FIXME-PA *)
+                  ~consensus_key:
+                    (Implicit_account_repr.Forbidden.to_pkh consensus_key)
                   ~delegate
                   ~destination:consensus_key
               in
@@ -622,7 +631,8 @@ let preattestation_descriptor =
           if
             List.exists
               (fun {Context.delegate; _} ->
-                Signature.Public_key_hash.equal delegate manager_pkh)
+                (* FIXME-PA *)
+                Implicit_account_repr.compare delegate manager_pkh = 0)
               attesters
           then
             (* The manager key has attesting rights on this block *)
@@ -649,7 +659,8 @@ let attestation_descriptor =
           if
             List.exists
               (fun {Context.delegate; _} ->
-                Signature.Public_key_hash.equal delegate manager_pkh)
+                (* FIXME-PA *)
+                Implicit_account_repr.compare delegate manager_pkh = 0)
               attesters
           then
             (* The manager key has attesting rights on this block *)
@@ -762,7 +773,13 @@ let manager_prelude (infos : Manager.infos) b =
     let bootstrap, counter, ops = Stdlib.List.nth ops_by_bootstrap (n - 1) in
     let amount = Tez.of_mutez (Int64.of_int 150000) in
     let+ op, counter =
-      Manager.fund_account_op b bootstrap account.pkh amount counter
+      (* FIXME-PA *)
+      Manager.fund_account_op
+        b
+        bootstrap
+        (Implicit_account_repr.Forbidden.of_pkh account.pkh)
+        amount
+        counter
     in
     (account :: sources, add bootstrap counter (op :: ops) ops_by_bootstrap)
   in
@@ -808,8 +825,9 @@ let manager_candidates block infos batch_max_size =
     in
     let* operations = return (reveal :: operations) in
     Op.batch_operations
-      ~recompute_counters:true
-      ~source:(Contract.Implicit source.pkh)
+      ~recompute_counters:true (* FIXME-PA *)
+      ~source:
+        (Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh source.pkh))
       (B block)
       operations
   in

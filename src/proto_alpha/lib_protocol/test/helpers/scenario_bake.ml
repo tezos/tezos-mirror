@@ -58,7 +58,15 @@ let check_all_balances _full_metadata (block, state) : unit tzresult Lwt.t =
       (fun name account acc ->
         if account.revealed then (
           log_debug_balance name account_map ;
-          let* () = log_debug_rpc_balance name (Implicit account.pkh) block in
+          (* FIXME-PA *)
+          let* () =
+            log_debug_rpc_balance
+              name
+              (* FIXME-PA *)
+              (Implicit
+                 (Protocol.Implicit_account_repr.Forbidden.of_pkh account.pkh))
+              block
+          in
           let*! r =
             assert_balance_check ~loc:__LOC__ (B block) name account_map
           in
@@ -102,7 +110,10 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
               ufd_state
           in
           let* u_rpc =
-            Context.Delegate.unstaked_frozen_deposits (B block) account.pkh
+            (* FIXME-PA *)
+            Context.Delegate.unstaked_frozen_deposits
+              (B block)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh account.pkh)
           in
           let u_rpc =
             List.map
@@ -145,7 +156,10 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
           in
           let*! r = Assert.join_errors r1 r2 in
           let* deactivated_rpc =
-            Context.Delegate.deactivated (B block) account.pkh
+            (* FIXME-PA *)
+            Context.Delegate.deactivated
+              (B block)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh account.pkh)
           in
           let current_cycle = Block.current_cycle block in
           let ctxt_cycle =
@@ -252,7 +266,10 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
               baker ;
             assert false
         in
-        Some (Block.By_account pkh)
+        (* FIXME-PA *)
+        Some
+          (Block.By_account
+             (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh))
   in
   let payload_round =
     match payload_round with
@@ -261,7 +278,10 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
   in
   let* baker, _, _, _ = Block.get_next_baker ?policy block in
   let baker_name, {contract = baker_contract; _} =
-    State.find_account_from_pkh baker state
+    (* FIXME-PA *)
+    State.find_account_from_pkh
+      (Protocol.Implicit_account_repr.Forbidden.to_pkh baker)
+      state
   in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
   let* next_level =

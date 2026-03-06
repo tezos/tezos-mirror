@@ -143,7 +143,7 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
     ~get_shard_count_map current_block_accountability stored_history =
   let open Dal_attestations_repr.Accountability in
   let number_of_shards_of_delegate shard_count_map delegate =
-    match Signature.Public_key_hash.Map.find delegate shard_count_map with
+    match Implicit_account_repr.Map.find delegate shard_count_map with
     | None -> 0
     | Some n -> n
   in
@@ -166,23 +166,21 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
           {
             total_shards = number_of_shards;
             attested_shards = 0;
-            attesters = Signature.Public_key_hash.Set.empty;
+            attesters = Implicit_account_repr.Set.empty;
             is_proto_attested = false;
           }
     in
     (* Find attesters who are new (attested this block but not in previous blocks) *)
     let new_attesters =
-      Signature.Public_key_hash.Set.diff
-        current_attesters
-        stored_status.attesters
+      Implicit_account_repr.Set.diff current_attesters stored_status.attesters
     in
-    if Signature.Public_key_hash.Set.is_empty new_attesters then
+    if Implicit_account_repr.Set.is_empty new_attesters then
       (* All current attesters already attested before; nothing to add *)
       (level_history, newly_attested_slots)
     else
       (* Sum up shards from new attesters using the pre-resolved map. *)
       let shards_to_add =
-        Signature.Public_key_hash.Set.fold
+        Implicit_account_repr.Set.fold
           (fun attester acc ->
             acc + number_of_shards_of_delegate shard_count_map attester)
           new_attesters
@@ -200,7 +198,7 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
           total_shards = number_of_shards;
           attested_shards = merged_shards;
           attesters =
-            Signature.Public_key_hash.Set.union
+            Implicit_account_repr.Set.union
               stored_status.attesters
               new_attesters;
           is_proto_attested = is_attested_now;
@@ -227,7 +225,7 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
     in
     let shard_count_map =
       match get_shard_count_map ~committee_level with
-      | None -> Signature.Public_key_hash.Map.empty
+      | None -> Implicit_account_repr.Map.empty
       | Some map -> map
     in
     let stored_level_history =
@@ -363,7 +361,7 @@ let update_skip_list ctxt ~stored_history ~updated_history newly_attested
                                 is_proto_attested = false;
                                 attested_shards = 0;
                                 total_shards = number_of_shards;
-                                attesters = Signature.Public_key_hash.Set.empty;
+                                attesters = Implicit_account_repr.Set.empty;
                               }
                       | Some status -> (
                           if
@@ -460,9 +458,9 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
             else
               (* First, we increase the [number_of_slots_attested_by_delegate] of all those that attested. *)
               let delegate_map =
-                Signature.Public_key_hash.Set.fold
+                Implicit_account_repr.Set.fold
                   (fun attester delegate_map ->
-                    Signature.Public_key_hash.Map.update
+                    Implicit_account_repr.Map.update
                       attester
                       (function
                         | None -> Some (1, 1)
@@ -490,15 +488,15 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
                   [delegate_to_shard_count] *)
                   assert false
               | Some delegate_to_shard_count ->
-                  Signature.Public_key_hash.Map.fold
+                  Implicit_account_repr.Map.fold
                     (fun delegate _shard_count delegate_map ->
                       if
                         not
-                        @@ Signature.Public_key_hash.Set.mem
+                        @@ Implicit_account_repr.Set.mem
                              delegate
                              status.attesters
                       then
-                        Signature.Public_key_hash.Map.update
+                        Implicit_account_repr.Map.update
                           delegate
                           (function
                             | None -> Some (0, 1)
@@ -513,9 +511,9 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
                     delegate_to_shard_count
                     delegate_map)
           finalized_level_map
-          Signature.Public_key_hash.Map.empty
+          Implicit_account_repr.Map.empty
       in
-      Signature.Public_key_hash.Map.fold_es
+      Implicit_account_repr.Map.fold_es
         (fun delegate
              ( number_of_slots_attested_by_delegate,
                number_of_protocol_attested_slots )

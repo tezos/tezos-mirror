@@ -36,7 +36,7 @@ val ballots : 'a #RPC_context.simple -> 'a -> Vote.ballots shell_tzresult Lwt.t
 val ballot_list :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.Public_key_hash.t * Vote.ballot) list shell_tzresult Lwt.t
+  (Implicit_account_repr.t * Vote.ballot) list shell_tzresult Lwt.t
 
 val current_period :
   'a #RPC_context.simple -> 'a -> Voting_period.info shell_tzresult Lwt.t
@@ -50,7 +50,7 @@ val current_quorum :
 val listings :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.Public_key_hash.t * int64) list shell_tzresult Lwt.t
+  (Implicit_account_repr.t * int64) list shell_tzresult Lwt.t
 
 val proposals :
   'a #RPC_context.simple ->
@@ -68,7 +68,7 @@ val total_voting_power :
 val delegate_proposal_count :
   'a #RPC_context.simple ->
   'a ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   int shell_tzresult Lwt.t
 
 module S : sig
@@ -89,7 +89,7 @@ module S : sig
       Updater.rpc_context,
       unit,
       unit,
-      (public_key_hash * Vote.ballot) list )
+      (Implicit_account_repr.t * Vote.ballot) list )
     RPC_service.t
 
   val current_period :
@@ -125,7 +125,7 @@ module S : sig
       Updater.rpc_context,
       unit,
       unit,
-      (public_key_hash * int64) list )
+      (Implicit_account_repr.t * int64) list )
     RPC_service.t
 
   val proposals :
@@ -158,7 +158,7 @@ module S : sig
   val delegate_proposal_count :
     ( [`GET],
       Updater.rpc_context,
-      Updater.rpc_context * public_key_hash,
+      Updater.rpc_context * Implicit_account_repr.t,
       unit,
       unit,
       int )

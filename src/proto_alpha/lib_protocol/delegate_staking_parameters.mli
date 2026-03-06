@@ -25,17 +25,17 @@
 
 val of_delegate :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Staking_parameters_repr.t tzresult Lwt.t
 
 val pending_updates :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   (Cycle_repr.t * Staking_parameters_repr.t) list tzresult Lwt.t
 
 val register_update :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Staking_parameters_repr.t ->
   Raw_context.t tzresult Lwt.t
 

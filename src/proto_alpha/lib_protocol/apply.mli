@@ -37,11 +37,11 @@ open Alpha_context
 
 type error +=
   | Faulty_validation_wrong_slot
-  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Set_deposits_limit_on_unregistered_delegate of Implicit_account_repr.t
   | Set_deposits_limit_when_automated_staking_off
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of
-      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
+      (Implicit_account_repr.t * Operation_repr.consensus_key_kind)
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
   | Internal_operation_replay of

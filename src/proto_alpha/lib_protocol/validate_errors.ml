@@ -53,7 +53,7 @@ let pp_option pp fmt = function
   | Some v -> Format.fprintf fmt "%a" pp v
 
 module Consensus = struct
-  type error += Forbidden_delegate of Signature.Public_key_hash.t
+  type error += Forbidden_delegate of Implicit_account_repr.t
 
   let () =
     register_error_kind
@@ -66,9 +66,9 @@ module Consensus = struct
           ppf
           "Delegate %a has committed too many misbehaviours; it is temporarily \
            not allowed to bake/preattest/attest."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function Forbidden_delegate delegate -> Some delegate | _ -> None)
       (fun delegate -> Forbidden_delegate delegate)
 
@@ -476,14 +476,14 @@ module Voting = struct
     | Too_many_proposals of {previous_count : int; operation_count : int}
     | Conflicting_proposals of operation_conflict
     | Testnet_dictator_multiple_proposals
-    | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Proposals_from_unregistered_delegate of Implicit_account_repr.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
-    | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Ballot_from_unregistered_delegate of Implicit_account_repr.t
     | Conflicting_ballot of operation_conflict
 
   let () =
@@ -651,9 +651,9 @@ module Voting = struct
           ppf
           "Cannot submit proposals with public key hash %a (unregistered \
            delegate)."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           c)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function Proposals_from_unregistered_delegate c -> Some c | _ -> None)
       (fun c -> Proposals_from_unregistered_delegate c) ;
 
@@ -703,9 +703,9 @@ module Voting = struct
         Format.fprintf
           ppf
           "Cannot cast a ballot for public key hash %a (unregistered delegate)."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           c)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function Ballot_from_unregistered_delegate c -> Some c | _ -> None)
       (fun c -> Ballot_from_unregistered_delegate c) ;
     register_error_kind
@@ -797,12 +797,12 @@ module Anonymous = struct
     | Invalid_denunciation of denunciation_kind
     | Inconsistent_denunciation of {
         kind : denunciation_kind;
-        delegate1 : Signature.Public_key_hash.t;
-        delegate2 : Signature.Public_key_hash.t;
+        delegate1 : Implicit_account_repr.t;
+        delegate2 : Implicit_account_repr.t;
       }
     | Already_denounced of {
         kind : denunciation_kind;
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Level.t;
       }
     | Conflicting_denunciation of {
@@ -883,15 +883,15 @@ module Anonymous = struct
           "Inconsistent double-%a evidence (distinct delegate: %a and %a)"
           pp_denunciation_kind
           kind
-          Signature.Public_key_hash.pp_short
+          Implicit_account_repr.pp_short
           delegate1
-          Signature.Public_key_hash.pp_short
+          Implicit_account_repr.pp_short
           delegate2)
       Data_encoding.(
         obj3
           (req "kind" Misbehaviour.kind_encoding)
-          (req "delegate1" Signature.Public_key_hash.encoding)
-          (req "delegate2" Signature.Public_key_hash.encoding))
+          (req "delegate1" Implicit_account_repr.encoding)
+          (req "delegate2" Implicit_account_repr.encoding))
       (function
         | Inconsistent_denunciation {kind; delegate1; delegate2} ->
             Some (kind, delegate1, delegate2)
@@ -907,7 +907,7 @@ module Anonymous = struct
         Format.fprintf
           ppf
           "Delegate %a at level %a has already been denounced for a double %a."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Level.pp
           level
@@ -916,7 +916,7 @@ module Anonymous = struct
       Data_encoding.(
         obj3
           (req "denunciation_kind" Misbehaviour.kind_encoding)
-          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "delegate" Implicit_account_repr.encoding)
           (req "level" Level.encoding))
       (function
         | Already_denounced {kind; delegate; level} ->
@@ -1022,7 +1022,7 @@ module Anonymous = struct
     | Invalid_shard_index of {given : int; min : int; max : int}
     | Invalid_lag_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
       }
     | Invalid_accusation_no_dal_content of {
@@ -1044,34 +1044,34 @@ module Anonymous = struct
         lag_index_opt : int option;
       }
     | Invalid_accusation_shard_is_not_trap of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
         shard_index : int;
       }
     | Invalid_accusation_wrong_shard_owner of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
         shard_index : int;
-        shard_owner : Signature.Public_key_hash.t;
+        shard_owner : Implicit_account_repr.t;
       }
     | Invalid_accusation_slot_not_published of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
       }
     | Accusation_validity_error_cannot_get_slot_headers of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
       }
     | Accusation_validity_error_levels_mismatch of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
         lag_index_opt : int option;
@@ -1191,12 +1191,12 @@ module Anonymous = struct
           ppf
           "Delegate %a at level %a has already been denounced for a DAL \
            entrapment."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level)
       (obj2
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding))
       (function
         | Dal_already_denounced {delegate; level} -> Some (delegate, level)
@@ -1311,7 +1311,7 @@ module Anonymous = struct
           ppf
           "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
            lag_index %a, and shard index %d: the provided shard is not a trap."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level
@@ -1321,7 +1321,7 @@ module Anonymous = struct
           lag_index_opt
           shard_index)
       (obj5
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
          (opt "lag_index" Data_encoding.uint8)
@@ -1351,7 +1351,7 @@ module Anonymous = struct
           "Invalid accusation for delegate %a, level %a, DAL slot index %a, \
            lag_index %a, and shard index %d: the shard is assigned to %a, not \
            the attester."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level
@@ -1360,15 +1360,15 @@ module Anonymous = struct
           (pp_option Format.pp_print_int)
           lag_index_opt
           shard_index
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           shard_owner)
       (obj6
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
          (opt "lag_index" Data_encoding.uint8)
          (req "shard_index" Data_encoding.int31)
-         (req "shard_owner" Signature.Public_key_hash.encoding))
+         (req "shard_owner" Implicit_account_repr.encoding))
       (function
         | Invalid_accusation_wrong_shard_owner
             {
@@ -1401,7 +1401,7 @@ module Anonymous = struct
           ppf
           "Invalid accusation for delegate %a, level %a, lag_index %a, and DAL \
            slot index %a: the DAL slot was not published."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level
@@ -1410,7 +1410,7 @@ module Anonymous = struct
           Dal.Slot_index.pp
           slot_index)
       (obj4
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
          (opt "lag_index" Data_encoding.uint8))
@@ -1435,7 +1435,7 @@ module Anonymous = struct
           "Accusation validity internal error for delegate %a, level %a, \
            lag_index %a, and DAL slot index %a: unable to retrieve the \
            required slot headers."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level
@@ -1444,7 +1444,7 @@ module Anonymous = struct
           Dal.Slot_index.pp
           slot_index)
       (obj4
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
          (opt "lag_index" Data_encoding.uint8))
@@ -1477,7 +1477,7 @@ module Anonymous = struct
           "Accusation validity error for delegate %a, level %a, lag_index %a, \
            and DAL slot index %a: mismatch between published levels in \
            evidence (%a) and storage (%a)."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Raw_level.pp
           level
@@ -1490,7 +1490,7 @@ module Anonymous = struct
           Raw_level.pp
           store_published_level)
       (obj6
-         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "delegate" Implicit_account_repr.encoding)
          (req "level" Raw_level.encoding)
          (req "slot_index" Dal.Slot_index.encoding)
          (opt "lag_index" Data_encoding.uint8)
@@ -1593,21 +1593,21 @@ module Anonymous = struct
       (fun conflict -> Conflicting_vdf_revelation conflict)
 
   type error +=
-    | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
+    | Drain_delegate_on_unregistered_delegate of Implicit_account_repr.t
     | Invalid_drain_delegate_inactive_key of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         consensus_key : Signature.Public_key_hash.t;
         active_consensus_key : Signature.Public_key_hash.t;
       }
-    | Invalid_drain_delegate_no_consensus_key of Signature.Public_key_hash.t
-    | Invalid_drain_delegate_noop of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_no_consensus_key of Implicit_account_repr.t
+    | Invalid_drain_delegate_noop of Implicit_account_repr.t
     | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees of {
-        delegate : Signature.Public_key_hash.t;
-        destination : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
+        destination : Implicit_account_repr.t;
         min_amount : Tez.t;
       }
     | Conflicting_drain_delegate of {
-        delegate : Signature.Public_key_hash.t;
+        delegate : Implicit_account_repr.t;
         conflict : operation_conflict;
       }
 
@@ -1621,9 +1621,9 @@ module Anonymous = struct
         Format.fprintf
           ppf
           "Cannot drain an unregistered delegate %a."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           c)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function
         | Drain_delegate_on_unregistered_delegate c -> Some c | _ -> None)
       (fun c -> Drain_delegate_on_unregistered_delegate c) ;
@@ -1639,13 +1639,13 @@ module Anonymous = struct
            The active consensus key is %a."
           Signature.Public_key_hash.pp
           consensus_key
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
           Signature.Public_key_hash.pp
           active_consensus_key)
       Data_encoding.(
         obj3
-          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "delegate" Implicit_account_repr.encoding)
           (req "consensus_key" Signature.Public_key_hash.encoding)
           (req "active_consensus_key" Signature.Public_key_hash.encoding))
       (function
@@ -1665,9 +1665,9 @@ module Anonymous = struct
         Format.fprintf
           ppf
           "There is no active consensus key for delegate %a."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function
         | Invalid_drain_delegate_no_consensus_key c -> Some c | _ -> None)
       (fun c -> Invalid_drain_delegate_no_consensus_key c) ;
@@ -1681,9 +1681,9 @@ module Anonymous = struct
           ppf
           "The destination of a drain operation cannot be the delegate itself \
            (%a)."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
       (function Invalid_drain_delegate_noop c -> Some c | _ -> None)
       (fun c -> Invalid_drain_delegate_noop c) ;
     register_error_kind
@@ -1698,16 +1698,16 @@ module Anonymous = struct
           ppf
           "Cannot drain delegate from %a to %a: not enough funds for the drain \
            fees in the delegate account (minimum balance required: %a)."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           destination
           Tez.pp
           min_amount)
       Data_encoding.(
         obj3
-          (req "delegate" Signature.Public_key_hash.encoding)
-          (req "destination" Signature.Public_key_hash.encoding)
+          (req "delegate" Implicit_account_repr.encoding)
+          (req "destination" Implicit_account_repr.encoding)
           (req "min_amount" Tez.encoding))
       (function
         | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
@@ -1729,11 +1729,11 @@ module Anonymous = struct
           "This drain operation conflicts with operation %a for the delegate %a"
           Operation_hash.pp
           existing
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           delegate)
       Data_encoding.(
         obj2
-          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "delegate" Implicit_account_repr.encoding)
           (req "conflict" operation_conflict_encoding))
       (function
         | Conflicting_drain_delegate {delegate; conflict} ->
@@ -1746,22 +1746,22 @@ end
 module Manager = struct
   type error +=
     | Manager_restriction of {
-        source : Signature.Public_key_hash.t;
+        source : Implicit_account_repr.t;
         conflict : operation_conflict;
       }
     | Inconsistent_sources of {
-        expected_source : public_key_hash;
-        source : public_key_hash;
+        expected_source : Implicit_account_repr.t;
+        source : Implicit_account_repr.t;
       }
     | Inconsistent_counters of {
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         previous_counter : Manager_counter.t;
         counter : Manager_counter.t;
       }
     | Incorrect_reveal_position
     | Missing_bls_proof of {
         kind : Operation_repr.public_key_kind;
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Incorrect_bls_proof of {
@@ -1771,11 +1771,11 @@ module Manager = struct
       }
     | Unused_bls_proof of {
         kind : Operation_repr.public_key_kind;
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Update_companion_key_not_tz4 of {
-        source : public_key_hash;
+        source : Implicit_account_repr.t;
         public_key : public_key;
       }
     | Insufficient_gas_for_manager
@@ -1803,13 +1803,13 @@ module Manager = struct
         Format.fprintf
           ppf
           "Manager %a already has the operation %a in the current block."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source
           Operation_hash.pp
           existing)
       Data_encoding.(
         obj2
-          (req "source" Signature.Public_key_hash.encoding)
+          (req "source" Implicit_account_repr.encoding)
           (req "conflict" operation_conflict_encoding))
       (function
         | Manager_restriction {source; conflict} -> Some (source, conflict)
@@ -1824,8 +1824,8 @@ module Manager = struct
          must have the same source."
       Data_encoding.(
         obj2
-          (req "first_source" Signature.Public_key_hash.encoding)
-          (req "unexpected_source" Signature.Public_key_hash.encoding))
+          (req "first_source" Implicit_account_repr.encoding)
+          (req "unexpected_source" Implicit_account_repr.encoding))
       (function
         | Inconsistent_sources {expected_source; source} ->
             Some (expected_source, source)
@@ -1843,7 +1843,7 @@ module Manager = struct
         Format.fprintf
           ppf
           "Non-consecutive counters for source %a: jumped from %a to %a."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source
           Manager_counter.pp
           previous_counter
@@ -1851,7 +1851,7 @@ module Manager = struct
           counter)
       Data_encoding.(
         obj3
-          (req "source" Signature.Public_key_hash.encoding)
+          (req "source" Implicit_account_repr.encoding)
           (req "previous_counter" Manager_counter.encoding_for_errors)
           (req "wrong_counter" Manager_counter.encoding_for_errors))
       (function
@@ -1891,12 +1891,12 @@ module Manager = struct
           kind
           Signature.Public_key.pp
           pk
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source)
       Data_encoding.(
         obj3
           (req "kind" Operation_repr.public_key_kind_encoding)
-          (req "source" Signature.Public_key_hash.encoding)
+          (req "source" Implicit_account_repr.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
         | Missing_bls_proof {kind; source; public_key} ->
@@ -1949,12 +1949,12 @@ module Manager = struct
           kind
           Signature.Public_key.pp
           pk
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source)
       Data_encoding.(
         obj3
           (req "kind" Operation_repr.public_key_kind_encoding)
-          (req "source" Signature.Public_key_hash.encoding)
+          (req "source" Implicit_account_repr.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
         | Unused_bls_proof {kind; source; public_key} ->
@@ -1972,13 +1972,13 @@ module Manager = struct
           ppf
           "Update to the BLS companion key of %a with key %a that should be a \
            tz4."
-          Signature.Public_key_hash.pp
+          Implicit_account_repr.pp
           source
           Signature.Public_key.pp
           pk)
       Data_encoding.(
         obj2
-          (req "source" Signature.Public_key_hash.encoding)
+          (req "source" Implicit_account_repr.encoding)
           (req "public_key" Signature.Public_key.encoding))
       (function
         | Update_companion_key_not_tz4 {source; public_key} ->

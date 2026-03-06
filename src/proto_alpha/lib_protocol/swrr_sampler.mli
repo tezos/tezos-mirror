@@ -115,9 +115,7 @@ val get_baker :
     Called from [Delegate_cycles.unfreeze_deposits] during cycle finalization,
     before [select_bakers_at_cycle_end] for next cycle. *)
 val reset_credit_for_deactivated_delegates :
-  Raw_context.t ->
-  Signature.Public_key_hash.t list ->
-  Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t list -> Raw_context.t tzresult Lwt.t
 
 (** [remove_outdated_cycle ctxt cycle] removes SWRR sampling data for [cycle]
     from both storage and cache.

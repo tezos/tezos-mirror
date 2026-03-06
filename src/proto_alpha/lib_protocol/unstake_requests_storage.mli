@@ -45,8 +45,7 @@
 
  *)
 
-type finalizable =
-  (Signature.Public_key_hash.t * Cycle_repr.t * Tez_repr.t) list
+type finalizable = (Implicit_account_repr.t * Cycle_repr.t * Tez_repr.t) list
 
 type transfer_result = Raw_context.t * Receipt_repr.balance_update_item list
 
@@ -64,7 +63,7 @@ val handle_finalizable_and_clear :
   Raw_context.t ->
   Contract_repr.t ->
   check_delegate_of_unfinalizable_requests:
-    (Signature.public_key_hash -> unit tzresult Lwt.t) ->
+    (Implicit_account_repr.t -> unit tzresult Lwt.t) ->
   handle_finalizable:
     (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
   transfer_result tzresult Lwt.t
@@ -91,13 +90,13 @@ val handle_finalizable_and_clear :
 val remove_from_unfinalizable_requests_and_finalize :
   Raw_context.t ->
   contract:Contract_repr.t ->
-  delegate:Signature.public_key_hash ->
+  delegate:Implicit_account_repr.t ->
   check_delegate_of_unfinalizable_requests:
-    (Signature.public_key_hash -> unit tzresult Lwt.t) ->
+    (Implicit_account_repr.t -> unit tzresult Lwt.t) ->
   transfer_from_unstake:
     (Raw_context.t ->
     Cycle_repr.t ->
-    Signature.public_key_hash ->
+    Implicit_account_repr.t ->
     Contract_repr.t ->
     Tez_repr.t ->
     transfer_result tzresult Lwt.t) ->
@@ -119,7 +118,7 @@ type error +=
 val finalize_and_add :
   Raw_context.t ->
   contract:Contract_repr.t ->
-  delegate:Signature.Public_key_hash.t ->
+  delegate:Implicit_account_repr.t ->
   handle_finalizable:
     (Raw_context.t -> finalizable -> transfer_result tzresult Lwt.t) ->
   Cycle_repr.t ->
@@ -129,7 +128,7 @@ val finalize_and_add :
 (** Slow functions only used for RPCs *)
 module For_RPC : sig
   type stored_requests = Storage.Unstake_request.t = {
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
     requests : (Cycle_repr.t * Tez_repr.t) list;
   }
 

@@ -7,7 +7,7 @@
 
 type item = {
   operation_hash : Operation_hash.t;
-  rewarded : Signature.public_key_hash;
+  rewarded : Implicit_account_repr.t;
   misbehaviour : Misbehaviour_repr.t;
 }
 
@@ -20,7 +20,7 @@ let item_encoding =
       {operation_hash; rewarded; misbehaviour})
     (obj3
        (req "operation_hash" Operation_hash.encoding)
-       (req "rewarded" Signature.Public_key_hash.encoding)
+       (req "rewarded" Implicit_account_repr.encoding)
        (req "misbehaviour" Misbehaviour_repr.encoding))
 
 type t = item list

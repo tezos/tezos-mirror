@@ -645,7 +645,12 @@ let assert_CKs ~loc ctxt current_cycle account_name account_map =
             account.consensus_keys
             (pp_ck_map Signature.Bls.Public_key_hash.pp)
             account.companion_keys ;
-          let* info = Context.Delegate.info ctxt account.pkh in
+          let* info =
+            Context.Delegate.info
+              ctxt
+              (* FIXME-PA *)
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh account.pkh)
+          in
           let {
             Delegate_services.active_consensus_key;
             active_companion_key;

@@ -405,8 +405,12 @@ let compute_future_frozen_rights block account_map =
               CycleMap.find (Block.current_cycle block) acc.frozen_rights
               |> Option.value ~default:Tez.zero
             in
+            (* FIXME-PA *)
+            let implicit_pkh =
+              Protocol.Implicit_account_repr.Forbidden.of_pkh acc.pkh
+            in
             let* current_rights_rpc =
-              Context.Delegate.initial_frozen_deposits (B block) acc.pkh
+              Context.Delegate.initial_frozen_deposits (B block) implicit_pkh
             in
             let* () =
               Assert.equal_tez
@@ -415,7 +419,9 @@ let compute_future_frozen_rights block account_map =
                 current_rights_rpc
             in
             (* Fill in the rights for future cycle. *)
-            let* deactivated = Context.Delegate.deactivated (B block) acc.pkh in
+            let* deactivated =
+              Context.Delegate.deactivated (B block) implicit_pkh
+            in
             if deactivated then return acc_map
             else
               let future_cycle =
@@ -427,7 +433,7 @@ let compute_future_frozen_rights block account_map =
                 current_total_frozen_deposits_with_limits acc
               in
               let* current_baking_power =
-                Context.get_current_baking_power (B block) acc.pkh
+                Context.get_current_baking_power (B block) implicit_pkh
               in
               let total_baking_power = Tez.of_mutez current_baking_power in
               if

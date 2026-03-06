@@ -62,7 +62,7 @@ module Test_contract_repr = struct
     in
     Contract_hash.hash_bytes [data]
 
-  let dummy_implicit_contract = Implicit Signature.Public_key_hash.zero
+  let dummy_implicit_contract = Implicit Implicit_account_repr.zero
 
   let dummy_originated_contract = originated_contract @@ dummy_origination_nonce
 

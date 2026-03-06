@@ -36,13 +36,13 @@ type 'kind internal_operation_contents =
     }
       -> Kind.transaction internal_operation_contents
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : Implicit_account_repr.t option;
       script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination internal_operation_contents
   | Delegation :
-      Signature.Public_key_hash.t option
+      Implicit_account_repr.t option
       -> Kind.delegation internal_operation_contents
   | Event : {
       ty : Script.expr;
@@ -373,7 +373,7 @@ module Internal_operation = struct
         encoding =
           obj3
             (req "balance" Tez.encoding)
-            (opt "delegate" Signature.Public_key_hash.encoding)
+            (opt "delegate" Implicit_account_repr.encoding)
             (req "script" Script.michelson_with_storage_encoding);
         iselect : Kind.origination iselect =
           (function
@@ -400,7 +400,7 @@ module Internal_operation = struct
            external tools such as indexers. *)
         tag = 3;
         name = "delegation";
-        encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
+        encoding = obj1 (opt "delegate" Implicit_account_repr.encoding);
         iselect : Kind.delegation iselect =
           (function
           | Internal_operation_result

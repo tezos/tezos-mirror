@@ -209,7 +209,7 @@ module Accountability : sig
   (** The recorded information for one slot: who attested, and the current total
       shard count (the sum of the shards assigned to these attesters). *)
   type slot_attestation_info = {
-    attesters : Signature.Public_key_hash.Set.t;
+    attesters : Implicit_account_repr.Set.t;
     attested_shards_count : int;
   }
 
@@ -217,8 +217,7 @@ module Accountability : sig
     total_shards : int;  (** The total number of (attestable) shards. *)
     attested_shards : int;
         (** The total number of shards that have been attested. *)
-    attesters : Signature.Public_key_hash.Set.t;
-        (** Who attested the shards. *)
+    attesters : Implicit_account_repr.Set.t;  (** Who attested the shards. *)
     is_proto_attested : bool;
         (** The boolean is set to [true] IFF the [attestation_ratio] is below or
             equal to the threshold defined by the protocol. *)
@@ -240,7 +239,7 @@ module Accountability : sig
     number_of_slots:int ->
     attestation_lag:int ->
     lags:int list ->
-    delegate:Signature.public_key_hash ->
+    delegate:Implicit_account_repr.t ->
     attested_level:Raw_level_repr.t ->
     attested_slots ->
     int Raw_level_repr.Map.t ->
@@ -317,11 +316,9 @@ module Accountability : sig
       Precondition: all levels in [packed_history] must have an entry in
       [ordered_delegates_for_level]. *)
   val unpack_history :
-    delegate_to_shard_count:
-      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t ->
+    delegate_to_shard_count:int Implicit_account_repr.Map.t Raw_level_repr.Map.t ->
     ordered_delegates_for_level:
-      (committee_level:Raw_level_repr.t ->
-      Signature.public_key_hash list option) ->
+      (committee_level:Raw_level_repr.t -> Implicit_account_repr.t list option) ->
     threshold:int ->
     number_of_shards:int ->
     committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
@@ -348,8 +345,7 @@ module Accountability : sig
       [ordered_delegates_for_level]. *)
   val pack_history :
     ordered_delegates_for_level:
-      (committee_level:Raw_level_repr.t ->
-      Signature.public_key_hash list option) ->
+      (committee_level:Raw_level_repr.t -> Implicit_account_repr.t list option) ->
     committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
     history ->
     packed_history
@@ -403,17 +399,17 @@ module Internal_for_tests : sig
   val of_z : Z.t -> t tzresult
 
   val attesters_to_bitset :
-    ordered_delegates:Signature.public_key_hash list ->
-    attesters:Signature.Public_key_hash.Set.t ->
+    ordered_delegates:Implicit_account_repr.t list ->
+    attesters:Implicit_account_repr.Set.t ->
     Bitset.t
 
   val bitset_to_attesters :
-    ordered_delegates:Signature.public_key_hash list ->
+    ordered_delegates:Implicit_account_repr.t list ->
     bitset:Bitset.t ->
-    Signature.Public_key_hash.Set.t
+    Implicit_account_repr.Set.t
 
   val attested_shards :
-    delegate_to_shard_count:int Signature.Public_key_hash.Map.t ->
-    attesters:Signature.Public_key_hash.Set.t ->
+    delegate_to_shard_count:int Implicit_account_repr.Map.t ->
+    attesters:Implicit_account_repr.Set.t ->
     int
 end

@@ -314,8 +314,9 @@ module Cost_of = struct
       | Bls _ -> Bls
       | Mldsa44 _ -> Mldsa44
 
-    let algo_of_public_key_hash (pkh : Signature.public_key_hash) =
-      match pkh with
+    let algo_of_public_key_hash (pkh : Implicit_account_repr.t) =
+      (* FIXME-PA: probably irrelevant for tzx, would need a new cost function *)
+      match Implicit_account_repr.Forbidden.to_pkh pkh with
       | Ed25519 _ -> Ed25519
       | Secp256k1 _ -> Secp256k1
       | P256 _ -> P256

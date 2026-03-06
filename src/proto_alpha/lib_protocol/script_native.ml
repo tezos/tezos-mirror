@@ -217,9 +217,11 @@ module CLST_contract = struct
       (standard_error ~mnemonic:"FA2_TOKEN_UNDEFINED")
 
   let execute_finalize_redeem (ctxt, (step_constants : step_constants))
-      (redeemer : Signature.public_key_hash) (storage : Clst_contract_storage.t)
-      : entrypoint_execution_result tzresult Lwt.t =
+      (redeemer : finalize_redeem) (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
     let open Lwt_result_syntax in
+    (* FIXME-PA needs tzx in Michelson *)
+    let redeemer = Implicit_account_repr.Forbidden.of_pkh redeemer in
     let account = Contract.Implicit redeemer in
     let typed_account = Typed_implicit redeemer in
     let* ctxt, balance_updates, finalized_amount =

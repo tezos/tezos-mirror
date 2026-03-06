@@ -117,12 +117,13 @@ let view_options =
     payer_arg
     (unparsing_mode_arg ~default:"Readable")
 
-let dummy_callback = Contract.Implicit Signature.Public_key_hash.zero
+let dummy_callback = Contract.Implicit Implicit_account_repr.zero
 
 let get_contract_caller_keys (cctxt : #Client_context.full) source =
   let open Lwt_result_syntax in
   let* _, caller_pk, caller_sk = Client_keys.get_key cctxt source in
-  return (source, caller_pk, caller_sk)
+  (* FIXME-PA *)
+  return (Implicit_account_repr.Forbidden.of_pkh source, caller_pk, caller_sk)
 
 let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
   Tezos_clic.
@@ -181,7 +182,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~action
               ~sender:(Some addr)
               ~gas
-              ~payer
+              ~payer:
+                (* FIXME-PA *)
+                (Option.map Implicit_account_repr.Forbidden.of_pkh payer)
               ~unparsing_mode
               ()
           in
@@ -221,7 +224,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~action
               ~sender:(Some sender)
               ~gas
-              ~payer
+              ~payer:
+                (* FIXME-PA *)
+                (Option.map Implicit_account_repr.Forbidden.of_pkh payer)
               ~unparsing_mode
               ()
           in
@@ -251,7 +256,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
               ~contract
               ~action
               ~gas
-              ~payer
+              ~payer:
+                (* FIXME-PA *)
+                (Option.map Implicit_account_repr.Forbidden.of_pkh payer)
               ~unparsing_mode
               ()
           in
@@ -293,7 +300,9 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
           let* source, src_pk, src_sk = get_contract_caller_keys cctxt addr in
           let action =
             Client_proto_fa12.Get_balance
-              (Implicit addr, (callback, callback_entrypoint))
+              (* FIXME-PA *)
+              ( Implicit (Implicit_account_repr.Forbidden.of_pkh addr),
+                (callback, callback_entrypoint) )
           in
           let*! errors =
             Client_proto_fa12.call_contract
@@ -365,7 +374,10 @@ let commands_ro () : #Protocol_client_context.full Tezos_clic.command list =
           let* source, src_pk, src_sk = get_contract_caller_keys cctxt src in
           let action =
             Client_proto_fa12.Get_allowance
-              (Implicit src, dst, (callback, callback_entrypoint))
+              (* FIXME-PA *)
+              ( Implicit (Implicit_account_repr.Forbidden.of_pkh src),
+                dst,
+                (callback, callback_entrypoint) )
           in
           let*! errors =
             Client_proto_fa12.call_contract
@@ -511,7 +523,13 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
           let* source, caller_pk, caller_sk =
             get_contract_caller_keys cctxt caller
           in
-          let action = Client_proto_fa12.Transfer (Implicit src, dst, amount) in
+          (* FIXME-PA *)
+          let action =
+            Client_proto_fa12.Transfer
+              ( Implicit (Implicit_account_repr.Forbidden.of_pkh src),
+                dst,
+                amount )
+          in
           let*! errors =
             Client_proto_fa12.call_contract
               cctxt
@@ -692,7 +710,9 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
                   ?confirmations:cctxt#confirmations
                   ~dry_run
                   ~verbose_signing
-                  ~sender:(Implicit src)
+                  ~sender:
+                    (* FIXME-PA *)
+                    (Implicit (Implicit_account_repr.Forbidden.of_pkh src))
                   ~source
                   ~src_pk
                   ~src_sk

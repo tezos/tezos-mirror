@@ -76,9 +76,10 @@ let equal_ballots b1 b2 =
 let pp_ballots ppf b =
   Format.fprintf ppf "{ yay = %Ld; nay = %Ld; pass = %Ld }" b.yay b.nay b.pass
 
-let has_recorded_ballot = Storage.Vote.Ballots.mem
+let has_recorded_ballot ctxt delegate = Storage.Vote.Ballots.mem ctxt delegate
 
-let record_ballot = Storage.Vote.Ballots.init
+let record_ballot ctxt delegate ballot =
+  Storage.Vote.Ballots.init ctxt delegate ballot
 
 let get_ballots ctxt =
   let open Lwt_result_syntax in
@@ -97,7 +98,7 @@ let get_ballots ctxt =
         | Pass -> {ballots with pass = count ballots.pass}))
     ~init:(Ok ballots_zero)
 
-let get_ballot_list = Storage.Vote.Ballots.bindings
+let get_ballot_list ctxt = Storage.Vote.Ballots.bindings ctxt
 
 let clear_ballots = Storage.Vote.Ballots.clear
 
@@ -105,7 +106,7 @@ let listings_encoding =
   Data_encoding.(
     list
       (obj2
-         (req "pkh" Signature.Public_key_hash.encoding)
+         (req "pkh" Implicit_account_repr.encoding)
          (req "voting_power" int64)))
 
 let get_current_voting_power_free ctxt delegate =
@@ -182,9 +183,9 @@ let delegate_info_encoding =
        (dft "current_proposals" (list Protocol_hash.encoding) [])
        (dft "remaining_proposals" int31 0))
 
-let in_listings = Storage.Vote.Listings.mem
+let in_listings ctxt delegate = Storage.Vote.Listings.mem ctxt delegate
 
-let get_listings = Storage.Vote.Listings.bindings
+let get_listings ctxt = Storage.Vote.Listings.bindings ctxt
 
 let get_delegate_info ctxt delegate =
   let open Lwt_result_syntax in
@@ -214,7 +215,7 @@ let get_delegate_info ctxt delegate =
               ~order:`Undefined
               ~init:[]
               ~f:(fun (h, d) acc ->
-                if Signature.Public_key_hash.equal d delegate then
+                if Implicit_account_repr.(d = delegate) then
                   Lwt.return (h :: acc)
                 else Lwt.return acc)
       in

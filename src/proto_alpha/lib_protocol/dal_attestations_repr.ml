@@ -433,7 +433,7 @@ module Accountability = struct
   (* the keys represent published levels *)
 
   type slot_attestation_info = {
-    attesters : Signature.Public_key_hash.Set.t;
+    attesters : Implicit_account_repr.Set.t;
     attested_shards_count : int;
   }
 
@@ -466,7 +466,7 @@ module Accountability = struct
                 (SlotMap.singleton
                    slot_index
                    {
-                     attesters = Signature.Public_key_hash.Set.singleton delegate;
+                     attesters = Implicit_account_repr.Set.singleton delegate;
                      attested_shards_count = number_of_delegate_shards;
                    })
           | Some slot_map ->
@@ -478,7 +478,7 @@ module Accountability = struct
                          Some
                            {
                              attesters =
-                               Signature.Public_key_hash.Set.singleton delegate;
+                               Implicit_account_repr.Set.singleton delegate;
                              attested_shards_count = number_of_delegate_shards;
                            }
                      | Some
@@ -487,13 +487,13 @@ module Accountability = struct
                             attested_shards_count =
                               old_number_of_attested_shards;
                           } as v) ->
-                         if Signature.Public_key_hash.Set.mem delegate attesters
+                         if Implicit_account_repr.Set.mem delegate attesters
                          then Some v
                          else
                            Some
                              {
                                attesters =
-                                 Signature.Public_key_hash.Set.add
+                                 Implicit_account_repr.Set.add
                                    delegate
                                    attesters;
                                attested_shards_count =
@@ -575,7 +575,7 @@ module Accountability = struct
   type attestation_status = {
     total_shards : int;
     attested_shards : int;
-    attesters : Signature.Public_key_hash.Set.t;
+    attesters : Implicit_account_repr.Set.t;
     is_proto_attested : bool;
   }
 
@@ -615,14 +615,14 @@ module Accountability = struct
     (* Build index map: delegate -> index *)
     let delegate_to_index =
       List.fold_left_i
-        (fun i acc delegate -> Signature.Public_key_hash.Map.add delegate i acc)
-        Signature.Public_key_hash.Map.empty
+        (fun i acc delegate -> Implicit_account_repr.Map.add delegate i acc)
+        Implicit_account_repr.Map.empty
         ordered_delegates
     in
     (* Set bits for attesters *)
-    Signature.Public_key_hash.Set.fold
+    Implicit_account_repr.Set.fold
       (fun attester acc ->
-        match Signature.Public_key_hash.Map.find attester delegate_to_index with
+        match Implicit_account_repr.Map.find attester delegate_to_index with
         | Some i -> (
             (* Set bit at index i *)
             match Bitset.add acc i with
@@ -654,8 +654,8 @@ module Accountability = struct
           | Ok b -> b
           | Error _ -> (* [i] cannot be negative *) assert false
         in
-        if is_set then Signature.Public_key_hash.Set.add delegate acc else acc)
-      Signature.Public_key_hash.Set.empty
+        if is_set then Implicit_account_repr.Set.add delegate acc else acc)
+      Implicit_account_repr.Set.empty
       ordered_delegates
 
   (** [attested_shards ~delegate_to_shard_count ~attesters] calculates the
@@ -670,11 +670,11 @@ module Accountability = struct
       @return the total number of attested shards *)
   let attested_shards ~delegate_to_shard_count ~attesters =
     (* Sum shards for delegates with bit set *)
-    Signature.Public_key_hash.Set.fold
+    Implicit_account_repr.Set.fold
       (fun delegate acc ->
         let shard_count =
           match
-            Signature.Public_key_hash.Map.find delegate delegate_to_shard_count
+            Implicit_account_repr.Map.find delegate delegate_to_shard_count
           with
           | None -> 0
           | Some n -> n
@@ -744,7 +744,7 @@ module Accountability = struct
             match
               Raw_level_repr.Map.find committee_level delegate_to_shard_count
             with
-            | None -> Signature.Public_key_hash.Map.empty
+            | None -> Implicit_account_repr.Map.empty
             | Some map -> map
           in
           let decoded_history_of_level =

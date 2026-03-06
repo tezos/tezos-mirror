@@ -72,9 +72,11 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
                             consensus_power = _;
                           });
                  } ) ->
-               Signature.Public_key_hash.(
-                 equal delegate delegate_pkh
-                 && equal consensus_key consensus_key_pkh)
+               (* FIXME-PA *)
+               Implicit_account_repr.(Forbidden.of_pkh delegate_pkh = delegate)
+               && Signature.Public_key_hash.equal
+                    consensus_key
+                    consensus_key_pkh
            | _ -> false)
          op_metadata
   then return_unit
@@ -113,7 +115,9 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
       List.sort
         (fun {Alpha_context.Consensus_key.delegate = d1; _}
              {delegate = d2; _}
-           -> Signature.Public_key_hash.compare d1 d2)
+           ->
+          (* FIXME-PA *)
+          Implicit_account_repr.compare d1 d2)
         committee
   in
   let committee_expect = may_sort committee_expect in
@@ -160,7 +164,8 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
                       }
                       {delegate = d2; consensus_pkh = c2}
                     ->
-                   Signature.Public_key_hash.equal d1 d2
+                   (* FIXME-PA *)
+                   Implicit_account_repr.(d1 = d2)
                    && Signature.Public_key_hash.equal c1 c2)
                  committee
                  committee_expect
@@ -243,7 +248,8 @@ let check_missed_attestation_rewards delegate_name ?(check_not_found = false) :
                ( Lost_attesting_rewards (pkh, _participation, _revelation),
                  Credited _,
                  Block_application ) ->
-               Signature.Public_key_hash.equal delegate.pkh pkh
+               (* FIXME-PA *)
+               Implicit_account_repr.(Forbidden.of_pkh delegate.pkh = pkh)
            | _ -> false)
          block_header_metadata.balance_updates
   then return_unit
@@ -260,7 +266,10 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
       else
         let delegate = State.find_account delegate_name state in
         let* consensus_key_info =
-          Context.Delegate.consensus_key (B state.grandparent) delegate.pkh
+          (* FIXME-PA *)
+          Context.Delegate.consensus_key
+            (B state.grandparent)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
         in
         let consensus_key = consensus_key_info.active in
         let* consensus_key = Account.find consensus_key.consensus_key_pkh in
@@ -268,7 +277,14 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
           Option.map_es Dal_helpers.dal_content_of_z dal_content
         in
         (* Fails to produce an attestation if the delegate has no slot for the block *)
-        let* op = Op.attestation ?dal_content ~manager_pkh:delegate.pkh block in
+        (* FIXME-PA *)
+        let* op =
+          Op.attestation
+            ?dal_content
+            ~manager_pkh:
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
+            block
+        in
         (* Update the activity of the delegate *)
         let state = update_activity delegate_name block state in
         let state = State.add_pending_operations [op] state in
@@ -313,7 +329,8 @@ let attest_aggreg_with ?(delegates_with_dal = ([] : (string * Z.t) list))
               let* consensus_key_info =
                 Context.Delegate.consensus_key
                   (B state.grandparent)
-                  delegate.pkh
+                  (* FIXME-PA *)
+                  (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
               in
               let consensus_pkh = consensus_key_info.active.consensus_key_pkh in
               let* () =
@@ -324,13 +341,17 @@ let attest_aggreg_with ?(delegates_with_dal = ([] : (string * Z.t) list))
               (* Update the activity of the committee *)
               let state = update_activity delegate_name block state in
               let* attesting_slot =
-                Op.get_attesting_slot_of_delegate
-                  ~manager_pkh:delegate.pkh
+                Op.get_attesting_slot_of_delegate (* FIXME-PA *)
+                  ~manager_pkh:
+                    (Protocol.Implicit_account_repr.Forbidden.of_pkh
+                       delegate.pkh)
                   ~attested_block:block
               in
               let key_in_metadata =
                 {
-                  Alpha_context.Consensus_key.delegate = delegate.pkh;
+                  Alpha_context.Consensus_key.delegate =
+                    (* FIXME-PA *)
+                    Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh;
                   consensus_pkh;
                 }
               in
@@ -399,7 +420,10 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
            ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =
-            State.find_account_from_pkh manager_pkh state
+            (* FIXME-PA *)
+            State.find_account_from_pkh
+              (Protocol.Implicit_account_repr.Forbidden.to_pkh manager_pkh)
+              state
           in
           let state = update_activity delegate_name block state in
           if Signature.Public_key_hash.is_bls consensus_pkh then
@@ -413,7 +437,11 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
             let state = State.add_pending_operations [op] state in
             let state =
               State.add_current_block_check
-                (check_attestation_metadata ~kind manager_pkh consensus_pkh)
+                (* FIXME-PA *)
+                (check_attestation_metadata
+                   ~kind
+                   (Protocol.Implicit_account_repr.Forbidden.to_pkh manager_pkh)
+                   consensus_pkh)
                 state
             in
             return (state, bls_committee))
@@ -484,12 +512,21 @@ let preattest_with ?payload_round (delegate_name : string) :
         let* fake_block = make_fake_block ?payload_round incr in
         let delegate = State.find_account delegate_name state in
         let* consensus_key_info =
-          Context.Delegate.consensus_key (I incr) delegate.pkh
+          (* FIXME-PA *)
+          Context.Delegate.consensus_key
+            (I incr)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
         in
         let consensus_key = consensus_key_info.active in
         let* consensus_key = Account.find consensus_key.consensus_key_pkh in
         (* Fails to produce an attestation if the delegate has no slot for the block *)
-        let* op = Op.preattestation ~manager_pkh:delegate.pkh fake_block in
+        (* FIXME-PA *)
+        let* op =
+          Op.preattestation
+            ~manager_pkh:
+              (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
+            fake_block
+        in
         (* Update the activity of the delegate *)
         let state =
           update_activity delegate_name (Incremental.predecessor incr) state
@@ -528,7 +565,10 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
                ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
-                Context.Delegate.consensus_key (I incr) delegate.pkh
+                (* FIXME-PA *)
+                Context.Delegate.consensus_key
+                  (I incr)
+                  (Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh)
               in
               let consensus_pkh = consensus_key_info.active.consensus_key_pkh in
               let* () =
@@ -545,13 +585,17 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
               in
               (* Fails if the delegate has no slot for the block *)
               let* attesting_slot =
-                Op.get_attesting_slot_of_delegate
-                  ~manager_pkh:delegate.pkh
+                Op.get_attesting_slot_of_delegate (* FIXME-PA *)
+                  ~manager_pkh:
+                    (Protocol.Implicit_account_repr.Forbidden.of_pkh
+                       delegate.pkh)
                   ~attested_block:fake_block
               in
               let key_for_metadata =
                 {
-                  Alpha_context.Consensus_key.delegate = delegate.pkh;
+                  Alpha_context.Consensus_key.delegate =
+                    (* FIXME-PA *)
+                    Protocol.Implicit_account_repr.Forbidden.of_pkh delegate.pkh;
                   consensus_pkh;
                 }
               in
@@ -614,7 +658,10 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
            ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =
-            State.find_account_from_pkh manager_pkh state
+            (* FIXME-PA *)
+            State.find_account_from_pkh
+              (Protocol.Implicit_account_repr.Forbidden.to_pkh manager_pkh)
+              state
           in
           let state =
             update_activity delegate_name (Incremental.predecessor incr) state
@@ -630,7 +677,11 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
             let* incr = Incremental.add_operation incr op in
             let state =
               State.add_current_block_check
-                (check_attestation_metadata ~kind manager_pkh consensus_pkh)
+                (* FIXME-PA *)
+                (check_attestation_metadata
+                   ~kind
+                   (Protocol.Implicit_account_repr.Forbidden.to_pkh manager_pkh)
+                   consensus_pkh)
                 state
             in
             return (incr, state, bls_committee))

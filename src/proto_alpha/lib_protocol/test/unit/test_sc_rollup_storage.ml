@@ -615,8 +615,10 @@ module Stake_storage_tests = struct
     let open Lwt_result_wrap_syntax in
     let* ctxt, sc_rollup, _genesis_hash = new_context_with_rollup () in
     let staker =
-      Sc_rollup_repr.Staker.of_b58check_exn
-        "tz1hhNZvjed6McQQLWtR7MRzPHpgSFZTXxdW"
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (Sc_rollup_repr.Staker.of_b58check_opt
+           "tz1hhNZvjed6McQQLWtR7MRzPHpgSFZTXxdW")
     in
     let stake = Constants_storage.sc_rollup_stake_amount ctxt in
     let* () =
@@ -2519,7 +2521,9 @@ module Stake_storage_tests = struct
     in
     let* () = assert_staker_index ~__LOC__ ctxt staker1 Z.zero in
     let* () = assert_staker_index ~__LOC__ ctxt staker2 Z.one in
-    let Account.{pkh; _} = Account.new_account () in
+    let Account.{pkh = pkh_sig; _} = Account.new_account () in
+    (* FIXME-PA *)
+    let pkh = Implicit_account_repr.Forbidden.of_pkh pkh_sig in
     let*@ ctxt, fresh_staker3_index =
       Sc_rollup_staker_index_storage.fresh_staker_index ctxt rollup pkh
     in

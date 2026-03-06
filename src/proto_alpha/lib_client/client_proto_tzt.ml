@@ -156,7 +156,9 @@ let run_unit_test (cctxt : #Protocol_client_context.rpc_context)
       ~now:ut.optional.now
       ~level:ut.optional.level
       ~sender:ut.optional.sender
-      ~source:ut.optional.source
+      ~source:
+        (* FIXME-PA *)
+        (Option.map Implicit_account_repr.Forbidden.of_pkh ut.optional.source)
       ~chain_id
       ~self:ut.optional.self
       ~parameter:ut.optional.parameter

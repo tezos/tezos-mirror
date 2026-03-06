@@ -261,7 +261,7 @@ val record_non_consensus_operation_hash : t -> Operation_hash.t -> t
 val non_consensus_operations : t -> Operation_hash.t list
 
 type consensus_pk = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Implicit_account_repr.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
   companion_pk : Bls.Public_key.t option;
@@ -299,15 +299,15 @@ val sampler_for_cycle :
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
 val stake_distribution_for_current_cycle :
-  t -> Stake_repr.t Signature.Public_key_hash.Map.t tzresult
+  t -> Stake_repr.t Implicit_account_repr.Map.t tzresult
 
 (** Like [stake_distribution_for_current_cycle] but returns [None] rather than
     an error. *)
 val find_stake_distribution_for_current_cycle :
-  t -> Stake_repr.t Signature.Public_key_hash.Map.t option
+  t -> Stake_repr.t Implicit_account_repr.Map.t option
 
 val init_stake_distribution_for_current_cycle :
-  t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
+  t -> Stake_repr.t Implicit_account_repr.Map.t -> t
 
 type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
 
@@ -383,7 +383,7 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map
+    t -> int Implicit_account_repr.Map.t raw_level_map
 
   (** [shard_count_map ctxt ~committee_level] returns the
       delegate-to-shard-count map for the given [committee_level],
@@ -391,12 +391,12 @@ module type CONSENSUS = sig
   val shard_count_map :
     t ->
     committee_level:Raw_level_repr.t ->
-    int Signature.Public_key_hash.Map.t option
+    int Implicit_account_repr.Map.t option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
       due to a previous slashing. *)
-  val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
+  val forbidden_delegates : t -> Implicit_account_repr.Set.t
 
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
@@ -413,7 +413,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
+    delegate_to_shard_count:int Implicit_account_repr.Map.t raw_level_map ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -438,11 +438,11 @@ module type CONSENSUS = sig
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
       forbidden delegates, which prevents this delegate from baking or
       attesting. *)
-  val forbid_delegate : t -> Signature.Public_key_hash.t -> t
+  val forbid_delegate : t -> Implicit_account_repr.t -> t
 
   (** [set_forbidden_delegate ctx delegates] sets [delegates] as the
       current forbidden delegates. *)
-  val set_forbidden_delegates : t -> Signature.Public_key_hash.Set.t -> t
+  val set_forbidden_delegates : t -> Implicit_account_repr.Set.t -> t
 
   val attestations_seen : t -> slot_set
 

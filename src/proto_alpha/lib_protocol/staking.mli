@@ -31,8 +31,8 @@ type error +=
 val stake :
   Raw_context.t ->
   amount:Tez_repr.t ->
-  sender:Signature.Public_key_hash.t ->
-  delegate:Signature.public_key_hash ->
+  sender:Implicit_account_repr.t ->
+  delegate:Implicit_account_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** [request_unstake ctxt ~sender_contract ~delegate amount] records a
@@ -41,7 +41,7 @@ val stake :
 val request_unstake :
   Raw_context.t ->
   sender_contract:Contract_repr.t ->
-  delegate:Signature.public_key_hash ->
+  delegate:Implicit_account_repr.t ->
   Tez_repr.t ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 

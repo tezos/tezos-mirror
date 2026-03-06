@@ -36,7 +36,11 @@ let check_cannot_bake_next_block ~loc src_name =
   assert_failure
     ~expected_error:(fun (_, state) errs ->
       let src = State.find_account src_name state in
-      Error_helpers.expect_no_slots_found_for ~loc ~pkh:src.pkh errs)
+      (* FIXME_PA *)
+      Error_helpers.expect_no_slots_found_for
+        ~loc
+        ~pkh:(Protocol.Implicit_account_repr.Forbidden.of_pkh src.pkh)
+        errs)
     (next_block_with_baker src_name)
 
 let check_can_bake_next_block ~loc src_name =
@@ -52,7 +56,12 @@ let check_grace_period ~loc src_name =
       last_seen_activity
       state.State.constants.tolerated_inactivity_period
   in
-  let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in
+  (* FIXME-PA *)
+  let* rpc_grace =
+    Context.Delegate.grace_period
+      (B block)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh src.pkh)
+  in
   Assert.equal
     ( = )
     "Grace period is not correct: expected vs RPC"

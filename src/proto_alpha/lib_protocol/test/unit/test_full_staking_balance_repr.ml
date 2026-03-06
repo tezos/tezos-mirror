@@ -188,7 +188,8 @@ let originate_implicit_unrevealed_account b ?(amount = Tez_helpers.of_int 10)
     source =
   let open Lwt_result_syntax in
   let a = Account.new_account () in
-  let c = Contract.Implicit a.pkh in
+  (* FIXME-PA *)
+  let c = Contract.Implicit (Implicit_account_repr.Forbidden.of_pkh a.pkh) in
   let* operation = Op.transaction (B b) ~fee:Tez.zero source c amount in
   let* b = Block.bake b ~operation in
   return (b, c)
@@ -199,16 +200,22 @@ let get_min_delegated_in_current_cycle b ~(delegate : Contract.t) =
   let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
   let* delegate_account = Context.Contract.manager (B b) delegate in
   let*@ min_delegated_in_current_cycle =
+    (* FIXME-PA *)
     Delegate_storage.For_RPC.min_delegated_in_current_cycle
       raw_ctxt
-      delegate_account.pkh
+      (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh)
   in
   return min_delegated_in_current_cycle
 
 let get_delegated_balance b ~(delegate : Contract.t) =
   let open Lwt_result_syntax in
   let* delegate_account = Context.Contract.manager (B b) delegate in
-  let* info = Context.Delegate.info (B b) delegate_account.pkh in
+  (* FIXME-PA *)
+  let* info =
+    Context.Delegate.info
+      (B b)
+      (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh)
+  in
   return info.delegated_balance
 
 let check_delegated_balance_and_delegated b ~loc ~(delegator : Contract.t)
@@ -244,7 +251,10 @@ let get_staking_balance b ~(delegate : Contract.t) =
   let raw_ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
   let* delegate_account = Context.Contract.manager (B b) delegate in
   let*@ staking_balance =
-    Storage.Stake.Staking_balance.get raw_ctxt delegate_account.pkh
+    (* FIXME-PA *)
+    Storage.Stake.Staking_balance.get
+      raw_ctxt
+      (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh)
   in
   Log.info ~color:Log.Color.BG.green "Staking balance:" ;
   pp_staking_balance staking_balance ;
@@ -443,7 +453,12 @@ let test_min_delegated_in_cycle () =
   in
   let* delegate_account = Context.Contract.manager (B b) delegate in
   let* set_delegate =
-    Op.delegation ~force_reveal:true (B b) delegator (Some delegate_account.pkh)
+    (* FIXME-PA *)
+    Op.delegation
+      ~force_reveal:true
+      (B b)
+      delegator
+      (Some (Implicit_account_repr.Forbidden.of_pkh delegate_account.pkh))
   in
   let* b = Block.bake ~operation:set_delegate b in
   Log.info ~color:Log.Color.BG.blue "After setting delegate" ;

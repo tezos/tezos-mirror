@@ -120,7 +120,8 @@ let maybe_recover_bond node_ctxt =
             (new Protocol_client_context.wrap_full node_ctxt.cctxt)
             (node_ctxt.cctxt#chain, `Head 0)
             node_ctxt.config.sc_rollup_address
-            operating_pkh
+            (* FIXME-PA *)
+            (Protocol.Implicit_account_repr.Forbidden.of_pkh operating_pkh)
         in
         match staked_on_commitment with
         | None ->
@@ -219,7 +220,9 @@ let process_included_l1_operation (type kind) ~catching_up
       | Loser {loser; reason}
         when Node_context.is_operator
                node_ctxt
-               (Tezos_crypto.Signature.Of_V3.public_key_hash loser) ->
+               (* FIXME-PA *)
+               (Tezos_crypto.Signature.Of_V3.public_key_hash
+                  (Protocol.Implicit_account_repr.Forbidden.to_pkh loser)) ->
           let result =
             match reason with
             | Conflict_resolved -> Sc_rollup_node_errors.Conflict_resolved
@@ -233,11 +236,19 @@ let process_included_l1_operation (type kind) ~catching_up
           let stakers =
             match operation with
             | Sc_rollup_refute {opponent; _} ->
-                [source; Tezos_crypto.Signature.Of_V3.public_key_hash opponent]
+                [
+                  source;
+                  (* FIXME-PA *)
+                  Tezos_crypto.Signature.Of_V3.public_key_hash
+                    (Protocol.Implicit_account_repr.Forbidden.to_pkh opponent);
+                ]
             | Sc_rollup_timeout {stakers = {alice; bob}; _} ->
                 [
-                  Tezos_crypto.Signature.Of_V3.public_key_hash alice;
-                  Tezos_crypto.Signature.Of_V3.public_key_hash bob;
+                  (* FIXME-PA *)
+                  Tezos_crypto.Signature.Of_V3.public_key_hash
+                    (Protocol.Implicit_account_repr.Forbidden.to_pkh alice);
+                  Tezos_crypto.Signature.Of_V3.public_key_hash
+                    (Protocol.Implicit_account_repr.Forbidden.to_pkh bob);
                 ]
             | _ -> assert false
           in
@@ -264,7 +275,9 @@ let process_included_l1_operation (type kind) ~catching_up
           fail_when
             Tezos_crypto.Signature.Public_key_hash.(
               operating_pkh
-              = Tezos_crypto.Signature.Of_V3.public_key_hash staker)
+              (* FIXME-PA *)
+              = Tezos_crypto.Signature.Of_V3.public_key_hash
+                  (Protocol.Implicit_account_repr.Forbidden.to_pkh staker))
             Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
       | _ -> return_unit)
   | ( Sc_rollup_execute_outbox_message {output_proof; _},
@@ -308,8 +321,11 @@ let process_included_l1_operation (type kind) ~catching_up
           then return_unit
           else
             let whitelist_update =
+              (* FIXME-PA *)
               List.map
-                Tezos_crypto.Signature.Of_V3.public_key_hash
+                (fun pkh ->
+                  Tezos_crypto.Signature.Of_V3.public_key_hash
+                    (Protocol.Implicit_account_repr.Forbidden.to_pkh pkh))
                 whitelist_update
             in
             let*? () =
@@ -385,7 +401,11 @@ let process_l1_block_operations ~catching_up node_ctxt (head : Layer1.header) =
       =
     let open Lwt_result_syntax in
     let* () = accu in
-    let source = Tezos_crypto.Signature.Of_V3.public_key_hash source in
+    (* FIXME-PA *)
+    let source =
+      Tezos_crypto.Signature.Of_V3.public_key_hash
+        (Protocol.Implicit_account_repr.Forbidden.to_pkh source)
+    in
     process_l1_operation ~catching_up node_ctxt head ~source operation result
   in
   let apply_internal (type kind) accu ~source:_

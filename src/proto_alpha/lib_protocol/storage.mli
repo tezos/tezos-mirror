@@ -95,7 +95,7 @@ module Unstake_request : sig
       list. *)
   type requests = request list
 
-  type t = {delegate : Signature.Public_key_hash.t; requests : requests}
+  type t = {delegate : Implicit_account_repr.t; requests : requests}
 
   (** [add cycle amount requests] adds [amount] to the tez value
       associated with [cycle].
@@ -194,7 +194,7 @@ module Contract : sig
   module Delegate :
     Indexed_data_storage
       with type key = Contract_repr.t
-       and type value = Signature.Public_key_hash.t
+       and type value = Implicit_account_repr.t
        and type t := Raw_context.t
 
   module Staking_parameters :
@@ -518,7 +518,7 @@ end
 module Delegates :
   Data_set_storage
     with type t := Raw_context.t
-     and type elt = Signature.Public_key_hash.t
+     and type elt = Implicit_account_repr.t
 
 (** Set of all active consensus and companion keys in cycle `current + consensus_rights_delay + 1` *)
 module Consensus_keys :
@@ -546,7 +546,7 @@ module Pending_companion_keys :
 module Pending_denunciations :
   Indexed_data_storage
     with type t := Raw_context.t
-     and type key = Signature.public_key_hash
+     and type key = Implicit_account_repr.t
      and type value = Denunciations_repr.t
 
 (** History of slashed deposits: an associative list of cycles to slashed
@@ -568,7 +568,7 @@ module Pending_denunciations :
 module Slashed_deposits :
   Indexed_data_storage
     with type t := Raw_context.t
-     and type key = Signature.public_key_hash
+     and type key = Implicit_account_repr.t
      and type value = Slashed_deposits_history.t
 
 (** This type is used to track which denunciations have already been
@@ -586,8 +586,7 @@ val default_denounced : denounced
 module Already_denounced :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
-     and type key =
-      (Raw_level_repr.t * Round_repr.t) * Signature.Public_key_hash.t
+     and type key = (Raw_level_repr.t * Round_repr.t) * Implicit_account_repr.t
      and type value = denounced
 
 (** Set used to avoid slashing multiple times for the same DAL entrapment event *)
@@ -595,7 +594,7 @@ module Dal_already_denounced :
   Indexed_data_storage
     with type t := Raw_context.t * Cycle_repr.t
      and type key =
-      (Raw_level_repr.t * Dal_slot_index_repr.t) * Signature.Public_key_hash.t
+      (Raw_level_repr.t * Dal_slot_index_repr.t) * Implicit_account_repr.t
      and type value = unit
 
 module Pending_staking_parameters :
@@ -610,21 +609,21 @@ module Stake : sig
       be large. *)
   module Staking_balance :
     Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = Full_staking_balance_repr.t
        and type t := Raw_context.t
 
   (** This should be fairly small compared to staking balance *)
   module Active_delegates_with_minimal_stake :
     Data_set_storage
-      with type elt = Signature.Public_key_hash.t
+      with type elt = Implicit_account_repr.t
        and type t := Raw_context.t
 
   (** List of active stake *)
   module Selected_distribution_for_cycle :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
+       and type value = (Implicit_account_repr.t * Stake_repr.t) list
        and type t := Raw_context.t
 
   (* Selected Bakers Storage
@@ -752,27 +751,27 @@ module Vote : sig
   (** Contains all delegates with their assigned voting weight. *)
   module Listings :
     Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = int64
        and type t := Raw_context.t
 
   (** Set of protocol proposal with corresponding proposer delegate *)
   module Proposals :
     Data_set_storage
-      with type elt = Protocol_hash.t * Signature.Public_key_hash.t
+      with type elt = Protocol_hash.t * Implicit_account_repr.t
        and type t := Raw_context.t
 
   (** Keeps for each delegate the number of proposed protocols *)
   module Proposals_count :
     Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = int
        and type t := Raw_context.t
 
   (** Contains for each delegate its ballot *)
   module Ballots :
     Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = Vote_repr.ballot
        and type t := Raw_context.t
 end
@@ -810,7 +809,7 @@ module Seed : sig
 
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : Implicit_account_repr.t;
   }
 
   type nonce_status =
@@ -961,7 +960,7 @@ module Tenderbake : sig
       allowed to bake or attest blocks. *)
   module Forbidden_delegates :
     Single_data_storage
-      with type value = Signature.Public_key_hash.Set.t
+      with type value = Implicit_account_repr.Set.t
        and type t := Raw_context.t
 end
 
@@ -1039,7 +1038,7 @@ module Sc_rollup : sig
   (** Contains the index of any staker that currently have stake. *)
   module Staker_index :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = Sc_rollup_staker_index_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
@@ -1105,10 +1104,9 @@ module Sc_rollup : sig
       convenient to quickly compute the opponents of a given staker. *)
   module Game :
     Indexed_carbonated_data_storage
-      with type key = Signature.Public_key_hash.t
+      with type key = Implicit_account_repr.t
        and type value = Sc_rollup_game_repr.Index.t
-       and type t =
-        (Raw_context.t * Sc_rollup_repr.t) * Signature.Public_key_hash.t
+       and type t = (Raw_context.t * Sc_rollup_repr.t) * Implicit_account_repr.t
 
   (** [Game_timeout] stores the block level at which the staker whose
       turn it is to move will (become vulnerable to) timeout. The staker
@@ -1148,7 +1146,7 @@ module Sc_rollup : sig
   module Whitelist :
     Carbonated_data_set_storage
       with type t := Raw_context.t * Sc_rollup_repr.t
-       and type elt = Signature.Public_key_hash.t
+       and type elt = Implicit_account_repr.t
 
   (** Maximal space available for the whitelist without needing to burn new fees. *)
   module Whitelist_paid_storage_space :
@@ -1226,7 +1224,7 @@ module Dal : sig
   module Denounced_delegates :
     Indexed_data_storage
       with type t := Raw_context.t
-       and type key = Signature.Public_key_hash.t
+       and type key = Implicit_account_repr.t
        and type value = unit
 
   (** This stores the value of Dal constants for each protocol.

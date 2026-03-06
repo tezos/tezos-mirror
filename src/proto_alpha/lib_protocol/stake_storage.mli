@@ -35,18 +35,18 @@
 
 val initialize_delegate :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   delegated:Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 val get_full_staking_balance :
   Raw_context.t ->
-  Signature.public_key_hash ->
+  Implicit_account_repr.t ->
   Full_staking_balance_repr.t tzresult Lwt.t
 
 val remove_delegated_stake :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -58,18 +58,18 @@ val remove_frozen_stake_only_call_from_token :
 
 val add_delegated_stake :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 val set_stez_frozen_stake :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
+  Implicit_account_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 val clear_stez_frozen_stake :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t tzresult Lwt.t
 
 val add_frozen_stake_only_call_from_token :
   Raw_context.t ->
@@ -78,17 +78,17 @@ val add_frozen_stake_only_call_from_token :
   Raw_context.t tzresult Lwt.t
 
 val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t Lwt.t
 
 val set_active :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Implicit_account_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
     minimal required stake. The folding process starts with [init]. Each element of the
     list is the public key hash of a delegate. *)
 val fold_on_active_delegates_with_minimal_stake_es :
   Raw_context.t ->
-  f:(Signature.Public_key_hash.t -> 'a -> 'a tzresult Lwt.t) ->
+  f:(Implicit_account_repr.t -> 'a -> 'a tzresult Lwt.t) ->
   order:[`Sorted | `Undefined] ->
   init:'a ->
   'a tzresult Lwt.t
@@ -99,7 +99,7 @@ val fold_on_active_delegates_with_minimal_stake_es :
 val set_selected_distribution_for_cycle :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Signature.public_key_hash * Stake_repr.t) list ->
+  (Implicit_account_repr.t * Stake_repr.t) list ->
   Stake_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -110,26 +110,25 @@ val fold_on_active_delegates_with_minimal_stake_s :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
   init:'a ->
-  f:(Signature.Public_key_hash.t -> 'a -> 'a Lwt.t) ->
+  f:(Implicit_account_repr.t -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
 val get_selected_distribution :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Raw_context.t * (Signature.Public_key_hash.t * Stake_repr.t) list) tzresult
-  Lwt.t
+  (Raw_context.t * (Implicit_account_repr.t * Stake_repr.t) list) tzresult Lwt.t
 
 val find_selected_distribution :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Raw_context.t * (Signature.Public_key_hash.t * Stake_repr.t) list option)
+  (Raw_context.t * (Implicit_account_repr.t * Stake_repr.t) list option)
   tzresult
   Lwt.t
 
 val get_selected_distribution_as_map :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Raw_context.t * Stake_repr.t Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (Raw_context.t * Stake_repr.t Implicit_account_repr.Map.t) tzresult Lwt.t
 
 (** Copy the stake distribution for the current cycle (from
    [Storage.Stake.Selected_distribution_for_cycle]) in the raw
@@ -157,12 +156,12 @@ val remove_contract_delegated_stake :
 
 module For_RPC : sig
   val get_staking_balance :
-    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+    Raw_context.t -> Implicit_account_repr.t -> Tez_repr.t tzresult Lwt.t
 end
 
 module Internal_for_tests : sig
   (** Same as [get_staking_balance] but returns zero if the argument
       is not an active delegate above minimal stake.  *)
   val get :
-    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+    Raw_context.t -> Implicit_account_repr.t -> Tez_repr.t tzresult Lwt.t
 end

@@ -57,17 +57,17 @@ type error +=
   | (* `Temporary *) Sc_rollup_game_already_started
   | (* `Temporary *)
       Sc_rollup_max_number_of_parallel_games_reached of
-      Signature.Public_key_hash.t
+      Implicit_account_repr.t
   | (* `Temporary *) Sc_rollup_wrong_turn
   | (* `Temporary *) Sc_rollup_no_game
   | (* `Temporary *)
       Sc_rollup_staker_in_game of
-      [ `Refuter of Signature.public_key_hash
-      | `Defender of Signature.public_key_hash
-      | `Both of Signature.public_key_hash * Signature.public_key_hash ]
+      [ `Refuter of Implicit_account_repr.t
+      | `Defender of Implicit_account_repr.t
+      | `Both of Implicit_account_repr.t * Implicit_account_repr.t ]
   | (* `Temporary *)
       Sc_rollup_timeout_level_not_reached of
-      int32 * Signature.public_key_hash
+      int32 * Implicit_account_repr.t
   | (* `Temporary *)
       Sc_rollup_max_number_of_messages_reached_for_commitment_period
   | (* `Permanent *) Sc_rollup_add_zero_messages
@@ -76,7 +76,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_outbox_message_already_applied
   | (* `Temporary *)
       Sc_rollup_staker_funds_too_low of {
-      staker : Signature.public_key_hash;
+      staker : Implicit_account_repr.t;
       sc_rollup : Sc_rollup_repr.t;
       staker_balance : Tez_repr.t;
       min_expected_balance : Tez_repr.t;
@@ -88,12 +88,12 @@ type error +=
   | (* `Permanent *)
       Sc_rollup_not_valid_commitments_conflict of
       Sc_rollup_commitment_repr.Hash.t
-      * Signature.public_key_hash
+      * Implicit_account_repr.t
       * Sc_rollup_commitment_repr.Hash.t
-      * Signature.public_key_hash
+      * Implicit_account_repr.t
   | (* `Permanent *)
       Sc_rollup_wrong_staker_for_conflict_commitment of
-      Signature.public_key_hash * Sc_rollup_commitment_repr.Hash.t
+      Implicit_account_repr.t * Sc_rollup_commitment_repr.Hash.t
   | (* `Permanent *)
       Sc_rollup_commitment_too_old of {
       last_cemented_inbox_level : Raw_level_repr.t;
@@ -120,24 +120,20 @@ let () =
     ~pp:(fun ppf staker ->
       let busy ppf = function
         | `Refuter sc ->
-            Format.fprintf
-              ppf
-              "the refuter (%a) is"
-              Signature.Public_key_hash.pp
-              sc
+            Format.fprintf ppf "the refuter (%a) is" Implicit_account_repr.pp sc
         | `Defender sc ->
             Format.fprintf
               ppf
               "the defender (%a) is"
-              Signature.Public_key_hash.pp
+              Implicit_account_repr.pp
               sc
         | `Both (refuter, defender) ->
             Format.fprintf
               ppf
               "both the refuter (%a) and the defender (%a) are"
-              Signature.Public_key_hash.pp
+              Implicit_account_repr.pp
               refuter
-              Signature.Public_key_hash.pp
+              Implicit_account_repr.pp
               defender
       in
       Format.fprintf
@@ -151,21 +147,21 @@ let () =
           case
             (Tag 0)
             ~title:"Refuter"
-            (obj1 (req "refuter" Signature.Public_key_hash.encoding))
+            (obj1 (req "refuter" Implicit_account_repr.encoding))
             (function `Refuter sc -> Some sc | _ -> None)
             (fun sc -> `Refuter sc);
           case
             (Tag 1)
             ~title:"Defender"
-            (obj1 (req "defender" Signature.Public_key_hash.encoding))
+            (obj1 (req "defender" Implicit_account_repr.encoding))
             (function `Defender sc -> Some sc | _ -> None)
             (fun sc -> `Defender sc);
           case
             (Tag 2)
             ~title:"Both"
             (obj2
-               (req "refuter" Signature.Public_key_hash.encoding)
-               (req "defender" Signature.Public_key_hash.encoding))
+               (req "refuter" Implicit_account_repr.encoding)
+               (req "defender" Implicit_account_repr.encoding))
             (function
               | `Both (refuter, defender) -> Some (refuter, defender)
               | _ -> None)
@@ -184,13 +180,13 @@ let () =
         ppf
         "%s. The player %a has %ld left blocks to play."
         description
-        Signature.Public_key_hash.pp_short
+        Implicit_account_repr.pp_short
         staker
         blocks_left)
     Data_encoding.(
       obj2
         (req "level_timeout" int32)
-        (req "staker" Signature.Public_key_hash.encoding))
+        (req "staker" Implicit_account_repr.encoding))
     (function
       | Sc_rollup_timeout_level_not_reached (blocks_left, staker) ->
           Some (blocks_left, staker)
@@ -492,7 +488,7 @@ let () =
         "Staker (%a) doesn't have enough funds to make the deposit for smart \
          rollup (%a). Staker's balance is %a while a balance of at least %a is \
          required."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         staker
         Sc_rollup_repr.pp
         sc_rollup
@@ -502,7 +498,7 @@ let () =
         min_expected_balance)
     Data_encoding.(
       obj4
-        (req "staker" Signature.Public_key_hash.encoding)
+        (req "staker" Implicit_account_repr.encoding)
         (req "smart_rollup" Sc_rollup_repr.encoding)
         (req "staker_balance" Tez_repr.encoding)
         (req "min_expected_balance" Tez_repr.encoding))
@@ -592,10 +588,10 @@ let () =
       Format.fprintf
         ppf
         "%a has reached the limit for number of parallel games"
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         staker)
     ~description
-    Data_encoding.(obj1 (req "staker" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "staker" Implicit_account_repr.encoding))
     (function
       | Sc_rollup_max_number_of_parallel_games_reached staker -> Some staker
       | _ -> None)
@@ -613,19 +609,19 @@ let () =
          direct predecessor is the same."
         Sc_rollup_commitment_repr.Hash.pp
         c1
-        Signature.Public_key_hash.pp_short
+        Implicit_account_repr.pp_short
         s1
         Sc_rollup_commitment_repr.Hash.pp
         c2
-        Signature.Public_key_hash.pp_short
+        Implicit_account_repr.pp_short
         s2)
     ~description
     Data_encoding.(
       obj4
         (req "commitment" Sc_rollup_commitment_repr.Hash.encoding)
-        (req "player" Signature.Public_key_hash.encoding)
+        (req "player" Implicit_account_repr.encoding)
         (req "opponent_commitment" Sc_rollup_commitment_repr.Hash.encoding)
-        (req "opponent" Signature.Public_key_hash.encoding))
+        (req "opponent" Implicit_account_repr.encoding))
     (function
       | Sc_rollup_not_valid_commitments_conflict (c1, s1, c2, s2) ->
           Some (c1, s1, c2, s2)
@@ -641,14 +637,14 @@ let () =
       Format.fprintf
         ppf
         "The staker %a has not staked commitment %a"
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         staker
         Sc_rollup_commitment_repr.Hash.pp
         commitment)
     ~description
     Data_encoding.(
       obj2
-        (req "player" Signature.Public_key_hash.encoding)
+        (req "player" Implicit_account_repr.encoding)
         (req "commitment" Sc_rollup_commitment_repr.Hash.encoding))
     (function
       | Sc_rollup_wrong_staker_for_conflict_commitment (staker, commitment) ->

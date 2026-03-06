@@ -44,13 +44,13 @@ type 'kind internal_operation_contents =
     }
       -> Kind.transaction internal_operation_contents
   | Origination : {
-      delegate : Signature.Public_key_hash.t option;
+      delegate : Implicit_account_repr.t option;
       script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination internal_operation_contents
   | Delegation :
-      Signature.Public_key_hash.t option
+      Implicit_account_repr.t option
       -> Kind.delegation internal_operation_contents
   | Event : {
       ty : Script.expr;

@@ -1359,10 +1359,12 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
            (fun acc (_oph, {protocol_data = Operation_data {contents; _}; _}) ->
              match contents with
              | Single (Manager_operation {source; _} as _op)
-               when Signature.Public_key_hash.equal source src ->
+             (* FIXME-PA *)
+               when Implicit_account_repr.(source = src) ->
                  Contents_list contents :: acc
              | Cons (Manager_operation {source; _}, _rest) as _op
-               when Signature.Public_key_hash.equal source src ->
+             (* FIXME-PA *)
+               when Implicit_account_repr.(source = src) ->
                  Contents_list contents :: acc
              | _ -> acc)
            []
@@ -1502,7 +1504,7 @@ let replace_operation (type kind) (cctxt : #full) chain source
             cctxt#error
               "Cannot replace! No validated manager operation found for %a in \
                mempool@."
-              Signature.Public_key_hash.pp
+              Implicit_account_repr.pp
               source
           in
           exit 1
@@ -1511,7 +1513,7 @@ let replace_operation (type kind) (cctxt : #full) chain source
             cctxt#error
               "More than one validated manager operation found for %a in \
                mempool. Found %d operations.@."
-              Signature.Public_key_hash.pp
+              Implicit_account_repr.pp
               source
               (List.length l)
           in
@@ -1545,7 +1547,7 @@ let apply_specified_options counter op source fee gas_limit storage_limit =
 let rec build_contents : type kind.
     Manager_counter.t ->
     kind Annotated_manager_operation.annotated_list ->
-    public_key_hash ->
+    Implicit_account_repr.t ->
     Tez.t Limit.t ->
     Gas.Arith.integral Limit.t ->
     Z.t Limit.t ->

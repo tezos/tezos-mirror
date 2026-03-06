@@ -91,8 +91,8 @@ val get_validators :
   chain:Shell_services.chain ->
   ?block:Shell_services.block ->
   ?levels:int32 list ->
-  ?delegates:public_key_hash list ->
-  ?consensus_keys:public_key_hash list ->
+  ?delegates:Implicit_account_repr.t list ->
+  ?consensus_keys:Signature.Public_key_hash.t list ->
   unit ->
   RPC.Validators.t list tzresult Lwt.t
 
@@ -174,7 +174,7 @@ val get_dal_profiles :
     [delegates]. *)
 val register_dal_profiles :
   Tezos_rpc.Context.generic ->
-  Signature.Public_key_hash.t list ->
+  Implicit_account_repr.t list ->
   unit tzresult Lwt.t
 
 (** [get_dal_health ctxt] calls the DAL node RPC 'GET /health' *)
@@ -194,7 +194,7 @@ val delegate_deactivated :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   ?block:Shell_services.block ->
-  public_key_hash ->
+  Implicit_account_repr.t ->
   bool tzresult Lwt.t
 
 val constants :

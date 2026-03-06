@@ -85,7 +85,7 @@ let bool (_ : bool) : t = 1
 let signature (signature : Script_typed_ir.Script_signature.t) : t =
   Script_typed_ir.Script_signature.size signature
 
-let key_hash (_keyhash : Signature.public_key_hash) : t =
+let key_hash (_keyhash : Signature.Public_key_hash.t) : t =
   Signature.Public_key_hash.size
 
 let public_key (public_key : Signature.public_key) : t =

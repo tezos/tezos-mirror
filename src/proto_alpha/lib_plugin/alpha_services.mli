@@ -170,7 +170,8 @@ module Cache : sig
 end
 
 module Denunciations : sig
-  type denunciations_with_key = public_key_hash * Denunciations_repr.item
+  type denunciations_with_key =
+    Implicit_account_repr.t * Denunciations_repr.item
 
   val denunciations_with_key_encoding : denunciations_with_key Data_encoding.t
 

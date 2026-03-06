@@ -106,5 +106,5 @@ module Internal_for_tests : sig
   val get_delegate_ordering :
     Raw_context.t ->
     committee_level:Raw_level_repr.t ->
-    (Raw_context.t * Signature.public_key_hash list) tzresult Lwt.t
+    (Raw_context.t * Implicit_account_repr.t list) tzresult Lwt.t
 end

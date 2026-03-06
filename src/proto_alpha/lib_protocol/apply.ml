@@ -32,11 +32,11 @@ open Alpha_context
 
 type error +=
   | Faulty_validation_wrong_slot
-  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Set_deposits_limit_on_unregistered_delegate of Implicit_account_repr.t
   | Set_deposits_limit_when_automated_staking_off
   | Error_while_taking_fees
   | Update_consensus_key_on_unregistered_delegate of
-      (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
+      (Implicit_account_repr.t * Operation_repr.consensus_key_kind)
   | Empty_transaction of Contract.t
   | Non_empty_transaction_from of Destination.t
   | Internal_operation_replay of
@@ -73,9 +73,9 @@ let () =
       Format.fprintf
         ppf
         "Cannot set a deposits limit on the unregistered delegate %a."
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         c)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    Data_encoding.(obj1 (req "delegate" Implicit_account_repr.encoding))
     (function
       | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
     (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
@@ -122,11 +122,11 @@ let () =
         "Cannot update the %a key on the unregistered delegate %a."
         Operation_repr.pp_consensus_key_kind
         kind
-        Signature.Public_key_hash.pp
+        Implicit_account_repr.pp
         delegate)
     Data_encoding.(
       obj2
-        (req "delegate" Signature.Public_key_hash.encoding)
+        (req "delegate" Implicit_account_repr.encoding)
         (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function
       | Update_consensus_key_on_unregistered_delegate c -> Some c | _ -> None)
@@ -369,7 +369,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   let*? () = error_when Tez.(amount = zero) (Empty_transaction contract) in
   let*? () =
     error_unless
-      Signature.Public_key_hash.(sender = destination)
+      Implicit_account_repr.(sender = destination)
       Invalid_self_transaction_destination
   in
   let*? ctxt = Gas.consume ctxt Adaptive_issuance_costs.stake_cost in
@@ -381,7 +381,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
         Delegate.Staking_parameters.of_delegate ctxt delegate
       in
       let forbidden =
-        Signature.Public_key_hash.(delegate <> sender)
+        Implicit_account_repr.(delegate <> sender)
         && Compare.Int32.(limit_of_staking_over_baking_millionth = 0l)
       in
       let*? () =
@@ -413,7 +413,7 @@ let apply_unstake ~ctxt ~sender ~amount ~destination ~before_operation =
   let open Lwt_result_syntax in
   let*? () =
     error_unless
-      Signature.Public_key_hash.(sender = destination)
+      Implicit_account_repr.(sender = destination)
       Invalid_self_transaction_destination
   in
   let sender_contract = Contract.Implicit sender in
@@ -477,7 +477,7 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
   in
   let*? () =
     error_unless
-      Signature.Public_key_hash.(sender = destination)
+      Implicit_account_repr.(sender = destination)
       Invalid_self_transaction_destination
   in
   let* is_delegate = Contract.is_delegate ctxt sender in
@@ -766,7 +766,7 @@ let find_contract_from_cache ctxt contract_hash =
 
 let apply_internal_operation_contents : type kind.
     context ->
-    payer:public_key_hash ->
+    payer:Implicit_account_repr.t ->
     sender:Destination.t ->
     chain_id:Chain_id.t ->
     kind Script_typed_ir.internal_operation_contents ->
@@ -965,7 +965,7 @@ let apply_internal_operation_contents : type kind.
 
 let apply_manager_operation : type kind.
     context ->
-    source:public_key_hash ->
+    source:Implicit_account_repr.t ->
     chain_id:Chain_id.t ->
     consume_gas_for_sig_check:Gas.cost option ->
     kind manager_operation ->
@@ -1813,7 +1813,7 @@ let burn_manager_storage_fees : type kind.
     context ->
     kind successful_manager_operation_result ->
     storage_limit:Z.t ->
-    payer:public_key_hash ->
+    payer:Implicit_account_repr.t ->
     (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
   let open Lwt_result_syntax in
   fun ctxt smopr ~storage_limit ~payer ->
@@ -1937,7 +1937,7 @@ let burn_internal_storage_fees : type kind.
     context ->
     kind successful_internal_operation_result ->
     storage_limit:Z.t ->
-    payer:public_key_hash ->
+    payer:Implicit_account_repr.t ->
     (context * Z.t * kind successful_internal_operation_result) tzresult Lwt.t =
   let open Lwt_result_syntax in
   fun ctxt smopr ~storage_limit ~payer ->
@@ -2364,9 +2364,7 @@ let record_dal_content ctxt ~delegate level slot
         Raw_level.Map.fold
           (fun level delegate_map map ->
             let power =
-              match
-                Signature.Public_key_hash.Map.find delegate delegate_map
-              with
+              match Implicit_account_repr.Map.find delegate delegate_map with
               | None -> 0
               | Some v -> v
             in
@@ -2814,7 +2812,11 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
       let sender = `Collected_commitments blinded_pkh in
-      let contract = Contract.Implicit (Signature.Ed25519 pkh) in
+      (* FIXME-PA *)
+      let contract =
+        Contract.Implicit
+          (Implicit_account_repr.Forbidden.of_pkh (Signature.Ed25519 pkh))
+      in
       let* ctxt, amount = Token.balance ctxt sender in
       let* ctxt, bupds =
         Token.transfer ctxt sender (`Contract contract) amount
@@ -2974,7 +2976,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                  entrypoint. *)
               {
                 sender = Destination.Contract liquidity_baking_cpmm_contract;
-                payer = Signature.Public_key_hash.zero;
+                payer = Implicit_account_repr.zero;
                 self = liquidity_baking_cpmm_contract_hash;
                 amount = liquidity_baking_subsidy;
                 balance;

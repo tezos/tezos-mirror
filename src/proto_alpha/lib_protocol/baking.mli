@@ -34,7 +34,7 @@ type error +=
     }
 
 type ordered_slots = private {
-  delegate : Signature.public_key_hash;
+  delegate : Implicit_account_repr.t;
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   rounds : Round.t list;
@@ -52,13 +52,13 @@ type ordered_slots = private {
 val attesting_rights :
   context ->
   attested_level:Level.t ->
-  (context * ordered_slots Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (context * ordered_slots Implicit_account_repr.Map.t) tzresult Lwt.t
 
 (** For a given level computes the number of DAL shards assigned to delegates. *)
 val delegate_to_shard_count :
   context ->
   Level.t ->
-  (context * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (context * int Implicit_account_repr.Map.t) tzresult Lwt.t
 
 (** Computes attesting rights for a given level.
 

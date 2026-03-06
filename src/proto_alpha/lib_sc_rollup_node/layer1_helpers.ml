@@ -85,7 +85,8 @@ let get_last_published_commitment ?(allow_unstake = true)
       cctxt
       (cctxt#chain, `Head 0)
       rollup_address
-      operator
+      (* FIXME-PA *)
+      (Protocol.Implicit_account_repr.Forbidden.of_pkh operator)
   in
   match res with
   | Error trace
@@ -259,7 +260,10 @@ let find_whitelist cctxt ?block rollup_address =
   in
   return
   @@ Option.map
-       (List.map Tezos_crypto.Signature.Of_V3.public_key_hash)
+       (* FIXME-PA *)
+       (List.map (fun pkh ->
+            Tezos_crypto.Signature.Of_V3.public_key_hash
+              (Protocol.Implicit_account_repr.Forbidden.to_pkh pkh)))
        whitelist
 
 let find_last_whitelist_update cctxt rollup_address =
@@ -300,7 +304,8 @@ let get_balance_mutez cctxt ?block pkh =
     Plugin.Alpha_services.Contract.balance
       cctxt
       (cctxt#chain, block)
-      (Implicit pkh)
+      (* FIXME-PA *)
+      (Implicit (Protocol.Implicit_account_repr.Forbidden.of_pkh pkh))
   in
   Protocol.Alpha_context.Tez.to_mutez balance
 

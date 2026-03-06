@@ -28,9 +28,9 @@
     delay initial rewarding, typically when waiting for more bakers to join the
     network. *)
 
-type error += Unrevealed_public_key of Signature.Public_key_hash.t
+type error += Unrevealed_public_key of Implicit_account_repr.t
 
-type error += Delegator_with_consensus_key of Signature.Public_key_hash.t
+type error += Delegator_with_consensus_key of Implicit_account_repr.t
 
 val init :
   Raw_context.t ->

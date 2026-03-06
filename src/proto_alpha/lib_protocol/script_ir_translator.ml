@@ -1308,7 +1308,7 @@ let find_entrypoint (type full fullc error_context error_trace)
             in
             Ex_ty_cstr
               {ty; construct = (fun e -> R (construct e)); original_type_expr})
-    | _, {nested = Entrypoints_None; _} -> Gas_monad.of_result (Error ())
+    | _, _ -> Gas_monad.of_result (Error ())
   in
   let {root; original_type_expr} = entrypoints in
   Gas_monad.bind_recover (find_entrypoint full root entrypoint) @@ function
@@ -1594,12 +1594,15 @@ let parse_key ctxt : Script.node -> (public_key * context) tzresult =
       tzfail
       @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_key_hash ctxt : Script.node -> (public_key_hash * context) tzresult =
+let parse_key_hash ctxt :
+    Script.node -> (Signature.Public_key_hash.t * context) tzresult =
   let open Result_syntax in
   function
   | Bytes (loc, bytes) as expr -> (
       (* As unparsed with [Optimized]. *)
       let* ctxt = Gas.consume ctxt Typecheck_costs.key_hash_optimized in
+      (* FIXME-PA: this is where bytes are parsed into an address. If we want
+         to handle tzx in Michelson, this must be updated carefully. *)
       match
         Data_encoding.Binary.of_bytes_opt
           Signature.Public_key_hash.encoding
@@ -1679,8 +1682,9 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
     match destination with
     | Destination.Zk_rollup _ when not (Constants.zk_rollup_enable ctxt) ->
         tzfail @@ Zk_rollup_disabled loc
-    | Destination.Contract (Implicit (Signature.Mldsa44 _))
-      when not (Constants.tz5_account_enable ctxt) ->
+    | Destination.Contract (Implicit pkh)
+      when Implicit_account_repr.is_tz5 pkh
+           && not (Constants.tz5_account_enable ctxt) ->
         tzfail @@ Tz5_account_disabled loc
     | _ -> Ok ({destination; entrypoint}, ctxt)
   in

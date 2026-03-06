@@ -52,8 +52,8 @@ end
 
 (* Usage of the functions in the [Forbidden] module SHOULD be avoided.
    If it seems unavoidable, their use MUST be indicated with a
-   comment starting with "FIXME-PA", followed by a very brief justification.
-   Test files are exempt from this. *)
+   comment starting with "FIXME-PA" *)
+(* FIXME-PA: remove all occurences of this module *)
 module Forbidden : sig
   val to_pkh : t -> Signature.Public_key_hash.t
 

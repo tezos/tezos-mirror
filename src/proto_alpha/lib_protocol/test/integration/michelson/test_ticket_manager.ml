@@ -42,7 +42,7 @@ open Alpha_context
 
 type init_env = {
   block : Block.t;
-  baker : Signature.public_key_hash;
+  baker : Implicit_account_repr.t;
   contract : Contract.t;
 }
 
