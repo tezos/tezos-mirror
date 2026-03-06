@@ -358,6 +358,14 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
       | Some context_hash -> return context_hash
       | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash)
 
+let get_state ctxt
+    ?(block = Ethereum_types.Block_parameter.Block_parameter Latest) () =
+  let open Lwt_result_syntax in
+  let* hash = find_irmin_hash ctxt block in
+  get_evm_state ctxt hash
+
+let read_state = read
+
 module MakeBackend (Ctxt : sig
   val ctxt : t
 

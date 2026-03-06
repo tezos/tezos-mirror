@@ -141,6 +141,19 @@ val transaction_receipt :
 val transaction_object :
   t -> Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
 
+(** [get_state ctxt ?block ()] returns the EVM state at the given block
+    parameter. Defaults to [Latest]. *)
+val get_state :
+  t ->
+  ?block:Ethereum_types.Block_parameter.extended ->
+  unit ->
+  Evm_state.t tzresult Lwt.t
+
+(** [read_state state path] reads a value from the durable storage at [path]
+    in the given [state]. Alias for {!Evm_state.inspect} wrapped in a result. *)
+val read_state :
+  Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 val ro_backend :
