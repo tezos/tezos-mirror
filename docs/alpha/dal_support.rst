@@ -32,7 +32,7 @@ If a block contains a valid ``DAL_publish_commitment`` operation, any subsequent
 Economics
 ---------
 
-Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the bandwidth required for bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
+Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the network bandwidth required by bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
 
 DAL attestation payloads
 ========================
@@ -172,11 +172,11 @@ This section describes the protocol constants specific to the DAL as well as the
 
 - ``FEATURE_ENABLE`` (true): whether the DAL is available
 - ``INCENTIVES_ENABLE`` (true): whether baker incentives are available
-- ``NUMBER_OF_SLOTS`` (32): how many slots are available per block
+- ``NUMBER_OF_SLOTS`` (160): how many slots are available per block
 - ``ATTESTATION_LAG`` (8 level): the timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
 - ``ATTESTATION_THRESHOLD`` (66%): the minimum percentage of shards attested for a given slot to declare the slot available
 - ``PAGE_SIZE`` (3967B, ~4KiB): the size of a page (see :ref:`dal_slots`)
-- ``SLOT_SIZE`` (126944B, ~128KiB): the size of a slot (see :ref:`dal_slots`)
+- ``SLOT_SIZE`` (380832B, ~372KiB): the size of a slot (see :ref:`dal_slots`)
 - ``REDUNDANCY_FACTOR`` (8): the erasure-code factor (see :ref:`dal_slots`)
 - ``NUMBER_OF_SHARDS`` (512): the number of shards per slot (see :ref:`dal_slots`)
 - ``MINIMAL_PARTICIPATION_RATIO`` (64%): the minimum percentage of slots attested by a baker during a cycle (among all slots deemed available) that entitles them to rewards

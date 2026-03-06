@@ -215,35 +215,30 @@ The system requirements for the DAL node depend on whether the node is being run
 The following sections provide system requirements for these cases based on experimentation.
 For more information about the experimentation, see `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
 
-.. note::
-
-    These requirements are for DAL nodes that run independently of any other Octez binary.
-    The requirements are higher if they are running on the same system as other Octez binaries.
-
 DAL attesters
 ~~~~~~~~~~~~~
 
 The amount of data that a DAL node must attest to depends on how much baking power the associated baker has.
 The larger the baking power, the more data the DAL sends to the DAL node to attest and the more system resources the DAL node needs.
 
-This table shows the system requirements for a DAL node (independent of any other Octez binary) that attests 100% of the data assigned to it.
+This table shows the system requirements for a complete baker setup, featuring a Layer 1 node, a baker node and a DAL node that attests 100% of the data assigned to it.
 The specifications in this table are an estimate based on experimentation with Google Cloud Platform compute instances; you must monitor your DAL node to ensure that it attests all or nearly all of the data that it is assigned to attest.
 
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Baking power          | 0.5% of total         | 1% of total           | 2% of total           | 5% of total           |
+| Baking power          | Up to 1% of total     | 2% of total           | 5% of total           | 10% of total          |
 +=======================+=======================+=======================+=======================+=======================+
-| Machine type          | e2-small (ssd)        | e2-small (ssd)        | e2-small (ssd)        | e2-medium (ssd)       |
+| Number of cores       | 4 cores               | 4 cores               | 8 cores               | 16 cores              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| CPU clock             | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              |
+| CPU perf. tier (*)    | low-end               | mid-range             | high-end              | high-end              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| RAM                   | 2 GiB                 | 2 GiB                 | 2 GiB                 | 4 GiB                 |
-+-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Disk space            | 20 GiB                | 20 GiB                | 20 GiB                | 20 GiB                |
+| RAM                   | 16 GiB                | 16 GiB                | 16 GiB                | 16 GiB                |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 | Bandwidth (upload)    | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| Bandwidth (download)  | 250 KiB/s             | 350 KiB/s             | 400 KiB/s             | 600 KiB/s             |
+| Bandwidth (download)  | 1 MiB/s               | 2 MiB/s               | 5 MiB/s               | 10 MiB/s              |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+
+(*): Low-end covers low-power or entry-level CPUs, mid-range targets modern desktop and entry-level server CPUs with mid-range clock speed, and high-end addresses recent high-performance CPUs with high clock speed.
 
 DAL producer node (operator/observer)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -252,8 +247,8 @@ The system resources that a DAL producer node needs depends on how much data it 
 This example is an estimate based on experimentation with a DAL producer node that publishes data into one slot in each block:
 
 ======================= ===============
-CPU                     n2-standard-2
-RAM                     4 GiB
+CPU                     c2-standard-4
+RAM                     16 GiB
 Disk space              500 GiB
 Bandwidth (upload)      2.5 MiB/s
 Bandwidth (download)    0.5 MiB/s
