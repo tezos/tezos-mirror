@@ -504,7 +504,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
          else Rpc_types.Single_chain_node_rpc_server chain_family)
       ~tick
       configuration
-      ((module Rpc_backend), smart_rollup_address_typed)
+      ((module Rpc_backend), ro_ctxt)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
@@ -515,7 +515,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~block_production:`Single_node
       ~tick
       configuration
-      ((module Rpc_backend), smart_rollup_address_typed)
+      ((module Rpc_backend), ro_ctxt)
   in
   let*! finalizer_rpc_process =
     Option.map_s

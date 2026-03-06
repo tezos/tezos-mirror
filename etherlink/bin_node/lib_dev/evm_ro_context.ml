@@ -1042,27 +1042,37 @@ let preload_known_kernels ctxt =
     (preload_kernel_from_level ctxt)
     (earliest_level @ activation_levels)
 
+type evm_services_methods = {
+  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
+  find_blueprint :
+    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
+  smart_rollup_address : Address.t;
+  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
+}
+
 let evm_services_methods ctxt time_between_blocks =
-  Rpc_server.
-    {
-      next_blueprint_number =
-        (fun () ->
-          let open Lwt_syntax in
-          let+ res = next_blueprint_number ctxt in
-          match res with
-          | Ok res -> res
-          | Error _ -> Stdlib.failwith "Couldn't fetch next blueprint number");
-      find_blueprint_legacy =
-        (fun level ->
-          Evm_store.use ctxt.store (fun conn ->
-              Evm_store.Blueprints.find_with_events_legacy conn level));
-      find_blueprint =
-        (fun level ->
-          Evm_store.use ctxt.store (fun conn ->
-              Evm_store.Blueprints.find_with_events conn level));
-      smart_rollup_address = ctxt.smart_rollup_address;
-      time_between_blocks;
-    }
+  {
+    next_blueprint_number =
+      (fun () ->
+        let open Lwt_syntax in
+        let+ res = next_blueprint_number ctxt in
+        match res with
+        | Ok res -> res
+        | Error _ -> Stdlib.failwith "Couldn't fetch next blueprint number");
+    find_blueprint_legacy =
+      (fun level ->
+        Evm_store.use ctxt.store (fun conn ->
+            Evm_store.Blueprints.find_with_events_legacy conn level));
+    find_blueprint =
+      (fun level ->
+        Evm_store.use ctxt.store (fun conn ->
+            Evm_store.Blueprints.find_with_events conn level));
+    smart_rollup_address = ctxt.smart_rollup_address;
+    time_between_blocks;
+  }
 
 let blueprints_range ctxt ~from ~to_ =
   Evm_store.use ctxt.store @@ fun conn ->

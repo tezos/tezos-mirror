@@ -987,7 +987,7 @@ let send_raw_tezlink_operation (type f) (config : Configuration.t)
 let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (config : Configuration.t) (mode : f Mode.t)
-    ((module Backend_rpc : Services_backend_sig.S), _)
+    ((module Backend_rpc : Services_backend_sig.S), ro_ctxt)
     ({method_; parameters; id} as request : JSONRPC.request) :
     JSONRPC.return_response Lwt.t =
   let open Lwt_result_syntax in
@@ -1576,10 +1576,7 @@ let dispatch_request (type f) ~websocket
         | Get_logs.Method ->
             let f filter =
               let* logs =
-                Filter_helpers.get_logs
-                  config.log_filter
-                  (module Backend_rpc)
-                  filter
+                Filter_helpers.get_logs config.log_filter ro_ctxt filter
               in
               rpc_ok logs
             in

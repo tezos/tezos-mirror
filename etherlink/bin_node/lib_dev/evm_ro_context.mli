@@ -156,6 +156,20 @@ val read_state :
 
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
+type evm_services_methods = {
+  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
+  find_blueprint :
+    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
+  smart_rollup_address : Address.t;
+  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
+}
+
+val evm_services_methods :
+  t -> Configuration.time_between_blocks -> evm_services_methods
+
 val ro_backend :
   ?evm_node_endpoint:Uri.t ->
   t ->
@@ -184,8 +198,5 @@ val replay :
   replay_strategy ->
   Ethereum_types.quantity ->
   replay_result tzresult Lwt.t
-
-val evm_services_methods :
-  t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods
 
 val blueprints_range : t -> Blueprints_publisher.blueprints_range

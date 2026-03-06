@@ -288,7 +288,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~rpc_server_family
       ~tick
       config
-      ((module Rpc_backend), smart_rollup_address)
+      ((module Rpc_backend), ro_ctxt)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
@@ -296,7 +296,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~rpc_server_family
       ~tick
       config
-      ((module Rpc_backend), smart_rollup_address)
+      ((module Rpc_backend), ro_ctxt)
   in
 
   let* () =

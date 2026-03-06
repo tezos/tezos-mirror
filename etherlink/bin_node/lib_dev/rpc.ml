@@ -146,7 +146,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       ~rpc_server_family
       ~tick:(fun () -> Lwt_result_syntax.return_unit)
       rpc_config
-      ((module Rpc_backend), ctxt.smart_rollup_address)
+      ((module Rpc_backend), ctxt)
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =

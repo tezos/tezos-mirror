@@ -74,8 +74,7 @@ let emit_and_return_none event arg =
   return_none
 
 (* Parses the [from_block] and [to_block] fields, as described before.  *)
-let validate_range log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) (filter : Filter.t) =
+let validate_range log_filter_config ctxt (filter : Filter.t) =
   let open Lwt_result_syntax in
   match filter with
   | {block_hash = Some _; from_block = Some _; _}
@@ -83,14 +82,16 @@ let validate_range log_filter_config
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
-        Rollup_node_rpc.Etherlink_block_storage.block_by_hash
+        Evm_ro_context.block_by_hash
+          ctxt
           ~full_transaction_object:false
           block_hash
       in
       return_some (block.number, block.number)
   | {from_block; to_block; _} ->
       let get_block_number block_param =
-        Rollup_node_rpc.block_param_to_block_number
+        Evm_ro_context.block_param_to_block_number
+          ctxt
           ~chain_family:L2_types.EVM
           (Block_parameter
              (Option.value ~default:Block_parameter.Latest block_param))
@@ -145,12 +146,9 @@ let validate_bloom_filter (filter : Filter.t) =
 
 (* Parsing a filter into a simpler representation, this is the
    input validation step *)
-let validate_filter log_filter_config
-    (module Rollup_node_rpc : Services_backend_sig.S) filter =
+let validate_filter log_filter_config ctxt filter =
   let open Lwt_result_syntax in
-  let* range =
-    validate_range log_filter_config (module Rollup_node_rpc) filter
-  in
+  let* range = validate_range log_filter_config ctxt filter in
   match range with
   | None -> return_none
   | Some (from_block, to_block) ->
@@ -242,12 +240,9 @@ let filter_one_tx :
    This design is meant to strike a balance between concurrent
    performace and not exceeding the bound in number of logs.
 *)
-let get_logs (log_filter_config : Configuration.log_filter_config)
-    (module Rollup_node_rpc : Services_backend_sig.S) filter =
+let get_logs (log_filter_config : Configuration.log_filter_config) ctxt filter =
   let open Lwt_result_syntax in
-  let* filter =
-    validate_filter log_filter_config (module Rollup_node_rpc) filter
-  in
+  let* filter = validate_filter log_filter_config ctxt filter in
   match filter with
   | None -> return []
   | Some filter ->
@@ -256,10 +251,7 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
       let length = Z.(to_int (to_ - from)) + 1 in
       (* Apply the filter to the entire chunk concurrently *)
       let* receipts =
-        Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
-          ?mask:filter.bloom
-          from
-          length
+        Evm_ro_context.block_range_receipts ctxt ?mask:filter.bloom from length
       in
       Octez_telemetry.Trace.with_tzresult
         ~service_name:"get_logs"

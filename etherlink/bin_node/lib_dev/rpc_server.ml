@@ -7,16 +7,7 @@
 
 type finalizer = unit -> unit Lwt.t
 
-type evm_services_methods = {
-  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
-  find_blueprint :
-    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
-  find_blueprint_legacy :
-    Ethereum_types.quantity ->
-    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
-  smart_rollup_address : Address.t;
-  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
-}
+type evm_services_methods = Evm_ro_context.evm_services_methods
 
 type block_production = [`Single_node | `Disabled]
 
@@ -189,7 +180,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
   let register_evm_services =
     match evm_services with
     | None -> Fun.id
-    | Some impl ->
+    | Some (impl : Evm_ro_context.evm_services_methods) ->
         Evm_services.register
           impl.next_blueprint_number
           impl.find_blueprint_legacy
