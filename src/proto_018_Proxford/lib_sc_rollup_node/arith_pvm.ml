@@ -85,8 +85,9 @@ module Impl : Pvm_sig.S = struct
   (* It is safe to pass the [is_reveal_enabled_predicate]:
      [eval_many] always stops at the beginning of a new Tezos block,
      so no execution of several Tezos block inboxes is possible. *)
-  let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug:_
-      ~is_reveal_enabled ?stop_at_snapshot ~max_steps initial_state =
+  let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_
+      ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled ?stop_at_snapshot
+      ~max_steps initial_state =
     ignore stop_at_snapshot ;
     let rec go state step =
       let open Lwt.Syntax in
@@ -156,12 +157,13 @@ module Impl : Pvm_sig.S = struct
       state := imm_state ;
       return_unit
 
-    let eval_many ?check_invalid_kernel ~reveal_builtins ~write_debug
-        ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+    let eval_many ?check_invalid_kernel ?fallback_to_slow_vm ~reveal_builtins
+        ~write_debug ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
       let open Lwt_syntax in
       let* imm_state, steps =
         eval_many
           ?check_invalid_kernel
+          ?fallback_to_slow_vm
           ~reveal_builtins
           ~write_debug
           ~is_reveal_enabled

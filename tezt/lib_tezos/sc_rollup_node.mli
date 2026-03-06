@@ -81,6 +81,7 @@ type argument =
   | Apply_unsafe_patches
   | Injector_retention_period of int
   | Acl_allow_all
+  | Slow_vm_fallback
 
 type event = {name : string; value : JSON.t; timestamp : float}
 

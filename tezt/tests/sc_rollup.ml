@@ -1613,7 +1613,7 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~inbox_file =
   else unit
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
-    ?boot_sector ~internal ~kind ?preimages_dir =
+    ?boot_sector ~internal ~kind ?preimages_dir ?(node_args = []) =
   test_full_scenario
     ?regression
     ?kernel_debug_log
@@ -1628,7 +1628,7 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ~kind
     ?preimages_dir
   @@ fun protocol sc_rollup_node sc_rollup _tezos_node client ->
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup node_args in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
   let* forwarder =
     if not internal then return None
@@ -1731,12 +1731,14 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
 
   unit
 
-let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
+let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal
+    ?(node_args = []) =
   test_rollup_node_advances_pvm_state
     ~title:(Format.sprintf "runs with kernel - %s" kernel_name)
     ~boot_sector:(fun () -> read_kernel kernel_name)
     ~internal
     ~kind
+    ~node_args
 
 (* Ensure the PVM is transitioning upon incoming messages.
       -------------------------------------------------------
@@ -5828,7 +5830,8 @@ let test_arg_boot_sector_file ~kind =
     match kind with "wasm_2_0_0" -> Hex.(of_string s |> show) | _ -> s
   in
   let boot_sector () =
-    hex_if_wasm "Nantes aurait été un meilleur nom de protocol"
+    Octez_smart_rollup_node_test_helpers.Helpers.noop_wasm_boot_sector
+    |> hex_if_wasm
   in
   test_full_scenario
     ~supports:(Protocol.From_protocol 018)
@@ -5841,7 +5844,8 @@ let test_arg_boot_sector_file ~kind =
     }
   @@ fun _protocol rollup_node rollup _node client ->
   let invalid_boot_sector =
-    hex_if_wasm "Nairobi est un bien meilleur nom de protocol que Nantes"
+    Octez_smart_rollup_node_test_helpers.Helpers.noop_wasm_boot_sector_2
+    |> hex_if_wasm
   in
   let invalid_boot_sector_file =
     Filename.temp_file "invalid-boot-sector" ".hex"
@@ -6060,7 +6064,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation ~kind =
       client
   in
   let* _ = Sc_rollup_node.config_init rollup_node rollup_address in
-  let* () = Sc_rollup_node.run rollup_node rollup_address [] in
+  let* () = Sc_rollup_node.run rollup_node rollup_address [Slow_vm_fallback] in
   let* () = Client.bake_for_and_wait client
   and* () =
     Sc_rollup_node.check_error
@@ -7763,6 +7767,63 @@ let register_riscv_kernel ~protocols ~kernel =
        ~priority:`No_priority)
     protocols
 
+let test_slow_vm_fallback ~kind =
+  let boot_sector () =
+    Sc_rollup_helpers.read_kernel
+      ~base:"tezt/tests/kernels"
+      "unreachable_kernel"
+  in
+  test_full_scenario
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["slow_vm_fallback"];
+      description =
+        "rollup node exits on fast VM panic without --slow-vm-fallback";
+    }
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  (* Node without --slow-vm-fallback: should crash on fast exec panic *)
+  let node_no_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap2.public_key_hash
+      ~name:"no_fallback"
+  in
+  (* Node with --slow-vm-fallback: falls back to slow VM, continues *)
+  let node_with_fallback =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap3.public_key_hash
+      ~name:"with_fallback"
+  in
+  let* () = Sc_rollup_node.run node_no_fallback sc_rollup []
+  and* () =
+    Sc_rollup_node.run node_with_fallback sc_rollup [Slow_vm_fallback]
+  in
+  let no_fallback_crash =
+    (* Node without fallback should crashed *)
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Wasmer fast execution panicked")
+      node_no_fallback
+  in
+  (* Bake block to trigger PVM evaluation *)
+  let* () = Client.bake_for_and_wait tezos_client in
+  (* Node without fallback should have crashed *)
+  let* () = no_fallback_crash in
+  (* Node with fallback should still be running *)
+  let* _level =
+    Sc_rollup_node.wait_for_level ~timeout:30. node_with_fallback 3
+  in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -7893,12 +7954,14 @@ let register ~protocols =
     protocols
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_random"
-    ~internal:false ;
+    ~internal:false
+    ~node_args:[Slow_vm_fallback] ;
   test_rollup_node_run_with_kernel
     protocols
     ~kind:"wasm_2_0_0"
     ~kernel_name:"no_parse_bad_fingerprint"
-    ~internal:false ;
+    ~internal:false
+    ~node_args:[Slow_vm_fallback] ;
 
   (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
@@ -8043,4 +8106,5 @@ let register_protocol_independent () =
   bailout_mode_fail_operator_no_stake ~kind protocols ;
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
-  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols
+  test_remote_signer ~hardcoded_remote_signer:false ~kind protocols ;
+  test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols

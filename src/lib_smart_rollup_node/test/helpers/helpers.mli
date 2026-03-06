@@ -28,6 +28,15 @@ open Octez_smart_rollup_node
 
 (** {1 Helper functions to build and run unit tests for the rollup node} *)
 
+(** A minimal valid WASM boot sector (no-op [kernel_run]) that can be used as a
+    boot sector for WASM 2.0.0 PVM tests. *)
+val noop_wasm_boot_sector : string
+
+(** Same as {!noop_wasm_boot_sector} but with 2 initial memory pages instead of
+    1, producing a different PVM state hash. Useful when tests need two distinct
+    valid boot sectors. *)
+val noop_wasm_boot_sector_2 : string
+
 (** {2 Creating Node Contexts} *)
 
 (** [with_node_context ?constants kind protocol ~boot_sector f] creates a node
@@ -42,7 +51,7 @@ val with_node_context :
   ?constants:Rollup_constants.protocol_constants ->
   Kind.t ->
   Protocol_hash.t ->
-  boot_sector:string ->
+  ?boot_sector:string ->
   (Node_context.rw -> genesis:Sc_rollup_block.t -> 'a tzresult Lwt.t) ->
   'a tzresult Lwt.t
 
@@ -52,7 +61,7 @@ val with_node_context :
     rollup/kernel needs to be provided. The newly created L2 block is
     returned. *)
 val add_l2_genesis_block :
-  Node_context.rw -> boot_sector:string -> Sc_rollup_block.t tzresult Lwt.t
+  ?boot_sector:string -> Node_context.rw -> Sc_rollup_block.t tzresult Lwt.t
 
 (** [append_l2_block node_ctxt ?is_first_block messages] creates and append
     an L2 block containing the [messages] given in argument. The block is added
@@ -115,6 +124,6 @@ val alcotest :
   ?constants:Rollup_constants.protocol_constants ->
   Kind.t ->
   Protocol_hash.t ->
-  boot_sector:string ->
+  ?boot_sector:string ->
   (Node_context.rw -> genesis:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
   unit Alcotest_lwt.test_case

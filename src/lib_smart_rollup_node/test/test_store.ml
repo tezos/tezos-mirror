@@ -190,7 +190,7 @@ let gc_test_reorg node_ctxt ~genesis =
 
 let mk_tests t =
   List.map
-    (fun proto -> Helpers.alcotest `Quick Wasm_2_0_0 proto ~boot_sector:"" t)
+    (fun proto -> Helpers.alcotest `Quick Wasm_2_0_0 proto t)
     (Protocol_plugins.registered_protocols ())
 
 let () =

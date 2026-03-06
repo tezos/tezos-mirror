@@ -20,8 +20,17 @@ val dump_durable_storage :
 val patch_durable_storage :
   data_dir:string -> key:string -> value:string -> unit tzresult Lwt.t
 
-(** Hooks to be used for the WASM PVM. *)
-val hooks : check_invalid_kernel:bool -> Tezos_scoru_wasm.Hooks.t
+(** Exception raised when the fast execution engine panics and
+    [fallback_to_slow_vm] is [false]. *)
+exception Fast_execution_panic of exn
+
+(** Hooks to be used for the WASM PVM. When [fallback_to_slow_vm] is [false],
+    the node will exit instead of falling back to the slow VM interpreter when
+    the fast execution engine fails. *)
+val hooks :
+  check_invalid_kernel:bool ->
+  fallback_to_slow_vm:bool ->
+  Tezos_scoru_wasm.Hooks.t
 
 val preload_kernel :
   _ Node_context.t -> Sc_rollup_block.header -> unit tzresult Lwt.t

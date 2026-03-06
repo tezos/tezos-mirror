@@ -80,6 +80,7 @@ module type MUTABLE_STATE_S = sig
 
   val eval_many :
     ?check_invalid_kernel:bool ->
+    ?fallback_to_slow_vm:bool ->
     reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
     write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
     is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
@@ -129,6 +130,7 @@ module type S = sig
       execution of up to [~max_steps] steps of the rollup at state [s0]. *)
   val eval_many :
     ?check_invalid_kernel:bool ->
+    ?fallback_to_slow_vm:bool ->
     reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
     write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
     is_reveal_enabled:Sc_rollup.is_reveal_enabled ->

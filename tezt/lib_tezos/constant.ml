@@ -200,6 +200,12 @@ module WASM = struct
         "tezt/tests/kernels/echo_dal_reveal_pages_with_external_message.wasm"
       ()
 
+  let unreachable_kernel =
+    Uses.make
+      ~tag:"unreachable_kernel"
+      ~path:"tezt/tests/kernels/unreachable_kernel.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"

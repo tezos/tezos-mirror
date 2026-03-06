@@ -151,8 +151,9 @@ let string_of_status status = Backend.string_of_status status
 
 let get_outbox _level _state = Lwt.return []
 
-let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
-    ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
+let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_ ~reveal_builtins:_
+    ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state
+    =
   let debug_printer =
     match write_debug with
     | Tezos_scoru_wasm.Builtins.Noop -> None
@@ -208,8 +209,9 @@ module Mutable_state :
   let install_boot_sector state boot_sector =
     Backend.Mutable_state.install_boot_sector state boot_sector
 
-  let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
-      ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
+  let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_
+      ~reveal_builtins:_ ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot
+      ~max_steps initial_state =
     let debug_printer =
       match write_debug with
       | Tezos_scoru_wasm.Builtins.Noop -> None

@@ -628,8 +628,18 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
-let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
-    bootstrap1_key =
+let noop_wasm_bootsector =
+  Octez_smart_rollup_node_test_helpers.Helpers.noop_wasm_boot_sector
+  |> Hex.of_string |> Hex.show
+
+let default_boot_sector ~pvm_name =
+  match pvm_name with "wasm_2_0_0" -> noop_wasm_bootsector | _ -> ""
+
+let with_fresh_rollup ?(pvm_name = "arith") ?boot_sector ?dal_node f tezos_node
+    tezos_client bootstrap1_key =
+  let boot_sector =
+    match boot_sector with Some b -> b | None -> default_boot_sector ~pvm_name
+  in
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
@@ -637,7 +647,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
       ~alias:"rollup"
       ~src:bootstrap1_key
       ~kind:pvm_name
-      ~boot_sector:""
+      ~boot_sector
       ~parameters_ty:"string"
       tezos_client
   in

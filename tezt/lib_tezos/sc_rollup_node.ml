@@ -113,6 +113,7 @@ type argument =
   | Apply_unsafe_patches
   | Injector_retention_period of int
   | Acl_allow_all
+  | Slow_vm_fallback
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -136,6 +137,7 @@ let make_argument = function
   | Injector_retention_period nb_block ->
       ["--injector-retention-period"; string_of_int nb_block]
   | Acl_allow_all -> ["--acl-override"; "allow-all"]
+  | Slow_vm_fallback -> ["--slow-vm-fallback"]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -156,7 +158,8 @@ let is_redundant = function
   | Pre_images_endpoint _, Pre_images_endpoint _
   | Apply_unsafe_patches, Apply_unsafe_patches
   | Injector_retention_period _, Injector_retention_period _
-  | Acl_allow_all, Acl_allow_all ->
+  | Acl_allow_all, Acl_allow_all
+  | Slow_vm_fallback, Slow_vm_fallback ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -178,7 +181,8 @@ let is_redundant = function
   | Pre_images_endpoint _, _
   | Apply_unsafe_patches, _
   | Injector_retention_period _, _
-  | Acl_allow_all, _ ->
+  | Acl_allow_all, _
+  | Slow_vm_fallback, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
