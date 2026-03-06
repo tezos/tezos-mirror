@@ -53,7 +53,24 @@ cosign version
 # Usage: sign_image <IMAGE> <TAG> [recursive]
 sign_image() {
   # Get image digest (better than tag for precision)
-  IMAGE_DIGEST="$1@$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest')"
+  # Retry on empty digest: a transient registry error (e.g. 504 Gateway Timeout) can cause
+  # imagetools inspect to return nothing, making cosign fail with "invalid reference format".
+  retry_attempt=0
+  IMAGE_DIGEST=''
+  until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+    _digest=$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest') || _digest=''
+    if [ -n "${_digest}" ]; then
+      IMAGE_DIGEST="$1@${_digest}"
+      break
+    fi
+    retry_attempt="$((retry_attempt + 1))"
+    echo "Empty digest for $1:$2, retrying in ${SLEEP_TIME}s..."
+    sleep "${SLEEP_TIME}"
+  done
+  if [ -z "${IMAGE_DIGEST}" ]; then
+    echo "Fatal: Failed to retrieve digest for $1:$2 after ${MAX_RETRY_ATTEMPTS} attempts."
+    exit 1
+  fi
   echo "Image digest to sign: ${IMAGE_DIGEST}"
 
   # Disable error catching to be able to retry
