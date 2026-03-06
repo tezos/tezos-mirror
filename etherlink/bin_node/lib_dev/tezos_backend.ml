@@ -13,12 +13,8 @@ module type Backend = sig
     Ethereum_types.quantity tzresult Lwt.t
 end
 
-let data_model = Tezlink_durable_storage.Rlp
-
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
-  include Simulator.MakeTezlink (Backend)
-
   type block_param =
     [ `Head of int32
     | `Level of int32
@@ -395,15 +391,12 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let* number = shell_block_param_to_block_number block in
     Block_storage.nth_block_hash (Z.of_int32 number)
 
-  let read ~block p =
+  let simulate_operation ~chain_id:_ ~skip_signature:_
+      (op : Tezlink_imports.SeouLo_context.packed_operation) hash _block =
     let open Lwt_result_syntax in
-    let* block = shell_block_param_to_eth_block_param block in
-    let* state = Backend.get_state ~block () in
-    Backend.read state p
-
-  let simulate_operation ~chain_id ~skip_signature op hash block =
-    let open Lwt_result_syntax in
-    let read = read ~block in
-    let* block = shell_block_param_to_eth_block_param block in
-    simulate_operation ~read ~data_model ~chain_id ~skip_signature op hash block
+    let op = op.protocol_data in
+    let*? mock_result =
+      Tezlink_mock.Operation_metadata.operation_metadata hash op
+    in
+    return mock_result
 end
