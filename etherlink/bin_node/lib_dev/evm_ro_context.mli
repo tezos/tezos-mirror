@@ -218,6 +218,37 @@ module Etherlink : sig
     Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
 end
 
+(** {2 Tracer operations} *)
+
+module Tracer_etherlink : sig
+  val trace_transaction :
+    t ->
+    Ethereum_types.hash ->
+    Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
+
+  val trace_call :
+    t ->
+    Ethereum_types.call ->
+    Ethereum_types.Block_parameter.extended ->
+    Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
+
+  val trace_block :
+    t ->
+    Ethereum_types.quantity ->
+    Tracer_types.config ->
+    Tracer_types.block_output tzresult Lwt.t
+end
+
+(** {2 Tezlink backend operations} *)
+
+(** [tezlink_backend ctxt] returns a Tezlink backend module. *)
+val tezlink_backend : t -> (module Tezlink_backend_sig.S)
+
+(** [tezos_backend ctxt] returns a Tezos backend module. *)
+val tezos_backend : t -> (module Tezlink_backend_sig.S)
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 type evm_services_methods = {

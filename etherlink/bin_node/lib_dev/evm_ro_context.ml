@@ -957,22 +957,14 @@ module Etherlink = struct
     | Replay_failure -> failwith "Could not replay the block"
 end
 
-let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
-    =
-  let module Executor = struct
-    let ctxt =
-      match ctxt.native_execution_policy with
-      | Rpcs_only ->
-          (* The [ro_backend] is only used to serve RPCs, so [replay]
-             and [execute] are only used for serving RPCs so it is
-             safe to “promote” the native execution policy to [Always].
-             Without this change, the node believes it is executing a
-             block and default to WASM execution. *)
-          {ctxt with native_execution_policy = Configuration.Always}
-      | _ -> ctxt
-
-    let pvm_config = pvm_config ctxt
-
+let make_executor ctxt =
+  let ctxt =
+    match ctxt.native_execution_policy with
+    | Rpcs_only -> {ctxt with native_execution_policy = Configuration.Always}
+    | _ -> ctxt
+  in
+  let pvm_config = pvm_config ctxt in
+  (module struct
     let replay ?log_file ?profile ?alter_evm_state number =
       let open Lwt_result_syntax in
       let+ result =
@@ -1002,7 +994,109 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         ~native_execution
         evm_state
         (`Inbox message)
-  end in
+  end : Evm_execution.S)
+
+module Tracer_etherlink = struct
+  let trace_transaction ctxt transaction_hash config =
+    let open Lwt_result_syntax in
+    let* receipt = transaction_receipt ctxt transaction_hash in
+    match receipt with
+    | None -> tzfail (Tracer_types.Transaction_not_found transaction_hash)
+    | Some Transaction_receipt.{blockNumber; _} ->
+        Tracer.trace_transaction
+          (make_executor ctxt)
+          ~block_number:blockNumber
+          ~transaction_hash
+          ~config
+
+  let trace_call ctxt call block config =
+    Tracer.trace_call (make_executor ctxt) ~call ~block ~config
+
+  let trace_block ctxt block_number config =
+    let (module Executor) = make_executor ctxt in
+    let module Storage = struct
+      let current_block_number () = current_block_number ctxt
+
+      let nth_block = nth_block ctxt
+
+      let block_by_hash = block_by_hash ctxt
+
+      let block_receipts = block_receipts ctxt
+
+      let block_range_receipts = block_range_receipts ctxt
+
+      let transaction_receipt = transaction_receipt ctxt
+
+      let transaction_object = transaction_object ctxt
+    end in
+    Tracer.trace_block (module Executor) (module Storage) ~block_number ~config
+end
+
+let tezlink_block_storage ctxt =
+  (module struct
+    let nth_block level =
+      let open Lwt_result_syntax in
+      Evm_store.use ctxt.store @@ fun conn ->
+      let* block_opt = Evm_store.Blocks.tez_find_with_level conn (Qty level) in
+      match block_opt with
+      | None -> failwith "Block %a not found" Z.pp_print level
+      | Some block -> return block
+
+    let nth_block_hash level =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.find_hash_of_number conn (Qty level)
+  end : Tezlink_block_storage_sig.S)
+
+let tezosx_block_storage ctxt =
+  (module struct
+    let nth_block level =
+      let open Lwt_result_syntax in
+      Evm_store.use ctxt.store @@ fun conn ->
+      let* block_opt =
+        Evm_store.Blocks.tezosx_find_tez_block_with_level conn (Qty level)
+      in
+      match block_opt with
+      | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
+      | Some block -> return block
+
+    let nth_block_hash level =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
+  end : Tezlink_block_storage_sig.S)
+
+let tezlink_backend ctxt =
+  let (module SB) = simulator_backend ctxt in
+  let (module BS) = tezlink_block_storage ctxt in
+  (module Tezlink_services_impl.Make
+            (struct
+              include SB
+
+              let block_param_to_block_number block_param =
+                block_param_to_block_number
+                  ctxt
+                  ~chain_family:L2_types.Michelson
+                  block_param
+            end)
+            (BS) : Tezlink_backend_sig.S)
+
+let tezos_backend ctxt =
+  let (module SB) = simulator_backend ctxt in
+  let (module BS) = tezosx_block_storage ctxt in
+  (module Tezos_backend.Make
+            (struct
+              include SB
+
+              let block_param_to_block_number =
+                block_param_to_block_number
+                  ctxt
+                  ~chain_family:L2_types.Michelson
+                  ~hash_column:`Michelson
+            end)
+            (BS) : Tezlink_backend_sig.S)
+
+let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
+    =
+  let module Executor = (val make_executor ctxt) in
   let module Backend = Make (struct
     module Executor = Executor
 
