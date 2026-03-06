@@ -261,7 +261,13 @@ let digest hash payload =
   | Blake2B -> Tezos_crypto.(Blake2B.to_string @@ Blake2B.hash_bytes [payload])
   | Keccak256 -> Digestif.KECCAK_256.(to_raw_string @@ digest_bytes payload)
 
-let rec sign_rpc ~allow_refresh kms_handler digest =
+let is_server_error status =
+  let code = Cohttp.Code.code_of_status status in
+  code >= 500 && code < 600
+
+let sign_retries = 3
+
+let rec sign_rpc ~allow_refresh ~allowed_retries kms_handler digest =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult
     ~service_name
@@ -295,7 +301,22 @@ let rec sign_rpc ~allow_refresh kms_handler digest =
     let*! () = Gcp_kms_events.invalidated_token () in
     let*! token = get_token kms_handler.config in
     kms_handler.auth_token <- token ;
-    sign_rpc ~allow_refresh:false kms_handler digest)
+    sign_rpc ~allow_refresh:false ~allowed_retries kms_handler digest)
+  else if
+    is_server_error (Cohttp.Response.status response) && allowed_retries > 0
+  then
+    let attempt = sign_retries - allowed_retries + 1 in
+    let reason =
+      Format.asprintf "KMS failed %a" Cohttp.Response.pp_hum response
+    in
+    let*! () = Gcp_kms_events.sign_transient_error ~attempt reason in
+    let backoff = 0.05 *. Float.of_int (1 lsl (attempt - 1)) in
+    let*! () = Lwt_unix.sleep backoff in
+    sign_rpc
+      ~allow_refresh
+      ~allowed_retries:(allowed_retries - 1)
+      kms_handler
+      digest
   else failwith "KMS failed %a" Cohttp.Response.pp_hum response
 
 let signature_of_b64encoded algo b64_sig =
@@ -326,7 +347,13 @@ let signature_of_b64encoded algo b64_sig =
 let sign kms_handler hash payload =
   let open Lwt_result_syntax in
   let digest = digest hash payload in
-  let* b64_sig = sign_rpc ~allow_refresh:true kms_handler digest in
+  let* b64_sig =
+    sign_rpc
+      ~allow_refresh:true
+      ~allowed_retries:sign_retries
+      kms_handler
+      digest
+  in
   signature_of_b64encoded (signature_algorithm kms_handler) b64_sig
 
 let assert_authentication_method config =

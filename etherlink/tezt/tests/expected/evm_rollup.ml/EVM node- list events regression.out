@@ -1221,6 +1221,21 @@ gcp_kms_is_ready:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+gcp_kms_sign_transient_error:
+  description: transient error while signing with GCP KMS (attempt {attempt}): {reason}
+  level: warning
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* gcp_kms_sign_transient_error version 0 */
+      "gcp_kms_sign_transient_error.v0":
+        { "attempt": integer ∈ [-2^30, 2^30],
+          "reason": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 ignored_kernel_arg:
   description: ignored the kernel command-line argument since the EVM state was already initialized
   level: warning

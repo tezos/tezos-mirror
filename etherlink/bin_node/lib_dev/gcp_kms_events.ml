@@ -45,8 +45,23 @@ let cannot_refresh_access_token =
 
 let is_ready pk = emit is_ready pk
 
+let sign_transient_error =
+  declare_2
+    ~section
+    ~name:"gcp_kms_sign_transient_error"
+    ~msg:
+      "transient error while signing with GCP KMS (attempt {attempt}): {reason}"
+    ~level:Warning
+    ~pp1:Format.pp_print_int
+    ~pp2:Format.pp_print_string
+    ("attempt", Data_encoding.int31)
+    ("reason", Data_encoding.string)
+
 let cannot_refresh_access_token pk = emit cannot_refresh_access_token pk
 
 let new_token = emit new_token
 
 let invalidated_token = emit invalidated_token
+
+let sign_transient_error ~attempt reason =
+  emit sign_transient_error (attempt, reason)
