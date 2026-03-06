@@ -604,6 +604,10 @@ let wait_for_retrying_connect ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"retrying_connect.v0"
   @@ Fun.const (Some ())
 
+let wait_for_connection_acquired ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"connection_acquired.v0"
+  @@ Fun.const (Some ())
+
 let wait_for_trying_reconnection ?timeout evm_node =
   wait_for_event
     ?timeout
@@ -849,6 +853,21 @@ let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
 let wait_for_next_block_info ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"next_block_info.v0" @@ fun json ->
   Some JSON.(json |-> "timestamp" |> as_string)
+
+let wait_for_ic_reset ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_context_ic_reset.v0"
+  @@ fun _json -> Some ()
+
+let wait_for_ic_reset_unexpected_level ?timeout evm_node =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"evm_context_ic_reset_unexpected_level.v0"
+  @@ fun _json -> Some ()
+
+let wait_for_ic_execute_skipped ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_context_ic_execute_skipped.v0"
+  @@ fun _json -> Some ()
 
 let wait_for_inclusion ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
