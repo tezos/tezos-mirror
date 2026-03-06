@@ -27,6 +27,9 @@ use octez_riscv::pvm::hooks::StdoutDebugHooks;
 use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
+use octez_riscv::pvm::outbox::OutboxMessage;
+use octez_riscv::pvm::outbox::Output as PvmOutput;
+use octez_riscv::pvm::outbox::OutputInfo as PvmOutputInfo;
 use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
@@ -253,10 +256,28 @@ unsafe impl ocaml::FromValue for RawLevel {
 
 /// Metadata of an output message
 #[derive(ocaml::ToValue, ocaml::FromValue)]
-#[ocaml::sig("{message_index : int64; outbox_level : int32}")]
+#[ocaml::sig("{message_index : int32; outbox_level : int32}")]
 pub struct OutputInfo {
-    pub message_index: u64,
+    pub message_index: u32,
     pub outbox_level: RawLevel,
+}
+
+impl From<PvmOutputInfo> for OutputInfo {
+    fn from(output_info: PvmOutputInfo) -> Self {
+        Self {
+            message_index: output_info.index,
+            outbox_level: RawLevel(u31::new(output_info.level)),
+        }
+    }
+}
+
+impl From<OutputInfo> for PvmOutputInfo {
+    fn from(output_info: OutputInfo) -> Self {
+        Self {
+            level: output_info.outbox_level.0.into(),
+            index: output_info.message_index,
+        }
+    }
 }
 
 /// A value of this type is generated as part of successfully verifying an output proof.
@@ -265,6 +286,27 @@ pub struct OutputInfo {
 pub struct Output {
     pub info: OutputInfo,
     pub encoded_message: BytesWrapper,
+}
+
+impl From<PvmOutput> for Output {
+    fn from(output: PvmOutput) -> Self {
+        Self {
+            info: output.info.into(),
+            encoded_message: BytesWrapper(output.message.into()),
+        }
+    }
+}
+
+impl TryFrom<Output> for PvmOutput {
+    type Error = String;
+
+    fn try_from(output: Output) -> Result<Self, String> {
+        Ok(Self {
+            message: OutboxMessage::try_from(output.encoded_message.0)
+                .map_err(|e| e.to_string())?,
+            info: output.info.into(),
+        })
+    }
 }
 
 // TODO RV-365 Implement OutputProof types

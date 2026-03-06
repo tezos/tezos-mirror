@@ -65,11 +65,11 @@ assets/etherlink assets/etherlink.checksum::
 
 # Update the serialised proof for the initial tick of jstz used in the CI tests
 assets/jstz_proof_initial:
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/jstz/proof_initial
+	@curl -L -o $@ $(RISCV_PVM_REPO)/pvm/tests/expected/jstz/proof_initial
 
 # Update the serialised proof for the initial tick of Etherlink used in the CI tests
 assets/etherlink_proof_initial:
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/etherlink/proof_initial
+	@curl -L -o $@ $(RISCV_PVM_REPO)/pvm/tests/expected/etherlink/proof_initial
 
 .PHONY: build-deps
 build-deps:
