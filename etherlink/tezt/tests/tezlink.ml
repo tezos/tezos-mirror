@@ -3715,12 +3715,12 @@ let test_tezlink_da_fee_credited_to_pool =
     fetches the correct DA fee from the mempool filter RPC and the
     transfer succeeds. *)
 let test_tezlink_simulation_with_da_fee =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Michelson transfer simulation succeeds with DA fees enabled"
     ~tags:["kernel"; "validation"; "da_fee"; "simulation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
-    ~da_fee:(Wei.of_string "4000000000000")
-  (* 4 mutez/byte = 4 * 10^12 wei *)
+    ~da_fee:(Wei.of_string "1000000000000000")
+  (* 1000 mutez/byte = 1000 * 10^12 wei *)
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -3729,7 +3729,7 @@ let test_tezlink_simulation_with_da_fee =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   (* 1000 nanotez/byte = 1 mutez/byte (L1 default), below the DA fee of
-     4 mutez/byte: the total fee doesn't cover the DA cost. *)
+     1000 mutez/byte: the total fee doesn't cover the DA cost. *)
   let process =
     Client.spawn_transfer
       ~endpoint
@@ -3745,7 +3745,7 @@ let test_tezlink_simulation_with_da_fee =
     ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
 
   (* Without [--minimal-nanotez-per-byte], the client fetches the DA fee
-     from the node's [GET .../mempool/filter] RPC (4000 nanotez/byte here)
+     from the node's [GET .../mempool/filter] RPC (1000000 nanotez/byte here)
      and uses it to compute a sufficient fee. *)
   let* () =
     Client.transfer
