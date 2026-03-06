@@ -39,23 +39,31 @@ DAL attestation payloads
 
 The attestation operation includes an optional field ``dal_content``. This field
 allows attesters participating to the DAL to announce whether they were able to
-successfully download the shards assigned to them. Concretely, this field is a
-bitset reflecting the status of each slot. The size of the bitset corresponds to
-the total number of slots. A value of 1 indicates successful retrieval of all
-assigned shards by the baker for that slot, while 0 indicates an unsuccessful
-attempt.  The least significant bit corresponds to the smallest slot index.
+successfully download the shards assigned to them.
+
+Because there are multiple attestation lags (see ``ATTESTATION_LAGS`` in
+:ref:`dal_constants_alpha`), a single attestation can simultaneously cover slots
+published at different levels. For each lag in ``ATTESTATION_LAGS``, the
+attester indicates which slots published at the corresponding level are
+available. Concretely, the ``dal_content`` field is encoded as a compact
+multi-lag bitset: a prefix of ``number_of_lags`` bits indicates which lags have
+non-empty attestations, followed by per-lag slot bitsets for each non-empty lag.
+To decode such a bitset into an explicit representation of attested slots per
+lag, one can use the ``GET
+/chains/<chain>/blocks/<block>/helpers/decode_dal_attestation/<bitset_as_decimal>``
+RPC.
 
 Attestation timing
 ------------------
 
-When a commitment is published at a certain level, say level ``n``, the corresponding DAL payloads are expected to be included in the attestations contained in the block at level ``n + ATTESTATION_LAG``.
+When a commitment is published at a certain level, say level ``n``, the corresponding DAL payloads can be included in the attestations contained in the block at level ``n + lag``, for any ``lag`` in ``ATTESTATION_LAGS``. This gives bakers multiple opportunities to attest a slot: they can attest early if they download their shards quickly, or later if they need more time. Shard attestations for a given slot accumulate across these levels until either the availability threshold is reached or the maximum lag (``ATTESTATION_LAG``) has elapsed.
 
 Block metadata
 --------------
 
-In the block’s metadata, there is a specific field for the DAL, called ``"dal_attestation"``. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``AVAILABILITY_THRESHOLD`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
+In the block’s metadata, there is a specific field for the DAL, called ``"dal_attestation"``. This field uses the same multi-lag bitset format as the ``dal_content`` field of attestation operations. For each lag in ``ATTESTATION_LAGS``, it indicates which slots (published at the level corresponding to that lag) are newly declared available at this block. A slot is declared available once a sufficient number of shards, as defined by the ``ATTESTATION_THRESHOLD`` parameter, have been attested across the attestation window (e.g. if the number of shards is 2048 and the attestation threshold is 50%, then 1024 shards are required).
 
-Therefore, for data committed (published) at level ``n``, the slot's availability is determined by the metadata of the block at level ``n + ATTESTATION_LAG``. Consequently, a smart rollup can only utilize this data from level ``n + ATTESTATION_LAG + 1`` onward.
+Shard attestations for a given slot accumulate across all levels in its attestation window (from the smallest to the largest lag). Therefore, a slot committed (published) at level ``n`` may become available as early as the metadata of the block at level ``n + min(ATTESTATION_LAGS)`` -- if enough bakers attest at the first opportunity -- or as late as level ``n + ATTESTATION_LAG`` (the maximum lag). A smart rollup can utilize the slot's data from the level following the one where it was declared available.
 
 .. _DAL_incentives_scheme_alpha:
 
@@ -173,7 +181,8 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``FEATURE_ENABLE`` (true): whether the DAL is available
 - ``INCENTIVES_ENABLE`` (true): whether baker incentives are available
 - ``NUMBER_OF_SLOTS`` (160): how many slots are available per block
-- ``ATTESTATION_LAG`` (8 level): the timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
+- ``ATTESTATION_LAGS`` ([1; 2; 3; 4; 5]): the list of lags (offsets in levels from the published level) at which bakers can attest the availability of a slot's shards. Having multiple lags allows bakers to attest earlier when they download shards quickly, while still offering later opportunities if more time is needed.
+- ``ATTESTATION_LAG`` (5 levels): the maximum attestation lag, equal to the last (largest) element of ``ATTESTATION_LAGS``. This bounds the attestation window: a slot published at level ``n`` must be attested by level ``n + ATTESTATION_LAG``.
 - ``ATTESTATION_THRESHOLD`` (66%): the minimum percentage of shards attested for a given slot to declare the slot available
 - ``PAGE_SIZE`` (3967B, ~4KiB): the size of a page (see :ref:`dal_slots`)
 - ``SLOT_SIZE`` (380832B, ~372KiB): the size of a slot (see :ref:`dal_slots`)

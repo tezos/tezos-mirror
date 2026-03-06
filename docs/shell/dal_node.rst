@@ -148,7 +148,7 @@ The DAL node essentially stores slots and shards. Slots are injected into the no
 The amount of storage space a DAL node needs depends on how long it keeps the data, and different profiles keep the data for different amounts of time:
 
 - Bootstrap nodes store no DAL data and therefore require negligible storage.
-- Attester and observer nodes store data in memory for a few blocks after the attestation delay by default.
+- Attester and observer nodes store data in memory for a few blocks after the maximum attestation lag by default.
 - Operator nodes store data on disk for the slots registered with this profile for 3 months by default because the data may be needed for the Smart Rollup refutation game.
 
 You can set how long the node stores data with the ``--history-mode`` option.

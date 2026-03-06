@@ -50,20 +50,28 @@ disseminates the shards across the DAL network (shown in step 4).
 Shards are assigned to bakers proportionally to their stake by the
 economic protocol. Hence, the bakers, also connected to the DAL
 network, retrieve these assigned shards (step 5). The bakers must
-download and verify these shards within a specific timeframe,
-precisely defined by the economic protocol as the ``attestation lag``
-period (see :ref:`dal_constants`). At the end of the attestation lag period, bakers declare using
-an optional field of the consensus attestation operation, whether they were able to download the
-shards effectively (illustrated in step 6). The economic protocol
-collates these attestations and, if a sufficient number of bakers have
-successfully obtained the shards, the blob is declared as available
-(step 7). Only when the blob is labeled as available can the rollup
-utilize it (represented as step 8).
+download and verify these shards within a specific timeframe
+defined by the economic protocol through the ``attestation_lags``
+parameter (see :ref:`dal_constants`). This parameter specifies
+multiple lag values (offsets in levels from the published level)
+at which bakers can attest the availability of shards. Bakers
+declare, using an optional field of the consensus attestation
+operation, whether they were able to download the shards
+effectively (illustrated in step 6). A single attestation can
+cover slots published at different levels, one per lag value.
+Shard attestations for a given slot accumulate across these
+levels. The economic protocol collates these attestations and, if
+a sufficient number of bakers have successfully obtained the
+shards, the blob is declared as available (step 7). Only when the
+blob is labeled as available can the rollup utilize it
+(represented as step 8).
 
-The rationale for having the attestation lag parameter is to give
-bakers sufficient time to download their assigned shards, while
-guaranteeing that the latency of publishing blobs stays within acceptable limits (around one
-minute).
+The rationale for having multiple attestation lags is to give
+bakers flexibility in when they attest: they can attest early if
+they download their shards quickly, or later if they need more
+time. This improves latency (a slot can become available after
+just a few levels) while still giving bakers a generous window to
+download their shards.
 
 
 .. _dal_slots:
