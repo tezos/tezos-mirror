@@ -483,7 +483,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       return_unit
   in
   let block_producer_endpoint =
-    Services_backend_sig.Block_producer Block_producer.preconfirm_transactions
+    Tx_queue_types.Block_producer Block_producer.preconfirm_transactions
   in
 
   let tick () =

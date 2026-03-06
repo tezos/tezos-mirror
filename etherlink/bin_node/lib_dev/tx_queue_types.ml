@@ -117,3 +117,38 @@ let fold_txpool tx_map =
 
 let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
   {pending = fold_txpool pending; queued = fold_txpool queued}
+
+(* Reuses [preconfirmed_transactions_result] so sequencer can
+   pass [Block_producer.preconfirm_transactions] directly without adapters. *)
+type preconfirm_transactions =
+  transactions:(string * transaction_object_t) list ->
+  preconfirmed_transactions_result tzresult Lwt.t
+
+type error += IC_disabled
+
+type endpoint =
+  | Rpc of Uri.t
+    (* Send transactions through standard RPC calls to the node at uri *)
+  | Websocket of Websocket_client.t
+    (* Use an active websocket client to push transactions in real time *)
+  | Block_producer of preconfirm_transactions
+(* Inject transactions directly into the block producer.
+       Callback form avoids a Tx_queue -> Block_producer dependency cycle. *)
+
+type callback_status = [`Accepted | `Confirmed | `Dropped | `Refused]
+
+type 'a variant_callback = 'a -> unit Lwt.t
+
+(** A [callback] is called by the [Tx_queue] at various stages of a
+    submitted transaction's life.
+
+    The next tick after its insertion in the queue, a transaction is submitted
+    to the relay node within a batch of [eth_sendRawTransaction] requests.
+
+    {ul
+      {li Depending on the result of the RPC, its [callback] is called with
+          either [`Accepted] or [`Refused]).}
+      {li As soon as the transaction appears in a blueprint, its callback is
+          called with [`Confirmed]. If this does not happen before 2s, the
+          [callback] is called with [`Dropped].}} *)
+type callback = callback_status variant_callback

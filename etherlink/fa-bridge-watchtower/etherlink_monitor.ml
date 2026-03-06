@@ -1116,7 +1116,7 @@ let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
   let tx_queue_endpoint =
-    ref (Services_backend_sig.Rpc (rpc_uri evm_node_endpoint))
+    ref (Tx_queue_types.Rpc (rpc_uri evm_node_endpoint))
   in
   let connected_once = ref false in
   let run () =
@@ -1131,7 +1131,7 @@ let start db ~config ~notify_ws_change ~first_block =
     in
     let* () = Websocket_client.connect ws_client in
     connected_once := true ;
-    tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
+    tx_queue_endpoint := Tx_queue_types.Websocket ws_client ;
     notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client config.rpc_timeout ~first_block in
     let* chain_id = get_chain_id ?timeout:config.rpc_timeout ws_client in

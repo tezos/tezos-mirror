@@ -21,7 +21,7 @@ val nonce :
     available based on the pending transaction of the tx_queue.
     [next_nonce] is the next expected nonce found in the backend. *)
 val add :
-  ?callback:Services_backend_sig.callback ->
+  ?callback:Tx_queue_types.callback ->
   next_nonce:Ethereum_types.quantity ->
   Tx_queue_types.transaction_object_t ->
   raw_tx:Ethereum_types.hex ->
@@ -46,13 +46,13 @@ val clear : unit -> unit tzresult Lwt.t
 
 (** Trigger a tick in the [Tx_queue]. *)
 val tx_queue_tick :
-  evm_node_endpoint:Services_backend_sig.endpoint -> unit tzresult Lwt.t
+  evm_node_endpoint:Tx_queue_types.endpoint -> unit tzresult Lwt.t
 
 (** [tx_queue_beacon ~evm_node_endpoint ~tick_interval] is a never fulfilled
     promise which triggers a tick in the [Tx_queue] every
     [tick_interval] seconds. *)
 val tx_queue_beacon :
-  evm_node_endpoint:Services_backend_sig.endpoint ->
+  evm_node_endpoint:Tx_queue_types.endpoint ->
   tick_interval:float ->
   unit tzresult Lwt.t
 
@@ -86,8 +86,7 @@ val dropped_transaction :
     called when the transaction is either confirmed or dropped. *)
 val add_pending_callback :
   Ethereum_types.hash ->
-  callback:
-    [`Confirmed | `Dropped | `Missing] Services_backend_sig.variant_callback ->
+  callback:[`Confirmed | `Dropped | `Missing] Tx_queue_types.variant_callback ->
   unit tzresult Lwt.t
 
 (** The Tx_pool pops transactions until the sum of the sizes of the
