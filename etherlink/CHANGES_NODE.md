@@ -4,17 +4,56 @@
 
 ### Breaking changes
 
-- Replace `--mainnet-compat` switch with `--kernel-compat <kernel_name>` in
-  `octez-evm-node make kernel installer config`. The new argument accepts a
-  named kernel version (e.g., `mainnet-beta`, `bifrost`, `latest`) to generate
-  a compatible installer configuration. (!20894)
-
 ### Configuration changes
 
 ### RPCs changes
 
-- Proxy mode is being deprecated, and will soon be fully removed.
-  In proxy mode RPCs are not expected to work and this mode is not to be used in production. (!20786)
+### Monitoring changes
+
+### Command-line interface changes
+
+### Execution changes
+
+- Supports executing `farfadet-r2` natively. (!20604)
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.54 (2026-03-06)
+
+This release includes fixes for `debug_traceBlockByNumber` trace count
+mismatches affecting some blocks of the Calypso kernel, and for the instant
+confirmation gas price computation.
+
+Additionally, we have removed the `proxy` mode of the EVM node. This mode was
+an artifact of the past, at a time where Etherlink did not have a sequencer,
+and the only way to know the state of the chain was to use a rollup node.
+Nowadays, a node in `proxy` mode was not providing any services of note that a
+node in `observer` mode cannot provide.
+
+This release will apply one migrations to the node’s store (version 23),
+meaning it is not possible downgrade to a previous version.
+
+### Breaking changes
+
+- Replace `--mainnet-compat` switch with `--kernel-compat <kernel_name>` in
+  `octez-evm-node make kernel installer config`. The new argument accepts a
+  named kernel version (e.g., `mainnet-beta`, `bifrost`, `latest`) to generate
+  a compatible installer configuration. (!20894)
+- `octez-evm-node run proxy` has been removed. (!20786 !20756)
+
+### RPCs changes
+
+- Fix the `debug_traceBlockByNumber` traces count mismatch error affecting some
+  blocks of the Calypso kernel. (!20855)
 
 ### Monitoring changes
 
@@ -45,9 +84,11 @@
 
 ### Execution changes
 
-- Supports executing Farfadet-r2 natively. (!20604)
-- Fix: Observer node sends transaction batches in a synchronous request-response
-  fashion (!20553)
+- The observer nodes now preserve the order of transactions they receive more
+  strictly. (!20553)
+- `replay blueprints` now passes the resulting EVM state from one blueprint
+  directly into the execution of the next, rather than fetching the state from
+  the storage at the start of every level. (!20963)
 
 ### Storage changes
 
@@ -63,14 +104,15 @@
   mode. The original database files are included directly in the archive,
   avoiding the expensive vacuum operation on large databases. (!21037)
 
-### Documentation changes
-
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Fix the instant confirmation logic to correctly compute the gas price
+  changes. (!20964)
 
 ## Version 0.53 (2026-01-28)
 
