@@ -36,6 +36,32 @@ module Setup = struct
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
 
+  let register_sandbox_regression_test ?uses_client ~title ~tags ~with_runtimes
+      ?tez_bootstrap_accounts body =
+    let uses_client = Option.value ~default:false uses_client in
+    Regression.register
+      ~__FILE__
+      ~title
+      ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
+      ~uses_admin_client:uses_client
+      ~uses_client
+      ~uses_node:false
+      ~uses:
+        [
+          Constant.octez_evm_node;
+          Constant.WASM.evm_kernel;
+          Constant.smart_rollup_installer;
+        ]
+    @@ fun () ->
+    let* sequencer =
+      Test_helpers.init_sequencer_sandbox
+        ~kernel:Latest
+        ?tez_bootstrap_accounts
+        ?with_runtimes:(Some with_runtimes)
+        ()
+    in
+    body sequencer
+
   let register_sandbox_with_oberver_test ?uses_client ~title ~tags
       ~with_runtimes ?eth_bootstrap_accounts ?tez_bootstrap_accounts =
     Test_helpers.register_sandbox_with_observer
@@ -2981,6 +3007,41 @@ let test_tezosx_simulation () =
   in
   Client.transfer ~hooks ~log_requests:true ~amount ~giver ~receiver client
 
+(** Query the /entrypoints RPC for [address] via the Tezlink endpoint. *)
+let get_entrypoints sequencer address =
+  let path =
+    sf
+      "/tezlink/chains/main/blocks/head/context/contracts/%s/entrypoints"
+      address
+  in
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  return @@ JSON.parse ~origin:"entrypoints" res
+
+(** Test that the /entrypoints RPC works for the enshrined TezosX Gateway
+    contract.  The gateway has no Micheline code in durable storage; its
+    entrypoints are returned by the kernel via the [tezosx_michelson_entrypoints]
+    entrypoint.
+
+    Note: the kernel always returns right-combs flattened into multi-arg pairs
+    (e.g. [pair(a, b, c)] instead of [pair(a, pair(b, c))]) because MIR's type
+    encoding ([into_micheline_optimized_legacy]) linearizes pairs.  This is
+    equivalent to the L1 [normalize_types=true] behavior for comb flattening. *)
+let test_entrypoints_enshrined () =
+  Setup.register_sandbox_regression_test
+    ~title:"Entrypoints RPC for enshrined TezosX Gateway contract"
+    ~tags:["rpc"; "entrypoints"; "tezlink"; "tezosx"; "gateway"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let* ep_json = get_entrypoints sandbox gateway_address in
+  Regression.capture (JSON.encode ep_json) ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3019,4 +3080,5 @@ let () =
   test_nested_crac [Alpha] ;
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
-  test_tezosx_simulation ()
+  test_tezosx_simulation () ;
+  test_entrypoints_enshrined ()
