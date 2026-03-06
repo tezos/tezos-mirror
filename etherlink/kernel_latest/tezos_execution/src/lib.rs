@@ -559,7 +559,11 @@ where
             })?;
             log!(ctx.host(), Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
-                storage: Some(new_storage),
+                storage: if new_storage.is_empty() {
+                    None
+                } else {
+                    Some(new_storage)
+                },
                 lazy_storage_diff,
                 consumed_milligas,
                 ..receipt
