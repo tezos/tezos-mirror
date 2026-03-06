@@ -167,6 +167,8 @@ pub enum TransferError {
     OutOfGas,
     #[error("Unexpected deposit error: {0}")]
     DepositError(String),
+    // TODO: L2-971
+    // this should reference tezosx-interfaces::TezosXRuntimeError if possible
     #[error("Gateway problem: {0}")]
     GatewayError(String),
 }

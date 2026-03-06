@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::Type;
-use mir::ast::{BinWriter, ByteReprTrait, TypedValue};
+use mir::ast::{AddressHash, BinWriter, ByteReprTrait, TypedValue};
 use mir::context::PushableTypecheckingContext;
 use mir::gas::Gas;
 use mir::typechecker::typecheck_value;
@@ -12,6 +12,7 @@ use mir::{
     context::CtxTrait,
 };
 use num_bigint::{BigInt, BigUint};
+use num_traits::ToPrimitive;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -21,7 +22,11 @@ use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
-use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::{
+    CrossCallResult, CrossRuntimeContext, Registry, RuntimeId,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+};
 
 use crate::alias::{get_alias, store_alias};
 
@@ -117,9 +122,10 @@ where
                 calldata.extend_from_slice(&abi_params);
                 tezosx_cross_runtime_call(registry, ctx, &dest, &calldata)
             } else if entrypoint.as_str() == "http_call" {
-                let _request = extract_http_call_request(typed)?;
-                // Mock: no dispatch, return success.
-                // Will be wired to RuntimeInterface::serve when available.
+                let mut request = extract_http_call_request(typed)?;
+                inject_context_headers(request.headers_mut(), ctx, registry)?;
+                // TODO: https://linear.app/tezos/issue/L2-918
+                // Dispatch to EVM runtime via RuntimeInterface::serve.
                 Ok(())
             } else {
                 Err(TransferError::GatewayError(format!(
@@ -252,7 +258,6 @@ fn build_http_request(
     body: &[u8],
     method: BigUint,
 ) -> Result<http::Request<Vec<u8>>, TransferError> {
-    use num_traits::ToPrimitive;
     let http_method = match method.to_u64() {
         Some(0) => http::Method::GET,
         Some(1) => http::Method::POST,
@@ -261,6 +266,11 @@ fn build_http_request(
 
     let mut builder = http::Request::builder().method(http_method).uri(url);
     for (name, value) in headers {
+        if name.to_ascii_lowercase().starts_with("x-tezos-") {
+            return Err(TransferError::GatewayError(format!(
+                "{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"
+            )));
+        }
         builder = builder.header(name.as_str(), value.as_str());
     }
 
@@ -269,6 +279,85 @@ fn build_http_request(
             "http_call: failed to build HTTP request: {e}"
         ))
     })
+}
+
+/// Inject trusted X-Tezos-* context headers into `headers`, overwriting any
+/// existing values with the same name.
+///
+/// `amount` is in wei (see L2-969 for the canonical encoding decision).
+/// `timestamp` is a Unix timestamp in seconds (must be non-negative).
+fn inject_context_headers_raw(
+    headers: &mut http::HeaderMap,
+    sender_alias: &[u8],
+    source_alias: &[u8],
+    amount: U256,
+    gas_limit: u64,
+    timestamp: u64,
+    block_number: u32,
+) -> Result<(), TransferError> {
+    let parse_value = |v: String| -> Result<http::HeaderValue, TransferError> {
+        v.parse().map_err(|e| {
+            TransferError::GatewayError(format!("invalid header value: {e}"))
+        })
+    };
+    headers.insert(
+        X_TEZOS_SENDER,
+        parse_value(String::from_utf8_lossy(sender_alias).into_owned())?,
+    );
+    headers.insert(
+        X_TEZOS_SOURCE,
+        parse_value(String::from_utf8_lossy(source_alias).into_owned())?,
+    );
+    headers.insert(X_TEZOS_AMOUNT, parse_value(amount.to_string())?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(gas_limit.to_string())?);
+    headers.insert(X_TEZOS_TIMESTAMP, parse_value(timestamp.to_string())?);
+    headers.insert(X_TEZOS_BLOCK_NUMBER, parse_value(block_number.to_string())?);
+    Ok(())
+}
+
+/// Inject trusted X-Tezos-* context headers derived from `ctx` into `headers`.
+fn inject_context_headers<'a, Host>(
+    headers: &mut http::HeaderMap,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    registry: &impl Registry,
+) -> Result<(), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
+    let sender = ctx.sender();
+    let source = AddressHash::from(ctx.source());
+    let amount_mutez: u64 = ctx
+        .amount()
+        .try_into()
+        .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
+    let block_number = ctx.level();
+    let timestamp = ctx.now();
+    let block_number_u32 = block_number
+        .to_u32()
+        .ok_or_else(|| TransferError::GatewayError("Block number out of range".into()))?;
+    let timestamp_u64 = timestamp
+        .to_i64()
+        .ok_or_else(|| TransferError::GatewayError("Timestamp out of range".into()))
+        .and_then(|t| {
+            u64::try_from(t)
+                .map_err(|_| TransferError::GatewayError("Negative timestamp".into()))
+        })?;
+    let context = cross_runtime_ctx_from_ctx(ctx)?;
+    let sender_alias =
+        get_or_create_alias(ctx.host(), &sender, context.clone(), registry)?;
+    let source_alias = get_or_create_alias(ctx.host(), &source, context, registry)?;
+    inject_context_headers_raw(
+        headers,
+        &sender_alias,
+        &source_alias,
+        // TODO: L2-969 — determine the canonical encoding for tez amounts in
+        // X-Tezos-Amount. For now we convert mutez to wei to match the bridge
+        // path (tezosx_cross_runtime_call), but this may change.
+        eth_from_mutez(amount_mutez),
+        u64::MAX, // TODO: L2-916 — no gas metering yet
+        timestamp_u64,
+        block_number_u32,
+    )
 }
 
 /// Extract (evm_contract, address_bytes, value) from a typed
@@ -348,6 +437,42 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
+/// Look up the Ethereum alias for `address`. If none exists, generate one via
+/// `registry`, persist it, and return it.
+fn get_or_create_alias<Host>(
+    host: &mut Host,
+    address: &AddressHash,
+    context: CrossRuntimeContext,
+    registry: &impl Registry,
+) -> Result<Vec<u8>, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
+    if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
+        return Ok(alias);
+    }
+    let address_b58 = address.to_base58_check();
+    let alias = registry
+        .generate_alias(host, address_b58.as_bytes(), RuntimeId::Ethereum, context)
+        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+    store_alias(host, address, RuntimeId::Ethereum, &alias)?;
+    Ok(alias)
+}
+
+/// Build a `CrossRuntimeContext` from the current execution context.
+fn cross_runtime_ctx_from_ctx<'a, Host>(
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+) -> Result<CrossRuntimeContext, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
+    Ok(CrossRuntimeContext {
+        gas_limit: u64::MAX, // TODO: L2-916 — no gas metering yet
+        timestamp: bigint_to_u256(&ctx.now())?,
+        block_number: biguint_to_u256(ctx.level())?,
+    })
+}
+
 fn tezosx_cross_runtime_call<'a, Host>(
     registry: &impl Registry,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
@@ -359,36 +484,13 @@ where
 {
     let source = ctx.sender();
     let amount = ctx.amount();
-    let block_number = ctx.level();
-    let timestamp = ctx.now();
-    let host = ctx.host();
 
     if amount < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()));
     }
 
-    let context = CrossRuntimeContext {
-        gas_limit: u64::MAX,
-        timestamp: bigint_to_u256(&timestamp)?,
-        block_number: biguint_to_u256(block_number)?,
-    };
-
-    let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
-        Some(alias) => alias,
-        None => {
-            let source_b58 = source.to_base58_check();
-            let alias = registry
-                .generate_alias(
-                    host,
-                    source_b58.as_bytes(),
-                    RuntimeId::Ethereum,
-                    context.clone(),
-                )
-                .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-            store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
-            alias
-        }
-    };
+    let context = cross_runtime_ctx_from_ctx(ctx)?;
+    let alias = get_or_create_alias(ctx.host(), &source, context.clone(), registry)?;
     let destination_contract = registry
         .address_from_string(dest, RuntimeId::Ethereum)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
@@ -398,7 +500,7 @@ where
         .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
     let result = registry
         .bridge(
-            host,
+            ctx.host(),
             RuntimeId::Ethereum,
             &destination_contract,
             &alias,
@@ -739,6 +841,82 @@ mod tests {
     fn test_http_call_malformed_parameters() {
         let result =
             typecheck_http_call(&Micheline::String("not a valid http_call".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_inject_context_headers_raw_sets_values() {
+        let mut headers = http::HeaderMap::new();
+        inject_context_headers_raw(
+            &mut headers,
+            b"sender_alias",
+            b"source_alias",
+            U256::from(42u64),
+            1000,
+            1700000000u64,
+            5,
+        )
+        .unwrap();
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
+        assert_eq!(headers.get("X-Tezos-Source").unwrap(), "source_alias");
+        assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "42");
+        assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
+        assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
+        assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
+    }
+
+    #[test]
+    fn test_inject_context_headers_raw_overwrites_existing() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::HeaderName::from_static("x-tezos-sender"),
+            "old-value".parse().unwrap(),
+        );
+        inject_context_headers_raw(
+            &mut headers,
+            b"new_alias",
+            b"source_alias",
+            U256::zero(),
+            0,
+            0u64,
+            0,
+        )
+        .unwrap();
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
+    }
+
+    #[test]
+    fn test_http_call_rejects_x_tezos_headers() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc",
+            &[("X-Tezos-Sender", "attacker")],
+            &[],
+            0,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let result = extract_http_call_request(typed);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("X-Tezos-"),
+            "error should mention the header name: {err}"
+        );
+    }
+
+    #[test]
+    fn test_http_call_rejects_x_tezos_headers_case_insensitive() {
+        let arena = typed_arena::Arena::new();
+        let value = build_http_call_micheline(
+            &arena,
+            "http://michelson/KT1abc",
+            &[("x-tezos-amount", "999")],
+            &[],
+            0,
+        );
+        let typed = typecheck_http_call(&value).unwrap();
+        let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
 }

@@ -20,6 +20,11 @@ pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
 pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
 pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
 
+/// Error message emitted when a user supplies an X-Tezos-* header that must
+/// only be injected by the trusted gateway.
+pub const ERR_FORBIDDEN_TEZOS_HEADER: &str =
+    "user-supplied X-Tezos-* headers are forbidden";
+
 /// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
 pub struct CrossRuntimeContext {
@@ -41,6 +46,8 @@ pub enum CrossCallResult {
     Halt(Vec<u8>),
 }
 
+// TODO: L2-971
+// cleanup this, and remove use of Custom for more specific errors
 #[derive(Eq, PartialEq, Debug, Error)]
 pub enum TezosXRuntimeError {
     #[error("RuntimeId not in registry")]
