@@ -83,7 +83,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario =
+    ?catchup_cooldown scenario =
   let scenario setup protocol =
     let* () =
       if wait_for_valid_block then
@@ -117,15 +117,13 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ~enable_dal:false
     ~enable_multichain:false
     ~instant_confirmations:false
-    ?da_fee
-    ?sequencer_pool_address
     scenario
 
 let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario protocols =
+    ?catchup_cooldown ?da_fee scenario protocols =
   register_tezlink_only_test
     ~title:(title ^ " (tezlink)")
     ~tags
@@ -140,7 +138,6 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?additional_uses
     ~wait_for_valid_block
     ?da_fee
-    ?sequencer_pool_address
     scenario
     protocols ;
   register_tezosx_test
@@ -156,8 +153,6 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?catchup_cooldown
     ?additional_uses
     ~wait_for_valid_block
-    ?da_fee
-    ?sequencer_pool_address
     scenario
     protocols
 
@@ -3443,7 +3438,7 @@ let test_tezlink_validation_balance =
     [Client.spawn_transfer] triggers a simulation that rejects the operation
     with [Insufficient_fees]. *)
 let test_tezlink_insufficient_da_fee =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Michelson transfer with insufficient DA fee is rejected"
     ~tags:["kernel"; "validation"; "da_fee"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3478,7 +3473,7 @@ let test_tezlink_insufficient_da_fee =
 let test_tezlink_da_fee_credited_to_pool =
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   let da_fee_eth_int = 4 in
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"DA fees are credited to sequencer pool address"
     ~tags:["kernel"; "da_fee"; "sequencer_pool_address"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3531,7 +3526,7 @@ let test_tezlink_da_fee_credited_to_pool =
     4 mutez/byte) is rejected with [insufficient_fees]. Then, verifies
     that a matching value (4000 nanotez/byte) lets the transfer succeed. *)
 let test_tezlink_simulation_with_da_fee =
-  register_tezlink_test
+  register_tezlink_only_test
     ~title:"Michelson transfer simulation succeeds with DA fees enabled"
     ~tags:["kernel"; "validation"; "da_fee"; "simulation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
