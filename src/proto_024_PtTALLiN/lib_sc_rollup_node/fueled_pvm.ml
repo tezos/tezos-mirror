@@ -53,8 +53,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
         failing_ticks : int64 list;
       }
 
-  exception Error_wrapper of tztrace
-
   let metadata (node_ctxt : _ Node_context.t) =
     let address =
       Sc_rollup_proto_types.Address.of_octez node_ctxt.config.sc_rollup_address
@@ -133,7 +131,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | Error error ->
               (* The [Error_wrapper] must be caught upstream and converted into
                  a tzresult. *)
-              Lwt.fail (Error_wrapper error)
+              Lwt.fail (Rollup_node_errors.Error_wrapper error)
           | Ok data -> Lwt.return data)
       | Reveal_metadata ->
           Lwt.return
@@ -176,7 +174,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               (* The [Error_wrapper] must be caught upstream and converted into
                  a tzresult. *)
               (* This happens when, for example, the kernel requests a page from a future level. *)
-              Lwt.fail (Error_wrapper error)
+              Lwt.fail (Rollup_node_errors.Error_wrapper error)
           | Ok None ->
               (* The page was not confirmed by L1.
                  We return empty string in this case, as done in the slow executon. *)
@@ -229,7 +227,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
             in
             return (executed_ticks, failing_ticks, remaining_fuel))
           (function
-            | Error_wrapper error -> Lwt.return (Error error)
+            | Rollup_node_errors.Error_wrapper error -> Lwt.return (Error error)
             | exn -> Lwt.reraise exn)
       in
       let normal_eval_wrapper state fuel one_step_eval =
