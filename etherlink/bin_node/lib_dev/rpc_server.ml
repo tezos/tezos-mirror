@@ -200,7 +200,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
-             (Evm_ro_context.tezlink_backend ro_ctxt)
+             (Tezlink_services_impl.make ro_ctxt)
              ~add_operation:
                (add_operation
                   ~mode

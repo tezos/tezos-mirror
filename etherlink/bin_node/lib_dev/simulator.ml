@@ -6,26 +6,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type backend = {
-  get_state :
-    ?block:Ethereum_types.Block_parameter.extended ->
-    unit ->
-    Evm_state.t tzresult Lwt.t;
-  read :
-    Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t;
-  subkeys :
-    Evm_state.t -> Durable_storage_path.path -> string list tzresult Lwt.t;
-  modify :
-    key:string -> value:string -> Evm_state.t -> Evm_state.t tzresult Lwt.t;
-  simulate_and_read :
-    ?state_override:Ethereum_types.state_override ->
-    Evm_state.t ->
-    input:Simulation.Encodings.simulate_input ->
-    bytes tzresult Lwt.t;
-}
+let simulate_and_read (ctxt : Evm_ro_context.t) ?state_override simulate_state
+    ~input =
+  let open Lwt_result_syntax in
+  let config =
+    Pvm.Kernel.config
+      ~preimage_directory:ctxt.preimages
+      ?preimage_endpoint:ctxt.preimages_endpoint
+      ~kernel_debug:false
+      ~destination:ctxt.smart_rollup_address
+      ~trace_host_funs:ctxt.trace_host_funs
+      ()
+  in
+  let* simulate_state =
+    State_override.update_accounts state_override simulate_state
+  in
+  let* raw_insights =
+    Evm_state.execute_and_inspect
+      ~pool:ctxt.execution_pool
+      ~native_execution_policy:ctxt.native_execution_policy
+      ~config
+      ~data_dir:ctxt.data_dir
+      ~input
+      simulate_state
+  in
+  match raw_insights with
+  | [Some bytes] -> return bytes
+  | _ -> Error_monad.failwith "Invalid insights format"
 
 module Etherlink = struct
-  let call_simulation backend
+  let call_simulation ctxt
       ?(state_override = Ethereum_types.state_override_empty) ~log_file
       ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
@@ -33,7 +43,8 @@ module Etherlink = struct
     let insight_requests =
       [Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"]]
     in
-    backend.simulate_and_read
+    simulate_and_read
+      ctxt
       ~state_override
       simulation_state
       ~input:
@@ -57,44 +68,45 @@ module Etherlink = struct
      we cannot consider only latest version if it's supported by all latest
      kernels on ghostnet and mainnet.
   *)
-  let simulation_version backend simulation_state =
+  let simulation_version simulation_state =
     let open Lwt_result_syntax in
-    let* storage_version =
-      Durable_storage.storage_version (backend.read simulation_state)
-    in
+    let read = Evm_ro_context.read_state simulation_state in
+    let* storage_version = Durable_storage.storage_version read in
     if Storage_version.simulation_v0 ~storage_version then return `V0
     else if Storage_version.simulation_v2 ~storage_version then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
-      let* kernel_version =
-        Durable_storage.kernel_version (backend.read simulation_state)
-      in
+      let* kernel_version = Durable_storage.kernel_version read in
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
       if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then
         return `V0
       else return `V1
 
-  let simulate_call backend ~overwrite_tick_limit call block_param
-      state_override =
+  let simulate_call ctxt ~overwrite_tick_limit call block_param state_override =
     let open Lwt_result_syntax in
-    let* simulation_state = backend.get_state ~block:block_param () in
+    let* simulation_state =
+      Evm_ro_context.get_state ctxt ~block:block_param ()
+    in
     let timestamp = Misc.now () in
-    let* simulation_version = simulation_version backend simulation_state in
+    let* simulation_version = simulation_version simulation_state in
     let* simulation_state =
       if overwrite_tick_limit then
-        backend.modify
-          simulation_state
-          ~key:"/evm/maximum_allowed_ticks"
-          ~value:
-            Data_encoding.(
-              Binary.to_string_exn Little_endian.int64 1_000_000_000_000L)
+        let*! state =
+          Evm_state.modify
+            ~key:"/evm/maximum_allowed_ticks"
+            ~value:
+              Data_encoding.(
+                Binary.to_string_exn Little_endian.int64 1_000_000_000_000L)
+            simulation_state
+        in
+        return state
       else return simulation_state
     in
     let* bytes =
       call_simulation
-        backend
+        ctxt
         ~state_override
         simulation_state
         ~log_file:"simulate_call"
@@ -108,13 +120,13 @@ module Etherlink = struct
     in
     Lwt.return (Simulation.simulation_result bytes)
 
-  let call_estimate_gas backend
+  let call_estimate_gas ctxt
       ?(state_override = Ethereum_types.state_override_empty) call
       simulation_state =
     let open Lwt_result_syntax in
     let* bytes =
       call_simulation
-        backend
+        ctxt
         ~log_file:"estimate_gas"
         ~input_encoder:Simulation.encode
         ~input:call
@@ -138,16 +150,15 @@ module Etherlink = struct
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances.
   *)
-  let da_fees_gas_limit_overhead backend simulation_state tx_data :
+  let da_fees_gas_limit_overhead simulation_state tx_data :
       (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
+    let read = Evm_ro_context.read_state simulation_state in
     let read_qty path =
-      let+ bytes = backend.read simulation_state path in
+      let+ bytes = read path in
       Option.map Ethereum_types.decode_number_le bytes
     in
-    let* da_fee_per_byte =
-      Etherlink_durable_storage.da_fee_per_byte (backend.read simulation_state)
-    in
+    let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
     let* (Qty minimum_base_fee_per_gas) =
       (* In future iterations of the kernel, the default value will be
          written to the storage. This default value will no longer need to
@@ -168,7 +179,7 @@ module Etherlink = struct
     in
     return da_fee
 
-  let rec confirm_gas backend ~timestamp ~maximum_gas_per_transaction
+  let rec confirm_gas ctxt ~timestamp ~maximum_gas_per_transaction
       ~simulation_version ~state_override (call : Ethereum_types.call) gas
       simulation_state =
     let open Ethereum_types in
@@ -178,7 +189,7 @@ module Etherlink = struct
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
-        backend
+        ctxt
         ~state_override
         (simulation_input
            ~timestamp
@@ -201,7 +212,7 @@ module Etherlink = struct
           if reached_max new_gas then
             (* We try one last time with maximum gas possible. *)
             confirm_gas
-              backend
+              ctxt
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
@@ -211,7 +222,7 @@ module Etherlink = struct
               simulation_state
           else
             confirm_gas
-              backend
+              ctxt
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
@@ -236,26 +247,26 @@ module Etherlink = struct
             | Some (Hash (Hex data)) -> `Hex data |> Hex.to_bytes_exn
             | None -> Bytes.empty
           in
-          let* da_fees =
-            da_fees_gas_limit_overhead backend simulation_state tx_data
-          in
+          let* da_fees = da_fees_gas_limit_overhead simulation_state tx_data in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
-  let estimate_gas backend call block_param state_override =
+  let estimate_gas ctxt call block_param state_override =
     let open Lwt_result_syntax in
-    let* simulation_state = backend.get_state ~block:block_param () in
-    let timestamp = Misc.now () in
-    let* (Qty maximum_gas_per_transaction) =
-      Etherlink_durable_storage.maximum_gas_per_transaction
-        (backend.read simulation_state)
+    let* simulation_state =
+      Evm_ro_context.get_state ctxt ~block:block_param ()
     in
-    let* simulation_version = simulation_version backend simulation_state in
+    let timestamp = Misc.now () in
+    let read = Evm_ro_context.read_state simulation_state in
+    let* (Qty maximum_gas_per_transaction) =
+      Etherlink_durable_storage.maximum_gas_per_transaction read
+    in
+    let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
-        backend
+        ctxt
         ~state_override
         (simulation_input
            ~timestamp
@@ -278,7 +289,7 @@ module Etherlink = struct
         let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
           confirm_gas
-            backend
+            ctxt
             ~state_override
             ~timestamp
             ~maximum_gas_per_transaction
@@ -313,9 +324,9 @@ module Tezlink = struct
   open Tezlink_imports
   open Imported_protocol
 
-  let call_simulation backend ~input ~skip_signature block =
+  let call_simulation ctxt ~input ~skip_signature block =
     let open Lwt_result_syntax in
-    let* simulation_state = backend.get_state ~block () in
+    let* simulation_state = Evm_ro_context.get_state ctxt ~block () in
     let skip_signature_tag = if skip_signature then "\000" else "\001" in
     let*? messages = String.chunk_bytes 4096 (Bytes.of_string input) in
     let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
@@ -324,7 +335,8 @@ module Tezlink = struct
         Simulation.Encodings.Durable_storage_key ["tezlink"; "simulation_result"];
       ]
     in
-    backend.simulate_and_read
+    simulate_and_read
+      ctxt
       ~state_override:Ethereum_types.state_override_empty
       simulation_state
       ~input:
@@ -337,7 +349,7 @@ module Tezlink = struct
           log_kernel_debug_file = Some "simulate_call";
         }
 
-  let simulate_operation backend ~chain_id ~skip_signature ~read ~data_model
+  let simulate_operation ctxt ~chain_id ~skip_signature ~read ~data_model
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -363,7 +375,7 @@ module Tezlink = struct
     in
 
     (* Now, the actual simulation. *)
-    let* bytes = call_simulation backend ~input ~skip_signature block in
+    let* bytes = call_simulation ctxt ~input ~skip_signature block in
     let*? operations =
       Tezos_services.Current_block_services.deserialize_operations
         ~chain_id

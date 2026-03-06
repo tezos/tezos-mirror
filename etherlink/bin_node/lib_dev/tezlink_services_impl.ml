@@ -7,8 +7,7 @@
 
 let data_model = Tezlink_durable_storage.Path
 
-let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
-    ~nth_block_hash =
+let make (ctxt : Evm_ro_context.t) =
   (module struct
     type block_param =
       [ `Head of int32
@@ -24,13 +23,17 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       function
       | `Head offset ->
           let* current_block_number =
-            block_param_to_block_number
+            Evm_ro_context.block_param_to_block_number
+              ctxt
+              ~chain_family:L2_types.Michelson
               (Ethereum_types.Block_parameter.Block_parameter Latest)
           in
           compute_offset current_block_number offset
       | `Hash (hash, offset) ->
           let* current_block_number =
-            block_param_to_block_number
+            Evm_ro_context.block_param_to_block_number
+              ctxt
+              ~chain_family:L2_types.Michelson
               (Ethereum_types.Block_parameter.Block_hash
                  {hash; require_canonical = false})
           in
@@ -86,14 +89,14 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let read ~block p =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
-      backend.read state p
+      let* state = Evm_ro_context.get_state ctxt ~block () in
+      Evm_ro_context.read_state state p
 
     let subkeys ~block p =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
-      backend.subkeys state p
+      let* state = Evm_ro_context.get_state ctxt ~block () in
+      Evm_ro_context.subkeys state p
 
     let balance chain block c =
       let `Main = chain in
@@ -212,7 +215,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       let open Lwt_result_syntax in
       let `Main = chain in
       let* block_number = shell_block_param_to_block_number block in
-      nth_block (Z.of_int32 block_number)
+      Evm_ro_context.tezlink_nth_block ctxt (Z.of_int32 block_number)
 
     let monitor_heads chain query =
       (* TODO: #7831
@@ -239,7 +242,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
             return_none
         | delay_ms :: rest -> (
             let* () = Lwt_unix.sleep (delay_ms /. 1000.) in
-            let* block_result = nth_block level in
+            let* block_result = Evm_ro_context.tezlink_nth_block ctxt level in
             match block_result with
             | Ok block -> return_some block
             | Error _ -> fetch_block level rest)
@@ -261,24 +264,28 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let bootstrapped () =
       let open Lwt_result_syntax in
       let* (Qty current_block_number) =
-        block_param_to_block_number
+        Evm_ro_context.block_param_to_block_number
+          ctxt
+          ~chain_family:L2_types.Michelson
           (Ethereum_types.Block_parameter.Block_parameter Latest)
       in
-      let* (block : L2_types.Tezos_block.t) = nth_block current_block_number in
+      let* (block : L2_types.Tezos_block.t) =
+        Evm_ro_context.tezlink_nth_block ctxt current_block_number
+      in
       return (block.hash, block.timestamp)
 
     let block_hash chain block =
       let open Lwt_result_syntax in
       let `Main = chain in
       let* number = shell_block_param_to_block_number block in
-      nth_block_hash (Z.of_int32 number)
+      Evm_ro_context.tezlink_nth_block_hash ctxt (Z.of_int32 number)
 
     let simulate_operation ~chain_id ~skip_signature op hash block =
       let open Lwt_result_syntax in
       let read = read ~block in
       let* block = shell_block_param_to_eth_block_param block in
       Simulator.Tezlink.simulate_operation
-        backend
+        ctxt
         ~read
         ~data_model
         ~chain_id

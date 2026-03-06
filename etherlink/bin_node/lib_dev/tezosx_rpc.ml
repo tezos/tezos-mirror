@@ -10,6 +10,6 @@ let add_rpc_directory ro_ctxt ~l2_chain_id ~add_operation dir = function
       Tezos_rpc.Directory.merge
         (Tezlink_directory.register_tezlink_services
            ~l2_chain_id
-           (Evm_ro_context.tezos_backend ro_ctxt)
+           (Tezos_backend.make ro_ctxt)
            ~add_operation)
         dir

@@ -5,8 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
-    ~nth_block_hash =
+let make (ctxt : Evm_ro_context.t) =
   (module struct
     type block_param =
       [ `Head of int32
@@ -22,13 +21,19 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       function
       | `Head offset ->
           let* current_block_number =
-            block_param_to_block_number
+            Evm_ro_context.block_param_to_block_number
+              ctxt
+              ~chain_family:L2_types.Michelson
+              ~hash_column:`Michelson
               (Ethereum_types.Block_parameter.Block_parameter Latest)
           in
           compute_offset current_block_number offset
       | `Hash (hash, offset) ->
           let* current_block_number =
-            block_param_to_block_number
+            Evm_ro_context.block_param_to_block_number
+              ctxt
+              ~chain_family:L2_types.Michelson
+              ~hash_column:`Michelson
               (Ethereum_types.Block_parameter.Block_hash
                  {hash; require_canonical = false})
           in
@@ -92,11 +97,11 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let balance _chain block contract =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       match (contract : Tezos_types.Contract.t) with
       | Implicit pkh -> (
           let* read_result =
-            backend.read
+            Evm_ro_context.read_state
               state
               (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
           in
@@ -107,7 +112,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
           | None -> return Tezos_types.Tez.zero)
       | Originated _ -> (
           let path = contract_path contract "/balance" in
-          let* read_result = backend.read state path in
+          let* read_result = Evm_ro_context.read_state state path in
           match read_result with
           | Some bytes -> (
               match
@@ -124,8 +129,8 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let subkeys ~block p =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
-      backend.subkeys state p
+      let* state = Evm_ro_context.get_state ctxt ~block () in
+      Evm_ro_context.subkeys state p
 
     let list_contracts chain block =
       let open Lwt_result_syntax in
@@ -177,10 +182,10 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
          Support unparsing_mode argument. *)
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       Lwt_result.map (Option.value ~default:None)
       @@ Durable_storage.inspect_durable_and_decode_opt
-           (backend.read state)
+           (Evm_ro_context.read_state state)
            (contract_path c "/data/storage")
            (Data_encoding.Binary.of_bytes_opt
               Tezlink_imports.Imported_context.Script.expr_encoding)
@@ -191,10 +196,10 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
          Support unparsing_mode argument. *)
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       Lwt_result.map (Option.value ~default:None)
       @@ Durable_storage.inspect_durable_and_decode_opt
-           (backend.read state)
+           (Evm_ro_context.read_state state)
            (contract_path c "/data/code")
            (Data_encoding.Binary.of_bytes_opt
               Tezlink_imports.Imported_context.Script.expr_encoding)
@@ -217,10 +222,12 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let manager_key _chain block contract =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       on_implicit_account contract @@ fun pkh ->
       let* read_result =
-        backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+        Evm_ro_context.read_state
+          state
+          (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
       in
       match read_result with
       | Some bytes ->
@@ -231,12 +238,12 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let counter _chain block (contract : Tezos_types.Contract.t) =
       let open Lwt_result_syntax in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       match contract with
       | Originated _ -> return_none
       | Implicit pkh -> (
           let* read_result =
-            backend.read
+            Evm_ro_context.read_state
               state
               (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
           in
@@ -250,7 +257,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       let open Lwt_result_syntax in
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       let raw_hash =
         Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
       in
@@ -267,7 +274,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       in
       let+ result =
         Durable_storage.inspect_durable_and_decode_opt
-          (backend.read state)
+          (Evm_ro_context.read_state state)
           path
           decode
       in
@@ -287,7 +294,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       in
       let+ result =
         Durable_storage.inspect_durable_and_decode_opt
-          (backend.read state)
+          (Evm_ro_context.read_state state)
           path
           decode
       in
@@ -307,7 +314,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       in
       let+ result =
         Durable_storage.inspect_durable_and_decode_opt
-          (backend.read state)
+          (Evm_ro_context.read_state state)
           path
           decode
       in
@@ -317,7 +324,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
       let open Lwt_result_syntax in
       let `Main = chain in
       let* block = shell_block_param_to_eth_block_param block in
-      let* state = backend.get_state ~block () in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
       let* key_type = big_map_key_type state id in
       let* value_type = big_map_value_type state id in
       match (key_type, value_type) with
@@ -334,7 +341,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let block _chain block =
       let open Lwt_result_syntax in
       let* block_number = shell_block_param_to_block_number block in
-      nth_block (Z.of_int32 block_number)
+      Evm_ro_context.tezosx_nth_block ctxt (Z.of_int32 block_number)
 
     let monitor_heads chain query =
       (* TODO: #7831
@@ -361,7 +368,7 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
             return_none
         | delay_ms :: rest -> (
             let* () = Lwt_unix.sleep (delay_ms /. 1000.) in
-            let* block_result = nth_block level in
+            let* block_result = Evm_ro_context.tezosx_nth_block ctxt level in
             match block_result with
             | Ok block -> return_some block
             | Error _ -> fetch_block level rest)
@@ -383,17 +390,22 @@ let make ~(backend : Simulator.backend) ~block_param_to_block_number ~nth_block
     let bootstrapped () =
       let open Lwt_result_syntax in
       let* (Qty current_block_number) =
-        block_param_to_block_number
+        Evm_ro_context.block_param_to_block_number
+          ctxt
+          ~chain_family:L2_types.Michelson
+          ~hash_column:`Michelson
           (Ethereum_types.Block_parameter.Block_parameter Latest)
       in
-      let* (block : L2_types.Tezos_block.t) = nth_block current_block_number in
+      let* (block : L2_types.Tezos_block.t) =
+        Evm_ro_context.tezosx_nth_block ctxt current_block_number
+      in
       return (block.hash, block.timestamp)
 
     let block_hash chain block =
       let open Lwt_result_syntax in
       let `Main = chain in
       let* number = shell_block_param_to_block_number block in
-      nth_block_hash (Z.of_int32 number)
+      Evm_ro_context.tezosx_nth_block_hash ctxt (Z.of_int32 number)
 
     let simulate_operation ~chain_id:_ ~skip_signature:_
         (op : Tezlink_imports.SeouLo_context.packed_operation) hash _block =

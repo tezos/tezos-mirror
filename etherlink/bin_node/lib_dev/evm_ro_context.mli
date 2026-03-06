@@ -74,14 +74,8 @@ val kernel_version : t -> string tzresult Lwt.t
 (** [kernel_root_hash ctxt] returns the internal kernel root hash. *)
 val kernel_root_hash : t -> string option tzresult Lwt.t
 
-val is_multichain_enabled : t -> bool tzresult Lwt.t
-
 (** [list_runtimes ctxt] returns the list of runtimes activated in the kernel. *)
 val list_runtimes : t -> Tezosx.runtime list tzresult Lwt.t
-
-(** [smart_rollup_address_str ctxt] returns the smart rollup address as a
-    string. *)
-val smart_rollup_address_str : t -> string
 
 val list_l1_l2_levels :
   t ->
@@ -195,28 +189,6 @@ module Etherlink : sig
 
   val coinbase : t -> Ethereum_types.address tzresult Lwt.t
 
-  val simulate_call :
-    t ->
-    overwrite_tick_limit:bool ->
-    Ethereum_types.call ->
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.state_override ->
-    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
-
-  val estimate_gas :
-    t ->
-    Ethereum_types.call ->
-    Ethereum_types.Block_parameter.extended ->
-    Ethereum_types.state_override ->
-    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
-
-  val inject_transactions :
-    t ->
-    config:Configuration.t ->
-    timestamp:Time.Protocol.t ->
-    transactions:(string * Transaction_object.t) list ->
-    Ethereum_types.hash list tzresult Lwt.t
-
   val replay :
     t ->
     Ethereum_types.quantity ->
@@ -246,13 +218,17 @@ module Tracer_etherlink : sig
     Tracer_types.block_output tzresult Lwt.t
 end
 
-(** {2 Tezlink backend operations} *)
+(** {2 Tezlink block storage} *)
 
-(** [tezlink_backend ctxt] returns a Tezlink backend module. *)
-val tezlink_backend : t -> (module Tezlink_backend_sig.S)
+val tezlink_nth_block : t -> Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
 
-(** [tezos_backend ctxt] returns a Tezos backend module. *)
-val tezos_backend : t -> (module Tezlink_backend_sig.S)
+val tezlink_nth_block_hash :
+  t -> Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
+
+val tezosx_nth_block : t -> Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
+
+val tezosx_nth_block_hash :
+  t -> Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
 
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 

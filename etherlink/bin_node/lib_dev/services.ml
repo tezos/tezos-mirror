@@ -1496,7 +1496,7 @@ let dispatch_request (type f) ~websocket
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
-                Evm_ro_context.Etherlink.simulate_call
+                Simulator.Etherlink.simulate_call
                   ro_ctxt
                   ~overwrite_tick_limit:
                     config.experimental_features.overwrite_simulation_tick_limit
@@ -1524,7 +1524,7 @@ let dispatch_request (type f) ~websocket
         | Get_estimate_gas.Method ->
             let f (call, block_param, state_override) =
               let* result =
-                Evm_ro_context.Etherlink.estimate_gas
+                Simulator.Etherlink.estimate_gas
                   ro_ctxt
                   call
                   block_param
@@ -2227,7 +2227,7 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
             let* _ = Evm_ro_context.current_block_number ro_ctxt in
             return_unit
         | Michelson ->
-            let (module Tezlink) = Evm_ro_context.tezlink_backend ro_ctxt in
+            let (module Tezlink) = Tezlink_services_impl.make ro_ctxt in
             let* _ = Tezlink.current_level `Main (`Head 0l) ~offset:0l in
             return_unit)
   in

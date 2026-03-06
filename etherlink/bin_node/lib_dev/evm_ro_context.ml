@@ -58,13 +58,7 @@ let kernel_version ctxt = with_latest_read ctxt Durable_storage.kernel_version
 let kernel_root_hash ctxt =
   with_latest_read ctxt Durable_storage.kernel_root_hash
 
-let is_multichain_enabled ctxt =
-  with_latest_read ctxt Durable_storage.is_multichain_enabled
-
 let list_runtimes ctxt = with_latest_read ctxt Durable_storage.list_runtimes
-
-let smart_rollup_address_str ctxt =
-  Tezos_crypto.Hashed.Smart_rollup_address.to_string ctxt.smart_rollup_address
 
 let list_l1_l2_levels ctxt ~from_l1_level =
   let open Lwt_result_syntax in
@@ -82,6 +76,9 @@ let l2_levels_of_l1_level ctxt l1_level =
   Evm_store.use ctxt.store @@ fun conn ->
   Evm_store.L1_l2_finalized_levels.find conn ~l1_level
 
+(* [chain_family] is currently ignored because the store uses a single
+   block numbering scheme shared across chain families. The parameter is
+   kept for forward compatibility. *)
 let block_param_to_block_number ctxt ~chain_family:_ ?hash_column
     (block_param : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
@@ -371,45 +368,6 @@ let subkeys state path =
   let*! res = Evm_state.subkeys state path in
   return res
 
-let simulator_backend ctxt =
-  {
-    Simulator.get_state = get_state ctxt;
-    read = read_state;
-    subkeys;
-    modify =
-      (fun ~key ~value state ->
-        let open Lwt_result_syntax in
-        let*! state = Evm_state.modify ~key ~value state in
-        return state);
-    simulate_and_read =
-      (fun ?state_override simulate_state ~input ->
-        let open Lwt_result_syntax in
-        let config =
-          Pvm.Kernel.config
-            ~preimage_directory:ctxt.preimages
-            ?preimage_endpoint:ctxt.preimages_endpoint
-            ~kernel_debug:false
-            ~destination:ctxt.smart_rollup_address
-            ~trace_host_funs:ctxt.trace_host_funs
-            ()
-        in
-        let* simulate_state =
-          State_override.update_accounts state_override simulate_state
-        in
-        let* raw_insights =
-          Evm_state.execute_and_inspect
-            ~pool:ctxt.execution_pool
-            ~native_execution_policy:ctxt.native_execution_policy
-            ~config
-            ~data_dir:ctxt.data_dir
-            ~input
-            simulate_state
-        in
-        match raw_insights with
-        | [Some bytes] -> return bytes
-        | _ -> Error_monad.failwith "Invalid insights format");
-  }
-
 let pvm_config ctxt =
   Pvm.Kernel.config
     ~preimage_directory:ctxt.preimages
@@ -418,6 +376,16 @@ let pvm_config ctxt =
     ~destination:ctxt.smart_rollup_address
     ~trace_host_funs:ctxt.trace_host_funs
     ()
+
+(** [promote_native_execution ctxt] promotes [Rpcs_only] to [Always].
+    The read-only context is only used to serve RPCs, so [replay] and
+    [execute] are only used for serving RPCs and it is safe to enable
+    native execution unconditionally.  Without this, the node would
+    believe it is executing a block and default to WASM execution. *)
+let promote_native_execution ctxt =
+  match ctxt.native_execution_policy with
+  | Rpcs_only -> {ctxt with native_execution_policy = Configuration.Always}
+  | _ -> ctxt
 
 let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
   let da_fees =
@@ -649,83 +617,9 @@ module Etherlink = struct
 
   let coinbase ctxt = with_latest_read ctxt Etherlink_durable_storage.coinbase
 
-  let simulate_call ctxt ~overwrite_tick_limit call block_param state_override =
-    let backend = simulator_backend ctxt in
-    Simulator.Etherlink.simulate_call
-      backend
-      ~overwrite_tick_limit
-      call
-      block_param
-      state_override
-
-  let estimate_gas ctxt call block_param state_override =
-    let backend = simulator_backend ctxt in
-    Simulator.Etherlink.estimate_gas backend call block_param state_override
-
-  let inject_transactions _ctxt ~config ~timestamp:_ ~transactions =
-    let open Lwt_result_syntax in
-    let hashes, messages =
-      let l, r =
-        List.to_seq transactions
-        |> Seq.map (fun (raw_tx, (obj : Transaction_object.t)) ->
-               (Transaction_object.hash obj, raw_tx))
-        |> Seq.split
-      in
-      (List.of_seq l, List.of_seq r)
-    in
-    let send_raw_transaction_method txn =
-      let open Rpc_encodings in
-      let message =
-        Hex.of_string txn |> Hex.show |> Ethereum_types.hex_of_string
-      in
-      JSONRPC.
-        {
-          method_ = Send_raw_transaction.method_;
-          parameters =
-            Some
-              (Data_encoding.Json.construct
-                 Send_raw_transaction.input_encoding
-                 message);
-          id = Some (random_id ());
-        }
-    in
-    let check_response =
-      let open Rpc_encodings.JSONRPC in
-      function
-      | {value = Ok _; _} -> return_unit
-      | {value = Error {message; _}; _} ->
-          failwith "Send_raw_transaction failed with message \"%s\"" message
-    in
-    let check_batched_response =
-      let open Batch in
-      function
-      | Batch l -> List.iter_es check_response l
-      | Singleton r -> check_response r
-    in
-    match config.Configuration.observer with
-    | Some {evm_node_endpoint; _} ->
-        let methods = List.map send_raw_transaction_method messages in
-        let* response =
-          Rollup_services.call_service
-            ~keep_alive:config.keep_alive
-            ~timeout:config.rpc_timeout
-            ~base:evm_node_endpoint
-            (Batch.dispatch_batch_service ~path:Resto.Path.root)
-            ()
-            ()
-            (Batch methods)
-        in
-        let* () = check_batched_response response in
-        return hashes
-    | None -> assert false
-
   let replay ctxt number =
     let open Lwt_result_syntax in
-    let ctxt =
-      match ctxt.native_execution_policy with
-      | Rpcs_only -> {ctxt with native_execution_policy = Configuration.Always}
-      | _ -> ctxt
-    in
+    let ctxt = promote_native_execution ctxt in
     let* result = replay ctxt ~log_file:"replay_rpc" Blueprint number in
     match result with
     | Replay_success {block = Eth block; _} -> return block
@@ -735,11 +629,7 @@ module Etherlink = struct
 end
 
 let make_executor ctxt =
-  let ctxt =
-    match ctxt.native_execution_policy with
-    | Rpcs_only -> {ctxt with native_execution_policy = Configuration.Always}
-    | _ -> ctxt
-  in
+  let ctxt = promote_native_execution ctxt in
   let pvm_config = pvm_config ctxt in
   (module struct
     let replay ?log_file ?profile ?alter_evm_state number =
@@ -834,25 +724,6 @@ let tezosx_nth_block ctxt level =
 let tezosx_nth_block_hash ctxt level =
   Evm_store.use ctxt.store @@ fun conn ->
   Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
-
-let tezlink_backend ctxt =
-  Tezlink_services_impl.make
-    ~backend:(simulator_backend ctxt)
-    ~block_param_to_block_number:
-      (block_param_to_block_number ctxt ~chain_family:L2_types.Michelson)
-    ~nth_block:(tezlink_nth_block ctxt)
-    ~nth_block_hash:(tezlink_nth_block_hash ctxt)
-
-let tezos_backend ctxt =
-  Tezos_backend.make
-    ~backend:(simulator_backend ctxt)
-    ~block_param_to_block_number:
-      (block_param_to_block_number
-         ctxt
-         ~chain_family:L2_types.Michelson
-         ~hash_column:`Michelson)
-    ~nth_block:(tezosx_nth_block ctxt)
-    ~nth_block_hash:(tezosx_nth_block_hash ctxt)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
