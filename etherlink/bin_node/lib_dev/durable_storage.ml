@@ -7,19 +7,6 @@
 
 exception Invalid_block_structure of string
 
-module type READER = sig
-  type state
-
-  val get_state :
-    ?block:Ethereum_types.Block_parameter.extended ->
-    unit ->
-    state tzresult Lwt.t
-
-  val read : state -> Durable_storage_path.path -> bytes option tzresult Lwt.t
-
-  val subkeys : state -> Durable_storage_path.path -> string list tzresult Lwt.t
-end
-
 let inspect_durable_and_decode_opt read path decode =
   let open Lwt_result_syntax in
   let* bytes = read path in

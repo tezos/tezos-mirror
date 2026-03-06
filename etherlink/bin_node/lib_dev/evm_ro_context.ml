@@ -372,49 +372,43 @@ let subkeys state path =
   return res
 
 let simulator_backend ctxt =
-  let module SB : Simulator.SimulationBackend with type state = Evm_state.t =
-  struct
-    type state = Evm_state.t
-
-    let get_state = get_state ctxt
-
-    let read = read_state
-
-    let subkeys = subkeys
-
-    let modify ~key ~value state =
-      let open Lwt_result_syntax in
-      let*! state = Evm_state.modify ~key ~value state in
-      return state
-
-    let simulate_and_read ?state_override simulate_state ~input =
-      let open Lwt_result_syntax in
-      let config =
-        Pvm.Kernel.config
-          ~preimage_directory:ctxt.preimages
-          ?preimage_endpoint:ctxt.preimages_endpoint
-          ~kernel_debug:false
-          ~destination:ctxt.smart_rollup_address
-          ~trace_host_funs:ctxt.trace_host_funs
-          ()
-      in
-      let* simulate_state =
-        State_override.update_accounts state_override simulate_state
-      in
-      let* raw_insights =
-        Evm_state.execute_and_inspect
-          ~pool:ctxt.execution_pool
-          ~native_execution_policy:ctxt.native_execution_policy
-          ~config
-          ~data_dir:ctxt.data_dir
-          ~input
-          simulate_state
-      in
-      match raw_insights with
-      | [Some bytes] -> return bytes
-      | _ -> Error_monad.failwith "Invalid insights format"
-  end in
-  (module SB : Simulator.SimulationBackend with type state = Evm_state.t)
+  {
+    Simulator.get_state = get_state ctxt;
+    read = read_state;
+    subkeys;
+    modify =
+      (fun ~key ~value state ->
+        let open Lwt_result_syntax in
+        let*! state = Evm_state.modify ~key ~value state in
+        return state);
+    simulate_and_read =
+      (fun ?state_override simulate_state ~input ->
+        let open Lwt_result_syntax in
+        let config =
+          Pvm.Kernel.config
+            ~preimage_directory:ctxt.preimages
+            ?preimage_endpoint:ctxt.preimages_endpoint
+            ~kernel_debug:false
+            ~destination:ctxt.smart_rollup_address
+            ~trace_host_funs:ctxt.trace_host_funs
+            ()
+        in
+        let* simulate_state =
+          State_override.update_accounts state_override simulate_state
+        in
+        let* raw_insights =
+          Evm_state.execute_and_inspect
+            ~pool:ctxt.execution_pool
+            ~native_execution_policy:ctxt.native_execution_policy
+            ~config
+            ~data_dir:ctxt.data_dir
+            ~input
+            simulate_state
+        in
+        match raw_insights with
+        | [Some bytes] -> return bytes
+        | _ -> Error_monad.failwith "Invalid insights format");
+  }
 
 let pvm_config ctxt =
   Pvm.Kernel.config
@@ -656,14 +650,17 @@ module Etherlink = struct
   let coinbase ctxt = with_latest_read ctxt Etherlink_durable_storage.coinbase
 
   let simulate_call ctxt ~overwrite_tick_limit call block_param state_override =
-    let (module SB) = simulator_backend ctxt in
-    let module E = Simulator.MakeEtherlink (SB) in
-    E.simulate_call ~overwrite_tick_limit call block_param state_override
+    let backend = simulator_backend ctxt in
+    Simulator.Etherlink.simulate_call
+      backend
+      ~overwrite_tick_limit
+      call
+      block_param
+      state_override
 
   let estimate_gas ctxt call block_param state_override =
-    let (module SB) = simulator_backend ctxt in
-    let module E = Simulator.MakeEtherlink (SB) in
-    E.estimate_gas call block_param state_override
+    let backend = simulator_backend ctxt in
+    Simulator.Etherlink.estimate_gas backend call block_param state_override
 
   let inject_transactions _ctxt ~config ~timestamp:_ ~transactions =
     let open Lwt_result_syntax in
@@ -812,67 +809,50 @@ module Tracer_etherlink = struct
     Tracer.trace_block (module Executor) (module Storage) ~block_number ~config
 end
 
-let tezlink_block_storage ctxt =
-  (module struct
-    let nth_block level =
-      let open Lwt_result_syntax in
-      Evm_store.use ctxt.store @@ fun conn ->
-      let* block_opt = Evm_store.Blocks.tez_find_with_level conn (Qty level) in
-      match block_opt with
-      | None -> failwith "Block %a not found" Z.pp_print level
-      | Some block -> return block
+let tezlink_nth_block ctxt level =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* block_opt = Evm_store.Blocks.tez_find_with_level conn (Qty level) in
+  match block_opt with
+  | None -> failwith "Block %a not found" Z.pp_print level
+  | Some block -> return block
 
-    let nth_block_hash level =
-      Evm_store.use ctxt.store @@ fun conn ->
-      Evm_store.Blocks.find_hash_of_number conn (Qty level)
-  end : Tezlink_block_storage_sig.S)
+let tezlink_nth_block_hash ctxt level =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blocks.find_hash_of_number conn (Qty level)
 
-let tezosx_block_storage ctxt =
-  (module struct
-    let nth_block level =
-      let open Lwt_result_syntax in
-      Evm_store.use ctxt.store @@ fun conn ->
-      let* block_opt =
-        Evm_store.Blocks.tezosx_find_tez_block_with_level conn (Qty level)
-      in
-      match block_opt with
-      | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
-      | Some block -> return block
+let tezosx_nth_block ctxt level =
+  let open Lwt_result_syntax in
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* block_opt =
+    Evm_store.Blocks.tezosx_find_tez_block_with_level conn (Qty level)
+  in
+  match block_opt with
+  | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
+  | Some block -> return block
 
-    let nth_block_hash level =
-      Evm_store.use ctxt.store @@ fun conn ->
-      Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
-  end : Tezlink_block_storage_sig.S)
+let tezosx_nth_block_hash ctxt level =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
 
 let tezlink_backend ctxt =
-  let (module SB) = simulator_backend ctxt in
-  let (module BS) = tezlink_block_storage ctxt in
-  (module Tezlink_services_impl.Make
-            (struct
-              include SB
-
-              let block_param_to_block_number block_param =
-                block_param_to_block_number
-                  ctxt
-                  ~chain_family:L2_types.Michelson
-                  block_param
-            end)
-            (BS) : Tezlink_backend_sig.S)
+  Tezlink_services_impl.make
+    ~backend:(simulator_backend ctxt)
+    ~block_param_to_block_number:
+      (block_param_to_block_number ctxt ~chain_family:L2_types.Michelson)
+    ~nth_block:(tezlink_nth_block ctxt)
+    ~nth_block_hash:(tezlink_nth_block_hash ctxt)
 
 let tezos_backend ctxt =
-  let (module SB) = simulator_backend ctxt in
-  let (module BS) = tezosx_block_storage ctxt in
-  (module Tezos_backend.Make
-            (struct
-              include SB
-
-              let block_param_to_block_number =
-                block_param_to_block_number
-                  ctxt
-                  ~chain_family:L2_types.Michelson
-                  ~hash_column:`Michelson
-            end)
-            (BS) : Tezlink_backend_sig.S)
+  Tezos_backend.make
+    ~backend:(simulator_backend ctxt)
+    ~block_param_to_block_number:
+      (block_param_to_block_number
+         ctxt
+         ~chain_family:L2_types.Michelson
+         ~hash_column:`Michelson)
+    ~nth_block:(tezosx_nth_block ctxt)
+    ~nth_block_hash:(tezosx_nth_block_hash ctxt)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
