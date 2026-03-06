@@ -190,32 +190,34 @@ let start_public_server (type f) ~(mode : f Mode.t)
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
-    let (module Backend : Services_backend_sig.S), _ = ctxt in
+    let (module Backend : Services_backend_sig.S), ro_ctxt = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
         let* l2_chain_id =
           match l2_chain_id with
           | Some l2_chain_id -> return l2_chain_id
-          | None -> Backend.chain_id ()
+          | None -> Evm_ro_context.chain_id ro_ctxt
         in
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
-             (module Backend.Tezlink)
+             (Evm_ro_context.tezlink_backend ro_ctxt)
              ~add_operation:
                (add_operation
                   ~mode
                   ~keep_alive:config.keep_alive
                   ~timeout:config.rpc_timeout)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
-        let*! runtimes = Backend.list_runtimes () in
+        let*! runtimes = Evm_ro_context.list_runtimes ro_ctxt in
         match runtimes with
         | Ok [] ->
             return
             @@ Evm_directory.empty config.experimental_features.rpc_server
         | Ok runtimes ->
             let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
-            let* l2_chain_id = Backend.michelson_runtime_chain_id () in
+            let* l2_chain_id =
+              Evm_ro_context.michelson_runtime_chain_id ro_ctxt
+            in
             let* () =
               (* we use Resto for some runtimes, so we can _only_ use resto. *)
               if config.experimental_features.rpc_server = Dream then
@@ -225,7 +227,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
             return @@ Evm_directory.init_from_resto_directory
             @@ List.fold_left
                  (Tezosx_rpc.add_rpc_directory
-                    (module Backend)
+                    ro_ctxt
                     ~l2_chain_id
                     ~add_operation:
                       (add_operation
