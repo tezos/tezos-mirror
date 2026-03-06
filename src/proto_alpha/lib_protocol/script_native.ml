@@ -949,6 +949,7 @@ module CLST_contract = struct
         execute_import_ticket (ctxt, step_constants) tickets storage
     | Lambda_export lambda_export ->
         execute_lambda_export (ctxt, step_constants) lambda_export storage
+    | Import_ticket_from_implicit _ticket -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
