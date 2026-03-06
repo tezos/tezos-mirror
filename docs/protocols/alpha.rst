@@ -57,9 +57,13 @@ Data Availability Layer
 - Introduced a new optional field ``lag_index`` to DAL entrapment evidence
   operations. (MR :gl:`!20360`)
 
+- Introduced a new RPC ``GET
+  /chains/<chain>/blocks/<block>/helpers/decode_dal_attestation/<bitset_as_decimal>``
+  which decodes a DAL attestation bitset (given as a decimal integer) into an
+  explicit representation of attested slots per lag. (MR :gl:`!21065`)
+
 Adaptive Issuance
 -----------------
-
 
 Gas improvements
 ----------------

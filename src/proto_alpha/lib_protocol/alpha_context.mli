@@ -2984,6 +2984,8 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
+    val rpc_arg : t RPC_arg.t
+
     val empty : t
 
     val is_empty : t -> bool
@@ -3007,6 +3009,9 @@ module Dal : sig
       bool
 
     type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+    val unfolded_lag_attestation_encoding :
+      unfolded_lag_attestation Data_encoding.t
 
     val decode :
       t ->
