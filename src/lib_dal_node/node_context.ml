@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type migration_status_entry = {
+  is_migration_pending : bool;
+  period_end_level : int32;
+}
+
 type t = {
   config : Configuration_file.t;
   identity : P2p_identity.t;
@@ -50,6 +55,7 @@ type t = {
   ignore_pkhs : Signature.Public_key_hash.Set.t;
   mutable last_migration_level : int32;
   mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
+  mutable migration_status : migration_status_entry option;
 }
 
 let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
@@ -82,6 +88,7 @@ let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
     last_migration_level = 0l;
     attestable_slots_watcher_table =
       Attestable_slots_watcher_table.create ~initial_size:5;
+    migration_status = None;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -337,6 +344,26 @@ let get_attestation_lags ctxt ~level =
   let open Result_syntax in
   let+ params = get_proto_parameters ctxt ~level:(`Level level) in
   List.map Int32.of_int params.attestation_lags
+
+let get_next_migration_level ctxt =
+  let open Lwt_result_syntax in
+  let last_finalized_level = get_last_finalized_level ctxt in
+  let* {is_migration_pending; period_end_level} =
+    match ctxt.migration_status with
+    | Some entry when last_finalized_level < entry.period_end_level ->
+        return entry
+    | _ ->
+        let*? (module Plugin) =
+          get_plugin_for_level ctxt ~level:last_finalized_level
+        in
+        let* is_migration_pending, period_end_level =
+          Plugin.is_migration_pending (get_tezos_node_cctxt ctxt)
+        in
+        let entry = {is_migration_pending; period_end_level} in
+        ctxt.migration_status <- Some entry ;
+        return entry
+  in
+  if is_migration_pending then return_some period_end_level else return_none
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

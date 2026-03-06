@@ -32,6 +32,7 @@ let call_handler1 handler = handler () |> Errors.to_option_tzresult
 type error +=
   | Cryptobox_error of string * string
   | Cannot_publish_on_slot_index of Types.slot_index
+  | Publish_crosses_migration of int32
 
 let () =
   register_error_kind
@@ -58,7 +59,23 @@ let () =
     Data_encoding.(obj1 (req "slot_index" uint8))
     (function
       | Cannot_publish_on_slot_index slot_index -> Some slot_index | _ -> None)
-    (fun slot_index -> Cannot_publish_on_slot_index slot_index)
+    (fun slot_index -> Cannot_publish_on_slot_index slot_index) ;
+  register_error_kind
+    `Permanent
+    ~id:"publish_crosses_migration"
+    ~title:"Publish crosses migration"
+    ~description:
+      "Publishing this slot would cross the T to U protocol migration \
+       boundary, potentially causing attestation issues."
+    ~pp:(fun fmt published_level ->
+      Format.fprintf
+        fmt
+        "Cannot publish slot at level %ld: would cross protocol migration \
+         boundary"
+        published_level)
+    Data_encoding.(obj1 (req "published_level" int32))
+    (function Publish_crosses_migration level -> Some level | _ -> None)
+    (fun level -> Publish_crosses_migration level)
 
 module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
@@ -121,17 +138,26 @@ module Slots_handlers = struct
           fail (Errors.other [Cannot_publish_on_slot_index slot_index])
       | None | Some _ -> return_unit
     in
-    (Slot_production.produce_commitment_and_proof
-       ctxt
-       query#padding
-       slot
-     [@profiler.wrap_f
-       {driver_ids = [Opentelemetry]}
-         (Opentelemetry_helpers.trace_slot_after_es
-            ~name:"inject_slot"
-            ?slot_index:query#slot_index
-            ~error_pp
-            ~commitment_of_result:fst)])
+    let published_level =
+      Node_context.get_l1_current_head_level ctxt |> Int32.succ
+    in
+    let* should_skip =
+      Slot_production.check_publish_crosses_migration ctxt ~published_level
+    in
+    if should_skip then
+      fail (Errors.other [Publish_crosses_migration published_level])
+    else
+      Slot_production.produce_commitment_and_proof
+        ctxt
+        query#padding
+        slot
+      [@profiler.wrap_f
+        {driver_ids = [Opentelemetry]}
+          (Opentelemetry_helpers.trace_slot_after_es
+             ~name:"inject_slot"
+             ?slot_index:query#slot_index
+             ~error_pp
+             ~commitment_of_result:fst)]
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->

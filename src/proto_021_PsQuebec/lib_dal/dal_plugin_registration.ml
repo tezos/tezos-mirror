@@ -284,6 +284,9 @@ module Plugin = struct
     in
     return @@ match res with Ok _deactivated -> true | Error _ -> false
 
+  let is_migration_pending _ctxt =
+    Lwt_result_syntax.return (false, Int32.max_int)
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list = struct

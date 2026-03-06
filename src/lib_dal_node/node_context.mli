@@ -256,6 +256,10 @@ val get_attestation_lag : t -> level:int32 -> int32 tzresult
     at [~level] using protocol parameters using [ctxt]. *)
 val get_attestation_lags : t -> level:int32 -> int32 list tzresult
 
+(** [get_next_migration_level ctxt] returns the level of the next known pending
+    migration, or [None] if no known migration is pending. *)
+val get_next_migration_level : t -> int32 option tzresult Lwt.t
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point

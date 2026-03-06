@@ -154,6 +154,10 @@ DAL node
 - ``octez-dal-node config update`` now fails if no configuration file exists. (MR
   :gl:`!20584`)
 
+- The DAL node now refuses to publish a slot during the last ``attestation_lag = 8``
+  levels before the migration to protocol U to avoid publishing a slot that cannot
+  be attested under the new protocol. (MR :gl:`!20957`)
+
 
 Miscellaneous
 -------------

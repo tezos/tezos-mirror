@@ -458,6 +458,22 @@ module Plugin = struct
     in
     return @@ match res with Ok _deactivated -> true | Error _ -> false
 
+  let is_migration_pending ctxt =
+    let open Lwt_result_syntax in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+    let+ {voting_period; position; remaining} =
+      Plugin.Voting_services.current_period cpctxt (`Main, `Head 0)
+    in
+    let period_end_level =
+      Int32.add voting_period.start_position (Int32.add position remaining)
+    in
+    let is_migration_pending =
+      match voting_period.kind with
+      | Adoption -> true
+      | Proposal | Exploration | Cooldown | Promotion -> false
+    in
+    (is_migration_pending, period_end_level)
+
   (* Section of helpers for Skip lists *)
 
   module Skip_list = struct
