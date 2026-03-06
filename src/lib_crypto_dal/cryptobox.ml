@@ -1284,6 +1284,9 @@ let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) ~fetch_trusted_setup
       download_trusted_setup
         [Failed_to_load_trusted_setup (Printexc.to_string exn)])
 
+let init_verifier_dal () =
+  initialisation_parameters := Verifier {is_fake = false}
+
 module Config = struct
   type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
