@@ -270,12 +270,6 @@ type evm_services_methods = {
 val evm_services_methods :
   t -> Configuration.time_between_blocks -> evm_services_methods
 
-val ro_backend :
-  ?evm_node_endpoint:Uri.t ->
-  t ->
-  Configuration.t ->
-  (module Services_backend_sig.S)
-
 type replay_strategy = Blueprint | Assemble
 
 type replay_result =
