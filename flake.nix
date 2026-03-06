@@ -19,8 +19,7 @@
 
     # This library helps us build OCaml packages and dependencies.
     opam-nix = {
-      # This is a fork with includes a fix for the nixpkgs overrides.
-      url = "github:vapourismo/opam-nix/fix/no-broken-symlinks-hidapi";
+      url = "github:tweag/opam-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
