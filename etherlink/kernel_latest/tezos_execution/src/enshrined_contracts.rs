@@ -316,11 +316,14 @@ fn inject_context_headers_raw(
 }
 
 /// Inject trusted X-Tezos-* context headers derived from `ctx` into `headers`.
-fn inject_context_headers<'a, Host: Runtime>(
+fn inject_context_headers<'a, Host>(
     headers: &mut http::HeaderMap,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
     registry: &impl Registry,
-) -> Result<(), TransferError> {
+) -> Result<(), TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     let sender = ctx.sender();
     let source = AddressHash::from(ctx.source());
     let amount_mutez: u64 = ctx
@@ -436,12 +439,15 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
 
 /// Look up the Ethereum alias for `address`. If none exists, generate one via
 /// `registry`, persist it, and return it.
-fn get_or_create_alias<Host: Runtime>(
+fn get_or_create_alias<Host>(
     host: &mut Host,
     address: &AddressHash,
     context: CrossRuntimeContext,
     registry: &impl Registry,
-) -> Result<Vec<u8>, TransferError> {
+) -> Result<Vec<u8>, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
         return Ok(alias);
     }
@@ -454,9 +460,12 @@ fn get_or_create_alias<Host: Runtime>(
 }
 
 /// Build a `CrossRuntimeContext` from the current execution context.
-fn cross_runtime_ctx_from_ctx<'a, Host: Runtime>(
+fn cross_runtime_ctx_from_ctx<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
-) -> Result<CrossRuntimeContext, TransferError> {
+) -> Result<CrossRuntimeContext, TransferError>
+where
+    Host: StorageV1 + Logging,
+{
     Ok(CrossRuntimeContext {
         gas_limit: u64::MAX, // TODO: L2-916 — no gas metering yet
         timestamp: bigint_to_u256(&ctx.now())?,
@@ -464,7 +473,7 @@ fn cross_runtime_ctx_from_ctx<'a, Host: Runtime>(
     })
 }
 
-fn tezosx_cross_runtime_call<'a, Host: Runtime>(
+fn tezosx_cross_runtime_call<'a, Host>(
     registry: &impl Registry,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
     dest: &str,
