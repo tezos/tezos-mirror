@@ -108,7 +108,7 @@ module Internal_for_tests : sig
       The [forge_consensus_vote_hook] function will be called inside the consensus vote forging task
       before forge_and_sign_consensus_vote is executed. This allows tests to inject custom behavior
       such as delays, logging, or error simulation.
-      
+
       In production code, use the main [start] function which has no hook (None). *)
   val start :
     ?forge_consensus_vote_hook:(unit -> unit Lwt.t) ->
