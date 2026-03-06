@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
-//
 // SPDX-License-Identifier: MIT
 
 use account_storage::Code;
@@ -559,7 +558,11 @@ where
             })?;
             log!(ctx.host(), Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
-                storage: Some(new_storage),
+                storage: if new_storage.is_empty() {
+                    None
+                } else {
+                    Some(new_storage)
+                },
                 lazy_storage_diff,
                 consumed_milligas,
                 ..receipt
@@ -6043,6 +6046,244 @@ mod tests {
         assert_eq!(
             result,
             Err(OperationError::Validation(ValidityError::InsufficientFee))
+        );
+    }
+
+    /// Calling the gateway with the default entrypoint (plain tez transfer to
+    /// an EVM address) produces an Applied receipt whose storage field is None.
+    ///
+    /// Enshrined contracts always return empty storage bytes; the receipt must
+    /// encode this as absent storage rather than Some([]).
+    #[test]
+    fn gateway_tez_transfer_receipt_storage_is_none() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .expect("Gateway KT1 address should be valid");
+        init_account(&mut host, &src.pkh, 100);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            100_000,
+            100,
+            src,
+            50_u64.into(),
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::default(),
+                value: Micheline::String(
+                    "0x1111111111111111111111111111111111111111".to_string(),
+                )
+                .encode(),
+            },
+        );
+
+        let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &registry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        )
+        .expect("validate_and_apply_operation should not fail");
+
+        assert_eq!(receipts.len(), 1);
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { storage: None, .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Applied transfer with storage=None, got {:?}",
+            receipts[0].receipt
+        );
+    }
+
+    /// Calling the gateway with the call entrypoint (EVM contract call with
+    /// value) produces an Applied receipt whose storage field is None.
+    #[test]
+    fn gateway_contract_call_receipt_storage_is_none() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .expect("Gateway KT1 address should be valid");
+        init_account(&mut host, &src.pkh, 100);
+        reveal_account(&mut host, &src);
+
+        // Encode Pair(dest, Pair(method_sig, abi_params)) for the call entrypoint
+        let arena = Arena::new();
+        let call_value = Micheline::prim2(
+            &arena,
+            mir::lexer::Prim::Pair,
+            Micheline::String("0x2222222222222222222222222222222222222222".to_string()),
+            Micheline::prim2(
+                &arena,
+                mir::lexer::Prim::Pair,
+                Micheline::String("store(uint256)".to_string()),
+                Micheline::Bytes(vec![0u8; 32]),
+            ),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            100_000,
+            100,
+            src,
+            50_u64.into(),
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::try_from("call").unwrap(),
+                value: call_value.encode(),
+            },
+        );
+
+        let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &registry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        )
+        .expect("validate_and_apply_operation should not fail");
+
+        assert_eq!(receipts.len(), 1);
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { storage: None, .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Applied transfer with storage=None, got {:?}",
+            receipts[0].receipt
+        );
+    }
+
+    /// A gateway call whose EVM execution reverts propagates as a Failed
+    /// receipt (not Applied), confirming that the revert path does not
+    /// produce an Applied result with a spurious storage field.
+    #[test]
+    fn gateway_evm_revert_yields_failed_receipt() {
+        struct RevertRegistry;
+
+        impl Registry for RevertRegistry {
+            fn bridge<Host>(
+                &self,
+                _host: &mut Host,
+                _destination_runtime: RuntimeId,
+                _destination_address: &[u8],
+                _source_address: &[u8],
+                _amount: primitive_types::U256,
+                _data: &[u8],
+                _context: CrossRuntimeContext,
+            ) -> Result<CrossCallResult, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
+                Ok(CrossCallResult::Revert(vec![]))
+            }
+
+            fn generate_alias<Host>(
+                &self,
+                _host: &mut Host,
+                _native_address: &[u8],
+                _runtime_id: RuntimeId,
+                _context: CrossRuntimeContext,
+            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
+                Ok(vec![0x11; 20])
+            }
+
+            fn address_from_string(
+                &self,
+                address_str: &str,
+                _runtime_id: RuntimeId,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                Ok(address_str.as_bytes().to_vec())
+            }
+
+            fn serve<Host>(
+                &self,
+                _host: &mut Host,
+                _request: http::Request<Vec<u8>>,
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
+                unimplemented!()
+            }
+        }
+
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .expect("Gateway KT1 address should be valid");
+        init_account(&mut host, &src.pkh, 100);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            100_000,
+            100,
+            src,
+            50_u64.into(),
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::default(),
+                value: Micheline::String(
+                    "0x3333333333333333333333333333333333333333".to_string(),
+                )
+                .encode(),
+            },
+        );
+
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &RevertRegistry,
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        )
+        .expect("validate_and_apply_operation should not fail at the protocol level");
+
+        assert_eq!(receipts.len(), 1);
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "Expected Failed transfer when EVM reverts, got {:?}",
+            receipts[0].receipt
         );
     }
 }
