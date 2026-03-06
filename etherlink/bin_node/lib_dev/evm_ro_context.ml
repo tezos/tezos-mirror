@@ -30,18 +30,117 @@ let read state path =
   let*! res = Evm_state.inspect state path in
   return res
 
-let read_chain_family ctxt chain_id =
+let with_latest_read ctxt f =
   let open Lwt_result_syntax in
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
-  let* chain_family = Durable_storage.chain_family (read evm_state) chain_id in
-  return chain_family
+  f (read evm_state)
+
+let read_chain_family ctxt chain_id =
+  with_latest_read ctxt (fun read -> Durable_storage.chain_family read chain_id)
 
 let read_enable_multichain_flag ctxt =
+  with_latest_read ctxt Durable_storage.is_multichain_enabled
+
+let chain_id ctxt = with_latest_read ctxt Durable_storage.chain_id
+
+let michelson_runtime_chain_id ctxt =
+  with_latest_read ctxt Durable_storage.michelson_runtime_chain_id
+
+let current_block_number_durable ctxt ~root =
+  with_latest_read ctxt (fun read ->
+      Durable_storage.block_number ~root read Durable_storage_path.Block.Current)
+
+let storage_version ctxt = with_latest_read ctxt Durable_storage.storage_version
+
+let kernel_version ctxt = with_latest_read ctxt Durable_storage.kernel_version
+
+let kernel_root_hash ctxt =
+  with_latest_read ctxt Durable_storage.kernel_root_hash
+
+let is_multichain_enabled ctxt =
+  with_latest_read ctxt Durable_storage.is_multichain_enabled
+
+let list_runtimes ctxt = with_latest_read ctxt Durable_storage.list_runtimes
+
+let smart_rollup_address_str ctxt =
+  Tezos_crypto.Hashed.Smart_rollup_address.to_string ctxt.smart_rollup_address
+
+let list_l1_l2_levels ctxt ~from_l1_level =
   let open Lwt_result_syntax in
-  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
-  let* evm_state = get_evm_state ctxt hash in
-  Durable_storage.is_multichain_enabled (read evm_state)
+  Evm_store.use ctxt.store @@ fun conn ->
+  let* last = Evm_store.L1_l2_finalized_levels.last conn in
+  match last with
+  | None -> return_nil
+  | Some (end_l1_level, _) ->
+      Evm_store.L1_l2_finalized_levels.list_by_l1_levels
+        conn
+        ~start_l1_level:from_l1_level
+        ~end_l1_level
+
+let l2_levels_of_l1_level ctxt l1_level =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.L1_l2_finalized_levels.find conn ~l1_level
+
+let block_param_to_block_number ctxt ~chain_family:_ ?hash_column
+    (block_param : Ethereum_types.Block_parameter.extended) =
+  let open Lwt_result_syntax in
+  match block_param with
+  | Block_hash {hash; _} -> (
+      Evm_store.use ctxt.store @@ fun conn ->
+      let* res =
+        match hash_column with
+        | Some `Michelson -> Evm_store.Blocks.find_number_of_tez_hash conn hash
+        | None | Some `Evm -> Evm_store.Blocks.find_number_of_hash conn hash
+      in
+      match res with
+      | Some number -> return number
+      | None -> failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
+  | Block_parameter (Number n) -> return n
+  | Block_parameter (Latest | Pending) when ctxt.finalized_view -> (
+      let* res = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
+      match res with
+      | Some (latest, _) -> return latest
+      | None -> failwith "The EVM node does not have any state available")
+  | Block_parameter (Latest | Pending) -> (
+      let* res = Evm_store.(use ctxt.store Context_hashes.find_latest) in
+      match res with
+      | Some (latest, _) -> return latest
+      | None -> failwith "The EVM node does not have any state available")
+  | Block_parameter Earliest -> (
+      let* res = Evm_store.(use ctxt.store Context_hashes.find_earliest) in
+      match res with
+      | Some (earliest, _) -> return earliest
+      | None -> failwith "The EVM node does not have any state available")
+  | Block_parameter Finalized -> (
+      let* res = Evm_store.(use ctxt.store Context_hashes.find_finalized) in
+      match res with
+      | Some (finalized, _) -> return finalized
+      | None -> failwith "The EVM node is not aware of any finalized block")
+
+let single_chain_id_and_family ctxt ~(config : Configuration.t)
+    ~enable_multichain =
+  let open Lwt_result_syntax in
+  match (config.experimental_features.l2_chains, enable_multichain) with
+  | None, false -> return (None, L2_types.Ex_chain_family EVM)
+  | None, true -> tzfail Node_error.Singlechain_node_multichain_kernel
+  | Some [l2_chain], false ->
+      let*! () = Events.multichain_node_singlechain_kernel () in
+      return (Some l2_chain.chain_id, L2_types.Ex_chain_family EVM)
+  | Some [l2_chain], true ->
+      let chain_id = l2_chain.chain_id in
+      let* chain_family = read_chain_family ctxt chain_id in
+      if l2_chain.chain_family = chain_family then
+        return (Some chain_id, chain_family)
+      else
+        tzfail
+          (Node_error.Mismatched_chain_family
+             {
+               chain_id;
+               node_family = l2_chain.chain_family;
+               kernel_family = chain_family;
+             })
+  | _ -> tzfail Node_error.Unexpected_multichain
 
 let network_sanity_check ~network ctxt =
   let open Lwt_result_syntax in
