@@ -409,7 +409,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       configuration
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
-  let (module Rpc_backend) = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* () =
     Prevalidator.start
       ~max_number_of_chunks:sequencer_config.max_number_of_chunks
@@ -436,7 +435,8 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
-    Rpc_backend.single_chain_id_and_family
+    Evm_ro_context.single_chain_id_and_family
+      ro_ctxt
       ~config:configuration
       ~enable_multichain
   in
@@ -504,7 +504,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
          else Rpc_types.Single_chain_node_rpc_server chain_family)
       ~tick
       configuration
-      ((module Rpc_backend), ro_ctxt)
+      ro_ctxt
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
@@ -515,7 +515,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~block_production:`Single_node
       ~tick
       configuration
-      ((module Rpc_backend), ro_ctxt)
+      ro_ctxt
   in
   let*! finalizer_rpc_process =
     Option.map_s

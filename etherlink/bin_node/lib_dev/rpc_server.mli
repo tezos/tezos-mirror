@@ -28,7 +28,7 @@ val start_private_server :
   tick:(unit -> unit tzresult Lwt.t) ->
   ?block_production:block_production ->
   Configuration.t ->
-  (module Services_backend_sig.S) * Evm_ro_context.t ->
+  Evm_ro_context.t ->
   finalizer tzresult Lwt.t
 
 (** [start_public_server config ctxt] starts the RPC servers as per specified
@@ -46,5 +46,5 @@ val start_public_server :
   tick:(unit -> unit tzresult Lwt.t) ->
   ?evm_services:evm_services_methods ->
   Configuration.t ->
-  (module Services_backend_sig.S) * Evm_ro_context.t ->
+  Evm_ro_context.t ->
   finalizer tzresult Lwt.t

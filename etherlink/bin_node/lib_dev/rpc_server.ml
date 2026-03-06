@@ -170,7 +170,7 @@ let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
 
 let start_public_server (type f) ~(mode : f Mode.t)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id ~tick
-    ?evm_services (config : Configuration.t) ctxt =
+    ?evm_services (config : Configuration.t) ro_ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
     Octez_performance_metrics.Unix.supports_performance_metrics ()
@@ -190,7 +190,6 @@ let start_public_server (type f) ~(mode : f Mode.t)
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
-    let (module Backend : Services_backend_sig.S), ro_ctxt = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
         let* l2_chain_id =
@@ -255,7 +254,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
   let directory =
     register_tezos_services
-    |> Services.directory ~rpc_server_family mode rpc config (snd ctxt) ~tick
+    |> Services.directory ~rpc_server_family mode rpc config ro_ctxt ~tick
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
@@ -272,7 +271,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
 let start_private_server ~mode
     ~(rpc_server_family : _ Rpc_types.rpc_server_family) ~tick
-    ?(block_production = `Disabled) config ctxt =
+    ?(block_production = `Disabled) config ro_ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
@@ -283,7 +282,7 @@ let start_private_server ~mode
           private_rpc
           ~block_production
           config
-          (snd ctxt)
+          ro_ctxt
           ~tick
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe

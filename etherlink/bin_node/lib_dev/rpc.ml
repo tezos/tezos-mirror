@@ -89,13 +89,9 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
     ~timeout:config.rpc_timeout
     ctxt.store ;
 
-  let (module Rpc_backend) =
-    Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint
-  in
-
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
   let* l2_chain_id, Ex_chain_family chain_family =
-    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
+    Evm_ro_context.single_chain_id_and_family ctxt ~config ~enable_multichain
   in
 
   let* () = set_metrics_level ctxt in
@@ -146,7 +142,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       ~rpc_server_family
       ~tick:(fun () -> Lwt_result_syntax.return_unit)
       rpc_config
-      ((module Rpc_backend), ctxt)
+      ctxt
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
