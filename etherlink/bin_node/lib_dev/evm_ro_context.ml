@@ -366,6 +366,56 @@ let get_state ctxt
 
 let read_state = read
 
+let subkeys state path =
+  let open Lwt_result_syntax in
+  let*! res = Evm_state.subkeys state path in
+  return res
+
+let simulator_backend ctxt =
+  let module SB : Simulator.SimulationBackend with type state = Evm_state.t =
+  struct
+    type state = Evm_state.t
+
+    let get_state = get_state ctxt
+
+    let read = read_state
+
+    let subkeys = subkeys
+
+    let modify ~key ~value state =
+      let open Lwt_result_syntax in
+      let*! state = Evm_state.modify ~key ~value state in
+      return state
+
+    let simulate_and_read ?state_override simulate_state ~input =
+      let open Lwt_result_syntax in
+      let config =
+        Pvm.Kernel.config
+          ~preimage_directory:ctxt.preimages
+          ?preimage_endpoint:ctxt.preimages_endpoint
+          ~kernel_debug:false
+          ~destination:ctxt.smart_rollup_address
+          ~trace_host_funs:ctxt.trace_host_funs
+          ()
+      in
+      let* simulate_state =
+        State_override.update_accounts state_override simulate_state
+      in
+      let* raw_insights =
+        Evm_state.execute_and_inspect
+          ~pool:ctxt.execution_pool
+          ~native_execution_policy:ctxt.native_execution_policy
+          ~config
+          ~data_dir:ctxt.data_dir
+          ~input
+          simulate_state
+      in
+      match raw_insights with
+      | [Some bytes] -> return bytes
+      | _ -> Error_monad.failwith "Invalid insights format"
+  end in
+  (module SB : Simulator.SimulationBackend with type state = Evm_state.t)
+
 module MakeBackend (Ctxt : sig
   val ctxt : t
 
@@ -793,6 +843,119 @@ let replay ctxt ?log_file ?profile ?evm_state
              tezos_block;
            })
   | Apply_failure -> return Replay_failure
+
+module Etherlink = struct
+  let balance ctxt address block_param =
+    let open Lwt_result_syntax in
+    let* state = get_state ctxt ~block:block_param () in
+    Etherlink_durable_storage.balance (read_state state) address
+
+  let nonce ctxt address block_param =
+    let open Lwt_result_syntax in
+    let* state = get_state ctxt ~block:block_param () in
+    Etherlink_durable_storage.nonce (read_state state) address
+
+  let code ctxt address block_param =
+    let open Lwt_result_syntax in
+    let* state = get_state ctxt ~block:block_param () in
+    Etherlink_durable_storage.code (read_state state) address
+
+  let storage_at ctxt address position block_param =
+    let open Lwt_result_syntax in
+    let* state = get_state ctxt ~block:block_param () in
+    Etherlink_durable_storage.storage_at (read_state state) address position
+
+  let base_fee_per_gas ctxt =
+    with_latest_read ctxt Etherlink_durable_storage.base_fee_per_gas
+
+  let backlog ctxt = with_latest_read ctxt Etherlink_durable_storage.backlog
+
+  let minimum_base_fee_per_gas ctxt =
+    with_latest_read ctxt Etherlink_durable_storage.minimum_base_fee_per_gas
+
+  let coinbase ctxt = with_latest_read ctxt Etherlink_durable_storage.coinbase
+
+  let simulate_call ctxt ~overwrite_tick_limit call block_param state_override =
+    let (module SB) = simulator_backend ctxt in
+    let module E = Simulator.MakeEtherlink (SB) in
+    E.simulate_call ~overwrite_tick_limit call block_param state_override
+
+  let estimate_gas ctxt call block_param state_override =
+    let (module SB) = simulator_backend ctxt in
+    let module E = Simulator.MakeEtherlink (SB) in
+    E.estimate_gas call block_param state_override
+
+  let inject_transactions _ctxt ~config ~timestamp:_ ~transactions =
+    let open Lwt_result_syntax in
+    let hashes, messages =
+      let l, r =
+        List.to_seq transactions
+        |> Seq.map (fun (raw_tx, (obj : Transaction_object.t)) ->
+               (Transaction_object.hash obj, raw_tx))
+        |> Seq.split
+      in
+      (List.of_seq l, List.of_seq r)
+    in
+    let send_raw_transaction_method txn =
+      let open Rpc_encodings in
+      let message =
+        Hex.of_string txn |> Hex.show |> Ethereum_types.hex_of_string
+      in
+      JSONRPC.
+        {
+          method_ = Send_raw_transaction.method_;
+          parameters =
+            Some
+              (Data_encoding.Json.construct
+                 Send_raw_transaction.input_encoding
+                 message);
+          id = Some (random_id ());
+        }
+    in
+    let check_response =
+      let open Rpc_encodings.JSONRPC in
+      function
+      | {value = Ok _; _} -> return_unit
+      | {value = Error {message; _}; _} ->
+          failwith "Send_raw_transaction failed with message \"%s\"" message
+    in
+    let check_batched_response =
+      let open Batch in
+      function
+      | Batch l -> List.iter_es check_response l
+      | Singleton r -> check_response r
+    in
+    match config.Configuration.observer with
+    | Some {evm_node_endpoint; _} ->
+        let methods = List.map send_raw_transaction_method messages in
+        let* response =
+          Rollup_services.call_service
+            ~keep_alive:config.keep_alive
+            ~timeout:config.rpc_timeout
+            ~base:evm_node_endpoint
+            (Batch.dispatch_batch_service ~path:Resto.Path.root)
+            ()
+            ()
+            (Batch methods)
+        in
+        let* () = check_batched_response response in
+        return hashes
+    | None -> assert false
+
+  let replay ctxt number =
+    let open Lwt_result_syntax in
+    let ctxt =
+      match ctxt.native_execution_policy with
+      | Rpcs_only -> {ctxt with native_execution_policy = Configuration.Always}
+      | _ -> ctxt
+    in
+    let* result = replay ctxt ~log_file:"replay_rpc" Blueprint number in
+    match result with
+    | Replay_success {block = Eth block; _} -> return block
+    | Replay_success {block = Tez _; _} ->
+        failwith "Could not replay a tezlink block"
+    | Replay_failure -> failwith "Could not replay the block"
+end
 
 let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     =

@@ -154,6 +154,70 @@ val get_state :
 val read_state :
   Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
 
+(** {2 Etherlink backend operations} *)
+
+module Etherlink : sig
+  val balance :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
+
+  val nonce :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  val code :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.hex tzresult Lwt.t
+
+  val storage_at :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.hex tzresult Lwt.t
+
+  val base_fee_per_gas : t -> Ethereum_types.quantity tzresult Lwt.t
+
+  val backlog : t -> Z.t tzresult Lwt.t
+
+  val minimum_base_fee_per_gas : t -> Z.t tzresult Lwt.t
+
+  val coinbase : t -> Ethereum_types.address tzresult Lwt.t
+
+  val simulate_call :
+    t ->
+    overwrite_tick_limit:bool ->
+    Ethereum_types.call ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.state_override ->
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
+
+  val estimate_gas :
+    t ->
+    Ethereum_types.call ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.state_override ->
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
+
+  val inject_transactions :
+    t ->
+    config:Configuration.t ->
+    timestamp:Time.Protocol.t ->
+    transactions:(string * Transaction_object.t) list ->
+    Ethereum_types.hash list tzresult Lwt.t
+
+  val replay :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
+end
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 type evm_services_methods = {
