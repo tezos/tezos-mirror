@@ -74,6 +74,13 @@ module Tezosx_simulation : sig
   val result : path
 end
 
+(** Kernel communication channel for Tezos X Michelson entrypoints query *)
+module Tezosx_entrypoints : sig
+  val input : path
+
+  val result : path
+end
+
 (** Kernel communication canal for block assembling (instant confirmations) *)
 module Assemble_block : sig
   val input : path

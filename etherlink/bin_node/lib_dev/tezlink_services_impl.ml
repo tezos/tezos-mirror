@@ -293,4 +293,11 @@ let make (ctxt : Evm_ro_context.t) =
         op
         hash
         block
+
+    let get_entrypoints chain block contract ~normalize_types =
+      let open Lwt_result_syntax in
+      let* code = get_code chain block contract in
+      match code with
+      | None -> return_none
+      | Some code -> Tezlink_mock.list_entrypoints code normalize_types
   end : Tezlink_backend_sig.S)

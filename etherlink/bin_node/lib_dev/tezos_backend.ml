@@ -414,4 +414,43 @@ let make (ctxt : Evm_ro_context.t) =
         op
         hash
         (Block_parameter Latest)
+
+    let get_entrypoints chain block contract ~normalize_types =
+      let open Lwt_result_syntax in
+      (* For originated contracts (code stored in durable storage), use the
+         OCaml-side entrypoints extraction which follows L1 behavior exactly
+         (correct handling of the implicit `default` entrypoint).
+         For enshrined contracts (no code in durable storage, e.g. TezosX
+         Gateway), fall through to the kernel via tezosx_michelson_entrypoints. *)
+      let* code = get_code chain block contract in
+      match code with
+      | Some code -> Tezlink_mock.list_entrypoints code normalize_types
+      | None -> (
+          let* eth_block = shell_block_param_to_eth_block_param block in
+          let addr_bytes =
+            Bytes.to_string
+              (Data_encoding.Binary.to_bytes_exn
+                 Tezos_types.Contract.encoding
+                 contract)
+          in
+          let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
+          let* bytes =
+            Evm_ro_context.execute_entrypoint
+              ctxt
+              state
+              ~input_path:Durable_storage_path.Tezosx_entrypoints.input
+              ~input:(Bytes.of_string addr_bytes)
+              ~output_path:Durable_storage_path.Tezosx_entrypoints.result
+              ~entrypoint:"tezosx_michelson_entrypoints"
+          in
+          let* result = Simulator.decode_entrypoints_result bytes in
+          match result with
+          | None -> return_none
+          | Some (unreachable, entries) ->
+              if normalize_types then
+                let* normalized =
+                  Tezlink_mock.normalize_entrypoint_type_exprs entries
+                in
+                return_some (unreachable, normalized)
+              else return_some (unreachable, entries))
   end : Tezlink_backend_sig.S)

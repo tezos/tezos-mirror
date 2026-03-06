@@ -526,6 +526,31 @@ let list_entrypoints code normalize_types =
         in
         return_some (unreachable_entrypoint, entrypoint_types))
 
+(* Normalize a list of (entrypoint_name, type_expr) pairs by round-tripping
+   each type expression through the typed IR, equivalent to normalize_types=true
+   in the L1 /entrypoints RPC.
+   Uses a dummy context with unlimited gas, matching the L1 RPC behavior. *)
+let normalize_entrypoint_type_exprs entries =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_wrap_syntax in
+  let open Imported_protocol in
+  let open Tezos_micheline in
+  let* ctxt = init_dummy_context () in
+  let rec normalize ctxt acc = function
+    | [] -> Ok (List.rev acc)
+    | (name, type_expr) :: rest ->
+        let open Result_syntax in
+        let* Script_typed_ir.Ex_ty ty, ctxt =
+          Script_ir_translator.parse_passable_ty
+            ctxt
+            ~legacy:false
+            (Micheline.root type_expr)
+        in
+        let* ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
+        normalize ctxt ((name, Micheline.strip_locations ty_node) :: acc) rest
+  in
+  Lwt.return @@ Imported_env.wrap_tzresult (normalize ctxt [] entries)
+
 let pack_data ~data ~ty ~gas =
   let open Imported_protocol_test_helpers in
   let open Lwt_result_wrap_syntax in

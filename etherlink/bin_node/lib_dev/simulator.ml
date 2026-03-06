@@ -304,6 +304,56 @@ end
 
 type error += Operation_serialization_error of Data_encoding.Binary.write_error
 
+type error += Entrypoints_decode_error of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.entrypoints_decode_error"
+    ~title:"Entrypoints result decode error"
+    ~description:
+      "Failed to decode the entrypoints result returned by the kernel."
+    ~pp:(fun ppf msg -> Format.fprintf ppf "Entrypoints decode error: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Entrypoints_decode_error msg -> Some msg | _ -> None)
+    (fun msg -> Entrypoints_decode_error msg)
+
+(* Decode the entrypoints result written by the kernel's
+   tezosx_michelson_entrypoints entrypoint. RLP encoding:
+     List []        → None (contract not found)
+     List [entries] → Some ([], entries)
+   where entries is an RLP list of [name_bytes, micheline_type_bytes] pairs. *)
+let decode_entrypoints_result bytes =
+  let open Lwt_result_syntax in
+  let decode_entry = function
+    | Rlp.List [Value name_bytes; Value type_bytes] -> (
+        let open Result_syntax in
+        let name = Bytes.to_string name_bytes in
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Imported_context.Script.expr_encoding
+            type_bytes
+        with
+        | None ->
+            tzfail
+              (Entrypoints_decode_error "Failed to deserialize a Micheline type")
+        | Some type_expr -> return (name, type_expr))
+    | _ ->
+        Result_syntax.tzfail
+          (Entrypoints_decode_error "Invalid RLP entry format")
+  in
+  let*? rlp = Rlp.decode bytes in
+  match rlp with
+  | Rlp.List [] -> return_none
+  | Rlp.List [entries_rlp] ->
+      let*? entries = Rlp.decode_list decode_entry entries_rlp in
+      (* The kernel does not encode unreachable entrypoints; always return
+         an empty list for the unreachable field. *)
+      return_some ([], entries)
+  | _ ->
+      tzfail
+        (Entrypoints_decode_error "Invalid RLP structure for entrypoints result")
+
 let () =
   register_error_kind
     `Permanent
