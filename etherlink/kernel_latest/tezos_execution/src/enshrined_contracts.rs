@@ -43,26 +43,44 @@ pub enum EnshrinedContracts {
 /// prefix used to do a first quick check to eliminate most non enshrined contracts
 const ENSHRINED_PREFIX: [u8; 6] = [2, 90, 121, 0, 0, 0];
 // KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw
-const GATEWAY_ADDRESS: &[u8] = &[
+const GATEWAY_ADDRESS: [u8; 20] = [
     2, 90, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
 ];
 // KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb
-const ERC20_WRAPPER_ADDRESS: &[u8] = &[
+const ERC20_WRAPPER_ADDRESS: [u8; 20] = [
     2, 90, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
 ];
 
 // Should be as transparent/cheap as possible for none-native contract (the
 // direct path)
+impl EnshrinedContracts {
+    /// Returns the 22-byte `AddressHash` binary encoding for this contract:
+    /// `[0x01][20-byte KT1 hash][0x00]`.
+    pub fn address_hash_bytes(&self) -> [u8; 22] {
+        let raw: &[u8; 20] = match self {
+            Self::TezosXGateway => &GATEWAY_ADDRESS,
+            Self::ERC20Wrapper => &ERC20_WRAPPER_ADDRESS,
+        };
+        let mut bytes = [0u8; 22];
+        bytes[0] = 0x01;
+        bytes[1..21].copy_from_slice(raw);
+        // bytes[21] stays 0x00
+        bytes
+    }
+}
+
 pub fn from_kt1(kt1: &ContractKt1Hash) -> Option<EnshrinedContracts> {
     let bytes = kt1.to_bytes().ok()?;
     // let's escape early if possible
     if !bytes.starts_with(&ENSHRINED_PREFIX) {
         return None;
     }
-    match bytes.as_slice() {
-        GATEWAY_ADDRESS => Some(EnshrinedContracts::TezosXGateway),
-        ERC20_WRAPPER_ADDRESS => Some(EnshrinedContracts::ERC20Wrapper),
-        _ => None,
+    if bytes.as_slice() == GATEWAY_ADDRESS {
+        Some(EnshrinedContracts::TezosXGateway)
+    } else if bytes.as_slice() == ERC20_WRAPPER_ADDRESS {
+        Some(EnshrinedContracts::ERC20Wrapper)
+    } else {
+        None
     }
 }
 
@@ -661,7 +679,7 @@ mod tests {
 
     #[test]
     fn test_gateway() {
-        let contract = ContractKt1Hash::try_from_bytes(GATEWAY_ADDRESS).unwrap();
+        let contract = ContractKt1Hash::try_from_bytes(&GATEWAY_ADDRESS).unwrap();
         assert![is_enshrined(&contract)];
         assert![contract.to_base58_check().as_str() == GATEWAY_KT1];
         assert![from_kt1(&contract) == Some(EnshrinedContracts::TezosXGateway)];
@@ -669,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_erc20_wrapper() {
-        let contract = ContractKt1Hash::try_from_bytes(ERC20_WRAPPER_ADDRESS).unwrap();
+        let contract = ContractKt1Hash::try_from_bytes(&ERC20_WRAPPER_ADDRESS).unwrap();
         assert![is_enshrined(&contract)];
         assert![contract.to_base58_check().as_str() == ERC20_WRAPPER_KT1];
         assert![from_kt1(&contract) == Some(EnshrinedContracts::ERC20Wrapper)];

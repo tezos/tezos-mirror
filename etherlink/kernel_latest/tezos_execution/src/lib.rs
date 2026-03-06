@@ -61,7 +61,7 @@ pub mod account_storage;
 mod address;
 mod alias;
 pub mod context;
-mod enshrined_contracts;
+pub mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
 mod validate;
@@ -601,7 +601,7 @@ fn get_originated_contract_entrypoint(
     Some(entrypoints)
 }
 
-fn get_contract_entrypoint<C: Context>(
+pub fn get_contract_entrypoint<C: Context>(
     host: &impl StorageV1,
     context: &C,
     address: &AddressHash,
