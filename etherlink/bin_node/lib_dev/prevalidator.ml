@@ -98,26 +98,20 @@ module Types = struct
       maximum_gas_per_transaction = Z.zero;
     }
 
-  type 'a inner_session = {
-    state : 'a;
-    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
+  type session = {
+    state : Evm_state.t;
+    ctxt : Evm_ro_context.t;
     storage_version : int;
     etherlink_infos : etherlink_infos;
   }
 
-  type session = Session : 'a inner_session -> session
+  let read state = Evm_ro_context.read_state state
 
-  let etherlink_infos_of_state (type state) state_backend state =
+  let etherlink_infos_of_state state =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
-    in
     let* (Qty base_fee_per_gas) =
       Lwt.catch
-        (fun () ->
-          Etherlink_durable_storage.base_fee_per_gas
-            (Backend_rpc.Reader.read state))
+        (fun () -> Etherlink_durable_storage.base_fee_per_gas (read state))
         (function
           | Durable_storage.Invalid_block_structure _ ->
               (* Placeholder value for observer starting from genesis.
@@ -126,15 +120,13 @@ module Types = struct
           | exn -> Lwt.reraise exn)
     in
     let* minimum_base_fee_per_gas =
-      Etherlink_durable_storage.minimum_base_fee_per_gas
-        (Backend_rpc.Reader.read state)
+      Etherlink_durable_storage.minimum_base_fee_per_gas (read state)
     in
     let* (Qty da_fee_per_bytes) =
-      Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
+      Etherlink_durable_storage.da_fee_per_byte (read state)
     in
     let* (Qty maximum_gas_per_transaction) =
-      Etherlink_durable_storage.maximum_gas_per_transaction
-        (Backend_rpc.Reader.read state)
+      Etherlink_durable_storage.maximum_gas_per_transaction (read state)
     in
     return
       {
@@ -144,29 +136,21 @@ module Types = struct
         maximum_gas_per_transaction;
       }
 
-  let session_of_state (type state) chain_family state_backend state =
+  let session_of_state chain_family ctxt state =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
-    in
-    let* storage_version =
-      Durable_storage.storage_version (Backend_rpc.Reader.read state)
-    in
+    let* storage_version = Durable_storage.storage_version (read state) in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
-        let* etherlink_infos = etherlink_infos_of_state state_backend state in
-        return
-          (Session {state; state_backend; storage_version; etherlink_infos})
+        let* etherlink_infos = etherlink_infos_of_state state in
+        return {state; ctxt; storage_version; etherlink_infos}
     | L2_types.Ex_chain_family Michelson ->
         return
-          (Session
-             {
-               state;
-               state_backend;
-               storage_version;
-               etherlink_infos = etherlink_infos_default;
-             })
+          {
+            state;
+            ctxt;
+            storage_version;
+            etherlink_infos = etherlink_infos_default;
+          }
 
   type parameters = {
     mode : mode;
@@ -337,21 +321,15 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations (type state) ~session ~chain_id ~caller txn =
+let validate_authorizations ~session ~chain_id ~caller txn =
   let open Lwt_result_syntax in
   let authorization_list = Transaction_object.authorization_list txn in
   if not (Transaction_object.is_eip7702 txn) then return (Ok ())
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
     let read_nonce address =
-      Etherlink_durable_storage.nonce
-        (Backend_rpc.Reader.read session.state)
-        address
+      Etherlink_durable_storage.nonce (Types.read session.state) address
       |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
     in
     let check_auth (item : Transaction_object.authorization_item) =
@@ -385,17 +363,11 @@ let validate_authorizations (type state) ~session ~chain_id ~caller txn =
     in
     match opt_err with Some error -> return error | None -> return (Ok ())
 
-let validate_sender_not_a_contract (type state) session caller :
+let validate_sender_not_a_contract session caller :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
   let* (Hex code) =
-    Etherlink_durable_storage.code
-      (Backend_rpc.Reader.read session.state)
-      caller
+    Etherlink_durable_storage.code (Types.read session.state) caller
   in
   if
     (* EOA: *)
@@ -558,7 +530,7 @@ let validate_minimum_gas_requirement ~session
 let minimal_validation ~next_nonce ~max_number_of_chunks ctxt
     (transaction : Transaction_object.t) ~caller =
   let open Lwt_result_syntax in
-  let (Session session) = ctxt.session in
+  let session = ctxt.session in
   let (Chain_id chain_id) = ctxt.chain_id in
   let** () = validate_minimum_gas_requirement ~session ~transaction in
   let** () = validate_chain_id chain_id transaction in
@@ -578,17 +550,10 @@ let validate_balance_and_max_fee_per_gas ~base_fee_per_gas ~transaction
   in
   return (Ok total_cost)
 
-let validate_balance_and_gas_with_backend (type state) ~caller session
-    transaction =
+let validate_balance_and_gas_with_backend ~caller session transaction =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
   let* from_balance =
-    Etherlink_durable_storage.balance
-      (Backend_rpc.Reader.read session.state)
-      caller
+    Etherlink_durable_storage.balance (Types.read session.state) caller
   in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
@@ -608,23 +573,17 @@ let full_validation ~next_nonce ~max_number_of_chunks ~caller ctxt transaction =
       ctxt
       transaction
   in
-  let (Session session) = ctxt.session in
+  let session = ctxt.session in
   let** () =
     validate_balance_and_gas_with_backend ~caller session transaction
   in
   return (Ok ())
 
-let valid_transaction_object (type state) ctxt session mode txn =
+let valid_transaction_object ctxt session mode txn =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
   let caller = Transaction_object.sender txn in
   let* next_nonce =
-    Etherlink_durable_storage.nonce
-      (Backend_rpc.Reader.read session.state)
-      caller
+    Etherlink_durable_storage.nonce (Types.read session.state) caller
   in
   let next_nonce =
     match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce
@@ -666,14 +625,10 @@ module Handlers = struct
       ({chain_id; mode; max_number_of_chunks; chain_family; session}
         : Types.state)
 
-  let is_tx_valid (type state) ctxt session raw_transaction :
+  let is_tx_valid ctxt session raw_transaction :
       (Transaction_object.t prevalidation_result, string) result tzresult Lwt.t
       =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
     let*? transaction_object = Transaction_object.decode raw_transaction in
     let* () =
       when_
@@ -688,32 +643,20 @@ module Handlers = struct
     in
     return (Ok {next_nonce; transaction_object})
 
-  let refresh_state (type state) ctxt session =
+  let refresh_state ctxt session =
     let open Lwt_result_syntax in
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
-    let* state = Backend_rpc.Reader.get_state () in
+    let* state = Evm_ro_context.get_state session.ctxt () in
     let* session =
-      Types.session_of_state ctxt.chain_family session.state_backend state
+      Types.session_of_state ctxt.chain_family session.ctxt state
     in
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid (type state) ~data_model _ctxt session raw_transaction
-      :
+  let is_tezlink_tx_valid ~data_model _ctxt session raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
-    (* We build a `read` function from the session. It's the only part of the
-       backend we should rely on: the other helpers in the backend rely on the
-       internal state, not the state in the session. *)
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      session.state_backend
-    in
-    let read = Backend_rpc.Reader.read session.state in
+    let read = Types.read session.state in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~read
@@ -726,7 +669,7 @@ module Handlers = struct
       self -> (r, err) Request.t -> (r, err) result Lwt.t =
    fun self request ->
     let ctxt = Worker.state self in
-    let (Session session) = ctxt.session in
+    let session = ctxt.session in
     match request with
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
@@ -763,8 +706,7 @@ type worker_status =
   | Pending_valid_state : {
       mode : mode;
       max_number_of_chunks : int option;
-      state_backend :
-        (module Services_backend_sig.S with type Reader.state = 'a);
+      ctxt : Evm_ro_context.t;
       chain_family : 'f L2_types.chain_family;
     }
       -> worker_status
@@ -778,21 +720,19 @@ let table = Worker.create_table Queue
 
 type error += No_worker
 
-let start (type state f) ?max_number_of_chunks
-    ~(chain_family : f L2_types.chain_family) mode state_backend =
+let start (type f) ?max_number_of_chunks
+    ~(chain_family : f L2_types.chain_family) mode ctxt =
   let open Lwt_result_syntax in
   let starting_promise, starting_waker = Lwt.task () in
   worker := Starting starting_promise ;
   let*! start_result =
     protect @@ fun () ->
-    let (module Backend_rpc : Services_backend_sig.S
-          with type Reader.state = state) =
-      state_backend
+    let* state = Evm_ro_context.get_state ctxt () in
+    let* chain_id =
+      Durable_storage.chain_id (Evm_ro_context.read_state state)
     in
-    let* state = Backend_rpc.Reader.get_state () in
-    let* chain_id = Durable_storage.chain_id (Backend_rpc.Reader.read state) in
     let* session =
-      Types.session_of_state (Ex_chain_family chain_family) state_backend state
+      Types.session_of_state (Ex_chain_family chain_family) ctxt state
     in
     let* w =
       Worker.launch
@@ -817,8 +757,7 @@ let start (type state f) ?max_number_of_chunks
   | Error _ ->
       let*! () = Prevalidator_events.cannot_start () in
       worker :=
-        Pending_valid_state
-          {max_number_of_chunks; mode; state_backend; chain_family} ;
+        Pending_valid_state {max_number_of_chunks; mode; ctxt; chain_family} ;
       Lwt.wakeup starting_waker () ;
       return_unit
 
@@ -837,10 +776,9 @@ let rec get_worker ?(allow_retry = true) () =
   | Starting p ->
       let*! () = p in
       get_worker ~allow_retry ()
-  | Pending_valid_state
-      {max_number_of_chunks; mode; state_backend; chain_family}
+  | Pending_valid_state {max_number_of_chunks; mode; ctxt; chain_family}
     when allow_retry ->
-      let* () = start ~chain_family ?max_number_of_chunks mode state_backend in
+      let* () = start ~chain_family ?max_number_of_chunks mode ctxt in
       get_worker ~allow_retry:false ()
   | Pending_valid_state _ | Not_started -> tzfail No_worker
 

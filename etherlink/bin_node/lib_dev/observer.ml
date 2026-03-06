@@ -273,7 +273,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~max_number_of_chunks:config.sequencer.max_number_of_chunks
       ~chain_family
       Minimal
-      (module Rpc_backend)
+      ro_ctxt
   in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let tick () =

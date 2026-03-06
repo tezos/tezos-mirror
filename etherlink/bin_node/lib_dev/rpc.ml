@@ -112,7 +112,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
     }
   in
 
-  let* () = Prevalidator.start ~chain_family Minimal (module Rpc_backend) in
+  let* () = Prevalidator.start ~chain_family Minimal ctxt in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let ws_client =
     match rpc_config.websockets with

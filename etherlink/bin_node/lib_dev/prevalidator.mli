@@ -43,7 +43,7 @@ val start :
   ?max_number_of_chunks:int ->
   chain_family:'a L2_types.chain_family ->
   mode ->
-  (module Services_backend_sig.S with type Reader.state = 'state) ->
+  Evm_ro_context.t ->
   unit tzresult Lwt.t
 
 (** [prevalidate_raw_transaction raw_txn] sends a prevalidation request to the

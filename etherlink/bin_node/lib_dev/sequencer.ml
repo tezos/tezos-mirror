@@ -415,7 +415,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~max_number_of_chunks:sequencer_config.max_number_of_chunks
       ~chain_family
       Minimal
-      (module Rpc_backend)
+      ro_ctxt
   in
   let* () =
     when_ (not is_sandbox) @@ fun () ->
