@@ -3517,6 +3517,19 @@ module Dal = struct
         RPC_path.(
           open_root / "helpers" / "decode_dal_attestation"
           /: Dal.Attestations.rpc_arg)
+
+    let encode_dal_attestation =
+      RPC_service.post_service
+        ~description:
+          "Encodes an explicit representation of attested slots per lag into a \
+           DAL attestation bitset, using the current protocol parameters \
+           (number_of_slots and number_of_lags)."
+        ~query:RPC_query.empty
+        ~input:
+          Data_encoding.(
+            list Dal.Attestations.unfolded_lag_attestation_encoding)
+        ~output:Dal.Attestations.encoding
+        RPC_path.(open_root / "helpers" / "encode_dal_attestation")
   end
 
   let register_dal_commitments_history () =
@@ -3601,13 +3614,48 @@ module Dal = struct
         Lwt.return
           (Dal.Attestations.decode attestation ~number_of_slots ~number_of_lags))
 
+  let register_encode_dal_attestation () =
+    Registration.register0
+      ~chunked:false
+      S.encode_dal_attestation
+      (fun ctxt () attestations ->
+        let open Lwt_result_syntax in
+        let number_of_slots = Constants.dal_number_of_slots ctxt in
+        let number_of_lags = Constants.dal_number_of_lags ctxt in
+        let*? result =
+          List.fold_left_e
+            (fun acc
+                 (Dal.Attestations.{lag_index; slot_indices} :
+                   Dal.Attestations.unfolded_lag_attestation)
+               ->
+              List.fold_left_e
+                (fun acc slot ->
+                  let open Result_syntax in
+                  let* slot_index =
+                    Dal.Slot_index.of_int ~number_of_slots slot
+                  in
+                  return
+                    (Dal.Attestations.commit
+                       acc
+                       ~number_of_slots
+                       ~number_of_lags
+                       ~lag_index
+                       slot_index))
+                acc
+                slot_indices)
+            Dal.Attestations.empty
+            attestations
+        in
+        return result)
+
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
     register_past_parameters () ;
     register_published_slot_headers () ;
     register_skip_list_cells_of_level () ;
-    register_decode_dal_attestation ()
+    register_decode_dal_attestation () ;
+    register_encode_dal_attestation ()
 end
 
 module Forge = struct
