@@ -60,8 +60,6 @@ val create_initial_state :
   ?monitor_node_operations:bool ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Dal_attestable_slots_worker.t ->
-  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

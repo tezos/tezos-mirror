@@ -141,26 +141,34 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
-let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
-    ?(synchronize = true) ?monitor_node_operations ~chain config
-    dal_attestable_slots_worker round_durations ~(current_proposal : proposal)
-    ?constants delegates =
+let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
+    config delegates =
   let open Lwt_result_syntax in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
-     consider saved attestable value *)
-  let open Baking_state in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
     match constants with
     | Some c -> return c
     | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
+  let*? round_durations = create_round_durations constants in
   let cache = Baking_state.create_cache () in
   let dal_included_attestations_cache =
     Dal_included_attestations_cache.create
       ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~attestation_lags:constants.parametric.dal.attestation_lags
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
+  Option.iter
+    (fun canceler ->
+      Lwt_canceler.on_cancel canceler (fun () ->
+          Dal_attestable_slots_worker.shutdown_worker
+            dal_attestable_slots_worker))
+    canceler ;
   let global_state =
     {
       chain_id;
@@ -191,7 +199,26 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
       cancel_all_pending_tasks =
         (fun () -> Forge_worker.cancel_all_pending_tasks forge_worker);
     } ;
-  let chain = `Hash chain_id in
+  return global_state
+
+let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
+    ?(synchronize = true) ?monitor_node_operations ~chain config
+    ~(current_proposal : proposal) ?constants delegates =
+  let open Lwt_result_syntax in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
+     consider saved attestable value *)
+  let open Baking_state in
+  let* global_state =
+    create_global_state
+      ?canceler
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?constants
+      ~chain
+      config
+      delegates
+  in
+  let chain = `Hash global_state.chain_id in
   let current_level = current_proposal.block.shell.level in
   let* delegate_infos =
     Baking_state.compute_delegate_infos
@@ -209,11 +236,11 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
   in
   let () =
     Dal_included_attestations_cache.set_committee
-      dal_included_attestations_cache
+      global_state.dal_included_attestations_cache
       ~level:current_level
       (fun slot -> Baking_state.Delegate_infos.slot_owner delegate_infos ~slot) ;
     Dal_included_attestations_cache.set_committee
-      dal_included_attestations_cache
+      global_state.dal_included_attestations_cache
       ~level:(Int32.succ current_level)
       (fun slot ->
         Baking_state.Delegate_infos.slot_owner next_level_delegate_infos ~slot)
@@ -243,7 +270,9 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
   let* round_state =
     if synchronize then
       let*? current_round =
-        Baking_actions.compute_round current_proposal round_durations
+        Baking_actions.compute_round
+          current_proposal
+          global_state.round_durations
       in
       return
         {
@@ -283,11 +312,6 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let*! () = Events.emit Node_rpc_events.chain_id chain_id in
-  let* constants =
-    match constants with
-    | Some c -> return c
-    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
-  in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
   let* heads_stream, _block_stream_stopper =
@@ -299,22 +323,6 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*? round_durations = create_round_durations constants in
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~attestation_lags:constants.parametric.dal.attestation_lags
-      ~number_of_slots:constants.parametric.dal.number_of_slots
-  in
-  Option.iter
-    (fun canceler ->
-      Lwt_canceler.on_cancel canceler (fun () ->
-          let*! _ =
-            Dal_attestable_slots_worker.shutdown_worker
-              dal_attestable_slots_worker
-          in
-          Lwt.return_unit))
-    canceler ;
   let* initial_state =
     create_initial_state
       ?canceler
@@ -322,17 +330,15 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
       ?dal_node_rpc_ctxt
       ~chain
       config
-      dal_attestable_slots_worker
-      round_durations
       ~current_proposal
-      ~constants
+      ?constants
       delegates
   in
   let _promise =
     register_dal_profiles
       cctxt
       initial_state.global_state.dal_node_rpc_ctxt
-      dal_attestable_slots_worker
+      initial_state.global_state.dal_attestable_slots_worker
       delegates
   in
   let cloned_block_stream = Lwt_stream.clone heads_stream in
