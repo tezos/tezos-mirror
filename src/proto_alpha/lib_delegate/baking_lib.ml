@@ -64,9 +64,6 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       ~delay_increment_per_round:constants.parametric.delay_increment_per_round
     |> Environment.wrap_tzresult
   in
-  let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
-  in
   let dal_attestable_slots_worker =
     Dal_attestable_slots_worker.create
       ~attestation_lag:constants.parametric.dal.attestation_lag
@@ -77,10 +74,10 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
     Baking_scheduling.create_initial_state
       cctxt
       ?dal_node_rpc_ctxt
+      ?monitor_node_operations
       ?synchronize
       ~chain
       config
-      operation_worker
       dal_attestable_slots_worker
       round_durations
       ~current_proposal
