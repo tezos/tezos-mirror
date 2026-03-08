@@ -117,21 +117,14 @@ let remove_old_headers ctxt ~published_level =
   | None -> return ctxt
   | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
 
-let get_number_of_shards ctxt ~shard_assignment_level delegate =
+let get_shard_count_map ctxt ~shard_assignment_level =
   let delegate_to_shard_count =
     Raw_context.Consensus.delegate_to_shard_count ctxt
   in
-  match
-    Raw_level_repr.Map.find shard_assignment_level delegate_to_shard_count
-  with
-  | None -> 0
-  | Some map -> (
-      match Signature.Public_key_hash.Map.find delegate map with
-      | None -> 0
-      | Some n -> n)
+  Raw_level_repr.Map.find shard_assignment_level delegate_to_shard_count
 
 (** [merge_attestation_history ~attestation_lag ~threshold
-    ~number_of_shards ~get_attester_shards
+    ~number_of_shards ~get_shard_count_map
     current_block_accountability stored_history] merges the current block's
     accountability data into the stored history.
 
@@ -142,8 +135,9 @@ let get_number_of_shards ctxt ~shard_assignment_level delegate =
     - [stored_history]: Persistent data from PREVIOUS blocks. For each (level,
       slot), contains the attested shard counts (and their attesters) accumulated
       over all previous blocks in the current attestation window.
-    - [get_attester_shards]: Lookup function to get the number of shards
-      assigned to a given delegate.
+    - [get_shard_count_map]: Lookup function returning the delegate-to-shard-count
+      map for a given shard assignment level. The map is resolved once per
+      published level rather than once per delegate.
 
     Returns [(updated_history, newly_attested_by_level)] where:
     - [updated_history] is the merged history with the newly finalized level
@@ -152,8 +146,13 @@ let get_number_of_shards ctxt ~shard_assignment_level delegate =
       slot_indices for slots that crossed the attestation threshold during
       this merge *)
 let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
-    ~get_number_of_shards current_block_accountability stored_history =
+    ~get_shard_count_map current_block_accountability stored_history =
   let open Dal_attestations_repr.Accountability in
+  let number_of_shards_of_delegate shard_count_map delegate =
+    match Signature.Public_key_hash.Map.find delegate shard_count_map with
+    | None -> 0
+    | Some n -> n
+  in
   (* Merge a single slot's attestation data from the current block into the
      stored history for that slot.
 
@@ -162,8 +161,8 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
 
      We only add shards from attesters who haven't attested before (to avoid
      double-counting). For each new attester, we look up their shard count
-     using [get_attester_shards]. *)
-  let merge_slot ~shard_assignment_level slot_index
+     in [shard_count_map]. *)
+  let merge_slot ~shard_count_map slot_index
       {attesters = current_attesters; attested_shards_count = _}
       (level_history, newly_attested_slots) =
     let stored_status =
@@ -187,11 +186,11 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
       (* All current attesters already attested before; nothing to add *)
       (level_history, newly_attested_slots)
     else
-      (* Sum up shards from new attesters using the lookup function. *)
+      (* Sum up shards from new attesters using the pre-resolved map. *)
       let shards_to_add =
         Signature.Public_key_hash.Set.fold
           (fun attester acc ->
-            acc + get_number_of_shards ~shard_assignment_level attester)
+            acc + number_of_shards_of_delegate shard_count_map attester)
           new_attesters
           0
       in
@@ -232,6 +231,11 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
     let shard_assignment_level =
       Raw_level_repr.add published_level (attestation_lag - 1)
     in
+    let shard_count_map =
+      match get_shard_count_map ~shard_assignment_level with
+      | None -> Signature.Public_key_hash.Map.empty
+      | Some map -> map
+    in
     let stored_level_history =
       match Raw_level_repr.Map.find published_level history with
       | Some lh -> lh
@@ -239,7 +243,7 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
     in
     let merged_level_history, level_newly_attested_slots =
       Dal_slot_index_repr.Map.fold
-        (merge_slot ~shard_assignment_level)
+        (merge_slot ~shard_count_map)
         current_slot_map
         (stored_level_history, [])
     in
@@ -696,13 +700,13 @@ let finalize_attestation_history ctxt =
     | Some stored_history ->
         unpack_history ctxt ~threshold ~number_of_shards stored_history
   in
-  let get_number_of_shards = get_number_of_shards ctxt in
+  let get_shard_count_map = get_shard_count_map ctxt in
   let updated_history, newly_attested =
     merge_attestation_history
       ~attestation_lag
       ~threshold
       ~number_of_shards
-      ~get_number_of_shards
+      ~get_shard_count_map
       current_block_accountability
       stored_history
   in
