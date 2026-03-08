@@ -161,29 +161,37 @@ end
      is [bits_per_chunk] bits: 1 bit [is_last] followed by [slots_per_chunk]
      slot bits. The last chunk has [is_last]=1. *)
 module Attestations = struct
-  let slots_per_chunk = 7
-
-  let bits_per_chunk = slots_per_chunk + 1
-
-  let max_chunks ~number_of_slots =
-    (number_of_slots + slots_per_chunk - 1) / slots_per_chunk
-
-  let max_attested_slot dal_attestation =
-    let max_idx = ref (-1) in
-    Array.iteri
-      (fun idx is_attested -> if is_attested then max_idx := max !max_idx idx)
-      dal_attestation ;
-    !max_idx
-
-  let set_slot_bit ~offset_start ~slot_index z =
-    let chunk_index = slot_index / slots_per_chunk in
-    let bit_in_chunk = 1 + (slot_index mod slots_per_chunk) in
-    let bit_pos =
-      offset_start + (chunk_index * bits_per_chunk) + bit_in_chunk
+  let bool_array_to_attestation lag_index slots_array =
+    let slot_indices =
+      Array.to_seq slots_array
+      |> Seq.mapi (fun i b -> (i, b))
+      |> Seq.filter_map (fun (i, b) -> if b then Some i else None)
+      |> List.of_seq
     in
-    Z.logor z (Z.shift_left Z.one bit_pos)
+    RPC.{lag_index; slot_indices}
 
-  (* Encode using the before 025 simple bitset format. *)
+  let bool_array_array_to_attestations attestations_per_lag =
+    Array.to_seq attestations_per_lag
+    |> Seq.mapi (fun lag_index slots ->
+           bool_array_to_attestation lag_index slots)
+    |> Seq.filter (fun (a : RPC.unfolded_lag_attestation) ->
+           a.slot_indices <> [])
+    |> List.of_seq
+
+  let attestations_to_bool_array_array ~number_of_lags ~number_of_slots
+      (attestations : RPC.unfolded_lag_attestation list) =
+    let result =
+      Array.init number_of_lags (fun _ -> Array.make number_of_slots false)
+    in
+    List.iter
+      (fun RPC.{lag_index; slot_indices} ->
+        List.iter
+          (fun slot_index -> result.(lag_index).(slot_index) <- true)
+          slot_indices)
+      attestations ;
+    result
+
+  (* Pre-025 simple bitset format: bit[i] = slot i is attested *)
   let encode_single_lag_before_025 dal_attestation =
     let aux (acc, n) b =
       let bit = if b then 1 else 0 in
@@ -191,111 +199,6 @@ module Attestations = struct
     in
     Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
 
-  (* Encode using the post-025 compact multi-lag format.
-
-     For a single set of attestations (bool array), we encode them at the
-     specified [lag_index]. *)
-  let encode_single_lag_after_025 ~lag_index ~number_of_lags dal_attestation =
-    let max_slot = max_attested_slot dal_attestation in
-    if max_slot < 0 then "0"
-    else
-      let chunks_needed = (max_slot / slots_per_chunk) + 1 in
-      let prefix = Z.shift_left Z.one lag_index in
-      let offset_start = number_of_lags in
-      let last_chunk_bit =
-        offset_start + ((chunks_needed - 1) * bits_per_chunk)
-      in
-      let z =
-        Array.fold_left
-          (fun (slot_idx, z) is_attested ->
-            let z' =
-              if is_attested then
-                set_slot_bit ~offset_start ~slot_index:slot_idx z
-              else z
-            in
-            (slot_idx + 1, z'))
-          (0, prefix)
-          dal_attestation
-        |> snd
-      in
-      let z = Z.logor z (Z.shift_left Z.one last_chunk_bit) in
-      Z.to_string z
-
-  let encode_for_one_lag protocol ?lag_index dal_parameters dal_attestation =
-    if Protocol.number protocol < 025 then
-      encode_single_lag_before_025 dal_attestation
-    else
-      let number_of_lags =
-        List.length dal_parameters.Parameters.attestation_lags
-      in
-      (* Default to max lag (last element of the list) if not specified *)
-      let lag_index = Option.value ~default:(number_of_lags - 1) lag_index in
-      encode_single_lag_after_025 ~lag_index ~number_of_lags dal_attestation
-
-  let encode_multiple_lags_after_025 attestations_per_lag =
-    let number_of_lags = Array.length attestations_per_lag in
-    let lag_indices = List.init number_of_lags Fun.id in
-    (* Build the prefix: bit i is set if lag_index i has any attestations. *)
-    let prefix, max_slots =
-      List.fold_left
-        (fun (acc, max_slots) lag_index ->
-          let slots_array = attestations_per_lag.(lag_index) in
-          let max_slot = max_attested_slot slots_array in
-          let acc =
-            if max_slot >= 0 then Z.logor acc (Z.shift_left Z.one lag_index)
-            else acc
-          in
-          (acc, max_slot :: max_slots))
-        (Z.zero, [])
-        lag_indices
-    in
-    if Z.equal prefix Z.zero then "0"
-    else
-      let max_slots = Array.of_list (List.rev max_slots) in
-      let _, result =
-        List.fold_left
-          (fun (data_offset, acc) lag_index ->
-            let slots_array = attestations_per_lag.(lag_index) in
-            let max_slot = max_slots.(lag_index) in
-            if max_slot < 0 then (data_offset, acc)
-            else
-              let chunks_needed = (max_slot / slots_per_chunk) + 1 in
-              let last_chunk_bit =
-                data_offset + ((chunks_needed - 1) * bits_per_chunk)
-              in
-              let acc' =
-                Array.fold_left
-                  (fun (slot_idx, z) is_attested ->
-                    let z' =
-                      if is_attested then
-                        set_slot_bit
-                          ~offset_start:data_offset
-                          ~slot_index:slot_idx
-                          z
-                      else z
-                    in
-                    (slot_idx + 1, z'))
-                  (0, acc)
-                  slots_array
-                |> snd
-              in
-              let acc'' = Z.logor acc' (Z.shift_left Z.one last_chunk_bit) in
-              (data_offset + (chunks_needed * bits_per_chunk), acc''))
-          (number_of_lags, prefix)
-          lag_indices
-      in
-      Z.to_string result
-
-  let encode protocol attestations_per_lag =
-    if Protocol.number protocol < 025 then
-      match attestations_per_lag with
-      | [|dal_attestation|] -> encode_single_lag_before_025 dal_attestation
-      | _ ->
-          Test.fail
-            "Multiple lags encoding only supported for protocols >= 025."
-    else encode_multiple_lags_after_025 attestations_per_lag
-
-  (* Decode before 025 format: simple bitset where bit[i] = slot i is attested *)
   let decode_before_025 ~number_of_slots str =
     let attestation = Z.of_string str in
     let array = Array.make number_of_slots false in
@@ -304,69 +207,51 @@ module Attestations = struct
       (range 0 (number_of_slots - 1)) ;
     array
 
-  (* Decode post-025 compact multi-lag format into per-lag arrays.
+  let encode_for_one_lag protocol endpoint ?lag_index dal_parameters
+      dal_attestation =
+    if Protocol.number protocol < 025 then
+      return (encode_single_lag_before_025 dal_attestation)
+    else
+      let number_of_lags =
+        List.length dal_parameters.Parameters.attestation_lags
+      in
+      let lag_index = Option.value ~default:(number_of_lags - 1) lag_index in
+      let attestation = bool_array_to_attestation lag_index dal_attestation in
+      RPC_core.call endpoint
+      @@ RPC.post_chain_block_helpers_encode_dal_attestation [attestation]
 
-     Returns an array of size [number_of_lags], where element [i] is a bool
-     array of size [number_of_slots] representing the attested slots at lag
-     index [i].
+  let encode protocol endpoint attestations_per_lag =
+    if Protocol.number protocol < 025 then
+      match attestations_per_lag with
+      | [|dal_attestation|] ->
+          return (encode_single_lag_before_025 dal_attestation)
+      | _ ->
+          Test.fail
+            "Multiple lags encoding only supported for protocols >= 025."
+    else
+      let attestations =
+        bool_array_array_to_attestations attestations_per_lag
+      in
+      RPC_core.call endpoint
+      @@ RPC.post_chain_block_helpers_encode_dal_attestation attestations
 
-     The encoded format is:
-     - Prefix: first [number_of_lags] bits indicate which lag indices have
-       non-empty attestations (bit [i] set means lag index [i] has data)
-     - Data: for each non-empty lag (in order of lag_index), a sequence of
-       chunks. Each chunk is [bits_per_chunk] bits: 1 bit [is_last] followed
-       by [slots_per_chunk] slot bits. The last chunk has [is_last]=1. *)
-  let decode_after_025 ~number_of_lags ~number_of_slots str =
-    let z = Z.of_string str in
-    let result =
-      Array.init number_of_lags (fun _ -> Array.make number_of_slots false)
-    in
-    let lag_indices = List.init number_of_lags Fun.id in
-    let max_chunks = max_chunks ~number_of_slots in
-    (* Parse prefix to find which lags have data, then extract chunked slot bits.
-       We track [data_offset] which advances by [bits_per_chunk] for each chunk
-       consumed. *)
-    let _final_offset =
-      List.fold_left
-        (fun data_offset lag_index ->
-          let lag_has_data = Z.testbit z lag_index in
-          if lag_has_data then
-            let rec scan_chunks chunk_index offset =
-              if chunk_index >= max_chunks then
-                Test.fail
-                  "Malformed DAL attestations: missing last chunk marker."
-              else
-                let chunk_start = offset + (chunk_index * bits_per_chunk) in
-                let is_last = Z.testbit z chunk_start in
-                for bit_in_chunk = 1 to slots_per_chunk do
-                  let slot_index =
-                    (chunk_index * slots_per_chunk) + (bit_in_chunk - 1)
-                  in
-                  if slot_index < number_of_slots then
-                    if Z.testbit z (chunk_start + bit_in_chunk) then
-                      result.(lag_index).(slot_index) <- true
-                done ;
-                if is_last then offset + ((chunk_index + 1) * bits_per_chunk)
-                else scan_chunks (chunk_index + 1) offset
-            in
-            scan_chunks 0 data_offset
-          else data_offset)
-        number_of_lags
-        lag_indices
-    in
-    result
-
-  let decode protocol parameters str =
+  let decode protocol endpoint parameters str =
     let number_of_slots = parameters.Parameters.number_of_slots in
     if Protocol.number protocol < 025 then
-      [|decode_before_025 ~number_of_slots str|]
+      return [|decode_before_025 ~number_of_slots str|]
     else
       let number_of_lags = List.length parameters.Parameters.attestation_lags in
-      decode_after_025 ~number_of_lags ~number_of_slots str
+      let* attestations =
+        RPC_core.call endpoint
+        @@ RPC.get_chain_block_helpers_decode_dal_attestation str
+      in
+      return
+        (attestations_to_bool_array_array
+           ~number_of_lags
+           ~number_of_slots
+           attestations)
 end
 
-(* Decoding of the multi-lag Slot_availability.t bitset format. It has the same
-   format as Attestations. *)
 module Slot_availability = struct
   let decode = Attestations.decode
 end
@@ -390,7 +275,7 @@ let to_attested_levels ~protocol ~dal_parameters ~published_level =
       (published_level + lag, lag_index, dal_parameters, protocol))
     dal_parameters.Parameters.attestation_lags
 
-let is_slot_attested ~published_level ~slot_index ~to_attested_levels
+let is_slot_attested ~endpoint ~published_level ~slot_index ~to_attested_levels
     slot_availabilities =
   let attested_levels = to_attested_levels ~published_level in
   let is_attested_at (attested_level, lag_index, dal_params, protocol) =
@@ -401,8 +286,12 @@ let is_slot_attested ~published_level ~slot_index ~to_attested_levels
           "Metadata not found for attested level %d"
           attested_level
     | Some slot_availability ->
-        let attestation_array =
-          Slot_availability.decode protocol dal_params slot_availability
+        let* attestation_array =
+          Slot_availability.decode
+            protocol
+            endpoint
+            dal_params
+            slot_availability
         in
         let number_of_lags = List.length dal_params.attestation_lags in
         let attestations_at_lag =
@@ -426,15 +315,17 @@ let is_slot_attested ~published_level ~slot_index ~to_attested_levels
                 attested_level
             else attestation_array.(lag_index)
         in
-        Array.length attestations_at_lag > slot_index
-        && attestations_at_lag.(slot_index)
+        return
+          (Array.length attestations_at_lag > slot_index
+          && attestations_at_lag.(slot_index))
   in
-  List.exists is_attested_at attested_levels
+  let* results = Lwt_list.map_s is_attested_at attested_levels in
+  return (List.exists Fun.id results)
 
-let is_slot_attested_in_bitset ~protocol ~dal_parameters ~attested_level
-    ~published_level ~slot_index ~dal_attestation =
-  let attestation_array =
-    Attestations.decode protocol dal_parameters dal_attestation
+let is_slot_attested_in_bitset ~endpoint ~protocol ~dal_parameters
+    ~attested_level ~published_level ~slot_index ~dal_attestation =
+  let* attestation_array =
+    Attestations.decode protocol endpoint dal_parameters dal_attestation
   in
   let lag = attested_level - published_level in
   let lag_index_opt =
@@ -451,8 +342,9 @@ let is_slot_attested_in_bitset ~protocol ~dal_parameters ~attested_level
         published_level
   | Some lag_index ->
       let attestations_at_lag = attestation_array.(lag_index) in
-      Array.length attestations_at_lag > slot_index
-      && attestations_at_lag.(slot_index)
+      return
+        (Array.length attestations_at_lag > slot_index
+        && attestations_at_lag.(slot_index))
 
 module Committee = struct
   type member = {attester : string; indexes : int list}

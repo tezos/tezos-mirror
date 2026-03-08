@@ -2206,3 +2206,50 @@ let get_chain_block_helpers_swrr_selected_bakers ?(chain = "main")
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "swrr_selected_bakers"]
     Fun.id
+
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+let get_chain_block_helpers_decode_dal_attestation ?(chain = "main")
+    ?(block = "head") bitset =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "decode_dal_attestation";
+      bitset;
+    ]
+  @@ fun json ->
+  JSON.as_list json
+  |> List.map (fun entry ->
+         let lag_index = JSON.(entry |-> "lag_index" |> as_int) in
+         let slot_indices =
+           JSON.(entry |-> "slot_indices" |> as_list |> List.map as_int)
+         in
+         {lag_index; slot_indices})
+
+let post_chain_block_helpers_encode_dal_attestation ?(chain = "main")
+    ?(block = "head") attestations =
+  let data =
+    RPC_core.Data
+      (`A
+         (List.map
+            (fun {lag_index; slot_indices} ->
+              `O
+                [
+                  ("lag_index", `Float (Float.of_int lag_index));
+                  ( "slot_indices",
+                    `A
+                      (List.map (fun i -> `Float (Float.of_int i)) slot_indices)
+                  );
+                ])
+            attestations))
+  in
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "encode_dal_attestation"]
+    JSON.as_string

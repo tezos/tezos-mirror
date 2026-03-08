@@ -931,27 +931,33 @@ type attestation_availability =
   | No_dal_attestation
 
 let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
-    ~signer availability client dal_parameters =
-  let dal_attestation =
+    ~signer availability client dal_parameters node_endpoint =
+  let* dal_attestation =
     match availability with
     | Bitset bitset ->
-        Some
-          (Dal.Attestations.encode_for_one_lag
-             protocol
-             ?lag_index
-             dal_parameters
-             bitset)
+        let* encoded =
+          Dal.Attestations.encode_for_one_lag
+            protocol
+            node_endpoint
+            ?lag_index
+            dal_parameters
+            bitset
+        in
+        return (Some encoded)
     | Slots availability ->
         let number_of_slots = dal_parameters.number_of_slots in
         let dal_attestation = Array.make number_of_slots false in
         List.iter (fun i -> dal_attestation.(i) <- true) availability ;
-        Some
-          (Dal.Attestations.encode_for_one_lag
-             protocol
-             ?lag_index
-             dal_parameters
-             dal_attestation)
-    | No_dal_attestation -> None
+        let* encoded =
+          Dal.Attestations.encode_for_one_lag
+            protocol
+            node_endpoint
+            ?lag_index
+            dal_parameters
+            dal_attestation
+        in
+        return (Some encoded)
+    | No_dal_attestation -> return None
   in
   let* level =
     match level with Some level -> return level | None -> Client.level client
@@ -995,7 +1001,7 @@ let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       some op
 
 let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
-    ~signer availability client dal_parameters =
+    ~signer availability client dal_parameters node_endpoint =
   let* res =
     craft_dal_attestation
       ~protocol
@@ -1007,6 +1013,7 @@ let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
       availability
       client
       dal_parameters
+      node_endpoint
   in
   match res with
   | None ->
@@ -1017,7 +1024,8 @@ let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
   | Some v -> return v
 
 let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
-    ?force ?error ?request ~signer availability client dal_parameters =
+    ?force ?error ?request ~signer availability client dal_parameters
+    node_endpoint =
   let* op_opt =
     craft_dal_attestation
       ~protocol
@@ -1029,6 +1037,7 @@ let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       availability
       client
       dal_parameters
+      node_endpoint
   in
   match op_opt with
   | None -> none
@@ -1037,7 +1046,8 @@ let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       some (op, oph)
 
 let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
-    ?force ?error ?request ~signer availability client dal_parameters =
+    ?force ?error ?request ~signer availability client dal_parameters
+    node_endpoint =
   let* res =
     inject_dal_attestation
       ~protocol
@@ -1052,6 +1062,7 @@ let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
       availability
       client
       dal_parameters
+      node_endpoint
   in
   match res with
   | None ->
@@ -1063,7 +1074,7 @@ let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
 
 let inject_dal_attestations ~protocol ?payload_level ?level ?round ?lag_index
     ?force ?request ?(signers = Array.to_list Account.Bootstrap.keys)
-    availability client dal_parameters =
+    availability client dal_parameters node_endpoint =
   Lwt_list.filter_map_s
     (fun signer ->
       inject_dal_attestation
@@ -1077,7 +1088,8 @@ let inject_dal_attestations ~protocol ?payload_level ?level ?round ?lag_index
         ~signer
         availability
         client
-        dal_parameters)
+        dal_parameters
+        node_endpoint)
     signers
 
 let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
@@ -1095,6 +1107,7 @@ let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
       indexes
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   bake_for ~delegates:(`For [baker]) client
 
@@ -1492,6 +1505,8 @@ let test_slot_management_logic protocol parameters cryptobox node client
   check_manager_operation_status operations_result Applied oph2 ;
   let attestation_lag = parameters.attestation_lag in
   let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
+  let node_endpoint = Node.as_rpc_endpoint node in
+
   let* _ =
     inject_dal_attestations
       ~protocol
@@ -1499,6 +1514,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
       (Slots [1; 0])
       client
       parameters
+      node_endpoint
   in
   let* _ =
     inject_dal_attestations
@@ -1507,6 +1523,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
       (Slots [1])
       client
       parameters
+      node_endpoint
   in
   let* baker =
     let* level = Node.get_level node in
@@ -1523,23 +1540,29 @@ let test_slot_management_logic protocol parameters cryptobox node client
     Dal.collect_slot_availabilities node ~attested_levels
   in
 
+  let* slot_0_not_attested =
+    Dal.is_slot_attested
+      ~endpoint:(Node.as_rpc_endpoint node)
+      ~published_level
+      ~slot_index:0
+      ~to_attested_levels:
+        (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
+      all_slot_availabilities
+  in
   Check.is_false
-    (Dal.is_slot_attested
-       ~published_level
-       ~slot_index:0
-       ~to_attested_levels:
-         (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
-       all_slot_availabilities)
+    slot_0_not_attested
     ~error_msg:"Expected slot 0 to not be attested" ;
 
-  Check.is_true
-    (Dal.is_slot_attested
-       ~published_level
-       ~slot_index:1
-       ~to_attested_levels:
-         (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
-       all_slot_availabilities)
-    ~error_msg:"Expected slot 1 to be attested" ;
+  let* slot_1_attested =
+    Dal.is_slot_attested
+      ~endpoint:(Node.as_rpc_endpoint node)
+      ~published_level
+      ~slot_index:1
+      ~to_attested_levels:
+        (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
+      all_slot_availabilities
+  in
+  Check.is_true slot_1_attested ~error_msg:"Expected slot 1 to be attested" ;
   check_dal_raw_context node
 
 (** This test tests various situations related to DAL slots attestation.
@@ -1561,6 +1584,7 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
         (Slots [0])
         client
         parameters
+        (Node.as_rpc_endpoint node)
     in
     return op_hash
   in
@@ -1642,8 +1666,12 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
   match metadata.dal_attestation with
   | None -> unit
   | Some dal_attestation_bitset ->
-      let attestation_array =
-        Dal.Slot_availability.decode protocol parameters dal_attestation_bitset
+      let* attestation_array =
+        Dal.Slot_availability.decode
+          protocol
+          (Node.as_rpc_endpoint node)
+          parameters
+          dal_attestation_bitset
       in
       (* Check that no slots are attested at any lag *)
       let some_slot_attested =
@@ -1748,6 +1776,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
       (Slots [])
       client
       parameters
+      (Node.as_rpc_endpoint node)
   in
   (* Set up a new account that holds the right amount of tez and make sure it
      can be an attester. *)
@@ -1830,6 +1859,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           attested_slots
           client
           parameters
+          (Node.as_rpc_endpoint node)
       in
       Log.info "Bake a block and check the DAL attestation of the new baker." ;
       let* () = bake_for client in
@@ -2986,12 +3016,16 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   let to_attested_levels =
     Dal.to_attested_levels ~protocol ~dal_parameters:parameters
   in
+  let* slot_0_attested =
+    Dal.is_slot_attested
+      ~endpoint:(Node.as_rpc_endpoint node)
+      ~published_level
+      ~slot_index:0
+      ~to_attested_levels
+      all_slot_availabilities
+  in
   Check.is_true
-    (Dal.is_slot_attested
-       ~published_level
-       ~slot_index:0
-       ~to_attested_levels
-       all_slot_availabilities)
+    slot_0_attested
     ~error_msg:"Expected slot 0 from published_level to be attested" ;
 
   Log.info "Wait for the rollup node to catch up to the latest level." ;
@@ -4591,8 +4625,9 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     in
 
     let check_if_metadata_contain_expected_dal published_level =
-      let is_attested =
+      let* is_attested =
         Dal.is_slot_attested
+          ~endpoint:(Node.as_rpc_endpoint node)
           ~published_level
           ~slot_index
           ~to_attested_levels
@@ -5139,6 +5174,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
           availability
           client
           dal_parameters
+          (Node.as_rpc_endpoint node)
       in
       let* signature = Operation.sign attestation client in
       return (attestation, signature)
@@ -5686,6 +5722,7 @@ let dal_slots_retrievability =
         (Slots [1; 2; 3])
         client
         dal_parameters
+        (Node.as_rpc_endpoint l1_node)
     in
 
     let* () = bake_for ~count:3 ~delegates:(`For rest_pkhs) client in
@@ -6410,7 +6447,7 @@ module Skip_list_rpcs = struct
             (migrate_from, dal_parameters)
           else (migrate_to, new_dal_parameters)
         in
-        let attested =
+        let* attested =
           match metadata.dal_attestation with
           | None ->
               Test.fail
@@ -6418,21 +6455,26 @@ module Skip_list_rpcs = struct
                  information"
                 attested_level
           | Some str ->
-              let decoded =
-                Dal.Slot_availability.decode protocol params_to_use str
+              let* decoded =
+                Dal.Slot_availability.decode
+                  protocol
+                  (Node.as_rpc_endpoint node)
+                  params_to_use
+                  str
               in
-              List.mapi
-                (fun lag_index attestation_lag ->
-                  let published_level = attested_level - attestation_lag in
-                  if
-                    published_level > starting_level
-                    && published_level <= last_confirmed_published_level
-                  then
-                    let vec = decoded.(lag_index) in
-                    Array.length vec > slot_index && vec.(slot_index)
-                  else false)
-                params_to_use.attestation_lags
-              |> List.exists Fun.id
+              return
+                (List.mapi
+                   (fun lag_index attestation_lag ->
+                     let published_level = attested_level - attestation_lag in
+                     if
+                       published_level > starting_level
+                       && published_level <= last_confirmed_published_level
+                     then
+                       let vec = decoded.(lag_index) in
+                       Array.length vec > slot_index && vec.(slot_index)
+                     else false)
+                   params_to_use.attestation_lags
+                |> List.exists Fun.id)
         in
         (* Checks if a [level] is in the migration transition gap *)
         let in_migration_gap level lag =
@@ -7280,7 +7322,7 @@ module Amplification = struct
       Node.RPC.call node
       @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
     in
-    let attestation =
+    let* attestation =
       match metadata.dal_attestation with
       | None ->
           Test.fail
@@ -7288,7 +7330,14 @@ module Amplification = struct
              level %d"
             attested_level
       | Some str ->
-          (Dal.Slot_availability.decode protocol parameters str).(lag_index)
+          let* decoded =
+            Dal.Slot_availability.decode
+              protocol
+              (Node.as_rpc_endpoint node)
+              parameters
+              str
+          in
+          return decoded.(lag_index)
     in
     return (attestation = expected_attestation)
 
@@ -9127,7 +9176,7 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
           Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
         in
         let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-        let obtained_dal_attestation =
+        let* obtained_dal_attestation =
           match metadata.dal_attestation with
           | None ->
               (* Field is part of the encoding when the feature flag is true *)
@@ -9135,7 +9184,14 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
                 "Field dal_attestation in block headers is mandatory when DAL \
                  is activated"
           | Some str ->
-              (Dal.Slot_availability.decode protocol parameters str).(lag_index)
+              let* decoded =
+                Dal.Slot_availability.decode
+                  protocol
+                  (Node.as_rpc_endpoint node)
+                  parameters
+                  str
+              in
+              return decoded.(lag_index)
         in
         if obtained_dal_attestation.(slot_index) then (
           let expected_attestation =
@@ -9605,11 +9661,12 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
         else None)
       (JSON.as_list json)
   in
-  let new_attester_attested_slot =
+  let* new_attester_attested_slot =
     match dal_attestation_opt with
-    | None -> false
+    | None -> return false
     | Some dal_attestation ->
         Dal.is_slot_attested_in_bitset
+          ~endpoint:(Node.as_rpc_endpoint node)
           ~protocol
           ~dal_parameters
           ~attested_level
@@ -9962,6 +10019,7 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
       availability
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   let* signature = Operation.sign attestation client in
   let attestation = (attestation, signature) in
@@ -10238,6 +10296,7 @@ let test_inject_accusation_dynamic_multi_lag protocol dal_parameters cryptobox
       (Slots [0])
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   let* signature_a = Operation.sign attestation_a client in
   let attestation_a = (attestation_a, signature_a) in
@@ -10379,7 +10438,12 @@ let test_inject_accusation_dynamic_multi_lag protocol dal_parameters cryptobox
      publication level of B and lag_index_1 points to the publication level of A. *)
   attestation_per_lag.(0).(2) <- true ;
   attestation_per_lag.(1).(3) <- true ;
-  let dal_attestation = Dal.Attestations.encode protocol attestation_per_lag in
+  let* dal_attestation =
+    Dal.Attestations.encode
+      protocol
+      (Node.as_rpc_endpoint node)
+      attestation_per_lag
+  in
   let* attestation_B =
     Operation.Consensus.operation
       ~signer:alice
@@ -10511,6 +10575,7 @@ let test_inject_accusation_dynamic_multi_lag protocol dal_parameters cryptobox
       (Slots [0])
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   let* signature_c = Operation.sign attestation_c client in
   let attestation_c = (attestation_c, signature_c) in
@@ -10711,9 +10776,14 @@ let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
           "Field dal_attestation in block headers is mandatory when DAL is \
            activated"
     | Some str ->
-        let bitset =
-          (Dal.Slot_availability.decode protocol dal_parameters str).(lag_index)
+        let* decoded =
+          Dal.Slot_availability.decode
+            protocol
+            (Node.as_rpc_endpoint node)
+            dal_parameters
+            str
         in
+        let bitset = decoded.(lag_index) in
         let attested_count =
           Array.fold_left (fun acc b -> if b then acc + 1 else acc) 0 bitset
         in
@@ -10784,8 +10854,11 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
       ~block:(string_of_int level)
       client
   in
-  let dal_attestation =
-    Dal.Attestations.encode_for_one_lag protocol dal_parameters
+  let* dal_attestation =
+    Dal.Attestations.encode_for_one_lag
+      protocol
+      (Node.as_rpc_endpoint node)
+      dal_parameters
     @@ Array.init number_of_slots (fun i -> i = slot_index)
   in
   let faulty_bakers, other_tz4 =
@@ -10916,6 +10989,7 @@ let test_producer_attester (protocol : Protocol.t)
       (Slots [index])
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   let* lvl_attest = Client.level client in
   Check.(
@@ -11011,6 +11085,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   let* () = bake_for ~count:(lag - 1) client in
   log_step
     "Crafting attestation for [bootstrap3] (with expected DAL attestation)." ;
+  let node_endpoint = Node.as_rpc_endpoint node in
   let* op1 =
     craft_dal_attestation_exn
       ~protocol
@@ -11018,6 +11093,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
       (Slots [index])
       client
       dal_parameters
+      node_endpoint
   in
   let* (`OpHash oph1) = Operation.hash op1 client in
   let op1_promise = wait_for_classified oph1 node in
@@ -11029,6 +11105,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
       (Slots [])
       client
       dal_parameters
+      node_endpoint
   in
   let* (`OpHash oph2) = Operation.hash op2 client in
   let op2_promise = wait_for_classified oph2 node in
@@ -11070,8 +11147,9 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   let* all_slot_availabilities =
     Dal.collect_slot_availabilities node ~attested_levels
   in
-  let attestation_is_in_block =
+  let* attestation_is_in_block =
     Dal.is_slot_attested
+      ~endpoint:(Node.as_rpc_endpoint node)
       ~published_level
       ~slot_index:index
       ~to_attested_levels:(Dal.to_attested_levels ~protocol ~dal_parameters)
@@ -11193,6 +11271,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
       availability
       client
       dal_parameters
+      (Node.as_rpc_endpoint node)
   in
   let* signature = Operation.sign attestation client in
   let attestation = (attestation, signature) in
@@ -11333,6 +11412,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
     return shards_with_proofs
   in
   let* () = bake_for ~count:(dal_parameters.attestation_lag - 1) client in
+  let node_endpoint = Node.as_rpc_endpoint node in
   let* attestation =
     let* current_level = Node.get_level node in
     Log.info "Injecting a first attestation at level %d" current_level ;
@@ -11344,6 +11424,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
         availability
         client
         dal_parameters
+        node_endpoint
     in
     let* signature = Operation.sign attestation client in
     return (attestation, signature)
@@ -11396,6 +11477,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
         availability
         client
         dal_parameters
+        node_endpoint
     in
     let* signature = Operation.sign attestation client in
     return (attestation, signature)
@@ -11896,6 +11978,8 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     snapshot_full_balances_helper ()
   in
 
+  let node_endpoint = Node.as_rpc_endpoint node in
+
   (* This is the main helper function which injects (DAL) attestations for
      delegates depending on their profiles. *)
   let inject_attestations () =
@@ -11916,6 +12000,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         baker_attestation
         client
         dal_parameters
+        node_endpoint
     in
     (* 2. attesting_dal_slot_10 always attests TB and DAL slot 10 *)
     let* (_ : Operation.t * [`OpHash of peer_id]) =
@@ -11934,6 +12019,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         attestation
         client
         dal_parameters
+        node_endpoint
     in
     (* 3. not_attesting_at_all is not attesting neither TB nor DAL slots *)
     (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
@@ -11947,6 +12033,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         dal_attestation
         client
         dal_parameters
+        node_endpoint
     in
     (* 5. not_sufficiently_attesting_dal_slot_10: is attesting DAL slot 10, but only 25%
        of the time. *)
@@ -11963,6 +12050,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         slots_to_attest
         client
         dal_parameters
+        node_endpoint
     in
     (* 6. small_baker: is always attesting DAL slot 10. *)
     let* () =
@@ -11974,6 +12062,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
           slots_to_attest
           client
           dal_parameters
+          node_endpoint
       in
       (match res with
       | None ->
@@ -12424,15 +12513,21 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
       call l1_node
       @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
   in
-  let dal_attestation =
-    Option.map
-      (fun str ->
-        let per_lag =
-          Dal.Slot_availability.decode protocol dal_parameters str
+  let* dal_attestation =
+    match dal_attestation with
+    | None -> return None
+    | Some str ->
+        let* per_lag =
+          Dal.Slot_availability.decode
+            protocol
+            (Node.as_rpc_endpoint l1_node)
+            dal_parameters
+            str
         in
-        Array.init number_of_slots (fun slot_index ->
-            Array.exists (fun lag_array -> lag_array.(slot_index)) per_lag))
-      dal_attestation
+        return
+        @@ Some
+             (Array.init number_of_slots (fun slot_index ->
+                  Array.exists (fun lag_array -> lag_array.(slot_index)) per_lag))
   in
   let expected_attestation = expected_attestation dal_parameters [0] in
   Check.((Some expected_attestation = dal_attestation) (option (array bool)))
@@ -12742,6 +12837,7 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
             (Slots [slot_index])
             client
             dal_parameters
+            (Node.as_rpc_endpoint l1_node)
         in
         let* () = bake_for ~delegates:(`For rest_delegates_pkhs) client in
         let* _ops =
@@ -12926,17 +13022,21 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
     | _ -> ()) ;
 
     (* Check if delegate actually attested our slot when they included DAL content *)
-    let actual_bit_opt =
-      Option.map
-        (fun dal_attestation ->
-          Dal.is_slot_attested_in_bitset
-            ~protocol
-            ~dal_parameters
-            ~attested_level
-            ~published_level
-            ~slot_index
-            ~dal_attestation)
-        actual_dal_attestable_slots_opt
+    let* actual_bit_opt =
+      match actual_dal_attestable_slots_opt with
+      | None -> return None
+      | Some dal_attestation ->
+          let* b =
+            Dal.is_slot_attested_in_bitset
+              ~endpoint:(Node.as_rpc_endpoint node)
+              ~protocol
+              ~dal_parameters
+              ~attested_level
+              ~published_level
+              ~slot_index
+              ~dal_attestation
+          in
+          return (Some b)
     in
 
     match (expected_dal_attestable_slots, actual_bit_opt) with
@@ -13048,10 +13148,10 @@ let test_attestations_encode_decode_single_lag =
     ~__FILE__
     ~title:"DAL attestations encode/decode single lag"
     ~tags:["dal"; "attestations"; "encode"; "decode"; "single_lag"]
-    ~uses_node:false
-    ~uses_client:false
-    ~uses_admin_client:false
+    ~uses_node:true
+    ~uses_client:true
   @@ fun protocol ->
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let attestation_lag, attestation_lags =
     if Protocol.number protocol < 025 then (8, [8]) else (5, [2; 3; 5])
   in
@@ -13085,30 +13185,40 @@ let test_attestations_encode_decode_single_lag =
   original.(0) <- true ;
   original.(dal_parameters.number_of_slots - 1) <- true ;
 
-  List.iter
-    (fun lag_index ->
-      Log.info "Testing encoding/decoding at lag_index: %d" lag_index ;
-      let encoded =
-        Dal.Attestations.encode_for_one_lag
-          protocol
-          dal_parameters
-          ~lag_index
-          original
-      in
-      Log.info "Encoded (lag_index: %d): %s" lag_index encoded ;
+  let* () =
+    Lwt_list.iter_s
+      (fun lag_index ->
+        Log.info "Testing encoding/decoding at lag_index: %d" lag_index ;
+        let* encoded =
+          Dal.Attestations.encode_for_one_lag
+            protocol
+            (Node.as_rpc_endpoint node)
+            dal_parameters
+            ~lag_index
+            original
+        in
+        Log.info "Encoded (lag_index: %d): %s" lag_index encoded ;
 
-      let decoded = Dal.Attestations.decode protocol dal_parameters encoded in
-      let decoded_for_lag = decoded.(lag_index) in
-      Check.(
-        (Array.length decoded_for_lag = dal_parameters.number_of_slots) int)
-        ~error_msg:"Expected %R slots, got %L" ;
-      Array.iteri
-        (fun i expected ->
-          Check.(decoded_for_lag.(i) = expected)
-            Check.bool
-            ~error_msg:(Format.sprintf "Slot %d mismatch after round-trip" i))
-        original)
-    (List.init number_of_lags Fun.id) ;
+        let* decoded =
+          Dal.Attestations.decode
+            protocol
+            (Node.as_rpc_endpoint node)
+            dal_parameters
+            encoded
+        in
+        let decoded_for_lag = decoded.(lag_index) in
+        Check.(
+          (Array.length decoded_for_lag = dal_parameters.number_of_slots) int)
+          ~error_msg:"Expected %R slots, got %L" ;
+        Array.iteri
+          (fun i expected ->
+            Check.(decoded_for_lag.(i) = expected)
+              Check.bool
+              ~error_msg:(Format.sprintf "Slot %d mismatch after round-trip" i))
+          original ;
+        unit)
+      (List.init number_of_lags Fun.id)
+  in
 
   Log.info "Single-lag encode/decode succeeded" ;
   unit
@@ -13119,11 +13229,11 @@ let test_attestations_encode_decode_multiple_lags =
     ~__FILE__
     ~title:"DAL attestations encode/decode multiple lags"
     ~tags:["dal"; "attestations"; "encode"; "decode"; "multiple_lags"]
-    ~uses_node:false
-    ~uses_client:false
-    ~uses_admin_client:false
+    ~uses_node:true
+    ~uses_client:true
     ~supports:(Protocol.From_protocol 025)
   @@ fun protocol ->
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let dal_parameters : Dal.Parameters.t =
     {
       feature_enabled = true;
@@ -13160,10 +13270,21 @@ let test_attestations_encode_decode_multiple_lags =
           arr.(1) <- true ;
         arr)
   in
-  let encoded = Dal.Attestations.encode protocol attestations_per_lag in
+  let* encoded =
+    Dal.Attestations.encode
+      protocol
+      (Node.as_rpc_endpoint node)
+      attestations_per_lag
+  in
   Log.info "Encoded multi-lag: %s" encoded ;
 
-  let decoded = Dal.Attestations.decode protocol dal_parameters encoded in
+  let* decoded =
+    Dal.Attestations.decode
+      protocol
+      (Node.as_rpc_endpoint node)
+      dal_parameters
+      encoded
+  in
   Check.((Array.length decoded = number_of_lags) int)
     ~error_msg:"Expected %R lags, got %L" ;
   Array.iteri
@@ -13288,47 +13409,60 @@ let test_no_redundant_dal_attestations protocol parameters _cryptobox node
              ~block:(string_of_int level)
              ()
       in
-      List.iter
-        (fun op ->
-          let contents = JSON.(op |-> "contents" |> as_list) |> List.hd in
-          let kind = JSON.(contents |-> "kind" |> as_string) in
-          let delegate =
-            JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
-          in
-          if
-            String.equal kind "attestation_with_dal"
-            && String.equal delegate Constant.bootstrap1.public_key_hash
-          then
-            let dal_str = JSON.(contents |-> "dal_attestation" |> as_string) in
-            let decoded = Dal.Attestations.decode protocol parameters dal_str in
-            List.iteri
-              (fun lag_index lag ->
-                let published_level = level - lag in
-                if
-                  published_level >= first_level
-                  && published_level <= max_level
-                  && lag_index < Array.length decoded
-                  && slot_index < Array.length decoded.(lag_index)
-                  && decoded.(lag_index).(slot_index)
-                then
-                  let key = (published_level, slot_index) in
-                  match Hashtbl.find_opt first_seen key with
-                  | None -> Hashtbl.add first_seen key (level, lag_index)
-                  | Some (first_level, first_lag_index)
-                    when lag_index <> first_lag_index ->
-                      Test.fail
-                        "Slot %d published at level %d:\n\
-                         - First attested at level=%d (lag=%d)\n\
-                         - Re-attested at level=%d (lag=%d)"
-                        slot_index
-                        published_level
-                        first_level
-                        (List.nth attestation_lags first_lag_index)
-                        level
-                        lag
-                  | Some _ -> ())
-              attestation_lags)
-        (JSON.as_list ops) ;
+      let* () =
+        Lwt_list.iter_s
+          (fun op ->
+            let contents = JSON.(op |-> "contents" |> as_list) |> List.hd in
+            let kind = JSON.(contents |-> "kind" |> as_string) in
+            let delegate =
+              JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
+            in
+            if
+              String.equal kind "attestation_with_dal"
+              && String.equal delegate Constant.bootstrap1.public_key_hash
+            then
+              let dal_str =
+                JSON.(contents |-> "dal_attestation" |> as_string)
+              in
+              let* decoded =
+                Dal.Attestations.decode
+                  protocol
+                  (Node.as_rpc_endpoint node)
+                  parameters
+                  dal_str
+              in
+              Lwt_list.iteri_s
+                (fun lag_index lag ->
+                  let published_level = level - lag in
+                  if
+                    published_level >= first_level
+                    && published_level <= max_level
+                    && lag_index < Array.length decoded
+                    && slot_index < Array.length decoded.(lag_index)
+                    && decoded.(lag_index).(slot_index)
+                  then
+                    let key = (published_level, slot_index) in
+                    match Hashtbl.find_opt first_seen key with
+                    | None ->
+                        return @@ Hashtbl.add first_seen key (level, lag_index)
+                    | Some (first_level, first_lag_index)
+                      when lag_index <> first_lag_index ->
+                        Test.fail
+                          "Slot %d published at level %d:\n\
+                           - First attested at level=%d (lag=%d)\n\
+                           - Re-attested at level=%d (lag=%d)"
+                          slot_index
+                          published_level
+                          first_level
+                          (List.nth attestation_lags first_lag_index)
+                          level
+                          lag
+                    | Some _ -> unit
+                  else unit)
+                attestation_lags
+            else unit)
+          (JSON.as_list ops)
+      in
       check_level (level + 1)
   in
   let* () = check_level (first_level + 1) in

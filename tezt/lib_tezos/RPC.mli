@@ -1606,3 +1606,25 @@ val get_chain_block_helpers_swrr_credits :
     [cycle] doesn't have to be specified (defaults to current cycle). *)
 val get_chain_block_helpers_swrr_selected_bakers :
   ?chain:string -> ?block:string -> ?cycle:int -> unit -> JSON.t t
+
+type unfolded_lag_attestation = {lag_index : int; slot_indices : int list}
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/decode_dal_attestation/<bitset>]
+
+    Decodes a DAL attestation bitset (as a decimal string) into an explicit
+    representation of attested slots per lag.
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_helpers_decode_dal_attestation :
+  ?chain:string -> ?block:string -> string -> unfolded_lag_attestation list t
+
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/encode_dal_attestation]
+
+    Encodes an explicit representation of attested slots per lag into a
+    DAL attestation bitset (returned as a decimal string).
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val post_chain_block_helpers_encode_dal_attestation :
+  ?chain:string -> ?block:string -> unfolded_lag_attestation list -> string t
