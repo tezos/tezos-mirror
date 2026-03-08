@@ -62,6 +62,11 @@ Data Availability Layer
   which decodes a DAL attestation bitset (given as a decimal integer) into an
   explicit representation of attested slots per lag. (MR :gl:`!21065`)
 
+- Introduced a new RPC ``POST
+  /chains/<chain>/blocks/<block>/helpers/encode_dal_attestation``
+  which encodes an explicit representation of attested slots per lag into a
+  DAL attestation bitset. (MR :gl:`!21094`)
+
 Adaptive Issuance
 -----------------
 
