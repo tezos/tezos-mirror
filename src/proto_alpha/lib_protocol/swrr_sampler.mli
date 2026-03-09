@@ -70,8 +70,9 @@
     happens once per cycle (O(blocks_per_cycle × num_delegates)), not on the
     critical path for block production. *)
 
-(** [select_bakers_at_cycle_end ctxt ~target_cycle] precomputes the list
-    of bakers for round 0 of each level in [target_cycle] using SWRR lottery.
+(** [select_bakers_at_cycle_end ctxt ~target_cycle ~stakes_pk ~total_stake_weight]
+    precomputes the list of bakers for round 0 of each level in [target_cycle]
+    using SWRR lottery.
 
     Side effects:
     - Stores selected bakers in [Storage.Stake.Selected_bakers]
@@ -82,7 +83,11 @@
 
     Complexity: O(blocks_per_cycle × num_active_delegates) *)
 val select_bakers_at_cycle_end :
-  Raw_context.t -> target_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t ->
+  target_cycle:Cycle_repr.t ->
+  stakes_pk:(Raw_context.consensus_pk * int64) list ->
+  total_stake_weight:int64 ->
+  Raw_context.t tzresult Lwt.t
 
 (** [get_baker ctxt level round] returns the consensus key for the baker
     assigned to [level] and [round].

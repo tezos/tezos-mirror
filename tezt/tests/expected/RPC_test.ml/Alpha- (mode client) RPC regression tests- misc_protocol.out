@@ -141,7 +141,7 @@
 [ { "level": 1,
     "delegates":
       [ { "delegate": "[PUBLIC_KEY_HASH]",
-          "first_slot": 6, "attesting_power": 32,
+          "first_slot": 1, "attesting_power": 32,
           "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
@@ -169,12 +169,12 @@ null
     "credit": "-1466666666666" } ]
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/swrr_selected_bakers
-[ "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]" ]
+[ { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" } ]

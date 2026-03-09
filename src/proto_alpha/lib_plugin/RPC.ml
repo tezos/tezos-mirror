@@ -4761,7 +4761,7 @@ module S = struct
       ~query:cycle_query
       ~output:
         Data_encoding.(
-          option (FallbackArray.encoding Signature.Public_key_hash.encoding))
+          option (FallbackArray.encoding Raw_context.consensus_pk_encoding))
       RPC_path.(path / "swrr_selected_bakers")
 
   let swrr_credits =
