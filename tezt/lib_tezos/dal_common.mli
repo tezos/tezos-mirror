@@ -73,7 +73,8 @@ end
 (** Decoding of the slot availability bitset used in block metadata. It currently
     has the same behaviour as the [Attestations] module. *)
 module Slot_availability : sig
-  val decode : Protocol.t -> Parameters.t -> string -> bool array array
+  val decode :
+    Protocol.t -> Endpoint.t -> Parameters.t -> string -> bool array array Lwt.t
 end
 
 module IntMap : Map.S with type key = int
@@ -110,49 +111,58 @@ val to_attested_levels :
     Returns wether the slot is found attested at ANY of the checked
     (level, lag_index) pairs. *)
 val is_slot_attested :
+  endpoint:Endpoint.t ->
   published_level:int ->
   slot_index:int ->
   to_attested_levels:
     (published_level:int -> (int * int * Parameters.t * Protocol.t) list) ->
   string option IntMap.t ->
-  bool
+  bool Lwt.t
 
-(** [is_slot_attested_in_bitset ~protocol ~dal_parameters ~attested_level
-    ~published_level ~slot_index ~dal_attestation] checks if a delegate's
-    [~dal_attestation] at [attested_level] is attested for [slot_index]
-    from [published_level]. *)
+(** [is_slot_attested_in_bitset ~endpoint ~protocol ~dal_parameters
+    ~attested_level ~published_level ~slot_index ~dal_attestation] checks if a
+    delegate's [~dal_attestation] at [attested_level] is attested for
+    [slot_index] from [published_level]. *)
 val is_slot_attested_in_bitset :
+  endpoint:Endpoint.t ->
   protocol:Protocol.t ->
   dal_parameters:Parameters.t ->
   attested_level:int ->
   published_level:int ->
   slot_index:int ->
   dal_attestation:string ->
-  bool
+  bool Lwt.t
 
-(** Encoding/decoding of the DAL content included in attestation operations. *)
+(** Encoding/decoding of the DAL content included in attestation operations.
+    For protocols >= 025, these functions use the RPCs
+    [decode_dal_attestation] and [encode_dal_attestation] to perform
+    encoding/decoding. For pre-025 protocols, the simple bitset format is
+    handled locally. *)
 module Attestations : sig
-  (** [encode_for_one_lag protocol ?lag_index dal_parameters slot_array] encodes
-      an array of Booleans into a string, the format depending on the [protocol]
-      and [dal_parameters]. The latter is necessary for [protocol] values >= 025,
-      [?lag_index] being an optional parameter to set the offset for the encoding,
-      defaulting to the last position in the [attestation_lags] list. *)
+  (** [encode_for_one_lag protocol endpoint ?lag_index dal_parameters slot_array]
+      encodes an array of Booleans into a DAL attestation bitset string.
+      For protocols >= 025, uses the encode_dal_attestation RPC via [endpoint].
+      [?lag_index] defaults to the last position in the [attestation_lags]
+      list. *)
   val encode_for_one_lag :
-    Protocol.t -> ?lag_index:int -> Parameters.t -> bool array -> string
+    Protocol.t ->
+    Endpoint.t ->
+    ?lag_index:int ->
+    Parameters.t ->
+    bool array ->
+    string Lwt.t
 
-  (** [encode protocol parameters attestations_per_lag] encodes
-      attestations for multiple lag indices in a single call.
-      [attestations_per_lag] is an array of bool arrays, one per lag index,
-      where element [i] contains the slot attestations for lag index [i].
-      For protocols < 025, the [attestations_per_lag] array must
-      only contain a single element and will be encoded using the pre-025
-      single-lag format. *)
-  val encode : Protocol.t -> bool array array -> string
+  (** [encode protocol endpoint attestations_per_lag] encodes attestations for
+      multiple lag indices. For protocols >= 025, uses the
+      encode_dal_attestation RPC via [endpoint]. *)
+  val encode : Protocol.t -> Endpoint.t -> bool array array -> string Lwt.t
 
-  (** [decode protocol parameters str] decodes and returns an array of
-      size [number_of_lags], where each element is a bool array of size
-      [number_of_slots] representing attested slots at that lag index. *)
-  val decode : Protocol.t -> Parameters.t -> string -> bool array array
+  (** [decode protocol endpoint parameters str] decodes a DAL attestation bitset
+      string. For protocols >= 025, uses the decode_dal_attestation RPC via
+      [endpoint]. Returns an array of size [number_of_lags], where each element
+      is a bool array of size [number_of_slots]. *)
+  val decode :
+    Protocol.t -> Endpoint.t -> Parameters.t -> string -> bool array array Lwt.t
 end
 
 module Helpers : sig

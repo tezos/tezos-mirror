@@ -298,14 +298,18 @@ let test_produce_and_propagate_shards ~executors ~protocol =
       Node.RPC.(call node1 @@ get_chain_block_metadata ())
     in
     let number_of_lags = List.length dal_parameters.attestation_lags in
-    let dal_attestation =
-      Option.map
-        (fun str ->
-          let dal_attestations =
-            Dal.Slot_availability.decode protocol dal_parameters str
+    let* dal_attestation =
+      match dal_attestation with
+      | None -> return None
+      | Some str ->
+          let* dal_attestations =
+            Dal.Slot_availability.decode
+              protocol
+              (Node.as_rpc_endpoint node1)
+              dal_parameters
+              str
           in
-          dal_attestations.(number_of_lags - 1))
-        dal_attestation
+          return (Some dal_attestations.(number_of_lags - 1))
     in
     let expected_attestation = expected_attestation dal_parameters [0] in
     Check.((Some expected_attestation = dal_attestation) (option (array bool)))

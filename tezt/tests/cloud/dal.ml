@@ -125,9 +125,13 @@ let get_infos_per_level t ~level ~metadata =
     let block = string_of_int level in
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
-  let attested_commitments =
+  let* attested_commitments =
     let str = JSON.(metadata |-> "dal_attestation" |> as_string) in
-    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
+    Dal_common.Attestations.decode
+      t.configuration.protocol
+      t.some_node_rpc_endpoint
+      t.parameters
+      str
   in
   let manager_operation_batches = JSON.(operations |=> 3 |> as_list) in
   let is_published_commitment operation =
@@ -169,7 +173,11 @@ let get_infos_per_level t ~level ~metadata =
       (JSON.as_list dal_committee_json)
   in
   let decode_dal_attestation str =
-    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
+    Dal_common.Attestations.decode
+      t.configuration.protocol
+      t.some_node_rpc_endpoint
+      t.parameters
+      str
   in
   (* For each attester that sent an attestation operation, record
      whether they attached a DAL payload ([Some bits]) or not ([None]). *)
@@ -180,34 +188,41 @@ let get_infos_per_level t ~level ~metadata =
     | "attestation_with_dal" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
         let str = JSON.(contents |-> "dal_attestation" |> as_string) in
-        [(Metrics.PKH pkh, Some (decode_dal_attestation str))]
+        let* payload = decode_dal_attestation str in
+        return [(Metrics.PKH pkh, Some payload)]
     | "attestations_aggregate" ->
         let metadata_committee =
           JSON.(contents |-> "metadata" |-> "committee" |> as_list)
         in
         let committee_info = JSON.(contents |-> "committee" |> as_list) in
-        List.map2
-          (fun member_info committee_meta ->
+        Lwt_list.map_s
+          (fun (member_info, committee_meta) ->
             let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
             let json = JSON.(member_info |-> "dal_attestation") in
-            let payload =
-              if JSON.is_null json then None
-              else Some (decode_dal_attestation (JSON.as_string json))
+            let* payload =
+              if JSON.is_null json then return None
+              else
+                let* decoded = decode_dal_attestation (JSON.as_string json) in
+                return (Some decoded)
             in
-            (Metrics.PKH pkh, payload))
-          committee_info
-          metadata_committee
+            return (Metrics.PKH pkh, payload))
+          (List.combine committee_info metadata_committee)
     | "attestation" ->
         let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
-        [(Metrics.PKH pkh, None)]
-    | _ -> []
+        return [(Metrics.PKH pkh, None)]
+    | _ -> return []
   in
   let baker_dal_payloads = Hashtbl.create 16 in
-  consensus_operations
-  |> List.iter (fun operation ->
-         get_dal_payload operation
-         |> List.iter (fun (pkh, payload) ->
-                Hashtbl.replace baker_dal_payloads pkh payload)) ;
+  let* () =
+    Lwt_list.iter_s
+      (fun operation ->
+        let* payloads = get_dal_payload operation in
+        List.iter
+          (fun (pkh, payload) -> Hashtbl.replace baker_dal_payloads pkh payload)
+          payloads ;
+        return ())
+      consensus_operations
+  in
   let* etherlink_operator_balance_sum =
     Etherlink_helpers.total_operator_balance
       ~client
