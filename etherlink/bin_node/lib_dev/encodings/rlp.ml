@@ -85,6 +85,8 @@ and encode buffer = function
   | Value b -> encode_value buffer b
   | List l -> encode_list buffer l
 
+let encode_bool b = Bytes.make 1 (if b then '\x01' else '\x00')
+
 let encode_int i =
   let buffer = Buffer.create 0 in
   encode_int buffer i ;
