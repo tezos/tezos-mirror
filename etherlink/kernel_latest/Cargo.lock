@@ -3495,6 +3495,7 @@ dependencies = [
  "primitive-types",
  "revm",
  "revm-etherlink",
+ "rlp",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
