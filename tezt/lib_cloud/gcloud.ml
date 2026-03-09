@@ -125,6 +125,21 @@ let list_iam_service_accounts ?filter () =
 let list_disks ?filter () =
   gcloud_run_stdout_filter ~filter ["compute"; "disks"; "list"]
 
+let delete_address ~name ~region ~project_id () =
+  Process.run
+    "gcloud"
+    [
+      "compute";
+      "addresses";
+      "delete";
+      name;
+      "--region";
+      region;
+      "--project";
+      project_id;
+      "--quiet";
+    ]
+
 module DNS = struct
   let create_zone ~domain ~zone () =
     let dns_name = Format.asprintf "%s.%s" zone domain in

@@ -229,6 +229,40 @@ let register_list_dns_domains ~tags =
       unit)
     zones
 
+let register_delete_unused_ips ~tags =
+  Cloud.register
+    ?vms:None
+    ~__FILE__
+    ~title:"Delete unused static IPs"
+    ~tags:("delete" :: "unused" :: "ips" :: tags)
+  @@ fun _cloud ->
+  let* project_id = Gcloud.project_id () in
+  let filter = Format.asprintf "status=RESERVED" in
+  let* addresses = Gcloud.list_addresses ~filter () in
+  let unused = JSON.as_list addresses in
+  match unused with
+  | [] ->
+      Log.info "No unused static IPs found in project %s." project_id ;
+      Lwt.return_unit
+  | _ ->
+      Log.info
+        "Found %d unused static IP(s) to delete in project %s."
+        (List.length unused)
+        project_id ;
+      Lwt_list.iter_s
+        (fun addr ->
+          let name = JSON.(addr |-> "name" |> as_string) in
+          let region_url = JSON.(addr |-> "region" |> as_string) in
+          (* The region field is a full URL; extract the last segment. *)
+          let region =
+            match String.split_on_char '/' region_url |> List.rev with
+            | r :: _ -> r
+            | [] -> region_url
+          in
+          Log.info "Deleting unused IP: %s (region: %s)" name region ;
+          Gcloud.delete_address ~name ~region ~project_id ())
+        unused
+
 let register_dns_add ~tags =
   Cloud.register
     ?vms:None
@@ -290,6 +324,7 @@ let register ~tags =
   register_prometheus_import ~tags ;
   register_clean_up_vms ~tags ;
   register_list_vms ~tags ;
+  register_delete_unused_ips ~tags ;
   register_create_dns_zone ~tags ;
   register_describe_dns_zone ~tags ;
   register_list_dns_domains ~tags ;
