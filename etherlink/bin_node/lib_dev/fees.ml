@@ -51,8 +51,14 @@ let default_minimum_base_fee_per_gas = Z.of_int 1_000_000_000
 
  *)
 
+(* Size of a single EIP-7702 authorization entry:
+   chain_id (32) + address (20) + nonce (8)
+   + y_parity (1) + r (32) + s (32) = 125 bytes.
+   Must stay in sync with [AUTHORIZATION_ENTRY_SIZE] in fees.rs. *)
+let authorization_entry_size = 125
+
 let gas_used_for_da_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
-    ~base_fee_per_gas ?access_list tx_data =
+    ~base_fee_per_gas ?access_list ?(authorization_list_len = 0) tx_data =
   (* The computation of the gas_for_fees comes from the kernel in fees.rs
      in the gas_for_fees function *)
   (* Constants defined in the kernel: *)
@@ -71,30 +77,37 @@ let gas_used_for_da_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
         Z.zero
         access_list
     in
+    let authorization_data_size =
+      Z.of_int (authorization_list_len * authorization_entry_size)
+    in
     let size_wo_access_list =
       Bytes.length tx_data + assumed_tx_encoded_size |> Z.of_int
     in
-    let size = Z.add size_wo_access_list access_list_size in
+    let size =
+      Z.add (Z.add size_wo_access_list access_list_size) authorization_data_size
+    in
     Z.mul da_fee_per_byte size
   in
   let fees = da_fee ?access_list da_fee_per_byte tx_data in
   if Compare.Z.(fees <= Z.zero) then Z.zero else Z.cdiv fees base_fee_per_gas
 
 let da_fees_gas_limit_overhead ~da_fee_per_byte ~minimum_base_fee_per_gas
-    ?access_list tx_data =
+    ?access_list ?authorization_list_len tx_data =
   gas_used_for_da_fees
     ~da_fee_per_byte
     ~base_fee_per_gas:minimum_base_fee_per_gas
     ?access_list
+    ?authorization_list_len
     tx_data
 
 let execution_gas_limit ~da_fee_per_byte ~minimum_base_fee_per_gas ?access_list
-    ~gas_limit tx_data =
+    ?authorization_list_len ~gas_limit tx_data =
   let da_gas =
     da_fees_gas_limit_overhead
       ~da_fee_per_byte
       ~minimum_base_fee_per_gas
       ?access_list
+      ?authorization_list_len
       tx_data
   in
   let result = Z.sub gas_limit da_gas in

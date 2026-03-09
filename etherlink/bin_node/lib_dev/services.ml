@@ -1311,10 +1311,15 @@ let dispatch_request (type f) ~websocket
                       let da_fee_per_byte =
                         Helpers.decode_z_le da_fee_per_byte_bytes
                       in
+                      let authorization_list_len =
+                        List.length
+                          (Transaction_object.authorization_list object_)
+                      in
                       let da_fees =
                         Fees.gas_used_for_da_fees
                           ~da_fee_per_byte:(Qty da_fee_per_byte)
                           ~base_fee_per_gas
+                          ~authorization_list_len
                           tx_data
                       in
                       let (Qty gas_used) = receipt.gasUsed in
