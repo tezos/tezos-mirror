@@ -49,6 +49,11 @@ let save_merged_level (type value) ~root_dir
   let* () = Store.save store effective in
   Store.close store
 
+(** Number of levels in the inclusive range
+    [[min_published_level, max_published_level]]. *)
+let nb_levels ~min_published_level ~max_published_level =
+  Int32.(to_int (sub max_published_level min_published_level)) + 1
+
 (** Iterate through all levels in the given range, calling [f] for each level. *)
 let iterate_levels ?notify ~min_published_level ~max_published_level f =
   let open Lwt_result_syntax in
@@ -323,8 +328,8 @@ module Merge = struct
   (** Export a filtered subset of the skip_list SQLite database by iterating
       through levels in the range [min_published_level, max_published_level]
       and copying the data using Dal_store_sqlite3 functions. *)
-  let merge_skip_list ~src ~dst ~min_published_level ~max_published_level ~slots
-      ~proto_plugins () =
+  let merge_skip_list ?notify ~src ~dst ~min_published_level
+      ~max_published_level ~slots ~proto_plugins () =
     let open Lwt_result_syntax in
     let*! () =
       Event.emit_snapshot_copying ~resource:"skip_list" ~step:"start"
@@ -332,6 +337,7 @@ module Merge = struct
     let get_slots = get_slots_for_level ~proto_plugins ~slots in
     let* () =
       copy_skip_list_cells
+        ?notify
         ~src_dir:src
         ~dst_dir:dst
         ~min_published_level
@@ -346,8 +352,8 @@ module Merge = struct
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
-  let merge_slots ~src ~dst ~min_published_level ~max_published_level ~slots
-      proto_plugins =
+  let merge_slots ?notify ~src ~dst ~min_published_level ~max_published_level
+      ~slots proto_plugins =
     let open Lwt_result_syntax in
     let*! () = Event.emit_snapshot_copying ~resource:"slots" ~step:"start" in
     let*! () = Lwt_utils_unix.create_dir dst in
@@ -377,7 +383,7 @@ module Merge = struct
       return_unit
     in
     let*! res =
-      iterate_levels ~min_published_level ~max_published_level
+      iterate_levels ?notify ~min_published_level ~max_published_level
       @@ fun slot_level ->
       let*? slots = get_slots_for_level ~proto_plugins ~slots slot_level in
       List.iter_es (copy_slot ~slot_level) slots
@@ -392,8 +398,8 @@ module Merge = struct
 
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
-  let merge_shards ~src ~dst ~min_published_level ~max_published_level ~slots
-      ~proto_plugins ~shards_store_lru_size () =
+  let merge_shards ?notify ~src ~dst ~min_published_level ~max_published_level
+      ~slots ~proto_plugins ~shards_store_lru_size () =
     let open Lwt_result_syntax in
     let*! () = Event.emit_snapshot_copying ~resource:"shards" ~step:"start" in
     let*! () = Lwt_utils_unix.create_dir dst in
@@ -442,7 +448,7 @@ module Merge = struct
       Key_value_store.close dst_store
     in
     let*! res =
-      iterate_levels ~min_published_level ~max_published_level
+      iterate_levels ?notify ~min_published_level ~max_published_level
       @@ fun slot_level ->
       let*? _, proto_parameters =
         Proto_plugins.get_plugin_and_parameters_for_level
@@ -465,9 +471,9 @@ module Merge = struct
     in
     Lwt.return res
 
-  let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
-      ~min_published_level ~max_published_level ~slots ~dst_root_dir ~event_path
-      ~event_kind =
+  let merge ~progress_display_mode ~frozen_only ~src_root_dir ~config_file
+      ~endpoint ~min_published_level ~max_published_level ~slots ~dst_root_dir
+      ~event_path ~event_kind =
     let open Lwt_result_syntax in
     let* {
            min_published_level;
@@ -492,6 +498,7 @@ module Merge = struct
         ~min_level:(Some min_published_level)
         ~max_level:(Some max_published_level)
     in
+    let total = nb_levels ~min_published_level ~max_published_level in
     (* Verify destination store chain_id matches, if it already exists *)
     let* () =
       let*! dir_exists = Lwt_unix.file_exists dst_root_dir in
@@ -513,13 +520,19 @@ module Merge = struct
     let* () =
       let src_slot_dir = src_root_dir // Store.Stores_dirs.slot in
       let dst_slot_dir = dst_root_dir // Store.Stores_dirs.slot in
-      merge_slots
-        ~src:src_slot_dir
-        ~dst:dst_slot_dir
-        ~min_published_level
-        ~max_published_level
-        ~slots
-        proto_plugins
+      Animation.display_progress
+        ~progress_display_mode
+        ~pp_print_step:(fun fmt i ->
+          Format.fprintf fmt "Copying slots: %d/%d levels" i total)
+        (fun notify ->
+          merge_slots
+            ~notify
+            ~src:src_slot_dir
+            ~dst:dst_slot_dir
+            ~min_published_level
+            ~max_published_level
+            ~slots
+            proto_plugins)
     in
     (* Export shards *)
     let shards_store_lru_size =
@@ -529,15 +542,21 @@ module Merge = struct
     let* () =
       let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
       let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
-      merge_shards
-        ~src:src_shard_dir
-        ~dst:dst_shard_dir
-        ~min_published_level
-        ~max_published_level
-        ~slots
-        ~proto_plugins
-        ~shards_store_lru_size
-        ()
+      Animation.display_progress
+        ~progress_display_mode
+        ~pp_print_step:(fun fmt i ->
+          Format.fprintf fmt "Copying shards: %d/%d levels" i total)
+        (fun notify ->
+          merge_shards
+            ~notify
+            ~src:src_shard_dir
+            ~dst:dst_shard_dir
+            ~min_published_level
+            ~max_published_level
+            ~slots
+            ~proto_plugins
+            ~shards_store_lru_size
+            ())
     in
     (* Export skip_list *)
     let* () =
@@ -547,14 +566,20 @@ module Merge = struct
       let src_skip_list_dir =
         src_root_dir // Store.Stores_dirs.skip_list_cells
       in
-      merge_skip_list
-        ~src:src_skip_list_dir
-        ~dst:dst_skip_list_dir
-        ~min_published_level
-        ~max_published_level
-        ~slots
-        ~proto_plugins
-        ()
+      Animation.display_progress
+        ~progress_display_mode
+        ~pp_print_step:(fun fmt i ->
+          Format.fprintf fmt "Copying skip list: %d/%d levels" i total)
+        (fun notify ->
+          merge_skip_list
+            ~notify
+            ~src:src_skip_list_dir
+            ~dst:dst_skip_list_dir
+            ~min_published_level
+            ~max_published_level
+            ~slots
+            ~proto_plugins
+            ())
     in
     let* () =
       save_to_store ~root_dir:dst_root_dir (module Store.Chain_id) chain_id
@@ -596,8 +621,8 @@ let init_logging () =
   in
   Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
 
-let export ~data_dir ~config_file ~endpoint ~min_published_level
-    ~max_published_level ~slots dst =
+let export ?(progress_display_mode = Animation.Auto) ~data_dir ~config_file
+    ~endpoint ~min_published_level ~max_published_level ~slots dst =
   let open Lwt_result_syntax in
   let*! () = init_logging () in
   let src_root_dir = store_path data_dir in
@@ -612,6 +637,7 @@ let export ~data_dir ~config_file ~endpoint ~min_published_level
     else return_unit
   in
   Merge.merge
+    ~progress_display_mode
     ~frozen_only:true
     ~src_root_dir
     ~config_file
@@ -623,8 +649,9 @@ let export ~data_dir ~config_file ~endpoint ~min_published_level
     ~event_path:dst_root_dir
     ~event_kind:"data dir"
 
-let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
-    ~min_published_level ~max_published_level ~slots src =
+let import ?(check = true) ?(progress_display_mode = Animation.Auto)
+    ~data_dir:dst ~config_file ~endpoint ~min_published_level
+    ~max_published_level ~slots src =
   let open Lwt_result_syntax in
   let*! () = init_logging () in
   if check then
@@ -635,6 +662,7 @@ let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
     let src_root_dir = store_path src in
     let dst_root_dir = store_path dst in
     Merge.merge
+      ~progress_display_mode
       ~frozen_only:false
       ~src_root_dir
       ~config_file
