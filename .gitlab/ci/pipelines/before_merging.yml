@@ -1434,7 +1434,8 @@ images.alpine-docker-ci:
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker_initialize.sh
     when: on_success
-  needs: []
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:

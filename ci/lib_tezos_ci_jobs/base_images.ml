@@ -425,6 +425,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~variables
       ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
       ~stage:Stages.build
+      ?dependencies:(Option.map (fun j -> Dependent [Job j]) start_job)
       ~name:"images.alpine-docker-ci"
       [
         (* minimal set of tools needed to bootstrap the docker-ci image *)
