@@ -47,13 +47,24 @@ Consensus
 Data Availability Layer
 -----------------------
 
+- Increase number of slots to 160. (MR :gl:`!20457`)
+
+- Increase slot size to 380_832 bytes. (MR :gl:`!20457`)
+
+- Introduced a new protocol parameter ``attestation_lags``, with the value ``[1;
+  2; 3; 4; 5]``, to represent the list of lags (offsets in levels from the
+  published level) at which bakers can attest the availability of a slot's
+  shards. Having multiple lags allows bakers to attest earlier when they
+  download shards quickly, while still offering later opportunities if more time
+  is needed. (MRs :gl:`!19994` and :gl:`!20429`)
+
 - Introduced a new format for the bitset representing baker-attested DAL slots,
   used in the DAL payload of consensus attestation operation, and
   protocol-attested DAL slots, used in a block metadata's field
   ``"dal_attestation"``. The format is described in the header of the file
-  ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`) and (MR :gl:`!20731`)
-- Increase number of slots to 160. (MR :gl:`!20457`)
-- Increase slot size to 380_832 bytes. (MR :gl:`!20457`)
+  ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MRs :gl:`!20734`
+  and :gl:`!20731`)
+
 - Introduced a new optional field ``lag_index`` to DAL entrapment evidence
   operations. (MR :gl:`!20360`)
 
