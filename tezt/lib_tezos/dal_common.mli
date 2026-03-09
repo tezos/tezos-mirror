@@ -94,19 +94,19 @@ val to_attested_levels :
 (** [is_slot_attested ~published_level ~slot_index ~to_attested_levels slot_availabilities]
     checks if a slot published at [~published_level] with [~slot_index] was attested
     at any valid attestation level.
-    
+
     Uses [to_attested_levels ~published_level] to compute all possible
     (attested_level, lag_index, dal_params, protocol) tuples where the slot
     could have been attested. For each tuple:
     - [attested_level]: The level at which to check for the attestation
-    - [lag_index]: Which lag position to check at that level (since each lag 
+    - [lag_index]: Which lag position to check at that level (since each lag
       position corresponds to a different published level)
     - [dal_params]: DAL parameters at [attested_level]
     - [protocol]: Protocol at [attested_level]
-    
+
     The [slot_availabilities] map should contain metadata for all relevant levels
     (typically obtained via {!collect_slot_availabilities}).
-    
+
     Returns wether the slot is found attested at ANY of the checked
     (level, lag_index) pairs. *)
 val is_slot_attested :
@@ -187,6 +187,11 @@ module Helpers : sig
   (* Calls {!Cryptobox.init_prover_dal} to initialize the DAL crypto in "prover"
      mode. *)
   val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
+
+  (* Resets DAL initialisation parameters to verifier mode. This ensures a
+     clean state when the parameters may have been altered by other tests
+     sharing the same process. *)
+  val init_verifier : unit -> unit
 
   val get_commitment_and_shards_with_proofs :
     ?precomputation:Cryptobox.shards_proofs_precomputation ->

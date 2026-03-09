@@ -608,6 +608,13 @@ val init_prover_dal :
   unit ->
   unit Error_monad.tzresult Lwt.t
 
+(** [init_verifier_dal ()] resets the DAL initialisation parameters to verifier
+    mode with the real (non-fake) embedded SRS. This is the default state at
+    program startup. Calling this is useful to restore a clean state when the
+    initialisation parameters may have been altered (e.g. by test code using
+    {!Internal_for_tests}). *)
+val init_verifier_dal : unit -> unit
+
 val pp_error :
   Format.formatter ->
   [ `Fail of string

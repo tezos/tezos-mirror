@@ -624,7 +624,12 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let* () = if prover then Helpers.init_prover ~__LOC__ () else unit in
+  let* () =
+    if prover then Helpers.init_prover ~__LOC__ ()
+    else (
+      Helpers.init_verifier () ;
+      unit)
+  in
   let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key

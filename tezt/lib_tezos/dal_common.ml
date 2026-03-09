@@ -1038,6 +1038,8 @@ module Helpers = struct
           e
     | Ok () -> unit
 
+  let init_verifier () = Cryptobox.init_verifier_dal ()
+
   let get_commitment_and_shards_with_proofs ?precomputation cryptobox ~slot =
     let res =
       Tezos_crypto_dal.Cryptobox.Internal_for_tests
