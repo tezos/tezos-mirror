@@ -118,9 +118,8 @@ pub struct StorageAccount {
 
 // Used as a value for the durable storage, can't use REVM `AccountInfo`
 // because we need to implement `RlpEncodable` `RlpDecodable`
-// TODO: Remove pub when `evm_execution` doesn't use it anymore.
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
-pub struct AccountInfoInternal {
+struct AccountInfoInternal {
     pub balance: U256,
     pub nonce: u64,
     pub code_hash: B256,
