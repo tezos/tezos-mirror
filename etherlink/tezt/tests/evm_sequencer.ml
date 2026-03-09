@@ -1559,6 +1559,80 @@ let test_delayed_deposit_is_included =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+let test_empty_deposit_info_does_not_block_valid_deposits =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~da_fee:arb_da_fee_for_delayed_inbox
+      (* TODO: Remove once the Mainnet kernel has been updated *)
+    ~kernels:[Latest]
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"; "empty"]
+    ~title:"Empty deposit info does not block valid deposits"
+    ~use_dal:ci_enabled_dal_registration
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let amount = Tez.of_int 16 in
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+  let* receiver_balance_prev =
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
+  in
+  (* First, send a deposit with empty deposit info (without baking). *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf "Pair %S 0x" sc_rollup_address)
+      ~amount
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  (* Then, send a valid deposit. Both will be included in the same L1 block
+     since we have not baked yet. *)
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor:
+        (* Use a different depositor to avoid counter collision. *)
+        Constant.bootstrap4
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Wait for the valid deposit to be picked up and included. *)
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* receiver_balance_next =
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:
+      "Expected a bigger balance after the valid deposit, the empty deposit \
+       info should not have blocked it" ;
+  unit
+
 let encode_data json codec =
   let* hex_string = Codec.encode ~name:codec json in
   let hex = `Hex (Durable_storage_path.no_0x hex_string) in
@@ -15778,6 +15852,7 @@ let () =
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
+  test_empty_deposit_info_does_not_block_valid_deposits protocols ;
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
   test_fa_reentrant_deposit_reverts protocols ;
