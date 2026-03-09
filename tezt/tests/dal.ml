@@ -526,9 +526,9 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   return (node, client, dal_parameters)
 
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?attestation_lag ?slot_size ?number_of_slots ?page_size
-    ?attestation_threshold ?number_of_shards ?redundancy_factor
+    ?consensus_committee_size ?consensus_threshold_size ?minimal_block_delay
+    ?delay_increment_per_round ?attestation_lag ?slot_size ?number_of_slots
+    ?page_size ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
     ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
@@ -576,6 +576,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ sc_rollup_activation_dal_params dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["consensus_threshold_size"] consensus_threshold_size
     @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_string_parameter
         ["delay_increment_per_round"]
@@ -761,9 +762,9 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?blocks_per_cycle ?delay_increment_per_round ?consensus_committee_size
-    ?redundancy_factor ?slot_size ?number_of_shards ?number_of_slots
-    ?attestation_lag ?attestation_threshold ?traps_fraction ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?consensus_threshold_size ?redundancy_factor ?slot_size ?number_of_shards
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?event_sections_levels ?operator_profiles ?history_mode ?prover
     ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready ?env
@@ -790,6 +791,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?delay_increment_per_round
         ?blocks_per_cycle
         ?consensus_committee_size
+        ?consensus_threshold_size
         ?redundancy_factor
         ?slot_size
         ?number_of_slots
@@ -12407,23 +12409,29 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
   let* () = Agnostic_baker.terminate baker in
   let () = Dal_node.Mockup_for_baker.stop dal_node_mockup in
 
+  let attested_level = published_level + attestation_lag in
   Log.info
-    "Check that the slot published at level %d was attested"
-    published_level ;
-  let* current_level = Node.get_level l1_node in
-  let attested_levels = published_level --> current_level in
-  let* all_slot_availabilities =
-    Dal.collect_slot_availabilities l1_node ~attested_levels
+    "Check that the slot published at level %d was attested at level %d"
+    published_level
+    attested_level ;
+  let* {dal_attestation; _} =
+    Node.RPC.(
+      call l1_node
+      @@ get_chain_block_metadata ~block:(string_of_int attested_level) ())
   in
-
-  Check.is_true
-    (Dal.is_slot_attested
-       ~published_level
-       ~slot_index:0
-       ~to_attested_levels:(Dal.to_attested_levels ~protocol ~dal_parameters)
-       all_slot_availabilities)
-    ~error_msg:"Expected slot 0 from published_level to be attested" ;
-
+  let dal_attestation =
+    Option.map
+      (fun str ->
+        let per_lag =
+          Dal.Slot_availability.decode protocol dal_parameters str
+        in
+        Array.init number_of_slots (fun slot_index ->
+            Array.exists (fun lag_array -> lag_array.(slot_index)) per_lag))
+      dal_attestation
+  in
+  let expected_attestation = expected_attestation dal_parameters [0] in
+  Check.((Some expected_attestation = dal_attestation) (option (array bool)))
+    ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
   unit
 
 let test_disable_shard_validation_wrong_cli _protocol _parameters _cryptobox
@@ -13175,6 +13183,152 @@ let test_attestations_encode_decode_multiple_lags =
   Log.info "Multi-lag encode/decode succeeded" ;
   unit
 
+(** Check that bakers do not reattest the same DAL content, with the introduction
+    of multiple lags.
+
+    Setup:
+    - consensus_threshold_size = consensus_committee_size * 2/3.
+    - Two baker processes run in parallel:
+        baker_a: bootstrap1, bootstrap2 (~2/5 of committee)
+        baker_b: bootstrap3, bootstrap4 (~2/5 of committee)
+    - Together they control ~4/5 > 2/3 of the committee, so the chain
+      advances normally.
+    - After the publication phase, we terminate baker_b for a few seconds.
+      With only baker_a's ~2/5 of attestations, the threshold cannot be
+      reached, so no round 0 block can be proposed at the next level.
+    - We restart baker_b as baker_b2; the chain advances at round > 0.
+    - This forces the baker to reattest at a higher round for the
+      current level, but it must NOT reattest at a later lag for the
+      same published_level. *)
+let test_no_redundant_dal_attestations protocol parameters _cryptobox node
+    client dal_node =
+  let client = Client.with_dal_node client ~dal_node in
+  let attestation_lags = parameters.Dal.Parameters.attestation_lags in
+  let min_lag = List.hd attestation_lags in
+  let max_lag = parameters.attestation_lag in
+  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let slot_index = 0 in
+
+  let delegates_a =
+    [Account.Bootstrap.keys.(0).alias; Account.Bootstrap.keys.(1).alias]
+  in
+  let delegates_b =
+    [Account.Bootstrap.keys.(2).alias; Account.Bootstrap.keys.(3).alias]
+  in
+
+  let run_baker delegates =
+    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+    Agnostic_baker.init
+      ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
+      ~dal_node_rpc_endpoint
+      ~delegates
+      ~state_recorder:true
+      node
+      client
+  in
+
+  let* first_level = next_level node in
+  let max_level = first_level + 3 in
+
+  (* Both bakers run in parallel, covering the publish window. *)
+  let* baker_a = run_baker delegates_a in
+  let* baker_b = run_baker delegates_b in
+
+  let rec publish_slots level =
+    if level > max_level then unit
+    else
+      let slot_content = generate_dummy_slot slot_size in
+      let* _ =
+        Helpers.publish_and_store_slot
+          client
+          dal_node
+          Account.Bootstrap.keys.(level mod 4)
+          ~index:slot_index
+          (Helpers.make_slot ~slot_size slot_content)
+      in
+      let* current_level = Node.wait_for_level node level in
+      Log.info "Slot publication injected, node at level %d" current_level ;
+      publish_slots (level + 1)
+  in
+  let* () = publish_slots first_level in
+
+  Log.info "Waiting for level %d" (max_level + min_lag) ;
+  let* _ = Node.wait_for_level node (max_level + min_lag) in
+  Log.info "Level %d reached, stop one baker" (max_level + min_lag) ;
+  let* () = Agnostic_baker.terminate baker_b in
+
+  let sleep_time = 1. in
+  Log.info
+    "Sleep %.1f to have a high round block, then restart baker"
+    sleep_time ;
+  let* () = Lwt_unix.sleep sleep_time in
+  let* baker_b2 = run_baker delegates_b in
+
+  let last_level = max_level + max_lag in
+  Log.info "Waiting for level %d" last_level ;
+  let* _ = Node.wait_for_level node last_level in
+  Log.info "Level %d reached" last_level ;
+  let* () = Agnostic_baker.terminate baker_a in
+  let* () = Agnostic_baker.terminate baker_b2 in
+
+  (* Maps (published_level, slot_index) -> (first_consensus_level, first_lag_index). *)
+  let first_seen : (int * int, int * int) Hashtbl.t = Hashtbl.create 64 in
+  let rec check_level level =
+    if level > last_level then unit
+    else
+      let* ops =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_operations_validation_pass
+             ~validation_pass:0
+             ~block:(string_of_int level)
+             ()
+      in
+      List.iter
+        (fun op ->
+          let contents = JSON.(op |-> "contents" |> as_list) |> List.hd in
+          let kind = JSON.(contents |-> "kind" |> as_string) in
+          let delegate =
+            JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
+          in
+          if
+            String.equal kind "attestation_with_dal"
+            && String.equal delegate Constant.bootstrap1.public_key_hash
+          then
+            let dal_str = JSON.(contents |-> "dal_attestation" |> as_string) in
+            let decoded = Dal.Attestations.decode protocol parameters dal_str in
+            List.iteri
+              (fun lag_index lag ->
+                let published_level = level - lag in
+                if
+                  published_level >= first_level
+                  && published_level <= max_level
+                  && lag_index < Array.length decoded
+                  && slot_index < Array.length decoded.(lag_index)
+                  && decoded.(lag_index).(slot_index)
+                then
+                  let key = (published_level, slot_index) in
+                  match Hashtbl.find_opt first_seen key with
+                  | None -> Hashtbl.add first_seen key (level, lag_index)
+                  | Some (first_level, first_lag_index)
+                    when lag_index <> first_lag_index ->
+                      Test.fail
+                        "Slot %d published at level %d:\n\
+                         - First attested at level=%d (lag=%d)\n\
+                         - Re-attested at level=%d (lag=%d)"
+                        slot_index
+                        published_level
+                        first_level
+                        (List.nth attestation_lags first_lag_index)
+                        level
+                        lag
+                  | Some _ -> ())
+              attestation_lags)
+        (JSON.as_list ops) ;
+      check_level (level + 1)
+  in
+  let* () = check_level (first_level + 1) in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -13352,6 +13506,16 @@ let register ~protocols =
     "dal node snapshot export/import"
     (test_dal_node_snapshot ~operators:[0; 3])
     protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~tags:["baker"; "dal"; "attestation"; "redundant"; "multi_lag"]
+    ~operator_profiles:[0]
+    ~activation_timestamp:Now
+    ~consensus_committee_size:256
+    ~consensus_threshold_size:171 (* 2/3 * 256 *)
+    "No redundant DAL attestations with multi-lag"
+    test_no_redundant_dal_attestations
+    (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes

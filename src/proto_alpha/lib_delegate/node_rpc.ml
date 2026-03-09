@@ -216,8 +216,10 @@ let raw_header cctxt ~chain ?(block = `Head 0) () =
   warn_on_stalling_rpc ~rpc_name:"raw_header"
   @@ Shell_services.Blocks.raw_header cctxt ~chain ~block ()
 
-let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
-    block_hash (block_header : Tezos_base.Block_header.t) =
+let proposal cctxt ?(cache : block_info Block_cache.t option)
+    ?(dal_included_attestations_cache :
+       Dal_included_attestations_cache.t option) ?operations ~chain block_hash
+    (block_header : Tezos_base.Block_header.t) =
   let open Lwt_result_syntax in
   let predecessor_hash = block_header.shell.predecessor in
   let pred_block = `Hash (predecessor_hash, 0) in
@@ -339,14 +341,45 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
         Option.iter (fun cache -> Block_cache.replace cache block_hash pi) cache ;
         return pi
   in
+  let*! () =
+    match
+      Option.iter_e
+        (fun dal_cache ->
+          (Dal_included_attestations_cache.update_from_proposal
+             dal_cache
+             ~attested_level:block.shell.level
+             ~block_hash
+             ~predecessor_hash
+             ~grandparent:predecessor.shell.predecessor
+             ~operations:block.quorum
+           [@profiler.record_f
+             {verbosity = Debug}
+               (Format.asprintf
+                  "update_from_proposal (attested_level : %ld)"
+                  block.shell.level)]))
+        dal_included_attestations_cache
+    with
+    | Ok () -> Lwt.return_unit
+    | Error trace ->
+        Events.(emit dal_cache_update_error (block.shell.level, trace))
+  in
   return {block; predecessor}
 
-let proposal cctxt ?cache ?operations ~chain block_hash block_header =
+let proposal cctxt ?cache ?dal_included_attestations_cache ?operations ~chain
+    block_hash block_header =
   (protect @@ fun () ->
-  proposal cctxt ?cache ?operations ~chain block_hash block_header)
+  proposal
+    cctxt
+    ?cache
+    ?dal_included_attestations_cache
+    ?operations
+    ~chain
+    block_hash
+    block_header)
   [@profiler.record_s {verbosity = Notice} "proposal_computation"]
 
-let monitor_valid_proposals cctxt ~chain ?cache () =
+let monitor_valid_proposals cctxt ~chain ?cache ?dal_included_attestations_cache
+    () =
   let open Lwt_result_syntax in
   let next_protocols = [Protocol.hash] in
   let* block_stream, stopper =
@@ -357,7 +390,14 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
       () [@profiler.overwrite Profiler.reset_block_section (block_hash, [])] ;
       () [@profiler.overwrite RPC_profiler.reset_block_section (block_hash, [])] ;
       (let*! map_result =
-         proposal cctxt ?cache ~operations ~chain block_hash block_header
+         proposal
+           cctxt
+           ?cache
+           ?dal_included_attestations_cache
+           ~operations
+           ~chain
+           block_hash
+           block_header
        in
        match map_result with
        | Ok proposal -> Lwt.return_some proposal

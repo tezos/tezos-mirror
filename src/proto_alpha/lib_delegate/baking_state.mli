@@ -64,6 +64,10 @@ module Delegate_infos : sig
 
   (** Returns the consensus committee at the level the slots were computed *)
   val consensus_committee : t -> int64
+
+  (** [slot_owner t ~slot] returns the public key hash of the delegate that
+      owns the given attestation slot. *)
+  val slot_owner : t -> slot:Slot.t -> Signature.Public_key_hash.t option
 end
 
 type delegate_infos = Delegate_infos.t
@@ -443,6 +447,7 @@ type global_state = {
   delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
+  dal_included_attestations_cache : Dal_included_attestations_cache.t;
 }
 
 val pp_global_state : Format.formatter -> global_state -> unit

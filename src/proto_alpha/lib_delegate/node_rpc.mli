@@ -66,6 +66,7 @@ val monitor_valid_proposals :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   ?cache:block_info Baking_cache.Block_cache.t ->
+  ?dal_included_attestations_cache:Dal_included_attestations_cache.t ->
   unit ->
   (proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 
