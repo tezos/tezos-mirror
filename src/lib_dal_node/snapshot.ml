@@ -90,17 +90,20 @@ module Merge = struct
             else None)
           cells
       in
-      match items_with_lag with
-      | [] -> return_unit
-      | (_, _, _, attestation_lag) :: _ ->
+      (* Insert each item individually with its correct attested_level.
+         Items at the same published_level may have different attestation
+         lags so a single attested_level cannot be shared across all items. *)
+      List.iter_es
+        (fun (hash, cell, slot_index, attestation_lag) ->
           let attested_level =
             Int32.(add slot_level (of_int attestation_lag))
           in
           Dal_store_sqlite3.Skip_list_cells.insert
             dst_db
             ~attested_level
-            items_with_lag
-            Fun.id
+            [(hash, cell, slot_index, attestation_lag)]
+            Fun.id)
+        items_with_lag
     in
     Lwt.finalize
       (fun () ->
