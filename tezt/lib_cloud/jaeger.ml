@@ -5,9 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = unit
+type t = {port : int}
 
-let run () =
+let run ?(port = 16686) ?(interface = "0.0.0.0") () =
   let* () =
     Process.run
       "docker"
@@ -20,9 +20,11 @@ let run () =
         "--name";
         "jaeger";
         "-p";
-        "16686:16686";
+        sf "%d:%d" port port;
         "-p";
         "14250:14250";
+        "-e";
+        sf "QUERY_HTTP_SERVER_HOST_PORT=%s:%d" interface port;
         "jaegertracing/all-in-one:latest";
       ]
   in
@@ -30,11 +32,18 @@ let run () =
   let run () =
     Process.spawn
       "curl"
-      ["-s"; "-o"; "/dev/null"; "-w"; "%{http_code}"; "http://localhost:16686/"]
+      [
+        "-s";
+        "-o";
+        "/dev/null";
+        "-w";
+        "%{http_code}";
+        sf "http://localhost:%d/" port;
+      ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
-  Lwt.return ()
+  Lwt.return {port}
 
-let shutdown () =
+let shutdown _t =
   let* () = Docker.kill "jaeger" |> Process.check in
   Lwt.return_unit

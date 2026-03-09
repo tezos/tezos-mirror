@@ -7,6 +7,6 @@
 
 type t
 
-val run : unit -> t Lwt.t
+val run : ?port:int -> ?interface:string -> unit -> t Lwt.t
 
 val shutdown : t -> unit Lwt.t

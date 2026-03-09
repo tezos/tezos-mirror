@@ -304,7 +304,7 @@ let register_rules ?(group_name = default_group_name) ?interval rules t =
   write_rules_file t ;
   reload t
 
-let start ~alerts agents =
+let start ?(interface = "0.0.0.0") ~alerts agents =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Path.tmp_dir // "prometheus" in
@@ -365,7 +365,7 @@ let start ~alerts agents =
         (* To export a snapshot. *)
         "--web.enable-lifecycle";
         (* To reload the configuration while prometheus is running.*)
-        Format.asprintf "--web.listen-address=:%d" port;
+        Format.asprintf "--web.listen-address=%s:%d" interface port;
         (* Specify the port on which the prometheus instance runs. *)
       ]
   in
