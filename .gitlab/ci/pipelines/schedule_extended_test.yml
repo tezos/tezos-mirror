@@ -697,6 +697,7 @@ check_riscv_kernels:
   script:
   - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
     check
+  - make -C src/lib_riscv/kernels check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -736,6 +737,7 @@ audit_riscv_deps:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv audit
+  - make -C src/lib_riscv/kernels audit
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
