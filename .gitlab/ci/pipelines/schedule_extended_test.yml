@@ -632,97 +632,6 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-baker
     - ./octez-binaries/x86_64/telemetry/octez-client
 
-oc.install_opam_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - when: always
-  needs: []
-  dependencies: []
-  allow_failure: true
-  timeout: 2 hours
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - apt update
-  - apt install -y sudo
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/install-opam.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
-oc.compile_sources_doc_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - when: always
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/compile-sources-setup.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-  parallel:
-    matrix:
-    - IMAGE:
-      - debian:trixie-master-3bb7eddc
-      - ubuntu:24.04-master-3bb7eddc
-
-oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
-  stage: test
-  tags:
-  - gcp_very_high_cpu_ramfs
-  rules:
-  - when: always
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  parallel:
-    matrix:
-    - IMAGE:
-      - build-debian:trixie
-      - build-ubuntu:24.04
-
 sdk_bindings.test:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: test
@@ -1722,6 +1631,132 @@ test_sdk_rust:
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+oc.install_opam_noble:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 2 hours
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - apt update
+  - apt install -y sudo
+  - ./docs/introduction/install-opam.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.compile_sources_doc_deps_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-3bb7eddc
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/compile-sources-setup.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.compile_sources_doc_deps_noble:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/compile-sources-setup.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.compile_sources_doc_trixie:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
+  stage: test
+  tags:
+  - gcp_very_high_cpu_ramfs
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+oc.compile_sources_doc_noble:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
+  stage: test
+  tags:
+  - gcp_very_high_cpu_ramfs
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"

@@ -932,72 +932,6 @@ trigger:homebrew_auto:
     include: .gitlab/ci/pipelines/homebrew_auto.yml
     strategy: depend
 
-oc.install_opam_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  dependencies: []
-  allow_failure: true
-  timeout: 2 hours
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - apt update
-  - apt install -y sudo
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/install-opam.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
-oc.compile_sources_doc_master:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
-  stage: test
-  tags:
-  - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - docs/introduction/compile-sources.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  parallel:
-    matrix:
-    - IMAGE:
-      - build-debian:trixie
-
 trigger:homebrew:
   stage: manual
   variables:
@@ -3147,6 +3081,69 @@ test_sdk_rust:
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+oc.install_opam_noble:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 2 hours
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - apt update
+  - apt install -y sudo
+  - ./docs/introduction/install-opam.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+oc.compile_sources_doc:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
+  stage: test
+  tags:
+  - gcp_very_high_cpu_ramfs
+  rules:
+  - changes:
+    - docs/introduction/compile-sources.sh
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
+    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
