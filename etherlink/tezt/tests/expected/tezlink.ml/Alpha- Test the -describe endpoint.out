@@ -34,6 +34,11 @@ Available services:
       Expose the operating mode of the EVM node 
   + tezlink/
     + chains/<chain_id>/
+      - GET /tezlink/chains/<chain_id>/blocks
+          Lists block hashes from '<chain>', up to the last checkpoint,
+          sorted with decreasing fitness. Without arguments it returns the
+          head of the chain. Optional arguments allow to return the list of
+          predecessors of a given block or of a set of blocks. 
       - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
       - GET /tezlink/chains/<chain_id>/chain_id
           The chain unique identifier. 
@@ -98,6 +103,11 @@ Warning:
 Available services:
   
   + chains/<chain_id>/
+    - GET /chains/<chain_id>/blocks
+        Lists block hashes from '<chain>', up to the last checkpoint, sorted
+        with decreasing fitness. Without arguments it returns the head of the
+        chain. Optional arguments allow to return the list of predecessors of
+        a given block or of a set of blocks. 
     - /chains/<chain_id>/blocks/<block_id> <dynamic>
     - GET /chains/<chain_id>/chain_id
         The chain unique identifier. 
