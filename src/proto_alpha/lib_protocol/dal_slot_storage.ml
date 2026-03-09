@@ -117,12 +117,6 @@ let remove_old_headers ctxt ~published_level =
   | None -> return ctxt
   | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
 
-let get_shard_count_map ctxt ~shard_assignment_level =
-  let delegate_to_shard_count =
-    Raw_context.Consensus.delegate_to_shard_count ctxt
-  in
-  Raw_level_repr.Map.find shard_assignment_level delegate_to_shard_count
-
 (** [merge_attestation_history ~attestation_lag ~threshold
     ~number_of_shards ~get_shard_count_map
     current_block_accountability stored_history] merges the current block's
@@ -227,12 +221,12 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
      - [current_slot_map]: attestation data from THIS block for this level
      - Returns updated history and newly attested slots map *)
   let merge_level published_level current_slot_map (history, newly_attested) =
-    (* shard_assignment_level = published_level + attestation_lag - 1 *)
-    let shard_assignment_level =
+    (* committee_level = published_level + attestation_lag - 1 *)
+    let committee_level =
       Raw_level_repr.add published_level (attestation_lag - 1)
     in
     let shard_count_map =
-      match get_shard_count_map ~shard_assignment_level with
+      match get_shard_count_map ~committee_level with
       | None -> Signature.Public_key_hash.Map.empty
       | Some map -> map
     in
@@ -484,21 +478,16 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
               in
               (* Second, we do not increase the participation of all those that
                  did not attest, while having assigned shards. *)
-              let shard_assignment_level =
+              let committee_level =
                 (* same as [current_level - 1], but in this way we avoid a match *)
                 Raw_level_repr.add finalized_level (attestation_lag - 1)
               in
-              let committee_level_to_delegate_to_shard_count =
-                Raw_context.Consensus.delegate_to_shard_count ctxt
-              in
               match
-                Raw_level_repr.Map.find
-                  shard_assignment_level
-                  committee_level_to_delegate_to_shard_count
+                Raw_context.Consensus.shard_count_map ctxt ~committee_level
               with
               | None ->
                   (* unreachable by construction of
-                  [committee_level_to_delegate_to_shard_count] *)
+                  [delegate_to_shard_count] *)
                   assert false
               | Some delegate_to_shard_count ->
                   Signature.Public_key_hash.Map.fold
@@ -700,7 +689,7 @@ let finalize_attestation_history ctxt =
     | Some stored_history ->
         unpack_history ctxt ~threshold ~number_of_shards stored_history
   in
-  let get_shard_count_map = get_shard_count_map ctxt in
+  let get_shard_count_map = Raw_context.Consensus.shard_count_map ctxt in
   let updated_history, newly_attested =
     merge_attestation_history
       ~attestation_lag

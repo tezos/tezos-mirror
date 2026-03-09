@@ -61,8 +61,9 @@ module Helpers = struct
     let* delegate_to_shard_count =
       Assert.get_some
         ~loc:__LOC__
-        (Raw_level_repr.Map.find shard_assignment_level
-        @@ Raw_context.Consensus.delegate_to_shard_count ctxt)
+        (Raw_context.Consensus.shard_count_map
+           ctxt
+           ~committee_level:shard_assignment_level)
     in
     let* _ctxt, attesters =
       bitset_to_attesters ctxt ~shard_assignment_level ~bitset

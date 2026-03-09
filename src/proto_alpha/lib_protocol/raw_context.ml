@@ -2073,6 +2073,11 @@ module type CONSENSUS = sig
   val delegate_to_shard_count :
     t -> int Signature.Public_key_hash.Map.t raw_level_map
 
+  val shard_count_map :
+    t ->
+    committee_level:Raw_level_repr.t ->
+    int Signature.Public_key_hash.Map.t option
+
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
@@ -2139,6 +2144,11 @@ module Consensus :
 
   let[@inline] delegate_to_shard_count ctxt =
     ctxt.back.consensus.delegate_to_shard_count
+
+  let[@inline] shard_count_map ctxt ~committee_level =
+    Raw_level_repr.Map.find
+      committee_level
+      ctxt.back.consensus.delegate_to_shard_count
 
   let[@inline] forbidden_delegates ctxt =
     ctxt.back.consensus.forbidden_delegates

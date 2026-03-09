@@ -385,6 +385,14 @@ module type CONSENSUS = sig
   val delegate_to_shard_count :
     t -> int Signature.Public_key_hash.Map.t raw_level_map
 
+  (** [shard_count_map ctxt ~committee_level] returns the
+      delegate-to-shard-count map for the given [committee_level],
+      or [None] if the level is not present in the pre-computed map. *)
+  val shard_count_map :
+    t ->
+    committee_level:Raw_level_repr.t ->
+    int Signature.Public_key_hash.Map.t option
+
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
       due to a previous slashing. *)
