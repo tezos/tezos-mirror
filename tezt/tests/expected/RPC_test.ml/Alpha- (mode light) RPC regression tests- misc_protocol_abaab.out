@@ -170,12 +170,12 @@
     "credit": "-1466666666666" } ]
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/swrr_selected_bakers
-[ "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]",
-  "[PUBLIC_KEY_HASH]" ]
+[ { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" },
+  { "consensus_pk": "[PUBLIC_KEY]" } ]
