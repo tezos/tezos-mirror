@@ -13,9 +13,9 @@
 
 module CI = Cacio.Shared
 
-let job_install_opam_noble =
+let job_install_opam_ubuntu =
   CI.job
-    "oc.install_opam_noble"
+    "oc.install_opam_ubuntu"
     ~__POS__
     ~description:"Check that Octez can be installed via opam."
     ~stage:Test
@@ -47,14 +47,14 @@ let compile_sources_doc_deps_job ~name_suffix ~image =
     ~only_if_changed:["docs/introduction/compile-sources-setup.sh"]
     [sf "./docs/introduction/compile-sources-setup.sh"]
 
-let job_compile_sources_doc_deps_trixie =
+let job_compile_sources_doc_deps_debian =
   compile_sources_doc_deps_job
-    ~name_suffix:"_trixie"
+    ~name_suffix:"_debian"
     ~image:Tezos_ci.Images.Base_images.debian_trixie
 
-let job_compile_sources_doc_deps_noble =
+let job_compile_sources_doc_deps_ubuntu =
   compile_sources_doc_deps_job
-    ~name_suffix:"_noble"
+    ~name_suffix:"_ubuntu"
     ~image:Tezos_ci.Images.Base_images.ubuntu_24_04
 
 let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
@@ -79,16 +79,16 @@ let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
     ~sccache:(Cacio.sccache ())
     [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
 
-let job_compile_sources_doc_latest_trixie =
+let job_compile_sources_doc_latest_debian =
   compile_sources_doc_job
-    ~name_suffix:"_trixie"
+    ~name_suffix:"_debian"
     ~project:"tezos/tezos"
     ~branch:"latest-release"
     ~image_name:"build-debian:trixie"
 
-let job_compile_sources_doc_latest_noble =
+let job_compile_sources_doc_latest_ubuntu =
   compile_sources_doc_job
-    ~name_suffix:"_noble"
+    ~name_suffix:"_ubuntu"
     ~project:"tezos/tezos"
     ~branch:"latest-release"
     ~image_name:"build-ubuntu:24.04"
@@ -102,13 +102,13 @@ let job_compile_sources_doc =
 
 let register () =
   CI.register_merge_request_jobs
-    [(Manual, job_install_opam_noble); (Auto, job_compile_sources_doc)] ;
+    [(Manual, job_install_opam_ubuntu); (Auto, job_compile_sources_doc)] ;
   CI.register_schedule_extended_test_jobs
     [
-      (Auto, job_install_opam_noble);
-      (Auto, job_compile_sources_doc_deps_trixie);
-      (Auto, job_compile_sources_doc_deps_noble);
-      (Auto, job_compile_sources_doc_latest_trixie);
-      (Auto, job_compile_sources_doc_latest_noble);
+      (Auto, job_install_opam_ubuntu);
+      (Auto, job_compile_sources_doc_deps_debian);
+      (Auto, job_compile_sources_doc_deps_ubuntu);
+      (Auto, job_compile_sources_doc_latest_debian);
+      (Auto, job_compile_sources_doc_latest_ubuntu);
     ] ;
   ()

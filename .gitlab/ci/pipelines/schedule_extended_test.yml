@@ -1637,7 +1637,7 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-oc.install_opam_noble:
+oc.install_opam_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
   stage: test
   tags:
@@ -1661,7 +1661,7 @@ oc.install_opam_noble:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-oc.compile_sources_doc_deps_trixie:
+oc.compile_sources_doc_deps_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-3bb7eddc
   stage: test
   tags:
@@ -1682,7 +1682,7 @@ oc.compile_sources_doc_deps_trixie:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-oc.compile_sources_doc_deps_noble:
+oc.compile_sources_doc_deps_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
   stage: test
   tags:
@@ -1703,7 +1703,7 @@ oc.compile_sources_doc_deps_noble:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-oc.compile_sources_doc_trixie:
+oc.compile_sources_doc_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-debian:trixie
   stage: test
   tags:
@@ -1733,7 +1733,7 @@ oc.compile_sources_doc_trixie:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-oc.compile_sources_doc_noble:
+oc.compile_sources_doc_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
   stage: test
   tags:
