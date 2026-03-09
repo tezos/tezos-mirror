@@ -133,7 +133,12 @@ impl FeeUpdates {
         block_fees: &BlockFees,
         execution_gas_used: U256,
     ) -> Self {
-        let da_fee = da_fee(block_fees.da_fee_per_byte(), &tx.data, &tx.access_list);
+        let da_fee = da_fee(
+            block_fees.da_fee_per_byte(),
+            &tx.data,
+            &tx.access_list,
+            tx.authorization_list.as_deref().unwrap_or_default().len(),
+        );
 
         Self::of_gas_and_da_fee(block_fees, execution_gas_used, da_fee)
     }
@@ -227,7 +232,7 @@ pub fn simulation_add_gas_for_fees(
     block_fees: &BlockFees,
     tx_data: &[u8],
 ) -> Result<SimulationOutcome, Error> {
-    // Simulation does not have an access list
+    // Simulation does not have an access list or authorization list
     let gas_for_fees = gas_for_fees(
         block_fees.da_fee_per_byte(),
         // We select minimum base fee per gas, to ensure that the user has sufficient gas
@@ -235,6 +240,7 @@ pub fn simulation_add_gas_for_fees(
         block_fees.minimum_base_fee_per_gas(),
         tx_data,
         &[],
+        0,
     )?;
 
     outcome.gas_used = outcome.gas_used.saturating_add(gas_for_fees);
@@ -263,6 +269,7 @@ pub fn tx_execution_gas_limit(
         fees.minimum_base_fee_per_gas(),
         &tx.data,
         &tx.access_list,
+        tx.authorization_list.as_deref().unwrap_or_default().len(),
     )?;
 
     tx.gas_limit_with_fees()
@@ -276,27 +283,46 @@ pub(crate) fn gas_for_fees(
     gas_price: U256,
     tx_data: &[u8],
     tx_access_list: &[AccessListItem],
+    authorization_list_len: usize,
 ) -> Result<u64, Error> {
-    let fees = da_fee(da_fee_per_byte, tx_data, tx_access_list);
+    let fees = da_fee(
+        da_fee_per_byte,
+        tx_data,
+        tx_access_list,
+        authorization_list_len,
+    );
 
     let gas_for_fees = cdiv(fees, gas_price);
     gas_as_u64(gas_for_fees)
 }
+
+// Size of a single EIP-7702 authorization entry:
+// chain_id (U256=32) + address (H160=20) + nonce (u64=8)
+// + y_parity (u8=1) + r (U256=32) + s (U256=32) = 125 bytes
+const AUTHORIZATION_ENTRY_SIZE: usize = size_of::<U256>()
+    + size_of::<H160>()
+    + size_of::<u64>()
+    + size_of::<u8>()
+    + 2 * size_of::<U256>();
 
 /// Data availability fee for a transaction with given data size.
 pub(crate) fn da_fee(
     da_fee_per_byte: U256,
     tx_data: &[u8],
     access_list: &[AccessListItem],
+    authorization_list_len: usize,
 ) -> U256 {
     let access_data_size: usize = access_list
         .iter()
         .map(|ali| size_of::<H160>() + size_of::<H256>() * ali.storage_keys.len())
         .sum();
 
+    let authorization_data_size = authorization_list_len * AUTHORIZATION_ENTRY_SIZE;
+
     U256::from(tx_data.len())
         .saturating_add(ASSUMED_TX_ENCODED_SIZE.into())
         .saturating_add(access_data_size.into())
+        .saturating_add(authorization_data_size.into())
         .saturating_mul(da_fee_per_byte)
 }
 

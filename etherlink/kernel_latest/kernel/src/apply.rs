@@ -450,6 +450,10 @@ where
             block_constants.block_fees.da_fee_per_byte(),
             &transaction.data,
             &transaction.access_list,
+            transaction
+                .authorization_list
+                .as_ref()
+                .map_or(0, |al| al.len()),
         );
 
         let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
