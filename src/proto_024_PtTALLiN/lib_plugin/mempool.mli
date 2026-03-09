@@ -182,6 +182,9 @@ val default_minimal_nanotez_per_gas_unit : nanotez
 (** Minimal fee over byte size ratio in {!default_config}. *)
 val default_minimal_nanotez_per_byte : nanotez
 
+(** Extract the [minimal_nanotez_per_byte] field from a {!config}. *)
+val get_minimal_nanotez_per_byte : config -> nanotez
+
 (** Protocol context *)
 type ctxt
 
