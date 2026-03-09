@@ -124,6 +124,10 @@ val state_of_output_proof : output_proof -> hash
 
 val verify_output_proof : output_proof -> output option
 
+val verify_output_proof_res : output_proof -> (output, string) result
+
+val produce_output_proof : state -> output_info -> (output_proof, string) result
+
 val serialise_output_proof : output_proof -> bytes
 
 val deserialise_output_proof : bytes -> (output_proof, string) result

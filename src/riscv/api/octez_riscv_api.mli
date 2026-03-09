@@ -11,10 +11,10 @@ type id
 type status = Evaluating | Waiting_for_input | Waiting_for_reveal
 type input = Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes
 type input_request = No_input_required | Initial | First_after of {level: int32; counter: int64} | Needs_reveal of bytes
+type proof
 type output_info = {message_index : int32; outbox_level : int32}
 type output = {info : output_info; encoded_message : bytes}
 type output_proof
-type proof
 external octez_riscv_from_imm: state -> mut_state = "octez_riscv_from_imm"
 external octez_riscv_to_imm: mut_state -> state = "octez_riscv_to_imm"
 external octez_riscv_id_unsafe_of_raw_bytes: bytes -> id = "octez_riscv_id_unsafe_of_raw_bytes"
@@ -56,9 +56,10 @@ external octez_riscv_produce_proof: input option -> state -> proof option = "oct
 external octez_riscv_verify_proof: input option -> proof -> input_request option = "octez_riscv_verify_proof"
 external octez_riscv_serialise_proof: proof -> bytes = "octez_riscv_serialise_proof"
 external octez_riscv_deserialise_proof: bytes -> (proof, string) Result.t = "octez_riscv_deserialise_proof"
+external octez_riscv_produce_output_proof: state -> output_info -> (output_proof, string) Result.t = "octez_riscv_produce_output_proof"
+external octez_riscv_verify_output_proof: output_proof -> (output, string) Result.t = "octez_riscv_verify_output_proof"
 external octez_riscv_output_info_of_output_proof: output_proof -> output_info = "octez_riscv_output_info_of_output_proof"
-external octez_riscv_state_of_output_proof: output_proof -> bytes = "octez_riscv_state_of_output_proof"
-external octez_riscv_verify_output_proof: output_proof -> output option = "octez_riscv_verify_output_proof"
+external octez_riscv_state_hash_of_output_proof: output_proof -> bytes = "octez_riscv_state_hash_of_output_proof"
 external octez_riscv_serialise_output_proof: output_proof -> bytes = "octez_riscv_serialise_output_proof"
 external octez_riscv_deserialise_output_proof: bytes -> (output_proof, string) result = "octez_riscv_deserialise_output_proof"
 external octez_riscv_get_outbox_for_level: state -> int32 -> output list = "octez_riscv_get_outbox_for_level"

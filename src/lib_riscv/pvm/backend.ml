@@ -32,6 +32,8 @@ type output_proof = Api.output_proof
 
 type output_info = {
   message_index : Z.t;
+  (* This type guarantees infallible conversions both to and from `Raw_level_repr.t`
+   * and, on the Rust side of the API, `RawLevel` *)
   outbox_level : Bounded.Non_negative_int32.t;
 }
 
@@ -49,6 +51,17 @@ let from_api_output_info : Api.output_info -> output_info =
     | Some level -> level
   in
   {message_index = Z.of_int32 message_index; outbox_level}
+
+let try_to_api_output_info : output_info -> (Api.output_info, string) result =
+ fun {message_index; outbox_level} ->
+  Option.catch (fun () -> Z.to_int32 message_index)
+  |> Option.to_result ~none:"message_index too large"
+  |> Result.map (fun message_index ->
+         Api.
+           {
+             message_index;
+             outbox_level = Bounded.Non_negative_int32.to_value outbox_level;
+           })
 
 let from_api_output : Api.output -> output =
  fun {info; encoded_message} ->
@@ -220,12 +233,21 @@ let output_info_of_output_proof output_proof =
 
 let state_of_output_proof output_proof =
   riscv_hash_to_rollup_state_hash
-  @@ Api.octez_riscv_state_of_output_proof output_proof
+  @@ Api.octez_riscv_state_hash_of_output_proof output_proof
 
 let verify_output_proof output_proof =
-  let open Option_syntax in
+  Api.octez_riscv_verify_output_proof output_proof
+  |> Option.of_result |> Option.map from_api_output
+
+let verify_output_proof_res output_proof =
+  let open Result_syntax in
   let+ output = Api.octez_riscv_verify_output_proof output_proof in
   from_api_output output
+
+let produce_output_proof state output_info =
+  let open Result_syntax in
+  let* api_output_info = try_to_api_output_info output_info in
+  Api.octez_riscv_produce_output_proof state api_output_info
 
 let serialise_output_proof output_proof =
   Api.octez_riscv_serialise_output_proof output_proof
