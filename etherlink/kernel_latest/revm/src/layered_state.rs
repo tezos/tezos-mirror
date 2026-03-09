@@ -191,12 +191,8 @@ impl LayeredState {
     /// Revert the data stored in `etherlink_data` by reverse-applying
     /// all the entries from the last one to the the latest checkpoint.
     pub fn checkpoint_revert(&mut self) {
-        let entries = if let Some(depth) = self.depths.pop() {
-            self.entries.drain(depth..).collect::<Vec<_>>()
-        } else {
-            mem::take(&mut self.entries)
-        };
-        for entry in entries.into_iter().rev() {
+        let start = self.depths.pop().unwrap_or(0);
+        for entry in self.entries.drain(start..).rev() {
             match entry {
                 EtherlinkEntry::TicketBalanceAdd {
                     ticket_hash,

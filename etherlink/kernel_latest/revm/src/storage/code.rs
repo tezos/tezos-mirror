@@ -119,7 +119,6 @@ impl CodeStorage {
         Ok(number_reference)
     }
 
-    #[allow(dead_code)]
     pub fn delete(host: &mut impl StorageV1, code_hash: &B256) -> Result<(), Error> {
         let code = Self::new(code_hash)?;
         if code.exists(host)? {
