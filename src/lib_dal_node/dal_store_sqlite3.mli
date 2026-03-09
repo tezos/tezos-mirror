@@ -58,15 +58,16 @@ module Skip_list_cells : sig
     (Skip_list_cell.t * int) option tzresult Lwt.t
 
   (** [find_by_level ?conn store ~published_level] retrieves the tuples (cell *
-      hash * slot_index) for the given published level, if any. The results are
-      sorted in decreasing order w.r.t. slot indices. *)
+      hash * slot_index * attestation_lag) for the given published level, if
+      any. The results are sorted in decreasing order w.r.t. slot indices. *)
   val find_by_level :
     ?conn:conn ->
     t ->
     published_level:int32 ->
     (Dal_proto_types.Skip_list_cell.t
     * Dal_proto_types.Skip_list_hash.t
-    * Types.slot_index)
+    * Types.slot_index
+    * int)
     list
     tzresult
     Lwt.t

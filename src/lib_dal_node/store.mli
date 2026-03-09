@@ -313,7 +313,8 @@ module Skip_list_cells : sig
     published_level:int32 ->
     (Dal_proto_types.Skip_list_cell.t
     * Dal_proto_types.Skip_list_hash.t
-    * Types.slot_index)
+    * Types.slot_index
+    * int)
     list
     tzresult
     Lwt.t

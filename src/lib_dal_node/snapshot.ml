@@ -76,33 +76,18 @@ module Merge = struct
         ()
     in
     let module SlotsSet = Set.Make (Int) in
-    let copy_skip_list ~slot_level slots _slot_index =
-      (* Get all skip list cells for this level from source *)
+    let copy_skip_list ~slot_level slots () =
       let* cells =
         Dal_store_sqlite3.Skip_list_cells.find_by_level
           src_db
           ~published_level:slot_level
       in
-      (* For each slot in this level, get complete info and insert into destination *)
-      let* items_with_lag =
-        List.filter_map_es
-          (fun (_cell, hash, slot_index) ->
+      let items_with_lag =
+        List.filter_map
+          (fun (cell, hash, slot_index, attestation_lag) ->
             if SlotsSet.mem slot_index slots then
-              let slot_id = Types.Slot_id.{slot_level; slot_index} in
-              let* result =
-                Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
-                  src_db
-                  slot_id
-              in
-              match result with
-              | Some (cell, attestation_lag) ->
-                  return_some (hash, cell, slot_index, attestation_lag)
-              | None ->
-                  failwith
-                    "Cell for slot_id (%ld, %d) not found."
-                    slot_level
-                    slot_index
-            else return_none)
+              Some (hash, cell, slot_index, attestation_lag)
+            else None)
           cells
       in
       match items_with_lag with
@@ -134,9 +119,7 @@ module Merge = struct
                     (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
                   slots
               in
-              List.iter_es
-                (copy_skip_list ~slot_level (SlotsSet.of_list slots))
-                slots)
+              copy_skip_list ~slot_level (SlotsSet.of_list slots) ())
             ~min_published_level
             ~max_published_level
         in
