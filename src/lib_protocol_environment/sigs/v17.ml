@@ -12936,7 +12936,7 @@ val output_info_of_output_proof : output_proof -> output_info
 
 val state_of_output_proof : output_proof -> hash
 
-val verify_output_proof : output_proof -> output option
+val verify_output_proof : output_proof -> (output, string) result
 
 val output_proof_to_bytes : output_proof -> bytes
 
