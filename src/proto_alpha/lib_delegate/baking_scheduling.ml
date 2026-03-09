@@ -201,6 +201,61 @@ let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
     } ;
   return global_state
 
+let create_level_state ~chain_id ~cctxt ~current_proposal ~delegates =
+  let open Lwt_result_syntax in
+  let current_level = current_proposal.block.shell.level in
+  let chain = `Hash chain_id in
+  let* delegate_infos =
+    Baking_state.compute_delegate_infos
+      cctxt
+      delegates
+      ~level:current_level
+      ~chain
+  in
+  let* next_level_delegate_infos =
+    Baking_state.compute_delegate_infos
+      cctxt
+      delegates
+      ~level:(Int32.succ current_level)
+      ~chain
+  in
+  let elected_block =
+    if Baking_state.is_first_block_in_protocol current_proposal then
+      (* If the last block is a protocol transition, we admit it as a
+         final block *)
+      Some {proposal = current_proposal; attestation_qc = []}
+    else None
+  in
+  return
+    {
+      current_level;
+      latest_proposal = current_proposal;
+      is_latest_proposal_applied =
+        true (* this proposal is expected to be the current head *);
+      locked_round = None;
+      attestable_payload = None;
+      elected_block;
+      delegate_infos;
+      next_level_delegate_infos;
+      next_level_latest_forge_request = None;
+    }
+
+let create_round_state ~global_state ~synchronize ~current_proposal =
+  let open Result_syntax in
+  let* current_round =
+    if synchronize then
+      Baking_actions.compute_round current_proposal global_state.round_durations
+    else return Round.zero
+  in
+  return
+    {
+      current_round;
+      current_phase = Idle;
+      delayed_quorum = None;
+      early_attestations = [];
+      awaiting_unlocking_pqc = false;
+    }
+
 let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
     ?(synchronize = true) ?monitor_node_operations ~chain config
     ~(current_proposal : proposal) ?constants delegates =
@@ -218,79 +273,27 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
       config
       delegates
   in
-  let chain = `Hash global_state.chain_id in
-  let current_level = current_proposal.block.shell.level in
-  let* delegate_infos =
-    Baking_state.compute_delegate_infos
-      cctxt
-      delegates
-      ~level:current_level
-      ~chain
+  let* level_state =
+    create_level_state
+      ~chain_id:global_state.chain_id
+      ~cctxt
+      ~current_proposal
+      ~delegates
   in
-  let* next_level_delegate_infos =
-    Baking_state.compute_delegate_infos
-      cctxt
-      delegates
-      ~level:(Int32.succ current_level)
-      ~chain
-  in
-  let () =
-    Dal_included_attestations_cache.set_committee
-      global_state.dal_included_attestations_cache
-      ~level:current_level
-      (fun slot -> Baking_state.Delegate_infos.slot_owner delegate_infos ~slot) ;
-    Dal_included_attestations_cache.set_committee
-      global_state.dal_included_attestations_cache
-      ~level:(Int32.succ current_level)
-      (fun slot ->
-        Baking_state.Delegate_infos.slot_owner next_level_delegate_infos ~slot)
-  in
-  let elected_block =
-    if Baking_state.is_first_block_in_protocol current_proposal then
-      (* If the last block is a protocol transition, we admit it as a
-         final block *)
-      Some {proposal = current_proposal; attestation_qc = []}
-    else None
-  in
-  let current_level = current_proposal.block.shell.level in
-  let level_state =
-    {
-      current_level;
-      latest_proposal = current_proposal;
-      is_latest_proposal_applied =
-        true (* this proposal is expected to be the current head *);
-      locked_round = None;
-      attestable_payload = None;
-      elected_block;
-      delegate_infos;
-      next_level_delegate_infos;
-      next_level_latest_forge_request = None;
-    }
-  in
-  let* round_state =
-    if synchronize then
-      let*? current_round =
-        Baking_actions.compute_round
-          current_proposal
-          global_state.round_durations
-      in
-      return
-        {
-          current_round;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
-    else
-      return
-        {
-          Baking_state.current_round = Round.zero;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
+  Dal_included_attestations_cache.set_committee
+    global_state.dal_included_attestations_cache
+    ~level:level_state.current_level
+    (fun slot ->
+      Baking_state.Delegate_infos.slot_owner level_state.delegate_infos ~slot) ;
+  Dal_included_attestations_cache.set_committee
+    global_state.dal_included_attestations_cache
+    ~level:(Int32.succ level_state.current_level)
+    (fun slot ->
+      Baking_state.Delegate_infos.slot_owner
+        level_state.next_level_delegate_infos
+        ~slot) ;
+  let*? round_state =
+    create_round_state ~global_state ~synchronize ~current_proposal
   in
   let* automaton_state =
     create_automaton_state
