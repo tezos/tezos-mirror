@@ -40,6 +40,14 @@ module Single_tx = struct
   let input_tx = single_tx_path ^ "/input_tx"
 end
 
+module Tezosx_simulation = struct
+  let path = "/__simulation"
+
+  let input = path ^ "/input"
+
+  let result = path ^ "/result"
+end
+
 module Assemble_block = struct
   let path = World_state.make "/assemble_block"
 

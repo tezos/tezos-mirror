@@ -394,3 +394,71 @@ module Tezlink = struct
     in
     return simulation_receipt
 end
+
+module TezosX = struct
+  open Tezlink_imports
+  open Imported_protocol
+
+  let set_balance_update minted metadata =
+    let open Apply_results in
+    let update_op_result : type kind.
+        kind manager_operation_result -> kind manager_operation_result =
+      function
+      | Applied (Transaction_result (Transaction_to_contract_result r)) ->
+          let open Alpha_context in
+          let balance_updates =
+            [
+              Receipt.item Minted (Credited (Tez.of_mutez_exn minted)) Simulation;
+            ]
+          in
+          Applied
+            (Transaction_result
+               (Transaction_to_contract_result {r with balance_updates}))
+      | other -> other
+    in
+    match metadata with
+    | Operation_metadata {contents = Single_result (Manager_operation_result r)}
+      ->
+        Operation_metadata
+          {
+            contents =
+              Single_result
+                (Manager_operation_result
+                   {
+                     r with
+                     operation_result = update_op_result r.operation_result;
+                   });
+          }
+    | _ -> metadata
+
+  let simulate_operation ctxt ~skip_signature
+      (op : Imported_context.packed_operation) hash block =
+    let open Lwt_result_syntax in
+    (* TODO: https://linear.app/tezos/issue/L2-895
+       Replace the integer scaffold with actual operation simulation once the
+       kernel entrypoint handles Tezos operations. *)
+    let* state = Evm_ro_context.get_state ctxt ~block () in
+    let skip_sig_bytes = Rlp.encode_bool skip_signature in
+    let raw_input = Bytes.create 8 in
+    Bytes.set_int64_le raw_input 0 42L ;
+    let encoded_input =
+      Rlp.encode (Rlp.List [Rlp.Value skip_sig_bytes; Rlp.Value raw_input])
+    in
+    let* result =
+      Evm_ro_context.execute_entrypoint
+        ctxt
+        state
+        ~input_path:Durable_storage_path.Tezosx_simulation.input
+        ~input:encoded_input
+        ~output_path:Durable_storage_path.Tezosx_simulation.result
+        ~entrypoint:"tezosx_simulate"
+    in
+    let*? rlp_item = Rlp.decode result in
+    let*? result_bytes = Rlp.decode_as_bytes rlp_item in
+    let minted = Bytes.get_int64_le result_bytes 0 in
+    let op = op.protocol_data in
+    let*? mock_result =
+      Tezlink_mock.Operation_metadata.operation_metadata hash op
+    in
+    return (set_balance_update minted mock_result)
+end
