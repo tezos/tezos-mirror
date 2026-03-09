@@ -1,0 +1,16 @@
+[package]
+name = "riscv-echo"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+tezos-smart-rollup = { workspace = true, features = [
+  "debug_alloc",
+  "proto-alpha",
+  "panic-hook",
+  "data-encoding",
+  "alloc",
+] }
+
+[lints]
+workspace = true

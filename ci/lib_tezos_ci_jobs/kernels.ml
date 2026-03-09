@@ -12,7 +12,7 @@
    and are added to the [scheduled_extended_test] pipeline. *)
 
 module Files = struct
-  let riscv = ["src/riscv/**/*"; "sdk/rust/**/*"]
+  let riscv = ["src/riscv/**/*"; "sdk/rust/**/*"; "src/lib_riscv/kernels/**/*"]
 
   let kernels = "src/kernel_sdk/**/*" :: riscv
 
@@ -38,13 +38,14 @@ let job_check_riscv_kernels =
     "check_riscv_kernels"
     ~__POS__
     ~stage:Test
-    ~description:"Run 'make check' in 'src/riscv'."
+    ~description:"Run 'make check' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
     ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     [
       (* EXTRA_FLAGS ensure we don't need Ocaml installed in the check and test jobs. *)
       "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features \
        --features ci' check";
+      "make -C src/lib_riscv/kernels check";
     ]
 
 let job_audit_riscv_deps =
@@ -52,10 +53,10 @@ let job_audit_riscv_deps =
     "audit_riscv_deps"
     ~__POS__
     ~stage:Test
-    ~description:"Run 'make audit' in 'src/riscv'."
+    ~description:"Run 'make audit' in 'src/riscv' and 'src/lib_riscv/kernels'."
     ~only_if_changed:Files.kernels
     ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
-    ["make -C src/riscv audit"]
+    ["make -C src/riscv audit"; "make -C src/lib_riscv/kernels audit"]
 
 let job_test_kernels =
   job_kernel
