@@ -47,6 +47,42 @@ let of_pvm_input_request (input_request : Backend.input_request) :
       in
       Sc_rollup.Needs_reveal reveal_data
 
+(** Converts a protocol output_info to a RISC-V PVM backend-specific output_info. *)
+let to_pvm_output_info (output_info : Sc_rollup.output_info) :
+    Backend.output_info =
+  let outbox_level =
+    match
+      Bounded.Non_negative_int32.of_value
+        (Raw_level.to_int32 output_info.outbox_level)
+    with
+    | Some level -> level
+    | None -> assert false (* Raw_level is always positive *)
+  in
+  Backend.{message_index = output_info.message_index; outbox_level}
+
+(** Converts a RISC-V PVM backend-specific output_info to a protocol output_info. *)
+let of_pvm_output_info (output_info : Backend.output_info) :
+    Sc_rollup.output_info =
+  Sc_rollup.
+    {
+      message_index = output_info.message_index;
+      outbox_level =
+        (* Conversion from a non-negative int32 cannot fail *)
+        Raw_level.of_int32_exn
+          (Bounded.Non_negative_int32.to_value output_info.outbox_level);
+    }
+
+(** Tries to convert a RISC-V PVM backend-specific output to a protocol output.
+  * Returns [None] in case of failure. *)
+let of_pvm_output (output : Backend.output) : Sc_rollup.output option =
+  let open Option_syntax in
+  let+ message =
+    Data_encoding.Binary.of_string_opt
+      Sc_rollup.Outbox.Message.encoding
+      output.encoded_message
+  in
+  Sc_rollup.{output_info = of_pvm_output_info output.info; message}
+
 let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
     (get_current_level : 'a -> int32 option Lwt.t)
     (get_message_counter : 'a -> int64 Lwt.t)
@@ -82,15 +118,6 @@ module PVM :
   let parse_boot_sector s = Some s
 
   let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
-
-  type void = |
-
-  let void =
-    Data_encoding.(
-      conv_with_guard
-        (function (_ : void) -> .)
-        (fun _ -> Error "void has no inhabitant")
-        unit)
 
   type state = tree
 
@@ -154,17 +181,42 @@ module PVM :
     | None -> tzfail Sc_rollup_riscv.RISCV_proof_production_failed
     | Some proof -> return proof
 
-  type output_proof = void
+  type output_proof = Backend.output_proof
 
-  let output_proof_encoding = void
+  let output_proof_encoding : Backend.output_proof Data_encoding.t =
+    let open Data_encoding in
+    conv_with_guard
+      Backend.serialise_output_proof
+      Backend.deserialise_output_proof
+      bytes
 
-  let output_info_of_output_proof = function (_ : output_proof) -> .
+  let output_info_of_output_proof output_proof =
+    of_pvm_output_info (Backend.output_info_of_output_proof output_proof)
 
-  let state_of_output_proof = function (_ : output_proof) -> .
+  let state_of_output_proof output_proof =
+    Backend.state_of_output_proof output_proof
 
-  let verify_output_proof = function (_ : output_proof) -> .
+  let verify_output_proof output_proof =
+    let open Environment.Error_monad.Lwt_result_syntax in
+    match Backend.verify_output_proof_res output_proof with
+    | Error err ->
+        tzfail (Sc_rollup_riscv.RISCV_output_proof_verification_failed err)
+    | Ok output -> (
+        match of_pvm_output output with
+        | None ->
+            tzfail
+              (Sc_rollup_riscv.RISCV_output_proof_verification_failed
+                 "Failed to convert output from RISC-V representation")
+        | Some output -> return output)
 
-  let produce_output_proof _context _state _output = assert false
+  let produce_output_proof _context state (output : Sc_rollup.output) =
+    match
+      Backend.produce_output_proof state (to_pvm_output_info output.output_info)
+    with
+    | Error err ->
+        Lwt.return_error
+          (Sc_rollup_riscv.RISCV_output_proof_production_failed err)
+    | Ok output_proof -> Lwt.return_ok output_proof
 
   let check_dissection ~default_number_of_sections:_ ~start_chunk:_
       ~stop_chunk:_ =
@@ -197,24 +249,6 @@ let get_status ~is_reveal_enabled:_ state = Backend.get_status state
 let string_of_status status = Backend.string_of_status status
 
 let outbox_message_encoding = Sc_rollup_outbox_message_repr.encoding
-
-let of_pvm_output (output : Backend.output) : Sc_rollup.output option =
-  let open Option_syntax in
-  let* message =
-    Data_encoding.Binary.of_string_opt
-      Sc_rollup.Outbox.Message.encoding
-      output.encoded_message
-  in
-  let* outbox_level =
-    let value = Bounded.Non_negative_int32.to_value output.info.outbox_level in
-    Option.of_result (Raw_level.of_int32 value)
-  in
-  return
-    Sc_rollup.
-      {
-        output_info = {message_index = output.info.message_index; outbox_level};
-        message;
-      }
 
 let make_get_outbox
     (get_outbox :

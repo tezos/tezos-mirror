@@ -10,6 +10,10 @@ type error += RISCV_proof_verification_failed
 
 type error += RISCV_proof_production_failed
 
+type error += RISCV_output_proof_production_failed of string
+
+type error += RISCV_output_proof_verification_failed of string
+
 type state = Riscv.state
 
 type proof = Riscv.proof
