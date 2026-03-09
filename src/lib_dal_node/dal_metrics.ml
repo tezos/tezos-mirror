@@ -214,6 +214,25 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let slot_attestation_ratio =
+    let name = "slot_attestation_ratio" in
+    Prometheus.Gauge.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Ratio of attested shards over total shards for each slot at the \
+         current level (between 0.0 and 1.0)"
+      ~namespace
+      ~subsystem
+      name
+
+  let published_slots_per_level =
+    let name = "published_slots_per_level" in
+    Prometheus.Gauge.v
+      ~help:"Number of slots published at the current level"
+      ~namespace
+      ~subsystem
+      name
+
   (* Custom histogram for attestation lag with buckets matching possible lag values *)
   module Attestation_lag_histogram = Prometheus.Histogram (struct
     let spec =
@@ -704,6 +723,15 @@ let update_amplification_abort_reconstruction_duration duration =
   Prometheus.DefaultHistogram.observe
     Node_metrics.amplification_abort_reconstruction_duration
     duration
+
+let slot_attestation_ratio ~slot_index ratio =
+  Prometheus.Gauge.set
+    (Node_metrics.slot_attestation_ratio (string_of_int slot_index))
+    ratio
+
+let published_slots_per_level count =
+  float_of_int count
+  |> Prometheus.Gauge.set Node_metrics.published_slots_per_level
 
 let per_level_processing_time =
   Prometheus.Gauge.set Node_metrics.per_level_processing_time

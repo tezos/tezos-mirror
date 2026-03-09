@@ -82,6 +82,13 @@ val update_amplification_start_reconstruction_duration : float -> unit
 (** Add a the DAL metrics timing value when a reconstruction is aborted. *)
 val update_amplification_abort_reconstruction_duration : float -> unit
 
+(** Update the attestation ratio for a given slot index. The ratio is
+    [attested_shards / total_shards], between 0.0 and 1.0. *)
+val slot_attestation_ratio : slot_index:int -> float -> unit
+
+(** Update the number of slots published at the current level. *)
+val published_slots_per_level : int -> unit
+
 val per_level_processing_time : float -> unit
 
 (** [sample_time ~sampling_frequency ~to_sample ~metric_updater] samples

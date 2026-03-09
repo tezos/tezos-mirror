@@ -365,6 +365,66 @@ let get_next_migration_level ctxt =
   in
   if is_migration_pending then return_some period_end_level else return_none
 
+let convert_attestations_to_cache_format (type tb_slot dal_attestations)
+    (module Plugin : Dal_plugin.T
+      with type tb_slot = tb_slot
+       and type dal_attestations = dal_attestations) ~number_of_slots
+    ~number_of_lags attestations =
+  let open Result_syntax in
+  List.map_e
+    (fun (tb_slot, _op, dal_att_opt) ->
+      let* dal_att =
+        match dal_att_opt with
+        | None -> return_none
+        | Some dal_att ->
+            let* decoded =
+              Plugin.decode_baker_attestations
+                dal_att
+                ~number_of_slots
+                ~number_of_lags
+            in
+            return_some decoded
+      in
+      return (Plugin.tb_slot_to_int tb_slot, dal_att))
+    attestations
+
+let store_attestations_in_cache (type tb_slot dal_attestations)
+    (module Plugin : Dal_plugin.T
+      with type tb_slot = tb_slot
+       and type dal_attestations = dal_attestations) node_ctxt parameters
+    attestations ~block_level =
+  let open Lwt_result_syntax in
+  let cache = get_attestation_ops_cache node_ctxt in
+  let*? attestation_ops =
+    convert_attestations_to_cache_format
+      (module Plugin)
+      ~number_of_slots:parameters.Types.number_of_slots
+      ~number_of_lags:(List.length parameters.Types.attestation_lags)
+      attestations
+  in
+  Attestation_ops_cache.add cache ~level:block_level ~attestation_ops ;
+  return attestation_ops
+
+let get_cached_or_fetch_attestation_ops cctxt node_ctxt parameters
+    ~attested_level =
+  let open Lwt_result_syntax in
+  let cache = get_attestation_ops_cache node_ctxt in
+  match Attestation_ops_cache.find cache ~level:attested_level with
+  | Some cached_ops -> return cached_ops
+  | None ->
+      let*? (module Plugin), _proto_parameters =
+        get_plugin_and_parameters_for_level node_ctxt ~level:attested_level
+      in
+      let* attestations =
+        Plugin.get_attestations ~block_level:attested_level cctxt
+      in
+      store_attestations_in_cache
+        (module Plugin)
+        node_ctxt
+        parameters
+        attestations
+        ~block_level:attested_level
+
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =
     Gossipsub.Transport_layer.connect transport_layer ?timeout point

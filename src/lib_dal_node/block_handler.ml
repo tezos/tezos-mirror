@@ -358,28 +358,47 @@ let decoded_attests_slot (decoded : Dal_plugin.unfolded_lag_attestation list)
   | None -> false
   | Some att -> List.exists (Int.equal slot_index) att.slot_indices
 
-let convert_attestations_to_cache_format (type tb_slot dal_attestations)
-    (module Plugin : Dal_plugin.T
-      with type tb_slot = tb_slot
-       and type dal_attestations = dal_attestations) ~number_of_slots
-    ~number_of_lags attestations =
-  let open Result_syntax in
-  List.map_e
-    (fun (tb_slot, _op, dal_att_opt) ->
-      let* dal_att =
-        match dal_att_opt with
-        | None -> return_none
-        | Some dal_att ->
-            let* decoded =
-              Plugin.decode_baker_attestations
-                dal_att
-                ~number_of_slots
-                ~number_of_lags
-            in
-            return_some decoded
+(* [compute_total_attested_shards_per_slot] accumulates, for each slot
+   published at [published_level], the total number of attested shards across
+   all attestation lags up to [block_level]. Returns an array of size
+   [number_of_slots]. *)
+let compute_total_attested_shards_per_slot cctxt node_ctxt parameters
+    slot_to_committee ~published_level ~block_level
+    (module Plugin : Dal_plugin.T) =
+  let open Lwt_result_syntax in
+  let number_of_slots = parameters.Types.number_of_slots in
+  let* attestations_per_lag =
+    List.mapi_es
+      (fun lag_index lag ->
+        let attested_level = Int32.(add published_level (of_int lag)) in
+        if attested_level <= block_level then
+          let* cached_ops =
+            Node_context.get_cached_or_fetch_attestation_ops
+              cctxt
+              node_ctxt
+              parameters
+              ~attested_level
+          in
+          return_some (lag_index, cached_ops)
+        else return_none)
+      parameters.Types.attestation_lags
+  in
+  let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
+  let total_attested_shards = Array.make number_of_slots 0 in
+  List.iter
+    (fun (lag_index, cached_ops) ->
+      let shards =
+        attested_shards_per_slot
+          cached_ops
+          slot_to_committee
+          ~number_of_slots
+          ~lag_index
       in
-      return (Plugin.tb_slot_to_int tb_slot, dal_att))
-    attestations
+      Array.iteri
+        (fun i n -> total_attested_shards.(i) <- total_attested_shards.(i) + n)
+        shards)
+    attestations_per_lag ;
+  return total_attested_shards
 
 let check_attesters_attested cctxt node_ctxt committee slot_to_committee
     parameters ~block_level (module Plugin : Dal_plugin.T) =
@@ -581,6 +600,7 @@ let process_commitments ctxt cctxt store proto_parameters block_level
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "slot_headers"])
   in
+  Dal_metrics.published_slots_per_level (List.length slot_headers) ;
   let*! () =
     (Slot_manager.store_slot_headers
        ~number_of_slots:proto_parameters.Types.number_of_slots
@@ -679,16 +699,13 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "get_attestations"])
   in
-  let*? attestation_ops =
-    convert_attestations_to_cache_format
+  let* _attestation_ops =
+    Node_context.store_attestations_in_cache
       (module Plugin)
-      ~number_of_slots:proto_parameters.Types.number_of_slots
-      ~number_of_lags:(List.length proto_parameters.Types.attestation_lags)
+      ctxt
+      proto_parameters
       attestations
-  in
-  let () =
-    let cache = Node_context.get_attestation_ops_cache ctxt in
-    Attestation_ops_cache.add cache ~level:block_level ~attestation_ops
+      ~block_level
   in
   let* committees =
     let committee_level = Int32.pred block_level in
@@ -701,6 +718,35 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       (fun pkh (dal_slots, tb_slot) l -> (tb_slot, (pkh, dal_slots)) :: l)
       committees
       []
+  in
+  let* () =
+    let max_lag = proto_parameters.Types.attestation_lag in
+    let published_level = Int32.(sub block_level (of_int max_lag)) in
+    if published_level >= 1l then (
+      let number_of_shards =
+        proto_parameters.Types.cryptobox_parameters.number_of_shards
+      in
+      let* total_attested_shards =
+        compute_total_attested_shards_per_slot
+          cctxt
+          ctxt
+          proto_parameters
+          slot_to_committee
+          ~published_level
+          ~block_level
+          (module Plugin)
+      in
+      Array.iteri
+        (fun slot_index count ->
+          let ratio =
+            if number_of_shards > 0 then
+              float_of_int count /. float_of_int number_of_shards
+            else 0.
+          in
+          Dal_metrics.slot_attestation_ratio ~slot_index ratio)
+        total_attested_shards ;
+      return_unit)
+    else return_unit
   in
   let* () =
     (check_attesters_attested
