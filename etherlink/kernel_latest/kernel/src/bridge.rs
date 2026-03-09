@@ -195,6 +195,10 @@ pub struct DepositInfo {
 
 impl DepositInfo {
     fn decode(bytes: &[u8]) -> Result<Self, DecoderError> {
+        if bytes.is_empty() {
+            return Err(DecoderError::Custom("Unexpected empty deposit info"));
+        }
+
         let version = bytes[0];
         let decoder = Rlp::new(&bytes[1..]);
         if version == 1u8 {
