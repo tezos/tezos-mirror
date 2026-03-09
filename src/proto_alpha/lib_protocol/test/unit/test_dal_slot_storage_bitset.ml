@@ -39,41 +39,38 @@ let count_set_bits bitset =
 module Helpers = struct
   open Lwt_result_wrap_syntax
 
-  let get_delegate_ordering ctxt ~shard_assignment_level =
-    let*@ result = get_delegate_ordering ctxt ~shard_assignment_level in
+  let get_delegate_ordering ctxt ~committee_level =
+    let*@ result = get_delegate_ordering ctxt ~committee_level in
     return result
 
-  let attesters_to_bitset ctxt ~shard_assignment_level ~attesters =
+  let attesters_to_bitset ctxt ~committee_level ~attesters =
     let* ctxt, ordered_delegates =
-      get_delegate_ordering ctxt ~shard_assignment_level
+      get_delegate_ordering ctxt ~committee_level
     in
     let bitset = attesters_to_bitset ~ordered_delegates ~attesters in
     return (ctxt, bitset)
 
-  let bitset_to_attesters ctxt ~shard_assignment_level ~bitset =
+  let bitset_to_attesters ctxt ~committee_level ~bitset =
     let* ctxt, ordered_delegates =
-      get_delegate_ordering ctxt ~shard_assignment_level
+      get_delegate_ordering ctxt ~committee_level
     in
     let attesters = bitset_to_attesters ~ordered_delegates ~bitset in
     return (ctxt, attesters)
 
-  let bitset_attested_shards ctxt ~shard_assignment_level ~bitset =
+  let bitset_attested_shards ctxt ~committee_level ~bitset =
     let* delegate_to_shard_count =
       Assert.get_some
         ~loc:__LOC__
-        (Raw_level_repr.Map.find shard_assignment_level
-        @@ Raw_context.Consensus.delegate_to_shard_count ctxt)
+        (Raw_context.Consensus.shard_count_map ctxt ~committee_level)
     in
-    let* _ctxt, attesters =
-      bitset_to_attesters ctxt ~shard_assignment_level ~bitset
-    in
+    let* _ctxt, attesters = bitset_to_attesters ctxt ~committee_level ~bitset in
     let total_shards = attested_shards ~delegate_to_shard_count ~attesters in
     return (ctxt, total_shards)
 
-  let bitset_is_attested ctxt ~shard_assignment_level ~bitset ~threshold
+  let bitset_is_attested ctxt ~committee_level ~bitset ~threshold
       ~number_of_shards =
     let* ctxt, attested_shards =
-      bitset_attested_shards ctxt ~shard_assignment_level ~bitset
+      bitset_attested_shards ctxt ~committee_level ~bitset
     in
     let is_attested =
       Dal_attestations_repr.Accountability.is_threshold_reached
@@ -96,10 +93,8 @@ let test_roundtrip_conversion () =
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
   (* Get delegate ordering to understand the bitset structure *)
-  let shard_assignment_level = Raw_level_repr.of_int32_exn 10l in
-  let* ctxt, delegates =
-    Helpers.get_delegate_ordering ctxt ~shard_assignment_level
-  in
+  let committee_level = Raw_level_repr.of_int32_exn 10l in
+  let* ctxt, delegates = Helpers.get_delegate_ordering ctxt ~committee_level in
 
   (* Create an attester set with some delegates *)
   let attesters =
@@ -116,12 +111,12 @@ let test_roundtrip_conversion () =
 
   (* Convert to bitset *)
   let* ctxt, bitset =
-    Helpers.attesters_to_bitset ctxt ~shard_assignment_level ~attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters
   in
 
   (* Convert back to attesters *)
   let* _ctxt, recovered_attesters =
-    Helpers.bitset_to_attesters ctxt ~shard_assignment_level ~bitset
+    Helpers.bitset_to_attesters ctxt ~committee_level ~bitset
   in
 
   (* Verify the sets are equal *)
@@ -152,14 +147,11 @@ let test_empty_attesters () =
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
   let empty_attesters = Signature.Public_key_hash.Set.empty in
-  let shard_assignment_level = Raw_level_repr.of_int32_exn 5l in
+  let committee_level = Raw_level_repr.of_int32_exn 5l in
 
   (* Convert empty set to bitset *)
   let* ctxt, bitset =
-    Helpers.attesters_to_bitset
-      ctxt
-      ~shard_assignment_level
-      ~attesters:empty_attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:empty_attesters
   in
 
   (* Verify the bitset is empty (all bits are 0) *)
@@ -176,7 +168,7 @@ let test_empty_attesters () =
 
   (* Convert back and verify *)
   let* _ctxt, recovered_attesters =
-    Helpers.bitset_to_attesters ctxt ~shard_assignment_level ~bitset
+    Helpers.bitset_to_attesters ctxt ~committee_level ~bitset
   in
 
   let* () =
@@ -197,12 +189,10 @@ let test_all_delegates_attest () =
   let ctxt = Incremental.alpha_ctxt inc in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
-  let shard_assignment_level = Raw_level_repr.of_int32_exn 15l in
+  let committee_level = Raw_level_repr.of_int32_exn 15l in
 
   (* Get all delegates *)
-  let* ctxt, delegates =
-    Helpers.get_delegate_ordering ctxt ~shard_assignment_level
-  in
+  let* ctxt, delegates = Helpers.get_delegate_ordering ctxt ~committee_level in
 
   let n_delegates = List.length delegates in
 
@@ -216,10 +206,7 @@ let test_all_delegates_attest () =
 
   (* Convert to bitset *)
   let* ctxt, bitset =
-    Helpers.attesters_to_bitset
-      ctxt
-      ~shard_assignment_level
-      ~attesters:all_attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:all_attesters
   in
 
   (* Count set bits - should match number of delegates *)
@@ -232,7 +219,7 @@ let test_all_delegates_attest () =
 
   (* Convert back and verify *)
   let* _ctxt, recovered_attesters =
-    Helpers.bitset_to_attesters ctxt ~shard_assignment_level ~bitset
+    Helpers.bitset_to_attesters ctxt ~committee_level ~bitset
   in
 
   let* () =
@@ -261,12 +248,10 @@ let test_single_attester () =
   let ctxt = Incremental.alpha_ctxt inc in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
-  let shard_assignment_level = Raw_level_repr.of_int32_exn 20l in
+  let committee_level = Raw_level_repr.of_int32_exn 20l in
 
   (* Get delegates *)
-  let* ctxt, delegates =
-    Helpers.get_delegate_ordering ctxt ~shard_assignment_level
-  in
+  let* ctxt, delegates = Helpers.get_delegate_ordering ctxt ~committee_level in
 
   (* Create set with single delegate (first one) *)
   let single_attester =
@@ -277,10 +262,7 @@ let test_single_attester () =
 
   (* Convert to bitset *)
   let* ctxt, bitset =
-    Helpers.attesters_to_bitset
-      ctxt
-      ~shard_assignment_level
-      ~attesters:single_attester
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:single_attester
   in
 
   (* Should have exactly 1 set bit (unless empty) *)
@@ -300,7 +282,7 @@ let test_single_attester () =
 
   (* Convert back and verify *)
   let* _ctxt, recovered_attesters =
-    Helpers.bitset_to_attesters ctxt ~shard_assignment_level ~bitset
+    Helpers.bitset_to_attesters ctxt ~committee_level ~bitset
   in
 
   let* () =
@@ -337,14 +319,12 @@ let test_bitset_attested_shards () =
 
   (* Get delegates *)
   let current_level = (Raw_context.current_level ctxt).level in
-  let shard_assignment_level =
+  let committee_level =
     match Raw_level_repr.pred current_level with
     | Some l -> l
     | None -> assert false
   in
-  let* ctxt, delegates =
-    Helpers.get_delegate_ordering ctxt ~shard_assignment_level
-  in
+  let* ctxt, delegates = Helpers.get_delegate_ordering ctxt ~committee_level in
 
   (* Create attester set with some delegates *)
   let attesters =
@@ -357,12 +337,12 @@ let test_bitset_attested_shards () =
 
   (* Convert to bitset *)
   let* ctxt, bitset =
-    Helpers.attesters_to_bitset ctxt ~shard_assignment_level ~attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters
   in
 
   (* Calculate attested shards *)
   let* _ctxt, attested_shards =
-    Helpers.bitset_attested_shards ctxt ~shard_assignment_level ~bitset
+    Helpers.bitset_attested_shards ctxt ~committee_level ~bitset
   in
 
   let* () =
@@ -404,7 +384,7 @@ let test_bitset_is_attested () =
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
   let current_level = (Raw_context.current_level ctxt).level in
-  let shard_assignment_level =
+  let committee_level =
     match Raw_level_repr.pred current_level with
     | Some l -> l
     | None -> assert false
@@ -413,16 +393,13 @@ let test_bitset_is_attested () =
   (* Test with no attesters - should not reach threshold *)
   let empty_attesters = Signature.Public_key_hash.Set.empty in
   let* ctxt, empty_bitset =
-    Helpers.attesters_to_bitset
-      ctxt
-      ~shard_assignment_level
-      ~attesters:empty_attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:empty_attesters
   in
 
   let* ctxt, is_attested_empty =
     Helpers.bitset_is_attested
       ctxt
-      ~shard_assignment_level
+      ~committee_level
       ~bitset:empty_bitset
       ~threshold:66
       ~number_of_shards
@@ -439,9 +416,7 @@ let test_bitset_is_attested () =
   in
 
   (* Test with all delegates - it should reach the threshold *)
-  let* ctxt, delegates =
-    Helpers.get_delegate_ordering ctxt ~shard_assignment_level
-  in
+  let* ctxt, delegates = Helpers.get_delegate_ordering ctxt ~committee_level in
 
   let all_attesters =
     List.fold_left
@@ -451,16 +426,13 @@ let test_bitset_is_attested () =
   in
 
   let* ctxt, full_bitset =
-    Helpers.attesters_to_bitset
-      ctxt
-      ~shard_assignment_level
-      ~attesters:all_attesters
+    Helpers.attesters_to_bitset ctxt ~committee_level ~attesters:all_attesters
   in
 
   let* _ctxt, is_attested_full =
     Helpers.bitset_is_attested
       ctxt
-      ~shard_assignment_level
+      ~committee_level
       ~bitset:full_bitset
       ~threshold:100
       ~number_of_shards
@@ -498,7 +470,7 @@ let test_empty_bitset () =
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
 
   let current_level = (Raw_context.current_level ctxt).level in
-  let shard_assignment_level =
+  let committee_level =
     match Raw_level_repr.pred current_level with
     | Some l -> l
     | None -> assert false
@@ -508,10 +480,7 @@ let test_empty_bitset () =
   let empty_bitset = Bitset.empty in
 
   let* _ctxt, empty_attesters =
-    Helpers.bitset_to_attesters
-      ctxt
-      ~shard_assignment_level
-      ~bitset:empty_bitset
+    Helpers.bitset_to_attesters ctxt ~committee_level ~bitset:empty_bitset
   in
 
   let* () =
@@ -521,10 +490,7 @@ let test_empty_bitset () =
 
   (* Test shard calculation with empty bitset *)
   let* _ctxt, empty_shards =
-    Helpers.bitset_attested_shards
-      ctxt
-      ~shard_assignment_level
-      ~bitset:empty_bitset
+    Helpers.bitset_attested_shards ctxt ~committee_level ~bitset:empty_bitset
   in
 
   let* () =

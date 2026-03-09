@@ -721,7 +721,7 @@ module Accountability = struct
     PublishedLevelMap.(
       fold
         (fun published_level history_of_level decoded_history ->
-          let shard_assignment_level =
+          let committee_level =
             match
               Raw_level_repr.Map.find published_level committee_level_map
             with
@@ -732,7 +732,7 @@ module Accountability = struct
             | Some level -> level
           in
           let ordered_delegates =
-            match ordered_delegates_for_level ~shard_assignment_level with
+            match ordered_delegates_for_level ~committee_level with
             | None ->
                 (* The precondition ensures that we always have an entry for
                    levels of the [stored_history] *)
@@ -741,9 +741,7 @@ module Accountability = struct
           in
           let delegate_to_shard_count =
             match
-              Raw_level_repr.Map.find
-                shard_assignment_level
-                delegate_to_shard_count
+              Raw_level_repr.Map.find committee_level delegate_to_shard_count
             with
             | None -> Signature.Public_key_hash.Map.empty
             | Some map -> map
@@ -780,7 +778,7 @@ module Accountability = struct
     PublishedLevelMap.(
       fold
         (fun published_level history_of_level history ->
-          let shard_assignment_level =
+          let committee_level =
             match
               Raw_level_repr.Map.find published_level committee_level_map
             with
@@ -791,7 +789,7 @@ module Accountability = struct
             | Some level -> level
           in
           let ordered_delegates =
-            match ordered_delegates_for_level ~shard_assignment_level with
+            match ordered_delegates_for_level ~committee_level with
             | None ->
                 (* The precondition ensures that we always have an entry for
                    levels of [history] *)

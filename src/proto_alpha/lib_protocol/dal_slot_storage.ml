@@ -117,21 +117,8 @@ let remove_old_headers ctxt ~published_level =
   | None -> return ctxt
   | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
 
-let get_number_of_shards ctxt ~shard_assignment_level delegate =
-  let delegate_to_shard_count =
-    Raw_context.Consensus.delegate_to_shard_count ctxt
-  in
-  match
-    Raw_level_repr.Map.find shard_assignment_level delegate_to_shard_count
-  with
-  | None -> 0
-  | Some map -> (
-      match Signature.Public_key_hash.Map.find delegate map with
-      | None -> 0
-      | Some n -> n)
-
 (** [merge_attestation_history ~attestation_lag ~threshold
-    ~number_of_shards ~get_attester_shards
+    ~number_of_shards ~get_shard_count_map
     current_block_accountability stored_history] merges the current block's
     accountability data into the stored history.
 
@@ -142,8 +129,9 @@ let get_number_of_shards ctxt ~shard_assignment_level delegate =
     - [stored_history]: Persistent data from PREVIOUS blocks. For each (level,
       slot), contains the attested shard counts (and their attesters) accumulated
       over all previous blocks in the current attestation window.
-    - [get_attester_shards]: Lookup function to get the number of shards
-      assigned to a given delegate.
+    - [get_shard_count_map]: Lookup function returning the delegate-to-shard-count
+      map for a given shard assignment level. The map is resolved once per
+      published level rather than once per delegate.
 
     Returns [(updated_history, newly_attested_by_level)] where:
     - [updated_history] is the merged history with the newly finalized level
@@ -152,8 +140,13 @@ let get_number_of_shards ctxt ~shard_assignment_level delegate =
       slot_indices for slots that crossed the attestation threshold during
       this merge *)
 let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
-    ~get_number_of_shards current_block_accountability stored_history =
+    ~get_shard_count_map current_block_accountability stored_history =
   let open Dal_attestations_repr.Accountability in
+  let number_of_shards_of_delegate shard_count_map delegate =
+    match Signature.Public_key_hash.Map.find delegate shard_count_map with
+    | None -> 0
+    | Some n -> n
+  in
   (* Merge a single slot's attestation data from the current block into the
      stored history for that slot.
 
@@ -162,8 +155,8 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
 
      We only add shards from attesters who haven't attested before (to avoid
      double-counting). For each new attester, we look up their shard count
-     using [get_attester_shards]. *)
-  let merge_slot ~shard_assignment_level slot_index
+     in [shard_count_map]. *)
+  let merge_slot ~shard_count_map slot_index
       {attesters = current_attesters; attested_shards_count = _}
       (level_history, newly_attested_slots) =
     let stored_status =
@@ -187,11 +180,11 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
       (* All current attesters already attested before; nothing to add *)
       (level_history, newly_attested_slots)
     else
-      (* Sum up shards from new attesters using the lookup function. *)
+      (* Sum up shards from new attesters using the pre-resolved map. *)
       let shards_to_add =
         Signature.Public_key_hash.Set.fold
           (fun attester acc ->
-            acc + get_number_of_shards ~shard_assignment_level attester)
+            acc + number_of_shards_of_delegate shard_count_map attester)
           new_attesters
           0
       in
@@ -228,9 +221,14 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
      - [current_slot_map]: attestation data from THIS block for this level
      - Returns updated history and newly attested slots map *)
   let merge_level published_level current_slot_map (history, newly_attested) =
-    (* shard_assignment_level = published_level + attestation_lag - 1 *)
-    let shard_assignment_level =
+    (* committee_level = published_level + attestation_lag - 1 *)
+    let committee_level =
       Raw_level_repr.add published_level (attestation_lag - 1)
+    in
+    let shard_count_map =
+      match get_shard_count_map ~committee_level with
+      | None -> Signature.Public_key_hash.Map.empty
+      | Some map -> map
     in
     let stored_level_history =
       match Raw_level_repr.Map.find published_level history with
@@ -239,7 +237,7 @@ let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
     in
     let merged_level_history, level_newly_attested_slots =
       Dal_slot_index_repr.Map.fold
-        (merge_slot ~shard_assignment_level)
+        (merge_slot ~shard_count_map)
         current_slot_map
         (stored_level_history, [])
     in
@@ -480,21 +478,16 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
               in
               (* Second, we do not increase the participation of all those that
                  did not attest, while having assigned shards. *)
-              let shard_assignment_level =
+              let committee_level =
                 (* same as [current_level - 1], but in this way we avoid a match *)
                 Raw_level_repr.add finalized_level (attestation_lag - 1)
               in
-              let committee_level_to_delegate_to_shard_count =
-                Raw_context.Consensus.delegate_to_shard_count ctxt
-              in
               match
-                Raw_level_repr.Map.find
-                  shard_assignment_level
-                  committee_level_to_delegate_to_shard_count
+                Raw_context.Consensus.shard_count_map ctxt ~committee_level
               with
               | None ->
                   (* unreachable by construction of
-                  [committee_level_to_delegate_to_shard_count] *)
+                  [delegate_to_shard_count] *)
                   assert false
               | Some delegate_to_shard_count ->
                   Signature.Public_key_hash.Map.fold
@@ -542,21 +535,21 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
     are represented as bitsets indexed by delegate position in the cycle's
     stake distribution. *)
 
-(** [get_delegate_ordering ctxt ~shard_assignment_level] returns the ordered
-    list of delegates for the cycle containing [shard_assignment_level].
+(** [get_delegate_ordering ctxt ~committee_level] returns the ordered
+    list of delegates for the cycle containing [committee_level].
 
     This ordering is derived from the stake distribution cached for that cycle
     and is used as the basis for bitset indices. The ordering is stable for
     all blocks within a cycle.
 
-    @param shard_assignment_level The level used to determine delegate shard
+    @param committee_level The level used to determine delegate shard
            assignments, namely [published_level + attestation_lag - 1]
     @return The context and an ordered list of delegate public key hashes *)
-let get_delegate_ordering ctxt ~shard_assignment_level =
+let get_delegate_ordering ctxt ~committee_level =
   let open Lwt_result_syntax in
   (* Get the cycle for the shard assignment level *)
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  let cycle = Level_repr.cycle_from_raw ~cycle_eras shard_assignment_level in
+  let cycle = Level_repr.cycle_from_raw ~cycle_eras committee_level in
   (* Load the stake distribution for that cycle *)
   let+ ctxt, distribution =
     Selected_distribution_storage.get_selected_distribution ctxt cycle
@@ -565,20 +558,20 @@ let get_delegate_ordering ctxt ~shard_assignment_level =
   let delegates = List.map fst distribution in
   (ctxt, delegates)
 
-(** [ordered_delegates_for_levels ctxt ~shard_assignment_levels] retrieves the
+(** [ordered_delegates_for_levels ctxt ~committee_levels] retrieves the
     ordered delegate list for each shard assignment level in
-    [shard_assignment_levels]. Returns a map from shard assignment level to the
+    [committee_levels]. Returns a map from shard assignment level to the
     corresponding ordered delegate list. *)
-let ordered_delegates_for_levels ctxt ~shard_assignment_levels =
+let ordered_delegates_for_levels ctxt ~committee_levels =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun (ctxt, map) level ->
       let+ ctxt, ordered_delegates =
-        get_delegate_ordering ctxt ~shard_assignment_level:level
+        get_delegate_ordering ctxt ~committee_level:level
       in
       (ctxt, Raw_level_repr.Map.add level ordered_delegates map))
     (ctxt, Raw_level_repr.Map.empty)
-    shard_assignment_levels
+    committee_levels
 
 (** [committee_level_of_published_levels ctxt published_levels] computes the
     committee level for each published level in [published_levels], using
@@ -615,20 +608,20 @@ let unpack_history ctxt ~threshold ~number_of_shards
   let* ctxt, committee_level_map =
     committee_level_of_published_levels ctxt published_levels
   in
-  let shard_assignment_levels =
+  let committee_levels =
     Raw_level_repr.Map.fold
       (fun _ level acc -> level :: acc)
       committee_level_map
       []
   in
   let+ ctxt, ordered_delegates_for_level =
-    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+    ordered_delegates_for_levels ctxt ~committee_levels
   in
   let delegate_to_shard_count =
     Raw_context.Consensus.delegate_to_shard_count ctxt
   in
-  let ordered_delegates_for_level ~shard_assignment_level =
-    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  let ordered_delegates_for_level ~committee_level =
+    Raw_level_repr.Map.find committee_level ordered_delegates_for_level
   in
   let history =
     Dal_attestations_repr.Accountability.unpack_history
@@ -658,17 +651,17 @@ let pack_history ctxt history =
   let* ctxt, committee_level_map =
     committee_level_of_published_levels ctxt published_levels
   in
-  let shard_assignment_levels =
+  let committee_levels =
     Raw_level_repr.Map.fold
       (fun _ level acc -> level :: acc)
       committee_level_map
       []
   in
   let+ ctxt, ordered_delegates_for_level =
-    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+    ordered_delegates_for_levels ctxt ~committee_levels
   in
-  let ordered_delegates_for_level ~shard_assignment_level =
-    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  let ordered_delegates_for_level ~committee_level =
+    Raw_level_repr.Map.find committee_level ordered_delegates_for_level
   in
   let history =
     Dal_attestations_repr.Accountability.pack_history
@@ -696,13 +689,13 @@ let finalize_attestation_history ctxt =
     | Some stored_history ->
         unpack_history ctxt ~threshold ~number_of_shards stored_history
   in
-  let get_number_of_shards = get_number_of_shards ctxt in
+  let get_shard_count_map = Raw_context.Consensus.shard_count_map ctxt in
   let updated_history, newly_attested =
     merge_attestation_history
       ~attestation_lag
       ~threshold
       ~number_of_shards
-      ~get_number_of_shards
+      ~get_shard_count_map
       current_block_accountability
       stored_history
   in

@@ -105,6 +105,6 @@ val get_slot_headers_history :
 module Internal_for_tests : sig
   val get_delegate_ordering :
     Raw_context.t ->
-    shard_assignment_level:Raw_level_repr.t ->
+    committee_level:Raw_level_repr.t ->
     (Raw_context.t * Signature.public_key_hash list) tzresult Lwt.t
 end
