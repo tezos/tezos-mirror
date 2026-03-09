@@ -179,7 +179,6 @@ let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
-          get_forge_event_stream = (fun _ -> assert false);
           cancel_all_pending_tasks = (fun _ -> assert false);
         };
       delegates;
@@ -194,8 +193,6 @@ let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
   global_state.forge_worker_hooks <-
     {
       push_request = Forge_worker.push_request forge_worker;
-      get_forge_event_stream =
-        (fun () -> Forge_worker.get_event_stream forge_worker);
       cancel_all_pending_tasks =
         (fun () -> Forge_worker.cancel_all_pending_tasks forge_worker);
     } ;
@@ -371,13 +368,10 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
     | Ok (vbs, _) -> Lwt.return vbs
   in
-  let forge_event_stream =
-    initial_state.global_state.forge_worker_hooks.get_forge_event_stream ()
-  in
   let loop_state =
     create_loop_state
       ~get_valid_blocks_stream
-      ~forge_event_stream
+      ~forge_event_stream:initial_state.automaton_state.forge_event_stream
       ~heads_stream
       ~on_head_proposal_callback:revelation_worker_push_proposal
       initial_state.automaton_state.operation_worker

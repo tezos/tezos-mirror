@@ -1696,8 +1696,20 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
   in
   let name = Uri.to_string cctxt#base in
   let automaton_state =
+    let validation_mode = Baking_state.Local context_index in
+    let forge_event_stream, push_forge_event =
+      let stream, push = Lwt_stream.create () in
+      (stream, fun e -> push (Some e))
+    in
     Baking_state.
-      {name; cctxt; validation_mode = Local context_index; operation_worker}
+      {
+        name;
+        cctxt;
+        validation_mode;
+        operation_worker;
+        push_forge_event;
+        forge_event_stream;
+      }
   in
   let global_state =
     Baking_state.
@@ -1716,7 +1728,6 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
           {
             push_request =
               (fun _ -> failwith "Forge worker not supported in simulator");
-            get_forge_event_stream = (fun () -> Lwt_stream.of_list []);
             cancel_all_pending_tasks = (fun () -> ());
           };
         delegates;
