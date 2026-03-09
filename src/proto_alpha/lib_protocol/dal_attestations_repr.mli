@@ -318,7 +318,7 @@ module Accountability : sig
     delegate_to_shard_count:
       int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t ->
     ordered_delegates_for_level:
-      (shard_assignment_level:Raw_level_repr.t ->
+      (committee_level:Raw_level_repr.t ->
       Signature.public_key_hash list option) ->
     threshold:int ->
     number_of_shards:int ->
@@ -346,7 +346,7 @@ module Accountability : sig
       [ordered_delegates_for_level]. *)
   val pack_history :
     ordered_delegates_for_level:
-      (shard_assignment_level:Raw_level_repr.t ->
+      (committee_level:Raw_level_repr.t ->
       Signature.public_key_hash list option) ->
     committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
     history ->

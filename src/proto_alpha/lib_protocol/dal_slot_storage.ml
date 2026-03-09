@@ -535,21 +535,21 @@ let record_participation ctxt ~finalized_level ~attestation_lag updated_history
     are represented as bitsets indexed by delegate position in the cycle's
     stake distribution. *)
 
-(** [get_delegate_ordering ctxt ~shard_assignment_level] returns the ordered
-    list of delegates for the cycle containing [shard_assignment_level].
+(** [get_delegate_ordering ctxt ~committee_level] returns the ordered
+    list of delegates for the cycle containing [committee_level].
 
     This ordering is derived from the stake distribution cached for that cycle
     and is used as the basis for bitset indices. The ordering is stable for
     all blocks within a cycle.
 
-    @param shard_assignment_level The level used to determine delegate shard
+    @param committee_level The level used to determine delegate shard
            assignments, namely [published_level + attestation_lag - 1]
     @return The context and an ordered list of delegate public key hashes *)
-let get_delegate_ordering ctxt ~shard_assignment_level =
+let get_delegate_ordering ctxt ~committee_level =
   let open Lwt_result_syntax in
   (* Get the cycle for the shard assignment level *)
   let cycle_eras = Raw_context.cycle_eras ctxt in
-  let cycle = Level_repr.cycle_from_raw ~cycle_eras shard_assignment_level in
+  let cycle = Level_repr.cycle_from_raw ~cycle_eras committee_level in
   (* Load the stake distribution for that cycle *)
   let+ ctxt, distribution =
     Selected_distribution_storage.get_selected_distribution ctxt cycle
@@ -558,20 +558,20 @@ let get_delegate_ordering ctxt ~shard_assignment_level =
   let delegates = List.map fst distribution in
   (ctxt, delegates)
 
-(** [ordered_delegates_for_levels ctxt ~shard_assignment_levels] retrieves the
+(** [ordered_delegates_for_levels ctxt ~committee_levels] retrieves the
     ordered delegate list for each shard assignment level in
-    [shard_assignment_levels]. Returns a map from shard assignment level to the
+    [committee_levels]. Returns a map from shard assignment level to the
     corresponding ordered delegate list. *)
-let ordered_delegates_for_levels ctxt ~shard_assignment_levels =
+let ordered_delegates_for_levels ctxt ~committee_levels =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun (ctxt, map) level ->
       let+ ctxt, ordered_delegates =
-        get_delegate_ordering ctxt ~shard_assignment_level:level
+        get_delegate_ordering ctxt ~committee_level:level
       in
       (ctxt, Raw_level_repr.Map.add level ordered_delegates map))
     (ctxt, Raw_level_repr.Map.empty)
-    shard_assignment_levels
+    committee_levels
 
 (** [committee_level_of_published_levels ctxt published_levels] computes the
     committee level for each published level in [published_levels], using
@@ -608,20 +608,20 @@ let unpack_history ctxt ~threshold ~number_of_shards
   let* ctxt, committee_level_map =
     committee_level_of_published_levels ctxt published_levels
   in
-  let shard_assignment_levels =
+  let committee_levels =
     Raw_level_repr.Map.fold
       (fun _ level acc -> level :: acc)
       committee_level_map
       []
   in
   let+ ctxt, ordered_delegates_for_level =
-    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+    ordered_delegates_for_levels ctxt ~committee_levels
   in
   let delegate_to_shard_count =
     Raw_context.Consensus.delegate_to_shard_count ctxt
   in
-  let ordered_delegates_for_level ~shard_assignment_level =
-    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  let ordered_delegates_for_level ~committee_level =
+    Raw_level_repr.Map.find committee_level ordered_delegates_for_level
   in
   let history =
     Dal_attestations_repr.Accountability.unpack_history
@@ -651,17 +651,17 @@ let pack_history ctxt history =
   let* ctxt, committee_level_map =
     committee_level_of_published_levels ctxt published_levels
   in
-  let shard_assignment_levels =
+  let committee_levels =
     Raw_level_repr.Map.fold
       (fun _ level acc -> level :: acc)
       committee_level_map
       []
   in
   let+ ctxt, ordered_delegates_for_level =
-    ordered_delegates_for_levels ctxt ~shard_assignment_levels
+    ordered_delegates_for_levels ctxt ~committee_levels
   in
-  let ordered_delegates_for_level ~shard_assignment_level =
-    Raw_level_repr.Map.find shard_assignment_level ordered_delegates_for_level
+  let ordered_delegates_for_level ~committee_level =
+    Raw_level_repr.Map.find committee_level ordered_delegates_for_level
   in
   let history =
     Dal_attestations_repr.Accountability.pack_history
