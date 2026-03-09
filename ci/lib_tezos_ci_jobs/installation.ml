@@ -33,20 +33,16 @@ let job_install_opam_noble =
     ~force:true
     ["apt update"; "apt install -y sudo"; "./docs/introduction/install-opam.sh"]
 
-let compile_sources_doc_deps_job ~name_suffix ~image_name =
+let compile_sources_doc_deps_job ~name_suffix ~image =
   CI.job
     ("oc.compile_sources_doc_deps" ^ name_suffix)
     ~__POS__
     ~description:
-      (sf
-         "Check that the instructions to install dependencies, from the \
-          documentation, still work (on image %s)."
-         image_name)
+      "Check that the instructions to install dependencies, from the \
+       documentation, still work (on image %s)."
     ~stage:Test
     ~cpu:Very_high
-    ~image:
-      (Tezos_ci.Image.mk_external
-         ~image_path:(Tezos_ci.Images.Base_images.path_prefix ^ "/" ^ image_name))
+    ~image
     ~variables:[("CARGO_NET_OFFLINE", "false")]
     ~only_if_changed:["docs/introduction/compile-sources-setup.sh"]
     [sf "./docs/introduction/compile-sources-setup.sh"]
@@ -54,12 +50,12 @@ let compile_sources_doc_deps_job ~name_suffix ~image_name =
 let job_compile_sources_doc_deps_trixie =
   compile_sources_doc_deps_job
     ~name_suffix:"_trixie"
-    ~image_name:("debian:trixie-" ^ Tezos_ci.Images.Base_images.debian_version)
+    ~image:Tezos_ci.Images.Base_images.debian_trixie
 
 let job_compile_sources_doc_deps_noble =
   compile_sources_doc_deps_job
     ~name_suffix:"_noble"
-    ~image_name:("ubuntu:24.04-" ^ Tezos_ci.Images.Base_images.debian_version)
+    ~image:Tezos_ci.Images.Base_images.ubuntu_24_04
 
 let compile_sources_doc_job ~name_suffix ~project ~branch ~image_name =
   CI.job
