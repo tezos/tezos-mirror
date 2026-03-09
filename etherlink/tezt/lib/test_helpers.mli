@@ -309,6 +309,7 @@ val init_sequencer_sandbox :
   ?websockets:bool ->
   ?kernel:Kernel.t ->
   ?evm_version:Evm_version.t ->
+  ?sequencer_pool_address:string ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->

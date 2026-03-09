@@ -17,8 +17,8 @@ let tag = function
   | Eip2930 -> "Eip2930"
 
 let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
-    ?(kernels = [Kernel.Latest; Mainnet]) ?minimum_base_fee_per_gas ~title ~tags
-    f tx_types =
+    ?(kernels = [Kernel.Latest; Mainnet]) ?minimum_base_fee_per_gas
+    ?sequencer_pool_address ~title ~tags f tx_types =
   List.iter
     (fun kernel ->
       List.iter
@@ -50,6 +50,7 @@ let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
               ?da_fee_per_byte
               ?minimum_base_fee_per_gas
               ~kernel
+              ?sequencer_pool_address
               ~patch_config
               ()
           in
@@ -757,6 +758,110 @@ let test_validate_calldata_cost =
       "The transaction has not enough gas to pay calldata cost, it should fail" ;
   unit
 
+let test_eip7702_da_fee_includes_authorization_list =
+  let da_fee_per_byte = Wei.of_string "1_000_000_000_000" in
+  let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
+  register
+    ~kernels:[Kernel.Latest]
+    ~da_fee_per_byte
+    ~sequencer_pool_address
+    ~title:"DA fee includes EIP-7702 authorization list bytes"
+    ~tags:["eip7702"; "da_fees"]
+  @@ fun kernel sequencer _tx_type ->
+  let evm_version = Kernel.select_evm_version kernel in
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let sponsored =
+    Eth_account.
+      {
+        address = "0x202dFc8a729ac2cdE90D3B0e7A0424b6Ed6f6c34";
+        private_key =
+          "0x7d597ae2d861eda61e148e757478c9a07d950be9f355958195f1fc75a0cdd8b2";
+      }
+  in
+  let endpoint = Evm_node.endpoint sequencer in
+  (* Deploy the delegation contract. *)
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  (* Record pool balance after deploy, before EIP-7702 tx. *)
+  let*@ pool_balance_before =
+    Rpc.get_balance ~address:sequencer_pool_address sequencer
+  in
+  (* Sign authorization for the delegation contract. *)
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:sponsored.private_key
+      ~endpoint
+      ()
+  in
+  (* Send EIP-7702 tx with one authorization entry. *)
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas:1_000_000
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:sponsored.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@! Transaction.{type_; _} =
+    Rpc.get_transaction_receipt ~tx_hash sequencer
+  in
+  Check.((type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected EIP-7702 tx type (4), got %L" ;
+  let*@! Transaction.{authorizationList; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:tx_hash sequencer
+  in
+  (match authorizationList with
+  | Some [{address; _}] ->
+      Check.(
+        (String.lowercase_ascii address
+        = String.lowercase_ascii eip7702_contract)
+          string)
+        ~error_msg:"Expected msg.sender of %R, got %L"
+  | Some _ -> failwith "Authorization list should only contain one element."
+  | None -> failwith "Authorization list should not be empty.") ;
+  (* Check that the pool balance increase exactly matches the expected DA fee.
+     The DA fee is: (tx_data_len + tx_encoded_size + auth_data_size)
+                    * da_fee_per_byte.
+     - tx_data_len = 0 (empty calldata for the set-code tx)
+     - tx_encoded_size = 150
+     - auth_data_size = 1 entry * 125 bytes per entry
+       (chain_id:32 + address:20 + nonce:8 + y_parity:1 + r:32 + s:32)
+     So: (0 + 150 + 125) * da_fee_per_byte = 275 * da_fee_per_byte.
+     Without the fix, auth_data_size would be 0, giving only
+     150 * da_fee_per_byte. *)
+  let*@ pool_balance_after =
+    Rpc.get_balance ~address:sequencer_pool_address sequencer
+  in
+  let pool_balance_increase = Wei.(pool_balance_after - pool_balance_before) in
+  let tx_encoded_size = 150 in
+  let authorization_entry_size = 125 in
+  let total_bytes = tx_encoded_size + authorization_entry_size in
+  let expected_da_fee = Wei.(da_fee_per_byte * Z.of_int total_bytes) in
+  Check.((pool_balance_increase = expected_da_fee) Wei.typ)
+    ~error_msg:
+      "Pool balance increase %L should equal expected DA fee %R (including 125 \
+       bytes for one authorization entry)" ;
+  unit
+
 let () =
   let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
@@ -771,4 +876,5 @@ let () =
   test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction [Legacy] ;
   test_sender_is_not_contract all_types ;
   test_base_gas_cost all_types ;
-  test_validate_calldata_cost all_types
+  test_validate_calldata_cost all_types ;
+  test_eip7702_da_fee_includes_authorization_list [Eip1559]
