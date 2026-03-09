@@ -52,10 +52,7 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = []) ~artifacts
     ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
     ?storage
     ~image:Tezos_ci.Images.CI.build
-    ~only_if_changed:
-      ((* TODO: why "or_doc"? *)
-       Tezos_ci.Changeset.encode
-         Changesets.changeset_octez_or_doc)
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~variables:
       (("EXECUTABLE_FILES", executable_files)
       ::

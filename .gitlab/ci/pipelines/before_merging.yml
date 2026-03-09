@@ -1544,21 +1544,17 @@ oc.build_x86_64-exp:
   - gcp_very_high_cpu
   rules:
   - changes:
-    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
-    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
-    - grafazos/doc/**/*
     - irmin/**/*
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
@@ -1572,7 +1568,6 @@ oc.build_x86_64-exp:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -4638,21 +4633,17 @@ oc.build_arm64-exp:
   - gcp_arm64
   rules:
   - changes:
-    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
-    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
-    - grafazos/doc/**/*
     - irmin/**/*
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
@@ -4666,7 +4657,6 @@ oc.build_arm64-exp:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
     when: manual
     allow_failure: true
   needs:
@@ -4726,21 +4716,17 @@ oc.build_arm64-extra-dev:
   - gcp_arm64
   rules:
   - changes:
-    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
-    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
-    - grafazos/doc/**/*
     - irmin/**/*
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
@@ -4754,7 +4740,6 @@ oc.build_arm64-extra-dev:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
     when: manual
     allow_failure: true
   needs:
@@ -4816,21 +4801,17 @@ oc.build_arm64-released:
   - gcp_arm64
   rules:
   - changes:
-    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
-    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
-    - grafazos/doc/**/*
     - irmin/**/*
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
@@ -4844,7 +4825,6 @@ oc.build_arm64-released:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
     when: manual
     allow_failure: true
   needs:
