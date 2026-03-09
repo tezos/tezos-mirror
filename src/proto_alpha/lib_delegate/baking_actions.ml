@@ -520,9 +520,9 @@ let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
     state.global_state.constants.parametric.dal.number_of_slots
   in
   List.fold_left_i
-    (fun i acc' flag ->
+    (fun i acc' status ->
       match Dal.Slot_index.of_int_opt ~number_of_slots i with
-      | Some index when flag ->
+      | Some index when status = Dal_attestable_slots_worker.Attestable ->
           Dal.Attestations.commit
             acc'
             ~number_of_slots
@@ -532,6 +532,61 @@ let process_and_accumulate_dal_rpc_result state ~number_of_lags ~lag_index acc
       | None | Some _ -> acc')
     acc
     slots
+
+let attested_slot_indices slots =
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Attestable then i :: acc else acc)
+    []
+    slots
+  |> List.rev
+
+let trap_slot_indices slots =
+  List.fold_left_i
+    (fun i acc status ->
+      if status = Dal_attestable_slots_worker.Trap then i :: acc else acc)
+    []
+    slots
+  |> List.rev
+
+let emit_dal_attestation_logs ~delegate_id ~attested_level
+    ~no_dal_attestations_levels ~dal_trap_slots_per_level ~dal_content
+    ~published_levels ~level ~round =
+  let open Lwt_syntax in
+  let* () =
+    if no_dal_attestations_levels <> [] then
+      let published_levels_str =
+        no_dal_attestations_levels |> List.map Int32.to_string
+        |> String.concat ", "
+      in
+      Events.(
+        emit
+          no_attestable_dal_slots_for_levels
+          (delegate_id, attested_level, published_levels_str))
+    else return_unit
+  in
+  let* () =
+    if dal_trap_slots_per_level <> [] then
+      let trap_details =
+        dal_trap_slots_per_level
+        |> List.map (fun (published_level, slots) ->
+               Format.asprintf
+                 "%ld -> [%a]"
+                 published_level
+                 (Format.pp_print_list
+                    ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+                    Format.pp_print_int)
+                 slots)
+        |> String.concat "; "
+      in
+      Events.(
+        emit dal_slots_not_attested_due_to_traps (delegate_id, trap_details))
+    else return_unit
+  in
+  Events.(
+    emit
+      attach_dal_attestation
+      (delegate_id, dal_content, published_levels, level, round))
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_syntax in
@@ -546,7 +601,7 @@ let may_get_dal_content state consensus_vote =
   in
   only_if_dal_feature_enabled
     state
-    ~default_value:None
+    ~default_value:consensus_vote
     (fun _dal_node_rpc_ctxt ->
       let* () =
         (* Only emit this message for the maximum attestation lag. *)
@@ -569,9 +624,15 @@ let may_get_dal_content state consensus_vote =
           attestation_lags
       in
       let number_of_lags = List.length attestation_lags in
-      let* dal_attestations, no_dal_attestations_levels =
+      let* ( dal_attestations,
+             no_dal_attestations_levels,
+             dal_attested_slots_per_level,
+             dal_trap_slots_per_level ) =
         List.fold_left_i_s
-          (fun lag_index (acc, missing_levels) published_level ->
+          (fun lag_index
+               (acc, missing_levels, slots_per_level, traps_per_level)
+               published_level
+             ->
             let+ dal_attestable_slots =
               (Dal_attestable_slots_worker.get_dal_attestable_slots
                  dal_attestable_slots_worker
@@ -586,38 +647,62 @@ let may_get_dal_content state consensus_vote =
                       published_level)])
             in
             match dal_attestable_slots with
-            | None -> (acc, published_level :: missing_levels)
+            | None ->
+                ( acc,
+                  published_level :: missing_levels,
+                  slots_per_level,
+                  traps_per_level )
             | Some slots ->
+                let attested_indices = attested_slot_indices slots in
+                let trap_indices = trap_slot_indices slots in
+                let slots_per_level =
+                  if attested_indices <> [] then
+                    (published_level, attested_indices) :: slots_per_level
+                  else slots_per_level
+                in
+                let traps_per_level =
+                  if trap_indices <> [] then
+                    (published_level, trap_indices) :: traps_per_level
+                  else traps_per_level
+                in
                 ( process_and_accumulate_dal_rpc_result
                     state
                     acc
                     ~number_of_lags
                     ~lag_index
                     slots,
-                  missing_levels ))
-          (Dal.Attestations.empty, [])
+                  missing_levels,
+                  slots_per_level,
+                  traps_per_level ))
+          (Dal.Attestations.empty, [], [], [])
           published_levels
       in
-      let* () =
-        if no_dal_attestations_levels <> [] then
-          let published_levels_str =
-            no_dal_attestations_levels |> List.map Int32.to_string
-            |> String.concat ", "
-          in
-          Events.(
-            emit
-              no_attestable_dal_slots_for_levels
-              (delegate_id, attested_level, published_levels_str))
-        else return_unit
+      let dal_attested_slots_per_level =
+        List.rev dal_attested_slots_per_level
       in
+      let dal_trap_slots_per_level = List.rev dal_trap_slots_per_level in
       let dal_content = {attestations = dal_attestations} in
       let* () =
-        Events.(
-          emit
-            attach_dal_attestation
-            (delegate_id, dal_content, published_levels, level, round))
+        emit_dal_attestation_logs
+          ~delegate_id
+          ~attested_level
+          ~no_dal_attestations_levels
+          ~dal_trap_slots_per_level
+          ~dal_content
+          ~published_levels
+          ~level
+          ~round
       in
-      return_some dal_content)
+      return
+        {
+          consensus_vote with
+          dal_info =
+            Some
+              {
+                content = dal_content;
+                attested_slots_per_level = dal_attested_slots_per_level;
+              };
+        })
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -719,10 +804,11 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     vote_kind;
     vote_consensus_content = {level; round; _} as vote_consensus_content;
     delegate;
-    dal_content;
+    dal_info;
   } =
     unsigned_consensus_vote
   in
+  let dal_content = Option.map (fun {content; _} -> content) dal_info in
   let shell = {Tezos_base.Operation.branch} in
   let watermark =
     match vote_kind with
@@ -889,7 +975,14 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let signed_operation : Operation.packed = {shell; protocol_data} in
   (* Also update unsigned_consensus_vote: dal_content may have been
      set to None. *)
-  let unsigned_consensus_vote = {unsigned_consensus_vote with dal_content} in
+  let dal_info =
+    match (dal_content, dal_info) with
+    | None, _ -> None
+    | Some content, Some {attested_slots_per_level; _} ->
+        Some {content; attested_slots_per_level}
+    | Some content, None -> Some {content; attested_slots_per_level = []}
+  in
+  let unsigned_consensus_vote = {unsigned_consensus_vote with dal_info} in
   return {unsigned_consensus_vote; signed_operation}
 
 let sign_consensus_votes (global_state : global_state)

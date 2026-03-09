@@ -93,6 +93,14 @@ val pp_dal_content : Format.formatter -> dal_content -> unit
 
 val dal_content_encoding : dal_content Data_encoding.t
 
+type dal_info = {
+  content : dal_content;
+  attested_slots_per_level : (int32 * int list) list;
+      (** For logging purposes: list of (published_level, attested_slot_indices).
+          Only contains entries for published levels that have at least one
+          attested slot. *)
+}
+
 (** An unsigned consensus vote consists of the consensus vote kind, either an
     attestation or a preattestation, the delegate keys and its protocol and dal
     content. *)
@@ -100,7 +108,7 @@ type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
   delegate : Delegate.t;
-  dal_content : dal_content option;
+  dal_info : dal_info option;
 }
 
 val pp_unsigned_consensus_vote :
@@ -138,8 +146,8 @@ type unsigned_consensus_vote_batch = private {
     delegates_and_slots] maps the [delegates_and_slots] list to create a list of
     {!type-unsigned_consensus_vote} that is then included in an
     {!type-unsigned_consensus_vote_batch} with [kind], [batch_content] and
-    [batch_branch]. Note: [dal_content] of each operations is set to [None],
-    {!dal_content_map_p} needs to be called to update the [dal_content] field.
+    [batch_branch]. Note: [dal_info] of each operations is set to [None],
+    {!dal_content_map_p} needs to be called to update the [dal_info] field.
 *)
 val make_unsigned_consensus_vote_batch :
   consensus_vote_kind ->
@@ -151,7 +159,7 @@ val make_unsigned_consensus_vote_batch :
 (** [dal_content_map_p f unsigned_consensus_vote_batch] map each
     [unsigned_consensus_vote] in the batch with [f]. *)
 val dal_content_map_p :
-  (unsigned_consensus_vote -> dal_content option Lwt.t) ->
+  (unsigned_consensus_vote -> unsigned_consensus_vote Lwt.t) ->
   unsigned_consensus_vote_batch ->
   unsigned_consensus_vote_batch Lwt.t
 

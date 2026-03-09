@@ -1111,12 +1111,24 @@ module Actions = struct
       ~name:"no_attestable_dal_slots_for_levels"
       ~level:Warning
       ~msg:
-        "No attestable DAL slots found for {delegate_id} at attested level \
+        "No DAL attestation data received for {delegate_id} at attested level \
          {attested_level} for published levels [{published_levels}]"
       ("delegate_id", Delegate_id.encoding)
       ("attested_level", Data_encoding.int32)
       ("published_levels", Data_encoding.string)
       ~pp3:Format.pp_print_string
+
+  let dal_slots_not_attested_due_to_traps =
+    declare_2
+      ~section
+      ~name:"dal_slots_not_attested_due_to_traps"
+      ~level:Notice
+      ~msg:
+        "{delegate_id} did not DAL attest slots due to traps at published \
+         levels: {trap_details}"
+      ("delegate_id", Delegate_id.encoding)
+      ("trap_details", Data_encoding.string)
+      ~pp2:Format.pp_print_string
 end
 
 module VDF = struct
