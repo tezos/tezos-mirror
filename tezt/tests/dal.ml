@@ -629,8 +629,223 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
        %L, got = %R)" ;
   unit
 
-let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
-    parameters cryptobox node client dal_node =
+(** Helper to verify that expected slot data is present and matches source *)
+let verify_expected_slots_present dal_node_source dal_node_target tests_ok =
+  Log.info "Checking expected slot data is present..." ;
+  Lwt_list.iter_s
+    (fun (slot_level, slot_index) ->
+      let* status_orig =
+        Dal_RPC.(
+          call dal_node_source @@ get_level_slot_status ~slot_level ~slot_index)
+      in
+      let* () =
+        check_slot_status
+          ~__LOC__
+          ~expected_status:status_orig
+          ~check_attested_lag:`Exact
+          dal_node_target
+          ~slot_level
+          ~slot_index
+      in
+      let* content_orig =
+        Dal_RPC.(
+          call dal_node_source @@ get_level_slot_content ~slot_level ~slot_index)
+        |> Lwt.map Helpers.content_of_slot
+      in
+      let* content_target =
+        Dal_RPC.(
+          call dal_node_target @@ get_level_slot_content ~slot_level ~slot_index)
+        |> Lwt.map Helpers.content_of_slot
+      in
+      Check.(content_target = content_orig)
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          (Format.sprintf
+             "Slot data mismatch for (level=%d,index=%d)"
+             slot_level
+             slot_index) ;
+      (* Also verify shard data (shard 0) is present and matches *)
+      let shard_index = 0 in
+      let* shard_orig =
+        Dal_RPC.(
+          call dal_node_source
+          @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index)
+      in
+      let* shard_target =
+        Dal_RPC.(
+          call dal_node_target
+          @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index)
+      in
+      Check.(shard_target = shard_orig)
+        ~__LOC__
+        Check.string
+        ~error_msg:
+          (Format.sprintf
+             "Shard data mismatch for (level=%d,index=%d,shard=0)"
+             slot_level
+             slot_index) ;
+      unit)
+    tests_ok
+
+(** Helper to verify that filtered-out slot data is absent *)
+let verify_filtered_out_slots_absent dal_node_source dal_node_target tests_error
+    =
+  Log.info "Checking filtered-out slot data is absent..." ;
+  Lwt_list.iter_s
+    (fun (slot_level, slot_index) ->
+      (* Verify the source node has data *)
+      let* _ =
+        Dal_RPC.(
+          call dal_node_source @@ get_level_slot_content ~slot_level ~slot_index)
+      in
+      (* Verify the target node does not *)
+      let* response =
+        Dal_RPC.(
+          call_raw dal_node_target
+          @@ get_level_slot_content ~slot_level ~slot_index)
+      in
+      RPC_core.check_string_response ~code:404 response ;
+      unit)
+    tests_error
+
+(** [check_snapshot_variation] exports and imports snapshots from [dal_node]
+    into a fresh DAL node, and verifies that the expected data is present
+    and the filtered-out data is absent.
+
+    [published] is the list of [(level, index)] pairs published to the source
+    node. [upper_bound_exported] is the exclusive upper bound of levels that the
+    source store is expected to contain (capped by the export's
+    [latest_frozen_level]). [stop] is the baking stop level, used to compute
+    the maximum finalized level ([stop - 2]).
+
+    [import_steps] is a list of import configurations. Each configuration is
+    a tuple of (step_name, filters) where filters are:
+    (slots_exported, slots_imported, min_level_export, max_level_export,
+     min_level_import, max_level_import).
+
+    If [import_steps] has a single element, it performs a single import
+    (classic snapshot test). If it has multiple elements, it performs
+    sequential imports into the same DAL node to validate metadata merge
+    behavior when importing into a non-empty store.
+
+    When not provided, filter options default to no filtering. *)
+let check_snapshot_variation ~operators ~name ~published ~upper_bound_exported
+    ~stop ?(import_steps = [("single", (None, None, None, None, None, None))])
+    node dal_node =
+  (* Create a fresh DAL node for all imports *)
+  let fresh_dal_node = Dal_node.create ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
+
+  (* Helper to perform a single import *)
+  let perform_import
+      (step_name, (slots_exp, slots_imp, min_exp, max_exp, min_imp, max_imp)) =
+    let entry_in_export (level, index) =
+      level < upper_bound_exported
+      && (match min_exp with None -> true | Some m -> level >= m)
+      && (match max_exp with None -> true | Some m -> level <= m)
+      && match slots_exp with None -> true | Some l -> List.mem index l
+    in
+    let entry_in_import (level, _index) =
+      (match min_imp with None -> true | Some m -> level >= m)
+      && match max_imp with None -> true | Some m -> level <= m
+    in
+    let entry_ok entry =
+      entry_in_export entry && entry_in_import entry
+      &&
+      let _level, index = entry in
+      match slots_imp with None -> true | Some l -> List.mem index l
+    in
+    let step_data = List.filter entry_ok published in
+
+    let start_level =
+      match List.rev published with (l, _) :: _ -> l | [] -> assert false
+    in
+    let export_min =
+      match min_exp with
+      | Some l -> Int32.of_int l
+      | None -> Int32.of_int start_level
+    in
+    let export_max =
+      match max_exp with Some l -> Int32.of_int l | None -> Int32.of_int stop
+    in
+
+    let snapshot_file = Temp.file ("snapshot-" ^ name ^ "-" ^ step_name) in
+    let* () =
+      Dal_node.snapshot_export
+        ~min_published_level:export_min
+        ~max_published_level:export_max
+        ?slots:slots_exp
+        ~endpoint:(Node.as_rpc_endpoint node)
+        dal_node
+        snapshot_file
+    in
+
+    let import_min =
+      match min_imp with Some l -> Int32.of_int l | None -> export_min
+    in
+    let import_max =
+      match max_imp with Some l -> Int32.of_int l | None -> export_max
+    in
+
+    let* () =
+      Dal_node.snapshot_import
+        ~no_check:true
+        ~min_published_level:import_min
+        ~max_published_level:import_max
+        ?slots:slots_imp
+        ~endpoint:(Node.as_rpc_endpoint node)
+        fresh_dal_node
+        snapshot_file
+    in
+    Log.info
+      "[%s] Step %s: imported %d entries"
+      name
+      step_name
+      (List.length step_data) ;
+    return step_data
+  in
+
+  (* Perform all imports sequentially and collect expected data *)
+  let* all_imported_data =
+    Lwt_list.fold_left_s
+      (fun acc config ->
+        let* step_data = perform_import config in
+        return (acc @ step_data))
+      []
+      import_steps
+  in
+
+  (* Start the node after all imports are done to avoid lock contention on
+     the data directory during snapshot import. *)
+  let* () = Dal_node.run fresh_dal_node in
+
+  (* Verify all imported data is present *)
+  let* () =
+    verify_expected_slots_present dal_node fresh_dal_node all_imported_data
+  in
+
+  (* Verify data not included in any import is absent *)
+  let tests_error =
+    List.filter
+      (fun entry ->
+        let level, _ = entry in
+        level < stop - 2 && not (List.mem entry all_imported_data))
+      published
+  in
+  let* () =
+    verify_filtered_out_slots_absent dal_node fresh_dal_node tests_error
+  in
+
+  let* () = Dal_node.terminate fresh_dal_node in
+  (match import_steps with
+  | [_] -> Log.info "[%s] Single import completed successfully" name
+  | _ -> Log.info "[%s] Multi-step import completed successfully" name) ;
+  unit
+
+let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
+    dal_node =
+  (* Publish slots once for all snapshot test variations *)
   let* start = Lwt.map succ (Node.get_level node) in
   let expected_exported_levels = 5 in
   let stop =
@@ -643,6 +858,11 @@ let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
     + parameters.Dal_common.Parameters.attestation_lag
     + Tezos_dal_node_lib.Constants.validation_slack + 2
   in
+  (* Set up the wait promise before baking to avoid missing the event.
+     The DAL node processes finalized blocks asynchronously; we must wait for
+     it to reach stop - 2 before exporting, otherwise latest_frozen_level may
+     be too low and not all expected data will be in the frozen zone. *)
+  let wait_dal_processed = wait_for_layer1_final_block dal_node (stop - 2) in
   let* published =
     publish_and_bake
       ~slots:operators
@@ -654,172 +874,64 @@ let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
       client
       dal_node
   in
-
+  let* () = wait_dal_processed in
   let upper_bound_exported = start + expected_exported_levels in
-  let index_ok =
-    let is_exported =
-      match slots_exported with
-      | None -> fun _ -> true
-      | Some l -> fun x -> List.mem x l
+  let check ?slots_exported ?slots_imported ?min_level_export ?max_level_export
+      ?min_level_import ?max_level_import name =
+    let import_steps =
+      [
+        ( "single",
+          ( slots_exported,
+            slots_imported,
+            min_level_export,
+            max_level_export,
+            min_level_import,
+            max_level_import ) );
+      ]
     in
-    let is_imported =
-      match slots_imported with
-      | None -> fun _ -> true
-      | Some l -> fun x -> List.mem x l
-    in
-    fun i -> is_exported i && is_imported i
-  in
-  let tests_ok =
-    (* Levels that must be present in both original store and snapshot *)
-    List.filter
-      (fun (level, index) -> index_ok index && level < upper_bound_exported)
-      published
-  in
-  let tests_error =
-    (* Levels that must be present in original store but not in snapshot *)
-    (* [stop - 2] is used because [publish_and_bake ~to_level:stop] means
-       that blocks up to level [stop - 2] are sure to be finalized and
-       therefore present in the source DAL node's store. *)
-    List.filter
-      (fun (level, index) ->
-        (level >= upper_bound_exported && level < stop - 2)
-        || (level < upper_bound_exported && not (index_ok index)))
-      published
-  in
-  let min_published_level = Int32.of_int start in
-  let max_published_level = Int32.of_int stop in
-  let file = Temp.file ("snapshot-" ^ name) in
-  (* Wait for the DAL node to process finalized blocks up to [stop - 2] before
-     exporting the snapshot. The snapshot export caps [max_published_level] at
-     [last_processed_level - (validation_slack + attestation_lag + 1)], so if
-     the DAL node hasn't caught up yet the snapshot would be missing levels
-     required by [tests_ok]. *)
-  let* () = wait_for_layer1_final_block dal_node (stop - 2) in
-  (* Export with default levels (uses first_seen_level and last_processed_level) *)
-  let* () =
-    Dal_node.snapshot_export
-      ~min_published_level
-      ~max_published_level
-      ?slots:slots_exported
-      ~endpoint:(Node.as_rpc_endpoint node)
-      dal_node
-      file
-  in
-  (* Verify the snapshot file was created *)
-  let* file_exists = Lwt_unix.file_exists file in
-  let* () =
-    if file_exists then unit
-    else Test.fail "Snapshot export failed: file was not created at %s" file
-  in
-  (* Create a fresh DAL node using the exported snapshot data. *)
-  let fresh_dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
-  let* () =
-    Dal_node.snapshot_import
-      ~no_check:true (* Snapshot data validation is not implemented yet *)
-      ~min_published_level
-      ~max_published_level
-      ?slots:slots_imported
-      ~endpoint:(Node.as_rpc_endpoint node)
-      fresh_dal_node
-      file
-  in
-  let* () = Dal_node.run fresh_dal_node in
-  (* Compare slot statuses between the original node and the fresh one built from snapshot. *)
-  let* () =
-    Log.info
-      "Checking that the DAL node bootstrapped from snapshot has the expected \
-       slot data..." ;
-    Lwt_list.iter_s
-      (fun (slot_level, slot_index) ->
-        let* status_orig =
-          Dal_RPC.(
-            call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
-        in
-        let* () =
-          check_slot_status
-            ~__LOC__
-            ~expected_status:status_orig
-            ~check_attested_lag:`Exact
-            fresh_dal_node
-            ~slot_level
-            ~slot_index
-        in
-        let* content_orig =
-          Dal_RPC.(
-            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
-          |> Lwt.map Helpers.content_of_slot
-        in
-        let* content_fresh =
-          Dal_RPC.(
-            call fresh_dal_node
-            @@ get_level_slot_content ~slot_level ~slot_index)
-          |> Lwt.map Helpers.content_of_slot
-        in
-        Check.(content_fresh = content_orig)
-          ~__LOC__
-          Check.string
-          ~error_msg:
-            (Format.sprintf
-               "Snapshot import mismatch for slot (level=%d,index=%d)"
-               slot_level
-               slot_index) ;
-        unit)
-      tests_ok
-  in
-  let unexpected_success = Failure "Should not succeed" in
-  let* () =
-    Log.info
-      "Checking that the DAL node bootstrapped from snapshot lacks the \
-       expected slot data..." ;
-    Lwt_list.iter_s
-      (fun (slot_level, slot_index) ->
-        (* Check that the source node has data *)
-        let* _ =
-          Dal_RPC.(
-            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
-        in
-        (* Check that the node bootstrapped from snapshot does not have data *)
-        let* () =
-          Lwt.catch
-            (fun () ->
-              let* _ =
-                Dal_RPC.(
-                  call fresh_dal_node
-                  @@ get_level_slot_content ~slot_level ~slot_index)
-              in
-              Lwt.fail unexpected_success)
-            (fun e ->
-              if e = unexpected_success then
-                Test.fail
-                  "After snapshot import: expected failure for \
-                   /levels/%d/slot/%d/content"
-                  slot_level
-                  slot_index
-              else Lwt.return_unit)
-        in
-        unit)
-      tests_error
-  in
-  Dal_node.terminate fresh_dal_node
-
-let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
-    dal_node =
-  let test ?slots_exported ?slots_imported name =
-    test_dal_node_snapshot_aux
-      ~name
+    check_snapshot_variation
       ~operators
-      ?slots_exported
-      ?slots_imported
-      parameters
-      cryptobox
+      ~name
+      ~published
+      ~upper_bound_exported
+      ~stop
+      ~import_steps
       node
-      client
       dal_node
   in
-  let* () = test "empty" in
-  let* () = test ~slots_exported:[List.hd operators] "filter-exported" in
-  let* () = test ~slots_imported:[List.hd operators] "filter-imported" in
+  let* () = check "no-filter" in
+  let* () = check ~slots_exported:[List.hd operators] "filter-exported" in
+  let* () = check ~slots_imported:[List.hd operators] "filter-imported" in
+  (* Import only a sub-range of levels from the snapshot *)
+  let* () =
+    check
+      ~min_level_import:(start + 1)
+      ~max_level_import:(start + 3)
+      "level-filter-import"
+  in
+  (* Combine slot and level filtering on import *)
+  let* () =
+    check
+      ~slots_imported:[List.hd operators]
+      ~min_level_import:(start + 1)
+      ~max_level_import:(start + 3)
+      "slot-and-level-filter-import"
+  in
+  (* Export only a sub-range of levels from the store *)
+  let* () =
+    check
+      ~min_level_export:(start + 1)
+      ~max_level_export:(start + 3)
+      "level-filter-export"
+  in
+  (* Combine slot and level filtering on export *)
+  let* () =
+    check
+      ~slots_exported:[List.hd operators]
+      ~min_level_export:(start + 1)
+      ~max_level_export:(start + 3)
+      "slot-and-level-filter-export"
+  in
   unit
 
 let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
@@ -860,6 +972,75 @@ let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
       (Node.Config_file.set_network_with_dal_config config)
   in
   let* () = Node.snapshot_import node2 file in
+  unit
+
+(** [test_dal_node_snapshot_import_merging] tests importing a snapshot
+    into a DAL node that already contains some data. It verifies that:
+    1. Data that was present before import remains present
+    2. Newly imported data is correctly added
+    3. Metadata (first_seen_level, last_processed_level) is properly merged *)
+let test_dal_node_snapshot_import_merging ~operators _protocol parameters
+    cryptobox node client dal_node =
+  (* Publish data across multiple levels to test multi-step import *)
+  let* start = Lwt.map succ (Node.get_level node) in
+  let total_levels = 9 in
+  let stop =
+    start + total_levels + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
+  in
+  (* Set up the wait promise before baking to avoid missing the event.
+     The DAL node processes finalized blocks asynchronously; we must wait for
+     it to reach stop - 2 before exporting, otherwise latest_frozen_level may
+     be too low and not all expected data will be in the frozen zone. *)
+  let wait_dal_processed = wait_for_layer1_final_block dal_node (stop - 2) in
+  let* published =
+    publish_and_bake
+      ~slots:operators
+      ~from_level:start
+      ~to_level:stop
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let* () = wait_dal_processed in
+  Log.info "Published test data (levels %d-%d)" start (stop - 1) ;
+
+  (* Split the published data into two parts for sequential import *)
+  let split_level = start + 5 in
+  let upper_bound_exported = start + total_levels in
+
+  (* Test scenario: Import first part, then second part of the same snapshot
+     into a fresh DAL node. This validates metadata merge behavior. *)
+  let import_steps =
+    [
+      (* Step 1: Import first part of data (levels start to split_level - 1) *)
+      ( "part-1",
+        ( None,
+          None,
+          Some start,
+          Some (split_level - 1),
+          Some start,
+          Some (split_level - 1) ) );
+      (* Step 2: Import second part of data (levels split_level to stop - 1) *)
+      ( "part-2",
+        (None, None, Some split_level, Some stop, Some split_level, Some stop)
+      );
+    ]
+  in
+
+  let* () =
+    check_snapshot_variation
+      ~operators
+      ~name:"snapshot-merge-test"
+      ~published
+      ~upper_bound_exported
+      ~stop
+      ~import_steps
+      node
+      dal_node
+  in
   unit
 
 let test_dal_node_startup =
@@ -7265,6 +7446,15 @@ let register ~protocols =
     "No redundant DAL attestations with multi-lag"
     test_no_redundant_dal_attestations
     (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "merge"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot import with merging into existing store"
+    (test_dal_node_snapshot_import_merging ~operators:[0; 3])
+    protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   Dal_p2p.register ~__FILE__ ~protocols ;
