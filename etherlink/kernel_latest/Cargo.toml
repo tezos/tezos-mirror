@@ -112,6 +112,7 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
 tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+tezos-smart-rollup-build-utils = { path = "../../src/kernel_sdk/build-utils" }
 tezos-protocol = { path = "../../sdk/rust/protocol" }
 
 # property based testing
@@ -135,6 +136,7 @@ http = { path = "../../vendors/http" }
 
 # miscs
 format_no_std = "1.2.0"
+cfg-if = "1.0.4"
 
 # kernel execution profiling
 nop-macros = { version = "0.2.0" }

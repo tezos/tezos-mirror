@@ -9,6 +9,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+cfg-if.workspace = true
 num-traits.workspace = true
 num-derive.workspace = true
 tezos-smart-rollup-debug.workspace = true
@@ -16,9 +17,18 @@ tezos-smart-rollup-host.workspace = true
 nop-macros.workspace = true
 tracing = { workspace = true, optional = true }
 
+[build-dependencies]
+tezos-smart-rollup-build-utils.workspace = true
+
 [features]
 default = ["alloc"]
 alloc = []
 debug = []
 benchmark = []
 tracing = ["dep:tracing"]
+# Static log capturing of `log!` outputs.
+# Used by `EvalHost` during evm semantic tests
+#
+# TODO (L2-837): add feature to use `log` crate internally for running
+#                natively within evm-node
+capture-logs = []

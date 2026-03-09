@@ -595,9 +595,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-if"
-version = "1.0.1"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
+checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "checked"
@@ -3174,9 +3174,11 @@ dependencies = [
 name = "tezos-evm-logging-latest"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "nop-macros",
  "num-derive",
  "num-traits",
+ "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-host",
  "tracing",

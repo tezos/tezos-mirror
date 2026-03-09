@@ -1,13 +1,39 @@
 // SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
-#[doc(hidden)]
-pub use tezos_smart_rollup_debug::debug_str;
-
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+
+cfg_if::cfg_if! {
+    if #[cfg(not(pvm_kind = "none"))] {
+        #[doc(hidden)]
+        pub use tezos_smart_rollup_debug::debug_str;
+    } else if #[cfg(feature = "capture-logs")] {
+        use std::cell::RefCell;
+
+        thread_local! {
+            /// Capture of all calls to `debug_str` that occurred in the current thread.
+            pub static DEBUG_LOG: RefCell<Vec<u8>> = RefCell::default();
+        }
+
+        #[macro_export]
+        macro_rules! debug_str {
+            ($host: expr, $msg: expr) => {{
+                $crate::DEBUG_LOG.with_borrow_mut(|log| log.extend_from_slice($msg.as_bytes()));
+            }};
+        }
+    } else {
+        #[macro_export]
+        macro_rules! debug_str {
+            ($host: expr, $msg: expr) => {{
+                eprint!("{}", $msg);
+            }};
+        }
+    }
+}
 
 #[repr(u8)]
 #[derive(PartialEq, Clone, Copy, PartialOrd, FromPrimitive)]
@@ -118,7 +144,6 @@ macro_rules! __trace_kernel_add_attrs {
 #[cfg(feature = "tracing")]
 pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
 where
-    H: HostDebug,
     F: FnOnce(&mut H) -> R,
 {
     let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
