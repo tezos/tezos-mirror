@@ -260,7 +260,15 @@ let register_delete_unused_ips ~tags =
             | [] -> region_url
           in
           Log.info "Deleting unused IP: %s (region: %s)" name region ;
-          Gcloud.delete_address ~name ~region ~project_id ())
+          Lwt.catch
+            (fun () -> Gcloud.delete_address ~name ~region ~project_id ())
+            (fun exn ->
+              Log.warn
+                "Failed to delete IP %s (region: %s): %s"
+                name
+                region
+                (Printexc.to_string exn) ;
+              Lwt.return_unit))
         unused
 
 let register_dns_add ~tags =
