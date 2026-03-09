@@ -81,6 +81,11 @@ val list_iam_service_accounts : ?filter:string -> unit -> JSON.t Lwt.t
     Filter can be used to filter by name *)
 val list_disks : ?filter:string -> unit -> JSON.t Lwt.t
 
+(** [delete_address ~name ~region ~project_id ()] deletes the static IP address
+    [name] in the given [region] for the specified [project_id]. *)
+val delete_address :
+  name:string -> region:string -> project_id:string -> unit -> unit Lwt.t
+
 module DNS : sig
   (** [create_zone ~domain ~zone ()] creates a [~zone] associated with
       [~domain]. *)
