@@ -920,11 +920,11 @@ module Handlers = struct
         protect @@ fun () ->
         (* Refuse preconfirmations when locked, before the first
            created block, or when preconfirmations are explicitly disabled *)
-        if state.locked then tzfail Services_backend_sig.IC_disabled
+        if state.locked then tzfail Tx_queue_types.IC_disabled
         else
           match state.preconfirmation_state with
-          | Disabled -> tzfail Services_backend_sig.IC_disabled
-          | Awaiting_first_timestamp -> tzfail Services_backend_sig.IC_disabled
+          | Disabled -> tzfail Tx_queue_types.IC_disabled
+          | Awaiting_first_timestamp -> tzfail Tx_queue_types.IC_disabled
           | Enabled preconfirmation_state ->
               let* preconfirmation_state, selected_txns_hashes =
                 preconfirm_transactions
@@ -1009,8 +1009,8 @@ let () =
     ~title:"Instant_confirmation_is_disabled"
     ~description:"Instant confirmation is disabled, request can't be traited."
     Data_encoding.unit
-    (function Services_backend_sig.IC_disabled -> Some () | _ -> None)
-    (fun () -> Services_backend_sig.IC_disabled)
+    (function Tx_queue_types.IC_disabled -> Some () | _ -> None)
+    (fun () -> Tx_queue_types.IC_disabled)
 
 let worker =
   lazy

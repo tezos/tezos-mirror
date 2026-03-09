@@ -7,19 +7,6 @@
 
 exception Invalid_block_structure of string
 
-module type READER = sig
-  type state
-
-  val get_state :
-    ?block:Ethereum_types.Block_parameter.extended ->
-    unit ->
-    state tzresult Lwt.t
-
-  val read : state -> Durable_storage_path.path -> bytes option tzresult Lwt.t
-
-  val subkeys : state -> Durable_storage_path.path -> string list tzresult Lwt.t
-end
-
 let inspect_durable_and_decode_opt read path decode =
   let open Lwt_result_syntax in
   let* bytes = read path in
@@ -143,75 +130,3 @@ let list_runtimes read =
     if Option.is_some bytes_opt then return @@ Some r else return None
   in
   List.filter_map_ep check_runtime Tezosx.known_runtimes
-
-module Make (Reader : READER) = struct
-  let read_with_state ?block () =
-    let open Lwt_result_syntax in
-    let* state = Reader.get_state ?block () in
-    return (Reader.read state)
-
-  let chain_id () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    chain_id read
-
-  let michelson_runtime_chain_id () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    michelson_runtime_chain_id read
-
-  let is_multichain_enabled () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    is_multichain_enabled read
-
-  let l2_minimum_base_fee_per_gas chain_id =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    l2_minimum_base_fee_per_gas read chain_id
-
-  let l2_da_fee_per_byte chain_id =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    l2_da_fee_per_byte read chain_id
-
-  let l2_maximum_gas_per_transaction chain_id =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    l2_maximum_gas_per_transaction read chain_id
-
-  let chain_family chain_id =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    chain_family read chain_id
-
-  let world_state chain_id =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    world_state read chain_id
-
-  let storage_version () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    storage_version read
-
-  let kernel_version () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    kernel_version read
-
-  let kernel_root_hash () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    kernel_root_hash read
-
-  let current_block_number ~root =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    block_number ~root read Durable_storage_path.Block.Current
-
-  let list_runtimes () =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    list_runtimes read
-end

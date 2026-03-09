@@ -52,13 +52,199 @@ val preload_known_kernels : t -> unit tzresult Lwt.t
 val preload_kernel_from_level :
   t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
+(** [chain_id ctxt] returns the chain id defined by the rollup. *)
+val chain_id : t -> L2_types.chain_id tzresult Lwt.t
+
+(** [michelson_runtime_chain_id ctxt] returns the chain id of the
+    Michelson runtime defined by the rollup. *)
+val michelson_runtime_chain_id : t -> L2_types.chain_id tzresult Lwt.t
+
+(** [current_block_number_durable ctxt ~root] returns the current block
+    number of the L2 chain prefixed by [root] from durable storage. *)
+val current_block_number_durable :
+  t -> root:string -> Ethereum_types.quantity tzresult Lwt.t
+
+(** [storage_version ctxt] returns the latest storage version known to the
+    current kernel. *)
+val storage_version : t -> int tzresult Lwt.t
+
+(** [kernel_version ctxt] returns the internal kernel version. *)
+val kernel_version : t -> string tzresult Lwt.t
+
+(** [kernel_root_hash ctxt] returns the internal kernel root hash. *)
+val kernel_root_hash : t -> string option tzresult Lwt.t
+
+(** [list_runtimes ctxt] returns the list of runtimes activated in the kernel. *)
+val list_runtimes : t -> Tezosx.runtime list tzresult Lwt.t
+
+val list_l1_l2_levels :
+  t ->
+  from_l1_level:int32 ->
+  (int32 * Evm_store.L1_l2_finalized_levels.t) list tzresult Lwt.t
+
+val l2_levels_of_l1_level :
+  t -> int32 -> Evm_store.L1_l2_finalized_levels.t option tzresult Lwt.t
+
+(** [block_param_to_block_number ctxt ~chain_family block_param] returns
+    the block number of the block identified by [block_param]. Uses the
+    store for hash lookups. *)
+val block_param_to_block_number :
+  t ->
+  chain_family:_ L2_types.chain_family ->
+  ?hash_column:[`Evm | `Michelson] ->
+  Ethereum_types.Block_parameter.extended ->
+  Ethereum_types.quantity tzresult Lwt.t
+
+(** [single_chain_id_and_family ctxt ~config ~enable_multichain] should only
+    be called if the node is expected to follow a single chain. *)
+val single_chain_id_and_family :
+  t ->
+  config:Configuration.t ->
+  enable_multichain:bool ->
+  (L2_types.chain_id option * L2_types.ex_chain_family) tzresult Lwt.t
+
+(** {2 Block storage operations (store-backed)} *)
+
+(** [current_block_number ctxt] returns the most recent stored block number. *)
+val current_block_number : t -> Ethereum_types.quantity tzresult Lwt.t
+
+val nth_block :
+  t ->
+  full_transaction_object:bool ->
+  Z.t ->
+  Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
+val block_by_hash :
+  t ->
+  full_transaction_object:bool ->
+  Ethereum_types.block_hash ->
+  Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
+val block_receipts : t -> Z.t -> Transaction_receipt.t list tzresult Lwt.t
+
+val block_range_receipts :
+  t ->
+  ?mask:Ethbloom.t ->
+  Z.t ->
+  int ->
+  Transaction_receipt.t list tzresult Lwt.t
+
+val transaction_receipt :
+  t -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t
+
+val transaction_object :
+  t -> Ethereum_types.hash -> Transaction_object.t option tzresult Lwt.t
+
+(** [get_state ctxt ?block ()] returns the EVM state at the given block
+    parameter. Defaults to [Latest]. *)
+val get_state :
+  t ->
+  ?block:Ethereum_types.Block_parameter.extended ->
+  unit ->
+  Evm_state.t tzresult Lwt.t
+
+(** [read_state state path] reads a value from the durable storage at [path]
+    in the given [state]. Alias for {!Evm_state.inspect} wrapped in a result. *)
+val read_state :
+  Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
+
+(** [subkeys state path] returns the list of subkeys under [path] in the
+    durable storage of [state]. *)
+val subkeys :
+  Evm_state.t -> Durable_storage_path.path -> string list tzresult Lwt.t
+
+(** {2 Etherlink backend operations} *)
+
+module Etherlink : sig
+  val balance :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
+
+  val nonce :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity option tzresult Lwt.t
+
+  val code :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.hex tzresult Lwt.t
+
+  val storage_at :
+    t ->
+    Ethereum_types.address ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.hex tzresult Lwt.t
+
+  val base_fee_per_gas : t -> Ethereum_types.quantity tzresult Lwt.t
+
+  val backlog : t -> Z.t tzresult Lwt.t
+
+  val minimum_base_fee_per_gas : t -> Z.t tzresult Lwt.t
+
+  val coinbase : t -> Ethereum_types.address tzresult Lwt.t
+
+  val replay :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
+end
+
+(** {2 Tracer operations} *)
+
+module Tracer_etherlink : sig
+  val trace_transaction :
+    t ->
+    Ethereum_types.hash ->
+    Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
+
+  val trace_call :
+    t ->
+    Ethereum_types.call ->
+    Ethereum_types.Block_parameter.extended ->
+    Tracer_types.config ->
+    Tracer_types.output tzresult Lwt.t
+
+  val trace_block :
+    t ->
+    Ethereum_types.quantity ->
+    Tracer_types.config ->
+    Tracer_types.block_output tzresult Lwt.t
+end
+
+(** {2 Tezlink block storage} *)
+
+val tezlink_nth_block : t -> Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
+
+val tezlink_nth_block_hash :
+  t -> Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
+
+val tezosx_nth_block : t -> Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
+
+val tezosx_nth_block_hash :
+  t -> Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
-val ro_backend :
-  ?evm_node_endpoint:Uri.t ->
-  t ->
-  Configuration.t ->
-  (module Services_backend_sig.S)
+type evm_services_methods = {
+  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
+  find_blueprint :
+    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
+  smart_rollup_address : Address.t;
+  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
+}
+
+val evm_services_methods :
+  t -> Configuration.time_between_blocks -> evm_services_methods
 
 type replay_strategy = Blueprint | Assemble
 
@@ -82,8 +268,5 @@ val replay :
   replay_strategy ->
   Ethereum_types.quantity ->
   replay_result tzresult Lwt.t
-
-val evm_services_methods :
-  t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods
 
 val blueprints_range : t -> Blueprints_publisher.blueprints_range

@@ -18,9 +18,9 @@ type queue_variant = [`Accepted | `Refused]
 
 type pending_variant = [`Confirmed | `Dropped]
 
-type all_variant = Services_backend_sig.callback_status
+type all_variant = Tx_queue_types.callback_status
 
-type 'a variant_callback = 'a Services_backend_sig.variant_callback
+type 'a variant_callback = 'a Tx_queue_types.variant_callback
 
 type callback = all_variant variant_callback
 
@@ -510,10 +510,7 @@ module Request = struct
         address : address;
       }
         -> (Ethereum_types.quantity, tztrace) t
-    | Tick : {
-        evm_node_endpoint : Services_backend_sig.endpoint;
-      }
-        -> (unit, tztrace) t
+    | Tick : {evm_node_endpoint : Tx_queue_types.endpoint} -> (unit, tztrace) t
     | Injection_confirmation : {
         txn_hash : Ethereum_types.hash;
         status : [`Accepted | `Refused];
@@ -567,7 +564,7 @@ module Request = struct
     let open Data_encoding in
     conv
       (function
-        | Services_backend_sig.Rpc uri -> Uri.to_string uri
+        | Tx_queue_types.Rpc uri -> Uri.to_string uri
         | Websocket _ -> "[websocket]"
         | Block_producer _ -> "[block_producer]")
       (fun _ -> assert false)
@@ -841,7 +838,7 @@ module Handlers = struct
     if Seq.is_empty transactions then return_unit
     else
       match evm_node_endpoint with
-      | Services_backend_sig.Rpc base -> (
+      | Tx_queue_types.Rpc base -> (
           let batch, hashes = build_batch transactions in
           match batch with
           | [] -> return_unit
@@ -905,7 +902,7 @@ module Handlers = struct
                   ]
               in
               return_unit
-          | Error [Services_backend_sig.IC_disabled] ->
+          | Error [Tx_queue_types.IC_disabled] ->
               (* This case should not happen: if instant confirmations are
                    disabled, we should not route through this endpoint. *)
               let*! () = inject_status `Refused hashes in

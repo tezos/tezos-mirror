@@ -227,24 +227,6 @@ let nth_block_hash read n =
     (Durable_storage_path.Indexes.block_by_number ~root number)
     Ethereum_types.decode_block_hash
 
-module Make_block_storage (Reader : Durable_storage.READER) :
-  Tezlink_block_storage_sig.S = struct
-  let read_with_state () =
-    let open Lwt_result_syntax in
-    let* state = Reader.get_state () in
-    return (Reader.read state)
-
-  let nth_block n =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    nth_block read n
-
-  let nth_block_hash n =
-    let open Lwt_result_syntax in
-    let* read = read_with_state () in
-    nth_block_hash read n
-end
-
 let da_fee_per_byte_mutez read =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty da_fee_per_byte_wei) =

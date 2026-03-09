@@ -43,7 +43,7 @@ val produce_block :
 (** [preconfirm_transactions ~transactions] validates each transaction
     in [transactions] and streams every successfully validated one to
     the preconfirmation pipeline. Fails with
-    [Services_backend_sig.IC_disabled] if instant confirmation is not
+    [Tx_queue_types.IC_disabled] if instant confirmation is not
     enabled. *)
 val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->

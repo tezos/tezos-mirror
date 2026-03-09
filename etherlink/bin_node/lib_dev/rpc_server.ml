@@ -7,16 +7,7 @@
 
 type finalizer = unit -> unit Lwt.t
 
-type evm_services_methods = {
-  next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
-  find_blueprint :
-    Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
-  find_blueprint_legacy :
-    Ethereum_types.quantity ->
-    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
-  smart_rollup_address : Address.t;
-  time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
-}
+type evm_services_methods = Evm_ro_context.evm_services_methods
 
 type block_production = [`Single_node | `Disabled]
 
@@ -179,7 +170,7 @@ let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
 
 let start_public_server (type f) ~(mode : f Mode.t)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id ~tick
-    ?evm_services (config : Configuration.t) ctxt =
+    ?evm_services (config : Configuration.t) ro_ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
     Octez_performance_metrics.Unix.supports_performance_metrics ()
@@ -189,7 +180,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
   let register_evm_services =
     match evm_services with
     | None -> Fun.id
-    | Some impl ->
+    | Some (impl : Evm_ro_context.evm_services_methods) ->
         Evm_services.register
           impl.next_blueprint_number
           impl.find_blueprint_legacy
@@ -199,32 +190,33 @@ let start_public_server (type f) ~(mode : f Mode.t)
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
-    let (module Backend : Services_backend_sig.S), _ = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
         let* l2_chain_id =
           match l2_chain_id with
           | Some l2_chain_id -> return l2_chain_id
-          | None -> Backend.chain_id ()
+          | None -> Evm_ro_context.chain_id ro_ctxt
         in
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
-             (module Backend.Tezlink)
+             (Tezlink_services_impl.make ro_ctxt)
              ~add_operation:
                (add_operation
                   ~mode
                   ~keep_alive:config.keep_alive
                   ~timeout:config.rpc_timeout)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
-        let*! runtimes = Backend.list_runtimes () in
+        let*! runtimes = Evm_ro_context.list_runtimes ro_ctxt in
         match runtimes with
         | Ok [] ->
             return
             @@ Evm_directory.empty config.experimental_features.rpc_server
         | Ok runtimes ->
             let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
-            let* l2_chain_id = Backend.michelson_runtime_chain_id () in
+            let* l2_chain_id =
+              Evm_ro_context.michelson_runtime_chain_id ro_ctxt
+            in
             let* () =
               (* we use Resto for some runtimes, so we can _only_ use resto. *)
               if config.experimental_features.rpc_server = Dream then
@@ -234,7 +226,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
             return @@ Evm_directory.init_from_resto_directory
             @@ List.fold_left
                  (Tezosx_rpc.add_rpc_directory
-                    (module Backend)
+                    ro_ctxt
                     ~l2_chain_id
                     ~add_operation:
                       (add_operation
@@ -262,7 +254,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
   let directory =
     register_tezos_services
-    |> Services.directory ~rpc_server_family mode rpc config ctxt ~tick
+    |> Services.directory ~rpc_server_family mode rpc config ro_ctxt ~tick
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
@@ -279,7 +271,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
 let start_private_server ~mode
     ~(rpc_server_family : _ Rpc_types.rpc_server_family) ~tick
-    ?(block_production = `Disabled) config ctxt =
+    ?(block_production = `Disabled) config ro_ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
@@ -290,7 +282,7 @@ let start_private_server ~mode
           private_rpc
           ~block_production
           config
-          ctxt
+          ro_ctxt
           ~tick
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe

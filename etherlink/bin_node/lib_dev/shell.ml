@@ -35,9 +35,11 @@ let run ~(config : Configuration.t) block_param k =
   let*! populated = Data_dir.populated ~data_dir:config.data_dir in
   let* () = unless populated @@ fun () -> failwith "Empty data dir" in
   let* ro_ctxt = Evm_ro_context.load ~pool config in
-  let (module Rpc_backend) = Evm_ro_context.ro_backend ro_ctxt config in
   let* block_number =
-    Rpc_backend.block_param_to_block_number ~chain_family:EVM block_param
+    Evm_ro_context.block_param_to_block_number
+      ro_ctxt
+      ~chain_family:EVM
+      block_param
   in
   let* store_result =
     Evm_store.(

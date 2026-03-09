@@ -5,12 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let add_rpc_directory (module Backend : Services_backend_sig.S) ~l2_chain_id
-    ~add_operation dir = function
+let add_rpc_directory ro_ctxt ~l2_chain_id ~add_operation dir = function
   | Tezosx.Tezos ->
       Tezos_rpc.Directory.merge
         (Tezlink_directory.register_tezlink_services
            ~l2_chain_id
-           (module Backend.Tezos)
+           (Tezos_backend.make ro_ctxt)
            ~add_operation)
         dir
