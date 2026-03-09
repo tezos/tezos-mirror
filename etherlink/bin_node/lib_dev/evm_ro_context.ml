@@ -368,6 +368,31 @@ let subkeys state path =
   let*! res = Evm_state.subkeys state path in
   return res
 
+let execute_entrypoint ctxt state ~input_path ~input ~output_path ~entrypoint =
+  let open Lwt_result_syntax in
+  let config =
+    Pvm.Kernel.config
+      ~preimage_directory:ctxt.preimages
+      ?preimage_endpoint:ctxt.preimages_endpoint
+      ~kernel_debug:false
+      ~destination:ctxt.smart_rollup_address
+      ~trace_host_funs:ctxt.trace_host_funs
+      ()
+  in
+  let* result =
+    Evm_state.execute_entrypoint
+      ~data_dir:ctxt.data_dir
+      ~pool:ctxt.execution_pool
+      ~native_execution_policy:Configuration.Always
+      ~config
+      state
+      ~input_path
+      ~input
+      ~output_path
+      ~entrypoint
+  in
+  return result
+
 let pvm_config ctxt =
   Pvm.Kernel.config
     ~preimage_directory:ctxt.preimages
