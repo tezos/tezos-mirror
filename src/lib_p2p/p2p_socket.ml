@@ -642,6 +642,8 @@ module Reader = struct
     Option.iter_s
       (fun Types.(S st) -> Error_monad.cancel_with_exceptions st.canceler)
       st
+
+  let wait_for_completion st = Worker.wait_for_completion st.worker
 end
 
 type 'msg encoded_message = bytes list
@@ -1015,6 +1017,10 @@ let close ?(wait = false) ~reason st =
   let* () = Reader.shutdown st.reader in
   let* () = Writer.shutdown st.writer in
   Lwt.return_unit
+
+let wait_reader_closed t = Reader.wait_for_completion t.reader
+
+let wait_writer_closed t = Writer.wait_for_completion t.writer
 
 module Internal_for_tests = struct
   module Connection_message = struct
