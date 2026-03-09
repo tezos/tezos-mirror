@@ -10,22 +10,31 @@
 //! using the inbox and a specific message.
 
 use crate::{
-    delayed_inbox::DelayedInbox, sub_block, transaction::Transaction,
+    apply::{ExecutionResult, RuntimeExecutionInfo, WITHDRAWAL_OUTBOX_QUEUE},
+    block::bip_from_blueprint,
+    blueprint::Blueprint,
+    blueprint_storage::read_current_blueprint_header,
+    chains::{ChainConfigTrait, EvmChainConfig},
+    configuration::fetch_pure_evm_config,
+    delayed_inbox::DelayedInbox,
+    storage::read_chain_id,
+    sub_block,
+    transaction::Transaction,
     ETHERLINK_SAFE_STORAGE_ROOT_PATH,
 };
-use mir::ast::Entrypoint;
-use mir::ast::IntoMicheline;
-use mir::ast::Type;
+use mir::ast::{Entrypoint, IntoMicheline, Type};
 use mir::parser::Parser;
+use primitive_types::{H160, H256, U256};
 use rlp::{Rlp, RlpStream};
 use std::collections::HashMap;
+use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::rlp_helpers::{
-    append_option_canonical, append_u64_le, decode_field_bool, decode_field_u64_le, next,
-    FromRlpBytes,
+    append_option_canonical, decode_field, decode_field_bool, next, FromRlpBytes,
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_execution::context::Context as _;
+use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
@@ -171,11 +180,18 @@ where
             return;
         }
     };
-    // Scaffold: decode RLP input [skip_signature_check_bool, n_u64_le_bytes],
-    // compute successor, write RLP-encoded result back.
+
+    // Input is RLP-encoded as a list: [skip_signature_check, transaction_bytes].
+    // Fees checks are always skipped during simulation.
+
+    if input.is_empty() {
+        log!(host, Error, "Tezos X simulation: empty input");
+        return;
+    }
+
     let rlp = Rlp::new(&input);
     let mut it = rlp.iter();
-    let _skip_signature_check: bool =
+    let skip_signature_check: bool =
         match next(&mut it).and_then(|f| decode_field_bool(&f, "skip_signature_check")) {
             Ok(v) => v,
             Err(err) => {
@@ -188,21 +204,168 @@ where
                 return;
             }
         };
-    let n: u64 = match next(&mut it).and_then(|f| decode_field_u64_le(&f, "n")) {
-        Ok(v) => v,
+    let transaction_bytes: Vec<u8> =
+        match next(&mut it).and_then(|f| decode_field(&f, "transaction_bytes")) {
+            Ok(v) => v,
+            Err(err) => {
+                log!(
+                    host,
+                    Error,
+                    "Tezos X simulation: failed to decode input: {:?}",
+                    err
+                );
+                return;
+            }
+        };
+
+    log!(
+        host,
+        Debug,
+        "Tezos X simulation starts, skip signature flag: {skip_signature_check:?}, \
+         input length: {:?}",
+        transaction_bytes.len()
+    );
+
+    // Build context: chain config, block constants, outbox queue.
+    let eth_chain_id = match read_chain_id(&host) {
+        Ok(id) => id,
         Err(err) => {
             log!(
                 host,
                 Error,
-                "Tezos X simulation: failed to decode input: {:?}",
+                "Tezos X simulation: failed to read chain id: {:?}",
                 err
             );
             return;
         }
     };
-    let result = n.wrapping_add(1);
+    let evm_config = fetch_pure_evm_config(&mut host, eth_chain_id);
+    let blueprint_header = match read_current_blueprint_header(&host) {
+        Ok(h) => h,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: failed to read blueprint header: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    let registry = evm_config.init_registry();
+
+    // Parse the transaction bytes as a Tezos X transaction (blueprint
+    // version 1 format: tag byte + raw bytes).
+    let transaction =
+        match EvmChainConfig::transaction_from_bytes(&mut host, &transaction_bytes, 1) {
+            Ok(tx) => tx,
+            Err(err) => {
+                log!(
+                    host,
+                    Error,
+                    "Tezos X simulation: failed to parse transaction: {:?}",
+                    err
+                );
+                return;
+            }
+        };
+
+    let block_in_progress = bip_from_blueprint(
+        &host,
+        &evm_config,
+        blueprint_header.number,
+        H256::zero(),
+        H256::zero(),
+        Blueprint {
+            transactions: vec![],
+            timestamp: blueprint_header.timestamp,
+        },
+    );
+
+    let block_constants = match evm_config.constants(
+        &mut host,
+        &block_in_progress,
+        U256::zero(),
+        H160::zero(),
+    ) {
+        Ok(c) => c,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: failed to build block constants: {:?}",
+                err
+            );
+            return;
+        }
+    };
+
+    let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
+        .expect("WITHDRAWAL_OUTBOX_QUEUE is a valid path");
+
+    let skip_fees_check = true;
+    let execution_result = match evm_config.apply_transaction(
+        &block_in_progress,
+        &mut host,
+        &registry,
+        &outbox_queue,
+        &block_constants,
+        transaction,
+        0,
+        None,
+        None,
+        skip_signature_check,
+        skip_fees_check,
+    ) {
+        Ok(result) => result,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: operation execution failed: {:?}",
+                err
+            );
+            return;
+        }
+    };
+
+    let applied_operation = match execution_result {
+        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(op)) => op,
+        ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: unexpected Ethereum execution result"
+            );
+            return;
+        }
+        ExecutionResult::Invalid => {
+            log!(host, Error, "Tezos X simulation: operation was invalid");
+            return;
+        }
+    };
+
+    log!(
+        host,
+        Debug,
+        "Tezos X simulation finished, result: {:?}",
+        applied_operation
+    );
+    let op_bytes = match applied_operation.to_bytes() {
+        Ok(b) => b,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: failed to serialize result: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    // Result is RLP-encoded as a value containing the serialized operation.
     let mut stream = RlpStream::new();
-    append_u64_le(&mut stream, &result);
+    stream.append(&op_bytes);
     if let Err(err) = host.store_write_all(&TEZOSX_SIMULATION_RESULT, &stream.out()) {
         log!(
             host,
