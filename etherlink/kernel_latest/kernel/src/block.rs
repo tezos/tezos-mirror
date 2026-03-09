@@ -147,6 +147,7 @@ where
             return Ok(BlockInProgressComputationResult::RebootNeeded);
         }
 
+        let skip_signature_check = false;
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match __trace_kernel!(
@@ -162,6 +163,7 @@ where
                 block_in_progress.index,
                 sequencer_pool_address,
                 tracer_input,
+                skip_signature_check,
             )?
         ) {
             ExecutionResult::Valid(execution_info) => {
