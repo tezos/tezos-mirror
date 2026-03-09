@@ -678,6 +678,19 @@ module Clst : sig
       with type key = Contract_repr.t
        and type value = Unstake_request.requests
        and type t := Raw_context.t
+
+  (** Delegates registered to the CLST contract, with their parameters *)
+  module Registered_delegates :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Clst_delegates_parameters_repr.t
+       and type t := Raw_context.t
+
+  module Pending_delegate_parameters :
+    Indexed_data_storage
+      with type t := Raw_context.t * Cycle_repr.t
+       and type key = Contract_repr.t
+       and type value = Clst_delegates_parameters_repr.t
 end
 
 type consensus_pk_in_R = {

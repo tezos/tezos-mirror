@@ -1,6 +1,6 @@
-From 7f89c2c4e83191e3c830a69881e1d91fed67401a Mon Sep 17 00:00:00 2001
-From: Gabriel Moise <gabriel.moise@trili.tech>
-Date: Fri, 6 Mar 2026 11:31:41 +0000
+From 5f7d790c6b328ab4e477439507c69a07f793cbac Mon Sep 17 00:00:00 2001
+From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
+Date: Mon, 9 Mar 2026 15:23:02 +0100
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
@@ -10,7 +10,7 @@ Subject: [PATCH 1/1] Profiler: patch proto_alpha
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
  src/proto_alpha/lib_protocol/baking.ml        |  4 +-
  .../lib_protocol/dal_slot_storage.ml          | 10 ++-
- .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++---
+ .../lib_protocol/delegate_cycles.ml           | 85 +++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
  src/proto_alpha/lib_protocol/init_storage.ml  | 26 +++++-
  src/proto_alpha/lib_protocol/main.ml          | 43 ++++++++--
@@ -18,11 +18,11 @@ Subject: [PATCH 1/1] Profiler: patch proto_alpha
  src/proto_alpha/lib_protocol/script_cache.ml  | 19 +++--
  .../lib_protocol/script_interpreter.ml        | 21 ++++-
  .../lib_protocol/script_ir_translator.ml      | 26 +++---
- 14 files changed, 297 insertions(+), 79 deletions(-)
+ 14 files changed, 303 insertions(+), 80 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v16/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v16.in.ml b/src/lib_protocol_environment/sigs/v16.in.ml
-index e4372cbc3bb..7d8acf506a1 100644
+index e4372cbc3b..7d8acf506a 100644
 --- a/src/lib_protocol_environment/sigs/v16.in.ml
 +++ b/src/lib_protocol_environment/sigs/v16.in.ml
 @@ -107,6 +107,8 @@ module type T = sig
@@ -35,7 +35,7 @@ index e4372cbc3bb..7d8acf506a1 100644
  
    module Context_hash : [%sig "v16/context_hash.mli"]
 diff --git a/src/lib_protocol_environment/sigs/v16.ml b/src/lib_protocol_environment/sigs/v16.ml
-index 1eb576a94ec..35cd3fe9d08 100644
+index 1eb576a94e..35cd3fe9d0 100644
 --- a/src/lib_protocol_environment/sigs/v16.ml
 +++ b/src/lib_protocol_environment/sigs/v16.ml
 @@ -10128,6 +10128,51 @@ end
@@ -271,7 +271,7 @@ index 1eb576a94ec..35cd3fe9d08 100644
  end
 diff --git a/src/lib_protocol_environment/sigs/v16/profiler.mli b/src/lib_protocol_environment/sigs/v16/profiler.mli
 new file mode 100644
-index 00000000000..efbc52c38ab
+index 0000000000..efbc52c38a
 --- /dev/null
 +++ b/src/lib_protocol_environment/sigs/v16/profiler.mli
 @@ -0,0 +1,39 @@
@@ -315,7 +315,7 @@ index 00000000000..efbc52c38ab
 +
 +val mark : verbosity -> ids -> unit
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index f128a25b226..cbd29956743 100644
+index f128a25b22..cbd2995674 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
 @@ -2595,7 +2595,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
@@ -350,7 +350,7 @@ index f128a25b226..cbd29956743 100644
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
-index 616ca63c329..13043031c13 100644
+index 616ca63c32..13043031c1 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
 @@ -114,7 +114,7 @@ type ordered_slots = {
@@ -372,10 +372,10 @@ index 616ca63c329..13043031c13 100644
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~baking_power:0L in
 diff --git a/src/proto_alpha/lib_protocol/dal_slot_storage.ml b/src/proto_alpha/lib_protocol/dal_slot_storage.ml
-index 36f456ff761..1c940bf1dfd 100644
+index 81ea04fc3e..24ecf1d699 100644
 --- a/src/proto_alpha/lib_protocol/dal_slot_storage.ml
 +++ b/src/proto_alpha/lib_protocol/dal_slot_storage.ml
-@@ -910,8 +910,14 @@ let finalize_pending_slot_headers ctxt =
+@@ -903,8 +903,14 @@ let finalize_pending_slot_headers ctxt =
    in
    if dynamic_lag || reset_dummy_genesis then
      (* Normal path: use new multi-lag attestation history. *)
@@ -393,7 +393,7 @@ index 36f456ff761..1c940bf1dfd 100644
  module Internal_for_tests = struct
    let get_delegate_ordering = get_delegate_ordering
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-index 0dfe990cada..f79774bee5f 100644
+index f26ec47631..08e83bb054 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
 @@ -225,21 +225,41 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
@@ -443,7 +443,7 @@ index 0dfe990cada..f79774bee5f 100644
    (* Reset SWRR credits for delegates deactivated at cycle end.
  
     Must run before computing next-cycle SWRR selection state, so that
-@@ -258,25 +278,55 @@ let cycle_end ctxt last_cycle =
+@@ -258,26 +278,61 @@ let cycle_end ctxt last_cycle =
    in
    (* Computing future staking rights *)
    let* ctxt =
@@ -490,11 +490,18 @@ index 0dfe990cada..f79774bee5f 100644
 +  in
    (* activate delegate parameters for the cycle to come.  *)
 -  let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
+-  let*! ctxt = Clst_delegates_storage.activate_parameters ctxt ~new_cycle in
 +  let*! ctxt =
 +    (Delegate_staking_parameters.activate
 +       ctxt
 +       ~new_cycle
 +     [@profiler.record_s {verbosity = Notice} "activate staking parameters"])
++  in
++  let*! ctxt =
++    (Clst_delegates_storage.activate_parameters
++       ctxt
++       ~new_cycle
++     [@profiler.record_s {verbosity = Notice} "activate CLST parameters"])
 +  in
    (* updating AI coefficient. It should remain after all balance changes of the
       cycle-end operations *)
@@ -509,7 +516,7 @@ index 0dfe990cada..f79774bee5f 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index dc91bfd144f..59ec74471a2 100644
+index 9ddeb8aa27..fafd84d398 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -522,7 +529,7 @@ index dc91bfd144f..59ec74471a2 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index c9b791e71bb..b7a5a5d3ca5 100644
+index c9b791e71b..b7a5a5d3ca 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
 @@ -260,10 +260,20 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -571,7 +578,7 @@ index c9b791e71bb..b7a5a5d3ca5 100644
          let*! cycles =
            Storage.Stake.Selected_distribution_for_cycle.keys ctxt
 diff --git a/src/proto_alpha/lib_protocol/main.ml b/src/proto_alpha/lib_protocol/main.ml
-index 4b75e1cd23a..7d245e6afa0 100644
+index 4b75e1cd23..7d245e6afa 100644
 --- a/src/proto_alpha/lib_protocol/main.ml
 +++ b/src/proto_alpha/lib_protocol/main.ml
 @@ -163,20 +163,39 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
@@ -649,7 +656,7 @@ index 4b75e1cd23a..7d245e6afa0 100644
    let ctxt =
      (* Store the resulting map in the context as [allowed_consensus]. *)
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index 24eeb38c79d..69ab63d0152 100644
+index 13e8933e63..20b6918260 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
 @@ -1661,12 +1661,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
@@ -668,7 +675,7 @@ index 24eeb38c79d..69ab63d0152 100644
    (previous_proto, previous_proto_constants, ctxt)
  
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
-index 35cc6b51781..5c679ad606b 100644
+index 35cc6b5178..5c679ad606 100644
 --- a/src/proto_alpha/lib_protocol/script_cache.ml
 +++ b/src/proto_alpha/lib_protocol/script_cache.ml
 @@ -98,15 +98,16 @@ let find ctxt addr =
@@ -698,7 +705,7 @@ index 35cc6b51781..5c679ad606b 100644
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index cbd5047eb36..db83a3b68bb 100644
+index cbd5047eb3..db83a3b68b 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
 @@ -1856,15 +1856,17 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -743,7 +750,7 @@ index cbd5047eb36..db83a3b68bb 100644
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
    execute_any_arg
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index e48748c928c..8b9a693b5d2 100644
+index e48748c928..8b9a693b5d 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
 @@ -5319,21 +5319,27 @@ let parse_script :

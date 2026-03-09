@@ -238,7 +238,19 @@ module CLST_types = struct
 
   type finalize = unit
 
-  type clst_entrypoints = ((deposit, redeem) or_, finalize) or_
+  type staker_entrypoints = ((deposit, redeem) or_, finalize) or_
+
+  type delegate_parameters =
+    nat (* edge_of_clst_staking *) * nat (* ratio_of_clst_staking *)
+
+  type register_delegate = delegate_parameters option
+
+  type update_delegate_parameters = delegate_parameters
+
+  type delegate_entrypoints =
+    (register_delegate, update_delegate_parameters) or_
+
+  type clst_entrypoints = (staker_entrypoints, delegate_entrypoints) or_
 
   type transfer =
     ( address (* from_ *),
@@ -327,6 +339,8 @@ module CLST_types = struct
     | Deposit of deposit
     | Redeem of redeem
     | Finalize of finalize
+    | Register_delegate of register_delegate
+    | Update_delegate_parameters of update_delegate_parameters
     | Transfer of transfer
     | Balance_of of balance_of
     | Approve of approve
@@ -336,9 +350,11 @@ module CLST_types = struct
     | Lambda_export of lambda_export
 
   let entrypoint_from_arg : arg -> entrypoint = function
-    | L (L (L p)) -> Deposit p
-    | L (L (R p)) -> Redeem p
-    | L (R p) -> Finalize p
+    | L (L (L (L p))) -> Deposit p
+    | L (L (L (R p))) -> Redeem p
+    | L (L (R p)) -> Finalize p
+    | L (R (L p)) -> Register_delegate p
+    | L (R (R p)) -> Update_delegate_parameters p
     | R (L (L p)) -> Transfer p
     | R (L (R p)) -> Balance_of p
     | R (R (L (L p))) -> Approve p
@@ -348,9 +364,11 @@ module CLST_types = struct
     | R (R (R (R p))) -> Lambda_export p
 
   let entrypoint_to_arg : entrypoint -> arg = function
-    | Deposit p -> L (L (L p))
-    | Redeem p -> L (L (R p))
-    | Finalize p -> L (R p)
+    | Deposit p -> L (L (L (L p)))
+    | Redeem p -> L (L (L (R p)))
+    | Finalize p -> L (L (R p))
+    | Register_delegate p -> L (R (L p))
+    | Update_delegate_parameters p -> L (R (R p))
     | Transfer p -> R (L (L p))
     | Balance_of p -> R (L (R p))
     | Approve p -> R (R (L (L p)))
@@ -380,6 +398,27 @@ module CLST_types = struct
 
   let finalize_type : (finalize ty_node * finalize entrypoints_node) tzresult =
     make_entrypoint_leaf "finalize" unit_ty
+
+  let delegate_parameters_type : delegate_parameters ty_node tzresult =
+    pair_ty
+      (add_name "edge_of_clst_staking" nat_ty)
+      (add_name "ratio_of_clst_staking" nat_ty)
+
+  let register_delegate_type :
+      (register_delegate ty_node * register_delegate entrypoints_node) tzresult
+      =
+    let open Result_syntax in
+    let* delegate_parameters_type in
+    let* param_ty = option_ty delegate_parameters_type in
+    make_entrypoint_leaf "register_delegate" param_ty
+
+  let update_delegate_parameters_type :
+      (update_delegate_parameters ty_node
+      * update_delegate_parameters entrypoints_node)
+      tzresult =
+    let open Result_syntax in
+    let* delegate_parameters_type in
+    make_entrypoint_leaf "update_delegate_parameters" delegate_parameters_type
 
   let approval_type : approval ty_node tzresult =
     let open Result_syntax in
@@ -520,6 +559,8 @@ module CLST_types = struct
     let* deposit_type in
     let* redeem_type in
     let* finalize_type in
+    let* register_delegate_type in
+    let* update_delegate_parameters_type in
     let* transfer_type in
     let* balance_of_type in
     let* approve_type in
@@ -527,11 +568,21 @@ module CLST_types = struct
     let* export_ticket_type in
     let* import_ticket_type in
     let* lambda_export_type in
-    let* clst_entrypoints_type_l =
+    let* clst_staker_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
+    let* clst_staker_entrypoints_type =
+      make_entrypoint_node clst_staker_entrypoints_type_l finalize_type
+    in
+    let* clst_delegate_entrypoints_type =
+      make_entrypoint_node
+        register_delegate_type
+        update_delegate_parameters_type
+    in
     let* clst_entrypoints_type =
-      make_entrypoint_node clst_entrypoints_type_l finalize_type
+      make_entrypoint_node
+        clst_staker_entrypoints_type
+        clst_delegate_entrypoints_type
     in
     let* fa21_entrypoints_type_l =
       make_entrypoint_node transfer_type balance_of_type

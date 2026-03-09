@@ -208,6 +208,21 @@ val pending_staking_parameters :
   public_key_hash ->
   (Cycle.t * Staking_parameters_repr.t) list shell_tzresult Lwt.t
 
+val clst_registered :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> bool shell_tzresult Lwt.t
+
+val active_clst_staking_parameters :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Clst_delegates_parameters_repr.t option shell_tzresult Lwt.t
+
+val pending_clst_staking_parameters :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  (Cycle.t * Clst_delegates_parameters_repr.t) list shell_tzresult Lwt.t
+
 val pending_denunciations :
   'a #RPC_context.simple ->
   'a ->

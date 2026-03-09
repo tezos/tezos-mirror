@@ -1017,3 +1017,35 @@ val clst_lambda_export :
   lambda_action:Script.expr ->
   int64 ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_register_delegate ctxt src
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth] returns a
+    register_delegate on the CLST contract. *)
+val clst_register_delegate :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  edge_of_clst_staking_over_baking_millionth:Z.t ->
+  ratio_of_clst_staking_over_direct_staking_billionth:Z.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [clst_update_delegate_parameters ctxt src
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth] returns a
+    update_delegate_parameters operation on the CLST contract. *)
+val clst_update_delegate_parameters :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  edge_of_clst_staking_over_baking_millionth:Z.t ->
+  ratio_of_clst_staking_over_direct_staking_billionth:Z.t ->
+  Operation.packed tzresult Lwt.t

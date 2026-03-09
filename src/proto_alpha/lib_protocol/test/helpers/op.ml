@@ -1818,3 +1818,76 @@ let clst_lambda_export ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let clst_register_delegate ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t)
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+    @@ Micheline.strip_locations
+         (Micheline.Prim
+            ( (),
+              Script.D_Some,
+              [
+                Micheline.Prim
+                  ( (),
+                    Script.D_Pair,
+                    [
+                      Micheline.Int
+                        ((), edge_of_clst_staking_over_baking_millionth);
+                      Micheline.Int
+                        ((), ratio_of_clst_staking_over_direct_staking_billionth);
+                    ],
+                    [] );
+              ],
+              [] ))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "register_delegate")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
+
+let clst_update_delegate_parameters ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) (src : Contract.t)
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+    @@ Micheline.strip_locations
+         (Micheline.Prim
+            ( (),
+              Script.D_Pair,
+              [
+                Micheline.Int ((), edge_of_clst_staking_over_baking_millionth);
+                Micheline.Int
+                  ((), ratio_of_clst_staking_over_direct_staking_billionth);
+              ],
+              [] ))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "update_delegate_parameters")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
