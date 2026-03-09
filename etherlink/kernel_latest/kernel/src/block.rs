@@ -878,6 +878,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
             &[],
             &[],
+            0,
         )
         .unwrap();
         let gas_limit = gas_limit + gas_for_fees;
@@ -949,7 +950,7 @@ mod tests {
         let data: Vec<u8> = hex::decode("608060405234801561001057600080fd5b5061017f806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033").unwrap();
 
         let gas_for_fees =
-            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[])
+            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &data, &[], 0)
                 .unwrap();
         let gas_limit = gas_limit + gas_for_fees;
 
@@ -1784,6 +1785,7 @@ mod tests {
             dummy_block_fees.base_fee_per_gas(),
             &[],
             &[],
+            0,
         )
         .unwrap();
 
@@ -1875,7 +1877,7 @@ mod tests {
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
-        let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[]);
+        let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[], 0);
         let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas + da_fee;
         let expected_sender_balance =
             initial_sender_balance - expected_dest_balance - expected_fees;
@@ -2145,6 +2147,7 @@ mod tests {
             DUMMY_BASE_FEE_PER_GAS.into(),
             &data,
             &[],
+            0,
         )
         .unwrap();
 

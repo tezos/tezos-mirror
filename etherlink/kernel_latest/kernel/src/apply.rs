@@ -1208,6 +1208,7 @@ mod tests {
             block_constants.block_fees.minimum_base_fee_per_gas(),
             vec![].as_slice(),
             vec![].as_slice(),
+            0,
         )
         .expect("should have been able to calculate fees")
     }

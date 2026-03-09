@@ -501,7 +501,7 @@ mod tests {
         let data = &[1, 2, 3];
 
         // Act
-        let fee = da_fee(super::DA_FEE_PER_BYTE.into(), data, al);
+        let fee = da_fee(super::DA_FEE_PER_BYTE.into(), data, al, 0);
 
         // Assert
         let expected_bytes = data.len() + 2 * (20 /* address */ + 2 * 32/* keys */);
