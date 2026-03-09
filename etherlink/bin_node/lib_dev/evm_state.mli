@@ -163,7 +163,7 @@ val execute_entrypoint :
   config:Pvm_types.config ->
   t ->
   input_path:string ->
-  input:string ->
+  input:bytes ->
   output_path:string ->
   entrypoint:string ->
   bytes tzresult Lwt.t

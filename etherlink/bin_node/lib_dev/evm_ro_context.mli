@@ -160,7 +160,7 @@ val execute_entrypoint :
   t ->
   Evm_state.t ->
   input_path:string ->
-  input:string ->
+  input:bytes ->
   output_path:string ->
   entrypoint:string ->
   bytes tzresult Lwt.t

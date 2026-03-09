@@ -430,7 +430,9 @@ let execute_single_transaction ~data_dir ~pool ~native_execution ~config
 let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
     evm_state ~input_path ~input ~output_path ~entrypoint =
   let open Lwt_result_syntax in
-  let*! evm_state = modify ~key:input_path ~value:input evm_state in
+  let*! evm_state =
+    modify ~key:input_path ~value:(Bytes.to_string input) evm_state
+  in
   let output_path_parts =
     String.split_on_char '/' output_path |> List.filter (fun s -> s <> "")
   in
