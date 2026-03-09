@@ -350,12 +350,18 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         ~canceler
         ~verbose)
     (fun exn ->
-      let msg =
-        "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
-        ^ Printexc.to_string exn
-      in
-      Format.eprintf "Error: %s@." msg ;
-      Lwt_exit.exit_and_raise 1)
+      match exn with
+      | Lwt.Canceled ->
+          (* This is expected when the daemon loop terminates and Lwt.pick
+             cancels us. Re-raise so the actual error can surface. *)
+          Lwt.fail exn
+      | _ ->
+          let msg =
+            "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
+            ^ Printexc.to_string exn
+          in
+          Format.eprintf "Error: %s@." msg ;
+          Lwt_exit.exit_and_raise 1)
 
 let resolve names =
   let open Lwt_result_syntax in
@@ -871,8 +877,20 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Start never-ending monitoring daemons *)
   let*! () = Event.emit_node_is_ready () in
   () [@profiler.overwrite may_start_profiler data_dir] ;
-  let* _ =
-    Lwt.pick
-      [gs; daemonize [on_new_finalized_head ctxt cctxt crawler amplificator]]
+  let* () =
+    let daemon =
+      daemonize [on_new_finalized_head ctxt cctxt crawler amplificator]
+    in
+    let daemon_with_log =
+      let open Lwt_syntax in
+      let* result = daemon in
+      let* () =
+        match result with
+        | Ok () -> Event.emit_daemon_loop_unexpected_termination ()
+        | Error errs -> Event.emit_daemon_error ~error:errs
+      in
+      Lwt.return result
+    in
+    Lwt.pick [gs; daemon_with_log]
   in
   return_unit

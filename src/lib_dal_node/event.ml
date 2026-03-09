@@ -317,6 +317,15 @@ open struct
       ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
+  let daemon_loop_unexpected_termination =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"daemon_loop_unexpected_termination"
+      ~msg:"the daemon loop terminated unexpectedly with no error"
+      ~level:Warning
+      ()
+
   let failed_to_fetch_block =
     declare_4
       ~section
@@ -1506,6 +1515,9 @@ let emit_no_protocol_constnts ~proto_hash ~level =
 let emit_unexpected_protocol_plugin () = emit unexpected_protocol_plugin ()
 
 let emit_daemon_error ~error = emit daemon_error error
+
+let emit_daemon_loop_unexpected_termination () =
+  emit daemon_loop_unexpected_termination ()
 
 let emit_failed_to_fetch_block ~type_ ~level ~last_notified ~error =
   emit failed_to_fetch_block (type_, level, last_notified, error)
