@@ -475,6 +475,14 @@ module type S = sig
       tzresult
       Lwt.t
 
+    (** Call RPC GET /chains/[chain]/mempool/filter *)
+    val get_filter :
+      #simple ->
+      ?chain:chain ->
+      ?include_default:bool ->
+      unit ->
+      Data_encoding.json tzresult Lwt.t
+
     (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
       #simple ->
