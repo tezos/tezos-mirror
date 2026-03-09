@@ -5500,13 +5500,14 @@ let octez_dal_node_gossipsub_lib =
     ~path:"src/lib_dal_node/gossipsub"
     ~deps:
       [
-        octez_base |> open_ ~m:"TzPervasives";
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_crypto_dal |> open_;
         octez_gossipsub |> open_;
         octez_p2p |> open_;
         octez_p2p_services |> open_;
         octez_dal_node_services |> open_;
         octez_crypto |> open_;
+        octez_workers |> open_;
       ]
 
 let octez_crawler =

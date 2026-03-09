@@ -205,7 +205,8 @@ module Transport_layer_hooks : sig
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
     app_in_callback:(Types.Message_id.t -> Types.Peer.t -> unit tzresult Lwt.t) ->
     verbose:bool ->
-    unit Lwt.t
+    canceler:Lwt_canceler.t ->
+    unit tzresult Lwt.t
 end
 
 (** [version ~network_name] returns the current version of the P2P. *)
