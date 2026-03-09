@@ -397,7 +397,7 @@ where
     Host: StorageV1 + Logging,
 {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
-        self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
+        self.withdrawals = etherlink_data.withdrawals;
         if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
             abort_on_error!(
                 self,
