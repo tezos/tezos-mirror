@@ -72,6 +72,8 @@ module Mutable_state : sig
   val insert_failure : t -> unit Lwt.t
 
   val install_boot_sector : t -> string -> unit Lwt.t
+
+  val get_outbox : t -> Bounded.Non_negative_int32.t -> output list Lwt.t
 end
 
 val compute_step_many :

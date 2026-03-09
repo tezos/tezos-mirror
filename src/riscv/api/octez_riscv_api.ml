@@ -62,6 +62,7 @@ external octez_riscv_verify_output_proof: output_proof -> output option = "octez
 external octez_riscv_serialise_output_proof: output_proof -> bytes = "octez_riscv_serialise_output_proof"
 external octez_riscv_deserialise_output_proof: bytes -> (output_proof, string) result = "octez_riscv_deserialise_output_proof"
 external octez_riscv_get_outbox_for_level: state -> int32 -> output list = "octez_riscv_get_outbox_for_level"
+external octez_riscv_mut_get_outbox_for_level: mut_state -> int32 -> output list = "octez_riscv_mut_get_outbox_for_level"
 external octez_riscv_get_reveal_request: state -> bytes = "octez_riscv_get_reveal_request"
 external octez_riscv_mut_get_reveal_request: mut_state -> bytes = "octez_riscv_mut_get_reveal_request"
 external octez_riscv_insert_failure: state -> state = "octez_riscv_insert_failure"

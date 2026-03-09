@@ -821,6 +821,19 @@ pub fn octez_riscv_get_outbox_for_level(
 }
 
 #[ocaml::func]
+#[ocaml::sig("mut_state -> int32 -> output list")]
+pub fn octez_riscv_mut_get_outbox_for_level(
+    state: SafePointer<MutState>,
+    level: RawLevel,
+) -> LinkedList<Output> {
+    // TODO: RV-918: return Iterator for get_outbox_messages to avoid double allocation
+    let outbox_messages = state
+        .apply_ro(|state| NodePvm::get_outbox_messages(state, level.0.into()))
+        .unwrap_or_default();
+    outbox_messages.into_iter().map(|o| o.into()).collect()
+}
+
+#[ocaml::func]
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_get_reveal_request(state: SafePointer<State>) -> BytesWrapper {
     let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
