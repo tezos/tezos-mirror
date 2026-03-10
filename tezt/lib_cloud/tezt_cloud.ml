@@ -76,8 +76,27 @@ let register_destroy_vms ~tags =
   let tezt_cloud = Env.tezt_cloud in
   let* project_id = Gcloud.project_id () in
   let* workspaces = Terraform.VM.Workspace.list ~tezt_cloud in
-  let* () = Terraform.VM.destroy workspaces ~project_id in
-  Terraform.VM.Workspace.destroy ~tezt_cloud
+  let* destroy_succeeded =
+    Lwt.catch
+      (fun () ->
+        let* () = Terraform.VM.destroy workspaces ~project_id in
+        Lwt.return_true)
+      (fun exn ->
+        Log.warn
+          "Terraform destroy failed: %s. Proceeding with IP cleanup."
+          (Printexc.to_string exn) ;
+        Lwt.return_false)
+  in
+  (* Clean up any static IPs that survived the terraform destroy.
+     Scoped to the exact workspace names we just destroyed. *)
+  let* () =
+    Lwt_list.iter_s
+      (fun workspace ->
+        Gcloud.delete_unused_addresses ~project_id ~name_filter:workspace ())
+      workspaces
+  in
+  if destroy_succeeded then Terraform.VM.Workspace.destroy ~tezt_cloud
+  else Lwt.return_unit
 
 let register_prometheus_import ~tags =
   Cloud.register
@@ -229,6 +248,30 @@ let register_list_dns_domains ~tags =
       unit)
     zones
 
+(** Project-wide garbage-collection job for orphaned static IPs.
+
+    This is a standalone cleanup command meant to be run manually or
+    periodically (e.g. via a cron-like tezt-cloud task).
+
+    It deletes {b all} RESERVED addresses in the GCP project that are
+    older than 6 hours, regardless of which user created them.  This
+    is intentionally project-wide: it serves as a safety net for IPs
+    that were missed by the per-workspace post-destroy cleanup (e.g.
+    due to terraform state corruption, interrupted processes, or
+    manual VM deletions via the GCP console).
+
+    The 6-hour age threshold ensures we never delete addresses that
+    are currently being provisioned by a concurrent [terraform apply].
+    The window between address creation ([RESERVED]) and VM attachment
+    ([IN_USE]) is at most a few minutes; 6 hours provides a
+    comfortable safety margin while still being practical for cleanup
+    at the end of a work day.
+
+    {b Why only IPs and not other GCP resources?}  Empirically, VMs
+    are configured with a max lifetime and auto-delete their boot
+    disks, so they clean themselves up.  Static IP addresses, however,
+    are not auto-deleted and silently accumulate billing costs when
+    left in RESERVED status. *)
 let register_delete_unused_ips ~tags =
   Cloud.register
     ?vms:None
@@ -237,39 +280,7 @@ let register_delete_unused_ips ~tags =
     ~tags:("delete" :: "unused" :: "ips" :: tags)
   @@ fun _cloud ->
   let* project_id = Gcloud.project_id () in
-  let filter = Format.asprintf "status=RESERVED" in
-  let* addresses = Gcloud.list_addresses ~filter () in
-  let unused = JSON.as_list addresses in
-  match unused with
-  | [] ->
-      Log.info "No unused static IPs found in project %s." project_id ;
-      Lwt.return_unit
-  | _ ->
-      Log.info
-        "Found %d unused static IP(s) to delete in project %s."
-        (List.length unused)
-        project_id ;
-      Lwt_list.iter_s
-        (fun addr ->
-          let name = JSON.(addr |-> "name" |> as_string) in
-          let region_url = JSON.(addr |-> "region" |> as_string) in
-          (* The region field is a full URL; extract the last segment. *)
-          let region =
-            match String.split_on_char '/' region_url |> List.rev with
-            | r :: _ -> r
-            | [] -> region_url
-          in
-          Log.info "Deleting unused IP: %s (region: %s)" name region ;
-          Lwt.catch
-            (fun () -> Gcloud.delete_address ~name ~region ~project_id ())
-            (fun exn ->
-              Log.warn
-                "Failed to delete IP %s (region: %s): %s"
-                name
-                region
-                (Printexc.to_string exn) ;
-              Lwt.return_unit))
-        unused
+  Gcloud.delete_unused_addresses ~project_id ~max_age_hours:6 ()
 
 let register_dns_add ~tags =
   Cloud.register

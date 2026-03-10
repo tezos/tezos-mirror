@@ -140,6 +140,183 @@ let delete_address ~name ~region ~project_id () =
       "--quiet";
     ]
 
+(** [region_of_url url] extracts the region name from a GCP resource URL.
+
+    GCP returns the [region] field of an address as a fully qualified URL
+    such as:
+      ["https://www.googleapis.com/compute/v1/projects/my-proj/regions/europe-west1"]
+
+    This function extracts the last path segment (["europe-west1"]).
+    If the input contains no ['/'], it is returned unchanged as a
+    fallback. *)
+let region_of_url region_url =
+  match String.split_on_char '/' region_url |> List.rev with
+  | r :: _ -> r
+  | [] -> region_url
+
+(** [utc_seconds_of_iso8601 s] attempts to parse an ISO 8601 timestamp
+    as returned by GCP (e.g. ["2024-01-15T10:30:00.000-07:00"]) and
+    returns the corresponding UTC time in seconds since the Unix epoch.
+
+    The implementation uses [Scanf] to extract the date-time fields and
+    the timezone offset, then converts to UTC via [CalendarLib]-free
+    arithmetic.  Fractional seconds are accepted but ignored (GCP
+    sometimes appends [".000"]).
+
+    Returns [None] if the string does not match the expected format. *)
+let utc_seconds_of_iso8601 s =
+  try
+    (* GCP format: "2024-01-15T10:30:00.000-07:00"
+       We accept with or without fractional seconds. *)
+    let year, month, day, hour, min, sec, tz_sign, tz_h, tz_m =
+      Scanf.sscanf
+        s
+        "%d-%d-%dT%d:%d:%d%[^0-9]%d:%d"
+        (fun y mo d h mi s tz_sign_str tz_h tz_m ->
+          let tz_sign = if String.contains tz_sign_str '-' then -1 else 1 in
+          (y, mo, d, h, mi, s, tz_sign, tz_h, tz_m))
+    in
+    let tm =
+      {
+        Unix.tm_sec = sec;
+        tm_min = min - (tz_sign * tz_m);
+        tm_hour = hour - (tz_sign * tz_h);
+        tm_mday = day;
+        tm_mon = month - 1;
+        tm_year = year - 1900;
+        (* The following fields are ignored by [mktime] but must be
+           present in the record. *)
+        tm_wday = 0;
+        tm_yday = 0;
+        tm_isdst = false;
+      }
+    in
+    let epoch, _ = Unix.mktime tm in
+    Some epoch
+  with _ -> None
+
+(** [delete_unused_addresses ~project_id ?name_filter ?max_age_hours ()]
+    lists and deletes GCP static IP addresses that are currently unused.
+
+    This function serves two use-cases:
+
+    {b (a) Post-destroy cleanup} (called from [Deployement.Remote.terminate]
+    and [register_destroy_vms]):  [name_filter] is set to the workspace
+    name we just destroyed, [max_age_hours] is [None].  We know the
+    workspaces are gone, so any matching RESERVED address is genuinely
+    orphaned.
+
+    {b (b) Periodic garbage collection} (called from
+    [register_delete_unused_ips]):  [name_filter] is [None] (match all
+    addresses in the project), [max_age_hours] is [Some 24].  This is the
+    safety net that cleans up after any user, regardless of whose
+    scenario created the IPs.
+
+    {b Safety invariants — read carefully before modifying this function:}
+
+    {b 1. Scope restriction via [name_filter].}
+    When provided, [name_filter] is passed as a [name:] prefix filter
+    to [gcloud compute addresses list].  In the tezt-cloud naming
+    convention, addresses are named ["{workspace}-{index:02d}"] where
+    the workspace itself is ["{tezt_cloud}-{n}"].  By passing a
+    workspace name (e.g. ["alice-0"]) or the tezt-cloud identifier
+    (e.g. ["alice"]) as [name_filter], we restrict deletion to the
+    current user's addresses.  When [None], all RESERVED addresses in
+    the project are considered — in that case, [max_age_hours] {b must}
+    be set to avoid destroying freshly-created addresses.
+
+    {b 2. Only RESERVED addresses are considered.}
+    The GCP filter includes [status=RESERVED], which means only
+    addresses that are {e not attached} to any VM are candidates.
+    An address that is [IN_USE] (attached to a running or stopped VM)
+    is never deleted.  This is the primary safeguard against deleting
+    IPs of a concurrent scenario that has already attached its
+    addresses to VMs.
+
+    {b 3. Race condition window.}
+    Between [terraform apply] creating an address and the address
+    becoming [IN_USE] (attached to a VM), there is a short window
+    where the address is [RESERVED].  During that window, a concurrent
+    cleanup could delete it.  The [max_age_hours] parameter mitigates
+    this: when provided, only addresses older than [max_age_hours] are
+    deleted.  For the post-destroy cleanup (where we know the
+    workspaces are gone), [max_age_hours] can safely be [None].  For
+    the garbage-collection job (no [name_filter]), it {b should} be set
+    (e.g. [Some 24]) to avoid touching freshly-created addresses.
+
+    {b 4. Resilience to concurrent execution.}
+    Deletion failures on individual addresses are caught and logged
+    as warnings without aborting the remaining deletions.  This makes
+    the function safe to call concurrently: if two processes try to
+    delete the same orphan address, one will succeed and the other
+    will get a "not found" error that is silently absorbed.
+
+    @param project_id   The GCP project identifier.
+    @param name_filter  When set, a prefix passed to
+      [gcloud --filter="name:{v}"].  When [None], all addresses are
+      considered (use together with [max_age_hours] for safety).
+    @param max_age_hours  When set, only addresses whose
+      [creationTimestamp] is strictly older than this many hours are
+      deleted.  When [None], all matching [RESERVED] addresses are
+      deleted regardless of age. *)
+let delete_unused_addresses ~project_id ?name_filter ?max_age_hours () =
+  let filter =
+    match name_filter with
+    | Some prefix -> Format.asprintf "status=RESERVED AND name:%s" prefix
+    | None -> "status=RESERVED"
+  in
+  let filter_description =
+    match name_filter with
+    | Some prefix -> Format.asprintf "'%s'" prefix
+    | None -> "<all addresses>"
+  in
+  let* addresses = list_addresses ~filter () in
+  let candidates = JSON.as_list addresses in
+  let candidates =
+    match max_age_hours with
+    | None -> candidates
+    | Some hours ->
+        let now = Unix.gettimeofday () in
+        let max_age_seconds = float_of_int hours *. 3600. in
+        List.filter
+          (fun addr ->
+            let creation = JSON.(addr |-> "creationTimestamp" |> as_string) in
+            match utc_seconds_of_iso8601 creation with
+            | Some created_at -> now -. created_at > max_age_seconds
+            | None ->
+                Log.warn
+                  "Could not parse creation timestamp '%s' for address '%s', \
+                   skipping"
+                  creation
+                  JSON.(addr |-> "name" |> as_string) ;
+                false)
+          candidates
+  in
+  match candidates with
+  | [] ->
+      Log.info "No unused static IPs matching %s to delete." filter_description ;
+      Lwt.return_unit
+  | _ ->
+      Log.info
+        "Found %d unused static IP(s) matching %s to delete."
+        (List.length candidates)
+        filter_description ;
+      Lwt_list.iter_s
+        (fun addr ->
+          let name = JSON.(addr |-> "name" |> as_string) in
+          let region = JSON.(addr |-> "region" |> as_string) |> region_of_url in
+          Log.info "Deleting unused IP: %s (region: %s)" name region ;
+          Lwt.catch
+            (fun () -> delete_address ~name ~region ~project_id ())
+            (fun exn ->
+              Log.warn
+                "Failed to delete IP %s (region: %s): %s"
+                name
+                region
+                (Printexc.to_string exn) ;
+              Lwt.return_unit))
+        candidates
+
 module DNS = struct
   let create_zone ~domain ~zone () =
     let dns_name = Format.asprintf "%s.%s" zone domain in

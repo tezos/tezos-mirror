@@ -81,10 +81,76 @@ val list_iam_service_accounts : ?filter:string -> unit -> JSON.t Lwt.t
     Filter can be used to filter by name *)
 val list_disks : ?filter:string -> unit -> JSON.t Lwt.t
 
-(** [delete_address ~name ~region ~project_id ()] deletes the static IP address
-    [name] in the given [region] for the specified [project_id]. *)
+(** [delete_address ~name ~region ~project_id ()] deletes a single static IP
+    address [name] in the given [region] for the specified [project_id].
+
+    This is a low-level primitive that calls
+    [gcloud compute addresses delete] with [--quiet] to suppress
+    confirmation prompts.  It raises on failure (e.g. address not found,
+    permission denied).
+
+    Prefer {!delete_unused_addresses} for bulk cleanup with safety
+    filters. *)
 val delete_address :
   name:string -> region:string -> project_id:string -> unit -> unit Lwt.t
+
+(** [delete_unused_addresses ~project_id ?name_filter ?max_age_hours ()]
+    finds and deletes GCP static IP addresses that are unused (status
+    [RESERVED]).
+
+    This function is used in two contexts:
+
+    {b (a) Post-destroy targeted cleanup.}  After [terraform destroy],
+    call with [~name_filter:(Some workspace_name)] and no
+    [max_age_hours].  Since we know the workspace has just been
+    destroyed, any matching RESERVED address is genuinely orphaned.
+
+    {b (b) Periodic project-wide garbage collection.}  Call with no
+    [name_filter] and [~max_age_hours:24].  This catches orphaned
+    addresses from any user that were missed by the targeted cleanup
+    (e.g. terraform state corruption, interrupted process, etc.).
+
+    {b Safety invariants:}
+
+    - {b Scoping by name prefix.}  When provided, [name_filter] is
+      passed to [gcloud --filter="name:{name_filter}"].  In the
+      tezt-cloud naming convention, addresses are named
+      ["{workspace}-{index:02d}"] where the workspace is
+      ["{tezt_cloud}-{n}"].  Passing a workspace name like ["alice-0"]
+      restricts to that workspace; passing ["alice"] covers all of
+      Alice's workspaces.  When [None], all RESERVED addresses in the
+      project are considered.
+
+    - {b Only RESERVED addresses are deleted.}  Addresses that are
+      [IN_USE] (attached to a VM) are never touched.  This is the
+      primary safeguard against deleting IPs of a running scenario.
+
+    - {b Age-based filtering} via [max_age_hours].  Protects against
+      a race condition: between [terraform apply] creating an address
+      and the VM attaching it (making it [IN_USE]), there is a short
+      window where the address appears [RESERVED].  Setting
+      [max_age_hours] (e.g. [Some 24]) avoids deleting those
+      freshly-created addresses.  {b When [name_filter] is [None],
+      [max_age_hours] should always be set} to avoid accidentally
+      deleting another user's in-flight addresses.
+
+    - {b Concurrent-safe.}  Individual deletion failures (e.g. another
+      process already deleted the address) are caught and logged as
+      warnings without aborting the remaining deletions.
+
+    @param project_id    The GCP project identifier.
+    @param name_filter   A prefix for the [name:] gcloud filter.
+      When [None], all RESERVED addresses in the project are
+      considered.
+    @param max_age_hours  When set, only addresses whose
+      [creationTimestamp] is strictly older than this many hours are
+      deleted.  When [None], no age check is performed. *)
+val delete_unused_addresses :
+  project_id:string ->
+  ?name_filter:string ->
+  ?max_age_hours:int ->
+  unit ->
+  unit Lwt.t
 
 module DNS : sig
   (** [create_zone ~domain ~zone ()] creates a [~zone] associated with

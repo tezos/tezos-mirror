@@ -286,8 +286,39 @@ module Remote = struct
       let tezt_cloud = Env.tezt_cloud in
       let* workspaces = Terraform.VM.Workspace.list ~tezt_cloud in
       let* project_id = Gcloud.project_id () in
-      let* () = Terraform.VM.destroy workspaces ~project_id in
-      Terraform.VM.Workspace.destroy ~tezt_cloud)
+      (* If terraform destroy fails (e.g. state desync, transient GCP
+         error), we still want to attempt the IP cleanup rather than
+         aborting entirely.  However, we only delete terraform
+         workspaces if the destroy succeeded: a workspace that still
+         contains resources cannot be deleted. *)
+      let* destroy_succeeded =
+        Lwt.catch
+          (fun () ->
+            let* () = Terraform.VM.destroy workspaces ~project_id in
+            Lwt.return_true)
+          (fun exn ->
+            Log.warn
+              "Terraform destroy failed: %s. Proceeding with IP cleanup."
+              (Printexc.to_string exn) ;
+            Lwt.return_false)
+      in
+      (* Clean up static IP addresses that belonged to the destroyed
+         workspaces.  Terraform should have deleted them, but if the
+         destroy was partial or the state was out of sync, some
+         addresses may remain in RESERVED status.  We scope the
+         deletion to the exact workspace names we just destroyed so
+         that concurrent scenarios from the same user are not
+         affected.  No age filter is needed here: the workspaces have
+         just been destroyed, so any matching RESERVED address is
+         genuinely orphaned. *)
+      let* () =
+        Lwt_list.iter_s
+          (fun workspace ->
+            Gcloud.delete_unused_addresses ~project_id ~name_filter:workspace ())
+          workspaces
+      in
+      if destroy_succeeded then Terraform.VM.Workspace.destroy ~tezt_cloud
+      else Lwt.return_unit)
     else (
       Log.report
         "No VM destroyed! Don't forget to destroy them when you are done with \
