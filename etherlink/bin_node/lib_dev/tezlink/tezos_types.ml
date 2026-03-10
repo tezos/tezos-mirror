@@ -81,6 +81,8 @@ module Tez = struct
 
   let wei_to_mutez wei = Z.(to_int64 (wei / pow (of_int 10) 12))
 
+  let wei_to_nanotez wei = Q.make wei (Z.pow (Z.of_int 10) 9)
+
   let mutez_to_wei mutez = Z.(of_int64 mutez * pow (of_int 10) 12)
 end
 

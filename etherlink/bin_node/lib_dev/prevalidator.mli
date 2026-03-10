@@ -62,6 +62,8 @@ val prevalidate_raw_transaction :
     performed. *)
 val refresh_state : unit -> unit tzresult Lwt.t
 
+val get_da_fee_per_byte_nanotez : unit -> Q.t tzresult Lwt.t
+
 (** [prevalidate_raw_transaction_tezlink raw_txn] sends a prevalidation request
     to the worker, and waits for the result.
 

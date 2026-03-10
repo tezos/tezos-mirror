@@ -90,14 +90,6 @@ module Types = struct
     maximum_gas_per_transaction : Z.t;
   }
 
-  let etherlink_infos_default =
-    {
-      minimum_base_fee_per_gas = Z.zero;
-      base_fee_per_gas = Z.zero;
-      da_fee_per_bytes = Z.zero;
-      maximum_gas_per_transaction = Z.zero;
-    }
-
   type session = {
     state : Evm_state.t;
     ctxt : Evm_ro_context.t;
@@ -106,6 +98,13 @@ module Types = struct
   }
 
   let read state = Evm_ro_context.read_state state
+
+  let da_fee_per_bytes_of_state state =
+    let open Lwt_result_syntax in
+    let* (Qty da_fee_per_bytes) =
+      Etherlink_durable_storage.da_fee_per_byte (read state)
+    in
+    return da_fee_per_bytes
 
   let etherlink_infos_of_state state =
     let open Lwt_result_syntax in
@@ -122,9 +121,7 @@ module Types = struct
     let* minimum_base_fee_per_gas =
       Etherlink_durable_storage.minimum_base_fee_per_gas (read state)
     in
-    let* (Qty da_fee_per_bytes) =
-      Etherlink_durable_storage.da_fee_per_byte (read state)
-    in
+    let* da_fee_per_bytes = da_fee_per_bytes_of_state state in
     let* (Qty maximum_gas_per_transaction) =
       Etherlink_durable_storage.maximum_gas_per_transaction (read state)
     in
@@ -144,12 +141,28 @@ module Types = struct
         let* etherlink_infos = etherlink_infos_of_state state in
         return {state; ctxt; storage_version; etherlink_infos}
     | L2_types.Ex_chain_family Michelson ->
+        let*! da_fee_result = da_fee_per_bytes_of_state state in
+        let* da_fee_per_bytes =
+          match da_fee_result with
+          | Ok v -> return v
+          | Error _ ->
+              let*! () = Prevalidator_events.failed_da_fee_read () in
+              return Z.zero
+        in
         return
           {
             state;
             ctxt;
             storage_version;
-            etherlink_infos = etherlink_infos_default;
+            (* Michelson chains do not use EVM gas semantics, only
+               da_fee_per_bytes is meaningful here. *)
+            etherlink_infos =
+              {
+                minimum_base_fee_per_gas = Z.zero;
+                base_fee_per_gas = Z.zero;
+                da_fee_per_bytes;
+                maximum_gas_per_transaction = Z.zero;
+              };
           }
 
   type parameters = {
@@ -820,6 +833,13 @@ let prevalidate_raw_transaction raw_transaction =
     (Request.Prevalidate_raw_transaction {raw_transaction})
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
+
+let get_da_fee_per_byte_nanotez () =
+  let open Lwt_result_syntax in
+  let* w = get_worker () in
+  let state = Worker.state w in
+  let da_fee_wei = state.session.etherlink_infos.da_fee_per_bytes in
+  return (Tezos_types.Tez.wei_to_nanotez da_fee_wei)
 
 let prevalidate_raw_transaction_tezlink raw_transaction =
   worker_wait_for_request
