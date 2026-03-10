@@ -114,14 +114,12 @@ module Acl = struct
               "GET /chains/*/blocks/*/context/big_maps/*/*";
               "GET /chains/*/blocks/*/context/cache/**";
               "GET /chains/*/blocks/*/context/constants";
-              "GET /chains/*/blocks/*/context/contracts/**";
-              "GET /chains/*/blocks/*/context/delegates/**";
+              "GET /chains/*/blocks/*/context/contracts/*/**";
+              "GET /chains/*/blocks/*/context/delegates/*/**";
               "GET /chains/*/blocks/*/context/denunciations";
               "GET /chains/*/blocks/*/context/issuance";
               "GET /chains/*/blocks/*/context/issuance/*";
               "GET /chains/*/blocks/*/context/liquidity_baking/*";
-              "GET /chains/*/blocks/*/context/merkle_tree/**";
-              "GET /chains/*/blocks/*/context/merkle_tree_v2/**";
               "GET /chains/*/blocks/*/context/nonces/*";
               "GET /chains/*/blocks/*/context/sapling/**";
               "GET /chains/*/blocks/*/context/seed_computation";
@@ -156,8 +154,6 @@ module Acl = struct
               "GET /config/network/user_activated_upgrades";
               "GET /config/network/dal";
               "GET /network/stat";
-              "GET /network/version";
-              "GET /network/versions";
               "GET /protocols";
               "GET /protocols/*/environment";
               "GET /version";
