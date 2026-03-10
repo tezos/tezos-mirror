@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+pub mod headers;
+
 use primitive_types::U256;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::runtime::RuntimeError;
