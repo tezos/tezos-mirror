@@ -376,6 +376,8 @@ val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
 
 val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 
+val wait_for_connection_acquired : ?timeout:float -> t -> unit Lwt.t
+
 val wait_for_trying_reconnection : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_flush_delayed_inbox :
@@ -403,6 +405,12 @@ val wait_for_blueprint_injection_failure :
   ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
 val wait_for_next_block_info : ?timeout:float -> t -> string Lwt.t
+
+val wait_for_ic_reset : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_ic_reset_unexpected_level : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_ic_execute_skipped : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_inclusion : ?timeout:float -> ?hash:string -> t -> string Lwt.t
 

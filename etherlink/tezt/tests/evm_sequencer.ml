@@ -14840,6 +14840,80 @@ let test_locked_tx_queue_timestamp () =
     ~error_msg:"Block timestamp should be current, not stale (got %L)" ;
   unit
 
+let test_next_block_info_ic_reset () =
+  register_sandbox_with_observer
+    ~fail_on_divergence:false
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+    ~__FILE__
+    ~genesis_timestamp
+    ~tags:["evm"; "observer"; "next_block_info"; "ic_reset"]
+    ~title:
+      "Observer re-enters Executing on duplicate next_block_info, drops old tx \
+       and executes new one"
+  @@ fun {sandbox; observer} ->
+  (* Step 1: produce an initial block so both nodes are synced and the
+     observer's preconfirmation stream callbacks are activated. *)
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:01Z" sandbox in
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  (* Step 2: submit a transaction so the observer enters IC Executing
+     state via the preconfirmation stream's next_block_info. *)
+  let next_block_info_p = Evm_node.wait_for_next_block_info observer in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sandbox in
+  let* _ = next_block_info_p in
+
+  (* Step 3: restart the sequencer without producing a block. The observer
+     reconnects while its IC state is still Executing. After restart, the
+     block_producer is in Awaiting_first_timestamp so we re-enable
+     preconfirmations by proposing a timestamp. *)
+  let* () = Evm_node.terminate sandbox in
+  let* () = Evm_node.run sandbox in
+  let* () = Evm_node.wait_for_ready sandbox in
+  let*@ () =
+    Rpc.propose_next_block_timestamp ~timestamp:"2020-01-01T00:00:02Z" sandbox
+  in
+  let* () = Evm_node.wait_for_connection_acquired observer in
+
+  (* Step 4: re-submit a transaction. The sequencer sends a new
+     next_block_info which the observer receives while still in Executing
+     state from step 2. This triggers ic_reset (discarding the first tx's
+     partial IC work), then IC re-enters Executing with the new block info.
+     The re-submitted transaction should be executed via IC
+     (single_tx_execution_done fires). *)
+  let ic_reset_p = Evm_node.wait_for_ic_reset observer in
+  let single_tx_done_p = Evm_node.wait_for_single_tx_execution_done observer in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx sandbox in
+  let* () = ic_reset_p in
+  let* _hash = single_tx_done_p in
+  let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:02Z" sandbox in
+  let* () = Evm_node.wait_for_blueprint_applied observer 2 in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -15027,4 +15101,5 @@ let () =
   test_fa_deposit_watchtower [Alpha] ;
   test_xtz_deposit_watchtower [Alpha] ;
   test_evm_events_cleanup () ;
-  test_locked_tx_queue_timestamp ()
+  test_locked_tx_queue_timestamp () ;
+  test_next_block_info_ic_reset ()

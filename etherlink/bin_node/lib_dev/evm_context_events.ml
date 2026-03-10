@@ -223,6 +223,36 @@ let switching_history_mode =
     ("from", Configuration.history_mode_encoding)
     ("to_", Configuration.history_mode_encoding)
 
+let ic_reset =
+  declare_1
+    ~section
+    ~name:"evm_context_ic_reset"
+    ~level:Warning
+    ~msg:
+      "received next_block_info while IC was in Executing state at level \
+       {level}, discarding partial IC work and re-entering Executing"
+    ~pp1:Ethereum_types.pp_quantity
+    ("level", Ethereum_types.quantity_encoding)
+
+let ic_reset_unexpected_level =
+  declare_1
+    ~section
+    ~name:"evm_context_ic_reset_unexpected_level"
+    ~level:Warning
+    ~msg:
+      "received next_block_info for a different level while IC was in \
+       Executing state at level {level}, resetting to Awaiting"
+    ~pp1:Ethereum_types.pp_quantity
+    ("level", Ethereum_types.quantity_encoding)
+
+let ic_execute_skipped =
+  declare_1
+    ~section
+    ~name:"evm_context_ic_execute_skipped"
+    ~level:Warning
+    ~msg:"skipping single transaction execution for {hash}, IC is not ready"
+    ("hash", Ethereum_types.hash_encoding)
+
 let ready () = emit ready ()
 
 let shutdown () = emit shutdown ()
@@ -276,3 +306,9 @@ let get_block_failed n err = emit get_block_failed (n, err)
 let start_history_mode history_mode = emit start_history_mode history_mode
 
 let switching_history_mode ~from ~to_ = emit switching_history_mode (from, to_)
+
+let ic_reset level = emit ic_reset level
+
+let ic_reset_unexpected_level level = emit ic_reset_unexpected_level level
+
+let ic_execute_skipped hash = emit ic_execute_skipped hash

@@ -434,6 +434,19 @@ compressing_snapshot:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+connection_acquired:
+  description: connection acquired with {endpoint}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* connection_acquired version 0 */
+      "connection_acquired.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 counter_inc_assertion_warning:
   description: assertion failed while updating a Counter metric: the increment ({increment} occuring at {label}) is negative; the value will not be updated
   level: warning
@@ -549,6 +562,45 @@ evm_context_get_block_failed:
     { /* evm_context_get_block_failed version 0 */
       "evm_context_get_block_failed.v0": { "level": $unistring,
                                            "trace": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_execute_skipped:
+  description: skipping single transaction execution for {hash}, IC is not ready
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_execute_skipped version 0 */
+      "evm_context_ic_execute_skipped.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_reset:
+  description: received next_block_info while IC was in Executing state at level {level}, discarding partial IC work and re-entering Executing
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_reset version 0 */
+      "evm_context_ic_reset.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+evm_context_ic_reset_unexpected_level:
+  description: received next_block_info for a different level while IC was in Executing state at level {level}, resetting to Awaiting
+  level: warning
+  section: evm_node.dev.evm_context
+  json format:
+    { /* evm_context_ic_reset_unexpected_level version 0 */
+      "evm_context_ic_reset_unexpected_level.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid

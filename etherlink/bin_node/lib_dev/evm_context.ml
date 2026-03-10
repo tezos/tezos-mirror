@@ -993,43 +993,69 @@ module State = struct
         return applied_sequencer_upgrade
     | None -> return false
 
+  let reset_future_block_info_if_enabled ctxt =
+    match ctxt.session.future_block_info with
+    | Disabled | Awaiting_next_block_info -> ()
+    | Executing _ -> ctxt.session.future_block_info <- Awaiting_next_block_info
+
+  let executing_ic_state ctxt conn ~timestamp =
+    let open Lwt_result_syntax in
+    let*! data_dir, config = execution_config in
+    let* applied_sequencer_upgrade =
+      handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
+    in
+    let* da_fee_per_byte =
+      Etherlink_durable_storage.da_fee_per_byte
+        (read_from_state ctxt.session.evm_state)
+    in
+    let* (Ethereum_types.Qty base_fee_per_gas) =
+      Etherlink_durable_storage.base_fee_per_gas
+        (read_from_state ctxt.session.evm_state)
+    in
+    return
+    @@ Executing
+         {
+           timestamp;
+           next_tx_index = 0l;
+           applied_sequencer_upgrade;
+           da_fee_per_byte;
+           base_fee_per_gas;
+         }
+
   let set_next_block_info ctxt conn (timestamp : Time.Protocol.t)
       (number : Ethereum_types.quantity) =
     let open Lwt_result_syntax in
     match ctxt.session.future_block_info with
     | Disabled -> return_unit
+    | Executing _
+      when Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) ->
+        let*! () =
+          Evm_context_events.ic_reset ctxt.session.next_blueprint_number
+        in
+        let*! evm_state = Pvm.State.get ctxt.session.context in
+        ctxt.session.evm_state <- evm_state ;
+        Octez_telemetry.Trace.add_attrs (fun () ->
+            [Telemetry.Attributes.Block.number number]) ;
+        let* exec_ic_state = executing_ic_state ctxt conn ~timestamp in
+        ctxt.session.future_block_info <- exec_ic_state ;
+        return_unit
     | Executing _ ->
-        tzfail
-          (Node_error.Set_next_block_info_while_executing
-             {
-               new_level = number;
-               current_level = ctxt.session.next_blueprint_number;
-             })
+        (* Defensive guard: in normal operation, [apply_blueprint] resets IC
+           to [Awaiting] before [next_blueprint_number] advances, so we should
+           never be [Executing] for a stale level when a new level's
+           [next_block_info] arrives. Reset to [Awaiting] as a safety net. *)
+        let*! () =
+          Evm_context_events.ic_reset_unexpected_level
+            ctxt.session.next_blueprint_number
+        in
+        reset_future_block_info_if_enabled ctxt ;
+        return_unit
     | Awaiting_next_block_info ->
         if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then (
           Octez_telemetry.Trace.add_attrs (fun () ->
               [Telemetry.Attributes.Block.number number]) ;
-          let*! data_dir, config = execution_config in
-          let* applied_sequencer_upgrade =
-            handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
-          in
-          let* da_fee_per_byte =
-            Etherlink_durable_storage.da_fee_per_byte
-              (read_from_state ctxt.session.evm_state)
-          in
-          let* (Ethereum_types.Qty base_fee_per_gas) =
-            Etherlink_durable_storage.base_fee_per_gas
-              (read_from_state ctxt.session.evm_state)
-          in
-          ctxt.session.future_block_info <-
-            Executing
-              {
-                timestamp;
-                next_tx_index = 0l;
-                applied_sequencer_upgrade;
-                da_fee_per_byte;
-                base_fee_per_gas;
-              } ;
+          let* exec_ic_state = executing_ic_state ctxt conn ~timestamp in
+          ctxt.session.future_block_info <- exec_ic_state ;
           return_unit)
         else (
           ctxt.session.future_block_info <- Awaiting_next_block_info ;
@@ -1104,9 +1130,8 @@ module State = struct
         return_some receipt
     | Disabled -> return_none
     | Awaiting_next_block_info ->
-        tzfail
-          (Node_error.Execute_single_transaction_no_block_info
-             {transaction_hash = hash})
+        let*! () = Evm_context_events.ic_execute_skipped hash in
+        return_none
 
   let commit_application_result ~ctxt ~conn ~timestamp ~time_processed ~payload
       ~block ~chain_family evm_state =
@@ -1272,13 +1297,6 @@ module State = struct
 
     return
       (evm_state, context, applied_kernel_upgrade, split_info, execution_gas)
-
-  let reset_future_block_info_if_enabled ctxt =
-    match ctxt.session.future_block_info with
-    | Disabled -> ()
-    | Awaiting_next_block_info | Executing _ ->
-        ctxt.session.future_block_info <- Awaiting_next_block_info ;
-        ()
 
   (* Helper to find Divergence or Unsync in error trace.
     The exception emitted by `apply_blueprint_store_unsafe` is caught by
@@ -2755,10 +2773,6 @@ module Handlers = struct
             ~received:level_received
         in
         Lwt_exit.exit_and_raise Node_error.exit_code_when_out_of_sync
-    (* Make it explicit that these error don't make the worker crash *)
-    | Next_block_info _, [Node_error.Set_next_block_info_while_executing _]
-    | ( Execute_single_transaction _,
-        [Node_error.Execute_single_transaction_no_block_info _] )
     | _ ->
         let Eq = Eq.request req in
         let request_view = Request.view req in

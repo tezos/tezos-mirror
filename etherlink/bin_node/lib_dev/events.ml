@@ -249,6 +249,14 @@ let event_retrying_connect =
     ("endpoint", Data_encoding.string)
     ("delay", Data_encoding.float)
 
+let event_connection_acquired =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"connection_acquired"
+    ~msg:"connection acquired with {endpoint}"
+    ~level:Notice
+    ("endpoint", Data_encoding.string)
+
 let event_deprecation_note =
   Internal_event.Simple.declare_1
     ~section
@@ -673,6 +681,9 @@ let event_kernel_log ~level ~kind ~msg =
 
 let retrying_connect ~endpoint ~delay =
   emit event_retrying_connect (Uri.to_string endpoint, delay)
+
+let connection_acquired ~endpoint =
+  emit event_connection_acquired (Uri.to_string endpoint)
 
 let preload_kernel commit = emit preload_kernel commit
 

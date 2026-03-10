@@ -138,6 +138,8 @@ val event_kernel_log :
 
 val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t
 
+val connection_acquired : endpoint:Uri.t -> unit Lwt.t
+
 (** [preload_kernel version] advertizes the EVM node has preloaded in the
     module cache the kernel [version]. *)
 val preload_kernel : string -> unit Lwt.t

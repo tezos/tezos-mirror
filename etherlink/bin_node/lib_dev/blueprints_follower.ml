@@ -282,6 +282,9 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
 
       match call_result with
       | Ok monitor ->
+          let*! () =
+            Events.connection_acquired ~endpoint:params.evm_node_endpoint
+          in
           (stream_loop [@tailcall])
             ~multichain
             ~sbl_callbacks_activated
