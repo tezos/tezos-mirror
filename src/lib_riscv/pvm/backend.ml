@@ -89,6 +89,15 @@ let with_hooks printer f =
   let* () = printer (Buffer.contents debug_log) in
   return res
 
+let make_get_outbox
+    (api_octez_riscv_get_outbox : 'a -> int32 -> Api.output list) =
+  let f state level =
+    let level = Bounded.Non_negative_int32.to_value level in
+    let outbox_messages = api_octez_riscv_get_outbox state level in
+    Lwt.return (List.map from_api_output outbox_messages)
+  in
+  f
+
 module Mutable_state = struct
   type t = Api.mut_state
 
@@ -132,6 +141,9 @@ module Mutable_state = struct
     Lwt.return
     @@ Api.octez_riscv_mut_install_boot_sector state
     @@ Bytes.of_string boot_sector
+
+  let get_outbox state level =
+    make_get_outbox Api.octez_riscv_mut_get_outbox_for_level state level
 end
 
 let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_
@@ -180,6 +192,9 @@ let state_hash state =
 let set_input state input =
   Lwt.return
     (Storage.State.track (Api.octez_riscv_set_input state (to_api_input input)))
+
+let get_outbox state level =
+  make_get_outbox Api.octez_riscv_get_outbox_for_level state level
 
 let proof_start_state proof =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_start_state proof

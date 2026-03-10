@@ -196,7 +196,43 @@ let get_status ~is_reveal_enabled:_ state = Backend.get_status state
 
 let string_of_status status = Backend.string_of_status status
 
-let get_outbox _level _state = Lwt.return []
+let outbox_message_encoding = Sc_rollup_outbox_message_repr.encoding
+
+let of_pvm_output (output : Backend.output) : Sc_rollup.output option =
+  let open Option_syntax in
+  let* message =
+    Data_encoding.Binary.of_string_opt
+      Sc_rollup.Outbox.Message.encoding
+      output.encoded_message
+  in
+  let* outbox_level =
+    let value = Bounded.Non_negative_int32.to_value output.info.outbox_level in
+    Option.of_result (Raw_level.of_int32 value)
+  in
+  return
+    Sc_rollup.
+      {
+        output_info = {message_index = output.info.message_index; outbox_level};
+        message;
+      }
+
+let make_get_outbox
+    (get_outbox :
+      'state -> Bounded.Non_negative_int32.t -> Backend.output list Lwt.t)
+    (to_int32 : 'level -> int32) =
+  let f level state =
+    let open Lwt_syntax in
+    let maybe_level = Bounded.Non_negative_int32.of_value (to_int32 level) in
+    match maybe_level with
+    | Some level ->
+        let* outbox_messages = get_outbox state level in
+        Lwt.return (List.filter_map of_pvm_output outbox_messages)
+    | None -> Lwt.return []
+  in
+  f
+
+let get_outbox (level : Raw_level.t) state =
+  make_get_outbox Backend.get_outbox Raw_level.to_int32 level state
 
 let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_ ~reveal_builtins:_
     ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state
@@ -237,7 +273,8 @@ module Mutable_state :
 
   let get_current_level state = Backend.Mutable_state.get_current_level state
 
-  let get_outbox _level _state = Lwt.return []
+  let get_outbox level state =
+    make_get_outbox Backend.Mutable_state.get_outbox Fun.id level state
 
   let get_status ~is_reveal_enabled:_ state =
     Backend.Mutable_state.get_status state

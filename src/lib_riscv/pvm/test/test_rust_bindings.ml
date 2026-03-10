@@ -57,6 +57,7 @@ let test_output_info () =
 
   return_unit
 
+(* TODO: RV-922 Remove redundant type binding tests when E2E testing is complete *)
 let test_output () =
   let open Lwt_syntax in
   let output_info = {Api.message_index = 42l; outbox_level = 12l} in
@@ -65,5 +66,21 @@ let test_output () =
   in
   let output_repr = Api.octez_riscv_test_output output in
   assert (output_repr = output) ;
+
+  return_unit
+
+let test_output_list () =
+  let open Lwt_syntax in
+  let make_output outbox_level message_index payload =
+    {
+      Api.info = {message_index; outbox_level};
+      encoded_message = String.to_bytes payload;
+    }
+  in
+  let outputs =
+    [make_output 12l 0l "first_message"; make_output 12l 1l "second_message"]
+  in
+  assert (Api.octez_riscv_test_output_list [] = []) ;
+  assert (Api.octez_riscv_test_output_list outputs = outputs) ;
 
   return_unit
