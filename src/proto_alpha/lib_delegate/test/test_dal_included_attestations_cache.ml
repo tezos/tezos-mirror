@@ -142,64 +142,446 @@ let test_fork_deduplication () =
     ~expected_slots:[] ;
   Lwt.return_unit
 
-(** Chain:
+(* ---- Depth 0: attested_level = head_level ---- *)
 
-    A(10) -- B(11) attests slot 5
-          \- B'(11) -- C'(12) -- D'(13) -- E'(14)
-
-    Replay: B attests slot 5; then B', C', D' with no attestation for slot 5.
-    Filter at head E'(14) → slot 5 should be allowed. *)
-let test_zombie_cleared_then_allowed () =
-  let h_a = make_block_hash 0 in
-  let h_b = make_block_hash 1 in
-  let h_b' = make_block_hash 2 in
-  let h_c' = make_block_hash 3 in
-  let h_d' = make_block_hash 4 in
-  let h_e' = make_block_hash 5 in
-  let h_0 = make_block_hash 0 in
+(** Depth 0: head_hash in block_hashes -> filter out. *)
+let test_depth0_head_in_block_hashes_filtered () =
   let cache = make_cache () in
+  let h_a = make_block_hash 11 in
+  let h_10 = make_block_hash 10 in
+  let h_9 = make_block_hash 9 in
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a
+    ~predecessor_hash:h_10
+    ~grandparent:h_9
+    ~slots:[0] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:11l
+    ~head_hash:h_a
+    ~predecessor_hash:h_10
+    ~expected_slots:[] ;
+  Lwt.return_unit
+
+(** Depth 0: head_hash not in block_hashes -> allow.
+
+    Chain: A(11) is head. Slot attested at B(11) with h_b (B != A). Filter at
+    head A -> slot allowed. *)
+let test_depth0_head_not_in_block_hashes_allowed () =
+  let cache = make_cache () in
+  let h_a = make_block_hash 3 in
+  let h_b = make_block_hash 2 in
+  let h_1 = make_block_hash 1 in
+  let h_0 = make_block_hash 0 in
   update_from_attested_slots
     cache
     ~attested_level:11l
     ~block_hash:h_b
-    ~predecessor_hash:h_a
+    ~predecessor_hash:h_1
     ~grandparent:h_0
-    ~slots:[5] ;
+    ~slots:[0] ;
+  (* This is a no-op on the cache, but mirrors the realistic scenario
+     where A is the head and B's attestation was on a competing block. *)
   update_from_attested_slots
     cache
     ~attested_level:11l
-    ~block_hash:h_b'
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:11l
+    ~head_hash:h_a
+    ~predecessor_hash:h_1
+    ~expected_slots:[0] ;
+  Lwt.return_unit
+
+(** Depth 0: same-level accumulation, head in list -> filter out.
+
+    Chain: A(11). Two blocks at level 11 attest slot 0 (h_a, h_b).
+    Filter at head h_a -> head in block_hashes -> filtered out. *)
+let test_depth0_head_in_block_hashes_accumulation_filtered () =
+  let cache = make_cache () in
+  let h_a = make_block_hash 2 in
+  let h_b = make_block_hash 3 in
+  let h_1 = make_block_hash 1 in
+  let h_0 = make_block_hash 0 in
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_b
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:11l
+    ~head_hash:h_a
+    ~predecessor_hash:h_1
+    ~expected_slots:[] ;
+  Lwt.return_unit
+
+(* ---- Depth 1: attested_level = head_level - 1 ---- *)
+
+(** Depth 1: predecessor_hash in block_hashes -> filter out.
+
+    Chain: A(13) -- B(14). Slot attested at A. Filter at head B; predecessor
+    h_a in block_hashes -> filtered out. *)
+let test_depth1_predecessor_in_block_hashes_filtered () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 13 in
+  let h_b = make_block_hash 14 in
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:14l
+    ~block_hash:h_b
     ~predecessor_hash:h_a
+    ~grandparent:h_1
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:14l
+    ~head_hash:h_b
+    ~predecessor_hash:h_a
+    ~expected_slots:[] ;
+  Lwt.return_unit
+
+(** Depth 1: predecessor_hash not in block_hashes -> allow.
+
+    Chain:
+    -- A(13)  (slot attested here)
+    \- A'(13) -- B'(14)  (head)
+
+    Filter at head B' -> predecessor h_a' not in block_hashes -> allowed. *)
+let test_depth1_predecessor_not_in_block_hashes_allowed () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 10 in
+  let h_a' = make_block_hash 11 in
+  let h_b' = make_block_hash 12 in
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a'
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:14l
+    ~block_hash:h_b'
+    ~predecessor_hash:h_a'
+    ~grandparent:h_1
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:14l
+    ~head_hash:h_b'
+    ~predecessor_hash:h_a'
+    ~expected_slots:[0] ;
+  Lwt.return_unit
+
+(* ---- Depth 2: attested_level = head_level - 2 ---- *)
+
+(** Depth 2: block_hashes = [] (abandoned fork) -> allow.
+
+    Chain:
+    -- A'(13)
+    \- A(13) -- B(14) -- C(15). Attest at 13 with h_a'; process C(15)
+    with grandparent h_a, h_abandoned <> h_a so entry cleared. Filter at head C ->
+    slot allowed. *)
+let test_depth2_empty_block_hashes_allowed () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 2 in
+  let h_b = make_block_hash 3 in
+  let h_c = make_block_hash 4 in
+  let h_a' = make_block_hash 99 in
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a'
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:14l
+    ~block_hash:h_b
+    ~predecessor_hash:h_a
+    ~grandparent:h_1
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:15l
+    ~block_hash:h_c
+    ~predecessor_hash:h_b
+    ~grandparent:h_a
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:15l
+    ~head_hash:h_c
+    ~predecessor_hash:h_b
+    ~expected_slots:[0] ;
+  Lwt.return_unit
+
+(** Depth 2: block_hashes = [grandparent] (on canonical chain) -> filter out.
+
+    Chain: A(13) -- B(14) -- C(15). Slot attested at A (h_a). Process C(15) with
+    grandparent h_a keeps entry. Filter at head C -> filtered out. *)
+let test_depth2_nonempty_block_hashes_filtered () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 2 in
+  let h_b = make_block_hash 3 in
+  let h_c = make_block_hash 4 in
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:14l
+    ~block_hash:h_b
+    ~predecessor_hash:h_a
+    ~grandparent:h_1
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:15l
+    ~block_hash:h_c
+    ~predecessor_hash:h_b
+    ~grandparent:h_a
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:15l
+    ~head_hash:h_c
+    ~predecessor_hash:h_b
+    ~expected_slots:[] ;
+  Lwt.return_unit
+
+(* ---- Depth 3 ---- *)
+
+(** Depth 3: block_hashes non-empty (on canonical chain at depth 2) -> filter out.
+
+    Chain: A(11) -- B(12) -- C(13) -- D(14). Slot attested at A (h_a). Process
+    C(13) with grandparent h_a keeps entry. Filter at head D -> filtered out. *)
+let test_depth3_nonempty_block_hashes_filtered () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 2 in
+  let h_b = make_block_hash 3 in
+  let h_c = make_block_hash 4 in
+  let h_d = make_block_hash 5 in
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:12l
+    ~block_hash:h_b
+    ~predecessor_hash:h_a
+    ~grandparent:h_1
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_c
+    ~predecessor_hash:h_b
+    ~grandparent:h_a
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:14l
+    ~block_hash:h_d
+    ~predecessor_hash:h_c
+    ~grandparent:h_b
+    ~slots:[] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0]
+    ~head_level:14l
+    ~head_hash:h_d
+    ~predecessor_hash:h_c
+    ~expected_slots:[] ;
+  Lwt.return_unit
+
+(** Depth 3: block_hashes = [] (cleared by depth-2 filter) -> allow.
+
+    Chain:
+    -- A'(11)
+    \- A(11) -- B(12) -- C(13) -- D(14)
+
+    Slot attested at 11 on A' (h_a'). Process C(13) with grandparent h_a;
+    h_a' != h_a so entry cleared. Filter at head D -> slot allowed. *)
+let test_depth3_empty_block_hashes_allowed () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_a = make_block_hash 2 in
+  let h_b = make_block_hash 3 in
+  let h_c = make_block_hash 4 in
+  let h_d = make_block_hash 5 in
+  let h_a' = make_block_hash 99 in
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a'
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[0] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
     ~grandparent:h_0
     ~slots:[] ;
   update_from_attested_slots
     cache
     ~attested_level:12l
-    ~block_hash:h_c'
-    ~predecessor_hash:h_b'
-    ~grandparent:h_a
+    ~block_hash:h_b
+    ~predecessor_hash:h_a
+    ~grandparent:h_1
     ~slots:[] ;
   update_from_attested_slots
     cache
     ~attested_level:13l
-    ~block_hash:h_d'
-    ~predecessor_hash:h_c'
-    ~grandparent:h_b'
+    ~block_hash:h_c
+    ~predecessor_hash:h_b
+    ~grandparent:h_a
     ~slots:[] ;
   update_from_attested_slots
     cache
     ~attested_level:14l
-    ~block_hash:h_e'
-    ~predecessor_hash:h_d'
-    ~grandparent:h_c'
+    ~block_hash:h_d
+    ~predecessor_hash:h_c
+    ~grandparent:h_b
     ~slots:[] ;
   assert_filter
     cache
-    ~attestable_slots:[5]
+    ~attestable_slots:[0]
     ~head_level:14l
-    ~head_hash:h_e'
-    ~predecessor_hash:h_d'
-    ~expected_slots:[5] ;
+    ~head_hash:h_d
+    ~predecessor_hash:h_c
+    ~expected_slots:[0] ;
+  Lwt.return_unit
+
+(** Multiple slots: mix of filter out and allow.
+
+    Chain:
+    -- A'(11) -- B'(12)
+    \- A(11) -- B(12) -- C(13).
+
+    Slot 0 attested at C (head) -> filtered.
+    Slot 1 attested at B' -> allowed.
+    Slot 2 no entry -> allowed.
+    Slot 3 attested at A', process C with grandparent h_a clears entry -> allowed.
+    Filter at head C. *)
+let test_multiple_slots_mixed () =
+  let cache = make_cache () in
+  let h_0 = make_block_hash 0 in
+  let h_1 = make_block_hash 1 in
+  let h_c = make_block_hash 4 in
+  let h_b = make_block_hash 3 in
+  let h_a = make_block_hash 2 in
+  let h_b' = make_block_hash 13 in
+  let h_a' = make_block_hash 12 in
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a'
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[3] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:12l
+    ~block_hash:h_b'
+    ~predecessor_hash:h_a'
+    ~grandparent:h_1
+    ~slots:[1] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:11l
+    ~block_hash:h_a
+    ~predecessor_hash:h_1
+    ~grandparent:h_0
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:12l
+    ~block_hash:h_b
+    ~predecessor_hash:h_a
+    ~grandparent:h_1
+    ~slots:[] ;
+  update_from_attested_slots
+    cache
+    ~attested_level:13l
+    ~block_hash:h_c
+    ~predecessor_hash:h_b
+    ~grandparent:h_a
+    ~slots:[0] ;
+  assert_filter
+    cache
+    ~attestable_slots:[0; 1; 2; 3]
+    ~head_level:13l
+    ~head_hash:h_c
+    ~predecessor_hash:h_b
+    ~expected_slots:[1; 2; 3] ;
   Lwt.return_unit
 
 let () =
@@ -208,8 +590,59 @@ let () =
     ~title:(Protocol.name ^ ": fork deduplication warm-up")
     ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
     test_fork_deduplication ;
+  (* Depth 0 *)
   Test.register
     ~__FILE__
-    ~title:(Protocol.name ^ ": zombie cleared by depth-2 filter then allowed")
+    ~title:(Protocol.name ^ ": depth 0 — head in block_hashes -> filtered")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    test_depth0_head_in_block_hashes_filtered ;
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 0 — head not in block_hashes -> allowed")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    test_depth0_head_not_in_block_hashes_allowed ;
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 0 — same-level accumulation -> filtered")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    test_depth0_head_in_block_hashes_accumulation_filtered ;
+  (* Depth 1 *)
+  Test.register
+    ~__FILE__
+    ~title:
+      (Protocol.name ^ ": depth 1 — predecessor in block_hashes -> filtered")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth1"]
+    test_depth1_predecessor_in_block_hashes_filtered ;
+  Test.register
+    ~__FILE__
+    ~title:
+      (Protocol.name ^ ": depth 1 — predecessor not in block_hashes -> allowed")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth1"]
+    test_depth1_predecessor_not_in_block_hashes_allowed ;
+  (* Depth 2 *)
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 2 — empty block_hashes -> allowed")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth2"]
+    test_depth2_empty_block_hashes_allowed ;
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 2 — non-empty block_hashes -> filtered")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth2"]
+    test_depth2_nonempty_block_hashes_filtered ;
+  (* Depth 3 *)
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 3 — non-empty block_hashes -> filtered")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth3"]
+    test_depth3_nonempty_block_hashes_filtered ;
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": depth 3 — empty block_hashes -> allowed")
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth3"]
+    test_depth3_empty_block_hashes_allowed ;
+  Test.register
+    ~__FILE__
+    ~title:(Protocol.name ^ ": multiple slots mixed depths")
     ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
-    test_zombie_cleared_then_allowed
+    test_multiple_slots_mixed
