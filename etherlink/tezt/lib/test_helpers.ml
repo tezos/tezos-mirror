@@ -763,8 +763,12 @@ let produce_block_and_wait_for ?timestamp ~sequencer n =
 let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
     ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    ?sequencer_keys ?with_runtimes body =
-  Test.register
+    ?sequencer_keys ?(regression = false) ?with_runtimes body =
+  let register =
+    if regression then Regression.register ?file:None
+    else Test.register ?seed:None
+  in
+  register
     ~__FILE__
     ~title
     ~tags:
