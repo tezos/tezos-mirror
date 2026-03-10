@@ -1296,6 +1296,188 @@ let test_tezlink_script_rpc =
 
   unit
 
+let test_tezlink_blocks_list =
+  register_tezlink_test
+    ~title:"Test of the blocks list rpc"
+    ~tags:["rpc"; "blocks"; "list"]
+  @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client = Client.init ~endpoint:tezlink_endpoint () in
+
+  let rpc_hash block =
+    Client.RPC.call client @@ RPC.get_chain_block_hash ~block ()
+  in
+  let rpc_blocks ?heads ?length ?min_date () =
+    Client.RPC.call client @@ RPC.get_chain_blocks ?heads ?length ?min_date ()
+  in
+  let rpc_header block =
+    Client.RPC.call client @@ RPC.get_chain_block_header ~block ()
+  in
+
+  let parse_chains res =
+    JSON.(
+      res |> as_list
+      |> List.map (fun chain -> chain |> as_list |> List.map as_string))
+  in
+
+  let check_chains ~__LOC__ ~label ~expected got =
+    Check.(
+      (got = expected)
+        (list (list string))
+        ~__LOC__
+        ~error_msg:
+          (sf "Unexpected block list (%s): expected %%R but got %%L" label))
+  in
+
+  let head_block i = if i = 0 then "head" else sf "head~%d" i in
+
+  let produce_blocks n =
+    (* Give each produced block a distinct timestamp so min_date filtering is
+       deterministic (otherwise multiple blocks can share a timestamp).
+
+       We must also ensure those timestamps are not in the past w.r.t. the
+       current head timestamp, otherwise the EVM node rejects the blueprint
+       (TimestampFromPast). *)
+    let* head_header = rpc_header "head" in
+    let head_timestamp =
+      JSON.(head_header |-> "timestamp" |> as_string)
+      |> Tezos_base.Time.Protocol.of_notation_exn
+    in
+    let rec loop i remaining =
+      if remaining <= 0 then return ()
+      else
+        let timestamp =
+          Tezos_base.Time.Protocol.(add head_timestamp (Int64.of_int (i + 1)))
+          |> Tezos_base.Time.Protocol.to_notation
+        in
+        let*@ _ = produce_block ~timestamp sequencer in
+        loop (i + 1) (remaining - 1)
+    in
+    loop 0 n
+  in
+
+  let collect_head_hashes n =
+    let rec loop i acc =
+      if i >= n then return (List.rev acc)
+      else
+        let* h = rpc_hash (head_block i) in
+        loop (i + 1) (h :: acc)
+    in
+    loop 0 []
+  in
+
+  let fetch_chains ?heads ?length ?min_date () =
+    let* res = rpc_blocks ?heads ?length ?min_date () in
+    return (parse_chains res)
+  in
+
+  let run_and_check ?heads ?length ?min_date ~__LOC__ ~label ~expected () =
+    let* got = fetch_chains ?heads ?length ?min_date () in
+    check_chains ~__LOC__ ~label ~expected got ;
+    return ()
+  in
+
+  let nb_blocks_to_produce = 6 in
+  let* () = produce_blocks nb_blocks_to_produce in
+  let* head_hashes = collect_head_hashes nb_blocks_to_produce in
+
+  let head, head_1, head_2, head_3, head_4, head_5 =
+    match head_hashes with
+    | h0 :: h1 :: h2 :: h3 :: h4 :: h5 :: _ -> (h0, h1, h2, h3, h4, h5)
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Expected at least %d head hashes, got %d"
+          nb_blocks_to_produce
+          (List.length head_hashes)
+  in
+  let* head_6 = rpc_hash "head~6" in
+  let* head_7 = rpc_hash "head~7" in
+
+  let* () = run_and_check ~__LOC__ ~label:"default" ~expected:[[head]] () in
+  let* () =
+    run_and_check ~__LOC__ ~label:"length=1" ~length:1 ~expected:[[head]] ()
+  in
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"length=nb_blocks_to_produce"
+      ~length:nb_blocks_to_produce
+      ~expected:[head_hashes]
+      ()
+  in
+
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head~1],length=2"
+      ~heads:[head_1]
+      ~length:2
+      ~expected:[[head_1; head_2]]
+      ()
+  in
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head~3;head~1],length=3"
+      ~heads:[head_3; head_1]
+      ~length:3
+      ~expected:[[head_1; head_2; head_3]; [head_3]]
+      ()
+  in
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head~2;head~1],length=3"
+      ~heads:[head_2; head_1]
+      ~length:3
+      ~expected:[[head_1; head_2; head_3]; [head_2]]
+      ()
+  in
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head~5;head~1],length=3"
+      ~heads:[head_5; head_1]
+      ~length:3
+      ~expected:[[head_1; head_2; head_3]; [head_5; head_6; head_7]]
+      ()
+  in
+
+  let* head_3_header = rpc_header "head~3" in
+  let min_date =
+    JSON.(head_3_header |-> "timestamp" |> as_string)
+    |> Tezos_base.Time.Protocol.of_notation_exn
+    |> Tezos_base.Time.Protocol.to_seconds |> Int64.to_int
+  in
+
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head;head~4],length=3,min_date=head~3"
+      ~heads:[head; head_4]
+      ~length:3
+      ~min_date
+      ~expected:[[head; head_1; head_2]]
+      ()
+  in
+
+  let* () =
+    run_and_check
+      ~__LOC__
+      ~label:"heads=[head;head~4],length=nb_blocks_to_produce,min_date=head~3"
+      ~heads:[head; head_4]
+      ~length:nb_blocks_to_produce
+      ~min_date
+      ~expected:[head_hashes]
+      ()
+  in
+  unit
+
 (* This test was copied and adapted from tezt/tests/contract_storage_normalization.ml *)
 
 let test_contract_storage_normalization =
@@ -4189,6 +4371,7 @@ let () =
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_script_rpc [Alpha] ;
+  test_tezlink_blocks_list [Alpha] ;
   test_contract_storage_normalization [Alpha] ;
   test_contract_counter [Alpha] ;
   test_tezlink_raw_json_cycle [Alpha] ;
