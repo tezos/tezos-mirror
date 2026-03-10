@@ -299,6 +299,60 @@ let create_initial_state ?canceler cctxt ?(synchronize = true)
   let* state = Baking_state.may_load_attestable_data state in
   may_initialise_with_latest_proposal_pqc state
 
+module Supervisor = struct
+  let run ~delay_between_restarts ~run_automaton cctxts =
+    let rec loop running_automatons_count pending_promises =
+      let open Lwt_syntax in
+      (* waits until one (or many) [pending_promises] gets fulfilled *)
+      let* fulfilled_promises, pending_promises =
+        Lwt.nchoose_split pending_promises
+      in
+      (* handle fulfilled promises *)
+      let* running_automatons_count, pending_promises =
+        List.fold_left_s
+          (fun (running_automatons_count, pending_promises) fulfilled_promise ->
+            match fulfilled_promise with
+            | `Start cctxt ->
+                let uri = Uri.to_string cctxt#base in
+                let* () = Events.(emit supervisor_starting_automaton uri) in
+                let promise =
+                  (* promise that resolves to (`Crash cctxt)
+                     when [run_automaton cctxt] resumes *)
+                  let* res = run_automaton cctxt in
+                  return (`Crash (cctxt, res))
+                in
+                return
+                  (succ running_automatons_count, promise :: pending_promises)
+            | `Crash (cctxt, _res) ->
+                let uri = Uri.to_string cctxt#base in
+                let* () =
+                  Events.(
+                    emit
+                      supervisor_automaton_crashed
+                      (uri, delay_between_restarts))
+                in
+                let promise =
+                  (* promise that resolves to (`Start cctxt)
+                     after [delay_between_restarts] seconds *)
+                  let* () = Lwt_unix.sleep delay_between_restarts in
+                  return (`Start cctxt)
+                in
+                return
+                  (pred running_automatons_count, promise :: pending_promises))
+          (running_automatons_count, pending_promises)
+          fulfilled_promises
+      in
+      (* We deliberately shutdown the baker when all automatons are
+         simultaneously waiting for a restart. This is done in order to escalate
+         the situation and draw attention to it. *)
+      if running_automatons_count <= 0 then
+        let* () = Events.(emit supervisor_all_down ()) in
+        Lwt_result_syntax.tzfail Baking_errors.Node_connection_lost
+      else loop running_automatons_count pending_promises
+    in
+    loop 0 (List.map (fun cctxt -> Lwt.return (`Start cctxt)) cctxts)
+end
+
 let initialize_automaton ?canceler ?(synchronize = true) ~chain ~cache
     ~on_head_proposal_callback global_state delegates cctxt =
   let open Lwt_result_syntax in
@@ -343,7 +397,7 @@ let initialize_automaton ?canceler ?(synchronize = true) ~chain ~cache
   let*? event = compute_bootstrap_event state in
   return (state, event, loop_state)
 
-let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
+let run cctxt ~extra_nodes ?dal_node_rpc_ctxt ?canceler
     ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
     config delegates =
@@ -390,34 +444,59 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     (* let retries = config.Baking_configuration.retries_on_failure in *)
     on_error err
   in
-  let* initial_state, initial_event, loop_state =
-    initialize_automaton
-      ?canceler
-      ~chain
-      ~cache
-      ~on_head_proposal_callback:revelation_worker_push_proposal
-      global_state
-      delegates
-      cctxt
+  let run_automaton cctxt =
+    let* initial_state, initial_event, loop_state =
+      initialize_automaton
+        ?canceler
+        ~chain
+        ~cache
+        ~on_head_proposal_callback:revelation_worker_push_proposal
+        global_state
+        delegates
+        cctxt
+    in
+    automaton_loop
+      ~stop_on_event
+      ~config
+      ~on_error
+      loop_state
+      initial_state
+      initial_event
   in
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8258
   let[@warning "-26"] profiler_section =
     New_valid_proposal initial_state.level_state.latest_proposal
   in
   () [@profiler.stop] ;
   () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
+*)
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in
       Lwt.return_error err)
     (fun () ->
-      let* _ignored_event =
-        automaton_loop
-          ~stop_on_event
-          ~config
-          ~on_error
-          loop_state
-          initial_state
-          initial_event
-      in
-      return_unit)
+      match extra_nodes with
+      | [] ->
+          let* _event = run_automaton cctxt in
+          return_unit
+      | _ ->
+          let* () =
+            (* sanity check: all nodes must target the same chain *)
+            List.iter_es
+              (fun cctxt ->
+                let* cctxt_chain_id = Node_rpc.chain_id ~chain cctxt in
+                fail_unless
+                  (Chain_id.equal cctxt_chain_id global_state.chain_id)
+                  (Baking_errors.Inconsistent_chain_id
+                     {
+                       uri = Uri.to_string cctxt#base;
+                       expected = global_state.chain_id;
+                       found = cctxt_chain_id;
+                     }))
+              extra_nodes
+          in
+          Supervisor.run
+            ~delay_between_restarts:20.
+            ~run_automaton
+            (cctxt :: extra_nodes))

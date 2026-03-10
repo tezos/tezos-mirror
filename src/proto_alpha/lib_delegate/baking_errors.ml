@@ -324,6 +324,40 @@ let () =
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
 
+type error +=
+  | Inconsistent_chain_id of {
+      uri : string;
+      expected : Chain_id.t;
+      found : Chain_id.t;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_scheduling.inconsistent_chain_id"
+    ~title:"Inconsistent chain id"
+    ~description:
+      "The node's chain id does not match the baker's expected chain id."
+    ~pp:(fun ppf (uri, expected, found) ->
+      Format.fprintf
+        ppf
+        "Baking automaton %s: expected chain id %a but found %a."
+        uri
+        Chain_id.pp
+        expected
+        Chain_id.pp
+        found)
+    Data_encoding.(
+      obj3
+        (req "uri" string)
+        (req "expected" Chain_id.encoding)
+        (req "found" Chain_id.encoding))
+    (function
+      | Inconsistent_chain_id {uri; expected; found} ->
+          Some (uri, expected, found)
+      | _ -> None)
+    (fun (uri, expected, found) -> Inconsistent_chain_id {uri; expected; found})
+
 (* BLS related errors *)
 type error +=
   | Signature_aggregation_failure
