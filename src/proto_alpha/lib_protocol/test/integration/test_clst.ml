@@ -138,7 +138,10 @@ let create_funded_account ~funder ~amount_mutez b =
   let* b = Block.bake ~operation:op b in
   return (account, b)
 
-let check_clst_balance_diff ~loc initial_balance_mutez diff_mutez b account =
+(* Checks the difference [diff] between an initial [init] and a
+   current CLST balances. Both [init] and [diff] are given in
+   mutez. *)
+let check_clst_balance_diff ~loc ~init ~diff b account =
   let open Lwt_result_syntax in
   let* balance =
     Plugin.Contract_services.clst_balance Block.rpc_ctxt b account
@@ -148,7 +151,7 @@ let check_clst_balance_diff ~loc initial_balance_mutez diff_mutez b account =
       ~default:(fun () -> assert false)
       (Script_int.to_int64 balance)
   in
-  let expected_balance = Int64.add initial_balance_mutez diff_mutez in
+  let expected_balance = Int64.add init diff in
   Assert.equal_int64 ~loc expected_balance balance
 
 (* Checks the block's balance updates contains the given balance updates, in the
@@ -199,7 +202,12 @@ let test_deposit =
   let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
   let* b, full_metadata = Block.bake_with_metadata ~operation:deposit_tx b in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ 0L (Tez.to_mutez amount) b sender
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:(Tez.to_mutez amount)
+      b
+      sender
   in
   let* clst_contract_hash = get_clst_hash (Context.B b) in
   let expected_balance_updates =
@@ -333,7 +341,12 @@ let () =
   in
   let* b = Block.bake ~operation:deposit_tx b in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ 0L initial_clst_bal_mutez b account
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:initial_clst_bal_mutez
+      b
+      account
   in
 
   let* frozen_redeemed_balance_before =
@@ -359,8 +372,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      initial_clst_bal_mutez
-      (Int64.neg redeemed_amount_mutez)
+      ~init:initial_clst_bal_mutez
+      ~diff:(Int64.neg redeemed_amount_mutez)
       b
       account
   in
@@ -1097,8 +1110,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg ticket_amount_export)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg ticket_amount_export)
       b
       src
   in
@@ -1145,8 +1158,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg ticket_amount)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg ticket_amount)
       b
       src
   in
@@ -1480,12 +1493,14 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg transfer_amount)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg transfer_amount)
       b
       src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:transfer_amount b dst
+  in
 
   (* Test a zero transfer *)
   let* transfer_tx = Op.clst_transfer (B b) ~src ~dst 0L in
@@ -1493,12 +1508,14 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Int64.sub (Tez.to_mutez amount) transfer_amount)
-      0L
+      ~init:(Int64.sub (Tez.to_mutez amount) transfer_amount)
+      ~diff:0L
       b
       src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ transfer_amount 0L b dst in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:transfer_amount ~diff:0L b dst
+  in
   return_unit
 
 let () =
@@ -1517,9 +1534,14 @@ let () =
   let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:0L
+      b
+      src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+  let* () = check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:0L b dst in
 
   (* Test a non-zero transfer with an approved sender with sufficient
      allowance *)
@@ -1529,12 +1551,14 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg transfer_amount)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg transfer_amount)
       b
       src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:transfer_amount b dst
+  in
   let* allowance = get_allowance ~owner:src ~spender:sender b in
   let* () = Assert.equal_int64 ~loc:__LOC__ 10_000_000L allowance in
 
@@ -1604,9 +1628,14 @@ let () =
   let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:0L
+      b
+      src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+  let* () = check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:0L b dst in
 
   (* Test a non-zero transfer with an approved operator *)
   let transfer_amount = 30_000_000L in
@@ -1615,12 +1644,14 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg transfer_amount)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg transfer_amount)
       b
       src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L transfer_amount b dst in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:transfer_amount b dst
+  in
 
   (* Test a second non-zero transfer with an approved operator *)
   let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
@@ -1628,13 +1659,18 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Int64.sub (Tez.to_mutez amount) transfer_amount)
-      (Int64.neg transfer_amount)
+      ~init:(Int64.sub (Tez.to_mutez amount) transfer_amount)
+      ~diff:(Int64.neg transfer_amount)
       b
       src
   in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ transfer_amount transfer_amount b dst
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:transfer_amount
+      ~diff:transfer_amount
+      b
+      dst
   in
 
   (* Test a non-zero transfer with an approved operator but with
@@ -1677,8 +1713,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg ticket_amount_export)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg ticket_amount_export)
       b
       src
   in
@@ -1778,8 +1814,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Tez.to_mutez amount)
-      (Int64.neg ticket_amount_export)
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg ticket_amount_export)
       b
       src
   in
@@ -1801,8 +1837,8 @@ let () =
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
-      (Int64.sub (Tez.to_mutez amount) ticket_amount_export)
-      (Int64.neg ticket_amount_export)
+      ~init:(Int64.sub (Tez.to_mutez amount) ticket_amount_export)
+      ~diff:(Int64.neg ticket_amount_export)
       b
       src
   in
@@ -1844,9 +1880,14 @@ let () =
   let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
-    check_clst_balance_diff ~loc:__LOC__ (Tez.to_mutez amount) 0L b src
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:0L
+      b
+      src
   in
-  let* () = check_clst_balance_diff ~loc:__LOC__ 0L 0L b dst in
+  let* () = check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:0L b dst in
 
   (* Test a non-zero transfer with an approved sender with insufficient
      allowance *)
