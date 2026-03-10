@@ -2992,7 +2992,7 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-oc.install_opam_noble:
+oc.install_opam_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu:24.04
   stage: test
   tags:
