@@ -214,7 +214,12 @@ where
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm_inspect<'a, Host, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>(
+fn build_evm_inspector_context<
+    'a,
+    Host,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+>(
     db: EtherlinkVMDB<'a, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
@@ -235,6 +240,11 @@ where
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
+    // IMPORTANT
+    // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
+    // `Journal` holds a mutable reference to its inner data that exists before it creation and must outlive it.
+    // `Journal::new` exists only as a requirement for the `revm::context_interface::JournalTr` trait impl.
+    // `Journal::new` is `unimplemented!()` and will panic.
     let mut journal = Journal::new_with_inner(db, journal);
     journal.set_spec_id(spec_id);
     let ctx = Context {
@@ -252,7 +262,7 @@ where
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm<'a, Host, R: Registry>(
+fn build_evm_context<'a, Host, R: Registry>(
     db: EtherlinkVMDB<'a, Host, R>,
     journal: &'a mut TezosXJournal,
     block: &'a BlockEnv,
@@ -272,6 +282,11 @@ where
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
+    // IMPORTANT
+    // `Journal::new_with_inner` is the only working constructor of our `Journal` implementation.
+    // `Journal` holds a mutable reference to its inner data that exists before it creation and must outlive it.
+    // `Journal::new` exists only as a requirement for the `revm::context_interface::JournalTr` trait impl.
+    // `Journal::new` is `unimplemented!()` and will panic.
     let mut journal = Journal::new_with_inner(db, journal);
     journal.set_spec_id(spec_id);
     let ctx = Context {
@@ -287,7 +302,7 @@ where
 }
 
 fn execute_transaction<'a, Host, R: Registry>(
-    evm: &mut EvmContext<'a, Host, R>,
+    evm_context: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
 ) -> Result<ExecutionResult, EVMError<Error>>
@@ -309,9 +324,9 @@ where
         } else {
             Box::new(|__host| ())
         };
-    __trace_kernel!(evm.db_mut().host, "evm.transact_commit", {
-        opt_attrs_fun(evm.db_mut().host);
-        evm.transact_commit(tx)
+    __trace_kernel!(evm_context.db_mut().host, "evm_context.transact_commit", {
+        opt_attrs_fun(evm_context.db_mut().host);
+        evm_context.transact_commit(tx)
     })
 }
 
@@ -353,7 +368,7 @@ where
     let db = EtherlinkVMDB::new(host, registry, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
-        let mut evm = evm_inspect(
+        let mut evm_context = build_evm_inspector_context(
             db,
             journal,
             &block_env,
@@ -370,26 +385,26 @@ where
             is_simulation,
         );
 
-        let result = evm.inspect_tx_commit(&tx)?;
+        let result = evm_context.inspect_tx_commit(&tx)?;
 
-        if evm.inspector.is_struct_logger() {
+        if evm_context.inspector.is_struct_logger() {
             StructLogger::store_outcome(
-                evm.ctx.db_mut().host,
+                evm_context.ctx.db_mut().host,
                 result.is_success(),
                 result.output(),
                 result.gas_used(),
-                evm.inspector.get_transaction_hash(),
+                evm_context.inspector.get_transaction_hash(),
             )?
         }
 
-        let withdrawals = evm.db_mut().take_withdrawals();
+        let withdrawals = evm_context.db_mut().take_withdrawals();
 
         Ok(ExecutionOutcome {
             result,
             withdrawals,
         })
     } else {
-        let mut evm = evm(
+        let mut evm_context = build_evm_context(
             db,
             journal,
             &block_env,
@@ -401,11 +416,11 @@ where
             is_simulation,
         );
 
-        let result = execute_transaction(&mut evm, &tx, transaction_hash)?;
+        let result = execute_transaction(&mut evm_context, &tx, transaction_hash)?;
 
-        let withdrawals = evm.db_mut().take_withdrawals();
+        let withdrawals = evm_context.db_mut().take_withdrawals();
 
-        if !evm.db_mut().commit_status() {
+        if !evm_context.db_mut().commit_status() {
             // No need to revert the possible database changes because
             // we are in a safe storage.
             return Err(EVMError::Custom(
