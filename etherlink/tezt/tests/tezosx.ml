@@ -3022,6 +3022,36 @@ let get_entrypoints sequencer address =
   in
   return @@ JSON.parse ~origin:"entrypoints" res
 
+let get_script sequencer address =
+  let foreign_endpoint =
+    {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let* response =
+    RPC_core.call_raw foreign_endpoint
+    @@ RPC.get_chain_block_context_contract_script ~id:address ()
+  in
+  return @@ JSON.parse ~origin:"script" response.RPC_core.body
+
+(** Recursively collect entrypoint names (field annotations, i.e. [%name])
+    from a Micheline type tree. Recurses into [or] branches; on any other
+    node collects [%name] annotations from the node's [annots] array. *)
+let rec entrypoint_names_of_type json =
+  match JSON.(json |-> "prim" |> as_string_opt) with
+  | Some "or" ->
+      JSON.(json |-> "args" |> as_list)
+      |> List.concat_map entrypoint_names_of_type
+  | _ ->
+      let annots =
+        Option.value ~default:[] JSON.(json |-> "annots" |> as_list_opt)
+      in
+      List.filter_map
+        (fun a ->
+          let s = JSON.as_string a in
+          if String.length s > 1 && s.[0] = '%' then
+            Some (String.sub s 1 (String.length s - 1))
+          else None)
+        annots
+
 (** Test that the /entrypoints RPC works for the enshrined TezosX Gateway
     contract.  The gateway has no Micheline code in durable storage; its
     entrypoints are returned by the kernel via the [tezosx_michelson_entrypoints]
@@ -3040,6 +3070,58 @@ let test_entrypoints_enshrined () =
   @@ fun sandbox ->
   let* ep_json = get_entrypoints sandbox gateway_address in
   Regression.capture (JSON.encode ep_json) ;
+
+  (* The gateway exposes three entrypoints: %default (string),
+     %call (pair string (pair string bytes)), and
+     %call_evm (pair string (pair (list (pair string string)) (pair bytes nat))). *)
+  let entrypoints = JSON.(ep_json |-> "entrypoints") in
+  let assert_ep name expected_prim =
+    let prim = JSON.(entrypoints |-> name |-> "prim" |> as_string) in
+    Check.(
+      (prim = expected_prim)
+        string
+        ~error_msg:(sf "Expected prim %%R for entrypoint %s but got %%L" name))
+  in
+  assert_ep "default" "string" ;
+  assert_ep "call" "pair" ;
+  assert_ep "call_evm" "pair" ;
+
+  unit
+
+(** Test that /script and /entrypoints are coherent for the enshrined TezosX
+    Gateway contract. The parameter type in /script must carry exactly the same
+    entrypoint names as /entrypoints. *)
+let test_script_coherency_enshrined () =
+  Setup.register_sandbox_test
+    ~title:"Script RPC coherency with entrypoints for enshrined TezosX Gateway"
+    ~tags:["rpc"; "script"; "entrypoints"; "tezlink"; "tezosx"; "gateway"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let* ep_json = get_entrypoints sandbox gateway_address in
+  let* script_json = get_script sandbox gateway_address in
+  (* Names from /entrypoints: keys of the "entrypoints" object. *)
+  let ep_names =
+    JSON.(ep_json |-> "entrypoints" |> as_object)
+    |> List.map fst |> List.sort String.compare
+  in
+  (* Names from /script: field annotations in the parameter type. *)
+  let code_list = JSON.(script_json |-> "code" |> as_list) in
+  let parameter_item =
+    List.find
+      (fun item -> JSON.(item |-> "prim" |> as_string_opt) = Some "parameter")
+      code_list
+  in
+  let param_type = JSON.(parameter_item |-> "args" |> as_list |> List.hd) in
+  let script_names =
+    entrypoint_names_of_type param_type |> List.sort String.compare
+  in
+  Check.(
+    (ep_names = script_names)
+      (list string)
+      ~error_msg:
+        "Entrypoint names from /entrypoints (%R) do not match those in the \
+         /script parameter type (%L)") ;
   unit
 
 let () =
@@ -3081,4 +3163,5 @@ let () =
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
   test_tezosx_simulation () ;
-  test_entrypoints_enshrined ()
+  test_entrypoints_enshrined () ;
+  test_script_coherency_enshrined ()
