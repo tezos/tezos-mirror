@@ -527,6 +527,10 @@ pub trait CrossRuntimeCall {
         amount: U256,
         data: &[u8],
     ) -> Result<(), CustomPrecompileError>;
+    fn tezosx_call_http(
+        &mut self,
+        http_request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, CustomPrecompileError>;
 }
 
 impl<Host, R: Registry> CrossRuntimeCall for Journal<EtherlinkVMDB<'_, Host, R>>
@@ -619,5 +623,19 @@ where
                 hex::encode(&data)
             ))),
         }
+    }
+
+    fn tezosx_call_http(
+        &mut self,
+        http_request: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, CustomPrecompileError> {
+        self.database
+            .registry
+            .serve(self.database.host, http_request)
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!(
+                    "Cross-runtime HTTP call failed: {e:?}"
+                ))
+            })
     }
 }

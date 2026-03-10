@@ -19,6 +19,8 @@ use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::TezosXRuntimeError;
 
+use crate::NULL_PKH;
+
 /// Values contained in the `X-Tezos-*` request headers, in their Tezos runtime
 /// types. Used in parsing and inserting.
 #[derive(Debug)]
@@ -51,7 +53,16 @@ pub fn parse_request_headers(
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         sender: require_kt1(headers, X_TEZOS_SENDER)?,
-        source: parse_pkh(headers, X_TEZOS_SOURCE)?,
+        // FIXME: We use the Tezos null address as source because the alias of
+        // the 0x EVM source account is a KT1, and Michelson doesn't allow KT1
+        // as a source. If the original call was emitted from Michelson (i.e. it
+        // hit EVM before re-entering the Michelson runtime), we might want to
+        // retrieve the original tz source in the future.
+        source: Some(PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Failed to parse null address: {e}"
+            ))
+        })?),
     })
 }
 
@@ -101,19 +112,6 @@ fn require_kt1(
             "Invalid {name}: expected KT1 address: {e}"
         ))
     })
-}
-
-fn parse_pkh(
-    headers: &http::HeaderMap,
-    name: &str,
-) -> Result<Option<PublicKeyHash>, TezosXRuntimeError> {
-    parse_str(headers, name)?
-        .map(|s| {
-            PublicKeyHash::from_b58check(&s).map_err(|e| {
-                TezosXRuntimeError::HeaderError(format!("Invalid {name}: {e}"))
-            })
-        })
-        .transpose()
 }
 
 /// Returns `None` if the header is absent, `Some(str)` if present and valid
@@ -172,7 +170,10 @@ mod tests {
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
         assert_eq!(parsed.sender, ContractKt1Hash::from_b58check(KT1).unwrap());
-        assert_eq!(parsed.source, None);
+        assert_eq!(
+            parsed.source,
+            Some(PublicKeyHash::from_b58check(NULL_PKH).unwrap())
+        );
     }
 
     #[test]
@@ -263,14 +264,6 @@ mod tests {
         let mut hdrs = required_headers();
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
             (X_TEZOS_SENDER, "not-a-kt1-address");
-        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
-        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
-    }
-
-    #[test]
-    fn invalid_source_returns_header_error() {
-        let mut hdrs = required_headers();
-        hdrs.push((X_TEZOS_SOURCE, "not-a-tz-address"));
         let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
         assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
     }

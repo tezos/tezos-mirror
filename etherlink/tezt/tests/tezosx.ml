@@ -2824,6 +2824,131 @@ let test_manager_key_on_block_hash =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+(** Test httpCall from EVM to Michelson via the transaction pool.
+
+    1. Originate [store_input.tz] via tezlink (transaction pool).
+    2. From EVM, call the [httpCall] precompile with URL
+       [http://tezos/<kt1>/default], POST method, and a Micheline-encoded
+       string as body.
+    3. Verify the Michelson contract storage was updated to the sent string. *)
+let test_http_call_from_evm_to_michelson ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"httpCall from EVM to Michelson via tx pool"
+    ~tags:["http_call"; "cross_runtime"; "tx_pool"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer = _} ->
+  (* Step 1: Originate store_input.tz via tezlink *)
+  let* tez_client = tezos_client sandbox in
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "store_input"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"store_input_http"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:{|""|}
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Step 2: Call httpCall precompile from EVM.
+     Micheline binary encoding of string "Hello from EVM":
+       0x01 = string tag
+       0x0000000e = length (14)
+       48656c6c6f2066726f6d2045564d = "Hello from EVM" *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let url = sf "http://tezos/%s/default" kt1_address in
+  let micheline_hello = "0x010000000e48656c6c6f2066726f6d2045564d" in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"httpCall(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_hello; "1"]
+      ()
+  in
+  (* Step 3: Verify Michelson storage *)
+  let* storage_json = account_str_rpc sandbox kt1_address "storage" in
+  Check.(
+    (JSON.(storage_json |-> "string" |> as_string) = "Hello from EVM")
+      string
+      ~error_msg:"Expected Michelson storage %R but got %L") ;
+  unit
+
+(** Test http_call from Michelson to EVM via the transaction pool.
+
+    1. Deploy a simple EVM contract that stores [calldataload(4)] in
+       storage slot 0.
+    2. From Michelson, call the gateway KT1's [http_call] entrypoint via
+       tezlink with URL [http://ethereum/<evm_addr>], POST method, and
+       calldata containing ABI-encoded uint256(42).
+    3. Verify EVM storage slot 0 = 42. *)
+let test_http_call_from_michelson_to_evm ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"http_call from Michelson to EVM via tx pool"
+    ~tags:["http_call"; "cross_runtime"; "tx_pool"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer = _} ->
+  (* Step 1: Deploy EVM storer contract *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address =
+    deploy_evm_contract
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~init_code:evm_storer_init_code
+      ()
+  in
+  (* Step 2: Call the gateway http_call entrypoint via tezlink.
+     Parameter type: pair string (pair (list (pair string string))
+                                      (pair bytes nat))
+     = (url, (headers, (body, method)))
+     Body = 4-byte function selector (zeros) + ABI-encoded uint256(42)
+     Method 1 = POST *)
+  let* tez_client = tezos_client sandbox in
+  let body_hex = "00000000" ^ abi_encoded_uint256_42 in
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~fee:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:gateway_address
+      ~burn_cap:Tez.one
+      ~entrypoint:"http_call"
+      ~arg:
+        (sf
+           {|Pair "http://ethereum/%s" (Pair {} (Pair 0x%s 1))|}
+           contract_address
+           body_hex)
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Step 3: Verify EVM storage slot 0 = 42 *)
+  let*@ storage =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sandbox
+  in
+  let expected_storage =
+    "0x000000000000000000000000000000000000000000000000000000000000002a"
+  in
+  Check.(
+    (storage = expected_storage)
+      string
+      ~error_msg:"Expected EVM storage slot 0 = %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -2859,4 +2984,6 @@ let () =
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
   test_manager_key_on_block_hash [Alpha] ;
   test_instant_confirmations ~runtime:Tezos () ;
-  test_nested_crac [Alpha]
+  test_nested_crac [Alpha] ;
+  test_http_call_from_evm_to_michelson ~runtime:Tezos () ;
+  test_http_call_from_michelson_to_evm ~runtime:Tezos ()

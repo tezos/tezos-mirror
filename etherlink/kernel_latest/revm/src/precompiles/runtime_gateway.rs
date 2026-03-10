@@ -7,6 +7,8 @@ use revm::{
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
+use tezos_data_encoding::nom::NomReader;
+use tezos_protocol::contract::Contract;
 use tezosx_interfaces::{
     ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
     X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
@@ -107,25 +109,26 @@ fn inject_tezos_headers(
     timestamp: U256,
     block_number: U256,
 ) -> Result<(), CustomPrecompileError> {
-    let parse_value = |v: String| -> Result<http::HeaderValue, CustomPrecompileError> {
+    let parse_value = |v: &str| -> Result<http::HeaderValue, CustomPrecompileError> {
         v.parse().map_err(|e| {
             CustomPrecompileError::Revert(format!("invalid header value: {e}"))
         })
     };
-    headers.insert(
-        X_TEZOS_SENDER,
-        parse_value(format!("{}", String::from_utf8_lossy(sender_alias)))?,
-    );
-    headers.insert(
-        X_TEZOS_SOURCE,
-        parse_value(format!("{}", String::from_utf8_lossy(source_alias)))?,
-    );
-    headers.insert(X_TEZOS_AMOUNT, parse_value(format!("{amount}"))?);
-    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(gas_limit.to_string())?);
-    headers.insert(X_TEZOS_TIMESTAMP, parse_value(format!("{timestamp}"))?);
+    //TODO: Avoid michelson specific formatting with https://linear.app/tezos/issue/L2-954/read-string-for-alias-on-durable-storage
+    let sender_alias: String = Contract::nom_read_exact(sender_alias)
+        .map_err(|_| CustomPrecompileError::Revert("invalid sender alias".to_string()))?
+        .to_string();
+    headers.insert(X_TEZOS_SENDER, parse_value(&sender_alias)?);
+    let source_alias: String = Contract::nom_read_exact(source_alias)
+        .map_err(|_| CustomPrecompileError::Revert("invalid source alias".to_string()))?
+        .to_string();
+    headers.insert(X_TEZOS_SOURCE, parse_value(&source_alias)?);
+    headers.insert(X_TEZOS_AMOUNT, parse_value(&format!("{amount}"))?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
+    headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
     headers.insert(
         X_TEZOS_BLOCK_NUMBER,
-        parse_value(format!("{block_number}"))?,
+        parse_value(&format!("{block_number}"))?,
     );
     Ok(())
 }
@@ -257,10 +260,9 @@ where
                 block_number,
             )?;
 
-            // TODO: Dispatch through gateway protocol (L2-918)
-            // For now, return placeholder success with empty response body
-            let _request = request;
-            let output: Vec<u8> = (true, Vec::<u8>::new()).abi_encode_params();
+            // TODO: L2-918 Handle http code responses
+            let response = context.journal_mut().tezosx_call_http(request)?;
+            let output: Vec<u8> = (true, response.body()).abi_encode_params();
 
             return Ok(InterpreterResult {
                 result: InstructionResult::Return,
@@ -292,6 +294,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use tezos_data_encoding::enc::BinWriter;
+
     use super::*;
 
     #[test]
@@ -414,8 +418,10 @@ mod tests {
         )
         .unwrap();
 
-        let sender_alias = b"KT1SenderAlias";
-        let source_alias = b"KT1SourceAlias";
+        let sender_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+        let source_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
         let amount = U256::from(42_000_000u64);
         let gas_limit = 100_000u64;
         let timestamp = U256::from(1_700_000_000u64);
@@ -423,8 +429,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            sender_alias,
-            source_alias,
+            &sender_alias.to_bytes().unwrap(),
+            &source_alias.to_bytes().unwrap(),
             amount,
             gas_limit,
             timestamp,
@@ -448,7 +454,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "KT1SenderAlias"
+            "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2"
         );
         assert_eq!(
             request
@@ -457,7 +463,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "KT1SourceAlias"
+            "KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2"
         );
         assert_eq!(
             request

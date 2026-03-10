@@ -124,8 +124,9 @@ where
             } else if entrypoint.as_str() == "http_call" {
                 let mut request = extract_http_call_request(typed)?;
                 inject_context_headers(request.headers_mut(), ctx, registry)?;
-                // TODO: https://linear.app/tezos/issue/L2-918
-                // Dispatch to EVM runtime via RuntimeInterface::serve.
+                let _ = registry
+                    .serve(ctx.host(), request)
+                    .map_err(|err| TransferError::GatewayError(err.to_string()))?;
                 Ok(())
             } else {
                 Err(TransferError::GatewayError(format!(
@@ -295,23 +296,27 @@ fn inject_context_headers_raw(
     timestamp: u64,
     block_number: u32,
 ) -> Result<(), TransferError> {
-    let parse_value = |v: String| -> Result<http::HeaderValue, TransferError> {
+    let parse_value = |v: &str| -> Result<http::HeaderValue, TransferError> {
         v.parse().map_err(|e| {
             TransferError::GatewayError(format!("invalid header value: {e}"))
         })
     };
+    //TODO: Avoid ethereum specific formatting with https://linear.app/tezos/issue/L2-954/read-string-for-alias-on-durable-storage
     headers.insert(
         X_TEZOS_SENDER,
-        parse_value(String::from_utf8_lossy(sender_alias).into_owned())?,
+        parse_value(&format!("0x{}", hex::encode(sender_alias)))?,
     );
     headers.insert(
         X_TEZOS_SOURCE,
-        parse_value(String::from_utf8_lossy(source_alias).into_owned())?,
+        parse_value(&format!("0x{}", hex::encode(source_alias)))?,
     );
-    headers.insert(X_TEZOS_AMOUNT, parse_value(amount.to_string())?);
-    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(gas_limit.to_string())?);
-    headers.insert(X_TEZOS_TIMESTAMP, parse_value(timestamp.to_string())?);
-    headers.insert(X_TEZOS_BLOCK_NUMBER, parse_value(block_number.to_string())?);
+    headers.insert(X_TEZOS_AMOUNT, parse_value(&format!("{amount}"))?);
+    headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
+    headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
+    headers.insert(
+        X_TEZOS_BLOCK_NUMBER,
+        parse_value(&format!("{block_number}"))?,
+    );
     Ok(())
 }
 
@@ -857,8 +862,14 @@ mod tests {
             5,
         )
         .unwrap();
-        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
-        assert_eq!(headers.get("X-Tezos-Source").unwrap(), "source_alias");
+        assert_eq!(
+            headers.get("X-Tezos-Sender").unwrap(),
+            "0x73656e6465725f616c696173"
+        );
+        assert_eq!(
+            headers.get("X-Tezos-Source").unwrap(),
+            "0x736f757263655f616c696173"
+        );
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "42");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
@@ -882,7 +893,10 @@ mod tests {
             0,
         )
         .unwrap();
-        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
+        assert_eq!(
+            headers.get("X-Tezos-Sender").unwrap(),
+            "0x6e65775f616c696173"
+        );
     }
 
     #[test]
