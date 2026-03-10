@@ -17,6 +17,7 @@ use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
 use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezosx_interfaces::headers::{require_i64, require_str, require_u32, require_u64};
 use tezosx_interfaces::TezosXRuntimeError;
 
 use crate::NULL_PKH;
@@ -66,42 +67,6 @@ pub fn parse_request_headers(
     })
 }
 
-fn require_str(
-    headers: &http::HeaderMap,
-    name: &str,
-) -> Result<String, TezosXRuntimeError> {
-    parse_str(headers, name)?.ok_or_else(|| {
-        TezosXRuntimeError::HeaderError(format!("Missing required header: {name}"))
-    })
-}
-
-fn require_u64(headers: &http::HeaderMap, name: &str) -> Result<u64, TezosXRuntimeError> {
-    let s = require_str(headers, name)?;
-    s.parse::<u64>().map_err(|_| {
-        TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name} header value: expected u64, got {s:?}"
-        ))
-    })
-}
-
-fn require_i64(headers: &http::HeaderMap, name: &str) -> Result<i64, TezosXRuntimeError> {
-    let s = require_str(headers, name)?;
-    s.parse::<i64>().map_err(|_| {
-        TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name} header value: expected i64, got {s:?}"
-        ))
-    })
-}
-
-fn require_u32(headers: &http::HeaderMap, name: &str) -> Result<u32, TezosXRuntimeError> {
-    let s = require_str(headers, name)?;
-    s.parse::<u32>().map_err(|_| {
-        TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name} header value: expected u32, got {s:?}"
-        ))
-    })
-}
-
 fn require_kt1(
     headers: &http::HeaderMap,
     name: &str,
@@ -114,41 +79,13 @@ fn require_kt1(
     })
 }
 
-/// Returns `None` if the header is absent, `Some(str)` if present and valid
-/// UTF-8, or `HeaderError` if the value is not valid UTF-8.
-fn parse_str(
-    headers: &http::HeaderMap,
-    name: &str,
-) -> Result<Option<String>, TezosXRuntimeError> {
-    headers
-        .get(name)
-        .map(|v| {
-            v.to_str().map(|s| s.to_owned()).map_err(|_| {
-                TezosXRuntimeError::HeaderError(format!(
-                    "Header {name} contains non-UTF-8 bytes"
-                ))
-            })
-        })
-        .transpose()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezosx_interfaces::headers::headers_from;
 
     const KT1: &str = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT";
     const TZ1: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
-
-    fn headers_from(pairs: &[(&str, &str)]) -> http::HeaderMap {
-        let mut map = http::HeaderMap::new();
-        for (k, v) in pairs {
-            map.insert(
-                http::header::HeaderName::from_bytes(k.as_bytes()).unwrap(),
-                http::header::HeaderValue::from_str(v).unwrap(),
-            );
-        }
-        map
-    }
 
     /// Build a valid set of all required headers.
     fn required_headers() -> Vec<(&'static str, &'static str)> {

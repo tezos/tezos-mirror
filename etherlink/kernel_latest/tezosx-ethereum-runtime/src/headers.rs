@@ -17,6 +17,7 @@ pub use tezosx_interfaces::{
 
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
 use primitive_types::U256;
+use tezosx_interfaces::headers::{require_str, require_u32, require_u64};
 use tezosx_interfaces::TezosXRuntimeError;
 
 /// Values contained in the `X-Tezos-*` request headers, in their Ethereum
@@ -51,24 +52,6 @@ pub fn parse_request_headers(
     })
 }
 
-fn require_str(
-    headers: &http::HeaderMap,
-    name: &str,
-) -> Result<String, TezosXRuntimeError> {
-    parse_str(headers, name)?.ok_or_else(|| {
-        TezosXRuntimeError::HeaderError(format!("Missing required header: {name}"))
-    })
-}
-
-fn require_u64(headers: &http::HeaderMap, name: &str) -> Result<u64, TezosXRuntimeError> {
-    let s = require_str(headers, name)?;
-    s.parse::<u64>().map_err(|_| {
-        TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name} header value: expected u64, got {s:?}"
-        ))
-    })
-}
-
 fn require_u256(
     headers: &http::HeaderMap,
     name: &str,
@@ -77,15 +60,6 @@ fn require_u256(
     AlloyU256::from_str_radix(&s, 10).map_err(|_| {
         TezosXRuntimeError::HeaderError(format!(
             "Invalid {name} header value: expected u256, got {s:?}"
-        ))
-    })
-}
-
-fn require_u32(headers: &http::HeaderMap, name: &str) -> Result<u32, TezosXRuntimeError> {
-    let s = require_str(headers, name)?;
-    s.parse::<u32>().map_err(|_| {
-        TezosXRuntimeError::HeaderError(format!(
-            "Invalid {name} header value: expected u32, got {s:?}"
         ))
     })
 }
@@ -102,40 +76,12 @@ fn require_address(
     })
 }
 
-/// Returns `None` if the header is absent, `Some(str)` if present and valid
-/// UTF-8, or `HeaderError` if the value is not valid UTF-8.
-fn parse_str(
-    headers: &http::HeaderMap,
-    name: &str,
-) -> Result<Option<String>, TezosXRuntimeError> {
-    headers
-        .get(name)
-        .map(|v| {
-            v.to_str().map(|s| s.to_owned()).map_err(|_| {
-                TezosXRuntimeError::HeaderError(format!(
-                    "Header {name} contains non-UTF-8 bytes"
-                ))
-            })
-        })
-        .transpose()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezosx_interfaces::headers::headers_from;
 
     const ADDR: &str = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-
-    fn headers_from(pairs: &[(&str, &str)]) -> http::HeaderMap {
-        let mut map = http::HeaderMap::new();
-        for (k, v) in pairs {
-            map.insert(
-                http::header::HeaderName::from_bytes(k.as_bytes()).unwrap(),
-                http::header::HeaderValue::from_str(v).unwrap(),
-            );
-        }
-        map
-    }
 
     /// Build a valid set of all required headers.
     fn required_headers() -> Vec<(&'static str, &'static str)> {
