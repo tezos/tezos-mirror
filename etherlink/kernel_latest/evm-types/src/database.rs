@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{Address, U256};
+use alloy_primitives::{Address, U256};
 use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 use tezos_evm_logging::Level;
 

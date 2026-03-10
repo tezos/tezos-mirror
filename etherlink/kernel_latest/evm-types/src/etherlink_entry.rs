@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{Address, U256};
+use alloy_primitives::{Address, U256};
 
 use crate::SequencerKeyChange;
 

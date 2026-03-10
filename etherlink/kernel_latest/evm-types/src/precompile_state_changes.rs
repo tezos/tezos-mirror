@@ -3,8 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+use alloy_primitives::map::{HashMap, HashSet};
+use alloy_primitives::{Address, U256};
 use michelson_types::Withdrawal;
-use revm::primitives::{Address, HashMap, HashSet, U256};
 
 use crate::{FaDepositWithProxy, SequencerKeyChange};
 

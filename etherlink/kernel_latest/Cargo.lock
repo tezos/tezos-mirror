@@ -1179,9 +1179,10 @@ dependencies = [
 name = "evm-types"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "michelson-types",
  "primitive-types",
- "revm",
+ "revm-database-interface",
  "rlp",
  "tezos-evm-logging-latest",
  "tezos-smart-rollup-encoding",

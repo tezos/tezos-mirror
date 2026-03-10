@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::context::DBErrorMarker;
+use revm_database_interface::DBErrorMarker;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
