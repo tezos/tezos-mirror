@@ -1,6 +1,6 @@
-From 5f7d790c6b328ab4e477439507c69a07f793cbac Mon Sep 17 00:00:00 2001
+From a71c2f29539264aeaa5b983304e44a72a79c92a4 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Mon, 9 Mar 2026 15:23:02 +0100
+Date: Tue, 10 Mar 2026 17:51:18 +0100
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
@@ -529,7 +529,7 @@ index 9ddeb8aa27..fafd84d398 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index c9b791e71b..b7a5a5d3ca 100644
+index 7643aafe0c..da9c5a04ae 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
 @@ -260,10 +260,20 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
