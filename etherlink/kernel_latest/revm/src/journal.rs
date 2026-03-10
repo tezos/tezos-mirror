@@ -5,9 +5,8 @@
 
 use revm::{
     bytecode::Bytecode,
-    context::{
-        journaled_state::{account::JournaledAccount, AccountInfoLoad, JournalLoadError},
-        JournalInner,
+    context::journaled_state::{
+        account::JournaledAccount, AccountInfoLoad, JournalLoadError,
     },
     context_interface::{
         context::{SStoreResult, SelfDestructResult, StateLoad},
@@ -16,33 +15,28 @@ use revm::{
     },
     inspector::JournalExt,
     primitives::{
-        hardfork::SpecId, Address, AddressMap, AddressSet, HashMap, HashSet, Log,
-        StorageKey, StorageValue, B256, U256,
+        hardfork::SpecId, Address, AddressMap, AddressSet, HashSet, Log, StorageKey,
+        StorageValue, B256, U256,
     },
     state::{Account, EvmState},
     JournalEntry,
 };
 use std::vec::Vec;
 
-use crate::{
-    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
-    helpers::legacy::FaDepositWithProxy,
-    layered_state::LayeredState,
-    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
-    storage::sequencer_key_change::SequencerKeyChange,
+use tezosx_journal::EvmJournal;
+
+use crate::database::EtherlinkVMDB;
+use crate::helpers::legacy::alloy_to_u256;
+use crate::tezosx::{get_alias, store_alias};
+use evm_types::{
+    CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
+    DatabasePrecompileStateChanges, FaDepositWithProxy, SequencerKeyChange,
 };
-
-type TicketBalanceKey = (Address, U256);
-
-#[derive(Debug, PartialEq, Eq, Default)]
-pub struct PrecompileStateChanges {
-    pub ticket_balances: HashMap<TicketBalanceKey, U256>,
-    pub removed_deposits: HashSet<U256>,
-    pub deposits: Vec<(U256, FaDepositWithProxy)>,
-    pub withdrawals: Vec<Withdrawal>,
-    pub global_counter: Option<U256>,
-    pub sequencer_key_change: Option<SequencerKeyChange>,
-}
+use michelson_types::Withdrawal;
+use tezos_ethereum::wei::mutez_from_wei;
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
 
 /// A journal of state changes internal to the EVM
 ///
@@ -54,12 +48,8 @@ pub struct Journal<DB> {
     /// Database
     pub database: DB,
 
-    /// Layered state for state changes not managed by REVM
-    /// (i.e. induced by Etherlink-specific precompiles)
-    pub layered_state: LayeredState,
-
-    /// Inner journal state.
-    pub inner: JournalInner<JournalEntry>,
+    /// EVM journal combining layered state and inner journal.
+    pub evm_journal: EvmJournal,
 }
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
@@ -74,8 +64,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
 
     fn new(database: DB) -> Journal<DB> {
         Self {
-            inner: JournalInner::new(),
-            layered_state: LayeredState::new(),
+            evm_journal: EvmJournal::new(),
             database,
         }
     }
@@ -107,7 +96,8 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         StateLoad<StorageValue>,
         JournalLoadError<<Self::Database as Database>::Error>,
     > {
-        self.inner
+        self.evm_journal
+            .inner
             .sload(&mut self.database, address, key, skip_cold_load)
     }
 
@@ -132,20 +122,25 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         StateLoad<SStoreResult>,
         JournalLoadError<<Self::Database as Database>::Error>,
     > {
-        self.inner
-            .sstore(&mut self.database, address, key, value, skip_cold_load)
+        self.evm_journal.inner.sstore(
+            &mut self.database,
+            address,
+            key,
+            value,
+            skip_cold_load,
+        )
     }
 
     fn tload(&mut self, address: Address, key: StorageKey) -> StorageValue {
-        self.inner.tload(address, key)
+        self.evm_journal.inner.tload(address, key)
     }
 
     fn tstore(&mut self, address: Address, key: StorageKey, value: StorageValue) {
-        self.inner.tstore(address, key, value)
+        self.evm_journal.inner.tstore(address, key, value)
     }
 
     fn log(&mut self, log: Log) {
-        self.inner.log(log)
+        self.evm_journal.inner.log(log)
     }
 
     fn selfdestruct(
@@ -154,40 +149,45 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         target: Address,
         skip_cold_load: bool,
     ) -> Result<StateLoad<SelfDestructResult>, JournalLoadError<DB::Error>> {
-        self.inner
-            .selfdestruct(&mut self.database, address, target, skip_cold_load)
+        self.evm_journal.inner.selfdestruct(
+            &mut self.database,
+            address,
+            target,
+            skip_cold_load,
+        )
     }
 
     fn warm_coinbase_account(&mut self, address: Address) {
-        self.inner.warm_addresses.set_coinbase(address);
+        self.evm_journal.inner.warm_addresses.set_coinbase(address);
     }
 
     fn warm_precompiles(&mut self, precompiles: AddressSet) {
-        self.inner
+        self.evm_journal
+            .inner
             .warm_addresses
             .set_precompile_addresses(precompiles);
     }
 
     #[inline]
     fn precompile_addresses(&self) -> &AddressSet {
-        self.inner.warm_addresses.precompiles()
+        self.evm_journal.inner.warm_addresses.precompiles()
     }
 
     /// Returns call depth.
     #[inline]
     fn depth(&self) -> usize {
-        self.inner.depth
+        self.evm_journal.inner.depth
     }
 
     #[inline]
     fn set_spec_id(&mut self, spec_id: SpecId) {
-        self.inner.cfg.spec = spec_id;
+        self.evm_journal.inner.cfg.spec = spec_id;
     }
 
     #[inline]
     fn set_eip7708_config(&mut self, disabled: bool, delayed_burn_disabled: bool) {
-        self.inner.cfg.eip7708_disabled = disabled;
-        self.inner.cfg.eip7708_delayed_burn_disabled = delayed_burn_disabled;
+        self.evm_journal.inner.cfg.eip7708_disabled = disabled;
+        self.evm_journal.inner.cfg.eip7708_delayed_burn_disabled = delayed_burn_disabled;
     }
 
     #[inline]
@@ -197,7 +197,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         to: Address,
         balance: U256,
     ) -> Result<Option<TransferError>, DB::Error> {
-        self.inner.transfer(&mut self.database, from, to, balance)
+        self.evm_journal
+            .inner
+            .transfer(&mut self.database, from, to, balance)
     }
 
     #[inline]
@@ -207,12 +209,12 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         to: Address,
         balance: U256,
     ) -> Option<TransferError> {
-        self.inner.transfer_loaded(from, to, balance)
+        self.evm_journal.inner.transfer_loaded(from, to, balance)
     }
 
     #[inline]
     fn touch_account(&mut self, address: Address) {
-        self.inner.touch(address);
+        self.evm_journal.inner.touch(address);
     }
 
     #[inline]
@@ -223,8 +225,11 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         bump_nonce: bool,
     ) {
         #[allow(deprecated)]
-        self.inner
-            .caller_accounting_journal_entry(address, old_balance, bump_nonce);
+        self.evm_journal.inner.caller_accounting_journal_entry(
+            address,
+            old_balance,
+            bump_nonce,
+        );
     }
 
     /// Increments the balance of the account.
@@ -234,7 +239,8 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         address: Address,
         balance: U256,
     ) -> Result<(), <Self::Database as Database>::Error> {
-        self.inner
+        self.evm_journal
+            .inner
             .balance_incr(&mut self.database, address, balance)
     }
 
@@ -242,7 +248,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     #[inline]
     fn nonce_bump_journal_entry(&mut self, address: Address) {
         #[allow(deprecated)]
-        self.inner.nonce_bump_journal_entry(address)
+        self.evm_journal.inner.nonce_bump_journal_entry(address)
     }
 
     #[inline]
@@ -250,7 +256,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
     ) -> Result<StateLoad<&Account>, DB::Error> {
-        self.inner.load_account(&mut self.database, address)
+        self.evm_journal
+            .inner
+            .load_account(&mut self.database, address)
     }
 
     #[inline]
@@ -258,7 +266,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
     ) -> Result<StateLoad<&Account>, DB::Error> {
-        self.inner.load_code(&mut self.database, address)
+        self.evm_journal
+            .inner
+            .load_code(&mut self.database, address)
     }
 
     #[inline]
@@ -266,33 +276,36 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
     ) -> Result<StateLoad<AccountLoad>, DB::Error> {
-        self.inner
+        self.evm_journal
+            .inner
             .load_account_delegated(&mut self.database, address)
     }
 
     #[inline]
     fn checkpoint(&mut self) -> JournalCheckpoint {
-        self.layered_state.checkpoint();
-        self.inner.checkpoint()
+        self.evm_journal.layered_state.checkpoint();
+        self.evm_journal.inner.checkpoint()
     }
 
     #[inline]
     fn checkpoint_commit(&mut self) {
-        self.layered_state.checkpoint_commit();
-        self.inner.checkpoint_commit()
+        self.evm_journal.layered_state.checkpoint_commit();
+        self.evm_journal.inner.checkpoint_commit()
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
         // Following the doc of REVM it's safe to consider that `checkpoint` is always the latest created.
         // https://github.com/bluealloy/revm/blob/a8916288952ca65ead1b0fd7aae20341e396b1c6/crates/context/src/journal/inner.rs#L465
-        self.layered_state.checkpoint_revert();
-        self.inner.checkpoint_revert(checkpoint)
+        self.evm_journal.layered_state.checkpoint_revert();
+        self.evm_journal.inner.checkpoint_revert(checkpoint)
     }
 
     #[inline]
     fn set_code_with_hash(&mut self, address: Address, code: Bytecode, hash: B256) {
-        self.inner.set_code_with_hash(address, code, hash);
+        self.evm_journal
+            .inner
+            .set_code_with_hash(address, code, hash);
     }
 
     #[inline]
@@ -303,30 +316,32 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         balance: U256,
         spec_id: SpecId,
     ) -> Result<JournalCheckpoint, TransferError> {
-        self.inner
+        self.evm_journal
+            .inner
             .create_account_checkpoint(caller, address, balance, spec_id)
     }
 
     #[inline]
     fn take_logs(&mut self) -> Vec<Log> {
-        self.inner.take_logs()
+        self.evm_journal.inner.take_logs()
     }
 
     #[inline]
     fn commit_tx(&mut self) {
-        self.inner.commit_tx()
+        self.evm_journal.inner.commit_tx()
     }
 
     #[inline]
     fn discard_tx(&mut self) {
-        self.inner.discard_tx();
+        self.evm_journal.inner.discard_tx();
     }
 
     /// Clear current journal resetting it to initial state and return changes state.
     #[inline]
     fn finalize(&mut self) -> Self::State {
-        self.database.commit(self.layered_state.finalize());
-        self.inner.finalize()
+        self.database
+            .commit(self.evm_journal.layered_state.finalize());
+        self.evm_journal.inner.finalize()
     }
 
     fn load_account_info_skip_cold_load(
@@ -336,8 +351,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         skip_cold_load: bool,
     ) -> Result<AccountInfoLoad<'_>, JournalLoadError<<Self::Database as Database>::Error>>
     {
-        let spec = self.inner.cfg.spec;
-        self.inner
+        let spec = self.evm_journal.inner.cfg.spec;
+        self.evm_journal
+            .inner
             .load_account_optional(&mut self.database, address, load_code, skip_cold_load)
             .map(|a| {
                 AccountInfoLoad::new(
@@ -350,12 +366,15 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
 
     #[inline]
     fn logs(&self) -> &[Log] {
-        &self.inner.logs
+        &self.evm_journal.inner.logs
     }
 
     #[inline]
     fn warm_access_list(&mut self, access_list: AddressMap<HashSet<StorageKey>>) {
-        self.inner.warm_addresses.set_access_list(access_list)
+        self.evm_journal
+            .inner
+            .warm_addresses
+            .set_access_list(access_list)
     }
 
     #[inline]
@@ -363,7 +382,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
     ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
-        self.inner.load_code(&mut self.database, address)
+        self.evm_journal
+            .inner
+            .load_code(&mut self.database, address)
     }
 
     #[inline]
@@ -373,7 +394,8 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         skip_cold_load: bool,
     ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
     {
-        self.inner
+        self.evm_journal
+            .inner
             .load_account_mut_optional(&mut self.database, address, skip_cold_load)
             .map_err(JournalLoadError::unwrap_db_error)
     }
@@ -385,7 +407,8 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         load_code: bool,
     ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
     {
-        self.inner
+        self.evm_journal
+            .inner
             .load_account_mut_optional_code(&mut self.database, address, load_code, false)
             .map_err(JournalLoadError::unwrap_db_error)
     }
@@ -394,17 +417,17 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
 impl<DB> JournalExt for Journal<DB> {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
-        &self.inner.journal
+        &self.evm_journal.inner.journal
     }
 
     #[inline]
     fn evm_state(&self) -> &EvmState {
-        &self.inner.state
+        &self.evm_journal.inner.state
     }
 
     #[inline]
     fn evm_state_mut(&mut self) -> &mut EvmState {
-        &mut self.inner.state
+        &mut self.evm_journal.inner.state
     }
 }
 
@@ -412,7 +435,8 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     pub fn get_and_increment_global_counter(
         &mut self,
     ) -> Result<U256, CustomPrecompileError> {
-        self.layered_state
+        self.evm_journal
+            .layered_state
             .get_and_increment_global_counter(&self.database)
     }
 
@@ -422,7 +446,7 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         owner: Address,
         amount: U256,
     ) -> Result<(), CustomPrecompileError> {
-        self.layered_state.ticket_balance_add(
+        self.evm_journal.layered_state.ticket_balance_add(
             &ticket_hash,
             &owner,
             amount,
@@ -436,7 +460,7 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         owner: Address,
         amount: U256,
     ) -> Result<(), CustomPrecompileError> {
-        self.layered_state.ticket_balance_remove(
+        self.evm_journal.layered_state.ticket_balance_remove(
             &ticket_hash,
             &owner,
             amount,
@@ -448,23 +472,30 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         &mut self,
         deposit_id: U256,
     ) -> Result<(), CustomPrecompileError> {
-        self.layered_state
+        self.evm_journal
+            .layered_state
             .remove_deposit(&deposit_id, &self.database)
     }
 
     pub fn queue_deposit(&mut self, deposit: FaDepositWithProxy, deposit_id: U256) {
-        self.layered_state.queue_deposit(deposit, deposit_id)
+        self.evm_journal
+            .layered_state
+            .queue_deposit(deposit, deposit_id)
     }
 
     pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
-        self.layered_state.push_withdrawal(withdrawal)
+        self.evm_journal.layered_state.push_withdrawal(withdrawal)
     }
 
     pub fn find_deposit_in_queue(
         &self,
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
-        if self.layered_state.is_deposit_removed(deposit_id) {
+        if self
+            .evm_journal
+            .layered_state
+            .is_deposit_removed(deposit_id)
+        {
             return Err(CustomPrecompileError::Revert(
                 "Deposit removed in layered state".to_string(),
             ));
@@ -473,10 +504,120 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     }
 
     pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
-        self.layered_state.store_sequencer_key_change(upgrade)
+        self.evm_journal
+            .layered_state
+            .store_sequencer_key_change(upgrade)
     }
 
     pub fn log(&mut self, log: Log) {
-        self.inner.log(log)
+        self.evm_journal.inner.log(log)
+    }
+}
+
+pub trait CrossRuntimeCall {
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+    ) -> Result<Vec<u8>, CustomPrecompileError>;
+
+    fn tezosx_call_michelson(
+        &mut self,
+        source: Address,
+        destination: &str,
+        amount: U256,
+        data: &[u8],
+    ) -> Result<(), CustomPrecompileError>;
+}
+
+impl<Host, R: Registry> CrossRuntimeCall for Journal<EtherlinkVMDB<'_, Host, R>>
+where
+    Host: StorageV1 + Logging,
+{
+    fn tezosx_resolve_source_alias(
+        &mut self,
+        source: Address,
+    ) -> Result<Vec<u8>, CustomPrecompileError> {
+        let context = CrossRuntimeContext {
+            gas_limit: self.database.block.gas_limit,
+            timestamp: self.database.block.timestamp,
+            block_number: self.database.block.number,
+        };
+        match get_alias(self.database.host, &source, RuntimeId::Tezos)? {
+            Some(alias) => Ok(alias),
+            None => {
+                let alias = self
+                    .database
+                    .registry
+                    .generate_alias(
+                        self.database.host,
+                        &source.0 .0,
+                        RuntimeId::Tezos,
+                        context,
+                    )
+                    .map_err(|e| {
+                        CustomPrecompileError::Revert(format!(
+                            "Failed to generate alias for source address: {e:?}"
+                        ))
+                    })?;
+                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias)?;
+                Ok(alias)
+            }
+        }
+    }
+
+    fn tezosx_call_michelson(
+        &mut self,
+        source: Address,
+        destination: &str,
+        amount: U256,
+        data: &[u8],
+    ) -> Result<(), CustomPrecompileError> {
+        let alias = self.tezosx_resolve_source_alias(source)?;
+        let context = CrossRuntimeContext {
+            gas_limit: self.database.block.gas_limit,
+            timestamp: self.database.block.timestamp,
+            block_number: self.database.block.number,
+        };
+        let destination_contract = self
+            .database
+            .registry
+            .address_from_string(destination, RuntimeId::Tezos)
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!(
+                    "Failed to get destination contract address from string: {e:?}"
+                ))
+            })?;
+        let result = self
+            .database
+            .registry
+            .bridge(
+                self.database.host,
+                RuntimeId::Tezos,
+                &destination_contract,
+                &alias,
+                primitive_types::U256::from(
+                    mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+                        CustomPrecompileError::Revert(format!(
+                            "Failed to convert amount from wei to mutez: {e:?}"
+                        ))
+                    })?,
+                ),
+                data,
+                context,
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!("Cross-runtime call failed: {e:?}"))
+            })?;
+        match result {
+            CrossCallResult::Success(_) => Ok(()),
+            CrossCallResult::Revert(data) => Err(CustomPrecompileError::Revert(format!(
+                "EVM Cross-runtime call reverted: {}",
+                hex::encode(&data)
+            ))),
+            CrossCallResult::Halt(data) => Err(CustomPrecompileError::Revert(format!(
+                "EVM Cross-runtime call halted: {}",
+                hex::encode(&data)
+            ))),
+        }
     }
 }

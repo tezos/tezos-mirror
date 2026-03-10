@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface};
+use evm_types::CustomPrecompileError;
 use revm::{
     context::{Block, ContextTr},
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -16,7 +17,6 @@ use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
     journal::Journal,
     precompiles::{
         change_sequencer_key::ChangeSequencerKey::ChangeSequencerKeyCalls,
@@ -24,11 +24,10 @@ use crate::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, SEQUENCER_UPGRADE_DELAY,
             UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST,
         },
-        error::CustomPrecompileError,
         guard::out_of_gas,
     },
-    storage::sequencer_key_change::SequencerKeyChange,
 };
+use evm_types::{DatabasePrecompileStateChanges, SequencerKeyChange};
 
 sol! {
     contract ChangeSequencerKey {

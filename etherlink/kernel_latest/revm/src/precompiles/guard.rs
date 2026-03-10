@@ -3,13 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use evm_types::CustomPrecompileError;
 use revm::{
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{Address, Bytes},
 };
 use std::fmt::Display;
-
-use crate::precompiles::error::CustomPrecompileError;
 
 pub(crate) fn guard(
     current: Address,

@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use evm_types::CustomPrecompileError;
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
@@ -11,8 +12,7 @@ use revm::{
 };
 
 use crate::{
-    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
-    journal::Journal,
+    journal::{CrossRuntimeCall, Journal},
     precompiles::{
         change_sequencer_key::change_sequencer_key_precompile,
         constants::{
@@ -20,7 +20,6 @@ use crate::{
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
         },
-        error::CustomPrecompileError,
         global_counter::global_counter_precompile,
         guard::revert,
         runtime_gateway::runtime_gateway_precompile,
@@ -28,7 +27,9 @@ use crate::{
         table::table_precompile,
     },
     storage::version::EVMVersion,
-    Error,
+};
+use evm_types::{
+    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges, Error,
 };
 
 #[derive(Debug, Clone)]
@@ -67,6 +68,7 @@ impl EtherlinkPrecompiles {
             + DatabaseCommitPrecompileStateChanges
             + revm::Database,
         CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+        Journal<DB>: CrossRuntimeCall,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -120,6 +122,7 @@ where
         + DatabaseCommitPrecompileStateChanges
         + revm::Database,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    Journal<DB>: CrossRuntimeCall,
 {
     type Output = InterpreterResult;
 

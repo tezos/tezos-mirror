@@ -15,17 +15,14 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
 };
 
+use evm_types::{custom, Error, FaDepositWithProxy};
+
 use crate::{
-    custom,
-    helpers::{
-        legacy::FaDepositWithProxy,
-        storage::{
-            concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
-            read_u64_le_default, write_u256_le,
-        },
+    helpers::storage::{
+        concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
+        read_u64_le_default, write_u256_le,
     },
     storage::code::CodeStorage,
-    Error,
 };
 
 /// Path where EVM accounts are stored.
@@ -489,8 +486,8 @@ mod test {
             XTZ_BRIDGE_SOL_CONTRACT,
         },
         storage::code::CodeStorage,
-        Error,
     };
+    use evm_types::Error;
 
     use revm::{
         primitives::{Bytes, FixedBytes, KECCAK_EMPTY},

@@ -13,6 +13,11 @@ license = "MIT"
 # VM
 revm.workspace = true
 
+# Extracted crates
+michelson-types.workspace = true
+evm-types.workspace = true
+tezosx-journal.workspace = true
+
 # Types
 http.workspace = true
 hex.workspace = true

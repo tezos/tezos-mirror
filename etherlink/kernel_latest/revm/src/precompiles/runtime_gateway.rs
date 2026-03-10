@@ -1,4 +1,5 @@
 use alloy_sol_types::{sol, SolInterface, SolValue};
+use evm_types::CustomPrecompileError;
 use http::header::HeaderMap;
 use revm::{
     context::{Block, ContextTr, JournalTr, Transaction},
@@ -12,18 +13,17 @@ use tezosx_interfaces::{
 };
 
 use crate::{
-    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
-    journal::Journal,
+    journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
             RUNTIME_GATEWAY_HTTP_CALL_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             RUNTIME_GATEWAY_TRANSFER_BASE_COST,
         },
-        error::CustomPrecompileError,
         guard::out_of_gas,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
+use evm_types::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges};
 
 sol! {
     contract RuntimeGateway {
@@ -140,6 +140,7 @@ where
         + DatabaseCommitPrecompileStateChanges
         + revm::Database,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    Journal<DB>: CrossRuntimeCall,
 {
     // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
 
@@ -161,7 +162,7 @@ where
             let amount = inputs.value.get();
 
             // Perform the transfer (no entrypoint/parameters)
-            context.db_mut().tezosx_call_michelson(
+            context.journal_mut().tezosx_call_michelson(
                 inputs.caller,
                 &implicit_address,
                 amount,
@@ -202,7 +203,7 @@ where
             data.extend_from_slice(&parameters);
 
             // Perform the cross-runtime call
-            context.db_mut().tezosx_call_michelson(
+            context.journal_mut().tezosx_call_michelson(
                 inputs.caller,
                 &destination,
                 amount,
@@ -237,9 +238,11 @@ where
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let sender_alias = context
-                .db_mut()
+                .journal_mut()
                 .tezosx_resolve_source_alias(inputs.caller)?;
-            let source_alias = context.db_mut().tezosx_resolve_source_alias(tx_caller)?;
+            let source_alias = context
+                .journal_mut()
+                .tezosx_resolve_source_alias(tx_caller)?;
 
             // Inject X-Tezos-* headers with trusted execution context.
             // These carry the call context that the target runtime's `serve`

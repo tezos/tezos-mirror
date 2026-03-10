@@ -28,7 +28,6 @@ use tezos_smart_rollup_encoding::{
 };
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
     helpers::storage::u256_to_bigint,
     journal::Journal,
     precompiles::{
@@ -36,10 +35,10 @@ use crate::{
             FA_BRIDGE_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        error::CustomPrecompileError,
         guard::{guard, out_of_gas},
     },
 };
+use evm_types::{CustomPrecompileError, DatabasePrecompileStateChanges};
 
 sol! {
     contract SendOutboxMessage {
@@ -80,39 +79,7 @@ sol! {
     }
 }
 
-/// Withdrawal interface of the ticketer contract
-pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
-
-/// Interface of the default entrypoint of the fast withdrawal contract.
-///
-/// The parameters corresponds to (from left to right w.r.t. `MichelsonPair`):
-/// * withdrawal_id
-/// * ticket
-/// * timestamp
-/// * withdrawer's address
-/// * generic payload
-/// * l2 caller's address
-pub type FastWithdrawalInterface = MichelsonPair<
-    MichelsonNat,
-    MichelsonPair<
-        FA2_1Ticket,
-        MichelsonPair<
-            MichelsonTimestamp,
-            MichelsonPair<
-                MichelsonContract,
-                MichelsonPair<MichelsonBytes, MichelsonBytes>,
-            >,
-        >,
-    >,
->;
-
-/// Outbox messages that implements the different withdrawal interfaces,
-/// ready to be encoded and posted.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Withdrawal {
-    Standard(OutboxMessage<RouterInterface>),
-    Fast(OutboxMessage<FastWithdrawalInterface>),
-}
+pub use michelson_types::{FastWithdrawalInterface, RouterInterface, Withdrawal};
 
 #[derive(Debug, thiserror::Error)]
 enum SendOutboxRevertReason {

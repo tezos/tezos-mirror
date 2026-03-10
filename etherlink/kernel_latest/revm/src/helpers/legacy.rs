@@ -3,11 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{custom, Error};
+pub use evm_types::FaDepositWithProxy;
+use evm_types::{custom, Error};
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{alloy_primitives::Keccak256, Address, Log, B256, U256};
-use rlp::{Decodable, Encodable, Rlp, RlpDecodable, RlpEncodable};
+use rlp::{Encodable, RlpDecodable, RlpEncodable};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup_encoding::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
@@ -136,24 +137,6 @@ pub fn ticket_hash(ticket: &FA2_1Ticket) -> Result<H256, Error> {
     let mut hasher = Keccak256::new();
     hasher.update(&payload);
     Ok(H256(hasher.finalize().into()))
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, RlpEncodable, RlpDecodable, Default)]
-pub struct FaDepositWithProxy {
-    pub amount: PU256,
-    pub receiver: H160,
-    // If proxy doesn't have code it will still be used as
-    // ticket owner.
-    pub proxy: H160,
-    pub ticket_hash: H256,
-    pub inbox_level: u32,
-    pub inbox_msg_id: u32,
-}
-
-impl FaDepositWithProxy {
-    pub(crate) fn from_raw(raw_deposit: Vec<u8>) -> Result<Self, Error> {
-        FaDepositWithProxy::decode(&Rlp::new(&raw_deposit)).map_err(custom)
-    }
 }
 
 pub fn u256_to_alloy(value: &PU256) -> U256 {

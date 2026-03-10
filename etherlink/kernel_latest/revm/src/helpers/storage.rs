@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::Error;
+use evm_types::Error;
 use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
 use tezos_smart_rollup_host::{

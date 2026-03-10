@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezosx-journal"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# VM
+revm.workspace = true
+
+# Types
+evm-types.workspace = true
+michelson-types.workspace = true
+
+[dev-dependencies]
+tezos_crypto_rs.workspace = true
+tezos-evm-logging.workspace = true

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use super::struct_logger::StructLog;
-use crate::{helpers::storage::concat, Error};
+use crate::helpers::storage::concat;
+use evm_types::Error;
 
 use revm::primitives::B256;
 use tezos_evm_logging::{log, Level::Debug, Logging};

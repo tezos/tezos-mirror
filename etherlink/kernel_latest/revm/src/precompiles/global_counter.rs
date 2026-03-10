@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface, SolValue};
+use evm_types::CustomPrecompileError;
 use revm::{
     context::ContextTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -11,17 +12,16 @@ use revm::{
 };
 
 use crate::{
-    database::DatabasePrecompileStateChanges,
     journal::Journal,
     precompiles::{
         constants::{
             FA_BRIDGE_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        error::CustomPrecompileError,
         guard::{guard, out_of_gas, revert},
     },
 };
+use evm_types::DatabasePrecompileStateChanges;
 
 sol! {
     contract GlobalCounter {

@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "evm-types"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# VM
+alloy-primitives.workspace = true
+revm-database-interface.workspace = true
+
+# Types
+primitive-types.workspace = true
+rlp.workspace = true
+michelson-types.workspace = true
+
+# Crypto
+tezos_crypto_rs.workspace = true
+
+# Tezos
+tezos_ethereum.workspace = true
+tezos-evm-logging.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+
+# Error handling
+thiserror.workspace = true

@@ -15,12 +15,13 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
 };
 
+use evm_types::Error;
+
 use crate::{
     helpers::storage::{bytes_hash, concat, read_u64_le_default, write_u64_le},
     precompiles::constants::{
         FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
     },
-    Error,
 };
 
 /// Path where EVM codes' are stored.
