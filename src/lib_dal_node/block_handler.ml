@@ -400,8 +400,8 @@ let compute_total_attested_shards_per_slot cctxt node_ctxt parameters
     attestations_per_lag ;
   return total_attested_shards
 
-let check_attesters_attested cctxt node_ctxt committee slot_to_committee
-    parameters ~block_level (module Plugin : Dal_plugin.T) =
+let check_attesters_attested cctxt node_ctxt committee parameters ~block_level
+    ~total_attested_shards (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let tracked_attesters =
     match
@@ -417,16 +417,6 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
     if published_level < 1l then return_unit
     else
       let number_of_slots = parameters.number_of_slots in
-      let* total_attested_shards =
-        compute_total_attested_shards_per_slot
-          cctxt
-          node_ctxt
-          parameters
-          slot_to_committee
-          ~published_level
-          ~block_level
-          (module Plugin)
-      in
       let threshold =
         parameters.cryptobox_parameters.number_of_shards
         / parameters.cryptobox_parameters.redundancy_factor
@@ -704,7 +694,8 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
   let* () =
     let max_lag = proto_parameters.Types.attestation_lag in
     let published_level = Int32.(sub block_level (of_int max_lag)) in
-    if published_level >= 1l then (
+    if published_level < 1l then return_unit
+    else
       let number_of_shards =
         proto_parameters.Types.cryptobox_parameters.number_of_shards
       in
@@ -727,19 +718,18 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
           in
           Dal_metrics.slot_attestation_ratio ~slot_index ratio)
         total_attested_shards ;
-      return_unit)
-    else return_unit
-  in
-  let* () =
-    (check_attesters_attested
-       cctxt
-       ctxt
-       committees
-       slot_to_committee
-       proto_parameters
-       ~block_level
-       (module Plugin)
-     [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
+      let* () =
+        (check_attesters_attested
+           cctxt
+           ctxt
+           committees
+           proto_parameters
+           ~block_level
+           ~total_attested_shards
+           (module Plugin)
+         [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
+      in
+      return_unit
   in
   let* () =
     Option.fold
