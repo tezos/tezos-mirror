@@ -102,6 +102,18 @@ let _version_manager =
     ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
 
+let _release_page_tests =
+  private_exe
+    "main"
+    ~path:"ci/bin_release_page/tezt"
+    ~opam:""
+    ~synopsis:"Tests for the release page tools"
+    ~release_status:Unreleased
+    ~modules:["main"; "test_version_manager"]
+    ~profile:"release-tools-deps"
+    ~deps:
+      [tezt_lib |> open_ |> open_ ~m:"Base"; _release_page_base_lib |> open_]
+
 let ci_grafazos =
   private_lib
     "grafazos_ci"

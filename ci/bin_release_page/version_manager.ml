@@ -232,6 +232,15 @@ let () =
       ~placeholder:"URL"
       ()
   in
+  let output =
+    Clap.default_string
+      ~long:"output"
+      ~short:'o'
+      ~description:
+        "Output file path for the RSS feed (used with generate-rss command)."
+      ~placeholder:"FILE"
+      "feed.xml"
+  in
   Clap.close () ;
   let require_path () =
     match remote_path with
@@ -369,7 +378,7 @@ let () =
           versions
       in
       let channel = Rss.channel ~title ~desc ~link ?last_build_date items in
-      let output_file = "feed.xml" in
+      let output_file = output in
       Format.printf "Generating RSS feed...@." ;
       try
         Rss.print_file ~indent:2 ~encoding:"UTF-8" output_file channel ;

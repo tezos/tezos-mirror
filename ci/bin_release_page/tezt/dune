@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt
+  base_lib)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Base_lib)
+ (modules main test_version_manager))
