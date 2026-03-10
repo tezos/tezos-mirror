@@ -1004,6 +1004,19 @@ module Big_map = struct
     import_service_with_arg service
 end
 
+let mempool_get_filter :
+    ( [`GET],
+      chain,
+      chain,
+      < include_default : bool >,
+      unit,
+      Data_encoding.json )
+    Tezos_rpc.Service.t =
+  import_service
+    (Current_block_services.S.Mempool.get_filter
+       (Tezos_shell_services.Block_services.mempool_path
+          Tezos_rpc.Path.open_root))
+
 module Forge = struct
   let operations :
       ( [`POST],

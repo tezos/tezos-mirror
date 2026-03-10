@@ -44,6 +44,8 @@ let () =
     (function Failed_operation_forging -> Some () | _ -> None)
     (fun () -> Failed_operation_forging)
 
+module Mempool = Tezos_protocol_plugin_024_PtTALLiN.Mempool
+
 let check_chain =
   let open Result_syntax in
   function
@@ -733,7 +735,7 @@ let register_dynamic_block_services ~l2_chain_id
   in
   Lwt.return dir
 
-let register_chain_services ~l2_chain_id
+let register_chain_services ~l2_chain_id ~get_da_fee_per_byte_nanotez
     (module Backend : Tezlink_backend_sig.S) base_dir =
   let dir =
     Tezos_rpc.Directory.empty
@@ -840,6 +842,25 @@ let register_chain_services ~l2_chain_id
            in
 
            return (List.rev chains))
+    |> register
+         ~service:Tezos_services.mempool_get_filter
+         ~impl:(fun chain query () ->
+           let open Lwt_result_syntax in
+           let*? _chain = check_chain chain in
+           let* nanotez_per_byte = get_da_fee_per_byte_nanotez () in
+           let config =
+             Mempool.with_minimal_nanotez_per_byte
+               nanotez_per_byte
+               Mempool.default_config
+           in
+           let include_default_fields =
+             if query#include_default then `Always else `Never
+           in
+           return
+             (Data_encoding.Json.construct
+                ~include_default_fields
+                Mempool.config_encoding
+                config))
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge
@@ -882,7 +903,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id ~add_operation backend =
+let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   let base_dir =
     Tezos_rpc.Directory.register_dynamic_directory
@@ -892,7 +913,7 @@ let build_dir ~l2_chain_id ~add_operation backend =
         register_dynamic_block_services ~l2_chain_id backend chain block)
   in
   base_dir
-  |> register_chain_services ~l2_chain_id backend
+  |> register_chain_services ~l2_chain_id ~get_da_fee_per_byte_nanotez backend
   |> register_with_conversion
        ~service:Tezos_services.bootstrapped
        ~impl:(fun () () () -> Backend.bootstrapped ())
@@ -919,8 +940,11 @@ let build_dir ~l2_chain_id ~add_operation backend =
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services ~l2_chain_id ~add_operation backend =
-  let directory = build_dir ~l2_chain_id ~add_operation backend in
+let register_tezlink_services ~l2_chain_id ~add_operation
+    ~get_da_fee_per_byte_nanotez backend =
+  let directory =
+    build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend
+  in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service
       directory
