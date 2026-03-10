@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** High-level OCaml bindings to the Wasmer 3.x WebAssembly runtime.
+
+    This library provides a type-safe interface for loading,
+    instantiating, and executing WebAssembly modules. It uses GADTs to
+    enforce type safety for function signatures and values at compile
+    time, and [Lwt_preemptive] for non-blocking execution.
+
+    The primary consumer is the WASM PVM fast execution backend
+    ([lib_scoru_wasm/fast]). *)
+
 module Config = Config
 module Engine = Engine
 module Store = Store

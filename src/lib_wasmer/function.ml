@@ -23,11 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly function creation and invocation.
+
+    Handles both directions of the FFI boundary:
+    - Creating host functions that WebAssembly modules can call
+      (via {!create}), using [Lwt_preemptive.run_in_main] to re-enter
+      the Lwt event loop from the Wasmer thread.
+    - Calling exported WebAssembly functions from OCaml (via {!call}),
+      using [Lwt_preemptive.detach] for non-blocking execution. *)
+
 open Api
 open Vectors
 
+(** An owned Wasmer function pointer. *)
 type owned = Types.Func.t Ctypes.ptr
 
+(** [call_with_inputs params f inputs] applies the WebAssembly input values
+    from [inputs] to the OCaml function [f] according to the parameter
+    types described by [params]. *)
 let call_with_inputs params f inputs =
   let rec go : type f r. (f, r) Function_type.params -> f -> int -> r =
    fun params f index ->
@@ -42,6 +55,8 @@ let call_with_inputs params f inputs =
   in
   go params f 0
 
+(** [pack_outputs results r outputs] writes the OCaml return value [r]
+    into the Wasmer output value vector [outputs]. *)
 let pack_outputs results r outputs =
   Value_vector.init_uninitialized outputs (Function_type.num_results results) ;
   let rec go : type r. r Function_type.results -> r -> int -> unit =
@@ -70,6 +85,9 @@ let () =
      OCaml side. *)
   Foreign.report_leaked_funptr := Fun.const ()
 
+(** [create store typ f] creates a Wasmer host function from the OCaml
+    function [f] with signature [typ]. Returns the owned function pointer
+    and a cleanup function that frees the callback closure. *)
 let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
     =
  fun store typ f ->
@@ -98,6 +116,9 @@ let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
   Functions.Functype.delete func_type ;
   (owned, free)
 
+(** [call_raw func inputs] invokes the Wasmer function [func] with the
+    given input value vector in a detached thread. Raises {!Trap.Trap}
+    if a trap occurs. *)
 let call_raw func inputs =
   let open Lwt.Syntax in
   let outputs = Value_vector.uninitialized (Functions.Func.result_arity func) in
@@ -160,6 +181,8 @@ let unpack_outputs results outputs =
   in
   go results 0 Fun.id
 
+(** [call func typ] type-checks [func] against [typ] and returns a
+    callable OCaml function that invokes the WebAssembly function. *)
 let call func typ =
   let func_type = Functions.Func.type_ func in
   Function_type.check_types typ func_type ;

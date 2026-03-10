@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Wasmer C API error handling.
+
+    Maps Wasmer error codes and messages to OCaml exceptions. Each
+    {!task} variant identifies the operation that failed so that the
+    exception message is human-readable. *)
+
+(** The high-level Wasmer operation that was attempted. *)
 type task =
   | Create_engine
   | Create_store
@@ -39,8 +46,10 @@ let string_of_task = function
 
 type t = {task : task; reason : string}
 
+(** Raised when a Wasmer C API call fails. *)
 exception Wasmer_error of t
 
+(** [make_exception task reason] builds a {!Wasmer_error} exception. *)
 let make_exception task reason = Wasmer_error {task; reason}
 
 let () =

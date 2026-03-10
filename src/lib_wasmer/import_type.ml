@@ -23,15 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Import type descriptor.
+
+    Provides introspection on the imports required by a WebAssembly
+    module: the module name, import name, and extern type. *)
+
 open Api
 open Vectors
 
+(** [module_ import] returns the module name of the import. *)
 let module_ modul =
   let name = Functions.Importtype.module_ modul in
   Name.to_string Ctypes.(!@name)
 
+(** [name modul] returns the name of the import. *)
 let name modul =
   let name = Functions.Importtype.name modul in
   Name.to_string Ctypes.(!@name)
 
+(** [type_ import] returns the extern type of the import. *)
 let type_ = Functions.Importtype.type_

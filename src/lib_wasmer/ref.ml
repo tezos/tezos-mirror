@@ -23,11 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For documentation please refer to the [Tezos_wasmer] module. *)
+(** Generic WebAssembly reference type.
+
+    Wraps a Wasmer reference pointer used for {i anyref} and {i funcref}
+    values.
+
+    {b Warning:} There is no [delete] function bound for this type
+    ([wasm_ref_delete] is not exposed). References unpacked from values
+    are never freed. This is currently harmless because [anyref] and
+    [funcref] are not used by the SCORU WASM PVM, but would leak if
+    they were. *)
 
 open Api
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-   Ensure that ownership and lifetime of [Types.Ref.t] is respected.
-*)
 type t = Ref of Types.Ref.t Ctypes.ptr

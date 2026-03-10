@@ -23,21 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For documentation please refer to the [Tezos_wasmer] module. *)
+(** WebAssembly engine.
+
+    An engine manages the compilation and runtime environment for
+    WebAssembly modules. It is configured via {!Config.t} and used to
+    create {!Store.t} instances. Ownership of the underlying Wasmer
+    object is transferred to the OCaml side; callers must invoke
+    {!delete} when the engine is no longer needed.
+
+    {b Warning:} No caller currently calls {!delete}. In the fast
+    execution backend the engine is created once and lives for the
+    entire process lifetime, so the leak is benign in practice. *)
 
 open Utils
 open Api
 
-type t =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of [Types.Engine.t] is respected.
-  *)
-  Types.Engine.t Ctypes.ptr
+type t = Types.Engine.t Ctypes.ptr
 
+(** [create config] instantiates a new WebAssembly engine using the given
+    [config]. Raises {!Error.Wasmer_error} if engine creation fails. *)
 let create config =
   let config = Config.to_owned config in
   let engine = Functions.Engine.new_with_config config in
   check_null_ptr Error.(make_exception Create_engine) engine ;
   engine
 
+(** [delete engine] destroys the engine and frees its resources. The engine
+    must not be used after this call. *)
 let delete = Functions.Engine.delete

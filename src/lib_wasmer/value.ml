@@ -23,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly value packing and unpacking.
+
+    Converts between OCaml values and Wasmer's C representation
+    ([wasm_val_t]). Type safety is enforced by {!Value_type.t}. *)
+
 open Api
 
+(** Raised when a value's runtime kind does not match the expected type. *)
 exception Kind_mismatch of {expected : Types.Valkind.t; got : Types.Valkind.t}
 
 let check_kind value expected =
@@ -35,6 +41,8 @@ let unpack_value value field =
   let of_ = Ctypes.getf value Types.Val_repr.of_ in
   Ctypes.getf of_ field
 
+(** [unpack typ value] extracts an OCaml value of type ['a] from a
+    Wasmer [value]. Raises {!Kind_mismatch} if the runtime kind is wrong. *)
 let unpack : type a. a Value_type.t -> Types.Val.t -> a =
  fun typ value ->
   match typ with
@@ -68,6 +76,7 @@ let pack_value kind field value =
   Ctypes.setf repr Types.Val_repr.of_ of_ ;
   repr
 
+(** [pack typ value] wraps an OCaml value into a Wasmer [wasm_val_t]. *)
 let pack : type a. a Value_type.t -> a -> Types.Val.t =
  fun typ value ->
   match typ with
