@@ -64,6 +64,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as split_bytes.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg 0xaabbcc
 Node is bootstrapped.
@@ -99,6 +100,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
 { 0xaa ; 0xbb ; 0xcc }
@@ -137,6 +139,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
 { 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }

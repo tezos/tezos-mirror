@@ -60,6 +60,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as send_ticket_list.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none originate contract tickets_list_blackhole transferring 1 from bootstrap1 running michelson_test_scripts/mini_scenarios/tickets_list_blackhole_016.tz --init Unit --burn-cap 1
 Node is bootstrapped.
@@ -106,6 +107,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as tickets_list_blackhole.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -151,6 +153,7 @@ This sequence of operations was run:
           Storage size: 42 bytes
           Consumed gas: 1854.686
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[PUBLIC_KEY_HASH]"'
 Node is bootstrapped.
@@ -168,6 +171,7 @@ This simulation failed:
       Parameter: "[PUBLIC_KEY_HASH]"
       This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Runtime error in contract [CONTRACT_HASH]:
   01: { parameter address ;
   02:   storage unit ;

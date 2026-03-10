@@ -42,6 +42,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as contract.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -59,6 +60,7 @@ This simulation failed:
       Parameter: "[CONTRACT_HASH]"
       This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Runtime error in contract [CONTRACT_HASH]:
   1: { parameter address ;
   2:   storage unit ;

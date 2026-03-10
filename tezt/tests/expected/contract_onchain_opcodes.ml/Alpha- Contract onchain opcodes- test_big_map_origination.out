@@ -45,6 +45,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as originate_big_map.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none originate contract originate_big_map transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/originate_big_map.tz --init 0 --burn-cap 10 --force
 Node is bootstrapped.
@@ -66,6 +67,7 @@ This simulation failed:
         No delegate for this contract
         This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Ill typed data: 1: 0 is not an expression of type big_map int int
 At line 1 characters 0 to 1, value 0 is invalid for type big_map int int.
 At line 1 characters 0 to 1,
@@ -93,6 +95,7 @@ This simulation failed:
         No delegate for this contract
         This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Ill typed data: 1: (Pair 0 { Elt 1 (Some 4) })
 is not an expression of type big_map int int
 At line 1 characters 0 to 26, value (Pair 0 { Elt 1 (Some 4) })
@@ -118,6 +121,7 @@ This simulation failed:
       Parameter: 0
       This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Invalid argument passed to contract [CONTRACT_HASH].
 At (unshown) location 0, value 0 is invalid for type big_map int int.
 At (unshown) location 0, Unexpected forged value.
@@ -140,6 +144,7 @@ This simulation failed:
       Parameter: (Pair 0 { Elt 1 (Some 4) })
       This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Invalid argument passed to contract [CONTRACT_HASH].
 At (unshown) location 0, value (Pair 0 { Elt 1 (Some 4) })
 is invalid for type big_map int int.

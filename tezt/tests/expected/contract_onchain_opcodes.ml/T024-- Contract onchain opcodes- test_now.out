@@ -42,6 +42,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as store_now.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
@@ -72,6 +73,7 @@ This sequence of operations was run:
       Storage size: 40 bytes
       Consumed gas: 1278.890
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "string": "[TIMESTAMP]" }

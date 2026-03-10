@@ -57,6 +57,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as tickets_send.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 1'
 Node is bootstrapped.
@@ -106,6 +107,7 @@ This sequence of operations was run:
             Account updates:
               [PUBLIC_KEY_HASH] ... +1
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 2 tickets from bootstrap1 to bootstrap2 with entrypoint default and contents 0 and type nat and ticketer '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
@@ -125,5 +127,6 @@ This simulation failed:
       From: [PUBLIC_KEY_HASH]
       This operation FAILED.
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 Error:
   Attempted to set negative ticket balance value '-2' for key expru2shUeN2Ah7TLWrM937cMzrqkGL4LirEXUQYVZU4YvjdqGrkB2.

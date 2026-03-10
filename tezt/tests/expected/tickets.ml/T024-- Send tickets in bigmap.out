@@ -46,6 +46,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as receive_tickets_in_big_map.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none originate contract send_tickets_in_big_map transferring 200 from bootstrap1 running michelson_test_scripts/mini_scenarios/send_tickets_in_big_map_015.tz --init Unit --burn-cap 1
 Node is bootstrapped.
@@ -134,6 +135,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as send_tickets_in_big_map.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 30 --storage-limit 1000000 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -294,3 +296,4 @@ This sequence of operations was run:
             Account updates:
               [CONTRACT_HASH] ... +100
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
