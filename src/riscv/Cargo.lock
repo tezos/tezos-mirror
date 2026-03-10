@@ -1437,6 +1437,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "octez-riscv-durable-storage-in-memory"
+version = "0.1.0"
+dependencies = [
+ "ocaml",
+ "ocaml-boxroot-sys",
+ "ocaml-build",
+ "ocaml-sys",
+ "octez-riscv-api-common",
+ "octez-riscv-data",
+ "octez-riscv-durable-storage",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

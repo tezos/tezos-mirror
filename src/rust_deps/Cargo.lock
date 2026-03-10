@@ -3205,11 +3205,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "octez-riscv-durable-storage-in-memory"
+version = "0.1.0"
+dependencies = [
+ "ocaml",
+ "ocaml-boxroot-sys",
+ "ocaml-build",
+ "ocaml-sys",
+ "octez-riscv-api-common",
+ "octez-riscv-data",
+ "octez-riscv-durable-storage",
+]
+
+[[package]]
 name = "octez-rust-deps"
 version = "0.0.0"
 dependencies = [
  "librustzcash",
  "octez-riscv-api",
+ "octez-riscv-durable-storage-in-memory",
  "rust_igd_next",
  "rust_tezos_context",
  "wasmer-c-api",

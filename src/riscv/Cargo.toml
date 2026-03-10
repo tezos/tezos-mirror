@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["api", "common"]
+members = ["api", "common", "durable-in-memory"]
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
@@ -32,6 +32,11 @@ git = "https://github.com/tezos/riscv-pvm.git"
 [workspace.dependencies.octez-riscv-data]
 # The locked version can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
+
+[workspace.dependencies.octez-riscv-durable-storage]
+# The locked version can be updated via `make update-riscv-pvm`
+git = "https://github.com/tezos/riscv-pvm.git"
+default-features = false
 
 [workspace.dependencies.octez-riscv-api-common]
 path = "./common"

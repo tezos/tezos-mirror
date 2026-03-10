@@ -48,6 +48,8 @@ license_check_exclude=$(
 src/lib_protocol_environment/sigs/.*
 src/riscv/api/octez_riscv_api.ml
 src/riscv/api/octez_riscv_api.mli
+src/riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.ml
+src/riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.mli
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
