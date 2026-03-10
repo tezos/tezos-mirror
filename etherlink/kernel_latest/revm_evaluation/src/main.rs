@@ -4,9 +4,7 @@
 
 use crate::{
     fixture::{Account, Env, Fixtures, NamedFixture, PostEntry, TestCase},
-    helpers::{
-        extract_brackets, prepare_host, prepare_host_with_buffer, pretty, u256_to_u128,
-    },
+    helpers::{extract_brackets, prepare_host, pretty, u256_to_u128},
 };
 use revm::{
     context::{
@@ -357,7 +355,7 @@ pub fn main() {
         )
     };
 
-    let mut host = prepare_host();
+    let mut host;
     let registry = kernel::registry_impl::RegistryImpl::default();
 
     for NamedFixture { path, fixtures } in fixtures {
@@ -390,7 +388,7 @@ pub fn main() {
 
             for (spec_name, post_entrys) in post {
                 for PostEntry { state, indexes, .. } in post_entrys {
-                    host = prepare_host_with_buffer(host.buffer.take());
+                    host = prepare_host();
                     fill_state(&mut host, pre.clone());
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");

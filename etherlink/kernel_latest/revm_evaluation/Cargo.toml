@@ -16,7 +16,6 @@ revm.workspace = true
 serde.workspace = true
 primitive-types.workspace = true # TODO: temporary, should be dropped once [evm_execution] is deprecated.
 tezos_ethereum.workspace = true
-tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
@@ -26,6 +25,10 @@ kernel.workspace = true
 # Evaluation specific deps
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
 structopt = "0.3.26"
+
+[dependencies.tezos-evm-logging]
+workspace = true
+features = ["capture-logs"]
 
 [features]
 default = []
