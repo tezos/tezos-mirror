@@ -7853,6 +7853,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             parameters |> if_some |> if_ N.(number >= 012);
             octez_crypto |> if_ N.(number >= 012);
             octez_event_logging_test_helpers |> open_;
+            qcheck_tezt |> if_ N.(number >= 025);
             uri;
           ]
     in

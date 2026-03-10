@@ -18,7 +18,10 @@
 
     [filter_attestable_slots] uses the cache to remove already-attested slots.
 
-    This file contains some unit tests exercising concrete fork scenarios.
+    This file contains:
+    - some unit tests exercising concrete fork scenarios
+    - a property-based test simulating chain evolution with forks, checking the
+      "no duplicate attestations" property.
 *)
 
 open Baking_state_types
@@ -584,6 +587,249 @@ let test_multiple_slots_mixed () =
     ~expected_slots:[1; 2; 3] ;
   Lwt.return_unit
 
+let num_test_slots = 8
+
+let max_test_level = 20
+
+type step = {branch_level : int; block_slots : int list list}
+
+type scenario = {init_slots : int list list; steps : step list}
+
+let all_test_slots = Stdlib.List.init num_test_slots Fun.id
+
+let gen_slot_subset =
+  let open QCheck2.Gen in
+  let+ flags = list_size (return num_test_slots) bool in
+  let _, result =
+    List.fold_left
+      (fun (i, acc) b -> (i + 1, if b then i :: acc else acc))
+      (0, [])
+      flags
+  in
+  List.rev result
+
+(** Generates a random scenario for the "no duplicate attestations" property.
+
+    A scenario consists of:
+    - [init_slots]: an initial chain of 3–6 blocks, each with a subset of slots
+      attested at that block (levels [1..init_len] in the internal chain).
+    - [steps]: 2–5 steps. Each step forks the chain from [branch_level]
+      (between [head_level - 2] and [head_level]), then appends new blocks
+      with their attested slot subsets. [branch_level] and block count are
+      chosen so the chain length stays ≤ [max_test_level].
+
+    When run with [run_scenario], the chain is replayed into the cache and
+    [filter_attestable_slots] is checked against the expected set of slots
+    (no duplicate attestations on the chosen branch). *)
+let gen_scenario =
+  let open QCheck2.Gen in
+  let* init_len = 3 -- 6 in
+  let* init_slots = list_size (return init_len) gen_slot_subset in
+  let* num_steps = 2 -- 5 in
+  let rec gen_steps head_level remaining acc =
+    if remaining = 0 || head_level >= max_test_level then return (List.rev acc)
+    else
+      let min_branch = max 0 (head_level - 2) in
+      let* branch_level = min_branch -- head_level in
+      let min_blocks = head_level - branch_level in
+      let max_extra = min 3 (max_test_level - branch_level - min_blocks) in
+      let* extra = if max_extra > 0 then 0 -- max_extra else return 0 in
+      let num_blocks = min_blocks + extra in
+      let new_head = branch_level + num_blocks in
+      let* block_slots = list_size (return num_blocks) gen_slot_subset in
+      let s = {branch_level; block_slots} in
+      gen_steps new_head (remaining - 1) (s :: acc)
+  in
+  let+ steps = gen_steps init_len num_steps [] in
+  {init_slots; steps}
+
+(** At each step: fork at [branch_level], add new blocks, replay the full chain
+    into the cache via [update_from_attested_slots], call
+    [filter_attestable_slots], and verify the result matches expected. *)
+let run_scenario {init_slots; steps} =
+  let cache = make_cache () in
+  (* So that attested_level and head_level are always > default_published_level. *)
+  let level_offset = Int32.to_int default_published_level in
+  (* chain.(level) := (block_hash, slots attested at that block). *)
+  let chain =
+    Array.make (max_test_level + 1) (dummy_block_hash, Cache.SlotSet.empty)
+  in
+  let hash_counter = ref 0 in
+  (* Allocate a fresh block hash for each block. *)
+  let next_hash () =
+    incr hash_counter ;
+    make_block_hash !hash_counter
+  in
+  (* Current chain length (last block index). *)
+  let head_level = ref 0 in
+  (* Reference implementation: per-slot (level, hash) for expected filter result. *)
+  let sim_cache = Array.make num_test_slots None in
+  (* Update [sim_cache] as the cache would when processing one block. *)
+  let simulate_update_from_proposal ~level ~hash ~predecessor_hash ~grandparent
+      slots =
+    Cache.SlotSet.iter
+      (fun slot_index ->
+        match sim_cache.(slot_index) with
+        | None -> sim_cache.(slot_index) <- Some (level, hash)
+        | Some (existing_level, existing_hash) ->
+            let level_diff = level - existing_level in
+            if level_diff = 0 then sim_cache.(slot_index) <- Some (level, hash)
+            else if level_diff = 1 then
+              if existing_hash = predecessor_hash then ()
+              else sim_cache.(slot_index) <- Some (level, hash)
+            else if level_diff = 2 then
+              if existing_hash = grandparent then ()
+              else sim_cache.(slot_index) <- Some (level, hash)
+            else () (* depth > 2: keep earliest level *))
+      slots
+  in
+  (* Replay chain [1..hl] into the cache; uses [level_offset] for attested_level. *)
+  let replay_cache cache hl chain =
+    for level = 1 to hl do
+      let hash = fst chain.(level) in
+      let slot_set = snd chain.(level) in
+      let predecessor_hash =
+        if level >= 2 then fst chain.(level - 1) else dummy_block_hash
+      in
+      let grandparent =
+        if level >= 3 then fst chain.(level - 2) else dummy_block_hash
+      in
+      update_from_attested_slots
+        cache
+        ~attested_level:(Int32.of_int (level + level_offset))
+        ~block_hash:hash
+        ~predecessor_hash
+        ~grandparent
+        ~slots:(Cache.SlotSet.elements slot_set)
+    done
+  in
+  (* Append one block to [chain] and [sim_cache]; [slots] = attested at this block. *)
+  let add_block slots =
+    incr head_level ;
+    let level = !head_level in
+    let hash = next_hash () in
+    let attested_on_chain =
+      let found = ref Cache.SlotSet.empty in
+      for l = 1 to level - 1 do
+        let _, s = chain.(l) in
+        found := Cache.SlotSet.union !found s
+      done ;
+      !found
+    in
+    let valid_slots =
+      List.filter (fun s -> not (Cache.SlotSet.mem s attested_on_chain)) slots
+    in
+    chain.(level) <- (hash, Cache.SlotSet.of_list valid_slots) ;
+    let predecessor_hash =
+      if level >= 2 then fst chain.(level - 1) else dummy_block_hash
+    in
+    let grandparent =
+      if level >= 3 then fst chain.(level - 2) else dummy_block_hash
+    in
+    simulate_update_from_proposal
+      ~level
+      ~hash
+      ~predecessor_hash
+      ~grandparent
+      (Cache.SlotSet.of_list valid_slots)
+  in
+  (* Run one scenario step: fork, add blocks, replay cache, check filter
+     result. *)
+  let execute_step {branch_level; block_slots} =
+    (* Rewind chain to [branch_level] (drop blocks after it). *)
+    Array.fill
+      chain
+      (branch_level + 1)
+      (!head_level - branch_level)
+      (dummy_block_hash, Cache.SlotSet.empty) ;
+    head_level := branch_level ;
+    (* Reset [sim_cache] and repopulate from chain [1..branch_level]. *)
+    Array.fill sim_cache 0 num_test_slots None ;
+    for level = 1 to !head_level do
+      let hash = fst chain.(level) in
+      let slots = snd chain.(level) in
+      let predecessor_hash =
+        if level >= 2 then fst chain.(level - 1) else dummy_block_hash
+      in
+      let grandparent =
+        if level >= 3 then fst chain.(level - 2) else dummy_block_hash
+      in
+      simulate_update_from_proposal
+        ~level
+        ~hash
+        ~predecessor_hash
+        ~grandparent
+        slots
+    done ;
+    List.iter add_block block_slots ;
+    let hl = !head_level in
+    replay_cache cache hl chain ;
+    let head_hash = fst chain.(hl) in
+    let predecessor_hash =
+      if hl >= 2 then fst chain.(hl - 1) else dummy_block_hash
+    in
+    match
+      filter_attestable_slots
+        cache
+        ~attestable_slots:all_test_slots
+        ~head_level:(Int32.of_int (hl + level_offset))
+        ~head_hash
+        ~predecessor_hash
+    with
+    | Error _trace -> false
+    | Ok filtered ->
+        (* Mirror [filter_attestable_slots]: no entry → include; depth 0/1
+           hash match → exclude; depth >= 2 on current chain → exclude. *)
+        let expected_slots =
+          List.filter
+            (fun slot_index ->
+              match sim_cache.(slot_index) with
+              | None -> true
+              | Some (existing_lvl, existing_hash) ->
+                  let level_diff = hl - existing_lvl in
+                  if level_diff >= 2 then
+                    not
+                      (Block_hash.equal
+                         existing_hash
+                         (fst chain.(existing_lvl)))
+                  else if level_diff = 0 then
+                    not (Block_hash.equal head_hash existing_hash)
+                  else if level_diff = 1 then
+                    not (Block_hash.equal predecessor_hash existing_hash)
+                  else true)
+            all_test_slots
+        in
+        Cache.SlotSet.equal filtered (Cache.SlotSet.of_list expected_slots)
+  in
+  List.iter add_block init_slots ;
+  List.for_all execute_step steps
+
+let print_scenario {init_slots; steps} =
+  let print_slots slots =
+    "[" ^ String.concat "; " (List.map string_of_int slots) ^ "]"
+  in
+  let print_blocks blocks =
+    "[" ^ String.concat "; " (List.map print_slots blocks) ^ "]"
+  in
+  let print_step {branch_level; block_slots} =
+    Format.sprintf
+      "{branch_level=%d; block_slots=%s}"
+      branch_level
+      (print_blocks block_slots)
+  in
+  Format.sprintf
+    "{init_slots=%s; steps=[%s]}"
+    (print_blocks init_slots)
+    (String.concat "; " (List.map print_step steps))
+
+let test_no_duplicate_attestations =
+  QCheck2.Test.make
+    ~count:10000
+    ~print:print_scenario
+    ~name:"no duplicate attestations across forks"
+    gen_scenario
+    run_scenario
+
 let () =
   Test.register
     ~__FILE__
@@ -645,4 +891,8 @@ let () =
     ~__FILE__
     ~title:(Protocol.name ^ ": multiple slots mixed depths")
     ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
-    test_multiple_slots_mixed
+    test_multiple_slots_mixed ;
+  Qcheck_tezt.register
+    ~__FILE__
+    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
+    test_no_duplicate_attestations

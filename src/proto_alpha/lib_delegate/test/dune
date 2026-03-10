@@ -18,6 +18,7 @@
   tezos-protocol-alpha.parameters
   octez-libs.crypto
   octez-libs.event-logging-test-helpers
+  octez-libs.qcheck-tezt
   uri)
  (library_flags (:standard -linkall))
  (flags
