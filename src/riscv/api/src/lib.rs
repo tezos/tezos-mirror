@@ -5,17 +5,13 @@
 
 //! This module defines the OCaml API for the RISC-V PVM and serves as a basis for building the octez-riscv-api OCaml library.
 
-mod move_semantics;
-mod safe_pointer;
-mod try_clone;
-
 use core::panic;
 use std::fs;
 use std::str;
 
 use arbitrary_int::u31;
-use move_semantics::ImmutableState;
-use move_semantics::MutableState;
+use derive_more::Deref;
+use derive_more::DerefMut;
 use ocaml::ToValue;
 use octez_riscv::machine_state::page_cache::EmptyPageCache;
 use octez_riscv::pvm::InputRequest as PvmInputRequest;
@@ -34,75 +30,65 @@ use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::storage::StorageError;
+use octez_riscv_api_common::OcamlFallible;
+use octez_riscv_api_common::move_semantics::CustomGcResource;
+use octez_riscv_api_common::move_semantics::ImmutableState;
+use octez_riscv_api_common::move_semantics::MutableState;
+use octez_riscv_api_common::safe_pointer::SafePointer;
+use octez_riscv_api_common::try_clone::TryClone;
 use octez_riscv_data::hash;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::Verify;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use safe_pointer::SafePointer;
 use sha2::Digest;
 use sha2::Sha256;
-use try_clone::TryClone;
 
-type OcamlFallible<T> = Result<T, ocaml::Error>;
+/// Wrapper for `NodePvm<Normal>` to enable
+/// customing OCaml GC's resource tracking.
+#[derive(Deref, DerefMut)]
+#[repr(transparent)]
+pub struct NodePvmState(NodePvm<Normal>);
 
-impl TryClone for NodePvm<Normal> {
+impl TryClone for NodePvmState {
     type Error = ocaml::Error;
 
     fn try_clone(&self) -> Result<Self, Self::Error> {
-        NodePvm::try_clone(self).map_err(|e| ocaml::Error::Error(Box::new(e)))
+        NodePvm::try_clone(self)
+            .map_err(|e| ocaml::Error::Error(Box::new(e)))
+            .map(Self)
     }
+}
+
+impl CustomGcResource for NodePvmState {
+    const IMMUTABLE_NAME: &'static str = "riscv.imm.node_pvm_state";
+
+    const MUTABLE_NAME: &'static str = "riscv.mut.node_pvm_state";
+
+    const IMMUTABLE_USED: usize = 1;
+
+    const IMMUTABLE_MAX: usize = 2;
+
+    const MUTABLE_USED: usize = 1;
+
+    const MUTABLE_MAX: usize = 2;
 }
 
 #[ocaml::sig]
 pub struct Repo(RwLock<PvmStorage>);
 
 #[ocaml::sig]
-pub type State = ImmutableState<NodePvm<Normal>>;
+pub type State = ImmutableState<NodePvmState>;
 
 #[ocaml::sig]
-pub type MutState = MutableState<NodePvm<Normal>>;
+pub type MutState = MutableState<NodePvmState>;
 
 #[ocaml::sig]
 pub struct Id(hash::Hash);
 
 ocaml::custom!(Repo);
 ocaml::custom!(Id);
-
-/// Manual implementation of `Custom` to encourage ocaml GC to kick in
-/// once more than two instances of `State` are allocated.
-impl ocaml::Custom for State {
-    const NAME: &'static str = "riscv.State\u{0}";
-
-    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = 1;
-    const MAX: usize = 2;
-}
-
-/// Manual implementation of `Custom` to encourage ocaml GC to kick in
-/// once more than two instances of `MutState` are allocated.
-impl ocaml::Custom for MutState {
-    const NAME: &'static str = "riscv.MutState\u{0}";
-
-    const OPS: ::ocaml::custom::CustomOps = ocaml::custom::CustomOps {
-        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
-        ..ocaml::custom::CustomOps {
-            finalize: Some(Self::finalize),
-            ..ocaml::custom::DEFAULT_CUSTOM_OPS
-        }
-    };
-
-    const USED: usize = 1;
-    const MAX: usize = 2;
-}
 
 #[derive(ocaml::FromValue, ocaml::ToValue, strum::EnumCount)]
 #[ocaml::sig("Evaluating | Waiting_for_input | Waiting_for_reveal")]
@@ -391,13 +377,13 @@ pub fn octez_riscv_storage_mut_state_equal(
 #[ocaml::func]
 #[ocaml::sig("unit -> state")]
 pub fn octez_riscv_storage_state_empty() -> SafePointer<State> {
-    ImmutableState::new(NodePvm::empty()).into()
+    ImmutableState::new(NodePvmState(NodePvm::empty())).into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("unit -> mut_state")]
 pub fn octez_riscv_storage_mut_state_empty() -> SafePointer<MutState> {
-    MutableState::owned(NodePvm::empty()).into()
+    MutableState::owned(NodePvmState(NodePvm::empty())).into()
 }
 
 #[ocaml::func]
@@ -437,7 +423,7 @@ pub fn octez_riscv_storage_checkout(
     let id = &id.0;
     let guard = repo.0.read();
     match guard.checkout(id) {
-        Ok(pvm) => Ok(Some(MutableState::owned(pvm).into())),
+        Ok(pvm) => Ok(Some(MutableState::owned(NodePvmState(pvm)).into())),
         Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }

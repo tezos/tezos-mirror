@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["api"]
+members = ["api", "common"]
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
@@ -17,6 +17,10 @@ ocaml-build = "1.0.0"
 sha2 = "0.10.9"
 parking_lot = "0.12.5"
 
+[workspace.dependencies.derive_more]
+version = "2.1.1"
+features = ["deref", "deref_mut"]
+
 [workspace.dependencies.strum]
 version = "0.27"
 features = ["derive"]
@@ -28,6 +32,9 @@ git = "https://github.com/tezos/riscv-pvm.git"
 [workspace.dependencies.octez-riscv-data]
 # The locked version can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
+
+[workspace.dependencies.octez-riscv-api-common]
+path = "./common"
 
 [workspace.dependencies.ocaml]
 version = "1.2.1"

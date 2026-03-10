@@ -11,9 +11,10 @@
 //! interface.
 
 use std::ops::Deref;
+use std::ops::DerefMut;
 
-use super::move_semantics::ImmutableState;
-use super::try_clone::TryClone;
+use crate::move_semantics::ImmutableState;
+use crate::try_clone::TryClone;
 
 /// A version of [`ocaml::Pointer`] which does not allow mutable references to the underlying data.
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -40,7 +41,10 @@ where
 {
     /// In the case that we have an `ImmutableState` and a function that requires a mutable
     /// reference, we first make a copy of the state to apply the function to.
-    pub fn apply_imm<R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<(Self, R), T::Error> {
+    pub fn apply_imm<U, R>(&self, f: impl FnOnce(&mut U) -> R) -> Result<(Self, R), T::Error>
+    where
+        T: DerefMut<Target = U>,
+    {
         let (new_v, result) = self.apply(f)?;
         Ok((new_v.into(), result))
     }
