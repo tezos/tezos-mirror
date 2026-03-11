@@ -19,7 +19,7 @@ use revm::{
         StorageValue, B256, U256,
     },
     state::{Account, EvmState},
-    JournalEntry,
+    DatabaseCommit, JournalEntry,
 };
 use std::vec::Vec;
 
@@ -29,9 +29,10 @@ use crate::database::EtherlinkVMDB;
 use crate::tezosx::{get_alias, store_alias};
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
-    DatabasePrecompileStateChanges, FaDepositWithProxy, SequencerKeyChange,
+    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
+use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
@@ -603,4 +604,20 @@ where
                 ))
             })
     }
+}
+
+pub fn commit_evm_journal_from_external<Host>(
+    host: &mut Host,
+    registry: &impl Registry,
+    block_constants: &BlockConstants,
+    journal: &mut TezosXJournal,
+) -> Result<Vec<Withdrawal>, Error>
+where
+    Host: StorageV1 + Logging,
+{
+    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
+    let mut journal = Journal::new_with_inner(db, journal);
+    let state = journal.finalize();
+    DatabaseCommit::commit(journal.db_mut(), state);
+    Ok(journal.db_mut().take_withdrawals())
 }

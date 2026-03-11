@@ -20,7 +20,7 @@ use revm_etherlink::{
     storage::{
         code::CodeStorage, version::read_evm_version, world_state_handler::StorageAccount,
     },
-    ExecutionOutcome, GasData,
+    ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_logging::Logging;
@@ -170,26 +170,27 @@ where
     let block_constants = runtime.create_block_constants(host, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
-    with_temporary_credit(hdrs.sender, host, hdrs.amount, |host| {
-        run_transaction(
-            host,
-            registry,
-            journal,
-            evm_version.into(),
-            &block_constants,
-            None,
-            hdrs.sender,
-            Some(parsed.destination),
-            call_data,
-            gas_data,
-            hdrs.amount,
-            revm::context::transaction::AccessList(vec![]),
-            None,
-            None,
-            false,
-        )
-        .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))
-    })
+    run_transaction(
+        host,
+        registry,
+        journal,
+        evm_version.into(),
+        &block_constants,
+        None,
+        hdrs.sender,
+        Some(parsed.destination),
+        call_data,
+        gas_data,
+        hdrs.amount,
+        revm::context::transaction::AccessList(vec![]),
+        None,
+        None,
+        false,
+        TransactionOrigin::CrossRuntime {
+            credit: Some((hdrs.sender, hdrs.amount)),
+        },
+    )
+    .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))
 }
 
 impl RuntimeInterface for EthereumRuntime {
@@ -296,6 +297,7 @@ impl RuntimeInterface for EthereumRuntime {
             None,  // no authorization list
             None,  // no tracer
             false, // not a simulation
+            TransactionOrigin::CrossRuntime { credit: None },
         )
         .map_err(|e| {
             TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
@@ -357,83 +359,17 @@ impl RuntimeInterface for EthereumRuntime {
     }
 }
 
-/// Credits the caller alias with `value` so revm can debit it normally during
-/// execution (the real debit already happened on the source runtime), then
-/// runs `f`.
-///
-/// - On success: verifies that revm fully debited the alias — if not,
-///   resets the balance to zero and returns an error.
-/// - On revert/halt: revm reverted the debit so the temporary credit is
-///   still present — reset the balance to zero and return the outcome.
-/// - On error: resets the alias balance to zero.
-///
-/// TODO: L2-885 this should be done using the revm journal.
-fn with_temporary_credit<Host: StorageV1>(
-    caller: Address,
-    host: &mut Host,
-    value: AlloyU256,
-    f: impl FnOnce(&mut Host) -> Result<ExecutionOutcome, TezosXRuntimeError>,
-) -> Result<ExecutionOutcome, TezosXRuntimeError> {
-    if value == AlloyU256::ZERO {
-        return f(host);
-    }
-
-    // value > zero
-    let mut caller_account = StorageAccount::from_address(&caller)?;
-    let mut caller_info = caller_account.info(host)?;
-    caller_info.balance = caller_info
-        .balance
-        .checked_add(value)
-        .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-    caller_account.set_info(host, caller_info)?;
-
-    let outcome = f(host);
-
-    if matches!(
-        &outcome,
-        Ok(ExecutionOutcome {
-            result: ExecutionResult::Success { .. },
-            ..
-        })
-    ) {
-        // On success revm debited the alias — verify it's fully spent.
-        let caller_account = StorageAccount::from_address(&caller)?;
-        let caller_info = caller_account.info(host)?;
-        if caller_info.balance != AlloyU256::ZERO {
-            let remaining = caller_info.balance;
-            reset_balance(host, &caller)?;
-            return Err(TezosXRuntimeError::Custom(format!(
-                "Caller alias balance not zero after EVM execution: {remaining}"
-            )));
-        }
-    } else {
-        // On revert/halt revm reverted the debit, on error we just clean up.
-        reset_balance(host, &caller)?;
-    }
-
-    outcome
-}
-
-fn reset_balance(
-    host: &mut impl StorageV1,
-    address: &Address,
-) -> Result<(), TezosXRuntimeError> {
-    let mut account = StorageAccount::from_address(address)?;
-    let mut info = account.info(host)?;
-    info.balance = AlloyU256::ZERO;
-    account.set_info(host, info)?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
     use revm::primitives::Address;
     use revm::state::{AccountInfo, Bytecode};
+    use revm_etherlink::journal::commit_evm_journal_from_external;
     use revm_etherlink::{
         helpers::storage::bytes_hash,
         storage::{code::CodeStorage, world_state_handler::StorageAccount},
     };
+    use tezos_ethereum::block::BlockConstants;
     use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -512,6 +448,7 @@ mod tests {
     fn test_serve_simple_transfer() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = StubRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
@@ -527,6 +464,13 @@ mod tests {
             .serve(&registry, &mut host, &mut journal, request)
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
 
         // Verify destination received the transfer (5 TEZ in wei)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
@@ -538,6 +482,7 @@ mod tests {
     fn test_serve_executes_contract_bytecode() {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let registry = StubRegistry;
 
         let sender = Address::from_slice(&[0x11; 20]);
@@ -572,6 +517,13 @@ mod tests {
             .serve(&registry, &mut host, &mut journal, request)
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
 
         // Verify the contract wrote 0x42 to storage slot 1
         let slot_value = contract_account
@@ -587,6 +539,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let runtime = EthereumRuntime::default();
         let registry = StubRegistry;
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let sender = Address::from_slice(&[0x11; 20]);
         let contract = Address::from_slice(&[0x22; 20]);
@@ -621,6 +574,13 @@ mod tests {
             .serve(&registry, &mut host, &mut journal, request)
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
 
         // Contract stored CALLVALUE at slot 0 — verify it saw the real value
         // "42" TEZ = 42 * 10^18 wei

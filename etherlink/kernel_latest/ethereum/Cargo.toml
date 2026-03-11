@@ -35,5 +35,6 @@ serde = { workspace = true, optional = true }
 [features]
 default = []
 benchmark = []
+testing = []
 serde = ["dep:serde"]
 evaluation = ["serde"]
