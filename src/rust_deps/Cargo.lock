@@ -3216,6 +3216,7 @@ dependencies = [
 name = "octez-riscv-durable-storage-in-memory"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "ocaml",
  "ocaml-boxroot-sys",
  "ocaml-build",

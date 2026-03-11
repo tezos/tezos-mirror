@@ -12,6 +12,7 @@ private_intra_doc_links = "allow"
 
 [workspace.dependencies]
 arbitrary-int = "1.2.7"
+bytes = "1.11.1"
 num_enum = "0.7.2"
 ocaml-build = "1.0.0"
 sha2 = "0.10.9"
