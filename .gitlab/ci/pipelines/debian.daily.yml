@@ -559,7 +559,6 @@ oc.install_bin_debian_bookworm_systemd_test:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd-merge-manifest.debian
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
@@ -590,7 +589,6 @@ oc.upgrade_bin_debian_bookworm-systemd:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
@@ -691,7 +689,6 @@ oc.install_bin_ubuntu_24_04_systemd:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd-merge-manifest.ubuntu
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
@@ -722,7 +719,6 @@ oc.upgrade_bin_ubuntu_22_04_systemd_test:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd-merge-manifest.ubuntu
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
@@ -753,7 +749,6 @@ oc.upgrade_bin_ubuntu_24_04_systemd_test:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd-merge-manifest.ubuntu
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes

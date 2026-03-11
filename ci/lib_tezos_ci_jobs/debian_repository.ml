@@ -346,12 +346,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_24_04_systemd"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_merge_systemd_test_ubuntu_dependencies;
-               Job job_apt_repo_ubuntu;
-             ])
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -366,12 +361,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_22_04_systemd_test"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_merge_systemd_test_ubuntu_dependencies;
-               Job job_apt_repo_ubuntu;
-             ])
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -386,12 +376,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_24_04_systemd_test"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_merge_systemd_test_ubuntu_dependencies;
-               Job job_apt_repo_ubuntu;
-             ])
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -423,12 +408,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_test"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_merge_systemd_test_debian_dependencies;
-               Job job_apt_repo_debian;
-             ])
+        ~dependencies:(Dependent [Job job_apt_repo_debian])
         ~variables:
           (make_debian_variables
              "debian"
@@ -443,12 +423,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm-systemd"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_docker_systemd_test_debian_dependencies;
-               Job job_apt_repo_debian;
-             ])
+        ~dependencies:(Dependent [Job job_apt_repo_debian])
         ~variables:
           (make_debian_variables
              "debian"
