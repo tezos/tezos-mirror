@@ -1714,9 +1714,54 @@ let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (Contract.Originated clst_hash)
     Tez.zero
 
+let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(src : Contract.t) ~(dst : Contract.t) ?(sender = src)
+    (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let tx =
+    Prim
+      ( dummy_location,
+        Script.D_Pair,
+        [
+          String (dummy_location, Contract.to_b58check dst);
+          Int (dummy_location, Z.zero);
+          Int (dummy_location, Z.of_int64 amount);
+        ],
+        [] )
+  in
+  let elm =
+    Prim
+      ( dummy_location,
+        Script.D_Pair,
+        [
+          String (dummy_location, Contract.to_b58check src);
+          Seq (dummy_location, [tx]);
+        ],
+        [] )
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "transfer")
+    ~parameters
+    ctxt
+    sender
+    (Contract.Originated clst_hash)
+    Tez.zero
+
 let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?(destination_contract = None) (ctxt : Context.t) ~(src : Contract.t)
-    ~(dst : Contract.t) (amount : int64) =
+    ~(dst : Contract.t) ?(sender = src) (amount : int64) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
@@ -1772,7 +1817,7 @@ let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~entrypoint:(Entrypoint.of_string_strict_exn "export_ticket")
     ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
