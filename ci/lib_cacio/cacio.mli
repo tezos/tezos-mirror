@@ -446,6 +446,10 @@ module type COMPONENT_API = sig
 
   (** Register jobs to be included in the global packaging revision pipeline. *)
   val register_global_packaging_revision_jobs : (trigger * job) list -> unit
+
+  (** Register jobs to be included in the global packaging revision test pipeline. *)
+  val register_global_packaging_revision_test_jobs :
+    (trigger * job) list -> unit
 end
 
 (** The main functor of Cacio. *)
@@ -498,6 +502,9 @@ val get_octez_monitoring_jobs : unit -> Tezos_ci.tezos_job list
 
 (** Jobs for the global packaging revision pipelines. *)
 val get_global_packaging_revision_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the global packaging revision test pipelines. *)
+val get_global_packaging_revision_test_jobs : unit -> Tezos_ci.tezos_job list
 
 (** Regular expressions that match release tags.
 

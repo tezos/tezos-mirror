@@ -799,6 +799,9 @@ module type COMPONENT_API = sig
   val register_octez_monitoring_jobs : (trigger * job) list -> unit
 
   val register_global_packaging_revision_jobs : (trigger * job) list -> unit
+
+  val register_global_packaging_revision_test_jobs :
+    (trigger * job) list -> unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -875,10 +878,15 @@ let get_octez_monitoring_jobs () =
 let global_packaging_revision_jobs = ref []
 
 let get_global_packaging_revision_jobs () =
+  convert_jobs ~with_condition:false !global_packaging_revision_jobs
+
+let global_packaging_revision_test_jobs = ref []
+
+let get_global_packaging_revision_test_jobs () =
   convert_jobs
-    ~interruptible_pipeline:false
+    ~interruptible_publish:true
     ~with_condition:false
-    !global_packaging_revision_jobs
+    !global_packaging_revision_test_jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1410,6 +1418,10 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let register_global_packaging_revision_jobs jobs =
     global_packaging_revision_jobs := jobs @ !global_packaging_revision_jobs
+
+  let register_global_packaging_revision_test_jobs jobs =
+    global_packaging_revision_test_jobs :=
+      jobs @ !global_packaging_revision_test_jobs
 end
 
 module Shared = Make (struct
