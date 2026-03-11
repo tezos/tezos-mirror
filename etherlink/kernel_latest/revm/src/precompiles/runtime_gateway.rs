@@ -9,6 +9,7 @@ use revm::{
 };
 use tezos_data_encoding::nom::NomReader;
 use tezos_protocol::contract::Contract;
+use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
     ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
     X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
@@ -96,7 +97,7 @@ fn build_http_request(
 ///
 /// - `X-Tezos-Sender`: The resolved alias of the immediate caller (UTF-8 string).
 /// - `X-Tezos-Source`: The resolved alias of the transaction originator (UTF-8 string).
-/// - `X-Tezos-Amount`: The value attached to the call, in wei (decimal string).
+/// - `X-Tezos-Amount`: The value attached to the call, as a TEZ decimal string.
 /// - `X-Tezos-Gas-Limit`: The gas limit forwarded to the call (decimal string).
 /// - `X-Tezos-Timestamp`: The current block timestamp in seconds (decimal string).
 /// - `X-Tezos-Block-Number`: The current block number (decimal string).
@@ -123,7 +124,12 @@ fn inject_tezos_headers(
         .map_err(|_| CustomPrecompileError::Revert("invalid source alias".to_string()))?
         .to_string();
     headers.insert(X_TEZOS_SOURCE, parse_value(&source_alias)?);
-    headers.insert(X_TEZOS_AMOUNT, parse_value(&format!("{amount}"))?);
+    // Convert alloy U256 (wei) to primitive_types U256 for the shared formatter.
+    let amount_pt = primitive_types::U256(amount.into_limbs());
+    headers.insert(
+        X_TEZOS_AMOUNT,
+        parse_value(&format_tez_from_wei(amount_pt))?,
+    );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
     headers.insert(
@@ -472,7 +478,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "42000000"
+            "0.000000000042"
         );
         assert_eq!(
             request

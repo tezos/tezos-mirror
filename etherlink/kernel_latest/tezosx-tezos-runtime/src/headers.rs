@@ -17,7 +17,9 @@ use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
 use tezos_tezlink::enc_wrappers::BlockNumber;
-use tezosx_interfaces::headers::{require_i64, require_str, require_u32, require_u64};
+use tezosx_interfaces::headers::{
+    parse_tez_to_mutez, require_i64, require_str, require_u32, require_u64,
+};
 use tezosx_interfaces::TezosXRuntimeError;
 
 use crate::NULL_PKH;
@@ -49,7 +51,9 @@ pub fn parse_request_headers(
     headers: &http::HeaderMap,
 ) -> Result<MichelsonHeaders, TezosXRuntimeError> {
     Ok(MichelsonHeaders {
-        amount: Narith(require_u64(headers, X_TEZOS_AMOUNT)?.into()),
+        amount: Narith(
+            parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?.into(),
+        ),
         gas_limit: Narith(require_u64(headers, X_TEZOS_GAS_LIMIT)?.into()),
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
@@ -127,10 +131,31 @@ mod tests {
     #[test]
     fn amount_parsed() {
         let mut hdrs = required_headers();
+        // 1 TEZ = 1_000_000 mutez
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
-            (X_TEZOS_AMOUNT, "1000000");
+            (X_TEZOS_AMOUNT, "1");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
         assert_eq!(parsed.amount, Narith(1_000_000u64.into()));
+    }
+
+    #[test]
+    fn amount_parsed_fractional() {
+        let mut hdrs = required_headers();
+        // 1.5 TEZ = 1_500_000 mutez
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, "1.5");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.amount, Narith(1_500_000u64.into()));
+    }
+
+    #[test]
+    fn amount_rejects_excess_decimals() {
+        let mut hdrs = required_headers();
+        // 7 decimals — exceeds Michelson's 6-decimal limit
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, "0.0000001");
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
     }
 
     #[test]
