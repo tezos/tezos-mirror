@@ -121,11 +121,43 @@ let artifacts_dir = Cli.artifacts_dir
 
 let teztale_artifacts = Cli.teztale_artifacts
 
+type auth_infos = {username : string; password : string}
+
+let auth_enabled =
+  let auth_username =
+    match Cli.auth_username with
+    | Some _ as v -> v
+    | None -> Sys.getenv_opt "TEZT_CLOUD_AUTH_USERNAME"
+  in
+  let auth_password =
+    match Cli.auth_password with
+    | Some _ as v -> v
+    | None -> Sys.getenv_opt "TEZT_CLOUD_AUTH_PASSWORD"
+  in
+  match (auth_username, auth_password) with
+  | Some _, None ->
+      Test.fail
+        "Both --auth-username and --auth-password must be set (or \
+         TEZT_CLOUD_AUTH_USERNAME and TEZT_CLOUD_AUTH_PASSWORD). Only \
+         --auth-username is provided."
+  | None, Some _ ->
+      Test.fail
+        "Both --auth-username and --auth-password must be set (or \
+         TEZT_CLOUD_AUTH_USERNAME and TEZT_CLOUD_AUTH_PASSWORD). Only \
+         --auth-password is provided."
+  | None, None -> None
+  | Some username, Some password -> Some {username; password}
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
        environment variable 'TEZT_CLOUD'" ;
+  if Option.is_some auth_enabled && macosx then
+    Test.fail
+      "Auth mode (--auth-username / --auth-password) is not supported on \
+       macOS. Docker on macOS does not support --network host, which is \
+       required for the nginx reverse proxy. Use SSH tunneling instead." ;
   (* If using logfile, installs a signal handler to close and reopen the logfile.
      This allows logrotate to use a better strategy than copytruncate
      https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html

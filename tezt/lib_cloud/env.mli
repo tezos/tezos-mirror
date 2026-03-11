@@ -158,6 +158,17 @@ val artifacts_dir : string option
 (** Equivalent to [Cli.teztale_artifacts] *)
 val teztale_artifacts : bool
 
+type auth_infos = {username : string; password : string}
+
+(** [auth_enabled] is [Some {username; password}] when both [auth_username] and
+    [auth_password] are set.
+    The username is resolved from CLI flag [--auth-username], then config file,
+    then env var [TEZT_CLOUD_AUTH_USERNAME].
+    The password is resolved from CLI flag [--auth-password], then env var
+    [TEZT_CLOUD_AUTH_PASSWORD] (config file is excluded for security).
+    When enabled, monitoring services are protected by nginx basic auth. *)
+val auth_enabled : auth_infos option
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 

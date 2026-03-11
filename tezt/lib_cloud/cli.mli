@@ -185,6 +185,12 @@ val slack_channel_id : string option
 (** Slack authentication token to allow publication *)
 val slack_bot_token : string option
 
+(** Username for basic auth on monitoring services. *)
+val auth_username : string option
+
+(** Password for basic auth on monitoring services. *)
+val auth_password : string option
+
 module Types : sig
   val dir_typ : name:string -> cli_parameter:string -> string option Clap.typ
 end
