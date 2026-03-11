@@ -1740,7 +1740,9 @@ module Images = struct
 
   (** The jsonnet image (static tag [master]) *)
   let jsonnet_master =
-    let image_path = "${jsonnet_image_name_protected}:master" in
+    let image_path =
+      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet:master"
+    in
     Image.mk_external ~image_path
 
   module CI = struct
