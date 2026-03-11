@@ -370,7 +370,7 @@ module Tezlink = struct
     let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~check_signature:(not skip_signature)
-        ~check_da_fees:false
+        ~check_minimal_fees:false
         ~read
         ~data_model
         input
@@ -418,7 +418,7 @@ module TezosX = struct
     let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~check_signature:(not skip_signature)
-        ~check_da_fees:false
+        ~check_minimal_fees:false
         ~read
         ~data_model
         input

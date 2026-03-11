@@ -502,12 +502,12 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez =
+let compute_minimal_fees ~op_raw_size ~da_fee_per_byte_mutez =
   let da_fees_mutez = Int64.(mul (of_int op_raw_size) da_fee_per_byte_mutez) in
   Tez.of_mutez_exn da_fees_mutez
 
 let parse_and_validate_for_queue ?(check_signature = true)
-    ?(check_da_fees = true) ~read ~data_model raw =
+    ?(check_minimal_fees = true) ~read ~data_model raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -553,10 +553,10 @@ let parse_and_validate_for_queue ?(check_signature = true)
   let* da_fee_per_byte_mutez =
     Tezlink_durable_storage.da_fee_per_byte_mutez read
   in
-  let da_fees = compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez in
-  if check_da_fees && ctxt.fee_sum < da_fees then
+  let minimal_fees = compute_minimal_fees ~op_raw_size ~da_fee_per_byte_mutez in
+  if check_minimal_fees && ctxt.fee_sum < minimal_fees then
     tzfail
-    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string da_fees)
+    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string minimal_fees)
   else
     let** () =
       validate_signature
