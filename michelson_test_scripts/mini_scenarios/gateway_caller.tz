@@ -1,4 +1,4 @@
-# Calls the TezosXGateway enshrined contract's %call entrypoint.
+# Calls the TezosXGateway enshrined contract's %call_evm entrypoint.
 # Storage: pair address (pair string (pair string bytes))
 #   address     = gateway KT1
 #   1st string  = EVM destination address
@@ -10,7 +10,7 @@ code {
        CDR;
        DUP;
        UNPAIR;
-       CONTRACT %call (pair string (pair string bytes));
+       CONTRACT %call_evm (pair string (pair string bytes));
        ASSERT_SOME;
        SWAP;
        AMOUNT;

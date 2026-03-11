@@ -24,6 +24,7 @@ use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{Registry, RuntimeInterface};
+use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
@@ -96,6 +97,7 @@ impl Registry for RegistryImpl {
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_journal::TezosXJournal;
 
     #[test]
     fn test_serve_unknown_host_returns_404() {
