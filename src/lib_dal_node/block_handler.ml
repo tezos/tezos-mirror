@@ -95,9 +95,7 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
         return_unit
       in
       let* () =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
-           We may want to remove this check. *)
-        if Node_context.supports_refutations ctxt then
+        if not @@ Node_context.is_bootstrap_node ctxt then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
              Remove after dynamic lag is active.
              This code cleans the skip-list for the "orphan" levels which are
@@ -636,7 +634,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
      [@profiler.record_s {verbosity = Notice} "fetch_skip_list_cells"])
   in
   let* () =
-    if Node_context.supports_refutations ctxt then
+    if not @@ Node_context.is_bootstrap_node ctxt then
       store_skip_list_cells
         ctxt
         ~attested_level:block_level
