@@ -179,7 +179,6 @@ let monitoring_full () =
 
 let nginx () =
   Cloud.register
-    ~vms:(fun () -> return [Agent.Configuration.make ()])
     ~__FILE__
     ~tags:["nginx"; "auth"]
     ~title:"Nginx reverse proxy with basic auth"
