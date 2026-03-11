@@ -61,6 +61,31 @@ let monitoring_child_pipeline =
             ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
        ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_octez_monitoring_jobs ()))
 
+let job_docker =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun trigger ->
+  Cacio.parameterize @@ fun arch ->
+  job_docker_build
+    ~__POS__
+    ~dependencies:(Dependent [])
+    ?rules:
+      (match trigger with
+      | `manual ->
+          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      | `auto -> None)
+    ~arch
+    ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
+    (match mode with `test -> Test | `real -> Release)
+
+let job_docker_merge =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun trigger ->
+  job_docker_merge_manifests
+    ~__POS__
+    ~ci_docker_hub:(match mode with `test -> false | `real -> true)
+    ~job_docker_amd64:(job_docker mode trigger Amd64)
+    ~job_docker_arm64:(job_docker mode trigger Arm64)
+
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
@@ -112,32 +137,11 @@ let job_release_page ~test ?dependencies () =
 
     On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
+  let mode = if test then `test else `real in
   let variables =
     match release_tag_pipeline_type with
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
     | _ -> None
-  in
-  let job_docker_amd64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      (if test then Test else Release)
-  in
-  let job_docker_arm64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      (if test then Test else Release)
-  in
-  let job_docker_merge =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:(not test)
-      ~job_docker_amd64
-      ~job_docker_arm64
   in
   (* on release pipelines the static binaries do not have any dependencies
      on previous stages and can start immediately *)
@@ -174,7 +178,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~image:Images.Base_images.ci_release
       ~stage:Stages.publish
       ~interruptible:false
-      ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
+      ~dependencies:
+        (Dependent (Job (job_docker_merge mode `auto) :: dependencies))
       ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:release"
       ?variables
@@ -259,7 +264,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let job_promote_to_latest_test =
     job_docker_promote_to_latest
       ~ci_docker_hub:false
-      ~dependencies:(Dependent [Job job_docker_merge])
+      ~dependencies:(Dependent [Job (job_docker_merge mode `auto)])
       ()
   in
   let job_dispatch_call =
@@ -291,10 +296,10 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     (* Stage: build *)
     job_static_x86_64_release;
     job_static_arm64_release;
-    job_docker_amd64;
-    job_docker_arm64;
+    job_docker mode `auto Amd64;
+    job_docker mode `auto Arm64;
     job_build_homebrew_release;
-    job_docker_merge;
+    job_docker_merge mode `auto;
     job_gitlab_release_or_publish;
     job_trigger_monitoring;
   ]
@@ -332,37 +337,14 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   | _ -> []
 
 let octez_packaging_revision_jobs ?(test = false) () =
+  let mode = if test then `test else `real in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
-  in
-  let job_docker_amd64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~__POS__
-      ~arch:Amd64
-      (if test then Test else Release)
-  in
-  let job_docker_arm64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      (if test then Test else Release)
-  in
-  let job_docker_merge =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:(not test)
-      ~job_docker_amd64
-      ~job_docker_arm64
   in
   let job_docker_promote_to_version =
     job_docker_authenticated
       ~__POS__
-      ~dependencies:(Dependent [Job job_docker_merge])
+      ~dependencies:(Dependent [Job (job_docker_merge mode `manual)])
       ~stage:Stages.publish
       ~name:"oc.docker:promote_revision_to_version"
       ~description:
@@ -436,9 +418,9 @@ let octez_packaging_revision_jobs ?(test = false) () =
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Docker images *)
-    job_docker_amd64;
-    job_docker_arm64;
-    job_docker_merge;
+    job_docker mode `manual Amd64;
+    job_docker mode `manual Arm64;
+    job_docker_merge mode `manual;
     job_docker_promote_to_version;
     (* Static binaries *)
     job_static_x86_64;
