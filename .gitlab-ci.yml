@@ -77,8 +77,8 @@ workflow:
     variables:
       PIPELINE_TYPE: tezos_x.build
     when: always
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      != "merge_train"
     variables:
       PIPELINE_TYPE: before_merging
     when: always
@@ -364,8 +364,8 @@ include:
     when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
-      && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE
+      != "merge_train"
     when: always
 - local: .gitlab/ci/pipelines/merge_train.yml
   rules:
