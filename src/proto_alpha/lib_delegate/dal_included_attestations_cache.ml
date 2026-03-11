@@ -406,3 +406,23 @@ let create ~attestation_lags ~number_of_slots =
     attestation_lags;
     number_of_slots;
   }
+
+module Internal_for_tests = struct
+  let update_from_attested_slots t ~delegate_id ~attested_level ~block_hash
+      ~predecessor_hash ~grandparent ~attested_slots =
+    let attested_pairs =
+      List.map
+        (fun (published_level, indices) ->
+          (published_level, SlotSet.of_list indices))
+        attested_slots
+    in
+    let attestations = create_delegate_table () in
+    Delegate_id.Table.replace attestations delegate_id attested_pairs ;
+    update_slot_attestations
+      t
+      ~attested_level
+      ~block_hash
+      ~predecessor_hash
+      ~grandparent
+      attestations
+end

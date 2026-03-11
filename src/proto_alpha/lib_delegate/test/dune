@@ -33,7 +33,7 @@
   -open Tezos_alpha_mockup_simulator
   -open Tezos_baking_alpha
   -open Tezos_event_logging_test_helpers)
- (modules test_scenario))
+ (modules test_scenario test_dal_included_attestations_cache))
 
 (executable
  (name main)
