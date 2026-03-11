@@ -345,25 +345,26 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   | true, Beta_release_tag -> [job_release_page]
   | _ -> []
 
+let job_docker_promote_to_version =
+  Cacio.parameterize @@ fun mode ->
+  job_docker_authenticated
+    ~__POS__
+    ~dependencies:(Dependent [Job (job_docker_merge mode `manual)])
+    ~stage:Stages.publish
+    ~name:"oc.docker:promote_revision_to_version"
+    ~description:
+      "Promote the Docker image from the packaging revision tag to the \
+       canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+    ~ci_docker_hub:(match mode with `test -> false | `real -> true)
+    ["./scripts/ci/docker_promote_to_version.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
 let octez_packaging_revision_jobs ?(test = false) () =
   let mode = if test then `test else `real in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
-  in
-  let job_docker_promote_to_version =
-    job_docker_authenticated
-      ~__POS__
-      ~dependencies:(Dependent [Job (job_docker_merge mode `manual)])
-      ~stage:Stages.publish
-      ~name:"oc.docker:promote_revision_to_version"
-      ~description:
-        "Promote the Docker image from the packaging revision tag to the \
-         canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~ci_docker_hub:(not test)
-      ["./scripts/ci/docker_promote_to_version.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
   in
   (* We want to be able to trigger each "batch" of jobs manually.
      There are two batches: one with the static jobs, and one that publishes.
@@ -413,7 +414,7 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_docker mode `manual Amd64;
     job_docker mode `manual Arm64;
     job_docker_merge mode `manual;
-    job_docker_promote_to_version;
+    job_docker_promote_to_version mode;
     (* Static binaries *)
     job_build_static `manual Amd64;
     job_build_static `manual Arm64;
