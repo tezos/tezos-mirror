@@ -171,7 +171,7 @@ oc.build_x86_64-released:
     when: on_success
 
 documentation.rst-check:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
   stage: test
   tags:
   - gcp

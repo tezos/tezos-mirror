@@ -1789,8 +1789,7 @@ module Images = struct
     let mk_ci_image_master name =
       Image.mk_external
         ~image_path:
-          ("${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci/" ^ name
-         ^ ":amd64--master")
+          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/" ^ name ^ ":amd64--master")
 
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
