@@ -117,14 +117,14 @@ where
                     ));
                 };
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])
-            } else if entrypoint.as_str() == "call" {
+            } else if entrypoint.as_str() == "call_evm" {
                 let (dest, method_sig, abi_params) = extract_call_params(typed)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
-            } else if entrypoint.as_str() == "http_call" {
+            } else if entrypoint.as_str() == "call" {
                 let mut request = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
                 inject_context_headers(
@@ -612,16 +612,16 @@ pub(crate) fn get_enshrined_contract_entrypoint(
             let mut entrypoints = HashMap::new();
             // default %default: string (destination address for simple transfers)
             entrypoints.insert(Entrypoint::default(), Type::String);
-            // %call: pair string (pair string bytes)
+            // %call_evm: pair string (pair string bytes)
             //   (destination, (method_signature, abi_parameters))
             entrypoints.insert(
-                Entrypoint::try_from("call").ok()?,
+                Entrypoint::try_from("call_evm").ok()?,
                 Type::new_pair(Type::String, Type::new_pair(Type::String, Type::Bytes)),
             );
-            // %http_call: pair string (pair (list (pair string string)) (pair bytes nat))
+            // %call: pair string (pair (list (pair string string)) (pair bytes nat))
             //   (url, (headers, (body, method)))
             entrypoints.insert(
-                Entrypoint::try_from("http_call").ok()?,
+                Entrypoint::try_from("call").ok()?,
                 Type::new_pair(
                     Type::String,
                     Type::new_pair(
@@ -796,7 +796,7 @@ mod tests {
         assert_eq!(bridge_calls.len(), 2);
     }
 
-    /// Helper to build a Micheline http_call value:
+    /// Helper to build a Micheline call value:
     /// Pair(String(url), Pair(Seq(headers), Pair(Bytes(body), Int(method))))
     fn build_http_call_micheline<'a>(
         arena: &'a typed_arena::Arena<Micheline<'a>>,
@@ -827,13 +827,13 @@ mod tests {
         Micheline::prim2(arena, Prim::Pair, url.to_string().into(), inner_pair)
     }
 
-    /// Typecheck a Micheline http_call value into a TypedValue.
-    fn typecheck_http_call<'a>(
+    /// Typecheck a Micheline call value into a TypedValue.
+    fn typecheck_call<'a>(
         value: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TransferError> {
         typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
-            &Entrypoint::try_from("http_call").unwrap(),
+            &Entrypoint::try_from("call").unwrap(),
             value,
         )
     }
@@ -848,7 +848,7 @@ mod tests {
             &[0x01, 0x02],
             1,
         );
-        let typed = typecheck_http_call(&value).unwrap();
+        let typed = typecheck_call(&value).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
@@ -864,7 +864,7 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let typed = typecheck_http_call(&value).unwrap();
+        let typed = typecheck_call(&value).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc");
         assert_eq!(request.method(), http::Method::GET);
@@ -885,7 +885,7 @@ mod tests {
             &[0xDE, 0xAD],
             42,
         );
-        let typed = typecheck_http_call(&value).unwrap();
+        let typed = typecheck_call(&value).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         // Unknown method defaults to POST
         assert_eq!(request.method(), http::Method::POST);
@@ -900,7 +900,7 @@ mod tests {
     #[test]
     fn test_http_call_malformed_parameters() {
         let result =
-            typecheck_http_call(&Micheline::String("not a valid http_call".to_string()));
+            typecheck_call(&Micheline::String("not a valid http_call".to_string()));
         assert!(result.is_err());
     }
 
@@ -964,7 +964,7 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_http_call(&value).unwrap();
+        let typed = typecheck_call(&value).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -984,7 +984,7 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_http_call(&value).unwrap();
+        let typed = typecheck_call(&value).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
