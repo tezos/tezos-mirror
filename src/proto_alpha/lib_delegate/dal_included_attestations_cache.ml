@@ -345,12 +345,8 @@ let update_slot_attestation ~attested_level ~block_hash ~predecessor_hash
            cannot be verified - replace with the fresh attestation. *)
         {attested_level; block_hashes = [block_hash]}
 
-let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
-    ~grandparent ~operations =
-  let open Result_syntax in
-  let+ attestations =
-    extract_dal_attestations_from_operations t ~attested_level operations
-  in
+let update_slot_attestations t ~attested_level ~block_hash ~predecessor_hash
+    ~grandparent attestations =
   Delegate_id.Table.iter
     (fun delegate_id attested_pairs ->
       let published_level_cache =
@@ -386,6 +382,20 @@ let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
             published_level
             updated_slot_map)
         attested_pairs)
+    attestations
+
+let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
+    ~grandparent ~operations =
+  let open Result_syntax in
+  let+ attestations =
+    extract_dal_attestations_from_operations t ~attested_level operations
+  in
+  update_slot_attestations
+    t
+    ~attested_level
+    ~block_hash
+    ~predecessor_hash
+    ~grandparent
     attestations
 
 let create ~attestation_lags ~number_of_slots =
