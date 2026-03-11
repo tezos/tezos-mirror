@@ -499,14 +499,10 @@ let make (ctxt : Evm_ro_context.t) =
             failwith "operation simulation is only possible on the head block"
       in
       let block = Ethereum_types.Block_parameter.(Block_parameter Latest) in
-      let* state = Evm_ro_context.get_state ctxt ~block () in
-      let read = Evm_ro_context.read_state state in
       Simulator.TezosX.simulate_operation
         ctxt
         ~simulator_mode
         ~chain_id
-        ~read
-        ~data_model:Tezlink_durable_storage.Rlp
         op
         hash
         block

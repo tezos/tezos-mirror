@@ -282,7 +282,6 @@ let make (ctxt : Evm_ro_context.t) =
 
     let simulate_operation ~chain_id ~simulator_mode op hash block =
       let open Lwt_result_syntax in
-      let read = read ~block in
       let* () =
         match block with
         | `Head 0l -> return_unit
@@ -292,8 +291,6 @@ let make (ctxt : Evm_ro_context.t) =
       let block = Ethereum_types.Block_parameter.(Block_parameter Latest) in
       Simulator.Tezlink.simulate_operation
         ctxt
-        ~read
-        ~data_model
         ~chain_id
         ~simulator_mode
         op

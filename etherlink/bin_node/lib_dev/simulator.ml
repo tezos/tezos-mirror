@@ -361,7 +361,7 @@ module Tezlink = struct
           log_kernel_debug_file = Some "simulate_call";
         }
 
-  let simulate_operation ctxt ~chain_id ~simulator_mode ~read ~data_model
+  let simulate_operation ctxt ~chain_id ~simulator_mode
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -372,16 +372,13 @@ module Tezlink = struct
     (* First, prevalidate the operation because there is no point
        in simulating it if it's invalid (invalid operations don't
        produce any receipt). *)
-    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
-      Tezlink_prevalidation.parse_and_validate_for_queue
-        ~simulator_mode
-        ~read
-        ~data_model
-        input
+    let* (prevalidation_res :
+           (_ Prevalidator.prevalidation_result, string) result) =
+      Prevalidator.prevalidate_raw_transaction_tezlink ~simulator_mode input
     in
     let* () =
       match prevalidation_res with
-      | Ok _op -> return_unit
+      | Ok _res -> return_unit
       | Error message -> Error_monad.failwith "Prevalidation error: %s" message
     in
 
@@ -410,7 +407,7 @@ module TezosX = struct
   open Tezlink_imports
   open Imported_protocol
 
-  let simulate_operation ctxt ~chain_id ~simulator_mode ~read ~data_model
+  let simulate_operation ctxt ~chain_id ~simulator_mode
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -419,16 +416,13 @@ module TezosX = struct
          Result_syntax.tzfail (Operation_serialization_error e)
     in
     (* Prevalidate the operation: invalid operations don't produce receipts. *)
-    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
-      Tezlink_prevalidation.parse_and_validate_for_queue
-        ~simulator_mode
-        ~read
-        ~data_model
-        input
+    let* (prevalidation_res :
+           (_ Prevalidator.prevalidation_result, string) result) =
+      Prevalidator.prevalidate_raw_transaction_tezlink ~simulator_mode input
     in
     let* () =
       match prevalidation_res with
-      | Ok _op -> return_unit
+      | Ok _res -> return_unit
       | Error message -> Error_monad.failwith "Prevalidation error: %s" message
     in
     (* Actual simulation via the kernel entrypoint.
