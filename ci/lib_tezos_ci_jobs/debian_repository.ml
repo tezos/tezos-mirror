@@ -13,7 +13,6 @@
 
 open Gitlab_ci.Util
 open Tezos_ci
-open Common.Helpers
 
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
@@ -143,7 +142,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~tag:Gcp_not_interruptible
     ?retry
     ~before_script:
-      (before_script
+      (Common.Helpers.before_script
          ~source_version:true
          ["apt-get install -y --update apt-utils debsigs"])
     ~variables
@@ -311,7 +310,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~stage:Stages.publishing_tests
       ~variables
       ~before_script:
-        (before_script
+        (Common.Helpers.before_script
            ~source_version:true
            [
              "export DEBIAN_FRONTEND=noninteractive";
