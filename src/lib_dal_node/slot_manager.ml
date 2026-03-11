@@ -160,13 +160,13 @@ let () =
     ~id:"dal.node.No_commitment_found_for_slot_id"
     ~title:"No commitment found on L1 for slot id"
     ~description:
-      "No commitment found (in memory or in the skip-list) for the given slot \
-       id."
+      "No commitment found (neither in memory, nor in the skip-list, nor in \
+       the L1 context) for the given slot id."
     ~pp:(fun ppf (published_level, slot_index) ->
       Format.fprintf
         ppf
-        "No commitment found (in memory or in the skip-list) at level %ld and \
-         index %d."
+        "No commitment found (neither in memory, nor in the skip-list, nor in \
+         the L1 context) at level %ld and index %d."
         published_level
         slot_index)
     Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
@@ -575,11 +575,13 @@ let try_get_slot_header_from_L1_skip_list ctxt slot_id =
 
    Retrieval order:
     1. Attempt to get the header from the local SQLite skip list.
-    2. ~~If not found, fall back to fetching it from the L1 skip list context.~~
+    2. If not found locally (empty skip list, or data pruned), fall back to
+       fetching it from the L1 node's context via
+       [try_get_slot_header_from_L1_skip_list].
 
-    Returns [Some commitment] if found and matches the [slot_id], [None]
-    otherwise. Performs assertions to ensure the returned slot header matches
-    the requested [slot_id]. *)
+    Returns [Some commitment] if a commitment was published for [slot_id],
+    [None] if the slot was not published (confirmed by either local store or
+    L1 context), or an error if the lookup itself failed. *)
 let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
@@ -592,14 +594,16 @@ let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
       assert (Int.equal slot_index slot_id.slot_index) ;
       return_some commitment
   | Ok None ->
-      (* The function(s) above succeeded, but nothing was found as "published". *)
-      return_none
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     If the header was not found, or there was an error, then normally we would
-     try to get it from the L1 context, using
-     [_try_get_slot_header_from_L1_skip_list ctxt slot_id]. See the FIXME there
-     to see why we don't use it. *)
-  | Error error -> tzfail error
+      (* Local lookup did not yield a slot header for this [slot_id].
+         Fall back to the L1 context as the source of truth. *)
+      let* slot_header_opt =
+        try_get_slot_header_from_L1_skip_list ctxt slot_id
+      in
+      return
+        (Option.map
+           (fun Dal_plugin.{commitment; _} -> commitment)
+           slot_header_opt)
+  | Error trace -> Lwt.return_error trace
 
 (* This function attempts to retrieve the commitment associated to a (published)
    slot whose id is given in [slot_id]. For that, we check in various places:
@@ -607,18 +611,20 @@ let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
 let get_commitment_from_slot_id ctxt slot_id =
   let open Lwt_result_syntax in
   match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
-  | Some res -> return res
+  | Some commitment -> return commitment
   | None -> (
       let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
-      | Ok (Some res) -> return res
+      | Ok (Some commitment) -> return commitment
       | Ok None -> tzfail @@ No_commitment_found_for_slot_id slot_id
       | Error error ->
+          (* Both lookups failed with an error (e.g. the L1 node does not have
+             the requested level in its history). *)
           let*! () =
             Event.emit_failed_to_retrieve_commitment_of_slot_id
               ~published_level:slot_id.slot_level
               ~slot_index:slot_id.slot_index
-              ~error
+              ~error:[error]
           in
           Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
@@ -635,8 +641,8 @@ let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
       let* expected_commitment_hash =
         (if config.trust_slots_backup_uris then return_none
          else
-           let+ res = get_commitment_from_slot_id ctxt slot_id in
-           Option.some res)
+           let+ commitment = get_commitment_from_slot_id ctxt slot_id in
+           Some commitment)
         |> Errors.other_lwt_result
       in
       let* slot_opt =
