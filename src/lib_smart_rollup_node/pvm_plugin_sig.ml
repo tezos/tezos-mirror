@@ -67,7 +67,7 @@ type cached_snapshot =
 (** Cached evaluation state: the {!eval_state_info} metadata plus a
     {!cached_snapshot} for the PVM state itself. *)
 type 'fuel cached_eval_state = {
-  info : 'fuel eval_state_info;
+  cached_info : 'fuel eval_state_info;
   snapshot : cached_snapshot;
 }
 

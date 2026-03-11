@@ -230,7 +230,7 @@ module type REFUTATION_GAME_HELPERS = sig
       dissection has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
-    _ Node_context.t ->
+    _ Node_context.rw_context ->
     Pvm_plugin_sig.state_cache ->
     start_state:
       ( Fuel.Accounted.t,

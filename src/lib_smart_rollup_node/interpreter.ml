@@ -380,7 +380,9 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
         remaining_fuel = Fuel.Accounted.of_ticks tick_distance;
       }
     in
-    Plugin.Pvm.Fueled.Accounted.eval_messages node_ctxt {start_state with info}
+    Plugin.Pvm.Fueled.Accounted.eval_messages
+      node_ctxt
+      {Pvm_plugin_sig.state = start_state.state; info}
   in
   eval_result.state_info
 
@@ -512,19 +514,54 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
       let+ run_info = run_to_tick plugin node_ctxt start_state tick in
       Pvm_plugin_sig.{state; info = run_info}
 
+(** [to_cached_eval_state preference ctx_index eval_st] creates a cached
+    snapshot from a mutable evaluation state. For [In_memory], it makes an
+    immutable copy. For [On_disk], it commits the state to disk and stores
+    only the hash. *)
+let to_cached_eval_state cache_preference ctx_index eval_st =
+  let open Lwt_syntax in
+  let open Pvm_plugin_sig in
+  match cache_preference with
+  | Context_sigs.In_memory ->
+      let imm = Context.PVMState.imm_copy eval_st.state in
+      return {cached_info = eval_st.info; snapshot = In_memory_snapshot imm}
+  | Context_sigs.On_disk ->
+      (* TODO: TZX-101
+         On-disk snapshots committed here are not cleaned up when evicted
+         from the cache. *)
+      let+ hash = Context.PVMState.commit ctx_index eval_st.state in
+      {cached_info = eval_st.info; snapshot = On_disk_snapshot hash}
+
+(** [from_cached_eval_state ctx_index cached] restores a mutable evaluation
+    state from a cached snapshot. For [In_memory], it creates a mutable copy.
+    For [On_disk], it checkouts the state from disk. *)
+let from_cached_eval_state ctx_index cached =
+  let open Lwt_result_syntax in
+  let open Pvm_plugin_sig in
+  match cached.snapshot with
+  | In_memory_snapshot imm ->
+      return {state = Context.PVMState.mut_copy imm; info = cached.cached_info}
+  | On_disk_snapshot hash -> (
+      let*! state = Context.PVMState.checkout ctx_index hash in
+      match state with
+      | Some state -> return {state; info = cached.cached_info}
+      | None -> failwith "Failed to checkout cached PVM state from disk")
+
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
   Pvm_plugin_sig.make_state_cache 64 (* size of 2 dissections *)
 
 (** Memoized version of [state_of_tick_aux] using both global and local caches.
-    A single immutable copy of the state is shared between both caches. *)
-let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
-    (event : Sc_rollup_block.t) tick =
+    A single cached snapshot is shared between both caches. For [In_memory]
+    backends, the snapshot is an immutable copy. For [On_disk] backends, the
+    state is committed to disk and only the hash is cached. *)
+let memo_state_of_tick_aux ~cache_preference ~ctx_index plugin node_ctxt
+    state_cache ~start_state (event : Sc_rollup_block.t) tick =
   match Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return with
-  | Some p_imm ->
+  | Some p_cached ->
       let open Lwt_syntax in
       let* () = Interpreter_event.refutation_cache_hit ~tick ~source:"local" in
-      Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+      Lwt_result.bind p_cached (from_cached_eval_state ctx_index)
   | None -> (
       match
         Pvm_plugin_sig.Tick_state_cache.bind
@@ -532,24 +569,37 @@ let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
           tick
           Lwt.return
       with
-      | Some p_imm ->
+      | Some p_cached ->
           let open Lwt_syntax in
           let* () =
             Interpreter_event.refutation_cache_hit ~tick ~source:"global"
           in
-          (* Global hit: share the same immutable copy in local cache. *)
-          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
-          Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+          (* Global hit: share the same cached snapshot in local cache. *)
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_cached ;
+          Lwt_result.bind p_cached (from_cached_eval_state ctx_index)
       | None ->
           let open Lwt_syntax in
           let* () = Interpreter_event.refutation_cache_miss ~tick in
-          (* Both miss: compute and store a single immutable copy in both. *)
+          (* Both miss: compute and store a cached snapshot in both. *)
           let p_mut =
             state_of_tick_aux plugin node_ctxt ~start_state event tick
           in
-          let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
-          Pvm_plugin_sig.Tick_state_cache.put global_tick_state_cache tick p_imm ;
-          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
+          let p_cached =
+            Lwt_result.bind p_mut (fun eval_st ->
+                let open Lwt_result_syntax in
+                let*! cached =
+                  to_cached_eval_state cache_preference ctx_index eval_st
+                in
+                return cached)
+          in
+          (* TODO: TZX-101
+             When cache entries are evicted, on-disk snapshots should be
+             cleaned up. *)
+          Pvm_plugin_sig.Tick_state_cache.put
+            global_tick_state_cache
+            tick
+            p_cached ;
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_cached ;
           p_mut)
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
@@ -557,6 +607,8 @@ let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     [level]. Otherwise, returns [None].*)
 let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
   let open Lwt_result_syntax in
+  let ctx_index = node_ctxt.Node_context.context in
+  let cache_preference = Context.PVMState.cache_preference ctx_index in
   let min_level =
     match start_state with
     | None -> None
@@ -582,6 +634,8 @@ let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
           state_of_tick_aux plugin node_ctxt ~start_state:None event tick
         else
           memo_state_of_tick_aux
+            ~cache_preference
+            ~ctx_index
             plugin
             node_ctxt
             state_cache

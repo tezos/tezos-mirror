@@ -103,6 +103,27 @@ val genesis_state :
   _ Node_context.t ->
   'm genesis_state tzresult Lwt.t
 
+(** {2 Cached snapshots for refutation game dissections} *)
+
+(** [to_cached_eval_state preference ctx_index eval_st] creates a cached
+    snapshot from a mutable evaluation state. For [In_memory], it makes an
+    immutable copy. For [On_disk], it commits the state to disk and stores
+    only the hash. *)
+val to_cached_eval_state :
+  Context_sigs.cache_preference ->
+  [`Read | `Write] Context.index ->
+  ('fuel, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state ->
+  'fuel Pvm_plugin_sig.cached_eval_state Lwt.t
+
+(** [from_cached_eval_state ctx_index cached] restores a mutable evaluation
+    state from a cached snapshot. For [In_memory], it creates a mutable copy.
+    For [On_disk], it checkouts the state from disk. *)
+val from_cached_eval_state :
+  _ Context.index ->
+  'fuel Pvm_plugin_sig.cached_eval_state ->
+  ('fuel, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state tzresult
+  Lwt.t
+
 (** [state_of_tick plugin node_ctxt cache ?start_state ~tick level] returns [Some
     state] for a given [tick] if this [tick] happened before [level] and where
     [state] is the PVM evaluation state before [tick] happened. Otherwise,
@@ -110,7 +131,7 @@ val genesis_state :
     [start_state]. *)
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
-  _ Node_context.t ->
+  _ Node_context.rw_context ->
   Pvm_plugin_sig.state_cache ->
   ?start_state:
     ( Fuel.Accounted.t,
