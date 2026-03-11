@@ -29,14 +29,14 @@ sol! {
     }
 }
 
-pub(crate) fn global_counter_precompile<CTX, DB>(
+pub(crate) fn global_counter_precompile<'j, CTX, DB>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
 {
     guard(
         GLOBAL_COUNTER_PRECOMPILE_ADDRESS,

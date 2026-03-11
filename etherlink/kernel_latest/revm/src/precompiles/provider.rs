@@ -58,7 +58,7 @@ impl EtherlinkPrecompiles {
         CUSTOMS.contains(address) || self.builtins.contains(address)
     }
 
-    fn run_custom_precompile<CTX, DB>(
+    fn run_custom_precompile<'j, CTX, DB>(
         &mut self,
         context: &mut CTX,
         inputs: &CallInputs,
@@ -67,8 +67,8 @@ impl EtherlinkPrecompiles {
         DB: DatabasePrecompileStateChanges
             + DatabaseCommitPrecompileStateChanges
             + revm::Database,
-        CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
-        Journal<DB>: CrossRuntimeCall,
+        CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+        Journal<'j, DB>: CrossRuntimeCall,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -116,13 +116,13 @@ impl EtherlinkPrecompiles {
     }
 }
 
-impl<CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
+impl<'j, CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
     DB: DatabasePrecompileStateChanges
         + DatabaseCommitPrecompileStateChanges
         + revm::Database,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
-    Journal<DB>: CrossRuntimeCall,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+    Journal<'j, DB>: CrossRuntimeCall,
 {
     type Output = InterpreterResult;
 

@@ -59,14 +59,14 @@ sol! {
     }
 }
 
-pub(crate) fn table_precompile<CTX, DB>(
+pub(crate) fn table_precompile<'j, CTX, DB>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
 {
     guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs)?;
 

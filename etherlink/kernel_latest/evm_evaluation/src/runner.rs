@@ -14,6 +14,7 @@ use revm_etherlink::{run_transaction, Error, ExecutionOutcome, GasData};
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
+use tezosx_journal::TezosXJournal;
 use thiserror::Error;
 
 use hex_literal::hex;
@@ -282,9 +283,11 @@ fn execute_transaction(
     let mut bytes = vec![0u8; 32];
     transaction_value.to_little_endian(&mut bytes);
     let registry = kernel::registry_impl::RegistryImpl::default();
+    let mut journal = TezosXJournal::new();
     run_transaction(
         host,
         &registry,
+        &mut journal,
         spec_id,
         &block_constants,
         None,

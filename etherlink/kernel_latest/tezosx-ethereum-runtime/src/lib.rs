@@ -29,6 +29,7 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
 };
+use tezosx_journal::TezosXJournal;
 
 alloy_sol_types::sol! {
     function init_tezosx_alias(string nativeAddress) external payable;
@@ -139,6 +140,7 @@ fn execute_request<Host>(
     runtime: &EthereumRuntime,
     registry: &impl Registry,
     host: &mut Host,
+    journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
@@ -161,6 +163,7 @@ where
     run_transaction(
         host,
         registry,
+        journal,
         evm_version.into(),
         &block_constants,
         None,
@@ -182,6 +185,7 @@ impl RuntimeInterface for EthereumRuntime {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         native_address: &[u8],
         context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>
@@ -267,6 +271,7 @@ impl RuntimeInterface for EthereumRuntime {
         let outcome = run_transaction(
             host,
             registry,
+            journal,
             evm_version.into(),
             &block_constants,
             None, // no transaction hash for internal transactions
@@ -300,6 +305,7 @@ impl RuntimeInterface for EthereumRuntime {
         &self,
         registry: &impl tezosx_interfaces::Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         from: &[u8],
         to: &[u8],
         amount: primitive_types::U256,
@@ -340,6 +346,7 @@ impl RuntimeInterface for EthereumRuntime {
             run_transaction(
                 host,
                 registry,
+                journal,
                 evm_version.into(),
                 &block_constants,
                 None, // no transaction hash for cross-runtime transactions
@@ -376,12 +383,13 @@ impl RuntimeInterface for EthereumRuntime {
         &self,
         registry: &impl Registry,
         host: &mut Host,
+        journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
-        build_response(execute_request(self, registry, host, request))
+        build_response(execute_request(self, registry, host, journal, request))
     }
 
     fn host(&self) -> &'static str {
@@ -500,6 +508,7 @@ mod tests {
         CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
         TezosXRuntimeError,
     };
+    use tezosx_journal::TezosXJournal;
 
     use crate::EthereumRuntime;
 
@@ -510,6 +519,7 @@ mod tests {
         fn bridge<Host>(
             &self,
             _host: &mut Host,
+            _journal: &mut TezosXJournal,
             _destination_runtime: RuntimeId,
             _destination_address: &[u8],
             _source_address: &[u8],
@@ -526,6 +536,7 @@ mod tests {
         fn generate_alias<Host>(
             &self,
             _host: &mut Host,
+            _journal: &mut TezosXJournal,
             _native_address: &[u8],
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
@@ -547,6 +558,7 @@ mod tests {
         fn serve<Host>(
             &self,
             _host: &mut Host,
+            _journal: &mut TezosXJournal,
             _request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
@@ -577,9 +589,11 @@ mod tests {
             block_number: U256::from(1),
         };
 
+        let mut journal = TezosXJournal::new();
         let result = runtime.call(
             &registry,
             &mut host,
+            &mut journal,
             &caller.0 .0,
             &destination.0 .0,
             value,
@@ -637,9 +651,11 @@ mod tests {
             block_number: U256::from(1),
         };
 
+        let mut journal = TezosXJournal::new();
         let result = runtime.call(
             &registry,
             &mut host,
+            &mut journal,
             &caller.0 .0,
             &contract.0 .0,
             U256::zero(),
@@ -700,9 +716,11 @@ mod tests {
             block_number: U256::from(1),
         };
 
+        let mut journal = TezosXJournal::new();
         let result = runtime.call(
             &registry,
             &mut host,
+            &mut journal,
             &caller.0 .0,
             &contract.0 .0,
             transfer_value,
@@ -942,7 +960,10 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let resp = runtime.serve(&registry, &mut host, request).unwrap();
+        let mut journal = TezosXJournal::new();
+        let resp = runtime
+            .serve(&registry, &mut host, &mut journal, request)
+            .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 }

@@ -43,6 +43,7 @@ use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
 use tezosx_interfaces::Registry;
+use tezosx_journal::TezosXJournal;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -486,9 +487,11 @@ impl Evaluation {
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
         simulation_caller.set_info_without_code(host, info)?;
 
+        let mut journal = TezosXJournal::new();
         match revm_run_transaction(
             host,
             registry,
+            &mut journal,
             &constants,
             None,
             from,
@@ -789,9 +792,11 @@ mod tests {
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
         let registry = RegistryImpl::default();
+        let mut journal = TezosXJournal::new();
         let outcome = run_transaction(
             host,
             &registry,
+            &mut journal,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
             None,

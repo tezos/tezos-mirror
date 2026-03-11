@@ -44,15 +44,14 @@ sol! {
     );
 }
 
-pub(crate) fn change_sequencer_key_precompile<CTX, DB>(
+pub(crate) fn change_sequencer_key_precompile<'j, CTX, DB>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    CTX: ContextTr,
-    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     DB: DatabasePrecompileStateChanges,
+    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
 {
     if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(

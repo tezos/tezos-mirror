@@ -36,6 +36,7 @@ sha3.workspace = true
 
 tezosx-interfaces.workspace = true
 http.workspace = true
+tezosx-journal.workspace = true
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

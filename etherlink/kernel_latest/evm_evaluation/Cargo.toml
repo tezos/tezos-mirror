@@ -12,6 +12,7 @@ license = "MIT"
 thiserror.workspace = true
 
 revm-etherlink.workspace = true
+tezosx-journal.workspace = true
 revm.workspace = true
 tezos_ethereum = { workspace = true, features = ["evaluation"] }
 tezos-evm-logging.workspace = true
