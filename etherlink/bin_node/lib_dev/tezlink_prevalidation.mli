@@ -87,6 +87,7 @@
     value should be created and validated at the same time. *)
 val parse_and_validate_for_queue :
   simulator_mode:Tezlink_backend_sig.simulator_mode ->
+  nanotez_per_michelson_gas:Tezos_types.Tez.nanotez ->
   read:(string -> bytes option tzresult Lwt.t) ->
   data_model:Tezlink_durable_storage.implicit_account_data_model ->
   string ->

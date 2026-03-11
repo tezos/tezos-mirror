@@ -63,9 +63,15 @@ module Tez : sig
 
   val to_mutez_z : t -> Z.t
 
+  val of_mutez_z : Z.t -> t tzresult
+
   val of_wei : wei -> t tzresult
 
   val nanotez_of_wei : wei -> nanotez
+
+  val to_wei : t -> wei
+
+  val of_nanotez_ceil : nanotez -> t tzresult
 end
 
 module Operation : sig

@@ -682,10 +682,23 @@ module Handlers = struct
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
+    let open Tezos_types.Tez in
     let read = Types.read session.state in
+    let* michelson_to_evm_gas_multiplier =
+      Etherlink_durable_storage.michelson_to_evm_gas_multiplier read
+    in
+    let nanotez_per_evm_gas =
+      Tezos_types.Tez.(
+        nanotez_of_wei (Wei session.etherlink_infos.base_fee_per_gas))
+    in
+    let nanotez_per_michelson_gas =
+      let (Nanotez per_evm_gas) = nanotez_per_evm_gas in
+      Nanotez Q.(per_evm_gas * of_int64 michelson_to_evm_gas_multiplier)
+    in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~simulator_mode
+        ~nanotez_per_michelson_gas
         ~read
         ~data_model
         raw_transaction

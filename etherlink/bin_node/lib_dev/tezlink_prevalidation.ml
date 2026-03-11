@@ -502,13 +502,24 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let compute_minimal_fees ~(op_raw_size : int)
-    ~(da_fee_per_byte : Tezos_types.Tez.t) =
+let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
+    ~(da_fee_per_byte : Tezos_types.Tez.t)
+    ~(nanotez_per_michelson_gas : Tezos_types.Tez.nanotez) =
   let open Tezos_types.Tez in
+  let open Result_syntax in
   let open Imported_env in
-  wrap_tzresult @@ (da_fee_per_byte *? Int64.of_int op_raw_size)
+  let* da_fees =
+    wrap_tzresult @@ (da_fee_per_byte *? Int64.of_int op_raw_size)
+  in
+  let execution_fees =
+    let (Nanotez per_michelson_gas) = nanotez_per_michelson_gas in
+    Nanotez Q.(mul per_michelson_gas (of_bigint op_gas_limit))
+  in
+  let* execution_fees = of_nanotez_ceil execution_fees in
+  Imported_env.wrap_tzresult @@ Tezos_types.Tez.(da_fees +? execution_fees)
 
-let parse_and_validate_for_queue ~simulator_mode ~read ~data_model raw =
+let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
+    ~read ~data_model raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -560,7 +571,13 @@ let parse_and_validate_for_queue ~simulator_mode ~read ~data_model raw =
   in
   let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
   let* da_fee_per_byte = Tezlink_durable_storage.da_fee_per_byte_mutez read in
-  let*? minimal_fees = compute_minimal_fees ~op_raw_size ~da_fee_per_byte in
+  let*? minimal_fees =
+    compute_minimal_fees
+      ~op_raw_size
+      ~op_gas_limit:ctxt.gas_limit_sum
+      ~da_fee_per_byte
+      ~nanotez_per_michelson_gas
+  in
   if check_minimal_fees && ctxt.fee_sum < minimal_fees then
     tzfail
     @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string minimal_fees)

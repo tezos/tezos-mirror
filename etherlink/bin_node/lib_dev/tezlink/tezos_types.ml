@@ -101,9 +101,29 @@ module Tez = struct
            "Only values fitting on int64 can be converted to Tez.t")
     else return (of_mutez_exn (Z.to_int64 mutez))
 
+  let of_mutez_q_floor mutez = of_mutez_z (Q.to_bigint mutez)
+
+  let of_mutez_q_ceil mutez =
+    let open Result_syntax in
+    (* Same as [of_mutez_q_floor] but rounds up instead of down. *)
+    match of_mutez_q_floor mutez with
+    | Error _ as err -> err
+    | Ok floor ->
+        if Q.(mutez = of_bigint (to_mutez_z floor)) then
+          (* The division was exact, there is no rounding so floor and ceil are the same thing. *)
+          return floor
+        else
+          (* The division is not exact, we need to take the successor. *)
+          Tezlink_imports.Imported_env.wrap_tzresult @@ (floor +? one_mutez)
+
   let of_wei (Wei wei) = of_mutez_z Z.(wei / pow (of_int 10) 12)
 
   let nanotez_of_wei (Wei wei) = Nanotez (Q.make wei (Z.pow (Z.of_int 10) 9))
+
+  let to_wei (t : t) = Wei Z.(to_mutez_z t * pow (of_int 10) 12)
+
+  let of_nanotez_ceil (Nanotez nanotez) =
+    of_mutez_q_ceil Q.(nanotez / of_int 1000)
 end
 
 module Operation = struct
