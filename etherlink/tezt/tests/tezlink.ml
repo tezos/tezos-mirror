@@ -3820,6 +3820,56 @@ let test_michelson_gas_backlog =
     ~error_msg:"baseFeePerGas should have increased: expected > %R, got %L" ;
   unit
 
+(** Tests that Michelson operations in TezosX validate execution gas fees.
+    With base_fee_per_gas = 10^9 (1 Gwei) and MICHELSON_TO_EVM_GAS_MULTIPLIER = 10,
+    gas_limit = 500_000 requires execution gas fee =
+    500_000 * 10 * 10^9 / 10^12 = 5_000 mutez.
+
+    A fee of 1_000 mutez does not cover execution gas: the operation
+    passes mempool injection but is rejected during block production.
+    A fee of 10_000 mutez covers execution gas: the operation is included. *)
+let test_michelson_execution_gas_fee =
+  register_tezosx_test
+    ~title:"Michelson transfer validates execution gas fee"
+    ~tags:["kernel"; "validation"; "execution"; "gas"; "fee"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  (* Fee = 1_000 mutez: below execution gas cost → rejected at
+     block production time. *)
+  let* (`OpHash _rejected) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~fee:1_000
+      ~gas_limit:500_000
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = check_operations ~client:client_tezlink ~block:"3" ~expected:[] in
+  (* Fee = 10_000 mutez: covers execution gas → included. *)
+  let* (`OpHash accepted) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap1
+      ~fee:10_000
+      ~gas_limit:500_000
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"4" ~expected:[accepted]
+  in
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4548,6 +4598,7 @@ let () =
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_michelson_gas_backlog [Alpha] ;
+  test_michelson_execution_gas_fee [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
