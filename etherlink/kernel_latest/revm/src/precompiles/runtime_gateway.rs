@@ -17,6 +17,7 @@ use tezosx_interfaces::{
 };
 
 use crate::{
+    helpers::legacy::alloy_to_u256,
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
@@ -28,6 +29,7 @@ use crate::{
     },
 };
 use evm_types::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges};
+use tezos_ethereum::wei::mutez_from_wei;
 
 sol! {
     contract RuntimeGateway {
@@ -171,13 +173,56 @@ where
             let implicit_address = call.implicitAddress;
             let amount = inputs.value.get();
 
-            // Perform the transfer (no entrypoint/parameters)
-            context.journal_mut().tezosx_call_michelson(
-                inputs.caller,
-                &implicit_address,
-                amount,
-                &[],
+            // Build HTTP request targeting the Tezos runtime (no entrypoint)
+            let url = format!("http://tezos/{implicit_address}");
+            let mut request = http::Request::builder()
+                .method(http::Method::POST)
+                .uri(&url)
+                .body(Vec::new())
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "failed to build HTTP request: {e}"
+                    ))
+                })?;
+
+            // Resolve cross-runtime aliases and inject context headers
+            let tx_caller = context.tx().caller();
+            let gas_limit = inputs.gas_limit;
+            let timestamp = context.block().timestamp();
+            let block_number = context.block().number();
+            let sender_alias = context
+                .journal_mut()
+                .tezosx_resolve_source_alias(inputs.caller)?;
+            let source_alias = context
+                .journal_mut()
+                .tezosx_resolve_source_alias(tx_caller)?;
+
+            // Convert amount from wei to mutez for the Tezos runtime
+            let amount_mutez =
+                U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "Failed to convert amount from wei to mutez: {e:?}"
+                    ))
+                })?);
+
+            inject_tezos_headers(
+                request.headers_mut(),
+                &sender_alias,
+                &source_alias,
+                amount_mutez,
+                gas_limit,
+                timestamp,
+                block_number,
             )?;
+
+            let response = context.journal_mut().tezosx_call_http(request)?;
+            if !response.status().is_success() {
+                return Err(CustomPrecompileError::Revert(format!(
+                    "Cross-runtime call failed with status {}: {}",
+                    response.status(),
+                    String::from_utf8_lossy(response.body())
+                )));
+            }
 
             // Emit event
             let log_data = TransferEvent {
@@ -200,25 +245,61 @@ where
             let parameters = call.parameters;
             let amount = inputs.value.get();
 
-            // Encode entrypoint + parameters into the bridge data field
-            // Format: [2 bytes: entrypoint length][entrypoint UTF-8][Micheline bytes]
-            let entrypoint_bytes = entrypoint.as_bytes();
-            let ep_len: u16 = entrypoint_bytes.len().try_into().map_err(|_| {
-                CustomPrecompileError::Revert("entrypoint name too long".into())
-            })?;
-            let mut data =
-                Vec::with_capacity(2 + entrypoint_bytes.len() + parameters.len());
-            data.extend_from_slice(&ep_len.to_be_bytes());
-            data.extend_from_slice(entrypoint_bytes);
-            data.extend_from_slice(&parameters);
+            // Build HTTP request targeting the Tezos runtime.
+            // Entrypoint goes in the URL path, Micheline parameters in the body.
+            let url = if entrypoint.is_empty() {
+                format!("http://tezos/{destination}")
+            } else {
+                format!("http://tezos/{destination}/{entrypoint}")
+            };
+            let mut request = http::Request::builder()
+                .method(http::Method::POST)
+                .uri(&url)
+                .body(parameters.to_vec())
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "failed to build HTTP request: {e}"
+                    ))
+                })?;
 
-            // Perform the cross-runtime call
-            context.journal_mut().tezosx_call_michelson(
-                inputs.caller,
-                &destination,
-                amount,
-                &data,
+            // Resolve cross-runtime aliases and inject context headers
+            let tx_caller = context.tx().caller();
+            let gas_limit = inputs.gas_limit;
+            let timestamp = context.block().timestamp();
+            let block_number = context.block().number();
+            let sender_alias = context
+                .journal_mut()
+                .tezosx_resolve_source_alias(inputs.caller)?;
+            let source_alias = context
+                .journal_mut()
+                .tezosx_resolve_source_alias(tx_caller)?;
+
+            // Convert amount from wei to mutez for the Tezos runtime
+            let amount_mutez =
+                U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "Failed to convert amount from wei to mutez: {e:?}"
+                    ))
+                })?);
+
+            inject_tezos_headers(
+                request.headers_mut(),
+                &sender_alias,
+                &source_alias,
+                amount_mutez,
+                gas_limit,
+                timestamp,
+                block_number,
             )?;
+
+            let response = context.journal_mut().tezosx_call_http(request)?;
+            if !response.status().is_success() {
+                return Err(CustomPrecompileError::Revert(format!(
+                    "Cross-runtime call failed with status {}: {}",
+                    response.status(),
+                    String::from_utf8_lossy(response.body())
+                )));
+            }
 
             // Emit event
             let log_data = CallMichelsonEvent {
@@ -241,7 +322,7 @@ where
                 build_http_request(&call.url, &call.headers, &call.body, call.method)?;
 
             // Resolve cross-runtime aliases for the caller and tx originator,
-            // just like tezosx_call_michelson does for transfer/call endpoints.
+            // just like the transfer/callMichelson handlers do.
             let tx_caller = context.tx().caller();
             let amount = inputs.value.get();
             // Convert EVM gas to the target runtime's units.

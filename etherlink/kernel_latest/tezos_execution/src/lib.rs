@@ -6201,7 +6201,7 @@ mod tests {
             50_u64.into(),
             Contract::Originated(gateway_kt1),
             Parameters {
-                entrypoint: Entrypoint::try_from("call").unwrap(),
+                entrypoint: Entrypoint::try_from("call_evm").unwrap(),
                 value: call_value.encode(),
             },
         );
@@ -6293,7 +6293,10 @@ mod tests {
             where
                 Host: StorageV1 + Logging,
             {
-                unimplemented!()
+                Ok(http::Response::builder()
+                    .status(http::StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(b"reverted".to_vec())
+                    .unwrap())
             }
         }
 
