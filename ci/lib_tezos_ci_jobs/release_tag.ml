@@ -222,6 +222,28 @@ let job_release_page =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
+let job_opam_release =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.CI.prebuild
+    ~stage:Stages.publish
+    ~description:
+      "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
+       This job does preliminary work for releasing Octez opam packages on \
+       opam repository, by pushing a branch with updated package descriptions \
+       (.opam files) to https://github.com/tezos/opam-repository. It _does \
+       not_ automatically create a corresponding pull request on the official \
+       opam repository."
+    ~interruptible:false
+    ~name:"opam:release"
+    [
+      ("./scripts/ci/opam-release.sh"
+      ^ match mode with `test -> " --dry-run" | `real -> "");
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
@@ -234,11 +256,6 @@ let job_release_page =
     On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let mode = if test then `test else `real in
-  let variables =
-    match release_tag_pipeline_type with
-    | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
-    | _ -> None
-  in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
@@ -249,25 +266,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     | _ -> job_gitlab_release mode
   in
   let job_release_page = job_release_page mode `wait_for_build in
-  let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
-    job
-      ~__POS__
-      ~image:Images.CI.prebuild
-      ~stage:Stages.publish
-      ~description:
-        "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
-         This job does preliminary work for releasing Octez opam packages on \
-         opam repository, by pushing a branch with updated package \
-         descriptions (.opam files) to \
-         https://github.com/tezos/opam-repository. It _does not_ automatically \
-         create a corresponding pull request on the official opam repository."
-      ~interruptible:false
-      ?variables
-      ~name:"opam:release"
-      [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
   let job_promote_to_latest_test =
     job_docker_promote_to_latest
       ~ci_docker_hub:false
@@ -327,7 +325,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   @
   match (test, release_tag_pipeline_type) with
   | false, Release_tag ->
-      [job_opam_release (); job_release_page; job_dispatch_call]
+      [job_opam_release `real; job_release_page; job_dispatch_call]
   | true, Release_tag ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -336,7 +334,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
            release testers are not required to trigger two separate pipelines
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
-        job_opam_release ~dry_run:true ();
+        job_opam_release `test;
         job_release_page;
       ]
   | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
