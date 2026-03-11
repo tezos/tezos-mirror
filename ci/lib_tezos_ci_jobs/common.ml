@@ -396,20 +396,6 @@ module Packaging = struct
       ]
     |> enable_sccache
 
-  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution ~script
-      ~base_image =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ~stage:Stages.images
-      ~variables:
-        (make_variables
-           ~kind:"systemd-tests"
-           [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      script
-
   let make_docker_build_dependencies ~__POS__ ?rules ~name ~matrix ~distribution
       ~base_image ~script () =
     job_docker_authenticated
@@ -432,20 +418,6 @@ module Packaging = struct
       ~dependencies
       ~variables:
         (make_variables
-           [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
-      ~parallel:(Matrix matrix)
-      ["scripts/ci/docker-merge-base-images.sh"]
-
-  let make_job_merge_systemd_test_dependencies ~distribution ~dependencies
-      ~matrix =
-    job_docker_authenticated
-      ~__POS__
-      ~name:(Format.sprintf "oc.docker-systemd-merge-manifest.%s" distribution)
-      ~stage:Stages.images
-      ~dependencies
-      ~variables:
-        (make_variables
-           ~kind:"systemd-tests"
            [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
       ~parallel:(Matrix matrix)
       ["scripts/ci/docker-merge-base-images.sh"]
