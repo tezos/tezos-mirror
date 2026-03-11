@@ -73,6 +73,11 @@ Node
   migrate to Brassaia unless the user explicitly opts out using
   ``TEZOS_CONTEXT_BACKEND=irmin``. (MR :gl:`!20079`)
 
+- Updated the default secure RPC ACL policy: tightened ``contracts`` and
+  ``delegates`` endpoint patterns to require an explicit identifier, and removed
+  ``merkle_tree``, ``merkle_tree_v2``, ``network/version``, and
+  ``network/versions`` endpoints from the default allowlist.
+
 Client
 ------
 
