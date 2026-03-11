@@ -309,31 +309,6 @@ module type COMPONENT_API = sig
     string ->
     job
 
-  (** Register jobs to be included in [before_merging]. *)
-  val register_before_merging_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [merge_train] pipelines. *)
-  val register_merge_train_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [before_merging] and [merge_train] pipelines.
-
-      This is equivalent to registering the job with both
-      [register_before_merging_jobs] and [register_merge_train_jobs]. *)
-  val register_merge_request_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [schedule_extended_test] pipelines.
-
-      Only available in the [Shared] component. *)
-  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [custom_extended_test] pipelines.
-
-      Only available in the [Shared] component. *)
-  val register_custom_extended_test_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in [master_branch] pipelines. *)
-  val register_master_jobs : (trigger * job) list -> unit
-
   (** Register a scheduled pipeline for this component.
 
       Usage: [register_scheduled_pipeline ~description name jobs]
@@ -362,36 +337,6 @@ module type COMPONENT_API = sig
   (** This section contains functions to define jobs for release pipelines.
       In the future, these functions may be replaced by something more abstract.
       (See the future work section at the end of the file.) *)
-
-  (** Register jobs to be included in the global release pipeline.
-
-      This pipeline is for major releases and includes all components.
-      It runs in [tezos/tezos]. *)
-  val register_global_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global test release pipeline.
-
-      This pipeline is supposed to be very close to the global release pipeline.
-      It is not run in [tezos/tezos] but in forks. *)
-  val register_global_test_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global scheduled test release pipeline.
-
-      This pipeline is supposed to be close to the global release pipeline,
-      except that it should not actually create the release.
-      It runs in [tezos/tezos]. *)
-  val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the publish release pages pipeline.
-
-      This pipeline is for publishing the updated release pages. *)
-  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the publish release pages test pipeline.
-
-      This pipeline is for publishing the updated release pages on the test web page. *)
-  val register_global_test_publish_release_page_jobs :
-    (trigger * job) list -> unit
 
   (** Register jobs to be included in the release pipeline of the current component.
 
@@ -434,16 +379,6 @@ module type COMPONENT_API = sig
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     (trigger * job) list ->
     unit
-
-  (** Register jobs to be included in the global [octez_monitoring] pipeline. *)
-  val register_octez_monitoring_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global packaging revision pipeline. *)
-  val register_global_packaging_revision_jobs : (trigger * job) list -> unit
-
-  (** Register jobs to be included in the global packaging revision test pipeline. *)
-  val register_global_packaging_revision_test_jobs :
-    (trigger * job) list -> unit
 end
 
 (** The main functor of Cacio. *)
@@ -455,50 +390,43 @@ module Make (_ : COMPONENT) : COMPONENT_API
     Add a comment next to your job definitions to justify this reason. *)
 module Shared : COMPONENT_API
 
+(** {2 Global pipelines} *)
+
+(** Global pipelines.
+
+    Global pipelines are shared between components. *)
+type global_pipeline =
+  | Before_merging
+  | Merge_train
+  | Schedule_extended_test
+  | Custom_extended_test
+  | Master
+  | Release
+  | Test_release
+  | Scheduled_test_release
+  | Publish_release_page
+  | Test_publish_release_page
+  | Octez_monitoring
+  | Packaging_revision
+  | Packaging_revision_test
+
+(** Add jobs to a given global pipeline. *)
+val register_jobs : global_pipeline -> (trigger * job) list -> unit
+
+(** Register jobs to be included in [before_merging] and [merge_train] pipelines.
+
+    This is equivalent to registering the job with both
+    [register_jobs Before_merging] and [register_jobs Merge_train]. *)
+val register_merge_request_jobs : (trigger * job) list -> unit
+
 (** {2 Listing registered jobs and more} *)
 
 (** Only call these functions after all jobs are registered.
     They are meant to be called from [ci/bin/main.ml]
     when registering the pipelines with CIAO. *)
 
-(** Jobs for [before_merging]. *)
-val get_before_merging_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [merge_train]. *)
-val get_merge_train_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [schedule_extended_test]. *)
-val get_schedule_extended_test_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [custom_extended_test]. *)
-val get_custom_extended_test_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [master]. *)
-val get_master_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global release pipeline. *)
-val get_global_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global test release pipeline. *)
-val get_global_test_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global scheduled test release pipeline. *)
-val get_global_scheduled_test_release_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the publish release pages pipeline. *)
-val get_global_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the publish release pages test pipeline. *)
-val get_global_test_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for [octez_monitoring]. *)
-val get_octez_monitoring_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global packaging revision pipelines. *)
-val get_global_packaging_revision_jobs : unit -> Tezos_ci.tezos_job list
-
-(** Jobs for the global packaging revision test pipelines. *)
-val get_global_packaging_revision_test_jobs : unit -> Tezos_ci.tezos_job list
+(** Get the list of jobs registered for a given global pipeline. *)
+val get_jobs : global_pipeline -> Tezos_ci.tezos_job list
 
 (** Regular expressions that match release tags.
 

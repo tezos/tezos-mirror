@@ -106,14 +106,15 @@ let job_build_kernels =
     ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_check_riscv_kernels);
       (Immediate, job_audit_riscv_deps);
       (Auto, job_test_kernels);
       (Auto, job_build_kernels);
     ] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, job_check_riscv_kernels);
       (Auto, job_audit_riscv_deps);

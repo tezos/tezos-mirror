@@ -132,8 +132,7 @@ let () =
   register
     "before_merging"
     If.(merge_request && not merge_train)
-    ~jobs:
-      (Code_verification.jobs Before_merging @ Cacio.get_before_merging_jobs ())
+    ~jobs:(Code_verification.jobs Before_merging @ Cacio.get_jobs Before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -144,7 +143,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_merge_train_jobs ())
+    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_jobs Merge_train)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -158,7 +157,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Master_branch.jobs @ Cacio.get_master_jobs ())
+    ~jobs:(Master_branch.jobs @ Cacio.get_jobs Master)
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -360,7 +359,7 @@ let () =
     ~jobs:
       ((Code_verification.jobs Schedule_extended_test
        |> List.map (with_interruptible false))
-      @ Cacio.get_schedule_extended_test_jobs ())
+      @ Cacio.get_jobs Schedule_extended_test)
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -417,7 +416,7 @@ let () =
      to testing the special options, and there is no reason why at least some tests
      could be run with special options in dedicated jobs in [before_merging] pipelines. *)
   let custom_extended_test_jobs =
-    Cacio.get_custom_extended_test_jobs () @ [job_datadog_pipeline_trace]
+    Cacio.get_jobs Custom_extended_test @ [job_datadog_pipeline_trace]
   in
   register
     "schedule_extended_rpc_test"
@@ -552,7 +551,7 @@ let () =
          Tezos_ci.job_datadog_pipeline_trace;
          Release_tag.job_release_page `test `wait_for_nothing;
        ]
-      @ Cacio.get_global_test_publish_release_page_jobs ())
+      @ Cacio.get_jobs Test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
@@ -562,7 +561,7 @@ let () =
          Tezos_ci.job_datadog_pipeline_trace;
          Release_tag.job_release_page `real `wait_for_nothing;
        ]
-      @ Cacio.get_global_publish_release_page_jobs ())
+      @ Cacio.get_jobs Publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)

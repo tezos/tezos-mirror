@@ -62,7 +62,7 @@ let monitoring_child_pipeline =
        ~inherit_:
          (Gitlab_ci.Types.Variable_list
             ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
-       ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_octez_monitoring_jobs ()))
+       ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_jobs Octez_monitoring))
 
 let job_docker =
   Cacio.parameterize @@ fun mode ->
@@ -321,10 +321,10 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
      else
        match (test, release_tag_pipeline_type) with
        | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           Cacio.get_global_release_jobs ()
+           Cacio.get_jobs Release
        | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           Cacio.get_global_test_release_jobs ()
-       | true, Schedule_test -> Cacio.get_global_scheduled_test_release_jobs ()
+           Cacio.get_jobs Test_release
+       | true, Schedule_test -> Cacio.get_jobs Scheduled_test_release
        | false, Schedule_test ->
            failwith
              "test = false is inconsistent with release_tag_pipeline_type = \
@@ -399,9 +399,11 @@ let job_update_gitlab_release =
     ~tag:Gcp_not_interruptible
 
 let () =
-  CI.register_global_packaging_revision_jobs
+  Cacio.register_jobs
+    Packaging_revision
     [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
-  CI.register_global_packaging_revision_test_jobs
+  Cacio.register_jobs
+    Packaging_revision_test
     [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
   ()
 
@@ -430,5 +432,5 @@ let octez_packaging_revision_jobs ?(test = false) () =
   ]
   @ jobs_debian_repository
   @
-  if test then Cacio.get_global_packaging_revision_test_jobs ()
-  else Cacio.get_global_packaging_revision_jobs ()
+  if test then Cacio.get_jobs Packaging_revision_test
+  else Cacio.get_jobs Packaging_revision

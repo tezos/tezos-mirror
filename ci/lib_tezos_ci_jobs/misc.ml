@@ -398,7 +398,7 @@ let job_test_sdk_rust =
     ["make -C sdk/rust check"; "make -C sdk/rust test"]
 
 let register () =
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);
@@ -422,7 +422,8 @@ let register () =
       (Auto, job_ocaml_check);
       (Auto, job_test_sdk_rust);
     ] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);

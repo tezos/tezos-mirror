@@ -793,35 +793,12 @@ module type COMPONENT_API = sig
     string ->
     job
 
-  val register_before_merging_jobs : (trigger * job) list -> unit
-
-  val register_merge_train_jobs : (trigger * job) list -> unit
-
-  val register_merge_request_jobs : (trigger * job) list -> unit
-
-  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
-
-  val register_custom_extended_test_jobs : (trigger * job) list -> unit
-
-  val register_master_jobs : (trigger * job) list -> unit
-
   val register_scheduled_pipeline :
     description:string ->
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     string ->
     (trigger * job) list ->
     unit
-
-  val register_global_release_jobs : (trigger * job) list -> unit
-
-  val register_global_test_release_jobs : (trigger * job) list -> unit
-
-  val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
-
-  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
-
-  val register_global_test_publish_release_page_jobs :
-    (trigger * job) list -> unit
 
   val register_dedicated_release_pipeline :
     ?tag_rex:string ->
@@ -834,98 +811,53 @@ module type COMPONENT_API = sig
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     (trigger * job) list ->
     unit
-
-  val register_octez_monitoring_jobs : (trigger * job) list -> unit
-
-  val register_global_packaging_revision_jobs : (trigger * job) list -> unit
-
-  val register_global_packaging_revision_test_jobs :
-    (trigger * job) list -> unit
 end
 
-(* Some jobs are to be added to shared pipelines.
-   We must only call [convert_jobs] once we know all of them,
-   otherwise some jobs (such as [select_tezts]) could be added twice. *)
-let before_merging_jobs = ref []
+type global_pipeline =
+  | Before_merging
+  | Merge_train
+  | Schedule_extended_test
+  | Custom_extended_test
+  | Master
+  | Release
+  | Test_release
+  | Scheduled_test_release
+  | Publish_release_page
+  | Test_publish_release_page
+  | Octez_monitoring
+  | Packaging_revision
+  | Packaging_revision_test
 
-let get_before_merging_jobs () =
-  (* Add [trigger] as a dependency of all [jobs]. *)
-  (* The actual [trigger] job is defined deep inside [code_verification.ml]
-     (look for [job_start]). CIAO only really cares about the name of the job,
-     so we hackishly redefine it here. *)
-  let job_trigger =
-    Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
-  in
-  convert_jobs
-    ~with_job_trigger:job_trigger
-    ~with_condition:true
-    !before_merging_jobs
+let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
+  Hashtbl.create 128
 
-let merge_train_jobs = ref []
+let register_jobs pipeline jobs =
+  List.iter (Hashtbl.add global_jobs pipeline) jobs
 
-let get_merge_train_jobs () =
-  convert_jobs ~with_condition:true !merge_train_jobs
+let register_merge_request_jobs jobs =
+  register_jobs Before_merging jobs ;
+  register_jobs Merge_train jobs
 
-let schedule_extended_test_jobs = ref []
-
-let get_schedule_extended_test_jobs () =
-  convert_jobs
-    ~interruptible_pipeline:false
-    ~with_condition:false
-    !schedule_extended_test_jobs
-
-let custom_extended_test_jobs = ref []
-
-let get_custom_extended_test_jobs () =
-  convert_jobs ~with_condition:false !custom_extended_test_jobs
-
-let master_jobs = ref []
-
-let get_master_jobs () =
-  convert_jobs ~interruptible_publish:true ~with_condition:false !master_jobs
-
-let global_release_jobs = ref []
-
-let get_global_release_jobs () =
-  convert_jobs ~with_condition:false !global_release_jobs
-
-let global_test_release_jobs = ref []
-
-let get_global_test_release_jobs () =
-  convert_jobs ~with_condition:false !global_test_release_jobs
-
-let global_scheduled_test_release_jobs = ref []
-
-let get_global_scheduled_test_release_jobs () =
-  convert_jobs ~with_condition:false !global_scheduled_test_release_jobs
-
-let global_publish_release_page_jobs = ref []
-
-let get_global_publish_release_page_jobs () =
-  convert_jobs ~with_condition:false !global_publish_release_page_jobs
-
-let global_test_publish_release_page_jobs = ref []
-
-let get_global_test_publish_release_page_jobs () =
-  convert_jobs ~with_condition:false !global_test_publish_release_page_jobs
-
-let octez_monitoring_jobs = ref []
-
-let get_octez_monitoring_jobs () =
-  convert_jobs ~with_condition:false !octez_monitoring_jobs
-
-let global_packaging_revision_jobs = ref []
-
-let get_global_packaging_revision_jobs () =
-  convert_jobs ~with_condition:false !global_packaging_revision_jobs
-
-let global_packaging_revision_test_jobs = ref []
-
-let get_global_packaging_revision_test_jobs () =
-  convert_jobs
-    ~interruptible_publish:true
-    ~with_condition:false
-    !global_packaging_revision_test_jobs
+let get_jobs pipeline =
+  let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in
+  match pipeline with
+  | Before_merging ->
+      (* Add [trigger] as a dependency of all [jobs]. *)
+      (* The actual [trigger] job is defined deep inside [code_verification.ml]
+           (look for [job_start]). CIAO only really cares about the name of the job,
+           so we hackishly redefine it here. *)
+      let job_trigger =
+        Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
+      in
+      convert_jobs ~with_job_trigger:job_trigger ~with_condition:true jobs
+  | Merge_train -> convert_jobs ~with_condition:true jobs
+  | Schedule_extended_test ->
+      convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
+  | Master ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Packaging_revision_test ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | _ -> convert_jobs ~with_condition:false jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1322,35 +1254,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
         ])
 
-  let register_before_merging_jobs jobs =
-    before_merging_jobs := jobs @ !before_merging_jobs
-
-  let register_merge_train_jobs jobs =
-    merge_train_jobs := jobs @ !merge_train_jobs
-
-  let register_merge_request_jobs jobs =
-    register_before_merging_jobs jobs ;
-    register_merge_train_jobs jobs
-
-  let register_schedule_extended_test_jobs jobs =
-    match Component.name with
-    | Some _ ->
-        failwith
-          "register_schedule_extended_test_jobs can only be used from the \
-           Shared component; regular components should define their own \
-           schedule pipelines with register_scheduled_pipeline"
-    | None -> schedule_extended_test_jobs := jobs @ !schedule_extended_test_jobs
-
-  let register_custom_extended_test_jobs jobs =
-    match Component.name with
-    | Some _ ->
-        failwith
-          "register_custom_extended_test_jobs can only be used from the Shared \
-           component to migrate old custom extended test jobs"
-    | None -> custom_extended_test_jobs := jobs @ !custom_extended_test_jobs
-
-  let register_master_jobs jobs = master_jobs := jobs @ !master_jobs
-
   (* Helper for other functions below, that is not exposed to users of this module.
      It is responsible for:
      - prefixing the name of the pipeline with the name of the component;
@@ -1377,23 +1280,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
-
-  let register_global_release_jobs jobs =
-    global_release_jobs := jobs @ !global_release_jobs
-
-  let register_global_test_release_jobs jobs =
-    global_test_release_jobs := jobs @ !global_test_release_jobs
-
-  let register_global_scheduled_test_release_jobs jobs =
-    global_scheduled_test_release_jobs :=
-      jobs @ !global_scheduled_test_release_jobs
-
-  let register_global_publish_release_page_jobs jobs =
-    global_publish_release_page_jobs := jobs @ !global_publish_release_page_jobs
-
-  let register_global_test_publish_release_page_jobs jobs =
-    global_test_publish_release_page_jobs :=
-      jobs @ !global_test_publish_release_page_jobs
 
   (* Use this function to get the release tag regular expression,
      as it makes sure that it is registered only once. *)
@@ -1452,16 +1338,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
-
-  let register_octez_monitoring_jobs jobs =
-    octez_monitoring_jobs := jobs @ !octez_monitoring_jobs
-
-  let register_global_packaging_revision_jobs jobs =
-    global_packaging_revision_jobs := jobs @ !global_packaging_revision_jobs
-
-  let register_global_packaging_revision_test_jobs jobs =
-    global_packaging_revision_test_jobs :=
-      jobs @ !global_packaging_revision_test_jobs
 end
 
 module Shared = Make (struct

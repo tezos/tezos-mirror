@@ -173,7 +173,7 @@ let job_tezt_static_binaries =
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]
 
 let register () =
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_tezt `merge_request);
       (Auto, job_tezt_time_sensitive `merge_request);
@@ -183,7 +183,8 @@ let register () =
       (Manual, job_tezt_flaky `merge_request);
       (Auto, job_tezt_static_binaries `merge_request);
     ] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);
@@ -193,7 +194,8 @@ let register () =
       (Auto, job_tezt_flaky `scheduled);
       (Auto, job_tezt_static_binaries `scheduled);
     ] ;
-  CI.register_custom_extended_test_jobs
+  Cacio.register_jobs
+    Custom_extended_test
     [
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_time_sensitive `scheduled);
