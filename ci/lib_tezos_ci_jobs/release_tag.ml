@@ -448,3 +448,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_update_gitlab_release;
   ]
   @ jobs_debian_repository
+  @
+  if test then Cacio.get_global_packaging_revision_test_jobs ()
+  else Cacio.get_global_packaging_revision_jobs ()
