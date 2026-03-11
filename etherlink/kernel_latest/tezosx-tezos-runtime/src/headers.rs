@@ -30,8 +30,8 @@ use crate::NULL_PKH;
 pub struct MichelsonHeaders {
     /// Transfer amount in mutez.
     pub amount: Narith,
-    /// Gas limit in gas units.
-    pub gas_limit: Narith,
+    /// Gas limit in milligas.
+    pub gas_limit: u64,
     /// Block timestamp.
     pub timestamp: Timestamp,
     /// Block level.
@@ -107,7 +107,7 @@ mod tests {
         let headers = headers_from(&required_headers());
         let parsed = parse_request_headers(&headers).unwrap();
         assert_eq!(parsed.amount, Narith(0u64.into()));
-        assert_eq!(parsed.gas_limit, Narith(1_000_000u64.into()));
+        assert_eq!(parsed.gas_limit, 1_000_000u64);
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
         assert_eq!(parsed.sender, ContractKt1Hash::from_b58check(KT1).unwrap());

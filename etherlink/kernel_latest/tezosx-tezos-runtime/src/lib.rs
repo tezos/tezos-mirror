@@ -35,6 +35,7 @@ use tezos_tezlink::{
 };
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
+    X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -102,11 +103,23 @@ fn build_response(
     result: Result<TransferSuccess, TezosXRuntimeError>,
 ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
     let builder_result = match result {
-        Ok(response) =>
-        // TODO: Do something meaningful with the response
-        {
+        Ok(response) => {
+            // X-Tezos-Gas-Consumed is in Tezos milligas.
+            // The calling runtime is responsible for converting to its own units.
+            let consumed_milligas: u64 = response
+                .consumed_milligas
+                .0
+                .clone()
+                .try_into()
+                .map_err(|_| {
+                    TezosXRuntimeError::Custom(
+                        "consumed milligas overflows u64".to_string(),
+                    )
+                })?;
+            // TODO: Do something meaningful with the rest of the response
             http::Response::builder()
                 .status(StatusCode::OK)
+                .header(X_TEZOS_GAS_CONSUMED, &consumed_milligas.to_string())
                 .body(response.storage.unwrap_or(vec![]))
         }
         Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
@@ -155,16 +168,19 @@ where
         TezosXRuntimeError::Custom(format!("Failed to fetch sender account: {e:?}"))
     })?;
 
-    let null_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
-        TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
+    let source_pkh = hdrs.source.ok_or_else(|| {
+        TezosXRuntimeError::HeaderError("X-Tezos-Source header missing".into())
     })?;
-    let source_account = context
-        .implicit_from_public_key_hash(&hdrs.source.unwrap_or(null_pkh))
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Failed to fetch source account: {e:?}"))
-        })?;
+    let source_account =
+        context
+            .implicit_from_public_key_hash(&source_pkh)
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "Failed to fetch source account: {e:?}"
+                ))
+            })?;
 
-    let mut gas = TezlinkOperationGas::start(&hdrs.gas_limit)
+    let mut gas = TezlinkOperationGas::start_milligas(hdrs.gas_limit)
         .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
     let mut next_temp_id = BigMapId {
         value: Zarith(0.into()),
@@ -437,12 +453,19 @@ mod tests {
     use super::*;
 
     fn make_success(storage: Option<Vec<u8>>) -> TransferSuccess {
+        make_success_with_milligas(storage, 0)
+    }
+
+    fn make_success_with_milligas(
+        storage: Option<Vec<u8>>,
+        milligas: u64,
+    ) -> TransferSuccess {
         TransferSuccess {
             storage,
             balance_updates: vec![],
             ticket_receipt: vec![],
             originated_contracts: vec![],
-            consumed_milligas: Narith(0u64.into()),
+            consumed_milligas: Narith(milligas.into()),
             storage_size: Zarith(0.into()),
             paid_storage_size_diff: Zarith(0.into()),
             allocated_destination_contract: false,
@@ -480,5 +503,36 @@ mod tests {
                 .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(String::from_utf8_lossy(resp.body()).contains("KT1 not found"));
+    }
+
+    #[test]
+    fn build_response_success_has_gas_consumed_header() {
+        // consumed_milligas = 0 → reported as 0
+        let resp = build_response(Ok(make_success(None))).unwrap();
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .and_then(|v| v.to_str().ok()),
+            Some("0")
+        );
+    }
+
+    #[test]
+    fn build_response_gas_consumed_reports_milligas() {
+        // 5000 milligas → reported as 5000
+        let resp = build_response(Ok(make_success_with_milligas(None, 5000))).unwrap();
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .and_then(|v| v.to_str().ok()),
+            Some("5000")
+        );
+    }
+
+    #[test]
+    fn build_response_error_has_no_gas_consumed_header() {
+        let resp =
+            build_response(Err(TezosXRuntimeError::BadRequest("err".into()))).unwrap();
+        assert!(resp.headers().get(X_TEZOS_GAS_CONSUMED).is_none());
     }
 }
