@@ -54,4 +54,6 @@ let job_test =
     ~select_tezts:false
     ~tezt_exe:"ci/bin_release_page/tezt/main.exe"
 
-let register () = CI.register_merge_request_jobs [(Auto, job_test)]
+let register () =
+  CI.register_merge_request_jobs [(Auto, job_test)] ;
+  Cacio.Shared.register_schedule_extended_test_jobs [(Auto, job_test)]
