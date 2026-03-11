@@ -370,7 +370,12 @@ module Tezlink = struct
     let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~check_signature:(not skip_signature)
-        ~check_minimal_fees:false
+          (* When skip_signature is true, we are simulating the
+           operation and the consumed gas resulting from the
+           simulation will be used to estimate the fees. For this
+           reason, we want to allow fees below the minimum in this
+           case. *)
+        ~check_minimal_fees:(not skip_signature)
         ~read
         ~data_model
         input
