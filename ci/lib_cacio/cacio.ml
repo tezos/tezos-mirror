@@ -210,6 +210,7 @@ type job = {
   timeout : Gitlab_ci.Types.time_interval option;
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
+  id_tokens : Gitlab_ci.Types.id_tokens option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -553,6 +554,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     timeout;
                     image_dependencies;
                     services;
+                    id_tokens;
                   };
                 trigger;
                 only_if;
@@ -632,6 +634,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?parallel
                 ?rules
                 ?services
+                ?id_tokens
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
                 ?interruptible_runner:
                   (if interruptible_stage then
@@ -721,6 +724,7 @@ module type COMPONENT_API = sig
     ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
+    ?id_tokens:Gitlab_ci.Types.id_tokens ->
     string ->
     string list ->
     job
@@ -975,7 +979,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?(image_dependencies = []) ?services name script =
+      ?timeout ?(image_dependencies = []) ?services ?id_tokens name script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -1026,6 +1030,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       timeout;
       image_dependencies;
       services;
+      id_tokens;
     }
 
   module SH = struct
