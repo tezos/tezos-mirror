@@ -402,28 +402,49 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
               let rev_deps = rev_deps |> UID_set.elements |> List.map fix_uid in
               (* Fix [trigger]. *)
               let trigger =
-                let merge_triggers a b =
-                  match (a, b) with
-                  | Manual, Manual -> Manual
-                  | Immediate, (Auto | Immediate | Manual)
-                  | (Auto | Manual), Immediate ->
-                      Immediate
-                  | Auto, (Auto | Manual) | Manual, Auto ->
-                      (* If a job is supposed to run automatically,
-                         its dependencies must run automatically as well. *)
-                      Auto
-                in
-                let initial_trigger =
-                  match trigger with
-                  | None ->
-                      (* We don't know yet.
-                         [Manual] will be upgraded to [Auto] if necessary. *)
-                      Manual
-                  | Some trigger -> trigger
-                in
-                rev_deps
-                |> List.map (fun node -> node.trigger)
-                |> List.fold_left merge_triggers initial_trigger
+                match trigger with
+                | Some Immediate -> Immediate
+                | Some ((Auto | Manual) as trigger) ->
+                    (* If a job A that was requested to be [Immediate] depends
+                       on a job B that was requested to be non-[Immediate],
+                       the job A will not actually be [Immediate].
+                       So this is probably a mistake.
+                       Here we check that this is not the case (with B = [job]). *)
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto | Manual -> ()
+                      | Immediate ->
+                          failwith
+                          @@ sf
+                               "Job %s, which is Immediate, depends on job %s, \
+                                which is non-Immediate; this is probably a \
+                                mistake."
+                               rev_dep.job.name
+                               job.name ) ;
+                    trigger
+                | None ->
+                    (* Job was added automatically because of reverse dependencies.
+                       - If all explicit reverse dependencies are [Manual],
+                         we don't want to trigger this job automatically;
+                         it must also be [Manual].
+                       - If there is an explicit reverse dependency that is [Immediate],
+                         the job must be [Immediate].
+                       - Else it should be [Auto]. *)
+                    let auto_rev_deps = ref 0 in
+                    let immediate_rev_deps = ref 0 in
+                    let manual_rev_deps = ref 0 in
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto -> incr auto_rev_deps
+                      | Immediate -> incr immediate_rev_deps
+                      | Manual -> incr manual_rev_deps ) ;
+                    if !immediate_rev_deps > 0 then Immediate
+                    else if !auto_rev_deps > 0 then Auto
+                    else if !manual_rev_deps > 0 then Manual
+                    else
+                      (* No reverse dependency, yet the job was added automatically?
+                         This does not make sense. *)
+                      assert false
               in
               (* Fix the job's conditions so that it becomes the disjunction
                  of the conditions of its transitive dependencies (including itself)

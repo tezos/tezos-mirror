@@ -71,19 +71,12 @@ type job
     - [Immediate]: same as [Auto], but do not wait for the [trigger] job.
     - [Manual]: the job can be triggered manually once all of its dependencies succeed.
 
-    If a job [dep] with trigger [Manual]
-    is needed by a job with trigger [Auto],
-    the trigger of [dep] is automatically forced to [Auto].
+    Dependencies of [Immediate] jobs must themselves be [Immediate].
 
-    If a job [dep] with trigger [Manual] or [Auto]
-    is needed by a job with trigger [Immediate],
-    the trigger of [dep] is automatically forced to [Immediate].
-
-    If a job [dep] is added to a pipeline automatically
-    because it is the dependency of other jobs,
-    and if all those other jobs have trigger [Manual],
-    [dep] is added with trigger [Manual].
-    Otherwise it is added with trigger [Auto]. *)
+    If a job [job] is added automatically, its trigger depends on its reverse dependencies.
+    - If there is an [Immediate] reverse dependency, [job] is added as [Immediate].
+    - Else, if there is an [Auto] reverse dependency, [job] is added as [Auto].
+    - Else, all reverse dependencies are [Manual], so [job] is added as [Manual]. *)
 type trigger = Auto | Immediate | Manual
 
 (** Memoize a function.
