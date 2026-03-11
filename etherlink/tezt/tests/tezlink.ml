@@ -83,7 +83,8 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario =
+    ?catchup_cooldown ?da_fee ?sequencer_pool_address
+    ?michelson_to_evm_gas_multiplier scenario =
   let scenario setup protocol =
     let* () =
       if wait_for_valid_block then
@@ -112,6 +113,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?additional_uses
     ?da_fee
     ?sequencer_pool_address
+    ?michelson_to_evm_gas_multiplier
     ~kernel
     ~title
     ~tags:("tezlink" :: "tezosx" :: tags)
@@ -3764,6 +3766,55 @@ let test_tezlink_simulation_with_da_fee =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
+(** Tests that Tezos operations feed the gas backlog.
+    A single Michelson transfer consumes ~1,039 gas (1,039,000 milligas).
+    With DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER = 1,000,000, each adds ~1,039,000,000
+    to cumulative_execution_gas, which exceeds the EIP-1559 TOLERANCE (135,000,000)
+    and pushes baseFeePerGas upward without overflowing the u64 backlog. *)
+let test_michelson_gas_backlog =
+  (* A single Michelson transfer costs ~1,039 gas (1,039,000 milligas / 1000).
+     With a multiplier of 1,000,000 the EVM-equivalent gas is ~1,039,000,000
+     which exceeds the EIP-1559 TOLERANCE (135,000,000), pushing baseFeePerGas
+     upward without overflowing the u64 backlog. *)
+  register_tezosx_test
+    ~title:"Tezos operations update EVM gas backlog"
+    ~tags:["kernel"; "gas"; "backlog"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~michelson_to_evm_gas_multiplier:1_000_000L
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  let* initial_result = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let initial_base_fee =
+    match initial_result with
+    | Ok block -> block.Block.baseFeePerGas
+    | Error _ -> Stdlib.failwith "Couldn't retrieve latest block"
+  in
+  let* () =
+    Client.transfer
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client_tezlink
+  in
+  (* Produce block containing the transfer, then another whose
+     baseFeePerGas reflects the updated backlog. *)
+  let* () =
+    repeat 2 (fun () ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let*@ new_block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  Check.((new_block.Block.baseFeePerGas > initial_base_fee) int64)
+    ~error_msg:"baseFeePerGas should have increased: expected > %R, got %L" ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4491,6 +4542,7 @@ let () =
   test_tezlink_simulation_with_da_fee [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
+  test_michelson_gas_backlog [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
