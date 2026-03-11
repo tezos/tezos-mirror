@@ -1361,7 +1361,6 @@ where
 #[cfg(test)]
 #[allow(clippy::type_complexity)]
 pub(crate) mod test_utils {
-    use primitive_types::U256;
     use std::cell::RefCell;
     use tezos_evm_logging::Logging;
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -1371,10 +1370,10 @@ pub(crate) mod test_utils {
     use tezosx_journal::TezosXJournal;
 
     /// Mock Registry for testing gateway operations.
-    /// Tracks all calls to bridge and generate_alias for verification.
+    /// Tracks all calls to serve and generate_alias for verification.
     pub struct MockRegistry {
         pub generate_alias_calls: RefCell<Vec<(Vec<u8>, RuntimeId)>>,
-        pub bridge_calls: RefCell<Vec<(RuntimeId, Vec<u8>, Vec<u8>, U256, Vec<u8>)>>,
+        pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
         generated_alias: Vec<u8>,
     }
 
@@ -1382,7 +1381,7 @@ pub(crate) mod test_utils {
         pub fn new(generated_alias: Vec<u8>) -> Self {
             Self {
                 generate_alias_calls: RefCell::new(Vec::new()),
-                bridge_calls: RefCell::new(Vec::new()),
+                serve_calls: RefCell::new(Vec::new()),
                 generated_alias,
             }
         }
@@ -1393,24 +1392,17 @@ pub(crate) mod test_utils {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            destination_runtime: RuntimeId,
-            destination_address: &[u8],
-            source_address: &[u8],
-            amount: U256,
-            data: &[u8],
+            _destination_runtime: RuntimeId,
+            _destination_address: &[u8],
+            _source_address: &[u8],
+            _amount: primitive_types::U256,
+            _data: &[u8],
             _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
-            self.bridge_calls.borrow_mut().push((
-                destination_runtime,
-                destination_address.to_vec(),
-                source_address.to_vec(),
-                amount,
-                data.to_vec(),
-            ));
-            Ok(CrossCallResult::Success(vec![]))
+            unimplemented!("bridge is deprecated, use serve")
         }
 
         fn generate_alias<Host>(
@@ -1442,12 +1434,13 @@ pub(crate) mod test_utils {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _request: http::Request<Vec<u8>>,
+            request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
-            unimplemented!("not needed for this test")
+            self.serve_calls.borrow_mut().push(request);
+            Ok(http::Response::builder().status(200).body(vec![]).unwrap())
         }
     }
 }
@@ -5893,14 +5886,9 @@ mod tests {
             "Source balance should have decreased by fee + transfer amount"
         );
 
-        // Verify that bridge was called with the correct amount
-        let bridge_calls = registry.bridge_calls.borrow();
-        assert_eq!(bridge_calls.len(), 1, "Bridge should have been called once");
-        assert_eq!(
-            bridge_calls[0].3, // amount is the 4th field in the tuple
-            tezos_ethereum::wei::eth_from_mutez(50u64),
-            "Bridge should have been called with transfer amount of 50"
-        );
+        // Verify that serve was called
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 1, "Serve should have been called once");
 
         // Verify that the gateway balance is 0 (funds were forwarded, not locked)
         let context = context::TezlinkContext::init_context();
@@ -5910,7 +5898,7 @@ mod tests {
         assert_eq!(
             gateway_account.balance(&host).unwrap(),
             0_u64.into(),
-            "Gateway balance should be 0 after successful bridge call"
+            "Gateway balance should be 0 after successful serve call"
         );
     }
 

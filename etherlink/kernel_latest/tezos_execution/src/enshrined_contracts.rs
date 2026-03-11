@@ -18,15 +18,14 @@ use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
-    gas::convert as convert_gas, CrossCallResult, CrossRuntimeContext, Registry,
-    RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    gas::convert as convert_gas, CrossRuntimeContext, Registry, RuntimeId,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -533,54 +532,48 @@ fn tezosx_cross_runtime_call<'a, Host>(
 where
     Host: StorageV1 + Logging,
 {
-    let source = ctx.sender();
-    let amount = ctx.amount();
-
-    if amount < 0 {
+    if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()));
     }
 
-    let context = cross_runtime_ctx_from_ctx(ctx)?;
-    let alias =
-        get_or_create_alias(ctx.host(), journal, &source, context.clone(), registry)?;
-    let destination_contract = registry
-        .address_from_string(dest, RuntimeId::Ethereum)
-        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+    // Build an HTTP POST request targeting the Ethereum runtime.
+    let url = format!("http://ethereum/{dest}");
+    let mut request = http::Request::builder()
+        .method(http::Method::POST)
+        .uri(&url)
+        .body(data.to_vec())
+        .map_err(|e| {
+            TransferError::GatewayError(format!("Failed to build HTTP request: {e}"))
+        })?;
 
-    let amount: u64 = amount
-        .try_into()
-        .map_err(|_| TransferError::GatewayError("Negative amount".into()))?;
-    let result = registry
-        .bridge(
-            ctx.host(),
-            journal,
-            RuntimeId::Ethereum,
-            &destination_contract,
-            &alias,
-            eth_from_mutez(amount),
-            data,
-            context,
-        )
-        .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    match result {
-        CrossCallResult::Success(_) => {
-            // Debit the gateway: after a successful bridge call, the gateway
-            // forwarded the funds to EVM so its balance should be reset to 0.
-            let account = ctx.contract_account().clone();
-            let host = ctx.host();
-            account
-                .set_balance(host, &0u64.into())
-                .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-            Ok(())
-        }
-        CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
-            "Michelson Cross-runtime call reverted: {}",
-            hex::encode(&data)
-        ))),
-        CrossCallResult::Halt(data) => Err(TransferError::GatewayError(format!(
-            "Michelson Cross-runtime call halted: {}",
-            hex::encode(&data)
-        ))),
+    // Inject trusted X-Tezos-* context headers (sender alias, amount, etc.).
+    inject_context_headers(
+        request.headers_mut(),
+        Some("ethereum"),
+        ctx,
+        journal,
+        registry,
+    )?;
+
+    let response = registry
+        .serve(ctx.host(), journal, request)
+        .map_err(|err| TransferError::GatewayError(err.to_string()))?;
+
+    if response.status().is_success() {
+        // Debit the gateway: after a successful call, the gateway
+        // forwarded the funds to EVM so its balance should be reset to 0.
+        let account = ctx.contract_account().clone();
+        let host = ctx.host();
+        account
+            .set_balance(host, &0u64.into())
+            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+        Ok(())
+    } else {
+        Err(TransferError::GatewayError(format!(
+            "Cross-runtime call failed with status {}: {}",
+            response.status(),
+            String::from_utf8_lossy(response.body())
+        )))
     }
 }
 
@@ -716,10 +709,25 @@ mod tests {
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &calldata);
         assert!(result.is_ok());
 
-        let bridge_calls = registry.bridge_calls.borrow();
-        assert_eq!(bridge_calls.len(), 1);
-        assert_eq!(bridge_calls[0].0, RuntimeId::Ethereum);
-        assert_eq!(bridge_calls[0].4, calldata);
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 1);
+        assert_eq!(
+            serve_calls[0].uri().to_string(),
+            format!("http://ethereum/{dest}")
+        );
+        assert_eq!(serve_calls[0].body(), &calldata);
+        assert_eq!(
+            serve_calls[0].headers().get(X_TEZOS_SENDER).unwrap(),
+            "0x01020304"
+        );
+        assert_eq!(
+            serve_calls[0].headers().get(X_TEZOS_SOURCE).unwrap(),
+            "0x01020304"
+        );
+        assert_eq!(
+            serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(),
+            "500000000000000"
+        );
     }
 
     #[test]
@@ -743,21 +751,20 @@ mod tests {
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result.is_ok());
 
-        // Verify generate_alias was called
+        // Verify generate_alias was called for both sender and source
         let alias_calls = registry.generate_alias_calls.borrow();
-        assert_eq!(alias_calls.len(), 1);
+        assert_eq!(alias_calls.len(), 2);
         assert_eq!(alias_calls[0].1, RuntimeId::Ethereum);
+        assert_eq!(alias_calls[1].1, RuntimeId::Ethereum);
 
-        // Verify bridge was called with correct parameters
-        let bridge_calls = registry.bridge_calls.borrow();
-        assert_eq!(bridge_calls.len(), 1);
-        assert_eq!(bridge_calls[0].0, RuntimeId::Ethereum);
-        assert_eq!(bridge_calls[0].1, dest.as_bytes().to_vec());
-        assert_eq!(bridge_calls[0].2, generated_alias);
+        // Verify serve was called with correct URL and headers
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 1);
         assert_eq!(
-            bridge_calls[0].3,
-            tezos_ethereum::wei::eth_from_mutez(amount)
+            serve_calls[0].uri().to_string(),
+            format!("http://ethereum/{dest}")
         );
+        assert_eq!(serve_calls[0].method(), http::Method::POST);
     }
 
     #[test]
@@ -777,23 +784,23 @@ mod tests {
         let mut journal = TezosXJournal::new();
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
-        // First transfer creates alias
+        // First transfer creates aliases (sender + source)
         let result1 =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result1.is_ok());
 
-        // Second transfer should reuse alias
+        // Second transfer should reuse aliases
         let result2 =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
         assert!(result2.is_ok());
 
-        // generate_alias should only have been called once
+        // generate_alias should have been called twice (sender + source on first call)
         let alias_calls = registry.generate_alias_calls.borrow();
-        assert_eq!(alias_calls.len(), 1);
+        assert_eq!(alias_calls.len(), 2);
 
-        // bridge should have been called twice
-        let bridge_calls = registry.bridge_calls.borrow();
-        assert_eq!(bridge_calls.len(), 2);
+        // serve should have been called twice
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 2);
     }
 
     /// Helper to build a Micheline call value:
