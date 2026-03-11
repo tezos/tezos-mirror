@@ -407,7 +407,18 @@ let () =
       (Tezos_ci.job_datadog_pipeline_trace :: Opam.jobs_opam_packages ()
       |> List.map (with_interruptible false))
     ~description:"Daily pipeline containing all OPAM jobs." ;
-  let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
+
+  (* The "custom extended test" pipelines test the codebase with some particular options.
+     This allows testing behaviors that are not enabled by default on the node,
+     and are thus not tested in Tezt jobs of [before_merging] pipelines in particular.
+
+     Note: this method is simple to implement but is not ideal.
+     It duplicates a lot of tests that do not actually contribute
+     to testing the special options, and there is no reason why at least some tests
+     could be run with special options in dedicated jobs in [before_merging] pipelines. *)
+  let custom_extended_test_jobs =
+    Cacio.get_custom_extended_test_jobs () @ [job_datadog_pipeline_trace]
+  in
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests

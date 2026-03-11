@@ -5,5 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Jobs [oc.build_*-released]. *)
+val job_build_released : Tezos_ci.Runner.Arch.t -> Cacio.job
+
+(** Jobs [oc.build_*-extra-dev]. *)
+val job_build_extra_dev : Tezos_ci.Runner.Arch.t -> Cacio.job
+
+(** Jobs [oc.build_*-exp]. *)
+val job_build_exp : Tezos_ci.Runner.Arch.t -> Cacio.job
+
 (** Register build jobs. *)
 val register : unit -> unit

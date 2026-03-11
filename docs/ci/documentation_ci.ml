@@ -121,15 +121,10 @@ let job_manuals =
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
        executables."
-    ~needs_legacy:
-      (* It's ok to assume Before_merging here because we only care about the job name. *)
+    ~needs:
       [
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-            Before_merging );
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-            Before_merging );
+        (Artifacts, Tezos_ci_jobs.Build.job_build_released Amd64);
+        (Artifacts, Tezos_ci_jobs.Build.job_build_extra_dev Amd64);
       ]
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
@@ -255,13 +250,6 @@ let register () =
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
-    ~legacy_jobs:
-      [
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-          Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-          Schedule_extended_test;
-      ]
     [
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_22_04 `master);
@@ -275,12 +263,5 @@ let register () =
     ~description:
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
-    ~legacy_jobs:
-      [
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-          Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-          Schedule_extended_test;
-      ]
     [(Auto, job_publish)] ;
   ()

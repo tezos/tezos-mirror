@@ -141,11 +141,11 @@ let job_test_liquidity_baking_scripts =
     ~stage:Test
     ~description:"Test the liquidity baking scripts."
     ~image:Tezos_ci.Images.CI.build
-    ~needs_legacy:
+    ~needs:
       [
-        (Artifacts, Code_verification.job_build_x86_64_release Before_merging);
-        (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
-        (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
+        (Artifacts, Build.job_build_released Amd64);
+        (Artifacts, Build.job_build_extra_dev Amd64);
+        (Artifacts, Build.job_build_exp Amd64);
       ]
     ~only_if_changed:
       [

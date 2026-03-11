@@ -123,44 +123,6 @@ module Build = struct
       ["./scripts/ci/build_static_binaries.sh"]
     |> enable_cargo_cache |> enable_sccache
 
-  let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
-      ?dependencies () =
-    let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-    let name = sf "oc.build_%s-released" arch_string in
-    let executable_files = "script-inputs/released-executables" in
-    let variables =
-      [("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
-    in
-    let artifacts =
-      artifacts
-        ~name:"build-$ARCH-$CI_COMMIT_REF_SLUG"
-        ~when_:On_success
-        ~expire_in:(Duration (Days 1))
-        ["octez-*"; "src/proto_*/parameters/*.json"]
-    in
-    job
-      ?rules
-      ?dependencies
-      ~__POS__
-      ~stage:Stages.build
-      ~arch
-      ?retry
-      ?cpu
-      ?storage
-      ~name
-      ~image:Images.CI.build
-      ~before_script:
-        (Helpers.before_script
-           ~take_ownership:true
-           ~source_version:true
-           ~eval_opam:true
-           [])
-      ~variables
-      ~artifacts
-      ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache
-    |> enable_sccache ~policy:Pull_push
-
   let job_build_dynamic_binaries ?(extra = false) ?rules ~__POS__ ~arch ?retry
       ?cpu ?storage ?dependencies ~name executable_files =
     let arch_string = Runner.Arch.show_easy_to_distinguish arch in
@@ -222,28 +184,6 @@ module Build = struct
       ["./scripts/ci/build_full_unreleased.sh"]
     |> enable_cargo_cache
     |> enable_sccache ~policy:Pull_push
-
-  let job_build_arm64_release ?rules () : tezos_job =
-    job_build_released_binaries ?rules ~__POS__ ~arch:Arm64 ~storage:Ramfs ()
-
-  let job_build_arm64_extra_dev ?rules () : tezos_job =
-    job_build_dynamic_binaries
-      ~name:"oc.build_arm64-extra-dev"
-      ?rules
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~extra:true
-      "script-inputs/dev-executables"
-
-  let job_build_arm64_exp ?rules () : tezos_job =
-    job_build_dynamic_binaries
-      ~name:"oc.build_arm64-exp"
-      ?rules
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      "script-inputs/experimental-executables"
 
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     let profiled_binaries =

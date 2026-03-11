@@ -191,182 +191,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build_arm64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - src/proto_*/parameters/*.json
-    when: on_success
-
-oc.build_arm64-extra-dev:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/dev-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
-    when: on_success
-
-oc.build_arm64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
-    when: on_success
-
 oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -511,281 +335,6 @@ oc.build:static-arm64-linux-binaries:
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
-
-oc.build_x86_64-released:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - lwt_domain/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/released-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - src/proto_*/parameters/*.json
-    when: on_success
-
-oc.build_amd64-extra-dev:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - lwt_domain/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  - key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/dev-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-    DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
-    when: on_success
-
-oc.build_amd64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - lwt_domain/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  - key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-    DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
-    when: on_success
 
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1857,6 +1406,280 @@ oc.build_kernels:
     - dal_echo_kernel.wasm
     when: on_success
 
+oc.build_x86_64-exp:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
+    - Makefile
+    - brassaia-eio/**/*
+    - brassaia/**/*
+    - data-encoding/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - irmin/**/*
+    - lwt_domain/**/*
+    - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
+    - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
+    - sdk/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  artifacts:
+    name: build-x86_64-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
+    - fa-bridge-watchtower
+    when: on_success
+
+oc.build_x86_64-extra-dev:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - .gitlab-ci.yml
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
+    - Makefile
+    - brassaia-eio/**/*
+    - brassaia/**/*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - grafazos/doc/**/*
+    - irmin/**/*
+    - lwt_domain/**/*
+    - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
+    - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
+    - sdk/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    EXECUTABLE_FILES: script-inputs/dev-executables
+    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
+      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  artifacts:
+    name: build-x86_64-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
+    - fa-bridge-watchtower
+    when: on_success
+
+oc.build_x86_64-released:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu_ramfs
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - .gitlab-ci.yml
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
+    - Makefile
+    - brassaia-eio/**/*
+    - brassaia/**/*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*
+    - grafazos/doc/**/*
+    - irmin/**/*
+    - lwt_domain/**/*
+    - michelson_test_scripts/**/*
+    - opam/**/*
+    - prometheus/**/*
+    - resto/**/*
+    - rust-toolchain
+    - script-inputs/**/*
+    - scripts/**/*
+    - sdk/**/*
+    - src/**/*
+    - tezt/**/*
+    - tzt_reference_test_suite/**/*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    EXECUTABLE_FILES: script-inputs/released-executables
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    name: build-x86_64-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*
+    - src/proto_*/parameters/*.json
+    when: on_success
+
 sanity_ci:
   image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
@@ -2363,13 +2186,13 @@ oc.test-liquidity-baking-scripts:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -3553,11 +3376,11 @@ documentation.manuals:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
+  - oc.build_x86_64-extra-dev
   timeout: 60 minutes
   interruptible: true
   before_script:
@@ -4115,18 +3938,18 @@ etherlink.tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   allow_failure: true
   timeout: 40 minutes
   interruptible: true
@@ -4212,18 +4035,18 @@ etherlink.tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -4308,18 +4131,18 @@ etherlink.tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -4402,18 +4225,18 @@ etherlink.tezt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
   - select_tezts
   - etherlink.build_tezt
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -4771,15 +4594,15 @@ tezt-static-binaries:
   needs:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -4862,18 +4685,18 @@ tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   allow_failure: true
   timeout: 40 minutes
   interruptible: true
@@ -4957,18 +4780,18 @@ tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -5050,18 +4873,18 @@ tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -5144,18 +4967,18 @@ tezt-riscv-slow-sequential:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -5236,18 +5059,18 @@ tezt-time-sensitive:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
@@ -5329,18 +5152,18 @@ tezt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   - select_tezts
   - oc.build_kernels
+  - oc.build_x86_64-released
+  - oc.build_x86_64-extra-dev
+  - oc.build_x86_64-exp
   timeout: 40 minutes
   interruptible: true
   before_script:
