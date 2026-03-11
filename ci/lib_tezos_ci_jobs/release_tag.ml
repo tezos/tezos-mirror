@@ -244,6 +244,26 @@ let job_opam_release =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
+let job_dispatch_call =
+  job
+    ~__POS__
+    ~image:Images.CI.prebuild
+    ~stage:Stages.publish
+    ~description:
+      "A job release that triggers pipelines from other repositories after a \
+       release.\n\
+       For now, it triggers the release pipeline from \
+       tez-capital/tezos-macos-pipeline"
+    ~interruptible:false
+    ~name:"dispatch-call"
+    ~dependencies:
+      (Dependent
+         [
+           Job (job_release_page `real `wait_for_build);
+           Job (job_gitlab_release `real);
+         ])
+    ["./scripts/releases/dispatch-call.sh"]
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
@@ -271,22 +291,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~ci_docker_hub:false
       ~dependencies:(Dependent [Job (job_docker_merge mode `auto)])
       ()
-  in
-  let job_dispatch_call =
-    job
-      ~__POS__
-      ~image:Images.CI.prebuild
-      ~stage:Stages.publish
-      ~description:
-        "A job release that triggers pipelines from other repositories after a \
-         release.\n\
-         For now, it triggers the release pipeline from \
-         tez-capital/tezos-macos-pipeline"
-      ~interruptible:false
-      ~name:"dispatch-call"
-      ~dependencies:
-        (Dependent [Job job_release_page; Job job_gitlab_release_or_publish])
-      ["./scripts/releases/dispatch-call.sh"]
   in
   let job_trigger_monitoring =
     trigger_job
