@@ -170,7 +170,13 @@ where
                     block_in_progress.register_delayed_transaction(tx_hash);
                 }
 
-                block_in_progress.register_valid_transaction(execution_info, host)?;
+                let multiplier =
+                    chain_config.michelson_to_evm_gas_multiplier(block_constants);
+                block_in_progress.register_valid_transaction(
+                    execution_info,
+                    host,
+                    multiplier,
+                )?;
             }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(is_delayed, tx_hash, block_in_progress)
@@ -303,7 +309,7 @@ where
     Host: StorageV1 + Logging + WithGas,
 {
     let constants: ChainConfig::BlockConstants =
-        chain_config.constants(&block_in_progress, da_fee_per_byte, coinbase)?;
+        chain_config.constants(host, &block_in_progress, da_fee_per_byte, coinbase)?;
     let result = compute(
         host,
         registry,
@@ -579,8 +585,8 @@ mod tests {
         ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
         TEZOS_BLOCKS_PATH,
     };
-    use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
+    use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
     use crate::registry_impl::RegistryImpl;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
@@ -1902,6 +1908,7 @@ mod tests {
                 )
                 .unwrap(),
                 da_fee_per_byte_mutez: 0,
+                michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
             },
         }
     }

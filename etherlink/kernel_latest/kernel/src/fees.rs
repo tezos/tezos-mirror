@@ -44,6 +44,13 @@ use std::mem::size_of;
 /// Minimum base fee per gas, set to 1 Gwei.
 pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 10_u64.pow(9);
 
+/// Naive conversion factor from Michelson gas to EVM gas.
+/// In the Michelson runtime, a native transfer typically costs approximately
+/// 2_100 gas while an equivalent EVM transfer costs 21_000 gas. Until a more
+/// precise calibration is done, we use this 10x multiplier.
+/// TODO: L2-1007
+pub const DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER: u64 = 10;
+
 // We assume a tx (with empty data) consumes roughly 150 bytes in the inbox.
 //
 // This is a slight underestimate (when external message framing is included), but this is

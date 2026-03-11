@@ -12,10 +12,13 @@ use crate::{
     bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     delayed_inbox::DelayedInbox,
     error,
-    fees::MINIMUM_BASE_FEE_PER_GAS,
+    fees::{DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER, MINIMUM_BASE_FEE_PER_GAS},
     l2block::L2Block,
     registry_impl::RegistryImpl,
     simulation::start_simulation_mode,
+    storage::{
+        read_michelson_to_evm_gas_multiplier, store_michelson_to_evm_gas_multiplier,
+    },
     tick_model::constants::MAXIMUM_GAS_LIMIT,
     transaction::TransactionContent,
     CHAIN_ID,
@@ -344,10 +347,13 @@ pub trait ChainConfigTrait: Debug {
 
     fn constants(
         &self,
+        host: &mut impl StorageV1,
         block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants>;
+
+    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64;
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
@@ -499,6 +505,19 @@ pub struct TezosXBlockConstants {
     pub michelson_runtime_block_constants: TezlinkBlockConstants<TezosRuntimeContext>,
 }
 
+fn read_or_init_michelson_to_evm_gas_multiplier(host: &mut impl StorageV1) -> u64 {
+    match read_michelson_to_evm_gas_multiplier(host) {
+        Ok(value) => value,
+        Err(_) => {
+            let _ = store_michelson_to_evm_gas_multiplier(
+                host,
+                DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
+            );
+            DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER
+        }
+    }
+}
+
 impl ChainConfigTrait for EvmChainConfig {
     type BlockConstants = TezosXBlockConstants;
 
@@ -518,6 +537,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn constants(
         &self,
+        host: &mut impl StorageV1,
         block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
@@ -526,6 +546,8 @@ impl ChainConfigTrait for EvmChainConfig {
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
+        let michelson_to_evm_gas_multiplier =
+            read_or_init_michelson_to_evm_gas_multiplier(host);
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.chain_id,
@@ -539,8 +561,15 @@ impl ChainConfigTrait for EvmChainConfig {
                 level,
                 context,
                 da_fee_per_byte_mutez,
+                michelson_to_evm_gas_multiplier,
             },
         })
+    }
+
+    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64 {
+        constants
+            .michelson_runtime_block_constants
+            .michelson_to_evm_gas_multiplier
     }
 
     fn base_fee_per_gas(&self, host: &impl StorageV1, timestamp: Timestamp) -> U256 {
@@ -773,6 +802,9 @@ pub struct TezlinkBlockConstants<Context: context::Context> {
     /// DA fee per byte in mutez, read once at block start from durable storage.
     /// When `disable_da_fees` is set, this is 0.
     pub da_fee_per_byte_mutez: u64,
+    /// Conversion factor from Michelson gas to EVM gas, read once at block
+    /// start from durable storage (falls back to the compile-time constant).
+    pub michelson_to_evm_gas_multiplier: u64,
 }
 
 fn credit_da_fees<Host>(
@@ -956,6 +988,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn constants(
         &self,
+        host: &mut impl StorageV1,
         block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         _coinbase: H160,
@@ -965,11 +998,18 @@ impl ChainConfigTrait for MichelsonChainConfig {
             context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
+        let michelson_to_evm_gas_multiplier =
+            read_or_init_michelson_to_evm_gas_multiplier(host);
         Ok(TezlinkBlockConstants {
             level,
             context,
             da_fee_per_byte_mutez,
+            michelson_to_evm_gas_multiplier,
         })
+    }
+
+    fn michelson_to_evm_gas_multiplier(&self, constants: &Self::BlockConstants) -> u64 {
+        constants.michelson_to_evm_gas_multiplier
     }
 
     fn base_fee_per_gas(&self, _host: &impl StorageV1, _timestamp: Timestamp) -> U256 {
