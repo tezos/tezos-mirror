@@ -819,12 +819,19 @@ type global_pipeline =
   | Schedule_extended_test
   | Custom_extended_test
   | Master
-  | Release
-  | Test_release
   | Scheduled_test_release
   | Publish_release_page
   | Test_publish_release_page
   | Octez_monitoring
+  (* Release tag pipelines *)
+  | Major_release_tag
+  | Major_release_tag_test
+  | Minor_release_tag
+  | Minor_release_tag_test
+  | Beta_release_tag
+  | Beta_release_tag_test
+  | Non_release_tag
+  | Non_release_tag_test
   | Packaging_revision
   | Packaging_revision_test
 
@@ -837,6 +844,16 @@ let register_jobs pipeline jobs =
 let register_merge_request_jobs jobs =
   register_jobs Before_merging jobs ;
   register_jobs Merge_train jobs
+
+let register_release_jobs jobs =
+  register_jobs Major_release_tag jobs ;
+  register_jobs Beta_release_tag jobs ;
+  register_jobs Non_release_tag jobs
+
+let register_test_release_jobs jobs =
+  register_jobs Major_release_tag_test jobs ;
+  register_jobs Beta_release_tag_test jobs ;
+  register_jobs Non_release_tag_test jobs
 
 let get_jobs pipeline =
   let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in

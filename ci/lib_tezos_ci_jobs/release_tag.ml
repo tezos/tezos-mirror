@@ -22,29 +22,6 @@ open Common.Docker
 (* Some jobs have been migrated to Cacio, in the shared component. *)
 module CI = Cacio.Shared
 
-(** Type of release tag pipelines.
-
-    The semantics of the type is summed up in this table:
-
-   |                       | Release_tag | Beta_release_tag | Non_release_tag |
-   |-----------------------+-------------+------------------+-----------------|
-   | GitLab release type   | Release     | Release          | Create          |
-   | Experimental binaries | No          | No               | No              |
-   | Docker build type     | Release     | Release          | Release         |
-   | Publishes to opam     | Yes         | No               | No              |
-
-    - All release tag pipelines types publish [Release] type Docker builds.
-    - No release tag pipelines include experimental binaries.
-    - [Release_tag] and [Beta_release_tag] pipelines creates GitLab
-    and publishes releases. [Non_release_tag] pipelines create the
-    GitLab release but do not publish them.
-    - Only [Release_tag] pipelines publish to opam. *)
-type release_tag_pipeline_type =
-  | Release_tag
-  | Beta_release_tag
-  | Non_release_tag
-  | Schedule_test
-
 (* Release jobs must not be retried: they publish artifacts and retrying could
    result in publishing the same artifact twice. *)
 let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
@@ -267,25 +244,24 @@ let job_dispatch_call =
          ])
     ["./scripts/releases/dispatch-call.sh"]
 
-(** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
-
-    If [test] is true (default is [false]), then the Docker images are
-    built of the [Test] type and are published to the GitLab registry
-    instead of Docker hub.
-
-    If [major] is false (default is [true]), then components jobs are
-    excluded from the Octez jobs.
-
-    On release pipelines these jobs can start immediately *)
-let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
-  let mode = if test then `test else `real in
+(** Create an Octez release tag pipeline of type {!pipeline_type},
+    which is expected to be a release pipeline type. *)
+let octez_jobs (pipeline_type : Cacio.global_pipeline) =
+  let mode =
+    match pipeline_type with
+    | Major_release_tag | Minor_release_tag | Beta_release_tag | Non_release_tag
+      ->
+        `real
+    | _ -> `test
+  in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
   let job_gitlab_release_or_publish =
-    match release_tag_pipeline_type with
+    match pipeline_type with
     | Non_release_tag -> job_gitlab_publish `non_release_tag
-    | Schedule_test -> job_gitlab_publish `scheduled_test
+    | Non_release_tag_test -> job_gitlab_publish `non_release_tag
+    | Scheduled_test_release -> job_gitlab_publish `scheduled_test
     | _ -> job_gitlab_release mode
   in
   let job_release_page = job_release_page mode `wait_for_build in
@@ -316,24 +292,12 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     job_trigger_monitoring;
   ]
   @ jobs_debian_repository
-  (* Include components release jobs only if this is a major release. *)
-  @ (if not major then []
-     else
-       match (test, release_tag_pipeline_type) with
-       | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           Cacio.get_jobs Release
-       | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           Cacio.get_jobs Test_release
-       | true, Schedule_test -> Cacio.get_jobs Scheduled_test_release
-       | false, Schedule_test ->
-           failwith
-             "test = false is inconsistent with release_tag_pipeline_type = \
-              Schedule_test")
+  @ Cacio.get_jobs pipeline_type
   @
-  match (test, release_tag_pipeline_type) with
-  | false, Release_tag ->
+  match pipeline_type with
+  | Major_release_tag | Minor_release_tag ->
       [job_opam_release `real; job_release_page; job_dispatch_call]
-  | true, Release_tag ->
+  | Major_release_tag_test | Minor_release_tag_test ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
            that is triggered manually after a release is made. However, to
@@ -344,8 +308,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         job_opam_release `test;
         job_release_page;
       ]
-  | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
-  | true, Beta_release_tag -> [job_release_page]
+  | Beta_release_tag -> [job_release_page; job_dispatch_call]
+  | Beta_release_tag_test -> [job_release_page]
   | _ -> []
 
 let job_docker_promote_to_version =

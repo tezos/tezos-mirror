@@ -401,12 +401,19 @@ type global_pipeline =
   | Schedule_extended_test
   | Custom_extended_test
   | Master
-  | Release
-  | Test_release
   | Scheduled_test_release
   | Publish_release_page
   | Test_publish_release_page
   | Octez_monitoring
+  (* Release tag pipelines *)
+  | Major_release_tag
+  | Major_release_tag_test
+  | Minor_release_tag
+  | Minor_release_tag_test
+  | Beta_release_tag
+  | Beta_release_tag_test
+  | Non_release_tag
+  | Non_release_tag_test
   | Packaging_revision
   | Packaging_revision_test
 
@@ -418,6 +425,22 @@ val register_jobs : global_pipeline -> (trigger * job) list -> unit
     This is equivalent to registering the job with both
     [register_jobs Before_merging] and [register_jobs Merge_train]. *)
 val register_merge_request_jobs : (trigger * job) list -> unit
+
+(** Register jobs to be included in release pipelines.
+
+    This registers jobs into:
+    - [Major_release_tag]
+    - [Beta_release_tag]
+    - [Non_release_tag] *)
+val register_release_jobs : (trigger * job) list -> unit
+
+(** Register jobs to be included in test release pipelines.
+
+    This registers jobs into:
+    - [Major_release_tag_test]
+    - [Beta_release_tag_test]
+    - [Non_release_tag_test] *)
+val register_test_release_jobs : (trigger * job) list -> unit
 
 (** {2 Listing registered jobs and more} *)
 
