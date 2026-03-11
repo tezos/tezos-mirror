@@ -11,11 +11,12 @@ type t = {
   provisioning_directory : string;
   dashboard_directory : string;
   password : string;
+  port : int;
 }
 
 let generate_password () = "saucisse"
 
-let generate_admin_api_key password =
+let generate_admin_api_key ~port password =
   let cmd = "curl" in
   let args =
     [
@@ -31,7 +32,7 @@ let generate_admin_api_key password =
       \      }";
       "-u";
       Format.asprintf "admin:%s" password;
-      "http://localhost:3000/api/auth/keys";
+      sf "http://localhost:%d/api/auth/keys" port;
     ]
   in
   let* output = Process.run_and_read_stdout cmd args in
@@ -39,9 +40,9 @@ let generate_admin_api_key password =
   let key = JSON.(json |-> "key" |> as_string) in
   Lwt.return key
 
-let configuration admin_api_key : config =
+let configuration ~port admin_api_key : config =
   {
-    url = Uri.of_string "http://localhost:3000";
+    url = Uri.of_string (sf "http://localhost:%d" port);
     api_token = Some admin_api_key;
     data_source = "Prometheus";
     timeout = 2.0;
@@ -87,7 +88,8 @@ let dashboards_filepaths () =
   in
   List.map (fun basename -> path // basename) basenames |> Lwt.return
 
-let run ?(sources = [default_source]) () =
+let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source]) ()
+    =
   let cmd = "docker" in
   let* () = Process.run "mkdir" ["-p"; Path.tmp_dir // "grafana"] in
   let dashboard_directory = Path.tmp_dir // "grafana" // "dashboards" in
@@ -116,6 +118,10 @@ let run ?(sources = [default_source]) () =
       "GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer";
       "-e";
       Format.asprintf "GF_SECURITY_ADMIN_PASSWORD=%s" password;
+      "-e";
+      sf "GF_SERVER_HTTP_ADDR=%s" interface;
+      "-e";
+      sf "GF_SERVER_HTTP_PORT=%d" port;
       "-v";
       Format.asprintf "%s:/etc/grafana/provisioning" provisioning_directory;
       "-v";
@@ -142,12 +148,12 @@ let run ?(sources = [default_source]) () =
         "/dev/null";
         "-w";
         "%{http_code}";
-        "http://localhost:3000/api/health";
+        sf "http://localhost:%d/api/health" port;
       ]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
-  let* admin_api_key = generate_admin_api_key password in
-  let configuration = configuration admin_api_key in
+  let* admin_api_key = generate_admin_api_key ~port password in
+  let configuration = configuration ~port admin_api_key in
   let* dashboards_filepaths = dashboards_filepaths () in
   let dashboard dashboard_filepath =
     read_file dashboard_filepath
@@ -165,4 +171,4 @@ let run ?(sources = [default_source]) () =
         loop l
   in
   let* () = loop dashboards_filepaths in
-  Lwt.return {provisioning_directory; dashboard_directory; password}
+  Lwt.return {provisioning_directory; dashboard_directory; password; port}

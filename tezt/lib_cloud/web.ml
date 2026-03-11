@@ -190,7 +190,7 @@ let add_service t ~agents service =
   t.services <- service :: t.services ;
   write t ~agents
 
-let run () =
+let run ~interface () =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Path.tmp_dir // "website" in
@@ -226,7 +226,7 @@ let run () =
     next_handler request
   in
   let process =
-    Dream.serve ~stop ~port ~tls:false ~interface:"0.0.0.0"
+    Dream.serve ~stop ~port ~tls:false ~interface
     (* @@ Dream.logger *)
     @@ logger
     @@ Dream.router
@@ -262,8 +262,8 @@ let run () =
       services = [];
     }
 
-let start ~agents =
-  let* t = run () in
+let start ?(interface = "0.0.0.0") ~agents () =
+  let* t = run ~interface () in
   let* () = write t ~agents in
   Lwt.return t
 

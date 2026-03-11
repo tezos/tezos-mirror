@@ -9,7 +9,7 @@ type t
 
 (** [start ~agents env] starts a webpage with experimentations information
   if [Cli.website] is [true]. *)
-val start : agents:Agent.t List.t -> t Lwt.t
+val start : ?interface:string -> agents:Agent.t List.t -> unit -> t Lwt.t
 
 (** [shutdown website] shutdowns the website. *)
 val shutdown : t -> unit Lwt.t

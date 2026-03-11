@@ -80,7 +80,12 @@ val add_alert : t -> alert:alert -> unit Lwt.t
 (** [run alerts] starts a new docker container in
     the background, using the latest Prometheus Alert Manager image.
     Activates the given [alerts]. *)
-val run : ?default_receiver:receiver -> alert list -> t option Lwt.t
+val run :
+  ?port:int ->
+  ?interface:string ->
+  ?default_receiver:receiver ->
+  alert list ->
+  t option Lwt.t
 
 (** [shutdown t] shutdowns the alert manager service. *)
 val shutdown : unit -> unit Lwt.t
