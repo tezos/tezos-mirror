@@ -160,7 +160,7 @@ impl<'a> VerifiableOperation<'a> {
                     signer_account.remove_ticket(host, ticket_id, amount)?;
 
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "withdrawing {ticket:?} from {signer_address} to {destination}@{entrypoint:?}\n");
+                    debug_msg!("withdrawing {ticket:?} from {signer_address} to {destination}@{entrypoint:?}\n");
 
                     withdrawals.push(Withdrawal {
                         ticket,
@@ -247,7 +247,7 @@ where
     let _dest_amount = dest_account.add_ticket(host, ticket, amount)?;
 
     #[cfg(feature = "debug")]
-    debug_msg!(host, "Transferring {amount} of {ticket} to {destination}\n");
+    debug_msg!("Transferring {amount} of {ticket} to {destination}\n");
 
     let _source_id = signer_account.get_or_set_id(host)?;
 
@@ -264,7 +264,7 @@ where
         1 => b'G',
         2 => b'B',
         a => {
-            debug_msg!(host, "Unknown ticket {a}");
+            debug_msg!("Unknown ticket {a}");
             return Ok(());
         }
     };

@@ -48,7 +48,7 @@ where
     Host: WasmHost + StorageV1 + HostReveal,
 {
     if let Err(e) = install_kernel(host, KERNEL_BOOT_PATH) {
-        debug_str!(host, e)
+        debug_str!(e)
     } else {
         let _ = host.mark_for_reboot();
     }

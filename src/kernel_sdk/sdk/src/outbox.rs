@@ -48,14 +48,14 @@
 //!     Host: WasmHost + StorageV1
 //! {
 //!   while let Ok(Some(message)) = host.read_input() {
-//!     debug_msg!(host, "found {message:?}");
+//!     debug_msg!("found {message:?}");
 //!     let message = make_outbox_message(message.level, message.id);
 //!
 //!     OUTBOX_QUEUE.queue_message(host, message).expect("able to queue message");
 //!   }
 //!
 //!   let num_flushed = OUTBOX_QUEUE.flush_queue(host);
-//!   debug_msg!(host, "wrote {num_flushed} messages to the outbox");
+//!   debug_msg!("wrote {num_flushed} messages to the outbox");
 //! }
 //!
 //! fn make_outbox_message(level: u32, index: u32) -> OutboxMessageTransaction<MichelsonString> {

@@ -215,7 +215,7 @@ where
             tezos_evm_logging::OTelAttrValue::Bool(true),
         ),
     ];
-    __trace_kernel_add_attrs!(host, __attrs);
+    __trace_kernel_add_attrs!(__attrs);
 
     let config = get_evm_config(host)?;
     let block_constants =
@@ -336,7 +336,7 @@ where
             tezos_evm_logging::OTelAttrValue::Bool(true),
         ),
     ];
-    __trace_kernel_add_attrs!(host, __attrs);
+    __trace_kernel_add_attrs!(__attrs);
 
     let config = get_evm_config(host)?;
     let block_constants =

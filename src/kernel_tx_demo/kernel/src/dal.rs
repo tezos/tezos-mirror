@@ -36,7 +36,7 @@ pub(crate) fn store_dal_slot<Host>(
         match result {
             Ok(size) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Revealed dal page with size {size}\n");
+                debug_msg!("Revealed dal page with size {size}\n");
                 if size == 0 {
                     return;
                 }
@@ -46,7 +46,7 @@ pub(crate) fn store_dal_slot<Host>(
             }
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Failed to reveal dal page. Error: {:?}", _e);
+                debug_msg!("Failed to reveal dal page. Error: {:?}", _e);
                 // Stop fetching pages on error
                 return;
             }

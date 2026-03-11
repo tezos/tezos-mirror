@@ -45,7 +45,7 @@ extern crate alloc;
 /// use tezos_smart_rollup_host::runtime::Runtime;
 ///
 /// fn run<Host: Runtime>(host: &mut Host) {
-///   debug_msg!(host, "Hello: {}", "Kernel!");
+///   debug_msg!("Hello: {}", "Kernel!");
 /// }
 ///
 /// # #[cfg(doc)]

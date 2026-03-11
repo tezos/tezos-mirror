@@ -150,14 +150,14 @@ where
         }
     };
     #[cfg(feature = "debug")]
-    debug_msg!(host, "message@{} stage {:?}\n", idx, stage);
+    debug_msg!("message@{} stage {:?}\n", idx, stage);
     let decision = match stage {
         MessageStage::Start => process_at_start(host, account_storage, idx)?,
         MessageStage::Verified => process_verified(host, idx)?,
         MessageStage::Revealed => process_revealed(host, account_storage, idx)?,
     };
     #[cfg(feature = "debug")]
-    debug_msg!(host, "message@{} decision {:?}\n", idx, decision);
+    debug_msg!("message@{} decision {:?}\n", idx, decision);
     match decision {
         Decision::NextMessage => next_message_or_next_level(host, idx),
         Decision::MessageNextStage(stage) => message_next_stage(host, &stage_path, stage),
@@ -178,7 +178,7 @@ where
         payload,
     )
     .map_err(CachedTransactionError::Store)?;
-    external_inbox::parse_external(host, message).ok_or(CachedTransactionError::MessageUnparsable)
+    external_inbox::parse_external(message).ok_or(CachedTransactionError::MessageUnparsable)
 }
 
 fn process_at_start<Host>(
@@ -194,7 +194,7 @@ where
         Ok(message) => message,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "cached message: {}\n", _e);
+            debug_msg!("cached message: {}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -210,14 +210,13 @@ where
                 .map_err(CachedTransactionError::ProcessExternalMessage)?;
             #[cfg(feature = "debug")]
             tezos_smart_rollup_debug::debug_msg!(
-                host,
                 "Verifying dac certificate {parsed_dac_message:?}. Have committee: {dac_committee:?}"
             );
             match parsed_dac_message.verify(&dac_committee, dac_committee.len() as u8) {
                 Ok(_) => Ok(Decision::MessageNextStage(MessageStage::Verified)),
                 Err(_e) => {
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "failed to verify signature {} for cert {parsed_dac_message:?} and committee {dac_committee:?}\n", _e);
+                    debug_msg!("failed to verify signature {} for cert {parsed_dac_message:?} and committee {dac_committee:?}\n", _e);
                     Ok(Decision::NextMessage)
                 }
             }
@@ -241,7 +240,7 @@ where
         Ok(message) => message,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "cached message: {}\n", _e);
+            debug_msg!("cached message: {}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -254,7 +253,7 @@ where
                 Ok(()) => Ok(Decision::MessageNextStage(MessageStage::Revealed)),
                 Err(_e) => {
                     #[cfg(feature = "debug")]
-                    debug_msg!(host, "cached message: {}\n", _e);
+                    debug_msg!("cached message: {}\n", _e);
                     Ok(Decision::NextMessage)
                 }
             }
@@ -283,7 +282,7 @@ where
         Ok(_) => i32::from_le_bytes(tx_per_kernel_run_buffer),
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not read transactions per kernel run value: {}\nSetting a default value of 150", _e);
+            debug_msg!("Could not read transactions per kernel run value: {}\nSetting a default value of 150", _e);
             150
         }
     };
@@ -291,7 +290,7 @@ where
         Ok(iterator) => iterator,
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "iterator state error: {:?}\n", _e);
+            debug_msg!("iterator state error: {:?}\n", _e);
             return Ok(Decision::NextMessage);
         }
     };
@@ -304,18 +303,18 @@ where
                     }
                     Err(_e) => {
                         #[cfg(feature = "debug")]
-                        debug_msg!(host, "Process transactions error: {:?}\n", _e);
+                        debug_msg!("Process transactions error: {:?}\n", _e);
                     }
                 };
             }
             Ok(None) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Finished parsing DAC payload\n");
+                debug_msg!("Finished parsing DAC payload\n");
                 return Ok(Decision::NextMessage);
             }
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "iterator state error: {:?}\n", _e);
+                debug_msg!("iterator state error: {:?}\n", _e);
                 return Ok(Decision::NextMessage);
             }
         };
@@ -323,12 +322,12 @@ where
     match dac_iterator.persist(host) {
         Ok(()) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Batch of messages executed. Iterator state has been persisted. Kernel will reboot before processing the rest of the DAC payload\n");
+            debug_msg!("Batch of messages executed. Iterator state has been persisted. Kernel will reboot before processing the rest of the DAC payload\n");
             Ok(Decision::MessageNextStage(MessageStage::Revealed))
         }
         Err(_e) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Failed to persist the iterator state: {:?}\n", _e);
+            debug_msg!("Failed to persist the iterator state: {:?}\n", _e);
             Ok(Decision::NextMessage)
         }
     }

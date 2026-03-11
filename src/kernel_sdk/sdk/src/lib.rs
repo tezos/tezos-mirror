@@ -62,7 +62,7 @@ pub mod prelude {
     //!
     //! #[entrypoint::main]
     //! fn kernel_run(host: &mut impl Runtime) {
-    //!   debug_msg!(host, "Hello, world!");
+    //!   debug_msg!("Hello, world!");
     //! }
     //!
     //! # use tezos_smart_rollup::testing::prelude::MockHost;

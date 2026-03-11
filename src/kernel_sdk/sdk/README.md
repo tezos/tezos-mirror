@@ -110,7 +110,7 @@ use tezos_smart_rollup::prelude::*;
 
 #[entrypoint::main]
 fn hello_kernel(host: &mut impl Runtime) {
-  debug_msg!(host, "Hello, kernel!\n");
+  debug_msg!("Hello, kernel!\n");
 }
 ```
 

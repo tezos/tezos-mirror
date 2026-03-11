@@ -8,11 +8,10 @@ The `debug_msg` macro supports inline formatting:
 ```no_run
 extern crate alloc;
 use tezos_smart_rollup_debug::debug_msg;
-use tezos_smart_rollup_host::debug::HostDebug;
 
-fn log_runtime(host: &impl HostDebug) {
-  debug_msg!(host, "Simple constant string");
+fn log_runtime() {
+  debug_msg!("Simple constant string");
 
-  debug_msg!(host, "A format {} with argument {}", "test", 5);
+  debug_msg!("A format {} with argument {}", "test", 5);
 }
 ```

@@ -334,12 +334,13 @@ where
                 OTelAttrValue::String(pretty_hash),
             )];
             Box::new(move |__host| {
-                __trace_kernel_add_attrs!(__host, __attrs);
+                let _ = __host;
+                __trace_kernel_add_attrs!(__attrs);
             })
         } else {
             Box::new(|__host| ())
         };
-    __trace_kernel!(evm_context.db_mut().host, "evm_context.transact_commit", {
+    __trace_kernel!("evm_context.transact_commit", {
         opt_attrs_fun(evm_context.db_mut().host);
         evm_context.transact_one(tx)
     })

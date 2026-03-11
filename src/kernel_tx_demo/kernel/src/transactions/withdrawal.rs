@@ -67,7 +67,7 @@ where
 
     if let Err(_err) = output.bin_write(&mut encoded) {
         #[cfg(feature = "debug")]
-        debug_msg!(host, "Failed to encode outbox message: {}\n", _err);
+        debug_msg!("Failed to encode outbox message: {}\n", _err);
     } else {
         // TODO: need to make sure withdrawals will never hit this limit
         // - part of the 'verify' step
@@ -75,7 +75,7 @@ where
             panic!("Failed to write outbox message {err:?}\n");
         } else {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Withdrawal executed: {output:?}\n");
+            debug_msg!("Withdrawal executed: {output:?}\n");
         }
     }
 }
