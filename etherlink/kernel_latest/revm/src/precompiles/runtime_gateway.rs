@@ -244,7 +244,20 @@ where
             // just like tezosx_call_michelson does for transfer/call endpoints.
             let tx_caller = context.tx().caller();
             let amount = inputs.value.get();
-            let gas_limit = inputs.gas_limit;
+            // Convert EVM gas to the target runtime's units.
+            // Unknown host is a user error (bad URL); overflow is impossible
+            // for EVM→Tezos (÷10) but we guard it defensively. Both revert.
+            let target_runtime =
+                request.uri().host().and_then(RuntimeId::from_host).ok_or(
+                    CustomPrecompileError::Revert(
+                        "httpCall: unknown or missing target runtime in URL host".into(),
+                    ),
+                )?;
+            let gas_limit =
+                gas::convert(RuntimeId::Ethereum, target_runtime, inputs.gas_limit)
+                    .ok_or(CustomPrecompileError::Revert(
+                        "httpCall: EVM gas limit overflows target runtime units".into(),
+                    ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let sender_alias = context
@@ -278,15 +291,16 @@ where
             let response = context.journal_mut().tezosx_call_http(request)?;
 
             // Charge the EVM caller for gas consumed in the CRAC, whether it
-            // succeeded or failed. X-Tezos-Gas-Consumed is in Tezos units;
-            // convert back to EVM units so the EVM gas object is kept in sync.
+            // succeeded or failed. X-Tezos-Gas-Consumed is in the called
+            // runtime's units; convert to EVM units to keep the gas object
+            // in sync.
             //
             // Both error cases (missing header, overflow) use Revert rather
             // than Abort: Revert fails only this call (consuming all its gas)
             // while letting EVM execution continue in the caller; Abort would
             // kill the entire blueprint. Our runtimes always set this header,
             // so either condition indicates a bug in the target runtime.
-            let tezos_consumed = response
+            let callee_consumed = response
                 .headers()
                 .get(X_TEZOS_GAS_CONSUMED)
                 .and_then(|v| v.to_str().ok())
@@ -296,11 +310,10 @@ where
                         .into(),
                 ))?;
             let evm_consumed =
-                gas::convert(target_runtime, RuntimeId::Ethereum, tezos_consumed).ok_or(
-                    CustomPrecompileError::Revert(
+                gas::convert(target_runtime, RuntimeId::Ethereum, callee_consumed)
+                    .ok_or(CustomPrecompileError::Revert(
                         "X-Tezos-Gas-Consumed overflows EVM gas units".into(),
-                    ),
-                )?;
+                    ))?;
             if !gas.record_cost(evm_consumed) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }

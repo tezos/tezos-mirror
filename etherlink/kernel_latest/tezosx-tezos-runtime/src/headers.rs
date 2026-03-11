@@ -54,7 +54,7 @@ pub fn parse_request_headers(
         amount: Narith(
             parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?.into(),
         ),
-        gas_limit: Narith(require_u64(headers, X_TEZOS_GAS_LIMIT)?.into()),
+        gas_limit: require_u64(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         sender: require_kt1(headers, X_TEZOS_SENDER)?,
