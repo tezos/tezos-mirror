@@ -558,37 +558,6 @@ mod test {
         }
 
         impl RegistryTrait for Registry {
-            fn bridge<Host>(
-                &self,
-                host: &mut Host,
-                journal: &mut TezosXJournal,
-                destination_runtime: RuntimeId,
-                destination_address: &[u8],
-                source_address: &[u8],
-                amount: primitive_types::U256,
-                data: &[u8],
-                context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError>
-            where
-                Host: StorageV1 + Logging,
-            {
-                match destination_runtime {
-                    RuntimeId::Tezos => self.mock_tezos.call(
-                        self,
-                        host,
-                        journal,
-                        source_address,
-                        destination_address,
-                        amount,
-                        data,
-                        context,
-                    ),
-                    RuntimeId::Ethereum => {
-                        Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
-                    }
-                }
-            }
-
             fn generate_alias<Host>(
                 &self,
                 host: &mut Host,

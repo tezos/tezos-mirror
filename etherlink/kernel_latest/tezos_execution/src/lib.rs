@@ -1365,7 +1365,7 @@ pub(crate) mod test_utils {
     use tezos_evm_logging::Logging;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
-        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+        CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
     use tezosx_journal::TezosXJournal;
 
@@ -1388,23 +1388,6 @@ pub(crate) mod test_utils {
     }
 
     impl Registry for MockRegistry {
-        fn bridge<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _destination_runtime: RuntimeId,
-            _destination_address: &[u8],
-            _source_address: &[u8],
-            _amount: primitive_types::U256,
-            _data: &[u8],
-            _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError>
-        where
-            Host: StorageV1 + Logging,
-        {
-            unimplemented!("bridge is deprecated, use serve")
-        }
-
         fn generate_alias<Host>(
             &self,
             _host: &mut Host,
@@ -1502,30 +1485,13 @@ mod tests {
     use crate::{get_required_da_fees, TcCtx};
     use crate::{make_default_ctx, COST_PER_BYTES};
     use tezosx_interfaces::{
-        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+        CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
 
     // Mock Registry for tests that don't need cross-runtime functionality
     struct MockRegistry;
 
     impl Registry for MockRegistry {
-        fn bridge<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            destination_runtime: RuntimeId,
-            _destination_address: &[u8],
-            _source_address: &[u8],
-            _amount: primitive_types::U256,
-            _data: &[u8],
-            _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError>
-        where
-            Host: StorageV1 + Logging,
-        {
-            Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
-        }
-
         fn generate_alias<Host>(
             &self,
             _host: &mut Host,
@@ -6245,23 +6211,6 @@ mod tests {
         struct RevertRegistry;
 
         impl Registry for RevertRegistry {
-            fn bridge<Host>(
-                &self,
-                _host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _destination_runtime: RuntimeId,
-                _destination_address: &[u8],
-                _source_address: &[u8],
-                _amount: primitive_types::U256,
-                _data: &[u8],
-                _context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError>
-            where
-                Host: StorageV1 + Logging,
-            {
-                Ok(CrossCallResult::Revert(vec![]))
-            }
-
             fn generate_alias<Host>(
                 &self,
                 _host: &mut Host,

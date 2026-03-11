@@ -527,23 +527,6 @@ mod tests {
     struct StubRegistry;
 
     impl Registry for StubRegistry {
-        fn bridge<Host>(
-            &self,
-            _host: &mut Host,
-            _journal: &mut TezosXJournal,
-            _destination_runtime: RuntimeId,
-            _destination_address: &[u8],
-            _source_address: &[u8],
-            _amount: U256,
-            _data: &[u8],
-            _context: CrossRuntimeContext,
-        ) -> Result<CrossCallResult, TezosXRuntimeError>
-        where
-            Host: StorageV1 + Logging,
-        {
-            unimplemented!("not needed for this test")
-        }
-
         fn generate_alias<Host>(
             &self,
             _host: &mut Host,

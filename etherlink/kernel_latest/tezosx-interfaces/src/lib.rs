@@ -79,21 +79,6 @@ pub enum TezosXRuntimeError {
     HeaderError(String),
 }
 pub trait Registry {
-    #[allow(clippy::too_many_arguments)]
-    fn bridge<Host>(
-        &self,
-        host: &mut Host,
-        journal: &mut TezosXJournal,
-        destination_runtime: RuntimeId,
-        destination_address: &[u8],
-        source_address: &[u8],
-        amount: U256,
-        data: &[u8],
-        context: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError>
-    where
-        Host: StorageV1 + Logging;
-
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
