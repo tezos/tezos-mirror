@@ -152,6 +152,22 @@ val execute_single_transaction :
   Broadcast.transaction ->
   (L2_types.single_tx_receipt * t) tzresult Lwt.t
 
+(** [execute_entrypoint ~data_dir ~pool ~native_execution ~config evm_state
+    ~input_path ~input ~output_path ~entrypoint] writes [input] to
+    [input_path] in durable storage, calls the kernel [entrypoint], and
+    reads the result bytes from [output_path]. *)
+val execute_entrypoint :
+  data_dir:string ->
+  pool:Lwt_domain.pool ->
+  native_execution_policy:Configuration.native_execution_policy ->
+  config:Pvm_types.config ->
+  t ->
+  input_path:string ->
+  input:string ->
+  output_path:string ->
+  entrypoint:string ->
+  bytes tzresult Lwt.t
+
 (** [assemble_block ~pool ~data_dir ~chain_family ~config ~timestamp ~number
     ~native_execution t]
     builds an L2 block at height [number] and [timestamp] from the transactions

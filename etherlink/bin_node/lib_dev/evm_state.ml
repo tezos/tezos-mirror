@@ -427,6 +427,36 @@ let execute_single_transaction ~data_dir ~pool ~native_execution ~config
            stored"
   else return (L2_types.Tezos, evm_state)
 
+let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
+    evm_state ~input_path ~input ~output_path ~entrypoint =
+  let open Lwt_result_syntax in
+  let*! evm_state = modify ~key:input_path ~value:input evm_state in
+  let output_path_parts =
+    String.split_on_char '/' output_path |> List.filter (fun s -> s <> "")
+  in
+  let execution_input =
+    Simulation.Encodings.
+      {
+        messages = [];
+        reveal_pages = None;
+        insight_requests = [Durable_storage_key output_path_parts];
+        log_kernel_debug_file = None;
+      }
+  in
+  let* bytes_opt_l =
+    execute_and_inspect
+      ~pool
+      ~native_execution_policy
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:entrypoint
+      ~input:execution_input
+      evm_state
+  in
+  match bytes_opt_l with
+  | [Some bytes] -> return bytes
+  | _ -> failwith "No value found at the entrypoint output path %s" output_path
+
 let retrieve_block_at_root ~chain_family ~root evm_state =
   let open Lwt_result_syntax in
   let* storage_version = storage_version evm_state in
