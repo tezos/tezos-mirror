@@ -32,10 +32,6 @@
    - reading a slot means rebuild it from the shards
    *)
 
-(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4099
-    DAL/Node: make slot_header/commitment definition consistent with
-    alpha_context.mli *)
-
 type slot = bytes
 
 (** [get_slot_pages ~reconstruct_if_missing cryptobox node_ctxt store
