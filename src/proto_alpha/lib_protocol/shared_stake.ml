@@ -5,33 +5,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type shared = {baker_part : Tez_repr.t; stakers_part : Tez_repr.t}
+type shared = {
+  baker_part : Tez_repr.t;
+  stakers_part : Tez_repr.t;
+  stez_part : Tez_repr.t;
+}
 
 let share ~adaptive_issuance_global_limit_of_staking_over_baking
     (delegate_parameters : Staking_parameters_repr.t) ~rounding
     ~full_staking_balance amount =
   let open Result_syntax in
-  let num, den =
-    Full_staking_balance_repr.own_ratio
+  let Full_staking_balance_repr.
+        {baker_over_all_frozen; staker_over_external_frozen} =
+    Full_staking_balance_repr.distribution_ratios
       ~adaptive_issuance_global_limit_of_staking_over_baking
       ~delegate_limit_of_staking_over_baking_millionth:
         delegate_parameters.limit_of_staking_over_baking_millionth
       full_staking_balance
   in
   let* baker_part =
+    let num, den = baker_over_all_frozen in
     let rounding =
       match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
     in
     Tez_repr.mul_ratio ~rounding amount ~num ~den
   in
-  let* stakers_part = Tez_repr.(amount -? baker_part) in
-  return {baker_part; stakers_part}
+  let* external_frozen_part = Tez_repr.(amount -? baker_part) in
+  let* stakers_part =
+    let num, den = staker_over_external_frozen in
+    let rounding =
+      match rounding with `Towards_stakers -> `Down | `Towards_baker -> `Up
+    in
+    Tez_repr.mul_ratio ~rounding external_frozen_part ~num ~den
+  in
+  let* stez_part = Tez_repr.(external_frozen_part -? stakers_part) in
+  return {baker_part; stakers_part; stez_part}
 
 type reward_distrib = {
   to_baker_from_staking : Tez_repr.t;
   to_baker_from_edge_over_stakers : Tez_repr.t;
+  to_baker_from_edge_over_stez : Tez_repr.t;
   to_stakers : Tez_repr.t;
   to_spendable : Tez_repr.t;
+  to_stez : Tez_repr.t;
 }
 
 (** Compute the reward distribution between frozen and spendable according to:
@@ -53,6 +69,7 @@ In case the delegate's stake is zero, everything goes to the spendable balance.
 *)
 let compute_reward_distrib
     ~adaptive_issuance_global_limit_of_staking_over_baking delegate_parameters
+    (stez_parameters : Clst_delegates_parameters_repr.t option)
     ~full_staking_balance ~stake ~(rewards : Tez_repr.t) =
   let open Result_syntax in
   let ({frozen; weighted_delegated} : Stake_repr.t) = stake in
@@ -63,7 +80,9 @@ let compute_reward_distrib
         to_spendable = rewards;
         to_baker_from_staking = Tez_repr.zero;
         to_baker_from_edge_over_stakers = Tez_repr.zero;
+        to_baker_from_edge_over_stez = Tez_repr.zero;
         to_stakers = Tez_repr.zero;
+        to_stez = Tez_repr.zero;
       }
   else
     let* to_spendable =
@@ -74,7 +93,7 @@ let compute_reward_distrib
         ~den:(Tez_repr.to_mutez total_stake)
     in
     let* to_frozen = Tez_repr.(rewards -? to_spendable) in
-    let* {baker_part; stakers_part} =
+    let* {baker_part; stakers_part; stez_part} =
       share
         ~adaptive_issuance_global_limit_of_staking_over_baking
         delegate_parameters
@@ -95,12 +114,32 @@ let compute_reward_distrib
     let* to_stakers =
       Tez_repr.(stakers_part -? to_baker_from_edge_over_stakers)
     in
+    (* TODO STEZ: This reward repartition with the contract is temporary, it will be different
+       once the final allocation model is implemented *)
+    let* to_baker_from_edge_over_stez =
+      match stez_parameters with
+      | None -> return Tez_repr.zero
+      (* If the parameters are not set (and sTEZ is enabled), it means the delegate is not registered
+         for stez, or has unregistered. By the time it is unregistered, it shouldn't
+         have any stez rights anyways. *)
+      | Some stez_parameters ->
+          Tez_repr.mul_ratio
+            ~rounding:`Up
+            stez_part
+            ~num:
+              (Int64.of_int32
+                 stez_parameters.edge_of_clst_staking_over_baking_millionth)
+            ~den:1_000_000L
+    in
+    let* to_stez = Tez_repr.(stez_part -? to_baker_from_edge_over_stez) in
     return
       {
         to_baker_from_staking;
         to_baker_from_edge_over_stakers;
+        to_baker_from_edge_over_stez;
         to_stakers;
         to_spendable;
+        to_stez;
       }
 
 let share ~rounding ctxt delegate amount =
@@ -127,6 +166,9 @@ let compute_reward_distrib ctxt delegate stake rewards =
   let* (delegate_parameters : Staking_parameters_repr.t) =
     Delegate_staking_parameters.of_delegate ctxt delegate
   in
+  let* (stez_parameters : Clst_delegates_parameters_repr.t option) =
+    Clst_delegates_storage.get_delegate_parameters ctxt delegate
+  in
   let* full_staking_balance =
     Stake_storage.get_full_staking_balance ctxt delegate
   in
@@ -137,6 +179,7 @@ let compute_reward_distrib ctxt delegate stake rewards =
           .adaptive_issuance_global_limit_of_staking_over_baking
             ctxt)
        delegate_parameters
+       stez_parameters
        ~full_staking_balance
        ~stake
        ~rewards
@@ -158,8 +201,10 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
   let* {
          to_baker_from_staking;
          to_baker_from_edge_over_stakers;
+         to_baker_from_edge_over_stez;
          to_stakers;
          to_spendable;
+         to_stez;
        } =
     compute_reward_distrib ctxt delegate active_stake rewards
   in
@@ -177,6 +222,13 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
       (`Frozen_deposits (Frozen_staker_repr.baker_edge delegate))
       to_baker_from_edge_over_stakers
   in
+  let* ctxt, balance_updates_frozen_rewards_baker_edge_from_stez =
+    Token.transfer
+      ctxt
+      source
+      (`Frozen_deposits (Frozen_staker_repr.baker_edge delegate))
+      to_baker_from_edge_over_stez
+  in
   let* ctxt, balance_updates_frozen_rewards_stakers =
     Token.transfer
       ctxt
@@ -184,15 +236,21 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
       (`Frozen_deposits (Frozen_staker_repr.shared_between_stakers ~delegate))
       to_stakers
   in
-  let+ ctxt, balance_updates_spendable_rewards =
+  let* ctxt, balance_updates_spendable_rewards =
     Token.transfer
       ctxt
       source
       (`Contract (Contract_repr.Implicit delegate))
       to_spendable
   in
-  ( ctxt,
-    balance_updates_frozen_rewards_baker
-    @ balance_updates_frozen_rewards_baker_edge
-    @ balance_updates_frozen_rewards_stakers @ balance_updates_spendable_rewards
-  )
+  let* ctxt, balance_updates_stez_rewards =
+    Token.transfer ctxt source `CLST_deposits to_stez
+  in
+
+  return
+    ( ctxt,
+      balance_updates_frozen_rewards_baker
+      @ balance_updates_frozen_rewards_baker_edge
+      @ balance_updates_frozen_rewards_baker_edge_from_stez
+      @ balance_updates_frozen_rewards_stakers
+      @ balance_updates_spendable_rewards @ balance_updates_stez_rewards )
