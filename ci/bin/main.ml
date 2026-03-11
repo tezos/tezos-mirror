@@ -131,7 +131,7 @@ let () =
   let open Pipeline in
   register
     "before_merging"
-    If.(on_tezos_namespace && merge_request && not merge_train)
+    If.(merge_request && not merge_train)
     ~jobs:
       (Code_verification.jobs Before_merging @ Cacio.get_before_merging_jobs ())
     ~description:
