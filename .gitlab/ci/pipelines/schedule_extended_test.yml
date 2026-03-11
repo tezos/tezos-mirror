@@ -813,7 +813,7 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master
   stage: sanity
   tags:
   - gcp
