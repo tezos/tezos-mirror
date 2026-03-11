@@ -206,7 +206,7 @@ pub trait RuntimeInterface {
     ) -> Result<U256, TezosXRuntimeError>;
 }
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy)]
 pub enum RuntimeId {
     Tezos = 0,
     Ethereum = 1,
@@ -273,9 +273,10 @@ mod from_host_tests {
 
 /// Gas conversion utilities for cross-runtime calls.
 ///
-/// **Convention**: `X-Tezos-Gas-Limit` is always in the **target** runtime's
-/// gas units. Gateways convert on the way out; receiving runtimes read
-/// directly without conversion.
+/// **Convention**: Both `X-Tezos-Gas-Limit` and `X-Tezos-Gas-Consumed` are
+/// in the **called** runtime's gas units. Gateways convert on the way out
+/// (for the limit) and on the way back (for consumed); receiving runtimes
+/// read/write directly without conversion.
 ///
 /// **Ratio**: 1 EVM gas = 100 Tezos milligas.
 /// **Tezos unit**: milligas (the native unit of the Tezos runtime).
