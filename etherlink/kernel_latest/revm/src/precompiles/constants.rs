@@ -180,8 +180,8 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 // TODO Define the cost: https://linear.app/tezos/issue/L2-662/define-cost-of-precompile-gateway-on-ethereum
 pub(crate) const RUNTIME_GATEWAY_TRANSFER_BASE_COST: u64 = 1_000;
 
-// TODO Define the cost for httpCall
-pub(crate) const RUNTIME_GATEWAY_HTTP_CALL_BASE_COST: u64 = 1_000;
+// TODO Define the cost for call (cross-runtime HTTP call)
+pub(crate) const RUNTIME_GATEWAY_CALL_BASE_COST: u64 = 1_000;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints

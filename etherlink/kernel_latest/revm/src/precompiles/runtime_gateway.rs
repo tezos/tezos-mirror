@@ -20,7 +20,7 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            RUNTIME_GATEWAY_HTTP_CALL_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            RUNTIME_GATEWAY_CALL_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             RUNTIME_GATEWAY_TRANSFER_BASE_COST,
         },
         guard::out_of_gas,
@@ -35,13 +35,13 @@ sol! {
             string implicitAddress,
         ) external;
 
-        function call(
+        function callMichelson(
             string destination,
             string entrypoint,
             bytes parameters,
         ) external;
 
-        function httpCall(
+        function call(
             string url,
             (string, string)[] headers,
             bytes body,
@@ -54,7 +54,7 @@ sol! {
         uint256 amount
     );
 
-    event CallEvent(
+    event CallMichelsonEvent(
         string destination,
         string entrypoint,
         uint256 amount
@@ -190,7 +190,7 @@ where
             };
             context.journal_mut().log(log);
         }
-        RuntimeGatewayCalls::call(call) => {
+        RuntimeGatewayCalls::callMichelson(call) => {
             if !gas.record_cost(RUNTIME_GATEWAY_TRANSFER_BASE_COST) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
@@ -221,7 +221,7 @@ where
             )?;
 
             // Emit event
-            let log_data = CallEvent {
+            let log_data = CallMichelsonEvent {
                 destination: destination.clone(),
                 entrypoint: entrypoint.clone(),
                 amount,
@@ -232,8 +232,8 @@ where
             };
             context.journal_mut().log(log);
         }
-        RuntimeGatewayCalls::httpCall(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_HTTP_CALL_BASE_COST) {
+        RuntimeGatewayCalls::call(call) => {
+            if !gas.record_cost(RUNTIME_GATEWAY_CALL_BASE_COST) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
@@ -420,10 +420,10 @@ mod tests {
     }
 
     #[test]
-    fn test_http_call_abi_decode() {
+    fn test_call_abi_decode() {
         use alloy_sol_types::SolCall;
 
-        let call = RuntimeGateway::httpCallCall {
+        let call = RuntimeGateway::callCall {
             url: "http://michelson/KT1abc/transfer".to_string(),
             headers: vec![(
                 "Content-Type".to_string(),
@@ -437,7 +437,7 @@ mod tests {
         // Decode via the dispatcher
         let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
         match decoded {
-            RuntimeGatewayCalls::httpCall(decoded_call) => {
+            RuntimeGatewayCalls::call(decoded_call) => {
                 assert_eq!(decoded_call.url, "http://michelson/KT1abc/transfer");
                 assert_eq!(decoded_call.headers.len(), 1);
                 assert_eq!(decoded_call.headers[0].0, "Content-Type");
@@ -445,12 +445,12 @@ mod tests {
                 assert_eq!(decoded_call.body.as_ref(), &[0x01, 0x02]);
                 assert_eq!(decoded_call.method, 1);
             }
-            _ => panic!("expected httpCall variant"),
+            _ => panic!("expected call variant"),
         }
     }
 
     #[test]
-    fn test_http_call_return_encoding() {
+    fn test_call_return_encoding() {
         let output: Vec<u8> = (true, Vec::<u8>::new()).abi_encode_params();
         // ABI encoding of (bool true, bytes empty):
         // 32 bytes: bool (padded, 1)
