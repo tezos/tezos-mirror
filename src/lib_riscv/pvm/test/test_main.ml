@@ -27,6 +27,7 @@ let tests =
         ( "Etherlink: Proofs are immutable",
           `Quick,
           Test_backend.test_proof_immutability Utils.Etherlink );
+        ("Echo: Initialise kernel", `Quick, Test_backend.test_init_echo_kernel);
       ] );
     ( "Storage",
       [

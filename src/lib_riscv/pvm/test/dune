@@ -11,7 +11,8 @@
   octez-libs.stdlib-unix
   octez-libs.base-test-helpers
   octez-alcotezt
-  octez-riscv-pvm)
+  octez-riscv-pvm
+  octez_riscv_kernels)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -38,7 +39,9 @@
  (deps
   (glob_files ../../../riscv/assets/riscv-dummy.elf)
   (glob_files ../../../riscv/assets/riscv-dummy.elf.checksum)
-  (glob_files ../../../riscv/assets/jstz_proof_initial))
+  (glob_files ../../../riscv/assets/jstz_proof_initial)
+  (glob_files ../../kernels/riscv-echo)
+  (glob_files ../../kernels/riscv-echo.checksum))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
