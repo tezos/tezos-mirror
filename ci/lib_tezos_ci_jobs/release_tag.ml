@@ -19,6 +19,9 @@ open Tezos_ci
 open Common.Build
 open Common.Docker
 
+(* Some jobs have been migrated to Cacio, in the shared component. *)
+module CI = Cacio.Shared
+
 (** Type of release tag pipelines.
 
     The semantics of the type is summed up in this table:
@@ -382,19 +385,25 @@ let job_create_gitlab_package =
     ~tag:Gcp_not_interruptible
 
 let job_update_gitlab_release =
-  job
+  CI.job
+    "gitlab:update_release"
     ~__POS__
     ~image:Images.Base_images.ci_release
-    ~stage:Stages.publish
-    ~name:"gitlab:update_release"
+    ~stage:Publish
     ~description:
       "Update existing GitLab release with new static binaries from this \
        packaging revision"
-    ~dependencies:(Dependent [Job job_create_gitlab_package])
+    ~needs_legacy:[(Job, job_create_gitlab_package)]
     ~id_tokens:Tezos_ci.id_tokens
     ["./scripts/releases/update_gitlab_release.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
+
+let () =
+  CI.register_global_packaging_revision_jobs [(Auto, job_update_gitlab_release)] ;
+  CI.register_global_packaging_revision_test_jobs
+    [(Auto, job_update_gitlab_release)] ;
+  ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
   let mode = if test then `test else `real in
@@ -419,7 +428,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_build_static `manual Arm64;
     (* Release update *)
     job_create_gitlab_package;
-    job_update_gitlab_release;
   ]
   @ jobs_debian_repository
   @
