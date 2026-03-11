@@ -40,6 +40,8 @@
 - Remove `tezos-smart-rollup-encoding::contract::Contract`. One may continue to use `tezos-smart-rollup::types::Contract`, which is exported
   from `tezos-protocol::contract::Contract`. This is a drop-in replacement that is fully backwards compatible.
 - Add `tezos-smart-rollup-keyspace` crate which defines the `KeySpace` high-level durable storage API
+- Add irmin path validation to `tezos-smart-rollup-keyspace` behind the `irmin-compat` feature flag (enabled by default).
+  `Key` and `Name` now validate that their content is a valid irmin path (starts with `/`, no trailing `/`, valid step bytes).
 - Move functionality from `Runtime` into new supertraits. This allows kernels to restrict capabilities certain parts of their
   codebase are able to use.
   - Move `store_` functions to new `StorageV1` supertrait.

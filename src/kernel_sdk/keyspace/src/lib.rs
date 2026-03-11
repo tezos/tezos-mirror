@@ -9,14 +9,21 @@
 //! for a given [`Key`]. Kernels can create and delete [`KeySpace`] instances as required
 //! and can generate hashes representing the entire state of a [`KeySpace`].
 
+#[cfg(feature = "irmin-compat")]
+mod irmin_path_validator;
+
 /// The maximum size that a V2 durable storage key can have.
+#[cfg(not(feature = "irmin-compat"))]
 pub const MAX_STORE_V2_KEY_SIZE: usize = 256;
 
 /// Key creation error
 #[derive(Debug)]
 pub enum KeyError {
-    /// Attempted to create a key larger than 256 bytes
+    /// Attempted to create a key that exceeds the maximum allowed size.
     KeyTooLarge,
+    /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step).
+    #[cfg(feature = "irmin-compat")]
+    PathError(tezos_smart_rollup_host::path::PathError),
 }
 
 /// Key used to access data in a [`KeySpace`].
@@ -24,36 +31,84 @@ pub enum KeyError {
 pub struct Key([u8]);
 
 impl Key {
-    /// Create a key from raw bytes. `key` must not be longer than the allowed maximum size.
-    pub fn from_bytes(key: &[u8]) -> Result<&Self, KeyError> {
-        // TODO TZX-45: Ensure keys don't result in invalid Irmin paths when implementing
-        // `KeySpace` for the Irmin-based durable storage
-        if key.len() > MAX_STORE_V2_KEY_SIZE {
+    // Fallback: when `irmin-compat` is not enabled, only a size check is performed.
+    // The full validation logic lives in `irmin_path_validator::Key::check_bytes`.
+    #[cfg(not(feature = "irmin-compat"))]
+    const fn check_bytes(bytes: &[u8]) -> Result<(), KeyError> {
+        if bytes.len() > MAX_STORE_V2_KEY_SIZE {
             return Err(KeyError::KeyTooLarge);
-        };
+        }
+        Ok(())
+    }
 
-        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely cast to `&Key`.
-        Ok(unsafe { &*(key as *const [u8] as *const Key) })
+    /// Create a key from raw bytes.
+    ///
+    /// Returns an error if `key` fails validation (see [`Key::check_bytes`] for rules).
+    pub fn from_bytes(key: &[u8]) -> Result<&Self, KeyError> {
+        Self::check_bytes(key)?;
+        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
+        Ok(unsafe { std::mem::transmute::<&[u8], &Key>(key) })
     }
 
     /// Create a key from raw bytes. Should only be used to create constant keys.
     ///
-    /// Panics if `key` is longer than the allowed maximum size.
+    /// Panics if `key` is an invalid set of bytes.
     pub const fn from_static(key: &'static [u8]) -> &'static Self {
-        assert!(
-            key.len() <= MAX_STORE_V2_KEY_SIZE,
-            "Key must not be longer than 256 bytes"
-        );
+        assert!(Self::check_bytes(key).is_ok(), "Invalid key");
+        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
+        unsafe { std::mem::transmute(key) }
+    }
+}
 
-        // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely cast to `&Key`.
-        unsafe { &*(key as *const [u8] as *const Key) }
+/// Name creation error
+#[derive(Debug)]
+pub enum NameError {
+    /// Attempted to create a name that exceeds the maximum allowed size.
+    #[cfg(feature = "irmin-compat")]
+    NameTooLong,
+    /// Path validation error (e.g. missing leading `/`, trailing `/`, invalid bytes,
+    /// or reserved `/readonly` prefix).
+    #[cfg(feature = "irmin-compat")]
+    PathError(tezos_smart_rollup_host::path::PathError),
+}
+
+/// A validated keyspace name, used as a path prefix in durable storage.
+#[repr(transparent)]
+pub struct Name(str);
+
+impl Name {
+    // Fallback: when `irmin-compat` is not enabled, no validation is performed.
+    // The actual validation logic lives in `irmin_path_validator::Name::check_bytes`.
+    #[cfg(not(feature = "irmin-compat"))]
+    const fn check_bytes(_bytes: &[u8]) -> Result<(), NameError> {
+        Ok(())
+    }
+
+    /// Create a name from a string slice.
+    ///
+    /// Returns an error if `name` fails validation (see [`Name::check_bytes`] for rules
+    /// when the `irmin-compat` feature is enabled).
+    pub fn from_slice(name: &str) -> Result<&Self, NameError> {
+        Self::check_bytes(name.as_bytes())?;
+        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
+        Ok(unsafe { std::mem::transmute::<&str, &Name>(name) })
+    }
+
+    /// Create a name from a static string. Should only be used to create constant names.
+    ///
+    /// Panics if the name fails validation (see [`Name::check_bytes`] for rules
+    /// when the `irmin-compat` feature is enabled).
+    pub const fn from_static_str(name: &'static str) -> &'static Self {
+        assert!(Self::check_bytes(name.as_bytes()).is_ok(), "Invalid name");
+        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
+        unsafe { std::mem::transmute(name) }
     }
 }
 
 /// A key space in the durable storage
 pub trait KeySpace {
     /// Find the key space with the given name. If it does not exist, create a new key space.
-    fn load_or_create(name: &str) -> Self;
+    fn load_or_create(name: &Name) -> Self;
 
     /// Read the whole value associated with the key.
     /// Returns `None` if the key does not exist.
