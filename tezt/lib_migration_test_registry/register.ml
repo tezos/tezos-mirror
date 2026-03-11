@@ -13,7 +13,6 @@ type state = {
     | `Mainnet
     | `Nextnet of string
     | `Sandbox
-    | `Seoulnet
     | `Shadownet
     | `Tallinnnet
     | `Weeklynet of string ];

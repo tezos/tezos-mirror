@@ -12,7 +12,6 @@ type public =
   | `Shadownet
   | `Nextnet of string
   | `Weeklynet of string
-  | `Seoulnet
   | `Tallinnnet ]
 
 type t = [`Sandbox | public]
@@ -30,14 +29,12 @@ let to_string = function
   | `Nextnet date -> sf "nextnet-%s" date
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
-  | `Seoulnet -> "seoulnet"
   | `Tallinnnet -> "tallinnnet"
 
 let parse = function
   | "mainnet" -> Some `Mainnet
   | "ghostnet" -> Some `Ghostnet
   | "shadownet" -> Some `Shadownet
-  | "seoulnet" -> Some `Seoulnet
   | "tallinnnet" -> Some `Tallinnnet
   | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
       (* format: weeklynet-2025-01-29 (with dashes) *)
@@ -72,20 +69,18 @@ let encoding =
     string
 
 let default_protocol : t -> Protocol.t = function
-  | `Mainnet -> S023
-  | `Ghostnet -> S023
-  | `Shadownet -> S023
+  | `Mainnet -> T024
+  | `Ghostnet -> T024
+  | `Shadownet -> T024
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
   | `Nextnet _ -> T024
-  | `Seoulnet -> S023
   | `Tallinnnet -> T024
 
 let block_time : t -> int = function
   | `Mainnet -> 6
   | `Shadownet -> 6
   | `Ghostnet -> 4
-  | `Seoulnet -> 4
   | `Tallinnnet -> 4
   | `Sandbox -> 6
   | network ->
@@ -96,7 +91,6 @@ let block_time : t -> int = function
 
 let next_protocol : t -> Protocol.t = function
   | `Mainnet | `Ghostnet | `Shadownet -> Alpha
-  | `Seoulnet -> T024
   | _ -> Alpha
 
 let public_rpc_endpoint testnet =
@@ -109,7 +103,6 @@ let public_rpc_endpoint testnet =
       | `Shadownet -> "rpc.shadownet.teztnets.com"
       | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
       | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
-      | `Seoulnet -> "rpc.seoulnet.teztnets.com"
       | `Tallinnnet -> "rpc.tallinnnet.teztnets.com")
     ~port:443
     ()
@@ -120,7 +113,6 @@ let snapshot_service = function
   | `Shadownet -> "https://snapshots.tzinit.org/shadownet"
   | `Nextnet _ -> "https://snapshots.eu.tzinit.org/nextnet"
   | `Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
-  | `Seoulnet -> "https://snapshots.eu.tzinit.org/seoulnet"
   | `Tallinnnet -> "https://snapshots.tzinit.org/tallinnnet"
 
 (* Argument to give to the --network option of `octez-node config init`. *)
@@ -131,7 +123,6 @@ let to_octez_network_options = function
   | `Shadownet -> "https://teztnets.com/shadownet"
   | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
-  | `Seoulnet -> "https://teztnets.com/seoulnet"
   | `Tallinnnet -> "https://teztnets.com/tallinnnet"
 
 let default_bootstrap = function
@@ -140,7 +131,6 @@ let default_bootstrap = function
   | `Shadownet -> "shadownet.teztnets.com"
   | `Nextnet date -> sf "nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
-  | `Seoulnet -> "seoulnet.teztnets.com"
   | `Tallinnnet -> "tallinnnet.teztnets.com"
 
 let default_dal_bootstrap = function
@@ -150,7 +140,6 @@ let default_dal_bootstrap = function
   | `Shadownet -> "dal.shadownet.teztnets.com"
   | `Nextnet date -> sf "dal.nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
-  | `Seoulnet -> "dal.seoulnet.teztnets.com"
   | `Tallinnnet -> "dal.tallinnnet.teztnets.com"
 
 let get_level endpoint =
@@ -161,8 +150,7 @@ let expected_pow = function `Sandbox -> 0. | _ -> 26.
 
 let versions network =
   match network with
-  | (`Mainnet | `Ghostnet | `Shadownet | `Seoulnet | `Tallinnnet) as
-    public_network -> (
+  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet) as public_network -> (
       let decoder json =
         json |> JSON.as_list |> List.to_seq
         |> Seq.map (fun json_account ->
@@ -209,8 +197,7 @@ let versions network =
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet | `Shadownet | `Seoulnet | `Tallinnnet) as network
-    -> (
+  | (`Mainnet | `Ghostnet | `Shadownet | `Tallinnnet) as network -> (
       let decoder json =
         json |> JSON.as_list
         |> List.map (fun json_account ->

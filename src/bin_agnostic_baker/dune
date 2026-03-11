@@ -20,8 +20,9 @@
   (select void_for_linking-octez-protocol-022-PsRiotum-libs-dal from
    (octez-protocol-022-PsRiotum-libs.dal -> void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty)
    (-> void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty))
-  octez-protocol-023-PtSeouLo-libs.agnostic-baker
-  octez-protocol-023-PtSeouLo-libs.dal
+  (select void_for_linking-octez-protocol-023-PtSeouLo-libs-dal from
+   (octez-protocol-023-PtSeouLo-libs.dal -> void_for_linking-octez-protocol-023-PtSeouLo-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-023-PtSeouLo-libs-dal.empty))
   octez-protocol-024-PtTALLiN-libs.agnostic-baker
   octez-protocol-024-PtTALLiN-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
@@ -51,5 +52,6 @@
   (progn
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-023-PtSeouLo-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

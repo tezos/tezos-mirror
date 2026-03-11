@@ -450,12 +450,6 @@ module Config_file : sig
   val set_ghostnet_sandbox_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
-  (** Set the network config to a Seoulnet network.
-
-      [user_activated_upgrades] can be given to add user-activated upgrades. *)
-  val set_seoulnet_network :
-    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
-
   (** Set the network config to a Tallinnnet network.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)

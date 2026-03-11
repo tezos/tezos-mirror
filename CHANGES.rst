@@ -39,6 +39,10 @@ General
   shutdown for tests. Improves reliability under domain contention and low
   resources. (MR :gl:`!19990`) (MR :gl:`!20258`) (MR :gl:`!20261`)
 
+- The Seoul protocol (023) has been frozen. The ``octez-baker-PtSeouLo`` and
+  ``octez-accuser-PtSeouLo`` executables have been removed. The ``--network
+  seoulnet`` alias has also been removed.
+
 Node
 ----
 

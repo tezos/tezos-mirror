@@ -91,19 +91,9 @@ type fee_parameter = {
   burn_cap : Tez.t;
 }
 
-let fetch_mempool_config (rpc_ctxt : Tezos_rpc.Context.simple) ~chain =
-  let open Lwt_syntax in
-  let* result = Alpha_block_services.Mempool.get_filter rpc_ctxt ~chain () in
-  match result with
-  | Ok json -> (
-      try
-        return_some
-          (Json_encoding.destruct
-             ~ignore_extra_fields:true
-             (Data_encoding.Json.convert Plugin.Mempool.config_encoding)
-             json)
-      with Json_encoding.Cannot_destruct _ -> return_none)
-  | Error _ -> return_none
+module Mempool = struct
+  let default_minimal_nanotez_per_byte = Q.of_int 1000
+end
 
 (** [resolve_fee_parameter_from_mempool cctxt ~chain fee_parameter] resolves
     [minimal_nanotez_per_byte] based on the following priority:
@@ -117,27 +107,20 @@ let fetch_mempool_config (rpc_ctxt : Tezos_rpc.Context.simple) ~chain =
     is why [cctxt] is [#Protocol_client_context.full] rather than
     [#Tezos_rpc.Context.simple]. *)
 let resolve_fee_parameter_from_mempool (cctxt : #Protocol_client_context.full)
-    ~chain fee_parameter =
+    ~chain:_ fee_parameter =
   let open Lwt_result_syntax in
   match fee_parameter.minimal_nanotez_per_byte with
   | Some _ -> return fee_parameter
   | None ->
-      let*! fetched =
-        fetch_mempool_config (cctxt :> Tezos_rpc.Context.simple) ~chain
-      in
       let* nanotez_per_byte =
-        match fetched with
-        | Some config ->
-            return (Plugin.Mempool.get_minimal_nanotez_per_byte config)
-        | None ->
-            let*! () =
-              cctxt#warning
-                "Failed to fetch minimal_nanotez_per_byte from the node's \
-                 mempool filter RPC. Using default value (%a nanotez/byte)."
-                Q.pp_print
-                Plugin.Mempool.default_minimal_nanotez_per_byte
-            in
-            return Plugin.Mempool.default_minimal_nanotez_per_byte
+        let*! () =
+          cctxt#warning
+            "Failed to fetch minimal_nanotez_per_byte from the node's mempool \
+             filter RPC. Using default value (%a nanotez/byte)."
+            Q.pp_print
+            Mempool.default_minimal_nanotez_per_byte
+        in
+        return Mempool.default_minimal_nanotez_per_byte
       in
       return
         {fee_parameter with minimal_nanotez_per_byte = Some nanotez_per_byte}
@@ -193,7 +176,7 @@ let check_fees : type t.
                [resolve_fee_parameter_from_mempool]. *)
             Q.mul
               (Option.value
-                 ~default:Plugin.Mempool.default_minimal_nanotez_per_byte
+                 ~default:Mempool.default_minimal_nanotez_per_byte
                  config.minimal_nanotez_per_byte)
               (Q.of_int size)
           in
@@ -871,7 +854,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
               [resolve_fee_parameter_from_mempool]. *)
            Q.mul
              (Option.value
-                ~default:Plugin.Mempool.default_minimal_nanotez_per_byte
+                ~default:Mempool.default_minimal_nanotez_per_byte
                 fee_parameter.minimal_nanotez_per_byte)
              (Q.of_int size)
          in
