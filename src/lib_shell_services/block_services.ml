@@ -832,6 +832,14 @@ module type S = sig
       tzresult
       Lwt.t
 
+    (** Call RPC GET /chains/[chain]/mempool/filter *)
+    val get_filter :
+      #simple ->
+      ?chain:chain ->
+      ?include_default:bool ->
+      unit ->
+      Data_encoding.json tzresult Lwt.t
+
     (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
       #simple ->
@@ -2643,6 +2651,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                -> operations)
             stream,
           stopper )
+
+    let get_filter ctxt ?(chain = `Main) ?(include_default = true) () =
+      let s = S.Mempool.get_filter (mempool_path chain_path) in
+      Tezos_rpc.Context.make_call1
+        s
+        ctxt
+        chain
+        (object
+           method include_default = include_default
+        end)
+        ()
 
     let request_operations ctxt ?(chain = `Main) ?peer_id () =
       let s = S.Mempool.request_operations (mempool_path chain_path) in

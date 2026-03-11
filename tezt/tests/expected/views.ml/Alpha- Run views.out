@@ -47,6 +47,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as view_registers_callers.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none originate contract view_check_caller transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/view_check_caller.tz --init None --burn-cap 1
 Node is bootstrapped.
@@ -104,6 +105,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as view_check_caller.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -138,6 +140,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [CONTRACT_HASH] ... +ꜩ1
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
@@ -174,6 +177,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [CONTRACT_HASH] ... +ꜩ1
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -211,3 +215,4 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [CONTRACT_HASH] ... +ꜩ1
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).

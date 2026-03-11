@@ -3554,6 +3554,24 @@ let test_tezlink_simulation_with_da_fee =
   let* err = Process.check_and_read_stderr ~expect_failure:true process in
   Check.(err =~ rex "evm_node.dev.insufficient_fees")
     ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
+
+  (* Currently, without setting DA fees, the hadcoded value of 1000 nanotez/byte
+     will be used. Which should make the transfer fail.
+     But this test should succeed (and thus adapted) with
+     MR https://gitlab.com/tezos/tezos/-/merge_requests/21050 *)
+  let process =
+    Client.spawn_transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "evm_node.dev.insufficient_fees")
+    ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
+
   (* 4000 nanotez/byte = 4 mutez/byte, matching the DA fee: the fee now
      covers the DA cost and the transfer succeeds. *)
   let* () =

@@ -57,6 +57,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as tickets_send.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none originate contract tickets_blackhole transferring 0 from bootstrap1 running michelson_test_scripts/mini_scenarios/tickets_blackhole_016.tz --init Unit --burn-cap 1
 Node is bootstrapped.
@@ -101,6 +102,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as tickets_blackhole.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[PUBLIC_KEY_HASH]" 1'
 Node is bootstrapped.
@@ -150,6 +152,7 @@ This sequence of operations was run:
             Account updates:
               [PUBLIC_KEY_HASH] ... +1
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg 'Pair "[CONTRACT_HASH]" 1'
 Node is bootstrapped.
@@ -195,3 +198,4 @@ This sequence of operations was run:
           Storage size: 51 bytes
           Consumed gas: 1853.638
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).

@@ -185,7 +185,8 @@ let originate_command =
         let fee_parameter =
           {
             Injection.minimal_fees = Tez.of_mutez_exn 100L;
-            minimal_nanotez_per_byte = Q.of_int 1000;
+            minimal_nanotez_per_byte =
+              Some Plugin.Mempool.default_minimal_nanotez_per_byte;
             minimal_nanotez_per_gas_unit = Q.of_int 100;
             force_low_fee = false;
             fee_cap = scontract.origination_fee_cap;

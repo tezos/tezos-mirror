@@ -651,8 +651,6 @@ let default_minimal_fees =
 
 let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
-let default_minimal_nanotez_per_byte = Q.of_int 1000
-
 let minimal_fees_arg =
   let open Lwt_result_syntax in
   Tezos_clic.default_arg
@@ -677,17 +675,20 @@ let minimal_nanotez_per_gas_unit_arg =
     (Tezos_clic.parameter (fun _ s ->
          try return (Q.of_string s) with _ -> tzfail (Bad_minimal_fees s)))
 
-let minimal_nanotez_per_byte_arg =
+let minimal_nanotez_per_byte_parameter =
   let open Lwt_result_syntax in
-  Tezos_clic.default_arg
+  Tezos_clic.parameter (fun _ s ->
+      try return (Q.of_string s) with _ -> tzfail (Bad_minimal_fees s))
+
+let minimal_nanotez_per_byte_arg =
+  Tezos_clic.arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
-    ~default:(Q.to_string default_minimal_nanotez_per_byte)
     ~doc:
-      "exclude operations with fees per byte lower than this threshold (in \
-       nanotez)"
-    (Tezos_clic.parameter (fun _ s ->
-         try return (Q.of_string s) with _ -> tzfail (Bad_minimal_fees s)))
+      "Set the fee per byte threshold (in nanotez) used to compute operation \
+       fees. If not provided, the value is fetched from the node's mempool \
+       filter configuration."
+    minimal_nanotez_per_byte_parameter
 
 let replace_by_fees_arg =
   Tezos_clic.switch

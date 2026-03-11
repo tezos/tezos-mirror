@@ -42,6 +42,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as transfer_amount.
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup --wait none transfer 500 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
@@ -78,6 +79,7 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
 
+Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
 500000000

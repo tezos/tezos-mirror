@@ -70,7 +70,9 @@ val minimal_fees_arg : (Tez.t, full) Tezos_clic.arg
 
 val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Tezos_clic.arg
 
-val minimal_nanotez_per_byte_arg : (Q.t, full) Tezos_clic.arg
+val minimal_nanotez_per_byte_parameter : (Q.t, full) Tezos_clic.parameter
+
+val minimal_nanotez_per_byte_arg : (Q.t option, full) Tezos_clic.arg
 
 val replace_by_fees_arg : (bool, full) Tezos_clic.arg
 
