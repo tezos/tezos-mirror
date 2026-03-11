@@ -300,6 +300,18 @@ let total_frozen
     } =
   Tez_repr.(own_frozen +? staked_frozen)
 
+let total_frozen_with_stez
+    ({
+       own_frozen = _;
+       staked_frozen = _;
+       delegated = _;
+       min_delegated_in_cycle = _;
+       stez_frozen;
+     } as fsbr) =
+  let open Result_syntax in
+  let* total_frozen = total_frozen fsbr in
+  Tez_repr.(total_frozen +? stez_frozen)
+
 let current_delegated
     {
       own_frozen = _;
