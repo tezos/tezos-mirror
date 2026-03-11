@@ -113,6 +113,62 @@ let job_build_homebrew_release =
     ["public/homebrew/*"]
     Homebrew.job_create_homebrew_formula
 
+let job_gitlab_release =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~interruptible:false
+    ~dependencies:
+      (Dependent
+         [
+           Job (job_docker_merge mode `auto);
+           Artifacts (job_build_static `auto Amd64);
+           Artifacts (job_build_static `auto Arm64);
+           Artifacts job_build_homebrew_release;
+         ])
+    ~id_tokens:Tezos_ci.id_tokens
+    ~name:"gitlab:release"
+    [
+      "./scripts/ci/restrict_export_to_octez_source.sh";
+      "./scripts/releases/gitlab-release.sh";
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_gitlab_publish =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~interruptible:false
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts (job_build_static `auto Amd64);
+           Artifacts (job_build_static `auto Arm64);
+           Artifacts job_build_homebrew_release;
+         ])
+    ?before_script:
+      (match mode with
+      | `scheduled_test -> Some ["git tag octez-v0.0"]
+      | `non_release_tag -> None)
+    ?variables:
+      (match mode with
+      | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
+      | `non_release_tag -> None)
+    ~id_tokens:Tezos_ci.id_tokens
+    ~name:"gitlab:publish"
+    [
+      ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+      ^
+      match mode with `scheduled_test -> " --dry-run" | `non_release_tag -> "");
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
@@ -170,64 +226,14 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
     | _ -> None
   in
-  let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~interruptible:false
-      ~dependencies:
-        (Dependent (Job (job_docker_merge mode `auto) :: dependencies))
-      ~id_tokens:Tezos_ci.id_tokens
-      ~name:"gitlab:release"
-      ?variables
-      [
-        "./scripts/ci/restrict_export_to_octez_source.sh";
-        "./scripts/releases/gitlab-release.sh";
-      ]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
-  let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
-    let before_script =
-      match release_tag_pipeline_type with
-      | Schedule_test -> Some ["git tag octez-v0.0"]
-      | _ -> None
-    in
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~interruptible:false
-      ~dependencies:(Dependent dependencies)
-      ?before_script
-      ?variables
-      ~id_tokens:Tezos_ci.id_tokens
-      ~name:"gitlab:publish"
-      [
-        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
-        ^
-        match release_tag_pipeline_type with
-        | Schedule_test -> " --dry-run"
-        | _ -> "");
-      ]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
   let job_gitlab_release_or_publish =
-    let dependencies =
-      [
-        Artifacts (job_build_static `auto Amd64);
-        Artifacts (job_build_static `auto Arm64);
-        Artifacts job_build_homebrew_release;
-      ]
-    in
     match release_tag_pipeline_type with
-    | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
-    | _ -> job_gitlab_release ~dependencies
+    | Non_release_tag -> job_gitlab_publish `non_release_tag
+    | Schedule_test -> job_gitlab_publish `scheduled_test
+    | _ -> job_gitlab_release mode
   in
   let job_release_page =
     job_release_page
