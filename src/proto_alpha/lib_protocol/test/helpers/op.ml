@@ -1864,6 +1864,50 @@ let clst_lambda_export ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (Contract.Originated clst_hash)
     Tez.zero
 
+let clst_import_ticket_from_implicit ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) ~(src : Contract.t) (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let*@ (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
+    Clst_contract_storage.ticket_token ~clst_hash
+  in
+  let*?@ cont_ty_unstripped, alpha_ctxt =
+    Script_ir_unparser.unparse_ty
+      ~loc:Micheline.dummy_location
+      alpha_ctxt
+      contents_type
+  in
+  let ty =
+    Script.lazy_expr
+      (Micheline.strip_locations (Script.strip_annotations cont_ty_unstripped))
+  in
+  let*@ contents, _alpha_ctxt =
+    Script_ir_unparser.unparse_comparable_data
+      alpha_ctxt
+      Script_ir_unparser.Readable
+      contents_type
+      contents
+  in
+  let amount =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Ticket_amount.of_n @@ Script_int.abs @@ Script_int.of_int64 amount
+  in
+  transfer_ticket
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ctxt
+    ~source:src
+    ~contents:(Script.lazy_expr contents)
+    ~ty
+    ~ticketer
+    ~amount
+    ~destination:(Contract.Originated clst_hash)
+    ~entrypoint:(Entrypoint.of_string_strict_exn "import_ticket_from_implicit")
+
 let clst_register_delegate ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (ctxt : Context.t) (src : Contract.t)
     ~edge_of_clst_staking_over_baking_millionth

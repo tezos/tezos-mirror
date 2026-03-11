@@ -302,6 +302,8 @@ module CLST_types = struct
   type import_ticket =
     (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
 
+  type import_ticket_from_implicit = ticket_with_token_id
+
   type lambda_export =
     ( (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
     (* tickets_to_export *),
@@ -312,7 +314,9 @@ module CLST_types = struct
   type allowance_entrypoints = (approve, update_operators) or_
 
   type tickets_entrypoints =
-    ((export_ticket, import_ticket) or_, lambda_export) or_
+    ( (export_ticket, import_ticket) or_,
+      (lambda_export, import_ticket_from_implicit) or_ )
+    or_
 
   type fa21_entrypoints =
     ( (transfer, balance_of) or_,
@@ -348,6 +352,7 @@ module CLST_types = struct
     | Export_ticket of export_ticket
     | Import_ticket of import_ticket
     | Lambda_export of lambda_export
+    | Import_ticket_from_implicit of import_ticket_from_implicit
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L (L p))) -> Deposit p
@@ -361,7 +366,8 @@ module CLST_types = struct
     | R (R (L (R p))) -> Update_operators p
     | R (R (R (L (L p)))) -> Export_ticket p
     | R (R (R (L (R p)))) -> Import_ticket p
-    | R (R (R (R p))) -> Lambda_export p
+    | R (R (R (R (L p)))) -> Lambda_export p
+    | R (R (R (R (R p)))) -> Import_ticket_from_implicit p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L (L p)))
@@ -375,7 +381,8 @@ module CLST_types = struct
     | Update_operators p -> R (R (L (R p)))
     | Export_ticket p -> R (R (R (L (L p))))
     | Import_ticket p -> R (R (R (L (R p))))
-    | Lambda_export p -> R (R (R (R p)))
+    | Lambda_export p -> R (R (R (R (L p))))
+    | Import_ticket_from_implicit p -> R (R (R (R (R p))))
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -533,6 +540,14 @@ module CLST_types = struct
     let* import_tickets_ty = list_ty import_ticket_ty in
     make_entrypoint_leaf "import_ticket" import_tickets_ty
 
+  let import_ticket_from_implicit_type :
+      (import_ticket_from_implicit ty_node
+      * import_ticket_from_implicit entrypoints_node)
+      tzresult =
+    let open Result_syntax in
+    let* ticket_ty = ticket_with_token_id_type in
+    make_entrypoint_leaf "import_ticket_from_implicit" ticket_ty
+
   let lambda_export_type :
       (lambda_export ty_node * lambda_export entrypoints_node) tzresult =
     let open Result_syntax in
@@ -568,6 +583,7 @@ module CLST_types = struct
     let* export_ticket_type in
     let* import_ticket_type in
     let* lambda_export_type in
+    let* import_ticket_from_implicit_type in
     let* clst_staker_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
@@ -593,8 +609,11 @@ module CLST_types = struct
     let* tickets_entrypoints_type_l =
       make_entrypoint_node export_ticket_type import_ticket_type
     in
+    let* tickets_entrypoints_type_r =
+      make_entrypoint_node lambda_export_type import_ticket_from_implicit_type
+    in
     let* tickets_entrypoints_type =
-      make_entrypoint_node tickets_entrypoints_type_l lambda_export_type
+      make_entrypoint_node tickets_entrypoints_type_l tickets_entrypoints_type_r
     in
     let* fa21_entrypoints_type_r =
       make_entrypoint_node allowance_entrypoints_type tickets_entrypoints_type

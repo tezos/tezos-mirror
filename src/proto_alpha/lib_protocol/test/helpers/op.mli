@@ -1036,6 +1036,20 @@ val clst_lambda_export :
   int64 ->
   Operation.packed tzresult Lwt.t
 
+(** [clst_import_ticket_from_implicit ctxt src amount] imports
+    [amount] clst tickets from an implicit account [src] to CLST as
+    [amount] clst tokens for [src]. *)
+val clst_import_ticket_from_implicit :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  src:Contract.t ->
+  int64 ->
+  Operation.packed tzresult Lwt.t
+
 (** [clst_register_delegate ctxt src
     ~edge_of_clst_staking_over_baking_millionth
     ~ratio_of_clst_staking_over_direct_staking_billionth] returns a

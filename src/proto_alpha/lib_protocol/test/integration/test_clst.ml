@@ -1931,3 +1931,69 @@ let () =
     | Error trace -> Error_helpers.expect_clst_empty_ticket ~loc:__LOC__ trace
   in
   return_unit
+
+let () =
+  register_test ~title:"Test import_ticket_from_implicit entrypoint"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst) = Context.init2 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_op = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_op b in
+
+  let ticket_amount_export = 30_000_000L in
+  let* op_export_ticket =
+    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+  in
+  let* b = Block.bake ~operation:op_export_ticket b in
+
+  let ticket_amount_import = 20_000_000L in
+  let* op_import_ticket =
+    Op.clst_import_ticket_from_implicit (B b) ~src:dst ticket_amount_import
+  in
+  let* b = Block.bake ~operation:op_import_ticket b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg ticket_amount_export)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:ticket_amount_import
+      b
+      dst
+  in
+  let* clst_ticket_balance =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  in
+  let expected_clst_ticked_balance =
+    Int64.sub ticket_amount_export ticket_amount_import
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance)
+      expected_clst_ticked_balance
+  in
+
+  (* Insufficient ticket balance *)
+  let* op_import_ticket =
+    Op.clst_import_ticket_from_implicit
+      (B b)
+      ~src:dst
+      (Int64.add expected_clst_ticked_balance 1L)
+  in
+  let*! b_error = Block.bake ~operation:op_import_ticket b in
+  let* () =
+    match b_error with
+    | Ok _ -> Test.fail "Expected to fail due to an insufficient ticket balance"
+    | Error trace ->
+        Error_helpers.expect_negative_ticket_balance ~loc:__LOC__ trace
+  in
+  return_unit

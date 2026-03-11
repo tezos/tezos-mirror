@@ -306,6 +306,11 @@ let expect_clst_contract_is_not_delegate ~loc errs =
         true
     | _ -> false)
 
+let expect_negative_ticket_balance ~loc errs =
+  Assert.expect_error ~loc errs (function
+    | [Ticket_storage.Negative_ticket_balance _] -> true
+    | _ -> false)
+
 let expect_tz5_account_disabled ~loc errs =
   Assert.expect_error ~loc errs (function
     | [Validate_errors.Manager.Tz5_account_disabled] -> true
