@@ -235,6 +235,23 @@ module PVMState : sig
       [set] does not perform any write on disk, this information must be
       committed using {!val:commit}. *)
   val set : 'a t -> value -> unit Lwt.t
+
+  val cache_preference : Context_sigs.cache_preference
+
+  (** [commit index state] commits just the raw PVM state tree to disk and
+      returns the commit hash. This is used for on-disk caching of PVM states
+      during refutation game dissections. Unlike {!Irmin_context.commit}, this
+      commits the raw PVM state tree directly, not a full context tree with the
+      [/pvm_state] subtree prefix.
+
+      Note: for the Irmin backend, in-memory caching via immutable copies is
+      preferred (see {!cache_preference}). These functions are provided for
+      interface completeness but are not used in practice. *)
+  val commit : [> `Write] index -> value -> hash Lwt.t
+
+  (** [checkout index hash] restores a PVM state from the commit [hash].
+      Returns [None] if the commit is not found. See {!commit} for details. *)
+  val checkout : _ index -> hash -> value option Lwt.t
 end
 
 module Internal_for_tests : sig

@@ -381,6 +381,39 @@ module PVMState = struct
   let maybe_readonly (type a) (mode : a Access_mode.t)
       (s : [`Read | `Write] pvmstate') : a pvmstate' =
     match mode with Read_write -> s | Read_only -> readonly s
+
+  let cache_preference (type a)
+      (Index {pvm_context_impl = (module Pvm_Context_Impl); _} : a index) =
+    Pvm_Context_Impl.PVMState.cache_preference
+
+  let commit :
+      [`Read | `Write] index -> [`Read | `Write] pvmstate' -> hash Lwt.t =
+   fun (Index {pvm_context_impl = (module C); index; equality_witness = eqw; _})
+       (PVMState state) ->
+    match equiv eqw state.equality_witness with
+    | _, _, Some Refl ->
+        let open Lwt_syntax in
+        let+ hash = C.PVMState.commit index state.pvmstate in
+        C.context_hash_of_hash hash
+    | _ ->
+        err_implementation_mismatch ~expected:C.impl_name ~got:state.impl_name
+
+  let checkout (type a) :
+      a index -> hash -> [`Read | `Write] pvmstate' option Lwt.t =
+   fun (Index
+          {pvm_context_impl = (module C); index; equality_witness; impl_name; _})
+       hash ->
+    let open Lwt_syntax in
+    let+ state = C.PVMState.checkout index (C.hash_of_context_hash hash) in
+    Option.map
+      (fun pvmstate ->
+        make_pvmstate
+          Read_write
+          ~pvm_context_impl:(module C)
+          ~equality_witness
+          ~impl_name
+          ~pvmstate)
+      state
 end
 
 module Internal_for_tests = struct

@@ -95,6 +95,13 @@ module PVMState = struct
   let lookup tree path = Storage.lookup tree path
 
   let set ctxt state = Storage.set ctxt.state Storage.pvm_state_key state
+
+  let cache_preference = Context_sigs.On_disk
+
+  let commit index state =
+    Storage.commit ~message:"refutation_cache" index.repo state
+
+  let checkout index hash = Storage.checkout index.repo hash
 end
 
 module Internal_for_tests = struct
