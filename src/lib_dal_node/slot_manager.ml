@@ -518,58 +518,57 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
         cell_bytes
       |> Plugin.Skip_list.slot_header_of_cell |> return
 
-(* Retrieve the slot header for [slot_id] by accessing the skip list cells
-   produced during [attested_level] and stored in in the L1 context).
+(* Retrieve the slot header for [slot_id] from the L1 skip list.
 
-   Steps:
-   - Retrieve the skip list cells for [attested_level] using the plugin from L1.
-   - Locate the one matching the [slot_index] of [slot_id].
-   - Extract and return the slot header via the plugin. *)
-let _try_get_slot_header_from_L1_skip_list ctxt slot_id =
+   For each [lag] in [attestation_lags], fetch the skip list at
+   [slot_level + lag] and look for a cell matching both [slot_index] and [lag]
+   (the lag check is required with dynamic lags to avoid matching a cell from a
+   different published level). Returns [None] if no match is found. *)
+let try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
-  let*? (module Plugin : Dal_plugin.T), dal_constants =
+  let*? _plugin_slot, dal_constants_slot =
     Node_context.get_plugin_and_parameters_for_level ctxt ~level:slot_level
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     The attested level is wrong around migration!
-     Example: If [M] is the migration level, for [slot_level = M-2],
-     [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
-     [attested_level = M+6], but at this level skip-list cells for
-     [slot_level = M+1] are found in the L1 context.  *)
-  let attested_level =
-    Int32.(add slot_level (of_int dal_constants.Types.attestation_lag))
+  let attestation_lags = dal_constants_slot.Types.attestation_lags in
+  let pred_published_level = Int32.pred slot_level in
+  let pred_publication_level_dal_constants =
+    lazy
+      (Lwt.return
+      @@ Node_context.get_proto_parameters
+           ctxt
+           ~level:(`Level pred_published_level))
   in
-  let* cells_of_level =
-    let pred_published_level = Int32.pred slot_level in
-    Plugin.Skip_list.cells_of_level
-      ~attested_level
-      (Node_context.get_tezos_node_cctxt ctxt)
-      ~dal_constants
-      ~pred_publication_level_dal_constants:
-        (lazy
-          (Lwt.return
-          @@ Node_context.get_proto_parameters
-               ctxt
-               ~level:(`Level pred_published_level)))
+  let rec find_in_lags = function
+    | [] -> return_none
+    | lag :: rest -> (
+        let attested_level = Int32.(add slot_level (of_int lag)) in
+        match
+          Node_context.get_plugin_and_parameters_for_level
+            ctxt
+            ~level:attested_level
+        with
+        | Error _ -> find_in_lags rest (* plugin not yet known; skip *)
+        | Ok (plugin_attested, dal_constants) -> (
+            let (module Plugin : Dal_plugin.T) = plugin_attested in
+            let* cells =
+              Plugin.Skip_list.cells_of_level
+                ~attested_level
+                (Node_context.get_tezos_node_cctxt ctxt)
+                ~dal_constants
+                ~pred_publication_level_dal_constants
+            in
+            match
+              List.find_opt
+                (fun (_hash, _cell, cell_slot_index, cell_lag) ->
+                  cell_slot_index = slot_index && cell_lag = lag)
+                cells
+            with
+            | None -> find_in_lags rest
+            | Some (_hash, cell, _slot_index, _cell_lag) ->
+                Plugin.Skip_list.slot_header_of_cell cell |> return))
   in
-  match
-    List.find_all
-      (fun (_hash, _cell, cell_slot_index, _cell_attestation_lag) ->
-        cell_slot_index = slot_index)
-      cells_of_level
-  with
-  | [(_cell_hash, cell, _slot_index, _cell_attestation_lag)] ->
-      Plugin.Skip_list.slot_header_of_cell cell |> return
-  | _ ->
-      (* This should not happen (unless the slot index is not valid). In fact,
-         the skip list delta for a level contains exactly [number_of_slots]
-         items: one per slot index. *)
-      let number_of_slots = dal_constants.number_of_slots in
-      if slot_index < 0 || slot_index >= number_of_slots then
-        tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
-      else (* Should not be reachable *)
-        assert false
+  find_in_lags attestation_lags
 
 (* Attempt to retrieve the commitment hash associated with the published slot
    header identified by [slot_id].
