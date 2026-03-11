@@ -24,9 +24,9 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
-    CrossCallResult, CrossRuntimeContext, Registry, RuntimeId,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    gas::convert as convert_gas, CrossCallResult, CrossRuntimeContext, Registry,
+    RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
+    X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -126,7 +126,14 @@ where
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
             } else if entrypoint.as_str() == "http_call" {
                 let mut request = extract_http_call_request(typed)?;
-                inject_context_headers(request.headers_mut(), ctx, journal, registry)?;
+                let target_host = request.uri().host().map(str::to_string);
+                inject_context_headers(
+                    request.headers_mut(),
+                    target_host.as_deref(),
+                    ctx,
+                    journal,
+                    registry,
+                )?;
                 let _ = registry
                     .serve(ctx.host(), journal, request)
                     .map_err(|err| TransferError::GatewayError(err.to_string()))?;
@@ -328,8 +335,13 @@ fn inject_context_headers_raw(
 }
 
 /// Inject trusted X-Tezos-* context headers derived from `ctx` into `headers`.
+///
+/// `target_host` is the URL host of the destination runtime (e.g. `"ethereum"`,
+/// `"tezos"`). Gas is converted from Tezos milligas to the target runtime's
+/// units before being written to `X-Tezos-Gas-Limit`.
 fn inject_context_headers<'a, Host>(
     headers: &mut http::HeaderMap,
+    target_host: Option<&str>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
     journal: &mut TezosXJournal,
     registry: &impl Registry,
@@ -356,16 +368,31 @@ where
                 .map_err(|_| TransferError::GatewayError("Negative timestamp".into()))
         })?;
     let context = cross_runtime_ctx_from_ctx(ctx)?;
+    let tezos_gas_limit = context.gas_limit;
     let sender_alias =
         get_or_create_alias(ctx.host(), journal, &sender, context.clone(), registry)?;
     let source_alias =
         get_or_create_alias(ctx.host(), journal, &source, context, registry)?;
+    // Convert gas from Tezos milligas to the target runtime's units.
+    // Unknown host is a user error (bad URL); overflow is unlikely but
+    // possible for very large gas limits. Both are gateway errors.
+    let target_runtime = target_host.and_then(RuntimeId::from_host).ok_or_else(|| {
+        TransferError::GatewayError(
+            "http_call: unknown or missing target runtime in URL host".into(),
+        )
+    })?;
+    let gas_limit = convert_gas(RuntimeId::Tezos, target_runtime, tezos_gas_limit)
+        .ok_or_else(|| {
+            TransferError::GatewayError(
+                "http_call: Tezos gas limit overflows target runtime units".into(),
+            )
+        })?;
     inject_context_headers_raw(
         headers,
         &sender_alias,
         &source_alias,
         amount_mutez,
-        u64::MAX, // TODO: L2-916 — no gas metering yet
+        gas_limit,
         timestamp_u64,
         block_number_u32,
     )
@@ -484,8 +511,12 @@ fn cross_runtime_ctx_from_ctx<'a, Host>(
 where
     Host: StorageV1 + Logging,
 {
+    // Remaining milligas is the gas budget for the cross-runtime call, in Tezos
+    // milligas. `inject_context_headers` converts to the target runtime's units
+    // on the way out.
+    let gas_limit = ctx.gas().milligas() as u64;
     Ok(CrossRuntimeContext {
-        gas_limit: u64::MAX, // TODO: L2-916 — no gas metering yet
+        gas_limit,
         timestamp: bigint_to_u256(&ctx.now())?,
         block_number: biguint_to_u256(ctx.level())?,
     })
