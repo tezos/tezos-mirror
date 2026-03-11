@@ -86,6 +86,25 @@ let job_docker_merge =
     ~job_docker_amd64:(job_docker mode trigger Amd64)
     ~job_docker_arm64:(job_docker mode trigger Arm64)
 
+(* On release pipelines the static binaries do not have any dependencies
+   on previous stages and can start immediately. *)
+let job_build_static =
+  Cacio.parameterize @@ fun trigger ->
+  Cacio.parameterize @@ fun arch ->
+  job_build_static_binaries
+    ~__POS__
+    ~dependencies:(Dependent [])
+    ?rules:
+      (match trigger with
+      | `manual ->
+          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      | `auto -> None)
+    ~arch
+    ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
+    ~storage:Ramfs
+    ~release:true
+    ()
+
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
@@ -142,27 +161,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     match release_tag_pipeline_type with
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
     | _ -> None
-  in
-  (* on release pipelines the static binaries do not have any dependencies
-     on previous stages and can start immediately *)
-  let job_static_arm64_release =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~release:true
-      ()
-  in
-  let job_static_x86_64_release =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~release:true
-      ()
   in
   let job_build_homebrew_release =
     add_artifacts
@@ -222,8 +220,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let job_gitlab_release_or_publish =
     let dependencies =
       [
-        Artifacts job_static_x86_64_release;
-        Artifacts job_static_arm64_release;
+        Artifacts (job_build_static `auto Amd64);
+        Artifacts (job_build_static `auto Arm64);
         Artifacts job_build_homebrew_release;
       ]
     in
@@ -237,8 +235,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~dependencies:
         (Dependent
            [
-             Artifacts job_static_x86_64_release;
-             Artifacts job_static_arm64_release;
+             Artifacts (job_build_static `auto Amd64);
+             Artifacts (job_build_static `auto Arm64);
            ])
       ()
   in
@@ -294,8 +292,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
-    job_static_x86_64_release;
-    job_static_arm64_release;
+    job_build_static `auto Amd64;
+    job_build_static `auto Arm64;
     job_docker mode `auto Amd64;
     job_docker mode `auto Arm64;
     job_build_homebrew_release;
@@ -361,27 +359,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  let job_static_arm64 =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~release:true
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ()
-  in
-  let job_static_x86_64 =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~release:true
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ()
-  in
   let job_create_gitlab_package =
     job
       ~__POS__
@@ -392,7 +369,11 @@ let octez_packaging_revision_jobs ?(test = false) () =
         "Create GitLab packages with static binaries from this packaging \
          revision"
       ~dependencies:
-        (Dependent [Artifacts job_static_x86_64; Artifacts job_static_arm64])
+        (Dependent
+           [
+             Artifacts (job_build_static `manual Amd64);
+             Artifacts (job_build_static `manual Arm64);
+           ])
       ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
       ~id_tokens:Tezos_ci.id_tokens
       ["./scripts/ci/create_gitlab_package.sh"]
@@ -423,8 +404,8 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_docker_merge mode `manual;
     job_docker_promote_to_version;
     (* Static binaries *)
-    job_static_x86_64;
-    job_static_arm64;
+    job_build_static `manual Amd64;
+    job_build_static `manual Arm64;
     (* Release update *)
     job_create_gitlab_package;
     job_update_gitlab_release;
