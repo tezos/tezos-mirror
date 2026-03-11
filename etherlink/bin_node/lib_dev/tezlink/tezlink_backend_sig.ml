@@ -21,6 +21,10 @@ type entrypoints_info = unreachable_paths * named_entrypoints
    preapplication mode, check signature and fees. *)
 type simulator_mode = Simulation | Preapplication
 
+let simulator_mode_encoding =
+  Data_encoding.string_enum
+    [("simulation", Simulation); ("preapplication", Preapplication)]
+
 module type S = sig
   type block_param =
     [ `Head of int32

@@ -140,7 +140,11 @@ let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
   let open Lwt_result_syntax in
   let raw_str = Bytes.to_string raw_op in
   let raw_hex = Ethereum_types.hex_of_bytes raw_op in
-  let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_str in
+  let* res =
+    Prevalidator.prevalidate_raw_transaction_tezlink
+      ~simulator_mode:Preapplication
+      raw_str
+  in
   match res with
   | Error err ->
       let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_hex in

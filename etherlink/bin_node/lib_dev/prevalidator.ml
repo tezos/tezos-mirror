@@ -209,6 +209,7 @@ module Request = struct
     | Refresh_state : (unit, tztrace) t
     | Prevalidate_raw_transaction_tezlink : {
         raw_transaction : string;
+        simulator_mode : Tezlink_backend_sig.simulator_mode;
       }
         -> ( (Tezos_types.Operation.t prevalidation_result, string) result,
              tztrace )
@@ -252,14 +253,17 @@ module Request = struct
         case
           ~title:"Prevalidate_raw_transaction_tezlink"
           Json_only
-          (obj2
+          (obj3
              (req "request" (constant "prevalidate_raw_transaction_tezlink"))
-             (req "raw_transaction" (string' Hex)))
+             (req "raw_transaction" (string' Hex))
+             (req "simulator_mode" Tezlink_backend_sig.simulator_mode_encoding))
           (function
-            | View (Prevalidate_raw_transaction_tezlink {raw_transaction}) ->
-                Some ((), raw_transaction)
+            | View
+                (Prevalidate_raw_transaction_tezlink
+                   {raw_transaction; simulator_mode}) ->
+                Some ((), raw_transaction, simulator_mode)
             | _ -> None)
-          (fun ((), _) ->
+          (fun ((), _, _) ->
             (* Only used for logging *)
             assert false);
       ]
@@ -673,16 +677,17 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid ~data_model _ctxt session raw_transaction :
+  let is_tezlink_tx_valid ~data_model ~simulator_mode _ctxt session
+      raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
     let read = Types.read session.state in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
-        ~simulator_mode:Preapplication
         ~read
         ~data_model
+        ~simulator_mode
         raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
@@ -696,13 +701,18 @@ module Handlers = struct
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
-    | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
+    | Prevalidate_raw_transaction_tezlink {raw_transaction; simulator_mode} ->
         let data_model =
           match ctxt.chain_family with
           | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
           | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
         in
-        is_tezlink_tx_valid ctxt session raw_transaction ~data_model
+        is_tezlink_tx_valid
+          ctxt
+          session
+          raw_transaction
+          ~data_model
+          ~simulator_mode
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -850,9 +860,10 @@ let get_da_fee_per_byte_nanotez () =
   let da_fee_wei = state.session.etherlink_infos.da_fee_per_bytes in
   return (Tezos_types.Tez.wei_to_nanotez da_fee_wei)
 
-let prevalidate_raw_transaction_tezlink raw_transaction =
+let prevalidate_raw_transaction_tezlink ~simulator_mode raw_transaction =
   worker_wait_for_request
-    (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
+    (Request.Prevalidate_raw_transaction_tezlink
+       {raw_transaction; simulator_mode})
 
 let validate_balance_gas_nonce_with_validation_state validation_state
     (transaction : Transaction_object.t) :

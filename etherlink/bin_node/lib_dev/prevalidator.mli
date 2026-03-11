@@ -70,6 +70,7 @@ val get_da_fee_per_byte_nanotez : unit -> Q.t tzresult Lwt.t
     If the worker failed to start, a new initialization attempt will be
     performed. *)
 val prevalidate_raw_transaction_tezlink :
+  simulator_mode:Tezlink_backend_sig.simulator_mode ->
   string ->
   (Tezos_types.Operation.t prevalidation_result, string) result tzresult Lwt.t
 
