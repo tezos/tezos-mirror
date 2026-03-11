@@ -519,8 +519,8 @@ mod test {
         };
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
-            CrossCallResult, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
-            RuntimeInterface, TezosXRuntimeError,
+            CrossRuntimeContext, Registry as RegistryTrait, RuntimeId, RuntimeInterface,
+            TezosXRuntimeError,
         };
         use tezosx_journal::TezosXJournal;
 
@@ -684,43 +684,6 @@ mod test {
                 let copy_len = native_address.len().min(20);
                 alias[2..2 + copy_len].copy_from_slice(&native_address[..copy_len]);
                 Ok(alias)
-            }
-
-            fn call<Host: StorageV1>(
-                &self,
-                _registry: &impl RegistryTrait,
-                host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _from: &[u8],
-                to: &[u8],
-                amount: primitive_types::U256,
-                _data: &[u8],
-                _context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError> {
-                // Store the balance for the destination address
-                let address_hex = hex::encode(to);
-                let path = OwnedPath::try_from(format!("/{address_hex}"))
-                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
-
-                // Read existing balance
-                let current_balance = match host.store_read_all(&full_path) {
-                    Ok(bytes) if bytes.len() == 32 => {
-                        primitive_types::U256::from_little_endian(&bytes)
-                    }
-                    _ => primitive_types::U256::zero(),
-                };
-
-                // Add amount and store
-                let new_balance =
-                    current_balance.checked_add(amount).ok_or_else(|| {
-                        TezosXRuntimeError::Custom("Balance overflow".to_string())
-                    })?;
-                let mut balance_bytes = [0u8; 32];
-                new_balance.to_little_endian(&mut balance_bytes);
-                host.store_write_all(&full_path, &balance_bytes)?;
-
-                Ok(CrossCallResult::Success(vec![]))
             }
 
             fn serve<Host>(

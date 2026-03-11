@@ -40,16 +40,6 @@ pub struct CrossRuntimeContext {
     pub block_number: U256,
 }
 
-#[derive(Debug)]
-pub enum CrossCallResult {
-    /// execution completed normally, return data is the output
-    Success(Vec<u8>),
-    /// execution explicitly reverted (Solidity revert() / require()), return data is the error message/selector. Gas not consumed is refunded. State changes are rolled back.
-    Revert(Vec<u8>),
-    /// execution stopped abnormally (out of gas, invalid opcode, stack overflow, etc.). All gas is consumed. State changes are rolled back.
-    Halt(Vec<u8>),
-}
-
 // TODO: L2-971
 // cleanup this, and remove use of Custom for more specific errors
 #[derive(Eq, PartialEq, Debug, Error)]
@@ -120,34 +110,6 @@ pub trait RuntimeInterface {
         native_address: &[u8],
         context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>
-    where
-        Host: StorageV1 + Logging;
-
-    /// Execute a cross-runtime call into this runtime.
-    ///
-    /// The caller's balance has already been debited by the source runtime
-    /// before this function is called.
-    ///
-    /// `from` is the caller's **alias** in this (destination) runtime, not the
-    /// native address from the source runtime. The alias is created by
-    /// `generate_alias` and resolved by the registry before being passed here.
-    /// For example, when an EVM address calls into the Tezos runtime, `from`
-    /// contains the binary-encoded KT1 alias of that EVM address.
-    ///
-    /// `to` is the destination address, encoded in this runtime's native
-    /// format.
-    #[allow(clippy::too_many_arguments)]
-    fn call<Host>(
-        &self,
-        registry: &impl Registry,
-        host: &mut Host,
-        journal: &mut TezosXJournal,
-        from: &[u8],
-        to: &[u8],
-        amount: U256,
-        data: &[u8],
-        context: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging;
 
