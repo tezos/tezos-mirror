@@ -112,31 +112,6 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  let make_job_docker_systemd_tests =
-    make_job_docker_systemd_tests
-      ~base_image:
-        Images.Base_images.(
-          sf "%s/$DISTRIBUTION:$RELEASE-%s" path_prefix debian_version)
-      ~script:
-        [
-          "./scripts/ci/build-packages-dependencies.sh \
-           images/packages/debian-systemd-tests.Dockerfile";
-        ]
-  in
-  let job_docker_systemd_test_debian_dependencies : tezos_job =
-    make_job_docker_systemd_tests
-      ~__POS__
-      ~name:"oc.docker-systemd_tests_debian"
-      ~distribution:"debian"
-      ~matrix:(debian_package_release_matrix pipeline_type)
-  in
-  let job_docker_systemd_test_ubuntu_dependencies : tezos_job =
-    make_job_docker_systemd_tests
-      ~__POS__
-      ~name:"oc.docker-systemd_tests_ubuntu"
-      ~distribution:"ubuntu"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
-  in
   let make_job_docker_build_debian_dependencies =
     make_docker_build_dependencies
       ?rules:
@@ -181,21 +156,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     make_job_merge_build_dependencies
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
-  in
-
-  let job_merge_systemd_test_debian_dependencies =
-    make_job_merge_systemd_test_dependencies
-      ~distribution:"debian"
-      ~dependencies:
-        (Dependent [Job job_docker_systemd_test_debian_dependencies])
-      ~matrix:(debian_package_release_matrix ~arm64:false pipeline_type)
-  in
-  let job_merge_systemd_test_ubuntu_dependencies =
-    make_job_merge_systemd_test_dependencies
-      ~distribution:"ubuntu"
-      ~dependencies:
-        (Dependent [Job job_docker_systemd_test_ubuntu_dependencies])
       ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
   in
 
@@ -455,21 +415,9 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     ]
   in
   match pipeline_type with
-  | Partial ->
-      ([
-         job_docker_systemd_test_debian_dependencies;
-         job_merge_systemd_test_debian_dependencies;
-       ]
-      @ debian_jobs)
-      @ test_debian_packages_jobs
+  | Partial -> debian_jobs @ test_debian_packages_jobs
   | Full ->
-      [
-        job_docker_systemd_test_debian_dependencies;
-        job_docker_systemd_test_ubuntu_dependencies;
-        job_merge_systemd_test_debian_dependencies;
-        job_merge_systemd_test_ubuntu_dependencies;
-      ]
-      @ debian_jobs @ ubuntu_jobs @ test_debian_packages_jobs
+      debian_jobs @ ubuntu_jobs @ test_debian_packages_jobs
       @ test_ubuntu_packages_jobs
   | Release -> debian_jobs @ ubuntu_jobs
 
