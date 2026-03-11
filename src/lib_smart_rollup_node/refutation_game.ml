@@ -89,28 +89,27 @@ type pvm_intermediate_state =
         Pvm_plugin_sig.eval_state;
           (** The working head which we are currently updating to go forwards
               during dissection traversal. *)
-      snapshot :
-        ( Fuel.Accounted.t,
-          Context.PVMState.immutable_value )
-        Pvm_plugin_sig.eval_state;
-          (** A fixed view of the most recent agreement point. We must make a
-              copy of the current pvm state computed during traversal because we
-              use the previous state we agree with as a starting point of the
-              following dissection. *)
+      snapshot : Fuel.Accounted.t Pvm_plugin_sig.cached_eval_state;
+          (** A cached view of the most recent agreement point. For Irmin this
+              is an in-memory immutable copy; for RISC-V it is a commit hash
+              on disk. We use the previous state we agree with as a starting
+              point of the following dissection. *)
     }
 
 let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
     ~default_number_of_sections ~commitment_period_tick_offset node_ctxt
     state_cache last_level ok our_view =
   let open Lwt_result_syntax in
-  let start_hash, start_tick, start_state =
+  let* start_hash, start_tick, start_state =
     match ok with
-    | Hash hash, tick -> (hash, tick, None)
+    | Hash hash, tick -> return (hash, tick, None)
     | Evaluated state, tick ->
-        (* Only use immutable copy because mutable version has been modified *)
-        ( state.snapshot.info.state_hash,
-          tick,
-          Some (Pvm_plugin_sig.to_mut_eval_state state.snapshot) )
+        let* restored =
+          Interpreter.from_cached_eval_state
+            node_ctxt.Node_context.context
+            state.snapshot
+        in
+        return (state.snapshot.cached_info.state_hash, tick, Some restored)
   in
   let start_chunk = Game.{state_hash = Some start_hash; tick = start_tick} in
   let our_state, our_tick = our_view in
@@ -174,8 +173,13 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
               with
               | None -> return_none
               | Some cached ->
-                  let+ cached in
-                  Some (Pvm_plugin_sig.to_mut_eval_state cached))
+                  let* cached in
+                  let* state =
+                    Interpreter.from_cached_eval_state
+                      node_ctxt.Node_context.context
+                      cached
+                  in
+                  return_some state)
         in
         let* our =
           Interpreter.state_of_tick
@@ -203,13 +207,14 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                   ~tick
                   ~state_hash:our_state.info.state_hash
               in
-              let ok =
-                Evaluated
-                  {
-                    head = our_state;
-                    snapshot = Pvm_plugin_sig.to_imm_eval_state our_state;
-                  }
+              let*! snapshot =
+                Interpreter.to_cached_eval_state
+                  (Context.PVMState.cache_preference
+                     node_ctxt.Node_context.context)
+                  node_ctxt.Node_context.context
+                  our_state
               in
+              let ok = Evaluated {head = our_state; snapshot} in
               traverse (ok, tick) dissection
             else
               let*! () =
