@@ -105,6 +105,14 @@ let job_build_static =
     ~release:true
     ()
 
+let job_build_homebrew_release =
+  add_artifacts
+    ~name:"build-$CI_COMMIT_REF_SLUG"
+    ~expire_in:(Duration (Days 1))
+    ~when_:On_success
+    ["public/homebrew/*"]
+    Homebrew.job_create_homebrew_formula
+
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
@@ -161,14 +169,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     match release_tag_pipeline_type with
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
     | _ -> None
-  in
-  let job_build_homebrew_release =
-    add_artifacts
-      ~name:"build-$CI_COMMIT_REF_SLUG"
-      ~expire_in:(Duration (Days 1))
-      ~when_:On_success
-      ["public/homebrew/*"]
-      Homebrew.job_create_homebrew_formula
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
