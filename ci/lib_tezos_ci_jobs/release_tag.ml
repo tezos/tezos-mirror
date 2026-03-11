@@ -365,21 +365,20 @@ let job_docker_promote_to_version =
     ~tag:Gcp_not_interruptible
 
 let job_create_gitlab_package =
-  job
+  CI.job
+    "gitlab:create_package"
     ~__POS__
     ~image:Images.Base_images.ci_release
-    ~stage:Stages.publish
-    ~name:"gitlab:create_package"
+    ~stage:Publish
     ~description:
       "Create GitLab packages with static binaries from this packaging revision"
-    ~dependencies:
-      (Dependent
-         [
-           Artifacts (job_build_static `manual Amd64);
-           Artifacts (job_build_static `manual Arm64);
-         ])
-    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+    ~needs_legacy:
+      [
+        (Artifacts, job_build_static `manual Amd64);
+        (Artifacts, job_build_static `manual Arm64);
+      ]
     ~id_tokens:Tezos_ci.id_tokens
+    ~allow_failure:No
     ["./scripts/ci/create_gitlab_package.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
@@ -393,16 +392,17 @@ let job_update_gitlab_release =
     ~description:
       "Update existing GitLab release with new static binaries from this \
        packaging revision"
-    ~needs_legacy:[(Job, job_create_gitlab_package)]
+    ~needs:[(Job, job_create_gitlab_package)]
     ~id_tokens:Tezos_ci.id_tokens
     ["./scripts/releases/update_gitlab_release.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
 let () =
-  CI.register_global_packaging_revision_jobs [(Auto, job_update_gitlab_release)] ;
+  CI.register_global_packaging_revision_jobs
+    [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
   CI.register_global_packaging_revision_test_jobs
-    [(Auto, job_update_gitlab_release)] ;
+    [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
   ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
@@ -427,7 +427,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_build_static `manual Amd64;
     job_build_static `manual Arm64;
     (* Release update *)
-    job_create_gitlab_package;
   ]
   @ jobs_debian_repository
   @
