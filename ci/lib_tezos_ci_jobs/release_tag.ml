@@ -361,6 +361,41 @@ let job_docker_promote_to_version =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
+let job_create_gitlab_package =
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~name:"gitlab:create_package"
+    ~description:
+      "Create GitLab packages with static binaries from this packaging revision"
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts (job_build_static `manual Amd64);
+           Artifacts (job_build_static `manual Arm64);
+         ])
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+    ~id_tokens:Tezos_ci.id_tokens
+    ["./scripts/ci/create_gitlab_package.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_update_gitlab_release =
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~name:"gitlab:update_release"
+    ~description:
+      "Update existing GitLab release with new static binaries from this \
+       packaging revision"
+    ~dependencies:(Dependent [Job job_create_gitlab_package])
+    ~id_tokens:Tezos_ci.id_tokens
+    ["./scripts/releases/update_gitlab_release.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
 let octez_packaging_revision_jobs ?(test = false) () =
   let mode = if test then `test else `real in
   let jobs_debian_repository =
@@ -371,42 +406,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  let job_create_gitlab_package =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~name:"gitlab:create_package"
-      ~description:
-        "Create GitLab packages with static binaries from this packaging \
-         revision"
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts (job_build_static `manual Amd64);
-             Artifacts (job_build_static `manual Arm64);
-           ])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~id_tokens:Tezos_ci.id_tokens
-      ["./scripts/ci/create_gitlab_package.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
-  let job_update_gitlab_release =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~name:"gitlab:update_release"
-      ~description:
-        "Update existing GitLab release with new static binaries from this \
-         packaging revision"
-      ~dependencies:(Dependent [Job job_create_gitlab_package])
-      ~id_tokens:Tezos_ci.id_tokens
-      ["./scripts/releases/update_gitlab_release.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
