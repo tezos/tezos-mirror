@@ -278,7 +278,8 @@ module type COMPONENT_API = sig
       - Tezt's [--keep-going] is set if, and only if [pipeline] is [`scheduled].
 
       Test selection:
-      - Manifezt is active if, and only if [pipeline] is [`merge_request].
+      - Manifezt is active if, and only if [pipeline] is [`merge_request]
+        and [select_tezts] is [true] (which is the default).
         When active, it causes the job to depend on the [select_tezts] job,
         which is automatically added to the pipeline if necessary.
       - [test_selection] is a TSL expression.
@@ -310,6 +311,7 @@ module type COMPONENT_API = sig
     ?retry_tests:int ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
+    ?select_tezts:bool ->
     string ->
     job
 

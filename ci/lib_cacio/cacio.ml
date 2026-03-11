@@ -750,6 +750,7 @@ module type COMPONENT_API = sig
     ?retry_tests:int ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
+    ?select_tezts:bool ->
     string ->
     job
 
@@ -1031,11 +1032,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(needs = []) ?needs_legacy ?disable_datadog ?allow_failure ?tezt_exe
       ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
+      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = [])
+      ?(select_tezts = true) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
-      match pipeline with `merge_request -> true | `scheduled -> false
+      select_tezts
+      && match pipeline with `merge_request -> true | `scheduled -> false
     in
     let record_dir =
       let dir =
