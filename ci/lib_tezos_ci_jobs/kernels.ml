@@ -99,6 +99,8 @@ let job_build_kernels =
            "tx_kernel.wasm";
            "tx_kernel_dal.wasm";
            "dal_echo_kernel.wasm";
+           "riscv-echo";
+           "riscv-echo.checksum";
          ])
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
     ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
