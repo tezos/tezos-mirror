@@ -169,7 +169,10 @@ let job_gitlab_publish =
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
 
-let job_release_page ~test ?dependencies () =
+let job_release_page =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize
+  @@ fun (wait_for : [`wait_for_nothing | `wait_for_build]) ->
   job
     ~__POS__
     ~image:Images.CI.release_page
@@ -187,24 +190,34 @@ let job_release_page ~test ?dependencies () =
          ["./index.md"; "index.html"])
     ~before_script:["eval $(opam env)"]
     ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
-    ?dependencies
+    ?dependencies:
+      (match wait_for with
+      | `wait_for_nothing -> None
+      | `wait_for_build ->
+          Some
+            (Dependent
+               [
+                 Artifacts (job_build_static `auto Amd64);
+                 Artifacts (job_build_static `auto Arm64);
+               ]))
     ~variables:
-      (if test then
-         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+      (match mode with
+      | `test ->
+          (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
             depends on the release type (tests or not). *)
-         [
-           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
-           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
-         ]
-       else
-         [
-           ("S3_BUCKET", "site-prod.octez.tezos.com");
-           ("BUCKET_PATH", "/releases");
-           ("URL", "octez.tezos.com");
-           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
-         ])
+          [
+            ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+            ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+          ]
+      | `real ->
+          [
+            ("S3_BUCKET", "site-prod.octez.tezos.com");
+            ("BUCKET_PATH", "/releases");
+            ("URL", "octez.tezos.com");
+            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+          ])
     ["./scripts/releases/publish_release_page.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
@@ -235,17 +248,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     | Schedule_test -> job_gitlab_publish `scheduled_test
     | _ -> job_gitlab_release mode
   in
-  let job_release_page =
-    job_release_page
-      ~test
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts (job_build_static `auto Amd64);
-             Artifacts (job_build_static `auto Arm64);
-           ])
-      ()
-  in
+  let job_release_page = job_release_page mode `wait_for_build in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
       ~__POS__
