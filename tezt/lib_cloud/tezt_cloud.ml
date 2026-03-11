@@ -425,4 +425,5 @@ module Artifact_helpers = struct
           ~contents:full_configuration_string
 end
 
+module Nginx = Nginx
 module Gcloud = Gcloud

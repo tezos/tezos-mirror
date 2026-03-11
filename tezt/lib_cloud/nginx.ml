@@ -52,7 +52,9 @@ let generate_htpasswd ~username ~password =
   let hash = String.trim output in
   let contents = sf "%s:%s\n" username hash in
   with_open_out htpasswd_file (fun oc -> output_string oc contents) ;
-  Unix.chmod htpasswd_file 0o600 ;
+  (* nginx:alpine docker runs workers as user nginx (not root), so the htpasswd
+     file has to be world-readable. *)
+  Unix.chmod htpasswd_file 0o644 ;
   Lwt.return_unit
 
 let run ~username ~password ~services () =
