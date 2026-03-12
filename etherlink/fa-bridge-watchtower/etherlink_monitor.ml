@@ -1176,14 +1176,14 @@ let start db ~config ~notify_ws_change ~first_block =
     loop ()
   in
   let rec tx_queue_beacon () =
-    let open Lwt_syntax in
-    let* res =
+    let*! res =
       protect @@ fun () ->
-      Tx_queue.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint
+      let* () = Tx_queue.tx_queue_tick ~evm_node_endpoint:!tx_queue_endpoint in
+      Tx_queue.drop_stale_transactions ()
     in
-    let* () =
+    let*! () =
       match res with
-      | Ok () -> return_unit
+      | Ok () -> Lwt.return_unit
       | Error e ->
           Format.kasprintf Event.(emit tx_queue_error) "%a" pp_print_trace e
     in
