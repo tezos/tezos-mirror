@@ -151,35 +151,30 @@ let job_gitlab_publish =
 
 let job_release_page =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize
-  @@ fun (wait_for : [`wait_for_nothing | `wait_for_build]) ->
-  job
+  Cacio.parameterize @@ fun wait_for ->
+  CI.job
+    "publish:release-page"
     ~__POS__
     ~image:Images.CI.release_page
-    ~stage:Stages.publish
+    ~stage:Publish
     ~description:
       "A job to update the Octez release page. If running in a test pipleine, \
        the assets are pushed in the [release-page-test.nomadic-labs.com] \
        bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
        its [index.html] is updated accordingly."
-    ~name:"publish:release-page"
-    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
          ["./index.md"; "index.html"])
-    ~before_script:["eval $(opam env)"]
-    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
-    ?dependencies:
+    ?needs_legacy:
       (match wait_for with
       | `wait_for_nothing -> None
       | `wait_for_build ->
           Some
-            (Dependent
-               [
-                 Artifacts (job_build_static `auto Amd64);
-                 Artifacts (job_build_static `auto Arm64);
-               ]))
+            [
+              (Artifacts, job_build_static `auto Amd64);
+              (Artifacts, job_build_static `auto Arm64);
+            ])
     ~variables:
       (match mode with
       | `test ->
@@ -198,9 +193,11 @@ let job_release_page =
             ("URL", "octez.tezos.com");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    ["./scripts/releases/publish_release_page.sh"]
-    ~retry:no_retry
-    ~tag:Gcp_not_interruptible
+    [
+      "eval $(opam env)";
+      "./scripts/releases/publish_release_page.sh";
+      "cp /tmp/release_page*/index.md ./index.md";
+    ]
 
 let job_opam_release =
   Cacio.parameterize @@ fun mode ->
@@ -232,23 +229,51 @@ let job_dispatch_call =
        release.\n\
        For now, it triggers the release pipeline from \
        tez-capital/tezos-macos-pipeline"
-    ~needs_legacy:
-      [
-        (Job, job_release_page `real `wait_for_build);
-        (Job, job_gitlab_release `real);
-      ]
+    ~needs:[(Job, job_release_page `real `wait_for_build)]
+    ~needs_legacy:[(Job, job_gitlab_release `real)]
     ["./scripts/releases/dispatch-call.sh"]
 
 let () =
   Cacio.register_jobs
     Major_release_tag
-    [(Auto, job_opam_release `real); (Auto, job_dispatch_call)] ;
-  Cacio.register_jobs Major_release_tag_test [(Auto, job_opam_release `test)] ;
+    [
+      (Manual, job_release_page `real `wait_for_build);
+      (Auto, job_opam_release `real);
+      (Auto, job_dispatch_call);
+    ] ;
+  Cacio.register_jobs
+    Major_release_tag_test
+    [
+      (Manual, job_release_page `test `wait_for_build);
+      (Auto, job_opam_release `test);
+    ] ;
   Cacio.register_jobs
     Minor_release_tag
-    [(Auto, job_opam_release `real); (Auto, job_dispatch_call)] ;
-  Cacio.register_jobs Minor_release_tag_test [(Auto, job_opam_release `test)] ;
-  Cacio.register_jobs Beta_release_tag [(Auto, job_dispatch_call)] ;
+    [
+      (Manual, job_release_page `real `wait_for_build);
+      (Auto, job_opam_release `real);
+      (Auto, job_dispatch_call);
+    ] ;
+  Cacio.register_jobs
+    Minor_release_tag_test
+    [
+      (Manual, job_release_page `test `wait_for_build);
+      (Auto, job_opam_release `test);
+    ] ;
+  Cacio.register_jobs
+    Beta_release_tag
+    [
+      (Manual, job_release_page `real `wait_for_build); (Auto, job_dispatch_call);
+    ] ;
+  Cacio.register_jobs
+    Beta_release_tag_test
+    [(Manual, job_release_page `test `wait_for_build)] ;
+  Cacio.register_jobs
+    Publish_release_page
+    [(Manual, job_release_page `real `wait_for_nothing)] ;
+  Cacio.register_jobs
+    Test_publish_release_page
+    [(Manual, job_release_page `test `wait_for_nothing)] ;
   ()
 
 (** Create an Octez release tag pipeline of type {!pipeline_type},
@@ -271,7 +296,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
     | Scheduled_test_release -> job_gitlab_publish `scheduled_test
     | _ -> job_gitlab_release mode
   in
-  let job_release_page = job_release_page mode `wait_for_build in
   let job_promote_to_latest_test =
     job_docker_promote_to_latest
       ~ci_docker_hub:false
@@ -302,7 +326,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   @ Cacio.get_jobs pipeline_type
   @
   match pipeline_type with
-  | Major_release_tag | Minor_release_tag -> [job_release_page]
   | Major_release_tag_test | Minor_release_tag_test ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -311,10 +334,7 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
            release testers are not required to trigger two separate pipelines
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
-        job_release_page;
       ]
-  | Beta_release_tag -> [job_release_page]
-  | Beta_release_tag_test -> [job_release_page]
   | _ -> []
 
 let job_docker_promote_to_version =

@@ -547,20 +547,14 @@ let () =
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
     ~jobs:
-      ([
-         Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page `test `wait_for_nothing;
-       ]
+      ([Tezos_ci.job_datadog_pipeline_trace]
       @ Cacio.get_jobs Test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
     If.(api_release_page && on_tezos_namespace)
     ~jobs:
-      ([
-         Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page `real `wait_for_nothing;
-       ]
+      ([Tezos_ci.job_datadog_pipeline_trace]
       @ Cacio.get_jobs Publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
