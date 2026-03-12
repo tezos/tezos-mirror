@@ -6017,10 +6017,11 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
   let* profile = Dal_RPC.(call dal_node @@ get_profiles ()) in
   let offline_period =
     if profile = Dal_RPC.Bootstrap then l1_history_length + blocks_per_cycle
-    else (* this is just a not too small value *)
-      3 * blocks_per_cycle
+    else
+      (* Cap to 2 cycles while stopped (seed retention is 2). *)
+      (2 * blocks_per_cycle) - 1
   in
-  let stop_level = 10 in
+  let stop_level = 16 in
   let restart_level = stop_level + offline_period in
   let last_finalized_level =
     restart_level + dal_parameters.Dal.Parameters.attestation_lag
@@ -14420,6 +14421,15 @@ let register ~protocols =
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom (Rolling (Some 5)))
     "restart DAL node (producer)"
+    test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["restart"]
+    ~observer_profiles:[0]
+    (* Use default L1 history (Default_without_refutation): observer profile
+       requires shard_retention_period_in_levels (150 levels ≈ 19 cycles),
+       so we cannot use a small fixed rolling window like the producer test. *)
+    "restart DAL node (observer)"
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
