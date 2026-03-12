@@ -18,6 +18,9 @@ CAMLprim value caml_sqlite3_register_receipt_bloom(value v_db)
 {
     sqlite3 *db = ocaml_sqlite3_db(v_db);
 
+    if (db == NULL)
+        caml_failwith("receipt_bloom: invalid sqlite3 handle");
+
     if (sqlite3_receipt_bloom_init(db) != SQLITE_OK)
         caml_failwith("receipt_bloom: init failed");
 

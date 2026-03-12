@@ -34,6 +34,8 @@ static inline sqlite3 *ocaml_sqlite3_db(value v)
 {
     /* db_wrap is stored as a pointer in the custom block */
     void *p = *((void **)Data_custom_val(v));
+    if (p == NULL)
+        return NULL;
     return ((db_wrap_prefix *)p)->db;
 }
 
