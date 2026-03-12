@@ -2019,13 +2019,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                     chain_store
                     extra_cycle.start_level
                 in
-                (* TODO explain this... *)
+                (* When cycles are short (e.g. in sandboxed mode), the extra
+                   cycle's start level may exceed the export block level,
+                   meaning more blocks live in the floating store than in
+                   cemented. In that case, fall back to the caboose as the
+                   starting point for floating block retrieval. *)
                 if
                   Compare.Int32.(
                     Store.Block.level first_block_in_cycle > export_block_level)
                 then
-                  (* When the cycles are short, we may keep more blocks in the
-                     floating store than in cemented *)
                   let*! _, caboose_level = Store.Chain.caboose chain_store in
                   Store.Block.read_block_by_level chain_store caboose_level
                 else return first_block_in_cycle
