@@ -1606,8 +1606,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let exception Done in
       let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
       let f block =
-        (* FIXME: we also write potential branches, it will eventually
-           be GCed *)
+        (* Blocks from alternative branches at or above the export
+           block level are skipped. Blocks below that level are
+           included even if from alternative branches. *)
         if Compare.Int32.(Block_repr.level block >= limit_level) then
           if Block_hash.equal limit_hash (Block_repr.hash block) then raise Done
           else return_unit
