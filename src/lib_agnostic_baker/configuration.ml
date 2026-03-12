@@ -398,11 +398,28 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
-  extra_nodes : Uri.t list;
+  extra_nodes : Tezos_client_base.Client_context.full list;
 }
 
+let switch_node_endpoint cctxt rpc_config endpoint =
+  let rpc_config =
+    Tezos_rpc_http_client_unix.RPC_client_unix.{rpc_config with endpoint}
+  in
+  let rpc_ctxt =
+    new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+      rpc_config
+      (Tezos_rpc_http.Media_type.Command_line.of_command_line
+         rpc_config.media_type)
+  in
+  object
+    inherit
+      Tezos_client_base.Client_context.proxy_context_with_rpc
+        cctxt
+        (rpc_ctxt :> Tezos_rpc.Context.generic)
+  end
+
 (** Create the configuration from the given arguments. *)
-let create_config
+let create_config cctxt rpc_config
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -421,6 +438,12 @@ let create_config
       remote_calls_timeout,
       allow_signing_delay,
       extra_nodes ) =
+  let extra_nodes =
+    Option.fold
+      ~none:[]
+      ~some:(List.map (switch_node_endpoint cctxt rpc_config))
+      extra_nodes
+  in
   {
     pidfile;
     node_version_check_bypass;
@@ -439,7 +462,7 @@ let create_config
     pre_emptive_forge_time;
     remote_calls_timeout;
     allow_signing_delay;
-    extra_nodes = Option.value ~default:[] extra_nodes;
+    extra_nodes;
   }
 
 type per_block_votes_config = {

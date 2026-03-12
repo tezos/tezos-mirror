@@ -22,9 +22,9 @@ module type AGNOSTIC_DAEMON = sig
   type command
 
   val run :
-    rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config ->
     keep_alive:bool ->
     command:command ->
+    extra_nodes:Tezos_client_base.Client_context.full list ->
     Tezos_client_base.Client_context.full ->
     unit tzresult Lwt.t
 end
@@ -37,7 +37,6 @@ module type AGENT = sig
   val run_command :
     (module Protocol_plugin_sig.S) ->
     Tezos_client_base.Client_context.full ->
-    Tezos_rpc_http_client_unix.RPC_client_unix.config ->
     command ->
     unit tzresult Lwt.t
 
@@ -66,19 +65,12 @@ module Baker_agent : AGENT with type command = baker_command = struct
 
   type command = baker_command
 
-  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt rpc_config
-      command =
+  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
     match command with
     | Run_with_local_node {data_dir; args; sources} ->
-        Command_run.run_baker
-          (module Plugin)
-          args
-          (Some data_dir)
-          sources
-          cctxt
-          rpc_config
+        Command_run.run_baker (module Plugin) args (Some data_dir) sources cctxt
     | Run_remotely {args; sources} ->
-        Command_run.run_baker (module Plugin) args None sources cctxt rpc_config
+        Command_run.run_baker (module Plugin) args None sources cctxt
     | Run_vdf {pidfile; keep_alive} ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
         Plugin.Baker_commands_helpers.run_vdf_daemon ~cctxt ~keep_alive
@@ -101,8 +93,7 @@ module Accuser_agent : AGENT with type command = accuser_command = struct
 
   type command = accuser_command
 
-  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt _rpc_config
-      command =
+  let run_command (module Plugin : Protocol_plugin_sig.S) cctxt command =
     match command with
     | Run_accuser {pidfile; preserved_levels; keep_alive} ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
@@ -127,7 +118,7 @@ module Make_daemon (Agent : AGENT) :
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
-    rpc_config : Tezos_rpc_http_client_unix.RPC_client_unix.config;
+    extra_nodes : Tezos_client_base.Client_context.full list;
     head_stream :
       (* we switch [head_stream] from [`Live] to [`Reconnecting] on
          disconnections, and from [`Reconnecting] to [`Live] on reconnections *)
@@ -173,12 +164,11 @@ module Make_daemon (Agent : AGENT) :
     | Error trace -> fail trace
 
   (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
-      rpc_config command] returns the main running thread for the baker given
-      its protocol [~protocol_hash] and cancellation [~cancel_promise]. It can
-      optionally initialise sapling parameters, as requested by
-      [~init_sapling_params]. *)
+      command] returns the main running thread for the baker given its protocol
+      [~protocol_hash] and cancellation [~cancel_promise]. It can optionally
+      initialise sapling parameters, as requested by [~init_sapling_params]. *)
   let run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
-      rpc_config command =
+      command =
     let plugin =
       match
         Protocol_plugins.proto_plugin_for_protocol
@@ -208,12 +198,12 @@ module Make_daemon (Agent : AGENT) :
       Tezos_sapling.Core.Validator.init_params ()
     else () ;
 
-    let agent_thread = Agent.run_command plugin cctxt rpc_config command in
+    let agent_thread = Agent.run_command plugin cctxt command in
     Lwt.pick [agent_thread; cancel_promise]
 
-  (** [spawn_baker cctxt rpc_config command protocol_hash] spawns a new baker
+  (** [spawn_baker cctxt command protocol_hash] spawns a new baker
       process for the given [protocol_hash]. *)
-  let spawn_baker cctxt rpc_config command protocol_hash =
+  let spawn_baker cctxt command protocol_hash =
     let open Lwt_result_syntax in
     let*! () = Events.(emit starting_agent) (Agent.name, protocol_hash) in
     let cancel_promise, canceller = Lwt.wait () in
@@ -223,7 +213,6 @@ module Make_daemon (Agent : AGENT) :
         ~cancel_promise
         ~init_sapling_params:Agent.init_sapling_params
         cctxt
-        rpc_config
         command
     in
     let*! () = Events.(emit agent_running) (Agent.name, protocol_hash) in
@@ -247,9 +236,7 @@ module Make_daemon (Agent : AGENT) :
       Some
         {baker = state.current_baker; level_to_kill = level_to_kill_old_baker}
     in
-    let* new_baker =
-      spawn_baker state.cctxt state.rpc_config state.command next_protocol_hash
-    in
+    let* new_baker = spawn_baker state.cctxt state.command next_protocol_hash in
     return {state with old_baker; current_baker = new_baker}
 
   (** [maybe_kill_old_baker state] checks whether the [old_baker] process
@@ -329,11 +316,11 @@ module Make_daemon (Agent : AGENT) :
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
-  (** [may_start_initial_baker cctxt rpc_config command ~node_addr] recursively waits
+  (** [may_start_initial_baker cctxt command ~node_addr] recursively waits
       for an [active] protocol and spawns a baker for it. If the protocol is
       [frozen] (not [active] anymore), it waits for a head with an [active]
       protocol. *)
-  let may_start_initial_baker cctxt rpc_config command ~node_addr =
+  let may_start_initial_baker cctxt command ~node_addr =
     let open Lwt_result_syntax in
     let rec may_start ?last_known_proto ~head_stream () =
       let* protocol_hash = Rpc_services.get_next_protocol_hash ~node_addr in
@@ -348,9 +335,7 @@ module Make_daemon (Agent : AGENT) :
       in
       match proto_status with
       | Active ->
-          let* current_baker =
-            spawn_baker cctxt rpc_config command protocol_hash
-          in
+          let* current_baker = spawn_baker cctxt command protocol_hash in
           return current_baker
       | Frozen -> (
           let* head_stream =
@@ -478,7 +463,7 @@ module Make_daemon (Agent : AGENT) :
     | None -> return_unit
     | Some next_state -> main_loop next_state
 
-  let run ~rpc_config ~keep_alive ~command cctxt =
+  let run ~keep_alive ~command ~extra_nodes cctxt =
     let open Lwt_result_syntax in
     () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
     let node_addr = Uri.to_string cctxt#base in
@@ -492,10 +477,9 @@ module Make_daemon (Agent : AGENT) :
       if keep_alive then
         retry_on_disconnection
           node_addr
-          (fun () ->
-            may_start_initial_baker cctxt rpc_config command ~node_addr)
+          (fun () -> may_start_initial_baker cctxt command ~node_addr)
           ()
-      else may_start_initial_baker cctxt rpc_config command ~node_addr
+      else may_start_initial_baker cctxt command ~node_addr
     in
     let* head_stream =
       (* Useful if the baker is started before the node. *)
@@ -508,7 +492,7 @@ module Make_daemon (Agent : AGENT) :
         keep_alive;
         command;
         cctxt;
-        rpc_config;
+        extra_nodes;
         head_stream = `Live head_stream;
       }
     in

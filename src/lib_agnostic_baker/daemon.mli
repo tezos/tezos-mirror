@@ -29,12 +29,12 @@ module type AGNOSTIC_DAEMON = sig
 
   type command
 
-  (** [run ~rpc_config ~keep_alive ~command cctxt] Runs the daemon
+  (** [run ~keep_alive ~command ~extra_nodes cctxt] Runs the daemon
       responsible for the spawn/stop of the daemons. *)
   val run :
-    rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config ->
     keep_alive:bool ->
     command:command ->
+    extra_nodes:Tezos_client_base.Client_context.full list ->
     Tezos_client_base.Client_context.full ->
     unit tzresult Lwt.t
 end

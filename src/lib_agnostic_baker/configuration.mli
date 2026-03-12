@@ -68,10 +68,12 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
-  extra_nodes : Uri.t list;
+  extra_nodes : Tezos_client_base.Client_context.full list;
 }
 
 val create_config :
+  Tezos_client_base.Client_context.full ->
+  Tezos_rpc_http_client_unix.RPC_client_unix.config ->
   string option
   * bool
   * string option

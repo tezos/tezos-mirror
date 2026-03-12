@@ -546,11 +546,11 @@ module Baker = struct
           let* rpc_config =
             init_logging client_config ~base_dir:cctxt#get_base_dir
           in
-          let args = Configuration.create_config args in
+          let args = Configuration.create_config cctxt rpc_config args in
           Daemon.Baker.run
-            ~rpc_config
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_with_local_node {data_dir; args; sources})
+            ~extra_nodes:args.extra_nodes
             cctxt);
       command
         ~group
@@ -561,11 +561,11 @@ module Baker = struct
           let* rpc_config =
             init_logging client_config ~base_dir:cctxt#get_base_dir
           in
-          let args = Configuration.create_config args in
+          let args = Configuration.create_config cctxt rpc_config args in
           Daemon.Baker.run
-            ~rpc_config
             ~keep_alive:args.keep_alive
             ~command:(Daemon.Run_remotely {args; sources})
+            ~extra_nodes:args.extra_nodes
             cctxt);
       command
         ~group
@@ -573,13 +573,15 @@ module Baker = struct
         (args2 pidfile_arg keep_alive_arg)
         (prefixes ["run"; "vdf"] @@ stop)
         (fun (pidfile, keep_alive) cctxt ->
-          let* rpc_config =
+          (* Initialize logging system for its side effects. The returned
+             rpc_config is not needed for VDF command. *)
+          let* _rpc_config =
             init_logging client_config ~base_dir:cctxt#get_base_dir
           in
           Daemon.Baker.run
-            ~rpc_config
             ~keep_alive
             ~command:(Daemon.Run_vdf {pidfile; keep_alive})
+            ~extra_nodes:[]
             cctxt);
       command
         ~group
@@ -595,14 +597,16 @@ module Baker = struct
               let default_daily_logs_path = Some "octez-accuser"
             end)
           in
-          let* rpc_config =
+          (* Initialize logging system for its side effects. The returned
+             rpc_config is not needed for accuser command. *)
+          let* _rpc_config =
             init_logging client_config ~base_dir:cctxt#get_base_dir
           in
           Daemon.Baker.run
-            ~rpc_config
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+            ~extra_nodes:[]
             cctxt);
     ]
     @ Dal.commands
@@ -626,11 +630,10 @@ module Accuser = struct
         (prefix "run" @@ stop)
         (fun (pidfile, preserved_levels, keep_alive) cctxt ->
           Daemon.Accuser.run
-            ~rpc_config:
-              Tezos_rpc_http_client_unix.RPC_client_unix.default_config
             ~keep_alive
             ~command:
               (Daemon.Run_accuser {pidfile; preserved_levels; keep_alive})
+            ~extra_nodes:[]
             cctxt);
     ]
 end
