@@ -119,35 +119,33 @@ let job_gitlab_release =
 
 let job_gitlab_publish =
   Cacio.parameterize @@ fun mode ->
-  job
+  CI.job
+    "gitlab:publish"
     ~__POS__
+    ~description:"Create a GitLab package."
     ~image:Images.Base_images.ci_release
-    ~stage:Stages.publish
-    ~interruptible:false
-    ~dependencies:
-      (Dependent
-         [
-           Artifacts (job_build_static `auto Amd64);
-           Artifacts (job_build_static `auto Arm64);
-           Artifacts job_build_homebrew_release;
-         ])
-    ?before_script:
-      (match mode with
-      | `scheduled_test -> Some ["git tag octez-v0.0"]
-      | `non_release_tag -> None)
+    ~stage:Publish
+    ~needs_legacy:
+      [
+        (Artifacts, job_build_static `auto Amd64);
+        (Artifacts, job_build_static `auto Arm64);
+        (Artifacts, job_build_homebrew_release);
+      ]
     ?variables:
       (match mode with
       | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
       | `non_release_tag -> None)
     ~id_tokens:Tezos_ci.id_tokens
-    ~name:"gitlab:publish"
-    [
-      ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
-      ^
-      match mode with `scheduled_test -> " --dry-run" | `non_release_tag -> "");
-    ]
-    ~retry:no_retry
-    ~tag:Gcp_not_interruptible
+    ((match mode with
+     | `scheduled_test -> ["git tag octez-v0.0"]
+     | `non_release_tag -> [])
+    @ [
+        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+        ^
+        match mode with
+        | `scheduled_test -> " --dry-run"
+        | `non_release_tag -> "");
+      ])
 
 let job_release_page =
   Cacio.parameterize @@ fun mode ->
@@ -234,6 +232,7 @@ let job_dispatch_call =
     ["./scripts/releases/dispatch-call.sh"]
 
 let () =
+  (* Major *)
   Cacio.register_jobs
     Major_release_tag
     [
@@ -247,6 +246,7 @@ let () =
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
     ] ;
+  (* Minor *)
   Cacio.register_jobs
     Minor_release_tag
     [
@@ -260,6 +260,7 @@ let () =
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
     ] ;
+  (* Beta *)
   Cacio.register_jobs
     Beta_release_tag
     [
@@ -268,6 +269,18 @@ let () =
   Cacio.register_jobs
     Beta_release_tag_test
     [(Manual, job_release_page `test `wait_for_build)] ;
+  (* Non-release *)
+  Cacio.register_jobs
+    Non_release_tag
+    [(Auto, job_gitlab_publish `non_release_tag)] ;
+  Cacio.register_jobs
+    Non_release_tag_test
+    [(Auto, job_gitlab_publish `non_release_tag)] ;
+  (* Scheduled *)
+  Cacio.register_jobs
+    Scheduled_test_release
+    [(Auto, job_gitlab_publish `scheduled_test)] ;
+  (* Release page *)
   Cacio.register_jobs
     Publish_release_page
     [(Manual, job_release_page `real `wait_for_nothing)] ;
@@ -291,10 +304,8 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   in
   let job_gitlab_release_or_publish =
     match pipeline_type with
-    | Non_release_tag -> job_gitlab_publish `non_release_tag
-    | Non_release_tag_test -> job_gitlab_publish `non_release_tag
-    | Scheduled_test_release -> job_gitlab_publish `scheduled_test
-    | _ -> job_gitlab_release mode
+    | Non_release_tag | Non_release_tag_test | Scheduled_test_release -> []
+    | _ -> [job_gitlab_release mode]
   in
   let job_promote_to_latest_test =
     job_docker_promote_to_latest
@@ -319,9 +330,8 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
     job_docker mode `auto Arm64;
     job_build_homebrew_release;
     job_docker_merge mode `auto;
-    job_gitlab_release_or_publish;
-    job_trigger_monitoring;
   ]
+  @ job_gitlab_release_or_publish @ [job_trigger_monitoring]
   @ jobs_debian_repository
   @ Cacio.get_jobs pipeline_type
   @
