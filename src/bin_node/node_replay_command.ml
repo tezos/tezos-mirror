@@ -521,6 +521,11 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
                process_path = Sys.executable_name;
              })
       in
+      let* () =
+        Block_validator_process.reconfigure_event_logging
+          validator_process
+          internal_events
+      in
       let commit_genesis ~chain_id =
         Block_validator_process.commit_genesis validator_process ~chain_id
       in
