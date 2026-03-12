@@ -120,8 +120,13 @@ let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
 let get_network_peer_banned peer_id =
   make GET ["network"; "peers"; peer_id; "banned"] Fun.id
 
-let get_chain_blocks ?(chain = "main") () =
-  make GET ["chains"; chain; "blocks"] Fun.id
+let get_chain_blocks ?(chain = "main") ?heads ?length ?min_date () =
+  let query_string =
+    Query_arg.opt_list "head" (fun name head -> (name, head)) heads
+    @ Query_arg.opt "length" string_of_int length
+    @ Query_arg.opt "min_date" string_of_int min_date
+  in
+  make ~query_string GET ["chains"; chain; "blocks"] Fun.id
 
 let get_chain_invalid_blocks ?(chain = "main") () =
   make GET ["chains"; chain; "invalid_blocks"] Fun.id

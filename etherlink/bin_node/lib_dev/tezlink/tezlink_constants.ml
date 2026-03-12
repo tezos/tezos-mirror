@@ -41,3 +41,12 @@ let all_constants : Tezlink_imports.Imported_context.Constants.t =
   with
   | Ok param -> param
   | Error _ -> assert false
+
+(* Construct a protocol-compatible fitness. Locked_round is mocked to None. *)
+let fitness ~level ~predecessor_round ~round : Fitness.t =
+  let level = Imported_protocol.Raw_level_repr.of_int32_exn level in
+  Imported_protocol.Fitness_repr.to_raw
+    (Imported_protocol.Fitness_repr.create_without_locked_round
+       ~level
+       ~predecessor_round
+       ~round)

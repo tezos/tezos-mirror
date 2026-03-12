@@ -809,6 +809,18 @@ let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Chain_services.S.chain_id
 
+let block_list :
+    ( [`GET],
+      chain,
+      chain,
+      < heads : Block_hash.t trace
+      ; length : int option
+      ; min_date : Time.Protocol.t option >,
+      unit,
+      Block_hash.t trace trace )
+    Tezos_rpc.Service.t =
+  import_service Tezos_shell_services.Chain_services.S.Blocks.list
+
 let bootstrapped :
     ( [`GET],
       unit,
