@@ -1815,7 +1815,7 @@ oc.build_x86_64-released:
     when: on_success
 
 sanity_ci:
-  image: ${ci_image_name_protected}/build:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/build:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -1871,7 +1871,7 @@ docker:hadolint:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.ocaml_fmt:
-  image: ${ci_image_name_protected}/build:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/build:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -1939,7 +1939,7 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${jsonnet_image_name_protected}:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master
   stage: sanity
   tags:
   - gcp
@@ -3485,7 +3485,7 @@ etherlink.build_tezt:
     when: on_success
 
 documentation.rst-check:
-  image: ${ci_image_name_protected}/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -4567,7 +4567,7 @@ etherlink.build_evm_node_static_x86_64:
     when: on_success
 
 oc.misc_checks:
-  image: ${ci_image_name_protected}/test:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/test:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -4606,7 +4606,7 @@ oc.misc_checks:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 commit_titles:
-  image: ${ci_image_name_protected}/prebuild:amd64--master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/prebuild:amd64--master
   stage: sanity
   tags:
   - gcp

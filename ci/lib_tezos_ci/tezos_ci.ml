@@ -1740,7 +1740,7 @@ module Images = struct
 
   (** The jsonnet image (static tag [master]) *)
   let jsonnet_master =
-    let image_path = "${jsonnet_image_name_protected}:master" in
+    let image_path = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master" in
     Image.mk_external ~image_path
 
   module CI = struct
@@ -1788,7 +1788,8 @@ module Images = struct
     (* To use static images from the protected registry. *)
     let mk_ci_image_master name =
       Image.mk_external
-        ~image_path:("${ci_image_name_protected}/" ^ name ^ ":amd64--master")
+        ~image_path:
+          ("${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci/" ^ name ^ ":amd64--master")
 
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
