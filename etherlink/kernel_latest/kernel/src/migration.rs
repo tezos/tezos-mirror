@@ -792,18 +792,17 @@ where
                 RefPath::assert_from(b"/evm/sequencer_upgrade");
             let legacy_sequencer_key = RefPath::assert_from(b"/evm/sequencer");
 
-            // The sequencer upgrade path only exists when a governance sequencer
-            // upgrade is pending. It is not always present.
-            if host.store_has(&legacy_sequencer_upgrade)?.is_some() {
-                host.store_move(
-                    &legacy_sequencer_upgrade,
-                    &RefPath::assert_from(b"/evm/world_state/sequencer_upgrade"),
-                )?;
-            }
-            host.store_move(
+            // Both paths are optional: the sequencer upgrade only exists when a
+            // governance upgrade is pending, and the sequencer key is absent in
+            // proxy mode or after a governance removal.
+            allow_path_not_found(host.store_move(
+                &legacy_sequencer_upgrade,
+                &RefPath::assert_from(b"/evm/world_state/sequencer_upgrade"),
+            ))?;
+            allow_path_not_found(host.store_move(
                 &legacy_sequencer_key,
                 &RefPath::assert_from(b"/evm/world_state/sequencer"),
-            )?;
+            ))?;
 
             Ok(MigrationStatus::Done)
         }

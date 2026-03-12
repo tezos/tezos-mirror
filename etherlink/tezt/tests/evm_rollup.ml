@@ -3535,6 +3535,55 @@ let test_mainnet_latest_kernel_migration =
     ~scenario_after
     protocol
 
+(* Regression test for the V50 migration: the sequencer key is optional and
+   must not be assumed to exist (e.g. in proxy mode or after a governance
+   removal). The migration previously called [store_move] unconditionally,
+   returning [PathNotFound] and aborting the boot when the key was absent. *)
+let test_v50_migration_without_sequencer_key =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "migration"; "upgrade"; "proxy"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.mainnet_kernel;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "Ensures V50 migration succeeds when the sequencer key is absent (proxy \
+       mode, mainnet -> latest)"
+  @@ fun protocol ->
+  (* In proxy mode no sequencer key is written to /evm/sequencer, which is
+     exactly the state that previously caused the V50 migration to abort. *)
+  let* evm_setup =
+    setup_evm_kernel
+      ~kernel:Mainnet
+      ~setup_mode:Setup_proxy
+      ~admin:(Some Constant.bootstrap5)
+      protocol
+  in
+  let _, to_use = Kernel.to_uses_and_tags Latest in
+  (* If the migration aborts on PathNotFound the kernel will not boot and
+     [gen_test_kernel_upgrade] will fail when checking the boot.wasm hash. *)
+  let* ( _sc_rollup_node,
+         _node,
+         _client,
+         _mode,
+         _before,
+         _root_hash,
+         produce_block ) =
+    gen_test_kernel_upgrade
+      ~evm_setup
+      ~installee:to_use
+      ~admin:Constant.bootstrap5
+      protocol
+  in
+  (* Advancing the rollup confirms the kernel is running after the migration. *)
+  let* _ = produce_block () in
+  unit
+
 let test_latest_fa_bridge_non_regression_migration protocols =
   let latest_kernel_migration ~from =
     let from_tag, from_use = Kernel.to_uses_and_tags from in
@@ -4042,6 +4091,7 @@ let test_kernel_root_hash_after_upgrade =
 let register_evm_migration ~protocols =
   test_latest_kernel_migration protocols ;
   test_mainnet_latest_kernel_migration protocols ;
+  test_v50_migration_without_sequencer_key protocols ;
   test_latest_fa_bridge_non_regression_migration protocols ;
   test_deposit_before_and_after_migration protocols
 

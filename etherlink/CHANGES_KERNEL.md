@@ -21,6 +21,13 @@ Its storage version is 50.
 
 ### Bug fixes
 
+- Fix V50 migration aborting when the legacy sequencer paths are absent.
+  Both `/evm/sequencer` and `/evm/sequencer_upgrade` are optional: the
+  sequencer key is missing in proxy mode or after a governance removal, and
+  the sequencer upgrade is only present when a governance upgrade is pending.
+  The migration now tolerates missing paths using `allow_path_not_found`
+  instead of assuming presence. (!21178)
+
 ### Internal
 
 - Migrate the sequencer key and sequencer upgrade paths to the world state.
