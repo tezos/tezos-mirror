@@ -32,7 +32,7 @@ use tezosx_journal::TezosXJournal;
 use crate::alias::{get_alias, store_alias};
 
 use crate::account_storage::TezlinkAccount;
-use crate::mir_ctx::{HasContractAccount, HasHost};
+use crate::mir_ctx::{HasContractAccount, HasHost, HasOperationGas};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EnshrinedContracts {
@@ -117,7 +117,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<(), TransferError>

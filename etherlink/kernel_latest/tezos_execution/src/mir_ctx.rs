@@ -298,6 +298,10 @@ pub trait HasContractAccount {
     fn contract_account(&self) -> &Self::Account;
 }
 
+pub trait HasOperationGas {
+    fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas;
+}
+
 impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
     for Ctx<'a, 'operation, Host, C>
 {
@@ -312,6 +316,12 @@ impl<'a, 'operation, Host: StorageV1, C: Context> HasHost<Host>
 {
     fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
+    }
+}
+
+impl<Host: StorageV1, C: Context> HasOperationGas for Ctx<'_, '_, Host, C> {
+    fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
+        self.tc_ctx.operation_gas
     }
 }
 
@@ -1073,7 +1083,7 @@ pub(crate) mod mock {
         pub level: BigUint,
         pub now: BigInt,
         pub operation_group_hash: OperationHash,
-        pub gas: mir::gas::Gas,
+        pub operation_gas: crate::gas::TezlinkOperationGas,
         pub contract_account: TezlinkOriginatedAccount,
     }
 
@@ -1086,7 +1096,7 @@ pub(crate) mod mock {
                 level: 1u32.into(),
                 now: 0.into(),
                 operation_group_hash: OperationHash::from([0u8; 32]),
-                gas: mir::gas::Gas::default(),
+                operation_gas: crate::gas::TezlinkOperationGas::default(),
                 contract_account: TezlinkOriginatedAccount {
                     path: RefPath::assert_from(b"/mock").into(),
                     kt1: ContractKt1Hash::from([0u8; 20]),
@@ -1108,9 +1118,15 @@ pub(crate) mod mock {
         }
     }
 
+    impl<'a, Host: StorageV1> HasOperationGas for MockCtx<'a, Host> {
+        fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
+            &mut self.operation_gas
+        }
+    }
+
     impl<'a, Host: StorageV1> TypecheckingCtx<'a> for MockCtx<'a, Host> {
         fn gas(&mut self) -> &mut mir::gas::Gas {
-            &mut self.gas
+            &mut self.operation_gas.remaining
         }
 
         fn lookup_entrypoints(
