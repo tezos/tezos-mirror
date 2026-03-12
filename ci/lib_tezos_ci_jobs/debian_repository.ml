@@ -320,7 +320,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_22_04_systemd_test"
+        ~name:"oc.upgrade_bin_ubuntu_22_04_systemd"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:
           (make_debian_variables
@@ -335,7 +335,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_24_04_systemd_test"
+        ~name:"oc.upgrade_bin_ubuntu_24_04_systemd"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:
           (make_debian_variables
@@ -367,7 +367,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.install_bin_debian_bookworm_systemd_test"
+        ~name:"oc.install_bin_debian_bookworm_systemd"
         ~dependencies:(Dependent [Job job_apt_repo_debian])
         ~variables:
           (make_debian_variables

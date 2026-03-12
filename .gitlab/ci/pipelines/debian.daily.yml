@@ -409,7 +409,7 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: ""
 
-oc.install_bin_debian_bookworm_systemd_test:
+oc.install_bin_debian_bookworm_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -569,7 +569,7 @@ oc.install_bin_ubuntu_24_04_systemd:
     DISTRIBUTION: ubuntu
     RELEASE: "24.04"
 
-oc.upgrade_bin_ubuntu_22_04_systemd_test:
+oc.upgrade_bin_ubuntu_22_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -599,7 +599,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd_test:
     DISTRIBUTION: ubuntu
     RELEASE: "22.04"
 
-oc.upgrade_bin_ubuntu_24_04_systemd_test:
+oc.upgrade_bin_ubuntu_24_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
