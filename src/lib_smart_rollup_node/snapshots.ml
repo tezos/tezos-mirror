@@ -478,7 +478,7 @@ let reconstruct_level_context ctxt ~predecessor (node_ctxt : _ Node_context.t)
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level node_ctxt level
   in
-  let* _num_messages, _num_ticks, _initial_tick =
+  let* _result =
     Interpreter.process_head
       (module Plugin)
       node_ctxt

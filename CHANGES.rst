@@ -150,6 +150,10 @@ Smart Rollup node
   default instead of falling back to the slow OCaml interpreter. Use
   ``--slow-vm-fallback`` to opt in to the previous behavior. (MR :gl:`!21069`)
 
+- Store the PVM state hash and status during block evaluation and serve RPCs
+  directly from the store, avoiding expensive context checkouts. This includes
+  a migration of the SQL database. (MR :gl:`!21016`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

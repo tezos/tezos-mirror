@@ -198,6 +198,65 @@ module Types = struct
       ~decode:(function true -> Ok `Confirmed | false -> Ok `Unconfirmed)
       bool
 
+  (* Compact PVM status encoding: maps well-known status strings to single-byte
+     tags, equivalent to a compression function.  The status strings originate
+     from each PVM's [string_of_status]:
+
+     - **WASM 2.0** ([wasm_2_0_0_pvm.ml]): "Computing",
+       "Waiting for input message", "Waiting for metadata",
+       "Waiting for DAL parameters", "Waiting for preimage reveal <hash>",
+       "Waiting for page data <page_id>".
+     - **Arith** ([arith_pvm.ml], test-only): "Halted",
+       "Waiting for input message", "Waiting for reveal <reveal>",
+       "Parsing", "Evaluating".
+     - **RISC-V** ([riscv_pvm.ml], via Rust backend): "Evaluating",
+       "WaitingForInput", "WaitingForReveal".
+
+     Statuses with a known tag are stored as a single byte.  Unknown statuses
+     (e.g. those containing dynamic data like reveal hashes, or new statuses
+     from future PVM versions) fall through to tag 0 which is followed by the
+     full string.
+
+     If a new fixed status is added to a PVM, add a corresponding tag here to
+     keep storage compact. *)
+  let pvm_status =
+    custom
+      ~encode:(fun status ->
+        let encoded =
+          match status with
+          | "Computing" -> "\001"
+          | "Waiting for input message" -> "\002"
+          | "Waiting for metadata" -> "\003"
+          | "Waiting for DAL parameters" -> "\004"
+          | "Halted" -> "\005"
+          | "Parsing" -> "\006"
+          | "Evaluating" -> "\007"
+          | "WaitingForInput" -> "\008"
+          | "WaitingForReveal" -> "\009"
+          | other -> "\000" ^ other
+        in
+        Ok encoded)
+      ~decode:(fun encoded ->
+        if String.length encoded = 0 then Error "Empty pvm_status in database"
+        else
+          let tag = Char.code encoded.[0] in
+          let status =
+            match tag with
+            | 1 -> "Computing"
+            | 2 -> "Waiting for input message"
+            | 3 -> "Waiting for metadata"
+            | 4 -> "Waiting for DAL parameters"
+            | 5 -> "Halted"
+            | 6 -> "Parsing"
+            | 7 -> "Evaluating"
+            | 8 -> "WaitingForInput"
+            | 9 -> "WaitingForReveal"
+            | 0 -> String.sub encoded 1 (String.length encoded - 1)
+            | _ -> encoded
+          in
+          Ok status)
+      octets
+
   let z =
     custom
       ~encode:(fun i -> Ok (Z.to_string i))
@@ -259,7 +318,7 @@ module Migrations = struct
       INSERT INTO migrations (id, name) VALUES (?, ?)
       |sql}
 
-    let version = 0
+    let version = 1
 
     let all : Rollup_node_sqlite_migrations.migration list =
       Rollup_node_sqlite_migrations.migrations version
@@ -951,6 +1010,8 @@ module L2_blocks = struct
           inbox_hash
           initial_tick
           num_ticks
+          state_hash
+          pvm_status
         ->
           {
             header =
@@ -967,6 +1028,8 @@ module L2_blocks = struct
             content = ();
             initial_tick;
             num_ticks;
+            state_hash;
+            pvm_status;
           })
       @@ proj block_hash (fun b -> b.header.block_hash)
       @@ proj level (fun b -> b.header.level)
@@ -978,6 +1041,8 @@ module L2_blocks = struct
       @@ proj inbox_hash (fun b -> b.header.inbox_hash)
       @@ proj z (fun b -> b.initial_tick)
       @@ proj int64 (fun b -> b.num_ticks)
+      @@ proj (option state_hash) (fun b -> b.state_hash)
+      @@ proj (option pvm_status) (fun b -> b.pvm_status)
       @@ proj_end
 
     let insert =
@@ -986,8 +1051,8 @@ module L2_blocks = struct
       REPLACE INTO l2_blocks
       (block_hash, level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       |sql}
 
     let select =
@@ -996,7 +1061,7 @@ module L2_blocks = struct
       SELECT
        block_hash, level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
       FROM l2_blocks
       WHERE block_hash = ?
       |sql}
@@ -1007,7 +1072,7 @@ module L2_blocks = struct
       SELECT
        block_hash, level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
-       inbox_hash, initial_tick, num_ticks
+       inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
       FROM l2_blocks
       WHERE level = ?
       |sql}
@@ -1034,7 +1099,7 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
       FROM l2_blocks as b
       INNER JOIN rollup_node_state as s
       ON s.name = "l2_head" AND s.value = b.block_hash
@@ -1046,7 +1111,7 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
       FROM l2_blocks AS b
       INNER JOIN rollup_node_state as s
       ON s.name = "finalized_level" AND s.value = b.block_hash
@@ -1068,7 +1133,7 @@ module L2_blocks = struct
       SELECT
        b.block_hash, b.level, b.predecessor, b.commitment_hash,
        b.previous_commitment_hash, b.context, b.inbox_witness,
-       b.inbox_hash, b.initial_tick, b.num_ticks,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status,
        c.compressed_state, c.inbox_level, c.predecessor, c.number_of_ticks,
        i.inbox_level, i.history_proof,
        m.message_list
@@ -1086,6 +1151,12 @@ module L2_blocks = struct
       (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {sql|
       DELETE FROM l2_blocks WHERE level < ?
+      |sql}
+
+    let get_pvm_status =
+      (block_hash ->? pvm_status) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT pvm_status FROM l2_blocks WHERE block_hash = ?
       |sql}
   end
 
@@ -1146,6 +1217,10 @@ module L2_blocks = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let find_pvm_status ?conn store block_hash =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.get_pvm_status block_hash
 end
 
 module State = struct
