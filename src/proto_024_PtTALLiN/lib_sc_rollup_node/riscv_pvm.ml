@@ -178,32 +178,9 @@ include PVM
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick state =
-  let open Lwt_syntax in
-  let* tick = Backend.get_tick state in
-  return (Sc_rollup.Tick.of_z tick)
-
 type status = Backend.status
 
-let get_status ~is_reveal_enabled:_ state = Backend.get_status state
-
 let string_of_status status = Backend.string_of_status status
-
-let get_outbox _level _state = Lwt.return []
-
-let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_ ~reveal_builtins:_
-    ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state
-    =
-  let debug_printer =
-    match write_debug with
-    | Tezos_scoru_wasm.Builtins.Noop -> None
-    | Tezos_scoru_wasm.Builtins.Printer p -> Some p
-  in
-  Backend.compute_step_many
-    ?stop_at_snapshot
-    ?write_debug:debug_printer
-    ~max_steps
-    initial_state
 
 module Mutable_state :
   Pvm_sig.MUTABLE_STATE_S
@@ -277,11 +254,6 @@ module Mutable_state :
 end
 
 let new_dissection = Game_helpers.default_new_dissection
-
-module Inspect_durable_state = struct
-  let lookup _state _keys =
-    raise (Invalid_argument "No durable storage for riscv PVM")
-end
 
 module Unsafe_patches = struct
   (** No unsafe patches for the riscv PVM. *)

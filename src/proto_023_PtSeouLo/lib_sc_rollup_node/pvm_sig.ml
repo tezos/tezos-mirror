@@ -116,35 +116,11 @@ module type S = sig
   (** Kind of the PVM. *)
   val kind : Sc_rollup.Kind.t
 
-  (** [get_tick state] gets the total tick counter for the given PVM state. *)
-  val get_tick : state -> Sc_rollup.Tick.t Lwt.t
-
   (** PVM status *)
   type status
 
-  (** [get_status ~is_reveal_enabled state] gives you the current execution status for the PVM. *)
-  val get_status :
-    is_reveal_enabled:Sc_rollup.is_reveal_enabled -> state -> status Lwt.t
-
   (** [string_of_status status] returns a string representation of [status]. *)
   val string_of_status : status -> string
-
-  (** [get_outbox outbox_level state] returns a list of outputs
-     available in the outbox of [state] at a given [outbox_level]. *)
-  val get_outbox : Raw_level.t -> state -> Sc_rollup.output list Lwt.t
-
-  (** [eval_many ~max_steps s0] returns a state [s1] resulting from the
-      execution of up to [~max_steps] steps of the rollup at state [s0]. *)
-  val eval_many :
-    ?check_invalid_kernel:bool ->
-    ?fallback_to_slow_vm:bool ->
-    reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
-    write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
-    is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
-    ?stop_at_snapshot:bool ->
-    max_steps:int64 ->
-    state ->
-    (state * int64) Lwt.t
 
   val new_dissection :
     default_number_of_sections:int ->
@@ -159,17 +135,6 @@ module type S = sig
        and type repo = repo
        and type hash = hash
        and type status = status
-
-  (** Inspect durable state using a more specialised way of reading the
-      PVM state.
-      For example in WASM, it decodes the durable storage in the state
-      before reading values.
-  *)
-  module Inspect_durable_state : sig
-    (** [lookup state path] returns the data stored for the path [path] in the
-        PVM state [state].  *)
-    val lookup : state -> string list -> bytes option Lwt.t
-  end
 
   (** Expose unsafe state patching functions for manual intervention.
       At the moment this feature is only used to increase the maximum number of
