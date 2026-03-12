@@ -122,7 +122,6 @@ module Make_daemon (Agent : AGENT) :
   type command = Agent.command
 
   type state = {
-    node_endpoint : string;
     current_baker : baker;
     old_baker : baker_to_kill option;
     keep_alive : bool;
@@ -253,14 +252,15 @@ module Make_daemon (Agent : AGENT) :
     in
     return {state with old_baker; current_baker = new_baker}
 
-  (** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
+  (** [maybe_kill_old_baker state] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
     it if that is the case. *)
-  let maybe_kill_old_baker state node_addr =
+  let maybe_kill_old_baker state =
     let open Lwt_result_syntax in
     match state.old_baker with
     | None -> return state
     | Some {baker; level_to_kill} ->
+        let node_addr = Uri.to_string state.cctxt#base in
         let* head_level =
           (Rpc_services.get_level
              ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
@@ -289,7 +289,7 @@ module Make_daemon (Agent : AGENT) :
     The voting period information is used for logging purposes. *)
   let monitor_voting_periods ~state =
     let open Lwt_result_syntax in
-    let node_addr = state.node_endpoint in
+    let node_addr = Uri.to_string state.cctxt#base in
     let* block_hash =
       (Rpc_services.get_block_hash
          ~node_addr [@profiler.record_s {verbosity = Notice} "get_block_hash"])
@@ -305,9 +305,7 @@ module Make_daemon (Agent : AGENT) :
     in
     let* state =
       (maybe_kill_old_baker
-         state
-         node_addr
-       [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
+         state [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
     in
     let* next_protocol_hash =
       (Rpc_services.get_next_protocol_hash
@@ -438,13 +436,20 @@ module Make_daemon (Agent : AGENT) :
         let* state = monitor_voting_periods ~state in
         return (Some state)
     | Head_stream_ended ->
-        let*! () = Events.(emit head_stream_ended) state.node_endpoint in
+        let*! () =
+          Events.(emit head_stream_ended) (Uri.to_string state.cctxt#base)
+        in
         let reconnect_promise =
-          retry_on_disconnection state.node_endpoint monitor_heads state.cctxt
+          retry_on_disconnection
+            (Uri.to_string state.cctxt#base)
+            monitor_heads
+            state.cctxt
         in
         return (Some {state with head_stream = `Reconnecting reconnect_promise})
     | Head_stream_reconnected stream ->
-        let*! () = Events.(emit head_stream_reconnected) state.node_endpoint in
+        let*! () =
+          Events.(emit head_stream_reconnected) (Uri.to_string state.cctxt#base)
+        in
         return (Some {state with head_stream = `Live stream})
     | Old_baker_stopped -> (
         match state.old_baker with
@@ -455,7 +460,7 @@ module Make_daemon (Agent : AGENT) :
             in
             let* head_level =
               (Rpc_services.get_level
-                 ~node_addr:state.node_endpoint
+                 ~node_addr:(Uri.to_string state.cctxt#base)
                [@profiler.record_s {verbosity = Notice} "get_level"])
             in
             if head_level >= old_baker.level_to_kill then
@@ -498,7 +503,6 @@ module Make_daemon (Agent : AGENT) :
     in
     let state =
       {
-        node_endpoint = node_addr;
         current_baker;
         old_baker = None;
         keep_alive;
