@@ -3597,7 +3597,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
     let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-    let chain_id = Chain_id.of_block_hash genesis.block in
     let dst_chain_dir = Naming.chain_dir dst_store_dir chain_id in
     let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_dir in
     (* Create directories *)
@@ -3605,7 +3604,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       List.iter_s
         (Lwt_utils_unix.create_dir ~perm:snapshot_dir_perm)
         [
-          Naming.dir_path dst_store_dir;
           Naming.dir_path dst_protocol_dir;
           Naming.dir_path dst_chain_dir;
           Naming.dir_path dst_cemented_dir;
