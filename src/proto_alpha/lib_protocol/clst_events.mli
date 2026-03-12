@@ -90,3 +90,38 @@ val token_metadata_update_event :
   token_id:CLST_types.nat ->
   new_metadata:CLST_types.token_info option ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** Accumulator containing all the events being generated for a given
+    entrypoint execution *)
+type events
+
+val init_events : events
+
+val update_balance_events :
+  events ->
+  owner:address ->
+  new_balance:CLST_types.nat ->
+  diff:Script_int.z Script_int.num ->
+  events
+
+val update_allowance_events :
+  events ->
+  owner:address ->
+  spender:address ->
+  new_allowance:CLST_types.nat ->
+  diff:Script_int.z Script_int.num ->
+  events
+
+val update_operator_events :
+  events -> owner:address -> operator:address -> is_operator:bool -> events
+
+val add_transfer_event : events -> Script_typed_ir.operation -> events
+
+(** [emit_all_events (ctxt, sc) ~entrypoint events] returns the list
+    of internal operations corresponding to the accumulated events,
+    without any particular order. *)
+val emit_all_events :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  events ->
+  (Script_typed_ir.operation list * context) tzresult Lwt.t
