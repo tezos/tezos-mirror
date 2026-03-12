@@ -204,10 +204,11 @@ let job_release_page =
 
 let job_opam_release =
   Cacio.parameterize @@ fun mode ->
-  job
+  CI.job
+    "opam:release"
     ~__POS__
     ~image:Images.CI.prebuild
-    ~stage:Stages.publish
+    ~stage:Publish
     ~description:
       "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
        This job does preliminary work for releasing Octez opam packages on \
@@ -215,14 +216,10 @@ let job_opam_release =
        (.opam files) to https://github.com/tezos/opam-repository. It _does \
        not_ automatically create a corresponding pull request on the official \
        opam repository."
-    ~interruptible:false
-    ~name:"opam:release"
     [
       ("./scripts/ci/opam-release.sh"
       ^ match mode with `test -> " --dry-run" | `real -> "");
     ]
-    ~retry:no_retry
-    ~tag:Gcp_not_interruptible
 
 let job_dispatch_call =
   CI.job
@@ -243,8 +240,14 @@ let job_dispatch_call =
     ["./scripts/releases/dispatch-call.sh"]
 
 let () =
-  Cacio.register_jobs Major_release_tag [(Auto, job_dispatch_call)] ;
-  Cacio.register_jobs Minor_release_tag [(Auto, job_dispatch_call)] ;
+  Cacio.register_jobs
+    Major_release_tag
+    [(Auto, job_opam_release `real); (Auto, job_dispatch_call)] ;
+  Cacio.register_jobs Major_release_tag_test [(Auto, job_opam_release `test)] ;
+  Cacio.register_jobs
+    Minor_release_tag
+    [(Auto, job_opam_release `real); (Auto, job_dispatch_call)] ;
+  Cacio.register_jobs Minor_release_tag_test [(Auto, job_opam_release `test)] ;
   Cacio.register_jobs Beta_release_tag [(Auto, job_dispatch_call)] ;
   ()
 
@@ -299,8 +302,7 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   @ Cacio.get_jobs pipeline_type
   @
   match pipeline_type with
-  | Major_release_tag | Minor_release_tag ->
-      [job_opam_release `real; job_release_page]
+  | Major_release_tag | Minor_release_tag -> [job_release_page]
   | Major_release_tag_test | Minor_release_tag_test ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -309,7 +311,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
            release testers are not required to trigger two separate pipelines
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
-        job_opam_release `test;
         job_release_page;
       ]
   | Beta_release_tag -> [job_release_page]
