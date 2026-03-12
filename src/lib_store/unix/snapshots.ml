@@ -92,6 +92,10 @@ type error +=
   | Invalid_chain_store_export of Chain_id.t * string
   | Cannot_export_snapshot_format
   | Cannot_checkout_imported_context of Context_hash.t
+  | Cannot_encode_floating_block of {
+      hash : Block_hash.t;
+      error : Data_encoding.Binary.write_error;
+    }
 
 let () =
   let open Data_encoding in
@@ -606,7 +610,27 @@ let () =
         h)
     (obj1 (req "context_hash" Context_hash.encoding))
     (function Cannot_checkout_imported_context h -> Some h | _ -> None)
-    (fun h -> Cannot_checkout_imported_context h)
+    (fun h -> Cannot_checkout_imported_context h) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.cannot_encode_floating_block"
+    ~title:"Cannot encode floating block"
+    ~description:"Failed to encode a floating block during snapshot export."
+    ~pp:(fun ppf (hash, error) ->
+      Format.fprintf
+        ppf
+        "Failed to encode floating block %a during snapshot export: %a."
+        Block_hash.pp
+        hash
+        Data_encoding.Binary.pp_write_error
+        error)
+    (obj2
+       (req "block_hash" Block_hash.encoding)
+       (req "error" Data_encoding.Binary.write_error_encoding))
+    (function
+      | Cannot_encode_floating_block {hash; error} -> Some (hash, error)
+      | _ -> None)
+    (fun (hash, error) -> Cannot_encode_floating_block {hash; error})
 
 (* This module handles snapshot's versioning system. *)
 module Version = struct
@@ -1582,8 +1606,18 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return_unit
 
   let write_floating_block fd (block : Block_repr.t) =
-    let bytes = Data_encoding.Binary.to_bytes_exn Block_repr.encoding block in
-    Lwt_utils_unix.write_bytes ~pos:0 ~len:(Bytes.length bytes) fd bytes
+    let open Lwt_result_syntax in
+    let* bytes =
+      match Data_encoding.Binary.to_bytes Block_repr.encoding block with
+      | Ok bytes -> return bytes
+      | Error error ->
+          tzfail
+            (Cannot_encode_floating_block {hash = Block_repr.hash block; error})
+    in
+    let*! () =
+      Lwt_utils_unix.write_bytes ~pos:0 ~len:(Bytes.length bytes) fd bytes
+    in
+    return_unit
 
   let export_floating_blocks ~floating_ro_fd ~floating_rw_fd ~export_block =
     let open Lwt_result_syntax in
@@ -2016,27 +2050,32 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
 
   let export_floating_block_stream snapshot_exporter floating_block_stream
       progress_display_mode =
-    let open Lwt_syntax in
-    let* () = Event.(emit exporting_floating_blocks) () in
+    let open Lwt_result_syntax in
+    let*! () = Event.(emit exporting_floating_blocks) () in
     let f fd =
-      let* is_empty = Lwt_stream.is_empty floating_block_stream in
-      if is_empty then Lwt.return_unit
+      let*! is_empty = Lwt_stream.is_empty floating_block_stream in
+      if is_empty then return_unit
       else
         Animation.display_progress
           ~every:10
           ~pp_print_step:(fun fmt i ->
             Format.fprintf fmt "Copying floating blocks: %d blocks copied" i)
           (fun notify ->
-            Lwt_stream.iter_s
-              (fun b ->
-                let* () = write_floating_block fd b in
-                notify ())
-              floating_block_stream)
+            let rec loop () =
+              let*! next = Lwt_stream.get floating_block_stream in
+              match next with
+              | None -> return_unit
+              | Some b ->
+                  let* () = write_floating_block fd b in
+                  let*! () = notify () in
+                  loop ()
+            in
+            loop ())
           ~progress_display_mode
     in
     let* () = Exporter.write_floating_blocks snapshot_exporter ~f in
-    let* () = Event.(emit floating_blocks_exported) () in
-    return_ok_unit
+    let*! () = Event.(emit floating_blocks_exported) () in
+    return_unit
 
   let export_context snapshot_exporter ~data_dir context_hash =
     let open Lwt_result_syntax in
