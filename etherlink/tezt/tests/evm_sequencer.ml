@@ -14784,6 +14784,119 @@ let test_xtz_deposit_watchtower =
   let* () = scenario_for ~address:sponsored.address in
   scenario_for ~address:eip7702_contract
 
+let test_xtz_deposit_watchtower_with_fa_whitelist =
+  register_test
+    ~__FILE__
+    ~kernel:Kernel.Latest
+    ~tags:["evm"; "xtz_deposit"; "watchtower"; "whitelist"]
+    ~title:
+      "XTZ deposit is claimed by the watchtower even when an FA whitelist is \
+       configured"
+    ~enable_fa_bridge:true
+    ~enable_multichain:false
+    ~enable_dal:false
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.watchtower]
+    ~websockets:true
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      _protocol
+    ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  (* Deploy a dummy proxy so we can configure the watchtower with a
+     non-empty FA whitelist. *)
+  let* dummy_proxy = Solidity_contracts.dummy_proxy evm_version in
+  let* () = Eth_cli.add_abi ~label:dummy_proxy.label ~abi:dummy_proxy.abi () in
+  let* proxy, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:dummy_proxy.abi
+         ~bin:dummy_proxy.bin)
+      sequencer
+  in
+  (* Deploy an eip7702 contract so we have an address with code to receive
+     the XTZ deposit (the two-step queue/claim path). *)
+  let* eip7702 = Solidity_contracts.eip7702_fallback evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  (* Start the watchtower with an FA whitelist. Before the fix, the
+     whitelist topic filter would prevent XTZ deposit logs (which have no
+     indexed ticket_hash/proxy topics) from being returned by getLogs,
+     so the watchtower would never see or claim them. *)
+  let* _watchtower =
+    let config =
+      Watchtower.
+        {
+          evm_node_endpoint = Evm_node.endpoint sequencer;
+          gas_limit = None;
+          max_fee_per_gas = None;
+          rpc = None;
+          secret_key = Some whale.private_key;
+          whitelist = Some [{proxy; ticket_hashes = None}];
+        }
+    in
+    Watchtower.init ~config ~first_block:1 ()
+  in
+  let depositor = Constant.bootstrap5 in
+  let amount = Tez.of_int 1125 in
+  let deposit_info =
+    {receiver = EthereumAddr eip7702_contract; chain_id = None}
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  (* The deposit goes to an address with code, so it is queued, not
+     credited directly. Balance should still be zero. *)
+  let*@ balance = Rpc.get_balance ~address:eip7702_contract sequencer in
+  Check.((balance = Wei.zero) Wei.typ)
+    ~error_msg:"Expected zero balance before claim, got %L wei" ;
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = produce_block sequencer in
+        unit)
+  in
+  (* After the watchtower claims, the balance should match the deposit. *)
+  let*@ balance = Rpc.get_balance ~address:eip7702_contract sequencer in
+  Check.((balance = Wei.of_tez amount) Wei.typ)
+    ~error_msg:
+      "Expected balance of %R after watchtower claim, got %L wei (XTZ deposit \
+       was likely not seen due to whitelist topic filter)" ;
+  unit
+
 let test_evm_events_cleanup () =
   Test_helpers.register_sandbox
     ~__FILE__
@@ -15100,6 +15213,7 @@ let () =
   test_eip3607_disabled_for_simulation [Alpha] ;
   test_fa_deposit_watchtower [Alpha] ;
   test_xtz_deposit_watchtower [Alpha] ;
+  test_xtz_deposit_watchtower_with_fa_whitelist [Alpha] ;
   test_evm_events_cleanup () ;
   test_locked_tx_queue_timestamp () ;
   test_next_block_info_ic_reset ()
