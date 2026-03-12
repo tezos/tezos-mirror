@@ -215,6 +215,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    releases/releases
+   releases/packaging_revisions
    releases/version-24
    releases/history
 

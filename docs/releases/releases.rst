@@ -23,9 +23,14 @@ Therefore, Octez releases are published not only when new features are
 added or bugs are fixed, but also when new protocols are proposed or
 adopted.
 
+In some cases, release artifacts may also be rebuilt and
+republished for an already-published stable version without changing the
+source code; these are called **packaging revisions** and are described
+in :doc:`packaging_revisions`.
+
 Octez releases are named using the ``octez-v<major>.<minor>`` numbering scheme.
-There are also release candidates suffixed by ``~rc<N>``, and beta
-versions suffixed by ``~beta<N>``.
+There are also release candidates suffixed by ``~rc<N>``, beta
+versions suffixed by ``~beta<N>``, and packaging revisions suffixed by ``-<N>``.
 
 Release candidates and beta versions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
