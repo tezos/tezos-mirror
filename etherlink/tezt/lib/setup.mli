@@ -108,6 +108,7 @@ val register_test :
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -165,6 +166,7 @@ val register_multichain_test :
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -222,6 +224,7 @@ val register_test_for_kernels :
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?minimum_base_fee_per_gas:Wei.t ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
@@ -279,6 +282,7 @@ val setup_sequencer :
   ?kernel:Kernel.t ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->
@@ -344,6 +348,7 @@ val register_all :
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?preimages_dir:string ->
   ?maximum_allowed_ticks:int64 ->
   ?maximum_gas_per_transaction:int64 ->

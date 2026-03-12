@@ -49,6 +49,7 @@ type l2_setup = {
   tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
   michelson_runtime_chain_id : string option;
@@ -71,6 +72,7 @@ let default_l2_setup ~l2_chain_id =
     tez_bootstrap_contracts = None;
     sequencer_pool_address = None;
     minimum_base_fee_per_gas = None;
+    michelson_to_evm_gas_multiplier = None;
     da_fee_per_byte = None;
     maximum_gas_per_transaction = None;
     michelson_runtime_chain_id = None;
@@ -146,6 +148,7 @@ type kernel_setup = {
   kernel_governance : string option;
   kernel_security_governance : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   delayed_inbox_timeout : int option;
   delayed_inbox_min_levels : int option;
@@ -175,13 +178,13 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     ?tez_bootstrap_balance ?tez_bootstrap_accounts ?tez_bootstrap_contracts
     ?sequencer ?delayed_bridge ?ticketer ?administrator ?sequencer_governance
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
-    ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?set_account_code ?enable_fa_bridge
-    ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
-    ?disable_legacy_dal_signals ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?enable_multichain ?evm_version ?with_runtimes
-    ?michelson_runtime_chain_id () =
+    ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?set_account_code ?enable_fa_bridge ?enable_revm ?enable_dal ?dal_slots
+    ?dal_publishers_whitelist ?disable_legacy_dal_signals
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?enable_multichain
+    ?evm_version ?with_runtimes ?michelson_runtime_chain_id () =
   let tez_bootstrap_accounts =
     match tez_bootstrap_accounts with
     | Some _ -> tez_bootstrap_accounts
@@ -211,6 +214,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     kernel_governance;
     kernel_security_governance;
     minimum_base_fee_per_gas;
+    michelson_to_evm_gas_multiplier;
     da_fee_per_byte;
     delayed_inbox_timeout;
     delayed_inbox_min_levels;
@@ -1793,6 +1797,10 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
         "minimum-base-fee-per-gas"
         Wei.to_string
         kernel_setup.minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg
+        "michelson-to-evm-gas-multiplier"
+        Int64.to_string
+        kernel_setup.michelson_to_evm_gas_multiplier
     @ [
         "--da-fee-per-byte";
         Wei.to_string
@@ -1900,9 +1908,9 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
 let make_l2_kernel_installer_config ?chain_id ?chain_family
     ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
-    ?(da_fee_per_byte = Wei.zero) ?sequencer_pool_address
-    ?maximum_gas_per_transaction ?(set_account_code = []) ?world_state_path
-    ~output () =
+    ?michelson_to_evm_gas_multiplier ?(da_fee_per_byte = Wei.zero)
+    ?sequencer_pool_address ?maximum_gas_per_transaction
+    ?(set_account_code = []) ?world_state_path ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1918,6 +1926,10 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
         "minimum-base-fee-per-gas"
         Wei.to_string
         minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg
+        "michelson-to-evm-gas-multiplier"
+        Int64.to_string
+        michelson_to_evm_gas_multiplier
     @ Cli_arg.optional_arg "world-state-path" Fun.id world_state_path
     @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
     @ Cli_arg.optional_arg

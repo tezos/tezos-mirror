@@ -43,6 +43,7 @@ type l2_setup = {
   tez_bootstrap_contracts : tez_contract list option;
   sequencer_pool_address : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   maximum_gas_per_transaction : int64 option;
   michelson_runtime_chain_id : string option;
@@ -184,6 +185,7 @@ type kernel_setup = {
   kernel_governance : string option;
   kernel_security_governance : string option;
   minimum_base_fee_per_gas : Wei.t option;
+  michelson_to_evm_gas_multiplier : int64 option;
   da_fee_per_byte : Wei.t option;
   delayed_inbox_timeout : int option;
   delayed_inbox_min_levels : int option;
@@ -233,6 +235,7 @@ val make_kernel_setup :
   ?kernel_governance:string ->
   ?kernel_security_governance:string ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?da_fee_per_byte:Wei.t ->
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
@@ -798,6 +801,7 @@ val make_l2_kernel_installer_config :
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:string list ->
   ?minimum_base_fee_per_gas:Wei.t ->
+  ?michelson_to_evm_gas_multiplier:int64 ->
   ?da_fee_per_byte:Wei.t ->
   ?sequencer_pool_address:string ->
   ?maximum_gas_per_transaction:int64 ->

@@ -280,11 +280,12 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?tez_bootstrap_contracts ?michelson_runtime_chain_id ?sequencer_pool_address
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ~enable_dal ?dal_slots ?dal_publishers_whitelist ?evm_version ?with_runtimes
-    ~sequencer ~preimages_dir ~kernel protocol () =
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
+    ?dal_publishers_whitelist ?evm_version ?with_runtimes ~sequencer
+    ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
@@ -345,6 +346,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ~administrator:l1_contracts.admin
       ~sequencer_governance:l1_contracts.sequencer_governance
       ?minimum_base_fee_per_gas
+      ?michelson_to_evm_gas_multiplier
       ?da_fee_per_byte
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -416,13 +418,13 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
     Evm_node.make_l2_kernel_installer_config
       ~chain_id:l2_setup.l2_chain_id
       ~chain_family:l2_setup.l2_chain_family
-      ?maximum_gas_per_transaction:l2_setup.maximum_gas_per_transaction
-      ?sequencer_pool_address:l2_setup.sequencer_pool_address
-      ?minimum_base_fee_per_gas:l2_setup.minimum_base_fee_per_gas
-      ?da_fee_per_byte:l2_setup.da_fee_per_byte
       ?eth_bootstrap_accounts:l2_setup.eth_bootstrap_accounts
       ?tez_bootstrap_accounts:l2_setup.tez_bootstrap_accounts
       ?tez_bootstrap_contracts
+      ?minimum_base_fee_per_gas:l2_setup.minimum_base_fee_per_gas
+      ?michelson_to_evm_gas_multiplier:l2_setup.michelson_to_evm_gas_multiplier
+      ?sequencer_pool_address:l2_setup.sequencer_pool_address
+      ?maximum_gas_per_transaction:l2_setup.maximum_gas_per_transaction
       ?world_state_path:l2_setup.world_state_path
       ~output:l2_config
       ()
@@ -443,6 +445,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
   (* To keep backwards compatibility, we also write to the current durable storage
      paths the variables that have been moved if we have a single chain. *)
   let ( minimum_base_fee_per_gas,
+        michelson_to_evm_gas_multiplier,
         da_fee_per_byte,
         sequencer_pool_address,
         maximum_gas_per_transaction,
@@ -451,6 +454,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     | [
      {
        minimum_base_fee_per_gas;
+       michelson_to_evm_gas_multiplier;
        da_fee_per_byte;
        sequencer_pool_address;
        maximum_gas_per_transaction;
@@ -468,6 +472,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
         in
 
         ( minimum_base_fee_per_gas,
+          michelson_to_evm_gas_multiplier,
           da_fee_per_byte,
           sequencer_pool_address,
           maximum_gas_per_transaction,
@@ -497,6 +502,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ~administrator:l1_contracts.admin
       ~sequencer_governance:l1_contracts.sequencer_governance
       ?minimum_base_fee_per_gas
+      ?michelson_to_evm_gas_multiplier
       ?da_fee_per_byte
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -542,6 +548,8 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?kernel_compat
       ~sequencer:sequencer.Account.public_key
       ?minimum_base_fee_per_gas:chain_config.minimum_base_fee_per_gas
+      ?michelson_to_evm_gas_multiplier:
+        chain_config.michelson_to_evm_gas_multiplier
       ?da_fee_per_byte:chain_config.da_fee_per_byte
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -844,9 +852,10 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ?kernel
-    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?da_fee ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?spawn_rpc ?periodic_snapshot_path ?signatory
@@ -864,6 +873,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
             tez_bootstrap_accounts = Some tez_bootstrap_accounts;
             da_fee_per_byte = da_fee;
             minimum_base_fee_per_gas;
+            michelson_to_evm_gas_multiplier;
             maximum_gas_per_transaction;
           };
         ]
@@ -925,10 +935,11 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?tez_bootstrap_contracts ?michelson_runtime_chain_id ?sequencer
     ?additional_sequencer_keys ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?commitment_period ?challenge_window ?(uses = uses) ?(additional_uses = [])
+    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ?dal_publishers_whitelist ~enable_multichain ~l2_setups ?rpc_server
@@ -957,6 +968,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
             da_fee_per_byte = da_fee;
             sequencer_pool_address;
             minimum_base_fee_per_gas;
+            michelson_to_evm_gas_multiplier;
             maximum_gas_per_transaction;
             eth_bootstrap_accounts = Some eth_bootstrap_accounts;
             tez_bootstrap_accounts = Some tez_bootstrap_accounts;
@@ -1052,15 +1064,15 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?tez_bootstrap_contracts ?michelson_runtime_chain_id ?sequencer
     ?additional_sequencer_keys ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?commitment_period ?challenge_window ?uses ?additional_uses
-    ?rollup_history_mode ~enable_dal ?dal_slots ?dal_publishers_whitelist
-    ~enable_multichain ?rpc_server ?websockets ?history_mode ?tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body ~title
-    ~tags protocols =
+    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
+    ?dal_slots ?dal_publishers_whitelist ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes
+    ?instant_confirmations body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -1088,6 +1100,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~kernel
     ?da_fee
     ?minimum_base_fee_per_gas
+    ?michelson_to_evm_gas_multiplier
     ?preimages_dir
     ?maximum_allowed_ticks
     ?maximum_gas_per_transaction
@@ -1128,14 +1141,15 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer ?additional_sequencer_keys ?sequencer_pool_address
-    ?(kernels = Kernel.etherlink_all) ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
-    ?dal_publishers_whitelist ~enable_multichain ?rpc_server ?websockets
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode ?tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec ?instant_confirmations ~title ~tags body protocols =
+    ?(kernels = Kernel.etherlink_all) ?da_fee ?michelson_to_evm_gas_multiplier
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ~enable_dal ?dal_slots ?dal_publishers_whitelist
+    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode ?tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec
+    ?instant_confirmations ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -1161,6 +1175,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?sequencer_pool_address
         ~kernel
         ?da_fee
+        ?michelson_to_evm_gas_multiplier
         ?minimum_base_fee_per_gas
         ?preimages_dir
         ?maximum_allowed_ticks
@@ -1219,11 +1234,11 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?sequencer ?additional_sequencer_keys
     ?sequencer_pool_address ?(kernels = Kernel.etherlink_all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?history_mode
+    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
+    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
+    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?tx_queue ?spawn_rpc
     ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec
@@ -1272,6 +1287,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
             ?sequencer_pool_address
             ~kernels
             ?da_fee
+            ?michelson_to_evm_gas_multiplier
             ?minimum_base_fee_per_gas
             ?preimages_dir
             ?maximum_allowed_ticks
