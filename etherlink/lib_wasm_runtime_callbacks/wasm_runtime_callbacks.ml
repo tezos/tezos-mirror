@@ -210,9 +210,10 @@ module Impl = struct
 
   let store_get_hash tree key =
     Key_parser.with_key key @@ fun key ->
-    Metrics.inc_host_function_call "store_get_hash" ;
     let findee =
-      Lwt_domain.run_in_main (fun () -> Irmin_context.Tree.find_tree tree key)
+      Lwt_domain.run_in_main (fun () ->
+          Metrics.inc_host_function_call "store_get_hash" ;
+          Irmin_context.Tree.find_tree tree key)
     in
     match findee with
     | Some tree -> Ok (Irmin_context.Tree.hash tree |> Context_hash.to_bytes)
