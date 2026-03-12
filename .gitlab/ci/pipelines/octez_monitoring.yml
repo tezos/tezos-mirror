@@ -118,7 +118,7 @@ teztale.build:static-arm64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: false
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -168,7 +168,7 @@ teztale.build:static-x86_64:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: false
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -218,7 +218,7 @@ build-layer1-profiling:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
-  interruptible: false
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh

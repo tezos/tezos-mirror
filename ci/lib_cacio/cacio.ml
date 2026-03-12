@@ -868,10 +868,7 @@ let get_global_test_publish_release_page_jobs () =
 let octez_monitoring_jobs = ref []
 
 let get_octez_monitoring_jobs () =
-  convert_jobs
-    ~interruptible_pipeline:false
-    ~with_condition:false
-    !octez_monitoring_jobs
+  convert_jobs ~with_condition:false !octez_monitoring_jobs
 
 let release_tag_rexes = ref String_set.empty
 
