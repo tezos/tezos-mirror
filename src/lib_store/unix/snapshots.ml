@@ -1444,6 +1444,13 @@ module Tar_exporter : EXPORTER = struct
 
   let cleaner ?to_clean t =
     let open Lwt_syntax in
+    (* Best-effort: close the tar archive, ignoring errors since we are
+       already in a cleanup path. *)
+    let* () =
+      Lwt.catch
+        (fun () -> Octez_tar_helpers.close_out t.tar)
+        (fun _exn -> Lwt.return_unit)
+    in
     let* () = Event.(emit cleaning_after_failure ()) in
     let paths =
       match to_clean with
