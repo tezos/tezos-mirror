@@ -52,6 +52,16 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
+let make_debian_variables distribution image_kind release version =
+  ( "DEP_IMAGE",
+    sf
+      "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-%s:%s-%s"
+      distribution
+      image_kind
+      release
+      version )
+  :: [("PREFIX", ""); ("DISTRIBUTION", distribution); ("RELEASE", release)]
+
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
     [job_build_ubuntu_package]. See {!debian_package_release_matrix}
