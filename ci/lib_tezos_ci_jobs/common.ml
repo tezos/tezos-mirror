@@ -184,52 +184,6 @@ module Build = struct
       ["./scripts/ci/build_full_unreleased.sh"]
     |> enable_cargo_cache
     |> enable_sccache ~policy:Pull_push
-
-  let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
-    let profiled_binaries =
-      ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]
-    in
-    let binaries =
-      List.map
-        (Filename.concat "./octez-binaries/x86_64/profiler/")
-        profiled_binaries
-      @ List.map
-          (Filename.concat "./octez-binaries/x86_64/telemetry/")
-          profiled_binaries
-    in
-    let profiled_binaries_string = String.concat " " profiled_binaries in
-    let octez_executables =
-      "OCTEZ_EXECUTABLES?=\"" ^ profiled_binaries_string ^ "\""
-    in
-    job
-      ~__POS__
-      ~stage:Stages.build
-      ~image:Images.CI.build
-      ?rules
-      ~name:"build-layer1-profiling"
-      ~cpu:Very_high
-      ~artifacts:(artifacts ~expire_in binaries)
-      ~before_script:
-        (Helpers.before_script
-           ~take_ownership:true
-           ~source_version:true
-           ~eval_opam:true
-           [])
-      ~variables:[("PROFILE", "static")]
-      [
-        "scripts/slim-mode.sh on";
-        (* turn on -opaque for all subsequent builds *)
-        "scripts/custom-flags.sh set -opaque";
-        (* 1) compile with PPX profiling *)
-        "TEZOS_PPX_PROFILER=profiling make build " ^ octez_executables;
-        "mkdir -p octez-binaries/x86_64/profiler";
-        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/profiler";
-        (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
-        "TEZOS_PPX_PROFILER=opentelemetry make build " ^ octez_executables;
-        "mkdir -p octez-binaries/x86_64/telemetry";
-        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
-      ]
-    |> enable_cargo_cache |> enable_sccache
 end
 
 (** {2 Shared Docker jobs} *)

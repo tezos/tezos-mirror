@@ -16,13 +16,16 @@ let job_build =
   Cacio.parameterize @@ fun arch ->
   let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
   CI.job
-    ("build-" ^ arch_string)
+    (match mode with
+    | `octez_monitoring -> "build:static-" ^ arch_string
+    | _ -> "build-" ^ arch_string)
     ~__POS__
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ~storage:Ramfs
     ~image:Tezos_ci.Images.CI.build
-    ~stage:(match mode with `test -> Test | `release -> Build)
+    ~stage:
+      (match mode with `test -> Test | `release | `octez_monitoring -> Build)
     ~description:"Build Teztale."
     ~artifacts:
       (Gitlab_ci.Util.artifacts
@@ -30,7 +33,7 @@ let job_build =
          ~expire_in:
            (match mode with
            | `test -> Gitlab_ci.Types.(Duration (Days 1))
-           | `release -> Gitlab_ci.Types.Never)
+           | `release | `octez_monitoring -> Gitlab_ci.Types.Never)
          ~when_:On_success
          ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
     ~variables:[("PROFILE", "static")]
@@ -143,5 +146,10 @@ let register () =
     [
       (Auto, job_gitlab_release);
       (Manual, job_release_page `test `build_dependencies);
+    ] ;
+  CI.register_octez_monitoring_jobs
+    [
+      (Auto, job_build `octez_monitoring Amd64);
+      (Auto, job_build `octez_monitoring Arm64);
     ] ;
   ()

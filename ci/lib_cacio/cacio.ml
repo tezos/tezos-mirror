@@ -795,6 +795,8 @@ module type COMPONENT_API = sig
     ?legacy_jobs:Tezos_ci.tezos_job list ->
     (trigger * job) list ->
     unit
+
+  val register_octez_monitoring_jobs : (trigger * job) list -> unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -862,6 +864,11 @@ let global_test_publish_release_page_jobs = ref []
 
 let get_global_test_publish_release_page_jobs () =
   convert_jobs ~with_condition:false !global_test_publish_release_page_jobs
+
+let octez_monitoring_jobs = ref []
+
+let get_octez_monitoring_jobs () =
+  convert_jobs ~with_condition:false !octez_monitoring_jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -1387,6 +1394,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
+
+  let register_octez_monitoring_jobs jobs =
+    octez_monitoring_jobs := jobs @ !octez_monitoring_jobs
 end
 
 module Shared = Make (struct

@@ -198,15 +198,7 @@ let jobs pipeline_type =
   in
 
   (* Build jobs *)
-  let build =
-    [
-      job_static_x86_64_experimental;
-      job_static_arm64_experimental;
-      job_build_layer1_profiling
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ();
-    ]
-  in
+  let build = [job_static_x86_64_experimental; job_static_arm64_experimental] in
 
   (* Test jobs*)
   let test =
