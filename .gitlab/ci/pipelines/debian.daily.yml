@@ -579,8 +579,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-3bb7eddc
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -611,8 +610,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-3bb7eddc
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -713,8 +711,7 @@ oc.install_bin_ubuntu_24_04_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-3bb7eddc
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "24.04"
@@ -745,8 +742,7 @@ oc.upgrade_bin_ubuntu_22_04_systemd_test:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:22.04-master-3bb7eddc
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "22.04"
@@ -777,8 +773,7 @@ oc.upgrade_bin_ubuntu_24_04_systemd_test:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu-systemd:24.04-master-3bb7eddc
     PREFIX: ""
     DISTRIBUTION: ubuntu
     RELEASE: "24.04"

@@ -353,9 +353,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "24.04")])
+          (make_debian_variables
+             "ubuntu"
+             "systemd"
+             "24.04"
+             Tezos_ci.Images.Base_images.debian_version)
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/install-bin-deb.sh \
@@ -371,9 +373,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "22.04")])
+          (make_debian_variables
+             "ubuntu"
+             "systemd"
+             "22.04"
+             Tezos_ci.Images.Base_images.debian_version)
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
@@ -389,9 +393,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "24.04")])
+          (make_debian_variables
+             "ubuntu"
+             "systemd"
+             "24.04"
+             Tezos_ci.Images.Base_images.debian_version)
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
@@ -424,13 +430,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
                Job job_apt_repo_debian;
              ])
         ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [
-               ("PREFIX", "");
-               ("DISTRIBUTION", "debian");
-               ("RELEASE", "bookworm");
-             ])
+          (make_debian_variables
+             "debian"
+             "systemd"
+             "bookworm"
+             Tezos_ci.Images.Base_images.debian_version)
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/install-bin-deb.sh \
@@ -446,13 +450,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
                Job job_apt_repo_debian;
              ])
         ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [
-               ("PREFIX", "");
-               ("DISTRIBUTION", "debian");
-               ("RELEASE", "bookworm");
-             ])
+          (make_debian_variables
+             "debian"
+             "systemd"
+             "bookworm"
+             Tezos_ci.Images.Base_images.debian_version)
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
