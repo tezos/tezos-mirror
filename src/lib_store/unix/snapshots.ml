@@ -1610,6 +1610,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (Inconsistent_floating_store
            (export_block_descr, (Block_repr.hash first_block, first_block_level)))
     else
+      (* [Done] is raised by [f] when the limit level is reached to
+         stop iteration, caught by the outer [Lwt.catch]. *)
       let exception Done in
       let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
       let f block =
