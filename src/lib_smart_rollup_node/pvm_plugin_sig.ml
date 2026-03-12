@@ -53,10 +53,6 @@ type 'fuel eval_result = {
   num_messages : int;
 }
 
-let to_mut_eval_state s = {s with state = Context.PVMState.mut_copy s.state}
-
-let to_imm_eval_state s = {s with state = Context.PVMState.imm_copy s.state}
-
 (** A cached snapshot is either an in-memory immutable copy or an on-disk
     commit hash. The choice depends on the context backend's
     {!Context.PVMState.cache_preference}. *)

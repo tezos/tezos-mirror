@@ -209,9 +209,8 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
               in
               let*! snapshot =
                 Interpreter.to_cached_eval_state
-                  (Context.PVMState.cache_preference
-                     node_ctxt.Node_context.context)
-                  node_ctxt.Node_context.context
+                  (Context.PVMState.cache_preference node_ctxt.context)
+                  node_ctxt.context
                   our_state
               in
               let ok = Evaluated {head = our_state; snapshot} in
