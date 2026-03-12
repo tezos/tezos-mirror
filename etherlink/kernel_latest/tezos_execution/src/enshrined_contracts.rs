@@ -22,6 +22,7 @@ use tezos_ethereum::wei::eth_from_mutez;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
+use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeId,
     ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
@@ -287,13 +288,14 @@ fn build_http_request(
 /// Inject trusted X-Tezos-* context headers into `headers`, overwriting any
 /// existing values with the same name.
 ///
-/// `amount` is in wei (see L2-969 for the canonical encoding decision).
+/// `amount_mutez` is in mutez (10^-6 TEZ). It is formatted as a canonical
+/// TEZ decimal string in the header (see L2-969).
 /// `timestamp` is a Unix timestamp in seconds (must be non-negative).
 fn inject_context_headers_raw(
     headers: &mut http::HeaderMap,
     sender_alias: &[u8],
     source_alias: &[u8],
-    amount: U256,
+    amount_mutez: u64,
     gas_limit: u64,
     timestamp: u64,
     block_number: u32,
@@ -312,7 +314,10 @@ fn inject_context_headers_raw(
         X_TEZOS_SOURCE,
         parse_value(&format!("0x{}", hex::encode(source_alias)))?,
     );
-    headers.insert(X_TEZOS_AMOUNT, parse_value(&format!("{amount}"))?);
+    headers.insert(
+        X_TEZOS_AMOUNT,
+        parse_value(&format_tez_from_mutez(amount_mutez))?,
+    );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
     headers.insert(
@@ -359,10 +364,7 @@ where
         headers,
         &sender_alias,
         &source_alias,
-        // TODO: L2-969 — determine the canonical encoding for tez amounts in
-        // X-Tezos-Amount. For now we convert mutez to wei to match the bridge
-        // path (tezosx_cross_runtime_call), but this may change.
-        eth_from_mutez(amount_mutez),
+        amount_mutez,
         u64::MAX, // TODO: L2-916 — no gas metering yet
         timestamp_u64,
         block_number_u32,
@@ -877,7 +879,7 @@ mod tests {
             &mut headers,
             b"sender_alias",
             b"source_alias",
-            U256::from(42u64),
+            42u64, // 42 mutez = 0.000042 TEZ
             1000,
             1700000000u64,
             5,
@@ -891,7 +893,7 @@ mod tests {
             headers.get("X-Tezos-Source").unwrap(),
             "0x736f757263655f616c696173"
         );
-        assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "42");
+        assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0.000042");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
         assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
@@ -908,7 +910,7 @@ mod tests {
             &mut headers,
             b"new_alias",
             b"source_alias",
-            U256::zero(),
+            0u64,
             0,
             0u64,
             0,
