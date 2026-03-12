@@ -41,6 +41,7 @@ type block_op = {
   op : operation;
   delegate : Tezos_crypto.Signature.public_key_hash;
   power : int;
+  is_aggregated : bool;
 }
 
 val block_op_encoding : block_op Data_encoding.encoding

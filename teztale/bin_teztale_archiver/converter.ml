@@ -119,6 +119,7 @@ let included_ops_map level data =
                     op = {kind; round; hash = maybe_faked_hash};
                     delegate;
                     power = attesting_power;
+                    is_aggregated = false;
                   }
                 acc)
             acc

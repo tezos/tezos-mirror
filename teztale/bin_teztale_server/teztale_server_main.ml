@@ -578,22 +578,60 @@ let attesting_rights_callback =
 let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) conf level
     block_hash operations =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+  let aggregated, individual =
+    List.partition (fun op -> op.Consensus_ops.is_aggregated) operations
+  in
   let* () =
     let operations =
       List.map
         (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
           format_block_op level delegate op)
-        operations
+        individual
     in
     may_insert_operations (module Db) conf operations
   in
+  let* () =
+    let seen = Hashtbl.create 16 in
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+      (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+        let* () =
+          if Hashtbl.mem seen op.hash then return_unit
+          else (
+            Hashtbl.add seen op.hash () ;
+            without_cache
+              Sql_requests.Mutex.operations
+              Sql_requests.maybe_insert_aggregated_operation
+              (module Db)
+              conf
+              [format_block_op level delegate op])
+        in
+        without_cache
+          Sql_requests.Mutex.aggregated_operations
+          Sql_requests.insert_aggregated_operation_delegate
+          (module Db)
+          conf
+          [(op.hash, delegate)])
+      aggregated
+  in
   let operation_inclusion =
-    List.map
-      (fun op ->
-        ( Lib_teztale_base.Consensus_ops.
-            (op.delegate, op.op.kind = Attestation, op.op.round),
-          (block_hash, level) ))
-      operations
+    let individual_inclusions =
+      List.map
+        (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+          ((delegate, op.kind = Attestation, op.round), (block_hash, level)))
+        individual
+    in
+    let seen = Hashtbl.create 16 in
+    let aggregated_inclusions =
+      List.filter_map
+        (fun {Lib_teztale_base.Consensus_ops.delegate; op; _} ->
+          if Hashtbl.mem seen op.hash then None
+          else (
+            Hashtbl.add seen op.hash () ;
+            Some
+              ((delegate, op.kind = Attestation, op.round), (block_hash, level))))
+        aggregated
+    in
+    individual_inclusions @ aggregated_inclusions
   in
   maybe_with_metrics conf "insert_included_operations" @@ fun () ->
   without_cache

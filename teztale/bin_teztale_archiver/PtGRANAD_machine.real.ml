@@ -211,6 +211,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     op = {hash; round = None; kind = Consensus_ops.Attestation};
                     delegate = public_key_hash_of_v0 delegate;
                     power = List.length slots;
+                    is_aggregated = false;
                   }
           | _ -> None)
         ops
