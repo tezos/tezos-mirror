@@ -28,6 +28,7 @@ use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
+    X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -103,21 +104,31 @@ fn build_response(
     result: Result<ExecutionOutcome, TezosXRuntimeError>,
 ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
     let builder_result = match result {
-        Ok(outcome) => match outcome.result {
-            ExecutionResult::Success { output, .. } => {
-                let body = match output {
-                    Output::Call(bytes) => bytes.to_vec(),
-                    Output::Create(bytes, _) => bytes.to_vec(),
-                };
-                http::Response::builder().status(StatusCode::OK).body(body)
+        Ok(outcome) => {
+            // X-Tezos-Gas-Consumed is in the called runtime's units (EVM here).
+            // The caller is responsible for converting to its own units.
+            let gas_consumed = outcome.result.gas_used().to_string();
+            match outcome.result {
+                ExecutionResult::Success { output, .. } => {
+                    let body = match output {
+                        Output::Call(bytes) => bytes.to_vec(),
+                        Output::Create(bytes, _) => bytes.to_vec(),
+                    };
+                    http::Response::builder()
+                        .status(StatusCode::OK)
+                        .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
+                        .body(body)
+                }
+                ExecutionResult::Revert { output, .. } => http::Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
+                    .body(output.to_vec()),
+                ExecutionResult::Halt { reason, .. } => http::Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
+                    .body(format!("EVM execution halted: {reason:?}").into_bytes()),
             }
-            ExecutionResult::Revert { output, .. } => http::Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(output.to_vec()),
-            ExecutionResult::Halt { reason, .. } => http::Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(format!("EVM execution halted: {reason:?}").into_bytes()),
-        },
+        }
         Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(msg.into_bytes()),
@@ -806,6 +817,7 @@ mod tests {
             ExecutionResult, HaltReason, Output, ResultGas, SuccessReason,
         };
         use revm_etherlink::ExecutionOutcome;
+        use tezosx_interfaces::X_TEZOS_GAS_CONSUMED;
 
         fn make_success(output: Vec<u8>) -> ExecutionOutcome {
             ExecutionOutcome {
@@ -887,6 +899,67 @@ mod tests {
         fn custom_error_propagates() {
             let result = build_response(Err(TezosXRuntimeError::Custom("boom".into())));
             assert!(result.is_err());
+        }
+
+        // Gas header tests: make_success uses ResultGas::new(u64::MAX, 21000, 0, 0, 0)
+        // so gas_used() = 21000. X-Tezos-Gas-Consumed is in EVM units (the called runtime).
+
+        #[test]
+        fn success_has_gas_consumed_header() {
+            let resp = build_response(Ok(make_success(vec![]))).unwrap();
+            assert_eq!(
+                resp.headers()
+                    .get(X_TEZOS_GAS_CONSUMED)
+                    .and_then(|v| v.to_str().ok()),
+                Some("21000")
+            );
+        }
+
+        #[test]
+        fn revert_has_gas_consumed_header() {
+            let outcome = ExecutionOutcome {
+                result: ExecutionResult::Revert {
+                    logs: vec![],
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                    output: vec![].into(),
+                },
+                withdrawals: vec![],
+            };
+            let resp = build_response(Ok(outcome)).unwrap();
+            assert_eq!(
+                resp.headers()
+                    .get(X_TEZOS_GAS_CONSUMED)
+                    .and_then(|v| v.to_str().ok()),
+                Some("21000")
+            );
+        }
+
+        #[test]
+        fn halt_has_gas_consumed_header() {
+            let outcome = ExecutionOutcome {
+                result: ExecutionResult::Halt {
+                    reason: HaltReason::OutOfGas(
+                        revm::context::result::OutOfGasError::Basic,
+                    ),
+                    logs: vec![],
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                },
+                withdrawals: vec![],
+            };
+            let resp = build_response(Ok(outcome)).unwrap();
+            assert_eq!(
+                resp.headers()
+                    .get(X_TEZOS_GAS_CONSUMED)
+                    .and_then(|v| v.to_str().ok()),
+                Some("21000")
+            );
+        }
+
+        #[test]
+        fn error_response_has_no_gas_consumed_header() {
+            let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())))
+                .unwrap();
+            assert!(resp.headers().get(X_TEZOS_GAS_CONSUMED).is_none());
         }
     }
 

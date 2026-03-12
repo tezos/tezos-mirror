@@ -61,8 +61,8 @@ impl TezlinkOperationGas {
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
     pub const MAX_LIMIT: u32 = 1_040_000_000;
 
-    /// Initializes operation gas from the provided limit and validates it
-    /// against the per-operation and remaining block limits.
+    /// Initializes operation gas from the provided limit (in gas units) and
+    /// validates it against the per-operation hard limit.
     pub fn start(
         limit_in_gas_unit: &tezos_data_encoding::types::Narith,
     ) -> Result<Self, GasLimitError> {
@@ -79,6 +79,29 @@ impl TezlinkOperationGas {
             .try_into()
             .map_err(GasLimitError::CannotConvertToU32)?;
 
+        Ok(Self {
+            limit,
+            remaining: gas::Gas::new(limit),
+        })
+    }
+
+    /// Initializes operation gas from a limit already expressed in milligas.
+    ///
+    /// This is used by the cross-runtime protocol where `X-Tezos-Gas-Limit`
+    /// carries milligas directly, avoiding a redundant milligas↔gas round-trip.
+    pub fn start_milligas(limit_in_milligas: u64) -> Result<Self, GasLimitError> {
+        let limit: u32 = limit_in_milligas.try_into().map_err(|_| {
+            GasLimitError::GasLimitTooHigh(
+                Self::MAX_LIMIT / 1000,
+                num_bigint::BigUint::from(limit_in_milligas / 1000),
+            )
+        })?;
+        if limit > Self::MAX_LIMIT {
+            return Err(GasLimitError::GasLimitTooHigh(
+                Self::MAX_LIMIT / 1000,
+                num_bigint::BigUint::from(limit / 1000),
+            ));
+        }
         Ok(Self {
             limit,
             remaining: gas::Gas::new(limit),

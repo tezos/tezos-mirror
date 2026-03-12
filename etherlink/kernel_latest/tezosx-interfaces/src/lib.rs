@@ -20,6 +20,7 @@ pub const X_TEZOS_SENDER: &str = "X-Tezos-Sender";
 pub const X_TEZOS_SOURCE: &str = "X-Tezos-Source";
 pub const X_TEZOS_AMOUNT: &str = "X-Tezos-Amount";
 pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
+pub const X_TEZOS_GAS_CONSUMED: &str = "X-Tezos-Gas-Consumed";
 pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
 pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
 
@@ -205,7 +206,7 @@ pub trait RuntimeInterface {
     ) -> Result<U256, TezosXRuntimeError>;
 }
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy)]
 pub enum RuntimeId {
     Tezos = 0,
     Ethereum = 1,
@@ -227,6 +228,122 @@ impl TryFrom<u8> for RuntimeId {
             0 => Ok(RuntimeId::Tezos),
             1 => Ok(RuntimeId::Ethereum),
             _ => Err("Invalid RuntimeId value"),
+        }
+    }
+}
+
+impl RuntimeId {
+    /// Parse a `RuntimeId` from the URL host string used in cross-runtime
+    /// HTTP requests (e.g. `"tezos"`, `"ethereum"`).
+    pub fn from_host(host: &str) -> Option<Self> {
+        match host {
+            "tezos" => Some(RuntimeId::Tezos),
+            "ethereum" => Some(RuntimeId::Ethereum),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod from_host_tests {
+    use super::*;
+
+    #[test]
+    fn tezos() {
+        assert_eq!(RuntimeId::from_host("tezos"), Some(RuntimeId::Tezos));
+    }
+
+    #[test]
+    fn ethereum() {
+        assert_eq!(RuntimeId::from_host("ethereum"), Some(RuntimeId::Ethereum));
+    }
+
+    #[test]
+    fn unknown_returns_none() {
+        assert_eq!(RuntimeId::from_host("michelson"), None);
+        assert_eq!(RuntimeId::from_host(""), None);
+    }
+
+    #[test]
+    fn case_sensitive() {
+        assert_eq!(RuntimeId::from_host("Tezos"), None);
+        assert_eq!(RuntimeId::from_host("Ethereum"), None);
+    }
+}
+
+/// Gas conversion utilities for cross-runtime calls.
+///
+/// **Convention**: Both `X-Tezos-Gas-Limit` and `X-Tezos-Gas-Consumed` are
+/// in the **called** runtime's gas units. Gateways convert on the way out
+/// (for the limit) and on the way back (for consumed); receiving runtimes
+/// read/write directly without conversion.
+///
+/// **Ratio**: 1 EVM gas = 100 Tezos milligas.
+/// **Tezos unit**: milligas (the native unit of the Tezos runtime).
+pub mod gas {
+    use crate::RuntimeId;
+
+    /// Convert `gas` from `source` runtime units to `target` runtime units.
+    ///
+    /// Returns `None` on overflow (only possible for Ethereum→Tezos when
+    /// `gas > u64::MAX / 100`). Returns `Some(gas)` unchanged when
+    /// `source == target`.
+    pub fn convert(source: RuntimeId, target: RuntimeId, gas: u64) -> Option<u64> {
+        match (source, target) {
+            (RuntimeId::Ethereum, RuntimeId::Tezos) => gas.checked_mul(100),
+            (RuntimeId::Tezos, RuntimeId::Ethereum) => Some(gas / 100),
+            _ => Some(gas),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn ethereum_to_tezos() {
+            assert_eq!(
+                convert(RuntimeId::Ethereum, RuntimeId::Tezos, 100),
+                Some(10_000)
+            );
+            assert_eq!(
+                convert(RuntimeId::Ethereum, RuntimeId::Tezos, 1_000_000),
+                Some(100_000_000)
+            );
+        }
+
+        #[test]
+        fn ethereum_to_tezos_overflow() {
+            let large = u64::MAX / 100 + 1;
+            assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, large), None);
+        }
+
+        #[test]
+        fn tezos_to_ethereum() {
+            assert_eq!(
+                convert(RuntimeId::Tezos, RuntimeId::Ethereum, 10_000),
+                Some(100)
+            );
+        }
+
+        #[test]
+        fn tezos_to_ethereum_truncates() {
+            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Ethereum, 150), Some(1));
+        }
+
+        #[test]
+        fn identity() {
+            assert_eq!(
+                convert(RuntimeId::Ethereum, RuntimeId::Ethereum, 42),
+                Some(42)
+            );
+            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Tezos, 42), Some(42));
+        }
+
+        #[test]
+        fn zero() {
+            assert_eq!(convert(RuntimeId::Ethereum, RuntimeId::Tezos, 0), Some(0));
+            assert_eq!(convert(RuntimeId::Tezos, RuntimeId::Ethereum, 0), Some(0));
         }
     }
 }
