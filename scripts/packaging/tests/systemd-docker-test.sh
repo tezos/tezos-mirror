@@ -21,6 +21,7 @@ GCP_LINUX_PACKAGES_BUCKET=${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}
 #shellcheck disable=SC2236
 if [ ! -z ${DEP_IMAGE+x} ]; then
   IMAGE="$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+  echo "Attempting to pull $IMAGE"
   docker pull "$IMAGE"
   echo "Using $IMAGE"
 else
