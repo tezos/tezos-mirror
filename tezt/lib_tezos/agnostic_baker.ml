@@ -29,6 +29,7 @@ module Parameters = struct
     base_dir : string;
     node_data_dir : string;
     node_rpc_endpoint : Endpoint.t;
+    extra_nodes : Endpoint.t list;
     dal_node_rpc_endpoint : Endpoint.t option;
     dal_node_timeout_percentage : int option;
     mutable pending_ready : unit option Lwt.u list;
@@ -90,7 +91,7 @@ let enable_remote_mode =
 let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
     ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
+    ?remote_mode ?operations_pool ?(extra_nodes = []) ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
     ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false)
@@ -113,6 +114,7 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
         base_dir;
         node_data_dir;
         node_rpc_endpoint;
+        extra_nodes;
         pending_ready = [];
         votefile;
         liquidity_baking_toggle_vote;
@@ -140,7 +142,7 @@ let handle_event node ({name; _} : event) =
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
-    ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
+    ?remote_mode ?operations_pool ?(extra_nodes = []) ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive
     ?allow_fixed_random_seed ?allow_signing_delay node client =
@@ -160,6 +162,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ?force_apply_from_round
       ?remote_mode
       ?operations_pool
+      ~extra_nodes
       ?dal_node_rpc_endpoint
       ?dal_node_timeout_percentage
       ~state_recorder
@@ -253,6 +256,11 @@ let run_args agnostic_baker =
       "allow-signing-delay"
       agnostic_baker.persistent_state.allow_signing_delay
   in
+  let extra_nodes =
+    List.concat_map
+      (fun endpoint -> ["--extra-node"; Endpoint.as_string endpoint])
+      agnostic_baker.persistent_state.extra_nodes
+  in
   let run_args =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
@@ -264,7 +272,7 @@ let run_args agnostic_baker =
   @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
   @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
   @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
-  @ node_version_allowed @ keep_alive @ allow_signing_delay
+  @ node_version_allowed @ keep_alive @ allow_signing_delay @ extra_nodes
 
 let raw ?env ?event_level ?event_sections_levels ~arguments (agnostic_baker : t)
     =
@@ -354,9 +362,10 @@ let wait_for_termination (baker : t) : unit Lwt.t =
 let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
-    ?operations_pool ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
-    ?state_recorder ?node_version_check_bypass ?node_version_allowed ?keep_alive
-    ?allow_fixed_random_seed ?allow_signing_delay ?extra_arguments node client =
+    ?operations_pool ?(extra_nodes = []) ?dal_node_rpc_endpoint
+    ?dal_node_timeout_percentage ?state_recorder ?node_version_check_bypass
+    ?node_version_allowed ?keep_alive ?allow_fixed_random_seed
+    ?allow_signing_delay ?extra_arguments node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -370,6 +379,7 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
       ?force_apply_from_round
       ?remote_mode
       ?operations_pool
+      ~extra_nodes
       ?dal_node_rpc_endpoint
       ?dal_node_timeout_percentage
       ?state_recorder
