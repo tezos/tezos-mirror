@@ -134,6 +134,7 @@ where
                     journal,
                     registry,
                 )?;
+                // TODO: L2-1029 Should register the gas consumed by the serve call
                 let _ = registry
                     .serve(ctx.host(), journal, request)
                     .map_err(|err| TransferError::GatewayError(err.to_string()))?;
