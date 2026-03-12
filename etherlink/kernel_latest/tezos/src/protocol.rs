@@ -6,6 +6,7 @@
 #[repr(u8)]
 pub enum Protocol {
     S023 = 23,
+    T024 = 24,
 }
 
 pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::S023;
@@ -27,6 +28,7 @@ impl rlp::Decodable for Protocol {
         let val: u8 = rlp.as_val()?;
         match val {
             23 => Ok(Protocol::S023),
+            24 => Ok(Protocol::T024),
             _ => Err(rlp::DecoderError::Custom("Unknown protocol version")),
         }
     }
@@ -56,6 +58,33 @@ mod tests {
     pub fn rlp_roundtrip_protocol() {
         let mut stream = rlp::RlpStream::new();
         let protocol = Protocol::S023;
+        stream.append(&protocol);
+        let encoded = stream.out();
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, protocol);
+    }
+
+    #[test]
+    pub fn rpl_encode_protocol_t024() {
+        let mut stream = rlp::RlpStream::new();
+        stream.append(&Protocol::T024);
+        let out = stream.out();
+        assert_eq!(out, vec![24]);
+    }
+
+    #[test]
+    pub fn rlp_decode_protocol_t024() {
+        let encoded = vec![24];
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, Protocol::T024);
+    }
+
+    #[test]
+    pub fn rlp_roundtrip_protocol_t024() {
+        let mut stream = rlp::RlpStream::new();
+        let protocol = Protocol::T024;
         stream.append(&protocol);
         let encoded = stream.out();
         let rlp = rlp::Rlp::new(&encoded);
