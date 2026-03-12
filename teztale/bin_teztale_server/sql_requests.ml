@@ -67,6 +67,7 @@ let create_operations =
   \  endorser $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  level INTEGER NOT NULL,\n\
   \  round INTEGER,\n\
+  \  is_aggregated BOOLEAN NOT NULL DEFAULT FALSE,\n\
   \  FOREIGN KEY (endorser) REFERENCES delegates(id))"
 
 let create_operations_reception =
@@ -222,6 +223,10 @@ let alter_blocks_reception_add_validation_timestamp =
 
 let alter_nodes = "ALTER TABLE nodes ADD COLUMN password $(BYTES)"
 
+let alter_operations_add_is_aggregated =
+  "ALTER TABLE operations ADD COLUMN is_aggregated BOOLEAN NOT NULL DEFAULT \
+   FALSE"
+
 let alter_tables =
   [
     [alter_blocks];
@@ -232,6 +237,7 @@ let alter_tables =
       alter_blocks_reception_add_validation_timestamp;
     ];
     [alter_nodes];
+    [alter_operations_add_is_aggregated];
   ]
 
 module Type = struct
