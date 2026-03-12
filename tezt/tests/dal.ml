@@ -670,8 +670,8 @@ let with_fresh_rollup ?(pvm_name = "arith") ?boot_sector ?dal_node f tezos_node
   f rollup_address sc_rollup_node
 
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
-    ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
-    ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
+    ?observer_profiles ?bootstrap_profile ?history_mode ?(wait_ready = true)
+    ?env ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
     ?trust_slots_backup_uris ?disable_amplification ?ignore_pkhs
     ?batching_time_interval tezos_node =
   let dal_node =
@@ -688,6 +688,7 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
       ?peers
       ?attester_profiles
       ?operator_profiles
+      ?observer_profiles
       ?bootstrap_profile
       ?history_mode
       ?slots_backup_uris
@@ -699,14 +700,15 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
-    ?bootstrap_profile ?history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification ?ignore_pkhs ?batching_time_interval tezos_node f key
-    =
+    ?observer_profiles ?bootstrap_profile ?history_mode ?wait_ready ?env
+    ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ?batching_time_interval tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
       ?attester_profiles
       ?operator_profiles
+      ?observer_profiles
       ?bootstrap_profile
       ?history_mode
       ?wait_ready
@@ -771,9 +773,9 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
     ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
-    ?event_sections_levels ?operator_profiles ?history_mode ?prover
-    ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready ?env
-    ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ?event_sections_levels ?operator_profiles ?observer_profiles ?history_mode
+    ?prover ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready
+    ?env ?disable_shard_validation ?disable_amplification ?ignore_pkhs
     ?batching_time_interval variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -819,6 +821,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
       with_dal_node
         ?bootstrap_profile
         ?operator_profiles
+        ?observer_profiles
         ?history_mode
         ?wait_ready
         ?env
@@ -836,9 +839,10 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?commitment_period ?challenge_window
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
-    ?bootstrap_profile ?operator_profiles ?smart_rollup_timeout_period_in_blocks
-    ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
-    ?disable_amplification ?batching_time_interval scenario =
+    ?bootstrap_profile ?operator_profiles ?observer_profiles
+    ?smart_rollup_timeout_period_in_blocks ?(regression = true) ?prover
+    ?attestation_threshold ?l1_history_mode variant ?disable_amplification
+    ?batching_time_interval scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -882,6 +886,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
       with_dal_node
         ?bootstrap_profile
         ?operator_profiles
+        ?observer_profiles
         ?disable_amplification
         ?batching_time_interval
         node
