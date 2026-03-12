@@ -18,7 +18,7 @@ pub mod test_helpers {
         let filepath = format!(
             "{}/{}/{:?}-- {}- {}.out",
             env!("CARGO_MANIFEST_DIR"),
-            "../../../tezt/tests/expected/encoding.ml",
+            "regressions",
             protocol,
             "protocol encoding regression test",
             encoding
