@@ -167,7 +167,6 @@ let send ?site ?api_key ?runner (metric : metric) =
       "curl"
       [
         "-f";
-        "-v";
         "-X";
         "POST";
         sf "https://api.%s/api/v2/series" site;
