@@ -214,6 +214,7 @@ type op_info = {
   round : Int32.t option;
   included : Tezos_crypto.Hashed.Block_hash.t list;
   received : Lib_teztale_base.Data.Delegate_operations.reception list;
+  is_aggregated : bool;
 }
 
 let kind_of_bool = function
@@ -245,7 +246,20 @@ let select_ops conf db_pool boundaries =
       "SELECT o.level, d.address, o.endorsement, o.round, o.hash, b.hash FROM \
        operations o JOIN operations_inclusion i ON i.operation = o.id JOIN \
        delegates d ON o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE \
-       o.level >= ? AND o.level <= ?"
+       o.level >= ? AND o.level <= ? AND o.is_aggregated = FALSE"
+  in
+  let q_aggregated_included =
+    Caqti_request.Infix.(
+      Caqti_type.(t2 int32 int32)
+      ->* Caqti_type.(
+            t2
+              (t4 int32 Sql_requests.Type.public_key_hash bool (option int32))
+              (t2 Sql_requests.Type.operation_hash Sql_requests.Type.block_hash)))
+      "SELECT o.level, d.address, o.endorsement, o.round, o.hash, b.hash FROM \
+       aggregated_operations ao JOIN operations o ON ao.operation = o.id JOIN \
+       operations_inclusion i ON i.operation = o.id JOIN delegates d ON \
+       ao.delegate = d.id JOIN blocks b ON i.block = b.id WHERE o.level >= ? \
+       AND o.level <= ?"
   in
   let q_received =
     Caqti_request.Infix.(
@@ -279,8 +293,8 @@ let select_ops conf db_pool boundaries =
     in
     Int32Map.add level ops info
   in
-  let cb_included ((level, delegate, attestation, round), (op_hash, block_hash))
-      info =
+  let cb_included ~is_aggregated
+      ((level, delegate, attestation, round), (op_hash, block_hash)) info =
     let ops =
       match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
     in
@@ -296,7 +310,14 @@ let select_ops conf db_pool boundaries =
                 with
                 | Some op_info ->
                     {op_info with included = block_hash :: op_info.included}
-                | None -> {kind; round; included = [block_hash]; received = []}
+                | None ->
+                    {
+                      kind;
+                      round;
+                      included = [block_hash];
+                      received = [];
+                      is_aggregated;
+                    }
               in
               let ops' =
                 Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
@@ -330,7 +351,13 @@ let select_ops conf db_pool boundaries =
                 | Some op_info ->
                     {op_info with received = received_info :: op_info.received}
                 | None ->
-                    {kind; round; included = []; received = [received_info]}
+                    {
+                      kind;
+                      round;
+                      included = [];
+                      received = [received_info];
+                      is_aggregated = false;
+                    }
               in
               let ops' =
                 Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
@@ -383,7 +410,19 @@ let select_ops conf db_pool boundaries =
     Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         maybe_with_metrics conf "select_operations_inclusion" @@ fun () ->
-        Db.fold q_included cb_included boundaries out)
+        Db.fold q_included (cb_included ~is_aggregated:false) boundaries out)
+      db_pool
+  in
+  let* out =
+    Caqti_lwt_unix.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        maybe_with_metrics conf "select_aggregated_operations_inclusion"
+        @@ fun () ->
+        Db.fold
+          q_aggregated_included
+          (cb_included ~is_aggregated:true)
+          boundaries
+          out)
       db_pool
   in
   let* out =
@@ -402,7 +441,7 @@ let select_ops conf db_pool boundaries =
 let translate_ops info =
   let translate pkh_ops =
     Tezos_crypto.Hashed.Operation_hash.Map.fold
-      (fun hash {kind; round; included; received} acc ->
+      (fun hash {kind; round; included; received; is_aggregated} acc ->
         Lib_teztale_base.Data.Delegate_operations.
           {
             hash;
@@ -410,6 +449,7 @@ let translate_ops info =
             round;
             mempool_inclusion = received;
             block_inclusion = included;
+            is_aggregated;
           }
         :: acc)
       pkh_ops

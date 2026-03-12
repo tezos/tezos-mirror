@@ -968,15 +968,29 @@ let import_callback ~logger conf db_pool g data =
                ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Delegate_operations.
-                       {hash; kind; round; _}
+                       {hash; kind; round; is_aggregated; _}
                    ->
-                  Db.exec
-                    Sql_requests.maybe_insert_operation
-                    ( ( level,
-                        hash,
-                        kind = Lib_teztale_base.Consensus_ops.Attestation,
-                        round ),
-                      delegate ))
+                  if is_aggregated then
+                    let* () =
+                      Db.exec
+                        Sql_requests.maybe_insert_aggregated_operation
+                        ( ( level,
+                            hash,
+                            kind = Lib_teztale_base.Consensus_ops.Attestation,
+                            round ),
+                          delegate )
+                    in
+                    Db.exec
+                      Sql_requests.insert_aggregated_operation_delegate
+                      (hash, delegate)
+                  else
+                    Db.exec
+                      Sql_requests.maybe_insert_operation
+                      ( ( level,
+                          hash,
+                          kind = Lib_teztale_base.Consensus_ops.Attestation,
+                          round ),
+                        delegate ))
                 operations)
             data.Lib_teztale_base.Data.delegate_operations
         in

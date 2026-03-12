@@ -67,7 +67,8 @@ let drop_file_mutex filename =
    preattestations or attestations in [ops] that were included in block
    [block_hash] to the list of operations already known for operation's
    producer. *)
-let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
+let add_to_operations block_hash ops_hash ops_kind ~is_aggregated ?ops_round
+    operations =
   match
     List.partition
       (fun Data.Delegate_operations.{kind; round; _} ->
@@ -80,7 +81,14 @@ let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
       operations
   with
   | ( Data.Delegate_operations.
-        {hash; kind; round = _; mempool_inclusion; block_inclusion}
+        {
+          hash;
+          kind;
+          round = _;
+          mempool_inclusion;
+          block_inclusion;
+          is_aggregated = _;
+        }
       :: _,
       operations' ) ->
       Data.Delegate_operations.
@@ -90,6 +98,7 @@ let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
           round = ops_round;
           mempool_inclusion;
           block_inclusion = block_hash :: block_inclusion;
+          is_aggregated;
         }
       :: operations'
   | [], _ ->
@@ -99,6 +108,7 @@ let add_to_operations block_hash ops_hash ops_kind ?ops_round operations =
         round = ops_round;
         mempool_inclusion = [];
         block_inclusion = [block_hash];
+        is_aggregated;
       }
       :: operations
 
@@ -137,6 +147,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
                       block_hash
                       op.op.hash
                       op.op.kind
+                      ~is_aggregated:op.is_aggregated
                       ?ops_round:op.op.round
                       operations;
                   assigned_shard_indices;
@@ -166,6 +177,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
                     round = op.op.round;
                     mempool_inclusion = [];
                     block_inclusion = [block_hash];
+                    is_aggregated = op.is_aggregated;
                   };
                 ];
               assigned_shard_indices = [];
@@ -336,6 +348,7 @@ let merge_operations =
               mempool_inclusion =
                 [{source = "archiver"; reception_time; errors}];
               block_inclusion;
+              is_aggregated = false;
             }
           :: acc'
       | _ :: _, _ -> acc
@@ -346,6 +359,7 @@ let merge_operations =
             round;
             mempool_inclusion = [{source = "archiver"; reception_time; errors}];
             block_inclusion = [];
+            is_aggregated = false;
           }
           :: acc)
 
@@ -427,6 +441,7 @@ let dump_received logger path ?unaccurate level received_ops =
                                      };
                                    ];
                                  block_inclusion = [];
+                                 is_aggregated = false;
                                })
                              ops;
                          assigned_shard_indices = [];
