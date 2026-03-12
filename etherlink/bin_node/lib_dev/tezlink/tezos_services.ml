@@ -12,13 +12,13 @@ open Tezlink_imports
    might be difficult to actually build, so we define conversion function from
    local types to protocol types. *)
 module Protocol_types = struct
-  module Raw_level = SeouLo_context.Raw_level
+  module Raw_level = Imported_context.Raw_level
 
   module Cycle = struct
-    include SeouLo_context.Cycle
+    include Imported_context.Cycle
 
     (* This function is copied from [cycle_repr.ml] because it is not exposed
-       in [SeouLo_context.mli]. *)
+       in [Imported_context.mli]. *)
     let of_int32_exn i =
       if Compare.Int32.(i >= 0l) then add root (Int32.to_int i)
       else invalid_arg "Cycle_repr.of_int32_exn"
@@ -27,9 +27,9 @@ module Protocol_types = struct
   module Level = struct
     open Tezos_types
 
-    type t = SeouLo_context.Level.t
+    type t = Imported_context.Level.t
 
-    let encoding = SeouLo_context.Level.encoding
+    let encoding = Imported_context.Level.encoding
 
     (** The sole purpose of this encoding is to reflect as closely as possible
           the encoding of Alpha_context.Level.t, so it can be used to convert to
@@ -68,9 +68,9 @@ module Protocol_types = struct
   end
 
   module Counter = struct
-    type t = SeouLo_context.Manager_counter.t
+    type t = Imported_context.Manager_counter.t
 
-    let encoding = SeouLo_context.Manager_counter.encoding_for_RPCs
+    let encoding = Imported_context.Manager_counter.encoding_for_RPCs
 
     let of_z : Z.t -> t tzresult =
       Tezos_types.convert_using_serialization
@@ -114,7 +114,7 @@ end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Tezlink_SeouLo_protocol = struct
-  include Tezlink_imports.SeouLo_protocol
+  include SeouLo_protocol
 
   let contents : Block_header_repr.contents =
     {
@@ -235,7 +235,7 @@ end
 
 (** We add to Imported_protocol_024 the mocked protocol data used in headers *)
 module Tezlink_TALLiN_protocol = struct
-  include Tezlink_imports.TALLiN_protocol
+  include TALLiN_protocol
 
   let contents : Block_header_repr.contents =
     {
@@ -963,7 +963,7 @@ module Big_map = struct
       ( [`GET],
         tezlink_rpc_context,
         (tezlink_rpc_context * Imported_context.Big_map.Id.t)
-        * Tezlink_imports.Imported_protocol.Script_expr_hash.t,
+        * Imported_protocol.Script_expr_hash.t,
         unit,
         unit,
         Imported_context.Script.expr )
