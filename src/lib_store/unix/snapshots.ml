@@ -909,7 +909,7 @@ module type EXPORTER = sig
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     export_block:Store.Block.t ->
     resulting_context_hash:Context_hash.t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   val export_context :
     t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
@@ -988,7 +988,7 @@ module Raw_exporter : EXPORTER = struct
   let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~export_block ~resulting_context_hash =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let block_data =
       {
         block_header = Store.Block.header export_block;
@@ -1006,15 +1006,18 @@ module Raw_exporter : EXPORTER = struct
     let file =
       Naming.(snapshot_block_data_file t.snapshot_tmp_dir |> file_path)
     in
-    let* fd =
+    let*! fd =
       Lwt_unix.openfile
         file
         Unix.[O_CREAT; O_TRUNC; O_WRONLY]
         snapshot_rw_file_perm
     in
-    Lwt.finalize
-      (fun () -> Lwt_utils_unix.write_bytes fd bytes)
-      (fun () -> Lwt_unix.close fd)
+    let*! () =
+      Lwt.finalize
+        (fun () -> Lwt_utils_unix.write_bytes fd bytes)
+        (fun () -> Lwt_unix.close fd)
+    in
+    return_unit
 
   let export_context t context_index context_hash =
     let open Lwt_result_syntax in
@@ -1249,6 +1252,7 @@ module Tar_exporter : EXPORTER = struct
   let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~export_block ~resulting_context_hash =
+    let open Lwt_result_syntax in
     let block_data =
       {
         block_header = Store.Block.header export_block;
@@ -1263,10 +1267,13 @@ module Tar_exporter : EXPORTER = struct
     let bytes =
       Data_encoding.Binary.to_bytes_exn block_data_encoding block_data
     in
-    Octez_tar_helpers.add_raw_and_finalize
-      t.tar
-      ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
-      ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
+    let*! () =
+      Octez_tar_helpers.add_raw_and_finalize
+        t.tar
+        ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
+        ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
+    in
+    return_unit
 
   let export_context t context_index context_hash =
     let open Lwt_result_syntax in
@@ -2377,7 +2384,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let predecessor_ops_metadata_hash =
             Store.Block.all_operations_metadata_hash pred_block
           in
-          let*! () =
+          let* () =
             Exporter.write_block_data
               snapshot_exporter
               ~predecessor_header:(Store.Block.header pred_block)
