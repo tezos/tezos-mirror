@@ -15,6 +15,34 @@ open Tezos_ci
 open Common.Helpers
 open Common.Packaging
 
+let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution ~script
+    ~base_image =
+  job_docker_authenticated
+    ~__POS__
+    ~name
+    ~stage:Stages.images
+    ~variables:
+      (make_variables
+         ~kind:"systemd-tests"
+         [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
+    ~parallel:(Matrix matrix)
+    ~tag:Dynamic
+    script
+
+let make_job_merge_systemd_test_dependencies ~distribution ~dependencies ~matrix
+    =
+  job_docker_authenticated
+    ~__POS__
+    ~name:(Format.sprintf "oc.docker-systemd-merge-manifest.%s" distribution)
+    ~stage:Stages.images
+    ~dependencies
+    ~variables:
+      (make_variables
+         ~kind:"systemd-tests"
+         [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
+    ~parallel:(Matrix matrix)
+    ["scripts/ci/docker-merge-base-images.sh"]
+
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
   else Runner.Tag.show Gcp_very_high_cpu
