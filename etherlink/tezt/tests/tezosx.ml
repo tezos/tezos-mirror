@@ -2976,11 +2976,7 @@ let test_call_from_michelson_to_evm ~runtime () =
       ~error_msg:"Expected EVM storage slot 0 = %R but got %L") ;
   unit
 
-(** Test the Tezos X simulation on a Tezos operation. For now, the simulation
-    simply transmits 42 to the kernel which increments it; the node injects the
-    returned integer in a balance update.
-    TODO https://linear.app/tezos/issue/L2-895: adjust regression when plugging
-    the actual simulation results. *)
+(** Test the Tezos X simulation on a Tezos operation. *)
 let test_tezosx_simulation () =
   Setup.register_sandbox_test
     ~regression:true
