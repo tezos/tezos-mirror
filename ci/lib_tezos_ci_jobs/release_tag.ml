@@ -225,24 +225,28 @@ let job_opam_release =
     ~tag:Gcp_not_interruptible
 
 let job_dispatch_call =
-  job
+  CI.job
+    "dispatch-call"
     ~__POS__
     ~image:Images.CI.prebuild
-    ~stage:Stages.publish
+    ~stage:Publish
     ~description:
       "A job release that triggers pipelines from other repositories after a \
        release.\n\
        For now, it triggers the release pipeline from \
        tez-capital/tezos-macos-pipeline"
-    ~interruptible:false
-    ~name:"dispatch-call"
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_release_page `real `wait_for_build);
-           Job (job_gitlab_release `real);
-         ])
+    ~needs_legacy:
+      [
+        (Job, job_release_page `real `wait_for_build);
+        (Job, job_gitlab_release `real);
+      ]
     ["./scripts/releases/dispatch-call.sh"]
+
+let () =
+  Cacio.register_jobs Major_release_tag [(Auto, job_dispatch_call)] ;
+  Cacio.register_jobs Minor_release_tag [(Auto, job_dispatch_call)] ;
+  Cacio.register_jobs Beta_release_tag [(Auto, job_dispatch_call)] ;
+  ()
 
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
@@ -296,7 +300,7 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   @
   match pipeline_type with
   | Major_release_tag | Minor_release_tag ->
-      [job_opam_release `real; job_release_page; job_dispatch_call]
+      [job_opam_release `real; job_release_page]
   | Major_release_tag_test | Minor_release_tag_test ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -308,7 +312,7 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
         job_opam_release `test;
         job_release_page;
       ]
-  | Beta_release_tag -> [job_release_page; job_dispatch_call]
+  | Beta_release_tag -> [job_release_page]
   | Beta_release_tag_test -> [job_release_page]
   | _ -> []
 
