@@ -24,8 +24,9 @@ use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
     gas::convert as convert_gas, CrossRuntimeContext, Registry, RuntimeId,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT,
-    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
+    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
+    X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -151,10 +152,14 @@ where
                     journal,
                     registry,
                 )?;
-                // TODO: L2-1029 Should register the gas consumed by the serve call
-                let _ = registry
+                let response = registry
                     .serve(ctx.host(), journal, request)
                     .map_err(|err| TransferError::GatewayError(err.to_string()))?;
+                let consumed_milligas =
+                    extract_gas_consumed(&response, target_host.as_deref())?;
+                ctx.operation_gas()
+                    .cast_and_consume_milligas(consumed_milligas)
+                    .map_err(|_| TransferError::OutOfGas)?;
                 Ok(())
             } else {
                 Err(TransferError::GatewayError(format!(
@@ -613,6 +618,37 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
         ));
     }
     Ok(U256::from_little_endian(&bytes))
+}
+
+/// Extract the gas consumed from an HTTP response's `X-Tezos-Gas-Consumed`
+/// header and convert it from the target runtime's units to Tezos milligas.
+fn extract_gas_consumed(
+    response: &http::Response<Vec<u8>>,
+    target_host: Option<&str>,
+) -> Result<u64, TransferError> {
+    let target_runtime = target_host.and_then(RuntimeId::from_host).ok_or_else(|| {
+        TransferError::GatewayError(
+            "http_call: unknown or missing target runtime in URL host".into(),
+        )
+    })?;
+    let consumed_in_target_units = response
+        .headers()
+        .get(X_TEZOS_GAS_CONSUMED)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or_else(|| {
+            TransferError::GatewayError(
+                "http_call: missing or invalid X-Tezos-Gas-Consumed header in response"
+                    .into(),
+            )
+        })?;
+    convert_gas(target_runtime, RuntimeId::Tezos, consumed_in_target_units).ok_or_else(
+        || {
+            TransferError::GatewayError(
+                "http_call: gas consumed overflows Tezos milligas".into(),
+            )
+        },
+    )
 }
 
 pub(crate) fn get_enshrined_contract_entrypoint(
