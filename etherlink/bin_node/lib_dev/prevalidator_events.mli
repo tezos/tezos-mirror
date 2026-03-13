@@ -15,3 +15,5 @@ val is_ready : unit -> unit Lwt.t
     This typically happen when starting an observer node in
     finalized view at the very beginning of an Etherlink chain. *)
 val cannot_start : unit -> unit Lwt.t
+
+val failed_da_fee_read : unit -> unit Lwt.t

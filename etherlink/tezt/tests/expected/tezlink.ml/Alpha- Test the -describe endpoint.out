@@ -44,6 +44,18 @@ Available services:
           The chain unique identifier. 
       - GET /tezlink/chains/<chain_id>/is_bootstrapped
           The bootstrap status of a chain 
+      - GET /tezlink/chains/<chain_id>/mempool/filter
+          Get the configuration of the mempool's filter and bounds. Values of
+          the form [ "21", "20" ] are rational numbers given as a numerator
+          and a denominator, e.g. 21/20 = 1.05. The minimal_fees (in mutez),
+          minimal_nanotez_per_gas_unit, and minimal_nanotez_per_byte are
+          requirements that a manager operation must meet to be considered by
+          the mempool. replace_by_fee_factor is how much better a manager
+          operation must be to replace a previous valid operation **from the
+          same manager** (both its fee and its fee/gas ratio must exceed the
+          old operation's by at least this factor). max_operations and
+          max_total_bytes are the bounds on respectively the number of valid
+          operations in the mempool and the sum of their sizes in bytes. 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
     - POST /tezlink/injection/operation
@@ -113,6 +125,18 @@ Available services:
         The chain unique identifier. 
     - GET /chains/<chain_id>/is_bootstrapped
         The bootstrap status of a chain 
+    - GET /chains/<chain_id>/mempool/filter
+        Get the configuration of the mempool's filter and bounds. Values of
+        the form [ "21", "20" ] are rational numbers given as a numerator and
+        a denominator, e.g. 21/20 = 1.05. The minimal_fees (in mutez),
+        minimal_nanotez_per_gas_unit, and minimal_nanotez_per_byte are
+        requirements that a manager operation must meet to be considered by
+        the mempool. replace_by_fee_factor is how much better a manager
+        operation must be to replace a previous valid operation **from the
+        same manager** (both its fee and its fee/gas ratio must exceed the
+        old operation's by at least this factor). max_operations and
+        max_total_bytes are the bounds on respectively the number of valid
+        operations in the mempool and the sum of their sizes in bytes. 
   - POST /injection/operation
       Inject an operation in node and broadcast it. Returns the ID of the
       operation. The `signedOperationContents` should be constructed using

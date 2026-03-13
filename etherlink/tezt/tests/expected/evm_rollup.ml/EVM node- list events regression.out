@@ -1709,6 +1709,14 @@ prevalidator_cannot_start:
     { /* prevalidator_cannot_start version 0 */
       "prevalidator_cannot_start.v0": any }
   
+prevalidator_failed_da_fee_read:
+  description: failed to read DA fee from durable storage, falling back to zero (expected at genesis)
+  level: warning
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_failed_da_fee_read version 0 */
+      "prevalidator_failed_da_fee_read.v0": any }
+  
 prevalidator_is_ready:
   description: prevalidator is ready
   level: notice

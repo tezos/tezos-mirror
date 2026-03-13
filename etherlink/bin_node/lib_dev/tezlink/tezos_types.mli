@@ -59,6 +59,8 @@ module Tez : sig
 
   val wei_to_mutez : Z.t -> int64
 
+  val wei_to_nanotez : Z.t -> Q.t
+
   val mutez_to_wei : int64 -> Z.t
 end
 

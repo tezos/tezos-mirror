@@ -73,6 +73,9 @@ let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let get_minimal_nanotez_per_byte config = config.minimal_nanotez_per_byte
 
+let with_minimal_nanotez_per_byte minimal_nanotez_per_byte config =
+  {config with minimal_nanotez_per_byte}
+
 let managers_quota =
   Stdlib.List.nth Main.validation_passes Operation_repr.manager_pass
 

@@ -206,6 +206,8 @@ let start_public_server (type f) ~(mode : f Mode.t)
                   ~mode
                   ~keep_alive:config.keep_alive
                   ~timeout:config.rpc_timeout)
+             ~get_da_fee_per_byte_nanotez:
+               Prevalidator.get_da_fee_per_byte_nanotez
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
         let*! runtimes = Evm_ro_context.list_runtimes ro_ctxt in
         match runtimes with
