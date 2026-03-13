@@ -407,12 +407,11 @@ let make (ctxt : Evm_ro_context.t) =
       let* number = shell_block_param_to_block_number block in
       Evm_ro_context.tezosx_nth_block_hash ctxt (Z.of_int32 number)
 
-    let simulate_operation ~chain_id:_ ~skip_signature:_
-        (op : Tezlink_imports.SeouLo_context.packed_operation) hash _block =
-      let open Lwt_result_syntax in
-      let op = op.protocol_data in
-      let*? mock_result =
-        Tezlink_mock.Operation_metadata.operation_metadata hash op
-      in
-      return mock_result
+    let simulate_operation ~chain_id:_ ~skip_signature op hash _block =
+      Simulator.TezosX.simulate_operation
+        ctxt
+        ~skip_signature
+        op
+        hash
+        (Block_parameter Latest)
   end : Tezlink_backend_sig.S)

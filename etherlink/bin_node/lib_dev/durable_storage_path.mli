@@ -67,6 +67,13 @@ module Single_tx : sig
   val input_tx : path
 end
 
+(** Kernel communication canal for Tezos X operation simulation *)
+module Tezosx_simulation : sig
+  val input : path
+
+  val result : path
+end
+
 (** Kernel communication canal for block assembling (instant confirmations) *)
 module Assemble_block : sig
   val input : path

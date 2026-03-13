@@ -32,6 +32,9 @@ type error += Rlp_decoding_error of string
 (** An RLP value is either a bytes value, or a list of RLP values. *)
 type item = Value of bytes | List of item list
 
+(** [encode_bool b] encodes a boolean as a single byte (0x01 for [true], 0x00 for [false]). *)
+val encode_bool : bool -> bytes
+
 (** [encode_int i] encodes an integer in big endian in its smallest representation. *)
 val encode_int : int -> bytes
 
