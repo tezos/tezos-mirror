@@ -14842,6 +14842,7 @@ let test_xtz_deposit_watchtower_with_fa_whitelist =
      whitelist topic filter would prevent XTZ deposit logs (which have no
      indexed ticket_hash/proxy topics) from being returned by getLogs,
      so the watchtower would never see or claim them. *)
+  let rpc_port = Port.fresh () in
   let* _watchtower =
     let config =
       Watchtower.
@@ -14849,7 +14850,7 @@ let test_xtz_deposit_watchtower_with_fa_whitelist =
           evm_node_endpoint = Evm_node.endpoint sequencer;
           gas_limit = None;
           max_fee_per_gas = None;
-          rpc = None;
+          rpc = Some {addr = "127.0.0.1"; port = rpc_port};
           secret_key = Some whale.private_key;
           whitelist = Some [{proxy; ticket_hashes = None}];
         }
@@ -14895,6 +14896,20 @@ let test_xtz_deposit_watchtower_with_fa_whitelist =
     ~error_msg:
       "Expected balance of %R after watchtower claim, got %L wei (XTZ deposit \
        was likely not seen due to whitelist topic filter)" ;
+  (* Also verify the deposit appears in GET /deposits?receiver=... — this
+     exercises the list_by_receiver query which had the same whitelist JOIN
+     bug as get_unclaimed. *)
+  let* deposits_json =
+    let url =
+      sf "http://127.0.0.1:%d/deposits?receiver=%s" rpc_port eip7702_contract
+    in
+    Curl.get_raw ~name:"watchtower_get_deposits" url |> Runnable.run
+  in
+  let deposits = JSON.parse ~origin:"watchtower_get_deposits" deposits_json in
+  Check.((JSON.as_list deposits |> List.length = 1) int)
+    ~error_msg:
+      "Expected 1 deposit in GET /deposits?receiver=..., got %L (XTZ deposit \
+       was likely excluded by whitelist JOIN in list_by_receiver query)" ;
   unit
 
 let test_evm_events_cleanup () =
