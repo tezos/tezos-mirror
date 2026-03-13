@@ -29,8 +29,6 @@ module Protocol_types = struct
 
     type t = Imported_context.Level.t
 
-    let encoding = Imported_context.Level.encoding
-
     (** The sole purpose of this encoding is to reflect as closely as possible
           the encoding of Alpha_context.Level.t, so it can be used to convert to
           that type, with a serialization pass. This is necessary only because
@@ -60,22 +58,32 @@ module Protocol_types = struct
            (req "cycle_position" int32)
            (req "expected_commitment" bool))
 
-    let convert : level -> t tzresult =
+    let convert_tallin : level -> TALLiN_context.Level.t tzresult =
       Tezos_types.convert_using_serialization
         ~name:"level"
-        ~dst:encoding
+        ~dst:TALLiN_context.Level.encoding
+        ~src:conversion_encoding
+
+    let convert_seoulo : level -> SeouLo_context.Level.t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"level"
+        ~dst:SeouLo_context.Level.encoding
+        ~src:conversion_encoding
+
+    let convert : level -> Imported_context.Level.t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"level"
+        ~dst:Imported_context.Level.encoding
         ~src:conversion_encoding
   end
 
   module Counter = struct
     type t = Imported_context.Manager_counter.t
 
-    let encoding = Imported_context.Manager_counter.encoding_for_RPCs
-
     let of_z : Z.t -> t tzresult =
       Tezos_types.convert_using_serialization
         ~name:"counter"
-        ~dst:encoding
+        ~dst:Imported_context.Manager_counter.encoding_for_RPCs
         ~src:Data_encoding.n
   end
 end
@@ -112,6 +120,53 @@ module type Tezlink_block_service = sig
     bytes -> (Operation_hash.t * Operation.shell_header * bytes) list tzresult
 end
 
+let voting_period ~cycles_per_voting_period ~position ~level_info =
+  let open Tezos_types in
+  (* There's a certain amount of cycle in each period, to get the index
+     of the current, we just divide the current number of cycle by the
+     number of cycle for a period (floor div) *)
+  let index = Int32.div level_info.cycle cycles_per_voting_period in
+  (* The start_position can be determined based on the current position
+     given in parameter. *)
+  let start_position = Int32.(sub (sub level_info.level 1l) position) in
+  Voting_period.
+    {index; kind = Imported_context.Voting_period.Proposal; start_position}
+
+let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info =
+  let open Tezos_types in
+  let open Result_syntax in
+  (* The number of cycles in the current period is the remainder of the
+     Euclidean division between the current cycle index the number of
+     cycles in a voting period. *)
+  let number_of_cycle_in_period =
+    Int32.rem level_info.cycle cycles_per_voting_period
+  in
+  (* During a voting period, the position parameter is the number of block
+     produced since the beginning of the period. We can deduce it based on
+     the number of cycles in the current period. *)
+  let position =
+    Int32.(
+      add
+        (mul number_of_cycle_in_period block_per_cycle)
+        level_info.cycle_position)
+  in
+  let* voting_period =
+    Tezos_types.convert_using_serialization
+      ~name:"voting_period"
+      ~src:Tezlink_mock.Voting_period.encoding
+      ~dst:Imported_context.Voting_period.encoding
+      (voting_period ~cycles_per_voting_period ~position ~level_info)
+  in
+  (* The number of block remaining is deducted from the current position
+     and the number of cycles needed to complete a period. *)
+  let remaining =
+    Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
+  in
+  let voting_period_info =
+    Imported_context.Voting_period.{voting_period; position; remaining}
+  in
+  return voting_period_info
+
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Tezlink_SeouLo_protocol = struct
   include SeouLo_protocol
@@ -143,51 +198,6 @@ module Tezlink_SeouLo_protocol = struct
       ~src:Block_header_repr.protocol_data_encoding
       mock_protocol_data
 
-  let voting_period ~cycles_per_voting_period ~position ~level_info =
-    let open Tezos_types in
-    (* There's a certain amount of cycle in each period, to get the index
-       of the current, we just divide the current number of cycle by the
-       number of cycle for a period (floor div) *)
-    let index = Int32.div level_info.cycle cycles_per_voting_period in
-    (* The start_position can be determined based on the current position
-       given in parameter. *)
-    let start_position = Int32.(sub (sub level_info.level 1l) position) in
-    Voting_period.
-      {index; kind = SeouLo_context.Voting_period.Proposal; start_position}
-
-  let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
-      =
-    let open Tezos_types in
-    let open Result_syntax in
-    (* The number of cycles in the current period is the remainder of the
-       Euclidean division between the current cycle index the number of
-       cycles in a voting period. *)
-    let number_of_cycle_in_period =
-      Int32.rem level_info.cycle cycles_per_voting_period
-    in
-    (* During a voting period, the position parameter is the number of block
-       produced since the beginning of the period. We can deduce it based on
-       the number of cycles in the current period. *)
-    let position =
-      Int32.(
-        add
-          (mul number_of_cycle_in_period block_per_cycle)
-          level_info.cycle_position)
-    in
-    let* voting_period =
-      Voting_period.convert
-        (voting_period ~cycles_per_voting_period ~position ~level_info)
-    in
-    (* The number of block remaining is deducted from the current position
-       and the number of cycles needed to complete a period. *)
-    let remaining =
-      Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
-    in
-    let voting_period_info =
-      SeouLo_context.Voting_period.{voting_period; position; remaining}
-    in
-    return voting_period_info
-
   let mock_block_header_metadata level_info =
     let open Apply_results in
     let open Result_syntax in
@@ -200,7 +210,7 @@ module Tezlink_SeouLo_protocol = struct
     in
     let balance_updates =
       let amount = SeouLo_context.Tez.of_mutez_exn 0L in
-      Tezlink_mock.balance_udpdate_rewards
+      Tezlink_mock.seoulo_balance_udpdate_rewards
         ~baker:Tezlink_mock.baker_account.pkh
         ~amount
     in
@@ -212,7 +222,7 @@ module Tezlink_SeouLo_protocol = struct
         ~cycles_per_voting_period:constant.cycles_per_voting_period
         ~level_info
     in
-    let* level_info = Protocol_types.Level.convert level_info in
+    let* level_info = Protocol_types.Level.convert_seoulo level_info in
     return
       {
         proposer;
@@ -270,42 +280,28 @@ module Tezlink_TALLiN_protocol = struct
           consensus_pkh = Tezlink_mock.baker_account.pkh;
         }
     in
-    let* balance_updates =
-      let amount = SeouLo_context.Tez.of_mutez_exn 0L in
-      let seoul_balance_update =
-        Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.baker_account.pkh
-          ~amount
-      in
-      Tezos_types.convert_using_serialization
-        ~name:"Tallinn balance updates"
-        ~src:SeouLo_context.Receipt.balance_updates_encoding
-        ~dst:TALLiN_context.Receipt.balance_updates_encoding
-        seoul_balance_update
+    let balance_updates =
+      let amount = TALLiN_context.Tez.of_mutez_exn 0L in
+      Tezlink_mock.tallin_balance_udpdate_rewards
+        ~baker:Tezlink_mock.baker_account.pkh
+        ~amount
     in
 
     let constant = Tezlink_constants.all_constants.parametric in
     let* voting_period_info =
-      let* seoul_period_info =
-        Tezlink_SeouLo_protocol.voting_period_info
+      let* imported_protocol_period_info =
+        voting_period_info
           ~block_per_cycle:constant.blocks_per_cycle
           ~cycles_per_voting_period:constant.cycles_per_voting_period
           ~level_info
       in
       Tezos_types.convert_using_serialization
         ~name:"Tallinn period info"
-        ~src:SeouLo_context.Voting_period.info_encoding
+        ~src:Imported_context.Voting_period.info_encoding
         ~dst:TALLiN_context.Voting_period.info_encoding
-        seoul_period_info
+        imported_protocol_period_info
     in
-    let* level_info =
-      let* level_info = Protocol_types.Level.convert level_info in
-      Tezos_types.convert_using_serialization
-        ~name:"Tallinn level info"
-        ~src:SeouLo_context.Level.encoding
-        ~dst:TALLiN_context.Level.encoding
-        level_info
-    in
+    let* level_info = Protocol_types.Level.convert_tallin level_info in
     return
       {
         proposer;

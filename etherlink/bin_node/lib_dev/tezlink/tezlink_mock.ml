@@ -419,17 +419,23 @@ module Voting_period = struct
                respect to the first level of the Alpha family of protocols."
             "start_position"
             int32))
-
-  let convert =
-    Tezos_types.convert_using_serialization
-      ~name:"voting_period_info"
-      ~src:encoding
-      ~dst:Imported_context.Voting_period.encoding
 end
 
-let balance_udpdate_rewards ~(baker : Imported_context.public_key_hash) ~amount
-    =
-  let open Imported_context.Receipt in
+let seoulo_balance_udpdate_rewards ~(baker : SeouLo_context.public_key_hash)
+    ~amount =
+  let open SeouLo_context.Receipt in
+  let debited_rewards =
+    item Baking_rewards (Debited amount) Block_application
+  in
+  let baker = frozen_baker baker in
+  let credited_rewards =
+    item (Deposits baker) (Credited amount) Block_application
+  in
+  [debited_rewards; credited_rewards]
+
+let tallin_balance_udpdate_rewards ~(baker : TALLiN_context.public_key_hash)
+    ~amount =
+  let open TALLiN_context.Receipt in
   let debited_rewards =
     item Baking_rewards (Debited amount) Block_application
   in
