@@ -103,7 +103,51 @@ let check_commitment_published cctxt address commitment =
      in
      return_unit
 
-let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
+let first_available_level ~data_dir store =
+  let open Lwt_result_syntax in
+  let* first_available_level = Store.State.Last_gc_target.get store in
+  match first_available_level with
+  | Some first_available_level -> return first_available_level
+  | None -> (
+      let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+      match metadata with
+      | None -> failwith "No metadata (needs rollup genesis info)."
+      | Some {genesis_info = {level; _}; _} -> return level)
+
+let resolve_snapshot_level (store : _ Store.t) ~(head : Sc_rollup_block.t)
+    ~first_available_level (level : Cli.snapshot_level) =
+  let open Lwt_result_syntax in
+  let head_level = head.header.level in
+  match level with
+  | Head -> return head_level
+  | Finalized -> (
+      let* finalized = Store.L2_blocks.find_finalized store in
+      match finalized with
+      | Some b -> return b.header.level
+      | None ->
+          failwith "No finalized block in the store, cannot use 'finalized'.")
+  | Cemented -> (
+      let* lcc = Store.State.LCC.get store in
+      match lcc with
+      | Some (_, lcc_level) -> return lcc_level
+      | None ->
+          failwith "No cemented commitment in the store, cannot use 'cemented'."
+      )
+  | Level l ->
+      if l > head_level then
+        failwith
+          "Requested level %ld is higher than the head level %ld."
+          l
+          head_level
+      else if l < first_available_level then
+        failwith
+          "Requested level %ld is below the first available level %ld."
+          l
+          first_available_level
+      else return l
+
+let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
+    =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir data_dir in
   let context_dir = Configuration.default_context_dir data_dir in
@@ -118,9 +162,23 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
   let*? () = Context.Version.check metadata.context_version in
   let* store = Store.init Read_only ~data_dir in
   let* head = get_head store in
-  let level = head.Sc_rollup_block.header.level in
+  let head_level = head.Sc_rollup_block.header.level in
+  (* Resolve the target level for the snapshot *)
+  let* first_avail = first_available_level ~data_dir store in
+  let* target_level =
+    resolve_snapshot_level store ~head ~first_available_level:first_avail level
+  in
+  (* Get the block at the target level to use for the snapshot header *)
+  let* target_block =
+    if target_level = head_level then return head
+    else
+      let* block = Store.L2_blocks.find_by_level store target_level in
+      match block with
+      | Some b -> return b
+      | None -> failwith "No block found at target level %ld." target_level
+  in
   let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_level_with_store store level
+    Protocol_plugins.proto_plugin_for_level_with_store store target_level
   in
   let (module C) = Plugin.Pvm.context metadata.kind in
   let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
@@ -130,9 +188,9 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
     | None -> error_with "No history mode information in %S." data_dir
     | Some h -> Ok h
   in
-  let* head = check_head head context in
+  let* target_block = check_head target_block context in
   let last_commitment_hash =
-    Sc_rollup_block.most_recent_commitment head.header
+    Sc_rollup_block.most_recent_commitment target_block.header
   in
   let* () =
     unless no_checks @@ fun () ->
@@ -156,20 +214,9 @@ let pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir =
       Header.version = V0;
       history_mode;
       address = metadata.rollup_address;
-      head_level = head.header.level;
+      head_level = target_block.header.level;
       last_commitment = last_commitment_hash;
     }
-
-let first_available_level ~data_dir store =
-  let open Lwt_result_syntax in
-  let* first_available_level = Store.State.Last_gc_target.get store in
-  match first_available_level with
-  | Some first_available_level -> return first_available_level
-  | None -> (
-      let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-      match metadata with
-      | None -> failwith "No metadata (needs rollup genesis info)."
-      | Some {genesis_info = {level; _}; _} -> return level)
 
 let check_some hash what = function
   | Some x -> Ok x
@@ -716,7 +763,7 @@ let lock_all ~data_dir ~rollup_node_endpoint =
   return unlock
 
 let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
-    ~filename =
+    ~filename ?at_level () =
   let open Lwt_result_syntax in
   let* snapshot_file =
     let dest_file_name =
@@ -764,7 +811,7 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
       in
       Lwt_utils_unix.with_tempdir "rollup_node_sqlite_export_" @@ fun tmp_dir ->
       let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
-      let* () = Store.export_store ~data_dir ~output_db_file () in
+      let* () = Store.export_store ~data_dir ~output_db_file ?at_level () in
       let files = (output_db_file, Store.sqlite_file_name) :: files in
       let writer =
         match compression with
@@ -795,23 +842,32 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
   return snapshot_file
 
 let export ?rollup_node_endpoint cctxt ~no_checks ~compression ~data_dir ~dest
-    ~filename =
+    ~filename ~level =
   let open Lwt_result_syntax in
   let* unlock = lock_all ~data_dir ~rollup_node_endpoint in
   let* snapshot_header =
-    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
+    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
   in
   let* snapshot_file =
-    export_dir snapshot_header ~unlock ~compression ~data_dir ~dest ~filename
+    export_dir
+      snapshot_header
+      ~unlock
+      ~compression
+      ~data_dir
+      ~dest
+      ~filename
+      ~at_level:snapshot_header.head_level
+      ()
   in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
 
-let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
+let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename
+    ~level =
   let open Lwt_result_syntax in
   let* unlock = lock_processing ~data_dir in
   let* snapshot_header =
-    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir
+    pre_export_checks_and_get_snapshot_header cctxt ~no_checks ~data_dir ~level
   in
   Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
   let tmp_context_dir = Configuration.default_context_dir tmp_dir in
@@ -824,10 +880,9 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     | None -> error_with "No rollup node metadata in %S." data_dir
     | Some m -> Ok m
   in
-  let* head = get_head store in
-  let level = head.Sc_rollup_block.header.level in
+  let target_level = snapshot_header.head_level in
   let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_level_with_store store level
+    Protocol_plugins.proto_plugin_for_level_with_store store target_level
   in
   let (module C) = Plugin.Pvm.context metadata.kind in
   let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
@@ -859,7 +914,13 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
       Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
   let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
-  let* () = Store.export_store ~data_dir ~output_db_file () in
+  let* () =
+    Store.export_store
+      ~data_dir
+      ~output_db_file
+      ~at_level:snapshot_header.head_level
+      ()
+  in
   copy_file "metadata" ;
   copy_dir "storage" ;
   copy_dir "wasm_2_0_0" ;
@@ -879,6 +940,7 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
     ~data_dir:tmp_dir
     ~dest
     ~filename
+    ()
 
 let pre_import_checks cctxt ~no_checks ~data_dir (snapshot_header : Header.t) =
   let open Lwt_result_syntax in

@@ -533,7 +533,8 @@ let export_snapshot
       compress_on_the_fly,
       uncompressed,
       compact,
-      rollup_node_endpoint ) filename (cctxt : Client_context.full) =
+      rollup_node_endpoint,
+      level ) filename (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let*! compression =
     match (compress_on_the_fly, uncompressed) with
@@ -552,6 +553,7 @@ let export_snapshot
         ~data_dir
         ~dest
         ~filename
+        ~level
     else
       Snapshots.export
         ?rollup_node_endpoint
@@ -561,6 +563,7 @@ let export_snapshot
         ~data_dir
         ~dest
         ~filename
+        ~level
   in
   let*! () = cctxt#message "Snapshot exported to %s@." snapshot_file in
   return_unit
@@ -570,14 +573,15 @@ let export_snapshot_auto_name =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state."
-    (args7
+    (args8
        data_dir_arg
        Cli.snapshot_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
        Cli.compact
-       Cli.rollup_node_endpoint_arg)
+       Cli.rollup_node_endpoint_arg
+       Cli.snapshot_level_arg)
     (prefixes ["snapshot"; "export"] @@ stop)
     (fun params cctxt -> export_snapshot params None cctxt)
 
@@ -586,20 +590,22 @@ let export_snapshot_named =
   command
     ~group
     ~desc:"Export a snapshot of the rollup node state to a given file."
-    (args6
+    (args7
        data_dir_arg
        Cli.no_checks_arg
        Cli.compress_on_the_fly_arg
        Cli.uncompressed
        Cli.compact
-       Cli.rollup_node_endpoint_arg)
+       Cli.rollup_node_endpoint_arg
+       Cli.snapshot_level_arg)
     (prefixes ["snapshot"; "export"] @@ Cli.snapshot_file_param @@ stop)
     (fun ( data_dir,
            no_checks,
            compress_on_the_fly,
            uncompressed,
            compact,
-           rollup_node_endpoint )
+           rollup_node_endpoint,
+           level )
          filename
          cctxt
        ->
@@ -610,7 +616,8 @@ let export_snapshot_named =
           compress_on_the_fly,
           uncompressed,
           compact,
-          rollup_node_endpoint )
+          rollup_node_endpoint,
+          level )
         (Some filename)
         cctxt)
 
