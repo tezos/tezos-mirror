@@ -10,6 +10,11 @@ pub enum Protocol {
 
 pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::S023;
 
+/// The first protocol to support the `next_protocol` field in block
+/// headers. Used as the default when decoding headers from kernels
+/// that predate this field.
+pub const INITIAL_PROTOCOL: Protocol = Protocol::S023;
+
 impl rlp::Encodable for Protocol {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         let val = *self as u8;

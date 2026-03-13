@@ -34,7 +34,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_rlp, store_read_slice, store_rlp};
 use tezos_tezlink::block::TezBlock;
-use tezos_tezlink::protocol::Protocol;
+use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -426,11 +426,19 @@ impl Encodable for TezBlockHeader {
 
 impl Decodable for TezBlockHeader {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 2)?;
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        let item_count = decoder.item_count()?;
         let mut it = decoder.iter();
         let hash = decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
-        let next_protocol: Protocol =
-            decode_field(&rlp_helpers::next(&mut it)?, "protocol")?;
+        let next_protocol: Protocol = match item_count {
+            // V0 format: only hash, default next_protocol to INITIAL_PROTOCOL
+            1 => INITIAL_PROTOCOL,
+            // V1 format: hash + next_protocol
+            2 => decode_field(&rlp_helpers::next(&mut it)?, "protocol")?,
+            _ => return Err(DecoderError::RlpIncorrectListLen),
+        };
         Ok(Self {
             hash,
             next_protocol,
