@@ -726,7 +726,7 @@ mod tests {
         );
         assert_eq!(
             serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(),
-            "500000000000000"
+            "0.0005"
         );
     }
 

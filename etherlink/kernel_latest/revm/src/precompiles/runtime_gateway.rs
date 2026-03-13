@@ -9,7 +9,7 @@ use revm::{
 };
 use tezos_data_encoding::nom::NomReader;
 use tezos_protocol::contract::Contract;
-use tezosx_interfaces::headers::format_tez_from_wei;
+use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
     gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
     X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
@@ -127,11 +127,11 @@ fn inject_tezos_headers(
         .map_err(|_| CustomPrecompileError::Revert("invalid source alias".to_string()))?
         .to_string();
     headers.insert(X_TEZOS_SOURCE, parse_value(&source_alias)?);
-    // Convert alloy U256 (wei) to primitive_types U256 for the shared formatter.
-    let amount_pt = primitive_types::U256(amount.into_limbs());
+    // The amount is already in mutez; format it as a TEZ decimal string.
+    let amount_mutez = amount.as_limbs()[0];
     headers.insert(
         X_TEZOS_AMOUNT,
-        parse_value(&format_tez_from_wei(amount_pt))?,
+        parse_value(&format_tez_from_mutez(amount_mutez))?,
     );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
@@ -187,7 +187,12 @@ where
 
             // Resolve cross-runtime aliases and inject context headers
             let tx_caller = context.tx().caller();
-            let gas_limit = inputs.gas_limit;
+            // Convert EVM gas to Tezos milligas for the target runtime
+            let gas_limit =
+                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, inputs.gas_limit)
+                    .ok_or(CustomPrecompileError::Revert(
+                        "transfer: EVM gas limit overflows Tezos milligas".into(),
+                    ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let sender_alias = context
@@ -264,7 +269,12 @@ where
 
             // Resolve cross-runtime aliases and inject context headers
             let tx_caller = context.tx().caller();
-            let gas_limit = inputs.gas_limit;
+            // Convert EVM gas to Tezos milligas for the target runtime
+            let gas_limit =
+                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, inputs.gas_limit)
+                    .ok_or(CustomPrecompileError::Revert(
+                        "callMichelson: EVM gas limit overflows Tezos milligas".into(),
+                    ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let sender_alias = context
@@ -609,7 +619,7 @@ mod tests {
                 .unwrap()
                 .to_str()
                 .unwrap(),
-            "0.000000000042"
+            "42"
         );
         assert_eq!(
             request

@@ -508,27 +508,6 @@ mod tests {
             .unwrap()
     }
 
-    /// Fund an address with the given balance.
-    fn fund_address(
-        host: &mut MockKernelHost,
-        address: &Address,
-        balance: revm::primitives::U256,
-    ) {
-        let mut account = StorageAccount::from_address(address).unwrap();
-        account
-            .set_info(
-                host,
-                AccountInfo {
-                    balance,
-                    nonce: 0,
-                    code_hash: revm::primitives::B256::ZERO,
-                    account_id: None,
-                    code: None,
-                },
-            )
-            .unwrap();
-    }
-
     #[test]
     fn test_serve_simple_transfer() {
         let mut host = MockKernelHost::default();
@@ -538,8 +517,9 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        // Fund sender so the EVM can debit the transfer
-        fund_address(&mut host, &sender, revm::primitives::U256::from(5));
+        // No need to fund the sender: serve() credits the sender with
+        // the transfer amount (the calling runtime already debited it).
+        let five_tez_wei = revm::primitives::U256::from(5_000_000_000_000_000_000u128);
 
         let mut journal = TezosXJournal::new();
         let request = build_serve_request(&sender, &destination, "5", vec![]);
@@ -548,10 +528,10 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), http::StatusCode::OK);
 
-        // Verify destination received the transfer
+        // Verify destination received the transfer (5 TEZ in wei)
         let destination_account = StorageAccount::from_address(&destination).unwrap();
         let info = destination_account.info(&mut host).unwrap();
-        assert_eq!(info.balance, revm::primitives::U256::from(5));
+        assert_eq!(info.balance, five_tez_wei);
     }
 
     #[test]
@@ -643,20 +623,21 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
 
         // Contract stored CALLVALUE at slot 0 — verify it saw the real value
+        // "42" TEZ = 42 * 10^18 wei
+        let forty_two_tez_wei =
+            revm::primitives::U256::from(42_000_000_000_000_000_000u128);
         let stored_value = contract_account
             .get_storage(&host, &revm::primitives::U256::ZERO)
             .unwrap();
         assert_eq!(
-            stored_value,
-            revm::primitives::U256::from(42),
-            "Contract should see msg.value = 42"
+            stored_value, forty_two_tez_wei,
+            "Contract should see msg.value = 42 TEZ in wei"
         );
 
         // Contract received the transfer
         let contract_info = contract_account.info(&mut host).unwrap();
         assert_eq!(
-            contract_info.balance,
-            revm::primitives::U256::from(42),
+            contract_info.balance, forty_two_tez_wei,
             "Contract should hold the transferred value"
         );
 

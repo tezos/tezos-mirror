@@ -706,12 +706,12 @@ mod test {
                     })?;
                 let to = self.address_from_string(address_str)?;
 
-                // Parse the amount from the X-Tezos-Amount header (in mutez)
+                // Parse the amount from the X-Tezos-Amount header (TEZ decimal → mutez)
                 let amount = request
                     .headers()
                     .get(tezosx_interfaces::X_TEZOS_AMOUNT)
                     .and_then(|v| v.to_str().ok())
-                    .and_then(|s| s.parse::<u64>().ok())
+                    .and_then(|s| tezosx_interfaces::headers::parse_tez_to_mutez(s).ok())
                     .unwrap_or(0);
 
                 // Store the balance for the destination address

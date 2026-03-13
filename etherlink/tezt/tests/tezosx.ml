@@ -1349,7 +1349,7 @@ let erc20_wrapper_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb"
     with optional [~counter] (default 1) and [~fee] (default 1000), then
     sent through the delayed inbox and baked until the rollup is synced. *)
 let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
-    ?(counter = 1) ?(fee = 1000) ?call
+    ?(counter = 1) ?(fee = 1000) ?(gas_limit = 100_000) ?call
     Tezt_etherlink.Setup.
       {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
   let transfer_amount_mutez = Tez.to_mutez transfer_amount in
@@ -1378,6 +1378,7 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
         [
           make
             ~fee
+            ~gas_limit
             ~counter
             ~source
             (call
