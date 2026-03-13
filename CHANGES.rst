@@ -160,6 +160,13 @@ Smart Rollup node
   directly from the store, avoiding expensive context checkouts. This includes
   a migration of the SQL database. (MR :gl:`!21016`)
 
+- Added a ``--level`` option to snapshot export and import commands. For export,
+  it controls the last level included in the snapshot (defaults to
+  ``finalized``). For import, it allows importing a snapshot at an earlier level
+  than provided by the snapshot. This fixes snapshot imports failing when the L2
+  head in the snapshot is on a branch that was reorganized on L1. (MR
+  :gl:`!21201`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
