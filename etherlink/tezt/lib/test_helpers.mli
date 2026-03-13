@@ -377,6 +377,7 @@ val register_sandbox :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?websockets:bool ->
   ?sequencer_keys:Account.key list ->
+  ?regression:bool ->
   ?with_runtimes:Tezosx_runtime.t list ->
   (Evm_node.t -> unit Lwt.t) ->
   unit

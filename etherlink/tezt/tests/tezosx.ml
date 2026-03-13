@@ -2950,6 +2950,37 @@ let test_call_from_michelson_to_evm ~runtime () =
       ~error_msg:"Expected EVM storage slot 0 = %R but got %L") ;
   unit
 
+(** Test the Tezos X simulation on a Tezos operation. For now, the simulation
+    simply transmits 42 to the kernel which increments it; the node injects the
+    returned integer in a balance update.
+    TODO https://linear.app/tezos/issue/L2-895: adjust regression when plugging
+    the actual simulation results. *)
+let test_tezosx_simulation () =
+  Setup.register_sandbox_test
+    ~regression:true
+    ~uses_client:true
+    ~title:"Tezos operation simulation in Tezos X"
+    ~tags:["simulation"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sandbox ->
+  let* client = tezos_client sandbox in
+  let amount = Tez.of_int 1 in
+  let giver = Constant.bootstrap1.public_key_hash in
+  let receiver = Constant.bootstrap2.public_key_hash in
+  let hooks =
+    let replacements =
+      ("edsig\\w{94}", "[SIGNATURE]")
+      :: ("\\w{250,}", "[SERIALIZED_OPERATION]")
+      :: Tezos_regression.replacements
+    in
+    Tezos_regression.hooks_custom
+      ~replace_variables:(fun s ->
+        Tezos_regression.replace_variables ~replacements s)
+      ()
+  in
+  Client.transfer ~hooks ~log_requests:true ~amount ~giver ~receiver client
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -2987,4 +3018,5 @@ let () =
   test_instant_confirmations ~runtime:Tezos () ;
   test_nested_crac [Alpha] ;
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
-  test_call_from_michelson_to_evm ~runtime:Tezos ()
+  test_call_from_michelson_to_evm ~runtime:Tezos () ;
+  test_tezosx_simulation ()
