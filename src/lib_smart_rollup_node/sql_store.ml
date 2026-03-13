@@ -448,6 +448,12 @@ module Commitments = struct
       DELETE FROM commitments WHERE inbox_level < ?
       |sql}
 
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM commitments WHERE inbox_level > ?
+      |sql}
+
     let lcc =
       (unit ->? commitment) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -488,6 +494,10 @@ module Commitments = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Commitments_published_at_levels = struct
@@ -539,6 +549,13 @@ module Commitments_published_at_levels = struct
       DELETE FROM commitments_published_at_levels
       WHERE first_published_at_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM commitments_published_at_levels
+      WHERE first_published_at_level > ?
+      |sql}
   end
 
   let register ?conn store commitment levels =
@@ -556,6 +573,10 @@ module Commitments_published_at_levels = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Inboxes = struct
@@ -594,6 +615,12 @@ module Inboxes = struct
       @@ {sql|
       DELETE FROM inboxes WHERE inbox_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM inboxes WHERE inbox_level > ?
+      |sql}
   end
 
   let store ?conn store inbox =
@@ -614,6 +641,10 @@ module Inboxes = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Messages = struct
@@ -645,6 +676,12 @@ module Messages = struct
       @@ {sql|
       DELETE FROM messages WHERE inbox_level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM messages WHERE inbox_level > ?
+      |sql}
   end
 
   let store ?conn store ~level payload_hashes_hash messages =
@@ -658,6 +695,10 @@ module Messages = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Outbox_messages = struct
@@ -714,6 +755,12 @@ module Outbox_messages = struct
       SET executed_messages = $2
       WHERE outbox_level = $1
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM outbox_messages WHERE outbox_level > ?
+      |sql}
   end
 
   let pending ?conn store ~min_level ~max_level =
@@ -749,6 +796,10 @@ module Outbox_messages = struct
     | Some executed_messages ->
         let*? executed_messages = Bitset.add executed_messages index in
         Sqlite.Db.exec conn Q.update_executed (outbox_level, executed_messages)
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Protocols = struct
@@ -878,6 +929,12 @@ module Dal_slots_headers = struct
       WHERE block_hash = ?
       ORDER BY slot_index DESC
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM dal_slots_headers WHERE published_level > ?
+      |sql}
   end
 
   let store ?conn store block slot_header =
@@ -895,6 +952,10 @@ module Dal_slots_headers = struct
   let list_slot_indexes ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_indexes block
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module Dal_slots_statuses = struct
@@ -933,6 +994,13 @@ module Dal_slots_statuses = struct
       WHERE block_hash = ?
       ORDER BY slot_index DESC
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM dal_slots_statuses
+      WHERE block_hash IN (SELECT block_hash FROM l2_blocks WHERE level > ?)
+      |sql}
   end
 
   let store ?conn store block slot_index slot_status =
@@ -946,6 +1014,10 @@ module Dal_slots_statuses = struct
   let list_slot_statuses ?conn store block =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.rev_collect_list conn Q.select_slot_statuses block
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module L2_levels = struct
@@ -975,6 +1047,12 @@ module L2_levels = struct
       @@ {sql|
       DELETE FROM l2_levels WHERE level < ?
       |sql}
+
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM l2_levels WHERE level > ?
+      |sql}
   end
 
   let store ?conn store level block =
@@ -988,6 +1066,10 @@ module L2_levels = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 end
 
 module L2_blocks = struct
@@ -1153,6 +1235,12 @@ module L2_blocks = struct
       DELETE FROM l2_blocks WHERE level < ?
       |sql}
 
+    let delete_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      DELETE FROM l2_blocks WHERE level > ?
+      |sql}
+
     let get_pvm_status =
       (block_hash ->? pvm_status) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -1217,6 +1305,10 @@ module L2_blocks = struct
   let delete_before ?conn store ~level =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.exec conn Q.delete_before level
+
+  let delete_after ?conn store ~level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.exec conn Q.delete_after level
 
   let find_pvm_status ?conn store block_hash =
     with_connection store conn @@ fun conn ->
@@ -1444,6 +1536,80 @@ let gc store ~level =
     return_unit
   in
   let*! () = Events.(emit finish_gc) () in
+  return_unit
+
+let reset_to_level store ~level =
+  let open Lwt_result_syntax in
+  Sqlite.use store @@ fun conn ->
+  Sqlite.with_transaction conn @@ fun conn ->
+  (* Update head to point to the block at the target level *)
+  let* block = L2_blocks.find_by_level ~conn store level in
+  let* block =
+    match block with
+    | Some b -> return b
+    | None -> failwith "No block found at level %ld." level
+  in
+  let* () =
+    State.L2_head.set ~conn store (block.header.block_hash, block.header.level)
+  in
+  let* () =
+    (* Set finalized level to target if it's after it *)
+    let* finalized = State.Finalized_level.get ~conn store in
+    match finalized with
+    | Some (_, finalized_level) when finalized_level > level ->
+        State.Finalized_level.set ~conn store (block.header.block_hash, level)
+    | _ -> return_unit
+  in
+  let most_recent_commitment_hash =
+    Sc_rollup_block.most_recent_commitment block.header
+  in
+  let* most_recent_commitment =
+    Commitments.find ~conn store most_recent_commitment_hash
+  in
+  let* most_recent_commitment =
+    match most_recent_commitment with
+    | Some c -> return c
+    | None ->
+        failwith
+          "No commitment found for hash %a."
+          Commitment.Hash.pp
+          most_recent_commitment_hash
+  in
+  let* () =
+    let* lcc = State.LCC.get ~conn store in
+    match lcc with
+    | Some (_, lcc_level) when lcc_level > level ->
+        (* Set LCC to last known commitment *)
+        State.LCC.set
+          ~conn
+          store
+          (most_recent_commitment_hash, most_recent_commitment.inbox_level)
+    | _ -> return_unit
+  in
+  (* Not useful for snapshots because it's removed but make reset_to_level
+     correct for other uses. *)
+  let* () =
+    let* lpc = State.LPC.get ~conn store in
+    match lpc with
+    | Some (_, lpc_level) when lpc_level > level ->
+        (* Set LPC to last known commitment *)
+        State.LPC.set
+          ~conn
+          store
+          (most_recent_commitment_hash, most_recent_commitment.inbox_level)
+    | _ -> return_unit
+  in
+  (* Delete DAL statuses before L2_blocks because the query uses a subquery on
+     l2_blocks to resolve block hashes to levels. *)
+  let* () = Dal_slots_statuses.delete_after ~conn store ~level in
+  let* () = Dal_slots_headers.delete_after ~conn store ~level in
+  let* () = Inboxes.delete_after ~conn store ~level in
+  let* () = Messages.delete_after ~conn store ~level in
+  let* () = Commitments_published_at_levels.delete_after ~conn store ~level in
+  let* () = Commitments.delete_after ~conn store ~level in
+  let* () = Outbox_messages.delete_after ~conn store ~level in
+  let* () = L2_blocks.delete_after ~conn store ~level in
+  let* () = L2_levels.delete_after ~conn store ~level in
   return_unit
 
 let export_store ~data_dir ~output_db_file =

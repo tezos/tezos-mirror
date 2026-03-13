@@ -34,6 +34,12 @@ val readonly : _ t -> ro
     (by removing information from the database). *)
 val gc : rw -> level:int32 -> unit tzresult Lwt.t
 
+(** [reset_to_level store ~level] deletes all data that relate to levels
+    strictly after [level] (by removing information from the database). It also
+    updates the L2 head and finalized level to point to the block at [level] if
+    they refer to levels after [level]. *)
+val reset_to_level : rw -> level:int32 -> unit tzresult Lwt.t
+
 (** [export_store ~data_dir ~output_db_file] exports the store database with
     data from the [data_dir] into the [output_db_file]. This function also
     removes data that is specific to the operator. This function is meant to be
