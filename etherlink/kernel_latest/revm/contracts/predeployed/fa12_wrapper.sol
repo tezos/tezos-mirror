@@ -63,7 +63,7 @@ contract FA12Wrapper {
     ) internal {
         (bool success, ) = RUNTIME_GATEWAY.call(
             abi.encodeWithSignature(
-                "call(string,string,bytes)",
+                "callMichelson(string,string,bytes)",
                 tokenAddress,
                 entrypoint,
                 params

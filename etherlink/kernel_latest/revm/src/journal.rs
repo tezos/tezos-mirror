@@ -26,17 +26,15 @@ use std::vec::Vec;
 use tezosx_journal::TezosXJournal;
 
 use crate::database::EtherlinkVMDB;
-use crate::helpers::legacy::alloy_to_u256;
 use crate::tezosx::{get_alias, store_alias};
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
     DatabasePrecompileStateChanges, FaDepositWithProxy, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
-use tezos_ethereum::wei::mutez_from_wei;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
+use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
 
 /// A journal of state changes internal to the EVM
 ///
@@ -549,13 +547,6 @@ pub trait CrossRuntimeCall {
         source: Address,
     ) -> Result<Vec<u8>, CustomPrecompileError>;
 
-    fn tezosx_call_michelson(
-        &mut self,
-        source: Address,
-        destination: &str,
-        amount: U256,
-        data: &[u8],
-    ) -> Result<(), CustomPrecompileError>;
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
@@ -596,63 +587,6 @@ where
                 store_alias(self.database.host, &source, RuntimeId::Tezos, &alias)?;
                 Ok(alias)
             }
-        }
-    }
-
-    fn tezosx_call_michelson(
-        &mut self,
-        source: Address,
-        destination: &str,
-        amount: U256,
-        data: &[u8],
-    ) -> Result<(), CustomPrecompileError> {
-        let alias = self.tezosx_resolve_source_alias(source)?;
-        let context = CrossRuntimeContext {
-            gas_limit: self.database.block.gas_limit,
-            timestamp: self.database.block.timestamp,
-            block_number: self.database.block.number,
-        };
-        let destination_contract = self
-            .database
-            .registry
-            .address_from_string(destination, RuntimeId::Tezos)
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!(
-                    "Failed to get destination contract address from string: {e:?}"
-                ))
-            })?;
-        let result = self
-            .database
-            .registry
-            .bridge(
-                self.database.host,
-                self.journal,
-                RuntimeId::Tezos,
-                &destination_contract,
-                &alias,
-                primitive_types::U256::from(
-                    mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
-                        CustomPrecompileError::Revert(format!(
-                            "Failed to convert amount from wei to mutez: {e:?}"
-                        ))
-                    })?,
-                ),
-                data,
-                context,
-            )
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!("Cross-runtime call failed: {e:?}"))
-            })?;
-        match result {
-            CrossCallResult::Success(_) => Ok(()),
-            CrossCallResult::Revert(data) => Err(CustomPrecompileError::Revert(format!(
-                "EVM Cross-runtime call reverted: {}",
-                hex::encode(&data)
-            ))),
-            CrossCallResult::Halt(data) => Err(CustomPrecompileError::Revert(format!(
-                "EVM Cross-runtime call halted: {}",
-                hex::encode(&data)
-            ))),
         }
     }
 

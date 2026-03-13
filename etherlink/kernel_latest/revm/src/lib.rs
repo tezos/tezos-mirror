@@ -519,8 +519,8 @@ mod test {
         };
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
-            CrossCallResult, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
-            RuntimeInterface, TezosXRuntimeError,
+            CrossRuntimeContext, Registry as RegistryTrait, RuntimeId, RuntimeInterface,
+            TezosXRuntimeError,
         };
         use tezosx_journal::TezosXJournal;
 
@@ -558,37 +558,6 @@ mod test {
         }
 
         impl RegistryTrait for Registry {
-            fn bridge<Host>(
-                &self,
-                host: &mut Host,
-                journal: &mut TezosXJournal,
-                destination_runtime: RuntimeId,
-                destination_address: &[u8],
-                source_address: &[u8],
-                amount: primitive_types::U256,
-                data: &[u8],
-                context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError>
-            where
-                Host: StorageV1 + Logging,
-            {
-                match destination_runtime {
-                    RuntimeId::Tezos => self.mock_tezos.call(
-                        self,
-                        host,
-                        journal,
-                        source_address,
-                        destination_address,
-                        amount,
-                        data,
-                        context,
-                    ),
-                    RuntimeId::Ethereum => {
-                        Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
-                    }
-                }
-            }
-
             fn generate_alias<Host>(
                 &self,
                 host: &mut Host,
@@ -633,14 +602,28 @@ mod test {
 
             fn serve<Host>(
                 &self,
-                _host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _request: http::Request<Vec<u8>>,
+                host: &mut Host,
+                journal: &mut TezosXJournal,
+                request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
-                unimplemented!("not needed for this test")
+                match request.uri().host() {
+                    Some("tezos") | Some("stub") => {
+                        self.mock_tezos.serve(self, host, journal, request)
+                    }
+                    unknown => Ok(http::Response::builder()
+                        .status(http::StatusCode::NOT_FOUND)
+                        .body(
+                            format!(
+                                "No runtime handles host: {}",
+                                unknown.unwrap_or("(none)")
+                            )
+                            .into_bytes(),
+                        )
+                        .unwrap()),
+                }
             }
         }
 
@@ -703,24 +686,40 @@ mod test {
                 Ok(alias)
             }
 
-            fn call<Host: StorageV1>(
+            fn serve<Host>(
                 &self,
                 _registry: &impl RegistryTrait,
                 host: &mut Host,
                 _journal: &mut TezosXJournal,
-                _from: &[u8],
-                to: &[u8],
-                amount: primitive_types::U256,
-                _data: &[u8],
-                _context: CrossRuntimeContext,
-            ) -> Result<CrossCallResult, TezosXRuntimeError> {
+                request: http::Request<Vec<u8>>,
+            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            where
+                Host: StorageV1 + Logging,
+            {
+                // Parse the destination address from the URL path
+                let path = request.uri().path();
+                let address_str = path
+                    .strip_prefix('/')
+                    .and_then(|rest| rest.split('/').next())
+                    .ok_or_else(|| {
+                        TezosXRuntimeError::Custom("Missing address in URL".to_string())
+                    })?;
+                let to = self.address_from_string(address_str)?;
+
+                // Parse the amount from the X-Tezos-Amount header (TEZ decimal → mutez)
+                let amount = request
+                    .headers()
+                    .get(tezosx_interfaces::X_TEZOS_AMOUNT)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| tezosx_interfaces::headers::parse_tez_to_mutez(s).ok())
+                    .unwrap_or(0);
+
                 // Store the balance for the destination address
-                let address_hex = hex::encode(to);
+                let address_hex = hex::encode(&to);
                 let path = OwnedPath::try_from(format!("/{address_hex}"))
                     .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
                 let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
 
-                // Read existing balance
                 let current_balance = match host.store_read_all(&full_path) {
                     Ok(bytes) if bytes.len() == 32 => {
                         primitive_types::U256::from_little_endian(&bytes)
@@ -728,29 +727,19 @@ mod test {
                     _ => primitive_types::U256::zero(),
                 };
 
-                // Add amount and store
-                let new_balance =
-                    current_balance.checked_add(amount).ok_or_else(|| {
+                let new_balance = current_balance
+                    .checked_add(primitive_types::U256::from(amount))
+                    .ok_or_else(|| {
                         TezosXRuntimeError::Custom("Balance overflow".to_string())
                     })?;
                 let mut balance_bytes = [0u8; 32];
                 new_balance.to_little_endian(&mut balance_bytes);
                 host.store_write_all(&full_path, &balance_bytes)?;
 
-                Ok(CrossCallResult::Success(vec![]))
-            }
-
-            fn serve<Host>(
-                &self,
-                _registry: &impl RegistryTrait,
-                _host: &mut Host,
-                _journal: &mut TezosXJournal,
-                _request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
-            where
-                Host: StorageV1 + Logging,
-            {
-                todo!("MockTezosRuntime::serve")
+                Ok(http::Response::builder()
+                    .status(http::StatusCode::OK)
+                    .body(Vec::new())
+                    .unwrap())
             }
 
             fn host(&self) -> &'static str {
@@ -998,12 +987,11 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
-        // Create a mock implicit address string for the test
-        let implicit_address =
-            String::from_utf8(alias.clone()).unwrap_or_else(|_| hex::encode(&alias));
+        // Create a mock implicit address string for the test (hex-encoded for URL safety)
+        let implicit_address = hex::encode(&alias);
 
         let calldata = RuntimeGatewayCalls::transfer(transferCall {
-            implicitAddress: implicit_address,
+            implicitAddress: implicit_address.clone(),
         })
         .abi_encode();
 
@@ -1036,7 +1024,11 @@ mod test {
             }
         }
         let balance = registry
-            .get_balance(&mut host, &alias, tezosx_interfaces::RuntimeId::Tezos)
+            .get_balance(
+                &mut host,
+                implicit_address.as_bytes(),
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
             .unwrap();
         assert_eq!(balance, primitive_types::U256::from(5));
 

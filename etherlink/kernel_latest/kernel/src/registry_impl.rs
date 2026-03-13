@@ -23,49 +23,11 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
-use tezosx_interfaces::{CrossCallResult, Registry, RuntimeInterface};
+use tezosx_interfaces::{Registry, RuntimeInterface};
 use tezosx_journal::TezosXJournal;
 use tezosx_tezos_runtime::TezosRuntime;
 
 impl Registry for RegistryImpl {
-    fn bridge<Host>(
-        &self,
-        host: &mut Host,
-        journal: &mut TezosXJournal,
-        destination_runtime: tezosx_interfaces::RuntimeId,
-        destination_address: &[u8],
-        source_address: &[u8],
-        amount: U256,
-        data: &[u8],
-        context: tezosx_interfaces::CrossRuntimeContext,
-    ) -> Result<CrossCallResult, tezosx_interfaces::TezosXRuntimeError>
-    where
-        Host: StorageV1 + Logging,
-    {
-        match destination_runtime {
-            tezosx_interfaces::RuntimeId::Tezos => self.tezos.call(
-                self,
-                host,
-                journal,
-                source_address,
-                destination_address,
-                amount,
-                data,
-                context,
-            ),
-            tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.call(
-                self,
-                host,
-                journal,
-                source_address,
-                destination_address,
-                amount,
-                data,
-                context,
-            ),
-        }
-    }
-
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
@@ -135,6 +97,7 @@ impl Registry for RegistryImpl {
 mod tests {
     use super::*;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_journal::TezosXJournal;
 
     #[test]
     fn test_serve_unknown_host_returns_404() {

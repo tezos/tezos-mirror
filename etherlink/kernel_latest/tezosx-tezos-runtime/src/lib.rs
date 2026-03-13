@@ -9,11 +9,7 @@ use std::collections::BTreeMap;
 use tezos_crypto_rs::{
     blake2b, hash::ChainId, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
 };
-use tezos_data_encoding::{
-    enc::BinWriter,
-    nom::NomReader,
-    types::{Narith, Zarith},
-};
+use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 use tezos_evm_logging::Logging;
 use tezos_execution::{
     account_storage::TezlinkAccount,
@@ -23,18 +19,15 @@ use tezos_execution::{
     OriginationNonce, TezlinkOperationGas,
 };
 use tezos_protocol::contract::Contract;
-use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
+use tezos_smart_rollup::types::PublicKeyHash;
 use tezos_smart_rollup_host::storage::StorageV1;
 // `Parameters` could come from `tezos_protocol::operation`, but we also need
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
 // to be moved to a shared crate.
-use tezos_protocol::entrypoint::Entrypoint;
-use tezos_tezlink::{
-    enc_wrappers::BlockNumber, operation::Parameters, operation_result::TransferSuccess,
-};
+use tezos_tezlink::{operation::Parameters, operation_result::TransferSuccess};
 use tezosx_interfaces::{
-    CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
+    CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
     X_TEZOS_GAS_CONSUMED,
 };
 use tezosx_journal::TezosXJournal;
@@ -54,37 +47,6 @@ pub mod account;
 pub mod context;
 pub mod headers;
 pub mod url;
-
-/// Decode cross-runtime call data into Michelson [`Parameters`].
-///
-/// Format: `[2 bytes: entrypoint name length (big-endian)][entrypoint UTF-8][Micheline bytes]`.
-/// Empty data yields [`Parameters::default()`] (the `default` entrypoint with
-/// unit value).
-fn decode_cross_runtime_parameters(
-    data: &[u8],
-) -> Result<Parameters, TezosXRuntimeError> {
-    if data.is_empty() {
-        return Ok(Parameters::default());
-    }
-    if data.len() < 2 {
-        return Err(TezosXRuntimeError::Custom(
-            "Cross-runtime call data too short: missing entrypoint length".into(),
-        ));
-    }
-    let ep_len = u16::from_be_bytes([data[0], data[1]]) as usize;
-    if data.len() < 2 + ep_len {
-        return Err(TezosXRuntimeError::Custom(
-            "Cross-runtime call data too short: entrypoint truncated".into(),
-        ));
-    }
-    let ep_str = std::str::from_utf8(&data[2..2 + ep_len]).map_err(|_| {
-        TezosXRuntimeError::Custom("Invalid UTF-8 in entrypoint name".into())
-    })?;
-    let entrypoint = Entrypoint::try_from(ep_str)
-        .map_err(|e| TezosXRuntimeError::Custom(format!("Invalid entrypoint: {e}")))?;
-    let value = data[2 + ep_len..].to_vec();
-    Ok(Parameters { entrypoint, value })
-}
 
 /// Build an HTTP response from the result of [`execute_request`].
 ///
@@ -157,9 +119,18 @@ where
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
 
+    let body = request.into_body();
+    // An empty body means "no parameters" which defaults to Micheline Unit.
+    // This is required for implicit account transfers where the Michelson VM
+    // checks that param == Unit.
+    let value = if body.is_empty() {
+        mir::ast::micheline::Micheline::from(()).encode()
+    } else {
+        body
+    };
     let parameters = Parameters {
         entrypoint: parsed.entrypoint,
-        value: request.into_body(),
+        value,
     };
 
     let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
@@ -247,127 +218,6 @@ impl RuntimeInterface for TezosRuntime {
     /// debited by the calling runtime (e.g. EVM gateway). This handles both
     /// implicit and originated destinations, including Michelson code execution
     /// and internal operations.
-    fn call<Host>(
-        &self,
-        registry: &impl Registry,
-        host: &mut Host,
-        journal: &mut TezosXJournal,
-        from: &[u8],
-        to: &[u8],
-        amount: U256,
-        data: &[u8],
-        cross_ctx: CrossRuntimeContext,
-    ) -> Result<CrossCallResult, TezosXRuntimeError>
-    where
-        Host: StorageV1 + Logging,
-    {
-        let dest = Contract::nom_read_exact(to).map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Failed to decode address from bytes: {e:?}"
-            ))
-        })?;
-        let amount_u64: u64 = amount.try_into().map_err(|_| {
-            TezosXRuntimeError::ConversionError("Amount exceeds u64::MAX".to_string())
-        })?;
-        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
-
-        // Decode the sender's KT1 alias from `from` (binary-encoded Contract).
-        // In cross-runtime calls the EVM gateway provides the KT1 alias of the
-        // calling EVM address so that Michelson SENDER returns the right value.
-        let sender_account = Contract::nom_read_exact(from)
-            .map_err(|e| {
-                TezosXRuntimeError::ConversionError(format!(
-                    "Failed to decode sender address from bytes: {e:?}"
-                ))
-            })
-            .and_then(|c| {
-                context.originated_from_contract(&c).map_err(|e| {
-                    TezosXRuntimeError::Custom(format!(
-                        "Failed to fetch sender originated account: {e:?}"
-                    ))
-                })
-            })?;
-
-        // FIXME: We use the Tezos null address as source because the alias of
-        // the 0x EVM source account is a KT1, and Michelson doesn't allow KT1
-        // as a source. If the original call was emitted from Michelson (i.e. it
-        // hit EVM before re-entering the Michelson runtime), we might want to
-        // retrieve the original tz source in the future.
-        let source_account = context
-            .implicit_from_public_key_hash(
-                &PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
-                    TezosXRuntimeError::ConversionError(format!(
-                        "Failed to parse null address: {e}"
-                    ))
-                })?,
-            )
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!("Failed to fetch zero account: {e:?}"))
-            })?;
-
-        // FIXME: The following values are placeholders. A cross-runtime call
-        // does not yet carry the real operation/block context. To fix, thread
-        // the actual values through RuntimeInterface::call:
-        //   - gas_limit (currently MAX_LIMIT)
-        //   - next_temporary_id for big maps (currently 0)
-        //   - chain_id (currently zeros)
-        //   - operation hash, origination nonce, counter (currently zeros)
-
-        let mut gas = TezlinkOperationGas::start(&Narith(
-            // MAX_LIMIT is in milligas; `start` expects gas units, hence / 1000.
-            (TezlinkOperationGas::MAX_LIMIT / 1000).into(),
-        ))
-        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to start gas: {e:?}")))?;
-        let mut next_temp_id = BigMapId {
-            value: Zarith(0.into()),
-        };
-        let mut tc_ctx = TcCtx {
-            host,
-            context: &context,
-            operation_gas: &mut gas,
-            big_map_diff: BTreeMap::new(),
-            next_temporary_id: &mut next_temp_id,
-        };
-        let level = BlockNumber {
-            block_number: cross_ctx.block_number.try_into().map_err(|_| {
-                TezosXRuntimeError::ConversionError(
-                    "block_number exceeds u32::MAX".to_string(),
-                )
-            })?,
-        };
-        let now = Timestamp::from(i64::try_from(cross_ctx.timestamp).map_err(|_| {
-            TezosXRuntimeError::ConversionError("timestamp exceeds i64::MAX".to_string())
-        })?);
-        let chain_id = ChainId::try_from_bytes(&[0u8; 4]).unwrap();
-        let mut nonce = OriginationNonce::initial(OperationHash::default());
-        let mut counter = 0u128;
-        let mut operation_ctx = OperationCtx {
-            source: &source_account,
-            origination_nonce: &mut nonce,
-            counter: &mut counter,
-            level: &level,
-            now: &now,
-            chain_id: &chain_id,
-        };
-        let parser = mir::parser::Parser::new();
-        let parameters = decode_cross_runtime_parameters(data)?;
-        let amount = Narith(amount_u64.into());
-        match cross_runtime_transfer(
-            &mut tc_ctx,
-            &mut operation_ctx,
-            registry,
-            journal,
-            &sender_account,
-            &amount,
-            &dest,
-            &parameters,
-            &parser,
-        ) {
-            Ok(_) => Ok(CrossCallResult::Success(vec![])),
-            Err(e) => Ok(CrossCallResult::Revert(format!("{e}").into_bytes())),
-        }
-    }
-
     fn serve<Host>(
         &self,
         registry: &impl Registry,
@@ -450,6 +300,8 @@ impl TezosRuntime {
 
 #[cfg(test)]
 mod tests {
+    use tezos_data_encoding::types::Narith;
+
     use super::*;
 
     fn make_success(storage: Option<Vec<u8>>) -> TransferSuccess {

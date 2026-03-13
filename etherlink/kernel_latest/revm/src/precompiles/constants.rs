@@ -53,9 +53,9 @@ pub const ALWAYS_REVERT_SOL_CONTRACT: PredeployedContract = PredeployedContract 
 pub const FA12_WRAPPER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
     code: include_bytes!("../../contracts/predeployed/fa12_wrapper.bin"),
     code_hash: FixedBytes::new([
-        0x0d, 0x9d, 0xbd, 0xb4, 0xb4, 0x40, 0x09, 0x1f, 0x0a, 0x11, 0x0c, 0x01, 0x27,
-        0x87, 0xe9, 0xb6, 0xe3, 0x98, 0x07, 0x19, 0x88, 0x33, 0x1a, 0x7b, 0x21, 0x56,
-        0x43, 0xe0, 0xd1, 0x68, 0xa2, 0xac,
+        0x04, 0xc9, 0xf7, 0xcb, 0x31, 0x9c, 0x77, 0x7b, 0x28, 0x6b, 0x99, 0x83, 0x9c,
+        0x35, 0x7e, 0x32, 0x63, 0x23, 0x78, 0x1a, 0x1b, 0x85, 0x1b, 0x78, 0x04, 0x0e,
+        0xbd, 0x71, 0x52, 0x40, 0xd4, 0xec,
     ]),
 };
 
@@ -180,8 +180,8 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 // TODO Define the cost: https://linear.app/tezos/issue/L2-662/define-cost-of-precompile-gateway-on-ethereum
 pub(crate) const RUNTIME_GATEWAY_TRANSFER_BASE_COST: u64 = 1_000;
 
-// TODO Define the cost for httpCall
-pub(crate) const RUNTIME_GATEWAY_HTTP_CALL_BASE_COST: u64 = 1_000;
+// TODO Define the cost for call (cross-runtime HTTP call)
+pub(crate) const RUNTIME_GATEWAY_CALL_BASE_COST: u64 = 1_000;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
