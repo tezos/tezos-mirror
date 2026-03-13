@@ -58,7 +58,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as tickets_send_with_tez.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[PUBLIC_KEY_HASH]"'
 Node is bootstrapped.
@@ -111,7 +111,7 @@ This sequence of operations was run:
             Account updates:
               [PUBLIC_KEY_HASH] ... +1
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup get ticket balance for bootstrap1 with ticketer '[CONTRACT_HASH]' and type string and content '"Ticket"'
 1

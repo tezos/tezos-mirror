@@ -48,7 +48,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as proxy.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none originate contract source transferring 0 from bootstrap1 running michelson_test_scripts/opcodes/source.tz --init '"[PUBLIC_KEY_HASH]"' --burn-cap 10 --force
 Node is bootstrapped.
@@ -93,7 +93,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as source.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
@@ -124,7 +124,7 @@ This sequence of operations was run:
       Storage size: 65 bytes
       Consumed gas: 1280.402
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
 "[PUBLIC_KEY_HASH]"
@@ -168,7 +168,7 @@ This sequence of operations was run:
           Storage size: 65 bytes
           Consumed gas: 1211.737
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
 "[PUBLIC_KEY_HASH]"
