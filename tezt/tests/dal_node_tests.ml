@@ -1917,7 +1917,12 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
               cryptobox available (expected 404)
        C.11 - Try future level (expected 404)
        C.12 - Try out-of-bounds slot index (expected 404)
-       C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
+       C.3 - Fetch via L1 skip list after removing sqlite DB: commitment found
+             via L1 fallback but slot not in backup archives (expected 404)
+       C.13 - Observer DAL node (no local sqlite skip list) uses L1 skip list
+              fallback for commitment verification and successfully fetches slot 3
+              from archive3 (untampered); contrast with C.3 which returns 404
+              because archive1/archive2 don't hold slot 3
 
     The same test can be triggered by requesting shards instead of slots.
 *)
@@ -2036,6 +2041,23 @@ let dal_slots_retrievability =
         l1_node
     in
 
+    (* Observer node: never writes skip list cells to SQLite (observer profile
+       does not support refutations).  Points its backup URI at archive3 so it
+       can fetch slot 3 once the L1 fallback supplies the commitment.
+       archive1 and archive2 are tampered by C.6 and C.7 respectively, so
+       archive3 (untouched) is the only reliable source. *)
+    let* observer_dal =
+      let dal_node = Dal_node.create ~name:"observer_dal" ~node:l1_node () in
+      let* () =
+        Dal_node.init_config
+          ~observer_profiles:[3]
+          ~slots_backup_uris:[archive3]
+          dal_node
+      in
+      let* () = Dal_node.run ~event_level:`Notice dal_node ~wait_ready:true in
+      return dal_node
+    in
+
     (* B. SLOT PUBLICATION *)
     let* start_level = Node.get_level l1_node in
     let published_level = start_level + 1 in
@@ -2066,6 +2088,7 @@ let dal_slots_retrievability =
              valid_dal_fetcher_3_trusted;
              invalid_dal_fetcher_bad_uri;
              invalid_dal_fetcher_bad_uri_trusted;
+             observer_dal;
            ]
     in
     let* () = bake_for ~count:attestation_lag client in
@@ -2229,9 +2252,11 @@ let dal_slots_retrievability =
       |> fetch_404_expected ~__LOC__
     in
 
-    (* C.3 Remove sqlite DB and fetch via L1 skip list *)
+    (* C.3 Remove sqlite DB: L1 fallback finds the commitment for slot 3 but
+       the backup archives (archive1, archive2) don't hold it — expect 404. *)
     let* () =
-      Log.info "C.3: L1 skip list" ;
+      Log.info
+        "C.3: L1 skip list fallback — commitment found, slot not in archives" ;
       let skip_db =
         Format.sprintf "%s/store/skip_list_store"
         @@ Dal_node.data_dir valid_dal_fetcher_1_2
@@ -2240,9 +2265,20 @@ let dal_slots_retrievability =
       let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
       let* () = Dal_node.run valid_dal_fetcher_1_2 in
       get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:3
-      |> fetch_500_expected
-           ~__LOC__
-           ~expected_error:"No_commitment_found_for_slot_id"
+      |> fetch_404_expected ~__LOC__
+    in
+
+    (* C.13 Observer DAL node uses L1 skip list fallback for commitment
+       verification: observer profile never populates the local SQLite skip
+       list, so the commitment for slot 3 must be retrieved from L1.  The
+       backup URI (archive3) holds the slot bytes, so the fetch succeeds.
+       Contrast with C.3: same slot 3, but valid_dal_fetcher_1_2 only has
+       archive1/archive2 so it gets 404; observer_dal has archive3 so it
+       gets 200. *)
+    let* () =
+      Log.info "C.13: observer L1 skip list fallback — fetch succeeds" ;
+      get_slot_rpc observer_dal ~published_level ~slot_index:3
+      |> fetch_succeeded ~__LOC__
     in
 
     unit
