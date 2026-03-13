@@ -85,7 +85,7 @@ let get_manager_operation_gas_and_fee (contents : packed_contents_list) =
 type fee_parameter = {
   minimal_fees : Tez.t;
   minimal_nanotez_per_byte : Q.t option;
-  minimal_nanotez_per_gas_unit : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t option;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;
@@ -106,12 +106,13 @@ let fetch_mempool_config (rpc_ctxt : Tezos_rpc.Context.simple) ~chain =
   | Error _ -> return_none
 
 (** [resolve_fee_parameter_from_mempool cctxt ~chain fee_parameter] resolves
-    [minimal_nanotez_per_byte] based on the following priority:
-    1. User-provided value via [--minimal-nanotez-per-byte] ([Some _])
+    [minimal_nanotez_per_byte] and [minimal_nanotez_per_gas_unit] based on
+    the following priority:
+    1. User-provided value via the corresponding CLI flag ([Some _])
     2. Value from the node's mempool filter RPC ([GET .../mempool/filter])
-    3. Hardcoded default (1000 nanotez/byte)
+    3. Hardcoded default (1000 nanotez/byte, 100 nanotez/gas_unit)
 
-    After this call, [minimal_nanotez_per_byte] is always [Some _].
+    After this call, both fields are always [Some _].
 
     A warning is emitted when the RPC fails and the default is used. This
     is why [cctxt] is [#Protocol_client_context.full] rather than
@@ -119,28 +120,67 @@ let fetch_mempool_config (rpc_ctxt : Tezos_rpc.Context.simple) ~chain =
 let resolve_fee_parameter_from_mempool (cctxt : #Protocol_client_context.full)
     ~chain fee_parameter =
   let open Lwt_result_syntax in
-  match fee_parameter.minimal_nanotez_per_byte with
-  | Some _ -> return fee_parameter
-  | None ->
+  match
+    ( fee_parameter.minimal_nanotez_per_byte,
+      fee_parameter.minimal_nanotez_per_gas_unit )
+  with
+  | Some _, Some _ -> return fee_parameter
+  | _ ->
       let*! fetched =
         fetch_mempool_config (cctxt :> Tezos_rpc.Context.simple) ~chain
       in
-      let* nanotez_per_byte =
-        match fetched with
-        | Some config ->
-            return (Plugin.Mempool.get_minimal_nanotez_per_byte config)
+      let nanotez_per_byte =
+        match fee_parameter.minimal_nanotez_per_byte with
+        | Some v -> v
         | None ->
-            let*! () =
-              cctxt#warning
-                "Failed to fetch minimal_nanotez_per_byte from the node's \
-                 mempool filter RPC. Using default value (%a nanotez/byte)."
-                Q.pp_print
-                Plugin.Mempool.default_minimal_nanotez_per_byte
+            Option.fold
+              ~none:Plugin.Mempool.default_minimal_nanotez_per_byte
+              ~some:Plugin.Mempool.get_minimal_nanotez_per_byte
+              fetched
+      in
+      let nanotez_per_gas =
+        match fee_parameter.minimal_nanotez_per_gas_unit with
+        | Some v -> v
+        | None ->
+            Option.fold
+              ~none:Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+              ~some:Plugin.Mempool.get_minimal_nanotez_per_gas_unit
+              fetched
+      in
+      let*! () =
+        match fetched with
+        | Some _ -> Lwt.return_unit
+        | None ->
+            let defaulted =
+              (if Option.is_none fee_parameter.minimal_nanotez_per_byte then
+                 [
+                   Format.asprintf
+                     "%a nanotez/byte"
+                     Q.pp_print
+                     Plugin.Mempool.default_minimal_nanotez_per_byte;
+                 ]
+               else [])
+              @
+              if Option.is_none fee_parameter.minimal_nanotez_per_gas_unit then
+                [
+                  Format.asprintf
+                    "%a nanotez/gas_unit"
+                    Q.pp_print
+                    Plugin.Mempool.default_minimal_nanotez_per_gas_unit;
+                ]
+              else []
             in
-            return Plugin.Mempool.default_minimal_nanotez_per_byte
+            cctxt#warning
+              "Failed to fetch mempool filter configuration from the node's \
+               RPC. Using defaults: %s."
+              (String.concat ", " defaulted)
       in
       return
-        {fee_parameter with minimal_nanotez_per_byte = Some nanotez_per_byte}
+        {
+          fee_parameter with
+          minimal_nanotez_per_byte = Some nanotez_per_byte;
+          minimal_nanotez_per_gas_unit = Some nanotez_per_gas;
+        }
 
 (* Rounding up (see Z.cdiv) *)
 let z_mutez_of_q_nanotez (ntz : Q.t) =
@@ -184,13 +224,17 @@ let check_fees : type t.
               (Q.of_int 1000)
           in
           let minimal_fees_for_gas_in_nanotez =
+            (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+               default if called before resolution. *)
             Q.mul
-              config.minimal_nanotez_per_gas_unit
+              (Option.value
+                 ~default:Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+                 config.minimal_nanotez_per_gas_unit)
               (Q.of_bigint (Gas.Arith.integral_to_z gas))
           in
           let minimal_fees_for_size_in_nanotez =
-            (* minimal_nanotez_per_byte is guaranteed to be [Some] after
-               [resolve_fee_parameter_from_mempool]. *)
+            (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+               default if called before resolution. *)
             Q.mul
               (Option.value
                  ~default:Plugin.Mempool.default_minimal_nanotez_per_byte
@@ -862,8 +906,12 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
              (Q.of_int 1000)
          in
          let minimal_fees_for_gas_in_nanotez =
+           (* [Some] after [resolve_fee_parameter_from_mempool]; uses
+              default if called before resolution. *)
            Q.mul
-             fee_parameter.minimal_nanotez_per_gas_unit
+             (Option.value
+                ~default:Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+                fee_parameter.minimal_nanotez_per_gas_unit)
              (Q.of_bigint @@ Gas.Arith.integral_to_z c.gas_limit)
          in
          let minimal_fees_for_size_in_nanotez =
