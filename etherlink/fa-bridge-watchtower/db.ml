@@ -375,12 +375,13 @@ module Deposits = struct
       SELECT
        d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      where d.exec_transactionHash IS NULL
+      WHERE d.exec_transactionHash IS NULL
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC
       |sql}
 
@@ -400,16 +401,17 @@ module Deposits = struct
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      where exec_transactionHash IS NULL
+      WHERE d.exec_transactionHash IS NULL
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC
       |sql}
 
@@ -430,17 +432,18 @@ module Deposits = struct
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed,
-       exec_transactionHash, exec_transactionIndex, exec_blockHash,
-       exec_blockNumber
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed,
+       d.exec_transactionHash, d.exec_transactionIndex, d.exec_blockHash,
+       d.exec_blockNumber
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
+      WHERE (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
 
@@ -462,18 +465,19 @@ module Deposits = struct
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
-       log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
-       log_blockNumber, log_removed,
-       exec_transactionHash, exec_transactionIndex, exec_blockHash,
-       exec_blockNumber
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit,
+       d.log_transactionHash, d.log_transactionIndex, d.log_logIndex,
+       d.log_blockHash, d.log_blockNumber, d.log_removed,
+       d.exec_transactionHash, d.exec_transactionIndex, d.exec_blockHash,
+       d.exec_blockNumber
       FROM deposits d
-      JOIN whitelist w
-      ON (
-       (d.proxy = w.proxy or w.proxy IS NULL)
-       AND
-       (d.ticket_hash = w.ticket_hash or w.ticket_hash IS NULL))
-      WHERE receiver = ?
+      WHERE d.receiver = ?
+      AND (
+       d.native_deposit = 1
+       OR EXISTS (
+        SELECT 1 FROM whitelist w
+        WHERE (d.proxy = w.proxy OR w.proxy IS NULL)
+        AND (d.ticket_hash = w.ticket_hash OR w.ticket_hash IS NULL)))
       ORDER BY nonce DESC LIMIT ? OFFSET ?
       |sql}
 

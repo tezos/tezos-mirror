@@ -555,11 +555,13 @@ module Deposit = struct
       kecack_topic "QueuedDeposit(uint256,uint256,address,uint256,uint256)"
   end
 
-  let filter ~addresses whitelist =
+  let fa_filter whitelist =
     mk_filter
-      addresses
-      [Dionysus.fa_topic; Farfadet.fa_topic; FarfadetR2.xtz_topic]
+      [Address.fa_bridge]
+      [Dionysus.fa_topic; Farfadet.fa_topic]
       whitelist
+
+  let xtz_filter = mk_filter [Address.xtz_bridge] [FarfadetR2.xtz_topic] None
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
@@ -791,44 +793,52 @@ let lwt_stream_iter_es_with_timeout ~timeout f stream =
     @param ctx Context with websocket client
     @param block Block number in which to look for log events
 *)
+let query_logs ctx ~block filter =
+  Websocket_client.send_jsonrpc
+    ?timeout:ctx.rpc_timeout
+    ctx.ws_client
+    (Call
+       ( (module Rpc_encodings.Get_logs),
+         Ethereum_types.Filter.
+           {
+             from_block = Some (Number block);
+             to_block = Some (Number block);
+             address = Some (Vec filter.Filter_helpers.address);
+             topics = Some filter.Filter_helpers.topics;
+             block_hash = None;
+           } ))
+
 let rec get_logs ?(n = 1) ctx ~block =
   let open Lwt_result_syntax in
-  (* Query logs for the specified block range *)
-  let filter =
-    Deposit.filter ~addresses:Address.bridge_addresses ctx.whitelist
-  in
-  let*! logs =
-    Websocket_client.send_jsonrpc
-      ?timeout:ctx.rpc_timeout
-      ctx.ws_client
-      (Call
-         ( (module Rpc_encodings.Get_logs),
-           Ethereum_types.Filter.
-             {
-               from_block = Some (Number block);
-               to_block = Some (Number block);
-               address = Some (Vec Address.bridge_addresses);
-               topics = Some filter.topics;
-               block_hash = None;
-             } ))
-  in
-  match logs with
-  | Ok logs ->
-      (* Process each log in the range *)
+  let fa_filter = Deposit.fa_filter ctx.whitelist in
+  let xtz_filter = Deposit.xtz_filter in
+  let*! fa_logs = query_logs ctx ~block fa_filter in
+  let*! xtz_logs = query_logs ctx ~block xtz_filter in
+  (* Regarding the following pattern matching, we do not
+     handle each logs seperatly on purpose because if one
+     fails we will crash anyway. *)
+  match (fa_logs, xtz_logs) with
+  | Ok fa, Ok xtz ->
+      let logs = fa @ xtz in
       List.iter_es
         (fun log -> handle_one_log ctx (Ethereum_types.decode_pre log))
         logs
-  | Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
+  | Error (Filter_helpers.Too_many_logs {limit} :: _ as e), _
+  | _, Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
       (* If we're querying a single block and it has too many logs, this is a
          fatal error - the node's max_nb_logs config needs to be increased *)
       fail (TzTrace.cons (Too_many_deposits_in_one_block {block; limit}) e)
-  | Error _ when n < 10 ->
+  | (Error _, _ | _, Error _) when n < 10 ->
       (* It's possible for the `getLogs` request to fail if the receipt has not
          been stored yet. We retry at most 10 times to allow for the node to
          compute it. *)
+      (* TODO: the retry logic should ideally live inside [query_logs] so that
+         each RPC call is retried independently rather than retrying both queries
+         when only one fails. *)
       let*! () = Lwt_unix.sleep (0.1 *. float n) in
       get_logs ~n:(n + 1) ctx ~block
-  | Error e -> fail e
+  | Error e1, Error e2 -> fail (TzTrace.conp e1 e2)
+  | Error e, _ | _, Error e -> fail e
 
 let claim_fa_selector =
   (Efunc_core.Evm.method_id ~name:"claim" [`uint 256] :> string)
