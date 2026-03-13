@@ -10,7 +10,10 @@
 //! using the inbox and a specific message.
 
 use crate::{delayed_inbox::DelayedInbox, sub_block, transaction::Transaction};
-use tezos_ethereum::rlp_helpers::FromRlpBytes;
+use rlp::{Rlp, RlpStream};
+use tezos_ethereum::rlp_helpers::{
+    append_u64_le, decode_field_bool, decode_field_u64_le, next, FromRlpBytes,
+};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::KernelHost;
 use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
@@ -19,6 +22,9 @@ use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 
 const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/__delayed_input");
+
+const TEZOSX_SIMULATION_INPUT: RefPath = RefPath::assert_from(b"/__simulation/input");
+const TEZOSX_SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/__simulation/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
@@ -121,5 +127,72 @@ where
         Err(err) => {
             log!(host, Error, "Error while assembling block: {:?}", err);
         }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+pub extern "C" fn tezosx_simulate() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    tezosx_simulate_fn(&mut sdk_host);
+}
+
+#[allow(dead_code)]
+pub fn tezosx_simulate_fn<Host>(host: &mut Host)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+{
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
+    let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Error reading Tezos X simulation input: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    // Scaffold: decode RLP input [skip_signature_check_bool, n_u64_le_bytes],
+    // compute successor, write RLP-encoded result back.
+    let rlp = Rlp::new(&input);
+    let mut it = rlp.iter();
+    let _skip_signature_check: bool =
+        match next(&mut it).and_then(|f| decode_field_bool(&f, "skip_signature_check")) {
+            Ok(v) => v,
+            Err(err) => {
+                log!(
+                    host,
+                    Error,
+                    "Tezos X simulation: failed to decode input: {:?}",
+                    err
+                );
+                return;
+            }
+        };
+    let n: u64 = match next(&mut it).and_then(|f| decode_field_u64_le(&f, "n")) {
+        Ok(v) => v,
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Tezos X simulation: failed to decode input: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    let result = n.wrapping_add(1);
+    let mut stream = RlpStream::new();
+    append_u64_le(&mut stream, &result);
+    if let Err(err) = host.store_write_all(&TEZOSX_SIMULATION_RESULT, &stream.out()) {
+        log!(
+            host,
+            Error,
+            "Error writing Tezos X simulation result: {:?}",
+            err
+        );
     }
 }
