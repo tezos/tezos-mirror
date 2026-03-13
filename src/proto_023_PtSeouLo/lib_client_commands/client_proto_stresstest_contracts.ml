@@ -186,7 +186,7 @@ let originate_command =
           {
             Injection.minimal_fees = Tez.of_mutez_exn 100L;
             minimal_nanotez_per_byte = Some (Q.of_int 1000);
-            minimal_nanotez_per_gas_unit = Q.of_int 100;
+            minimal_nanotez_per_gas_unit = Some (Q.of_int 100);
             force_low_fee = false;
             fee_cap = scontract.origination_fee_cap;
             burn_cap = scontract.origination_burn_cap;
