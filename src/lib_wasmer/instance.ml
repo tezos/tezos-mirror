@@ -23,12 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For documentation please refer to the [Tezos_wasmer] module. *)
+(** WebAssembly module instance.
+
+    An instance is a module that has been linked with its imports and is
+    ready to execute. Instantiation resolves imports against a provided
+    set of externs, and runs asynchronously via [Lwt_preemptive]. *)
 
 open Api
 open Vectors
 open Utils
 
+(** Import resolver map keyed by (module, name, extern kind). *)
 module Resolver = Map.Make (struct
   type t = string * string * Types.Externkind.t
 
@@ -47,6 +52,7 @@ type t = {
   clean : unit -> unit;
 }
 
+(** Raised when an import required by the module is not provided. *)
 exception
   Unsatisfied_import of {
     module_ : string;
@@ -54,6 +60,11 @@ exception
     kind : Types.Externkind.t;
   }
 
+(** [resolve_imports store modul resolver] matches the module's import
+    descriptors against the provided [resolver] map and returns the extern
+    vector, a post-instantiation cleanup function, and a final cleanup
+    function. Raises {!Unsatisfied_import} if an import cannot be
+    resolved. *)
 let resolve_imports store modul resolver =
   let lookup import =
     let module_ = Import_type.module_ import in
@@ -89,6 +100,11 @@ let resolve_imports store modul resolver =
   in
   (externs, clean_after_instantiation, clean)
 
+(** [create store module_ externs] instantiates a WebAssembly module with
+    the given imports. Each element of [externs] is a
+    [(module_name, name, extern)] triple. The instantiation runs in a
+    detached thread via [Lwt_preemptive]. Raises {!Trap.Trap} if a trap
+    occurs during start function execution. *)
 let create store module_ externs =
   let open Lwt.Syntax in
   let externs_vec, clean_after_instantiation, clean =
@@ -124,6 +140,8 @@ let create store module_ externs =
 
   {module_; instance; clean}
 
+(** [delete inst] destroys the instance and cleans up associated
+    resources. Must not be used after this call. *)
 let delete inst =
   Functions.Instance.delete inst.instance ;
   inst.clean ()

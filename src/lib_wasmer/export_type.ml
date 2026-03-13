@@ -23,17 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Export type descriptor.
+
+    Provides introspection on the exports declared by a WebAssembly
+    module: the export name and its extern type (function, memory,
+    etc.). The underlying Wasmer object is borrowed from the module's
+    export type vector and must not outlive it. *)
+
 open Api
 open Vectors
 
-type t =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4026
-     Ensure that ownership and lifetime of [Types.Exporttype.t] is respected.
-  *)
-  Types.Exporttype.t Ctypes.ptr
+type t = Types.Exporttype.t Ctypes.ptr
 
+(** [name modul] returns the name of the export. *)
 let name modul =
   let name = Functions.Exporttype.name modul in
   Name.to_string Ctypes.(!@name)
 
+(** [type_ export] returns the extern type of the export. *)
 let type_ = Functions.Exporttype.type_

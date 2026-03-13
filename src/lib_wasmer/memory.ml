@@ -23,8 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly linear memory access.
+
+    Provides bounds-checked byte-level read and write operations on a
+    WebAssembly module's linear memory. The backing storage is a Ctypes
+    C array pointing directly into Wasmer's memory. *)
+
 module Array = Ctypes.CArray
 
+(** Raised when a memory access is out of bounds. *)
 exception Out_of_bounds
 
 type t = {

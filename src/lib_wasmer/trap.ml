@@ -23,22 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** WebAssembly trap (runtime exception) handling.
+
+    A trap is raised when WebAssembly execution encounters an error
+    (e.g. unreachable instruction, out-of-bounds memory access). *)
+
 open Api
 open Vectors
 
+(** Raised when a WebAssembly trap occurs. The string carries the trap
+    message from Wasmer. *)
 exception Trap of string
 
+(** A null trap pointer, used as the initial value before a call. *)
 let none = Ctypes.from_voidp Types.Trap.t Ctypes.null
 
+(** [from_string store str] creates a new trap with message [str]. *)
 let from_string store str =
   let msg = Message.from_string str in
   Functions.Trap.new_ store (Ctypes.addr msg)
 
+(** [message trap] extracts the human-readable message from a trap. *)
 let message trap =
   let msg = Message.empty () in
   Functions.Trap.message trap (Ctypes.addr msg) ;
   Message.to_string msg
 
+(** [check trap] raises {!Trap} if [trap] is non-null, then deletes it. *)
 let check trap =
   if not (Ctypes.is_null trap) then (
     let msg = message trap in
