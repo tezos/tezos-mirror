@@ -83,7 +83,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown scenario =
+    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario =
   let scenario setup protocol =
     let* () =
       if wait_for_valid_block then
@@ -110,6 +110,8 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?catchup_cooldown
     ~time_between_blocks
     ?additional_uses
+    ?da_fee
+    ?sequencer_pool_address
     ~kernel
     ~title
     ~tags:("tezlink" :: "tezosx" :: tags)
@@ -123,7 +125,7 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?da_fee scenario protocols =
+    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario protocols =
   register_tezlink_only_test
     ~title:(title ^ " (tezlink)")
     ~tags
@@ -138,6 +140,7 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?additional_uses
     ~wait_for_valid_block
     ?da_fee
+    ?sequencer_pool_address
     scenario
     protocols ;
   register_tezosx_test
@@ -153,6 +156,8 @@ let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
     ?catchup_cooldown
     ?additional_uses
     ~wait_for_valid_block
+    ?da_fee
+    ?sequencer_pool_address
     scenario
     protocols
 
@@ -3620,9 +3625,9 @@ let test_tezlink_validation_balance =
     [Client.spawn_transfer] triggers a simulation that rejects the operation
     with [Insufficient_fees]. *)
 let test_tezlink_insufficient_da_fee =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Michelson transfer with insufficient DA fee is rejected"
-    ~tags:["kernel"; "validation"; "da_fee"]
+    ~tags:["kernel"; "validation"; "da_fee"; "insufficient"]
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~da_fee:(Wei.of_eth_int 4)
   (* For da fees, anything superior to zero works for testing. *)
@@ -3655,7 +3660,7 @@ let test_tezlink_insufficient_da_fee =
 let test_tezlink_da_fee_credited_to_pool =
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   let da_fee_eth_int = 4 in
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"DA fees are credited to sequencer pool address"
     ~tags:["kernel"; "da_fee"; "sequencer_pool_address"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3710,12 +3715,12 @@ let test_tezlink_da_fee_credited_to_pool =
     fetches the correct DA fee from the mempool filter RPC and the
     transfer succeeds. *)
 let test_tezlink_simulation_with_da_fee =
-  register_tezlink_only_test
+  register_tezlink_test
     ~title:"Michelson transfer simulation succeeds with DA fees enabled"
     ~tags:["kernel"; "validation"; "da_fee"; "simulation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
-    ~da_fee:(Wei.of_string "4000000000000")
-  (* 4 mutez/byte = 4 * 10^12 wei *)
+    ~da_fee:(Wei.of_string "1000000000000000")
+  (* 1000 mutez/byte = 1000 * 10^12 wei *)
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -3724,7 +3729,7 @@ let test_tezlink_simulation_with_da_fee =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   (* 1000 nanotez/byte = 1 mutez/byte (L1 default), below the DA fee of
-     4 mutez/byte: the total fee doesn't cover the DA cost. *)
+     1000 mutez/byte: the total fee doesn't cover the DA cost. *)
   let process =
     Client.spawn_transfer
       ~endpoint
@@ -3740,7 +3745,7 @@ let test_tezlink_simulation_with_da_fee =
     ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
 
   (* Without [--minimal-nanotez-per-byte], the client fetches the DA fee
-     from the node's [GET .../mempool/filter] RPC (4000 nanotez/byte here)
+     from the node's [GET .../mempool/filter] RPC (1000000 nanotez/byte here)
      and uses it to compute a sufficient fee. *)
   let* () =
     Client.transfer
