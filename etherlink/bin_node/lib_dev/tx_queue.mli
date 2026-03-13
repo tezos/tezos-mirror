@@ -44,6 +44,9 @@ val shutdown : unit -> unit tzresult Lwt.t
 (** [clear ()] removes the container data but keeps the allocated space *)
 val clear : unit -> unit tzresult Lwt.t
 
+(** Trigger a cleaning in the [Tx_queue]. *)
+val drop_stale_transactions : unit -> unit tzresult Lwt.t
+
 (** Trigger a tick in the [Tx_queue]. *)
 val tx_queue_tick :
   evm_node_endpoint:Tx_queue_types.endpoint -> unit tzresult Lwt.t
