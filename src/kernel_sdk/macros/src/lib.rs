@@ -20,13 +20,12 @@ use proc_macro_error2::proc_macro_error;
 /// ### Example
 /// ```
 /// use tezos_smart_rollup::prelude::*;
-/// use tezos_smart_rollup::host::HostDebug;
 /// use tezos_smart_rollup::host::StorageV1;
 ///
 /// #[entrypoint::main]
 /// pub fn f<Host>(host: &mut Host)
 /// where
-///     Host: HostDebug + StorageV1
+///     Host: StorageV1
 /// {
 ///     // user kernel code
 /// }

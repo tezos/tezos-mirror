@@ -6,7 +6,6 @@
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -19,7 +18,7 @@ fn process_slot<Host>(
     page_size: usize,
     slot_index: u8,
 ) where
-    Host: HostReveal + StorageV1 + HostDebug,
+    Host: HostReveal + StorageV1,
 {
     let mut buffer = vec![0u8; page_size * num_pages];
 
@@ -100,7 +99,7 @@ fn get_slots_from_storage<Host: StorageV1>(host: &Host, number_of_slots: u64) ->
 #[entrypoint::main]
 pub fn entry<Host>(host: &mut Host)
 where
-    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+    Host: StorageV1 + WasmHost + HostReveal,
 {
     let parameters = host.reveal_dal_parameters();
     debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);

@@ -12,7 +12,6 @@
 //! - For internal transfer messages: extracts the payload and writes it to the outbox
 
 use tezos_smart_rollup::entrypoint;
-use tezos_smart_rollup::host::HostDebug;
 use tezos_smart_rollup::host::WasmHost;
 use tezos_smart_rollup::inbox::InboxMessage;
 use tezos_smart_rollup::inbox::InternalInboxMessage;
@@ -23,7 +22,7 @@ use tezos_smart_rollup::prelude::debug_msg;
 #[entrypoint::main]
 pub fn entry<Host>(host: &mut Host)
 where
-    Host: WasmHost + HostDebug,
+    Host: WasmHost,
 {
     while let Some(msg) = host.read_input().expect("Failed to read input") {
         let (_, parsed_msg) = InboxMessage::<MichelsonBytes>::parse(msg.as_ref())

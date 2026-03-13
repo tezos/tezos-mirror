@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{cell::RefCell, io::Write};
-
 use tezos_evm_logging::Logging;
 use tezos_evm_runtime::{
     extensions::WithGas,
@@ -11,7 +9,6 @@ use tezos_evm_runtime::{
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
-    debug::HostDebug,
     input::Message,
     metadata::RollupMetadata,
     path::Path,
@@ -25,25 +22,15 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
 pub struct EvalHost {
     pub host: MockKernelHost,
-    pub buffer: RefCell<Vec<u8>>,
 }
 
 impl EvalHost {
-    /// Create a new instance of the `MockHost`, additionally provide the buffer
-    /// where the logs will be outputed.
-    pub fn default_with_buffer(buffer: RefCell<Vec<u8>>) -> Self {
+    /// Create a new instance of the `MockHost`. Resets the global log capture -
+    /// care should therefore be taken to not have two instances of `EvalHost` in parallel.
+    pub fn default_with_buffer_reset() -> Self {
+        tezos_evm_logging::DEBUG_LOG.with_borrow_mut(|log| log.truncate(0));
         let host = MockKernelHost::default();
-        Self { host, buffer }
-    }
-}
-
-impl HostDebug for EvalHost {
-    #[inline(always)]
-    fn write_debug(&self, data: &str) {
-        let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{data}") {
-            eprint!("Error due to: {e}")
-        }
+        Self { host }
     }
 }
 

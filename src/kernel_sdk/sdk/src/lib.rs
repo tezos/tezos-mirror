@@ -34,9 +34,6 @@ pub mod host {
     pub use tezos_smart_rollup_host::Error as HostError;
 
     #[doc(inline)]
-    pub use tezos_smart_rollup_host::debug::HostDebug;
-
-    #[doc(inline)]
     pub use tezos_smart_rollup_host::reveal::HostReveal;
 
     #[doc(inline)]
@@ -75,7 +72,6 @@ pub mod prelude {
     pub use crate::entrypoint;
     #[cfg(feature = "debug_alloc")]
     pub use tezos_smart_rollup_debug::debug_msg;
-    #[cfg(not(feature = "debug_alloc"))]
     pub use tezos_smart_rollup_debug::debug_str;
     pub use tezos_smart_rollup_host::runtime::Runtime;
 }

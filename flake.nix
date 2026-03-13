@@ -107,6 +107,9 @@
               shfmt
               taplo
               wabt
+
+	      # For RISC-V kernel cross-compilation
+	      pkgsCross.riscv64.pkgsStatic.stdenv.cc
             ]
             ++ (
               if stdenv.isDarwin then

@@ -14,7 +14,6 @@ use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::StringTicket;
 use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransaction};
-use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::wasm::WasmHost;
 
 /// Withdrawal to be sent to L1.
@@ -37,7 +36,7 @@ pub struct Withdrawal {
 /// withdrawal message goes into the rollup outbox.
 pub fn process_withdrawals<Host>(host: &mut Host, withdrawals: Vec<Withdrawal>)
 where
-    Host: WasmHost + HostDebug,
+    Host: WasmHost,
 {
     if withdrawals.is_empty() {
         return;

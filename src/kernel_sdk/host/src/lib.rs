@@ -14,7 +14,6 @@
 extern crate alloc;
 
 pub mod dal_parameters;
-pub mod debug;
 pub mod input;
 pub mod metadata;
 pub mod path;

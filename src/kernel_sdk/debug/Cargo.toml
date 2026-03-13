@@ -13,6 +13,9 @@ description = "Output formatted messages to Tezos Smart Rollup debug log."
 keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
 
+[build-dependencies.tezos-smart-rollup-build-utils]
+path = "../build-utils"
+
 [dependencies.tezos-smart-rollup-core]
 path = "../core"
 version = "0.2.2"
@@ -22,15 +25,10 @@ path = "../core"
 version = "0.2.2"
 features = ["mock-core-trait"]
 
-[dependencies.tezos-smart-rollup-host]
-path = "../host"
-version = "0.2.2"
-default-features = false
 
 [features]
 default = ["alloc"]
 alloc = []
 proto-alpha = [
   "tezos-smart-rollup-core/proto-alpha",
-  "tezos-smart-rollup-host/proto-alpha",
 ]

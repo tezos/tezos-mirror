@@ -12,7 +12,6 @@ pub mod unwindable;
 
 use tezos_smart_rollup_core::SmartRollupCore;
 
-use crate::debug::HostDebug;
 use crate::reveal::HostReveal;
 use crate::storage::StorageV1;
 use crate::wasm::WasmHost;
@@ -70,7 +69,7 @@ pub enum ValueType {
 /// - methods that take `&self` will not cause changes to the runtime state.
 /// - methods taking `&mut self` are expected to cause changes - either to *input*,
 ///   *output* or *durable storage*.
-pub trait Runtime: HostDebug + HostReveal + StorageV1 + WasmHost {}
+pub trait Runtime: HostReveal + StorageV1 + WasmHost {}
 
 impl<Host> Runtime for Host where Host: SmartRollupCore {}
 

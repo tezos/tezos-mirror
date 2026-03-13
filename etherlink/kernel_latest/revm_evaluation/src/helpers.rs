@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::cell::RefCell;
-
 use revm::primitives::{alloy_primitives::Keccak256, B256};
 
 use crate::evalhost::EvalHost;
@@ -29,14 +27,7 @@ pub fn extract_brackets(string: &str) -> &str {
 }
 
 pub fn prepare_host() -> EvalHost {
-    let execution_buffer = Vec::new();
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
-}
-
-pub fn prepare_host_with_buffer(execution_buffer: Vec<u8>) -> EvalHost {
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
+    EvalHost::default_with_buffer_reset()
 }
 
 #[macro_export]

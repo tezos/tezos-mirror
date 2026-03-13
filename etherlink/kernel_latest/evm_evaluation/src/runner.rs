@@ -19,7 +19,6 @@ use thiserror::Error;
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
-use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fs::File;
@@ -89,14 +88,7 @@ fn read_testsuite(path: &Path) -> Result<TestSuite, TestError> {
 }
 
 fn prepare_host() -> EvalHost {
-    let execution_buffer = Vec::new();
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
-}
-
-fn prepare_host_with_buffer(execution_buffer: Vec<u8>) -> EvalHost {
-    let buffer = RefCell::new(execution_buffer);
-    EvalHost::default_with_buffer(buffer)
+    EvalHost::default_with_buffer_reset()
 }
 
 fn prepare_filler_source(
@@ -411,7 +403,7 @@ pub fn run_test(
                     }
                     continue;
                 }
-                host = prepare_host_with_buffer(host.buffer.take());
+                host = prepare_host();
                 initialize_accounts(&mut host, &unit);
                 let data_label = info.labels.get(&data);
                 if let Some(data_label) = data_label {
@@ -482,7 +474,6 @@ pub fn run_test(
                 };
 
                 check_results(&host, &name, test_execution, &exec_result);
-                host.buffer.borrow_mut().clear();
             }
         }
     }

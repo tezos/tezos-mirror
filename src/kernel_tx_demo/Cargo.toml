@@ -20,3 +20,4 @@ tezos-smart-rollup-mock = { path = "../kernel_sdk/mock" }
 tezos_data_encoding = { path = "../../sdk/rust/encoding" }
 tezos_crypto_rs = { path = "../../sdk/rust/crypto", default-features = false }
 tezos-protocol = { path = "../../sdk/rust/protocol" }
+tezos-smart-rollup-build-utils = { path = "../kernel_sdk/build-utils" }

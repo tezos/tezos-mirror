@@ -15,7 +15,6 @@ revm-etherlink.workspace = true
 tezosx-journal.workspace = true
 revm.workspace = true
 tezos_ethereum = { workspace = true, features = ["evaluation"] }
-tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
@@ -34,6 +33,10 @@ structopt = "0.3.26"
 # Overwriting primitive-types from workspace to enable multiple features
 primitive-types = { version = "0.12.1", features = ["rlp", "serde"] }
 regex = "1.10.2"
+
+[dependencies.tezos-evm-logging]
+workspace = true
+features = ["capture-logs"]
 
 [features]
 default = ["debug"]

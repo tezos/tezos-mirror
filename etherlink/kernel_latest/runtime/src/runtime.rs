@@ -16,7 +16,6 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
-    debug::HostDebug,
     input::Message,
     metadata::RollupMetadata,
     path::{Path, RefPath},
@@ -56,13 +55,6 @@ pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub execution_gas_used: u64,
     pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
-}
-
-impl<R: HostDebug, Host: BorrowMut<R> + Borrow<R>> HostDebug for KernelHost<R, Host> {
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.borrow().write_debug(msg)
-    }
 }
 
 impl<R: HostReveal, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R, Host> {
@@ -297,7 +289,7 @@ where
     }
 }
 
-impl<R: HostDebug, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {
+impl<R, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {
     fn verbosity(&self) -> Level {
         self.logs_verbosity
     }
