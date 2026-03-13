@@ -27,22 +27,29 @@ open Baking_state
 open Baking_state_types
 open Protocol.Alpha_context
 
-(** [create_initial_state context ?synchronize chain baking_configuration
-    operation_worker dal_attestable_slots_worker current_proposal ?constants consensus_keys]
-    creates an initial {!Baking_state.t} by initializing a
-    {!type-Baking_state.global_state}, a {!type-Baking_state.level_state}
-    and a {!type-Baking_state.round_state}.
+(** [create_initial_state ?canceler context ?dal_node_rpc_ctxt ?synchronize
+    ?monitor_node_operations chain baking_configuration
+    dal_attestable_slots_worker round_durations current_proposal ?constants
+    consensus_keys] creates an initial {!Baking_state.t} by initializing a
+    {!type-Baking_state.global_state}, a {!type-Baking_state.automaton_state},
+    a {!type-Baking_state.level_state} and a {!type-Baking_state.round_state}.
 
-    - For the [global_state] and [automaton_state] initialization, a validation
-    mode is set based on the [baking_configuration] and a forge worker is
-    started. If [constants] is not provided, an RPC is called to recover them
-    from the [context].
+    - For the [global_state] initialization, a forge worker is started. If
+    [constants] is not provided, an RPC is called to recover them from the
+    [context].
+
+    - For the [automaton_state] initialization, a validation mode is set based
+    on the [baking_configuration] and an operation worker is started. If
+    [canceler] is provided, cancelling it will trigger a shutdown of the
+    operation worker. See {!Baking_automaton.create_automaton_state}.
 
     - For the [level_state] initialization, information regarding the current
-    level is retrieved (the current level being that of the [current_proposal])
-    and delegates slots are computed for the given [consensus_keys].
+    and next levels is retrieved (the current level being that of the
+    [current_proposal]) and delegate slots are computed for the given
+    [consensus_keys] at both levels. The DAL included attestations cache
+    committees are also initialized for both levels.
 
-    - For the [round_state] initialization, current round is compute by calling
+    - For the [round_state] initialization, current round is computed by calling
     {!Baking_actions.compute_round} with [current_proposal] information if
     [synchronize] is set to [true] (which is the default). *)
 val create_initial_state :
