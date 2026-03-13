@@ -783,6 +783,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       ~signers
       ~retention_period:configuration.injector.retention_period
       ~allowed_attempts:configuration.injector.attempts
+      ~injection_ttl:configuration.injector.injection_ttl
       ~collect_metrics:(Option.is_some state.configuration.metrics_addr)
   in
   let* () = start_workers plugin node_ctxt in
