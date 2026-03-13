@@ -121,6 +121,8 @@ octez-protocol-compiler: src/lib_protocol_compiler, src/lib_protocol_compiler/bi
 octez-protocol-compiler-compat: src/lib_protocol_compiler/compat
 octez-requester-tests: src/lib_requester/test
 octez-riscv-api: src/lib_riscv/api
+octez-riscv-nds: src/lib_riscv_nds/memory
+octez-riscv-nds-memory-api: src/lib_riscv_nds/memory/api
 octez-riscv-pvm: src/lib_riscv/pvm
 octez-riscv-pvm-test: src/lib_riscv/pvm/test
 octez-rpc-process: src/lib_rpc_process

@@ -3773,6 +3773,37 @@ let octez_riscv_api =
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/api/octez_riscv_api.*"]]
 
+let octez_riscv_durable_storage_in_memory_api =
+  public_lib
+    "octez-riscv-nds-memory-api"
+    ~path:"src/lib_riscv_nds/memory/api"
+    ~synopsis:
+      "OCaml API of the RISC-V durable storage in-memory Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~dep_globs_rec:["../../../riscv/*"]
+    ~link_deps:lib_wasmer_riscv
+    ~modules:["octez_riscv_durable_storage_in_memory_api"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "copy_files";
+            S
+              "../../../riscv/durable-in-memory/octez_riscv_durable_storage_in_memory_api.*";
+          ];
+        ]
+
+let _octez_riscv_nds_memory =
+  public_lib
+    "octez-riscv-nds.memory"
+    ~path:"src/lib_riscv_nds/memory"
+    ~synopsis:"RISC-V new durable storage - in-memory implementation"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_riscv_durable_storage_in_memory_api;
+      ]
+
 let octez_riscv_pvm =
   public_lib
     "octez-riscv-pvm"
