@@ -6,6 +6,7 @@
 //! This crate defines common types and functionalities used by the RISC-V and
 //! New Durable Storage API crates.
 
+pub mod bytes;
 pub mod move_semantics;
 pub mod safe_pointer;
 pub mod try_clone;
