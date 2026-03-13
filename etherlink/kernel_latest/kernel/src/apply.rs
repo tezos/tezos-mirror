@@ -16,6 +16,7 @@ use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithPro
 use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
+use revm_etherlink::journal::commit_evm_journal_from_external;
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
     XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
@@ -27,7 +28,7 @@ use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    ExecutionOutcome,
+    ExecutionOutcome, TransactionOrigin,
 };
 use tezos_crypto_rs::hash::HashTrait;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
@@ -251,7 +252,10 @@ pub struct EthereumTransactionResult {
 /// Enum distinguishing between Ethereum and Tezos transaction results.
 pub enum RuntimeTransactionResult {
     Ethereum(EthereumTransactionResult),
-    Tezos(AppliedOperation),
+    Tezos {
+        op: AppliedOperation,
+        etherlink_withdrawals: Vec<Withdrawal>,
+    },
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -288,6 +292,7 @@ pub fn revm_run_transaction<Host>(
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
+    origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, anyhow::Error>
 where
     Host: StorageV1 + Logging,
@@ -380,6 +385,7 @@ where
             ),
         }),
         is_simulation,
+        origin,
     )
     .map_err(|err| {
         Error::InvalidRunTransaction(revm_etherlink::Error::Custom(format!(
@@ -444,6 +450,7 @@ where
         spec_id,
         tracer_input,
         false,
+        TransactionOrigin::UserInput,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -536,6 +543,7 @@ where
         spec_id,
         tracer_input,
         false,
+        TransactionOrigin::UserInput,
     ) {
         Ok(execution_outcome) => Ok(execution_outcome),
         Err(err) => {
@@ -658,6 +666,7 @@ where
         spec_id,
         tracer_input,
         false,
+        TransactionOrigin::UserInput,
     ) {
         Ok(outcome) => Ok(outcome),
         Err(err) => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
@@ -732,6 +741,31 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
     }
 }
 
+pub fn push_withdrawals_to_outbox<Host>(
+    host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
+    withdrawals: Vec<Withdrawal>,
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1 + Logging,
+{
+    for message in withdrawals {
+        match message {
+            Withdrawal::Standard(message) => {
+                let outbox_message: OutboxMessage<RouterInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
+            }
+            Withdrawal::Fast(message) => {
+                let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
+            }
+        }
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn handle_transaction_result<Host>(
@@ -770,21 +804,9 @@ where
             );
             log!(host, Benchmarking, "gas_used: {:?}", gas_used);
             log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
-            for message in execution_outcome.withdrawals.drain(..) {
-                match message {
-                    Withdrawal::Standard(message) => {
-                        let outbox_message: OutboxMessage<RouterInterface> = message;
-                        let len = outbox_queue.queue_message(host, outbox_message)?;
-                        log!(host, Debug, "Length of the outbox queue: {}", len);
-                    }
-                    Withdrawal::Fast(message) => {
-                        let outbox_message: OutboxMessage<FastWithdrawalInterface> =
-                            message;
-                        let len = outbox_queue.queue_message(host, outbox_message)?;
-                        log!(host, Debug, "Length of the outbox queue: {}", len);
-                    }
-                }
-            }
+
+            let withdrawals = std::mem::take(&mut execution_outcome.withdrawals);
+            push_withdrawals_to_outbox(host, outbox_queue, withdrawals)?;
 
             if pay_fees {
                 fee_updates.apply(host, caller, sequencer_pool_address)?;
@@ -814,8 +836,12 @@ where
                 tx_object,
             }))
         }
-        RuntimeTransactionResult::Tezos(applied_operation) => {
-            Ok(RuntimeExecutionInfo::Tezos(applied_operation))
+        RuntimeTransactionResult::Tezos {
+            op,
+            etherlink_withdrawals,
+        } => {
+            push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
+            Ok(RuntimeExecutionInfo::Tezos(op))
         }
     }
 }
@@ -951,8 +977,17 @@ where
                             },
                         ),
                     };
+                    let etherlink_withdrawals = commit_evm_journal_from_external(
+                        host,
+                        registry,
+                        block_constants,
+                        &mut tezosx_journal,
+                    )?;
                     Ok::<_, anyhow::Error>(ExecutionResult::Valid(
-                        RuntimeTransactionResult::Tezos(operation_and_receipt),
+                        RuntimeTransactionResult::Tezos {
+                            op: operation_and_receipt,
+                            etherlink_withdrawals,
+                        },
                     ))
                 }
                 Err(OperationError::Validation(err)) => {

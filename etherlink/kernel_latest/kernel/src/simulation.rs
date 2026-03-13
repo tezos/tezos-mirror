@@ -26,7 +26,7 @@ use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy, inspectors::TracerInput, Error as RevmError,
-    ExecutionOutcome,
+    ExecutionOutcome, TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
@@ -507,6 +507,7 @@ impl Evaluation {
             spec_id,
             tracer_input,
             true,
+            TransactionOrigin::UserInput,
         ) {
             Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -809,6 +810,7 @@ mod tests {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
         assert!(
             outcome.is_ok(),

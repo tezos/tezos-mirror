@@ -482,9 +482,10 @@ where
                 ),
             };
 
-            Ok(ExecutionResult::Valid(RuntimeTransactionResult::Tezos(
-                applied_operation,
-            )))
+            Ok(ExecutionResult::Valid(RuntimeTransactionResult::Tezos {
+                op: applied_operation,
+                etherlink_withdrawals: vec![],
+            }))
         }
         DepositReceiver::Tezos(Contract::Originated(kt1)) => Err(
             crate::Error::BridgeError(format!("Invalid deposit receiver: {kt1}")),

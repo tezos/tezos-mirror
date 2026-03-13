@@ -16,7 +16,7 @@ use revm::{
 };
 use revm_etherlink::{
     run_transaction, storage::world_state_handler::StorageAccount, ExecutionOutcome,
-    GasData,
+    GasData, TransactionOrigin,
 };
 use std::{
     ffi::OsStr,
@@ -428,6 +428,7 @@ pub fn main() {
                         transaction.authorization_list.clone(),
                         None,
                         false,
+                        TransactionOrigin::UserInput,
                     );
 
                     let total_gas_refunded =

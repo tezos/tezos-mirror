@@ -62,6 +62,9 @@ use tezos_tezlink::{
 };
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::TezosXJournal;
+
+use crate::apply::push_withdrawals_to_outbox;
+use revm_etherlink::journal::commit_evm_journal_from_external;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
@@ -669,6 +672,8 @@ impl ChainConfigTrait for EvmChainConfig {
                 operation,
                 sequencer_pool_address,
                 skip_signature_check,
+                Some(outbox_queue),
+                Some(&block_constants.evm_runtime_block_constants),
             ),
         }
     }
@@ -801,6 +806,8 @@ fn apply_tezos_operation<Host>(
     operation: TezlinkOperation,
     sequencer_pool_address: Option<H160>,
     skip_signature_check: bool,
+    outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
+    evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1 + Logging,
@@ -868,6 +875,18 @@ where
             };
 
             credit_da_fees(host, sequencer_pool_address, required_da_fees)?;
+
+            if let (Some(outbox_queue), Some(evm_block_constants)) =
+                (outbox_queue, evm_block_constants)
+            {
+                let etherlink_withdrawals = commit_evm_journal_from_external(
+                    host,
+                    registry,
+                    evm_block_constants,
+                    &mut tezosx_journal,
+                )?;
+                push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
+            }
 
             Ok(crate::apply::ExecutionResult::Valid(
                 RuntimeExecutionInfo::Tezos(applied_operation),
@@ -1048,6 +1067,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 operation,
                 sequencer_pool_address,
                 skip_signature_check,
+                None::<&OutboxQueue<'_, RefPath>>,
+                None,
             ),
         }
     }

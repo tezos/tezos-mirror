@@ -24,12 +24,11 @@ use revm::{
         tx::TxEnvBuilder,
         BlockEnv, CfgEnv, ContextTr, Evm, LocalContext, TxEnv,
     },
-    context_interface::block::BlobExcessGasAndPrice,
-    context_interface::journaled_state::JournalTr,
+    context_interface::{block::BlobExcessGasAndPrice, journaled_state::JournalTr},
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
-    Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
+    Context, ExecuteCommitEvm, ExecuteEvm, InspectEvm, MainBuilder,
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
@@ -39,14 +38,13 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 use tezosx_journal::TezosXJournal;
 
+pub mod database;
 pub mod helpers;
 pub mod inspectors;
 pub mod journal;
 pub mod precompiles;
 pub mod storage;
 pub mod tezosx;
-
-mod database;
 
 type EVMInnerContext<'a, Host, R> = Context<
     &'a BlockEnv,
@@ -63,6 +61,16 @@ type EvmContext<'a, Host, R> = Evm<
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
+
+/// Controls commit behavior and optional balance injection in `run_transaction`.
+pub enum TransactionOrigin {
+    /// Original caller: commit EVM journal to durable storage, return withdrawals.
+    UserInput,
+    /// Cross-runtime call: do NOT commit the journal.
+    /// If `credit` is `Some`, inject a balance credit into the REVM journal
+    /// before executing the transaction.
+    CrossRuntime { credit: Option<(Address, U256)> },
+}
 
 #[derive(Debug, PartialEq)]
 pub struct ExecutionOutcome {
@@ -132,6 +140,7 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
 #[allow(clippy::too_many_arguments)]
 fn tx_env(
     host: &'_ mut impl StorageV1,
+    journal: &TezosXJournal,
     caller: Address,
     destination: Option<Address>,
     gas_data: &GasData,
@@ -146,8 +155,14 @@ fn tx_env(
         None => TxKind::Create,
     };
 
-    let storage_account = StorageAccount::from_address(&caller)?;
-    let info = storage_account.info(host)?;
+    // Check journal first for uncommitted nonce changes from earlier
+    // CrossRuntime transactions, then fall back to durable storage.
+    let nonce = if let Some(account) = journal.evm.inner.state.get(&caller) {
+        account.info.nonce
+    } else {
+        let storage_account = StorageAccount::from_address(&caller)?;
+        storage_account.info(host)?.nonce
+    };
 
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
@@ -159,7 +174,7 @@ fn tx_env(
         .kind(kind)
         .value(value)
         .data(data)
-        .nonce(info.nonce)
+        .nonce(nonce)
         .chain_id(Some(chain_id))
         .access_list(access_list);
 
@@ -326,7 +341,7 @@ where
         };
     __trace_kernel!(evm_context.db_mut().host, "evm_context.transact_commit", {
         opt_attrs_fun(evm_context.db_mut().host);
-        evm_context.transact_commit(tx)
+        evm_context.transact_one(tx)
     })
 }
 
@@ -348,6 +363,7 @@ pub fn run_transaction<'a, Host, R: Registry>(
     authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
+    origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EVMError<Error>>
 where
     Host: StorageV1 + Logging,
@@ -355,6 +371,7 @@ where
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
+        journal,
         caller,
         destination,
         &gas_data,
@@ -385,7 +402,30 @@ where
             is_simulation,
         );
 
-        let result = evm_context.inspect_tx_commit(&tx)?;
+        let credit_checkpoint = match origin {
+            TransactionOrigin::CrossRuntime {
+                credit: Some((addr, amount)),
+            } if amount > U256::ZERO => {
+                let cp = evm_context.ctx.journaled_state.checkpoint();
+                evm_context
+                    .ctx
+                    .journaled_state
+                    .balance_incr(addr, amount)
+                    .map_err(EVMError::Database)?;
+                Some(cp)
+            }
+            _ => None,
+        };
+
+        let result = evm_context.inspect_one_tx(&tx)?;
+
+        if let Some(cp) = credit_checkpoint {
+            if result.is_success() {
+                evm_context.ctx.journaled_state.checkpoint_commit();
+            } else {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
+        }
 
         if evm_context.inspector.is_struct_logger() {
             StructLogger::store_outcome(
@@ -397,7 +437,12 @@ where
             )?
         }
 
-        let withdrawals = evm_context.db_mut().take_withdrawals();
+        let withdrawals = if matches!(origin, TransactionOrigin::UserInput) {
+            evm_context.commit_inner();
+            evm_context.db_mut().take_withdrawals()
+        } else {
+            Vec::new()
+        };
 
         Ok(ExecutionOutcome {
             result,
@@ -416,17 +461,47 @@ where
             is_simulation,
         );
 
+        let credit_checkpoint = match origin {
+            TransactionOrigin::CrossRuntime {
+                credit: Some((addr, amount)),
+            } if amount > U256::ZERO => {
+                let cp = evm_context.ctx.journaled_state.checkpoint();
+                evm_context
+                    .ctx
+                    .journaled_state
+                    .balance_incr(addr, amount)
+                    .map_err(EVMError::Database)?;
+                Some(cp)
+            }
+            _ => None,
+        };
+
         let result = execute_transaction(&mut evm_context, &tx, transaction_hash)?;
 
-        let withdrawals = evm_context.db_mut().take_withdrawals();
-
-        if !evm_context.db_mut().commit_status() {
-            // No need to revert the possible database changes because
-            // we are in a safe storage.
-            return Err(EVMError::Custom(
-                "Comitting ended up in an incorrect state change: reverting.".to_owned(),
-            ));
+        if let Some(cp) = credit_checkpoint {
+            if result.is_success() {
+                evm_context.ctx.journaled_state.checkpoint_commit();
+            } else {
+                evm_context.ctx.journaled_state.checkpoint_revert(cp);
+            }
         }
+
+        let withdrawals = if matches!(origin, TransactionOrigin::UserInput) {
+            evm_context.commit_inner();
+
+            if !evm_context.db_mut().commit_status() {
+                // No need to revert the possible database changes because
+                // we are in a safe storage.
+                return Err(EVMError::Custom(
+                    "Comitting ended up in an incorrect state change: reverting."
+                        .to_owned(),
+                ));
+            }
+
+            evm_context.db_mut().take_withdrawals()
+        } else {
+            Vec::new()
+        };
 
         Ok(ExecutionOutcome {
             result,
@@ -463,12 +538,10 @@ mod test {
     use tezosx_interfaces::Registry as RegistryTrait;
     use tezosx_journal::TezosXJournal;
 
-    use utilities::{
-        block_constants_with_fees, block_constants_with_no_fees,
-        test_alias_creation_context, Registry, DEFAULT_SPEC_ID,
-    };
+    use tezos_ethereum::block::BlockConstants;
+    use utilities::{test_alias_creation_context, Registry, DEFAULT_SPEC_ID};
 
-    use super::Error;
+    use super::{Error, TransactionOrigin};
     use crate::helpers::storage::bytes_hash;
     use crate::precompiles::constants::{
         FEED_DEPOSIT_ADDR, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -509,9 +582,8 @@ mod test {
 
     mod utilities {
         use alloy_sol_types::sol;
-        use primitive_types::{H160 as PH160, U256 as PU256};
+        use primitive_types::U256 as PU256;
         use revm::primitives::hardfork::SpecId;
-        use tezos_ethereum::block::{BlockConstants, BlockFees};
         use tezos_evm_logging::Logging;
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
@@ -628,31 +700,10 @@ mod test {
         }
 
         pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
-        const ETHERLINK_CHAIN_ID: u64 = 42793;
 
         // Path where mock Tezos balances are stored for testing
         const MOCK_TEZOS_BALANCES_PATH: RefPath =
             RefPath::assert_from(b"/mock_tezos/balances");
-
-        pub(crate) fn block_constants_with_fees() -> BlockConstants {
-            BlockConstants::first_block(
-                PU256::from(1),
-                PU256::from(ETHERLINK_CHAIN_ID),
-                BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
-                GAS_LIMIT,
-                PH160::zero(),
-            )
-        }
-
-        pub(crate) fn block_constants_with_no_fees() -> BlockConstants {
-            BlockConstants::first_block(
-                PU256::from(1),
-                PU256::from(ETHERLINK_CHAIN_ID),
-                BlockFees::new(PU256::zero(), PU256::zero(), PU256::zero()),
-                GAS_LIMIT,
-                PH160::zero(),
-            )
-        }
 
         pub(crate) fn test_alias_creation_context() -> CrossRuntimeContext {
             CrossRuntimeContext {
@@ -796,7 +847,7 @@ mod test {
     #[test]
     fn test_simple_transfer() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -845,6 +896,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -868,7 +920,7 @@ mod test {
     #[test]
     fn test_tezosx_simple_transfer_to_mapped_address() {
         let mut host = MockKernelHost::default();
-        let mut block_constants = block_constants_with_no_fees();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         let caller =
@@ -936,6 +988,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -951,7 +1004,7 @@ mod test {
     #[test]
     fn test_tezosx_transfer_gateway_to_implicit_address() {
         let mut host = MockKernelHost::default();
-        let mut block_constants = block_constants_with_no_fees();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         let caller = Address::from(&[1; 20]);
@@ -1013,6 +1066,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1045,7 +1099,7 @@ mod test {
     #[test]
     fn test_contract_call_sload_sstore() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1108,6 +1162,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1131,7 +1186,7 @@ mod test {
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1178,6 +1233,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         match result {
@@ -1209,7 +1265,7 @@ mod test {
     #[test]
     fn test_withdrawal_contract() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         init_precompile_bytecodes(&mut host, true).unwrap();
 
@@ -1263,6 +1319,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1288,7 +1345,7 @@ mod test {
     #[test]
     fn test_call_update_sequencer_key() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         init_precompile_bytecodes(&mut host, true).unwrap();
         // Insert account information
@@ -1346,6 +1403,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1375,7 +1433,7 @@ mod test {
     #[test]
     fn test_call_mint_erc20() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1412,6 +1470,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         let contract_address = match result_create {
@@ -1445,6 +1504,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         match result_call {
@@ -1464,7 +1524,7 @@ mod test {
     #[test]
     fn test_revert_precompile_state_changes() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_call_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033").unwrap();
         init_precompile_bytecodes(&mut host, true).unwrap();
         let caller =
@@ -1488,6 +1548,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         let revert_contract_address = match result_create {
@@ -1573,6 +1634,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1606,7 +1668,7 @@ mod test {
     #[test]
     fn test_revert_delete_created_bytecode() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
         let deploy_create_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506102b38061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80634f8c2d0e1461002d575b5f5ffd5b610047600480360381019061004291906101de565b610049565b005b5f815f523660a05ff09050806040517f9f8aa6e50000000000000000000000000000000000000000000000000000000081526004016100889190610264565b60405180910390fd5b5f604051905090565b5f5ffd5b5f5ffd5b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6100f0826100aa565b810181811067ffffffffffffffff8211171561010f5761010e6100ba565b5b80604052505050565b5f610121610091565b905061012d82826100e7565b919050565b5f67ffffffffffffffff82111561014c5761014b6100ba565b5b610155826100aa565b9050602081019050919050565b828183375f83830152505050565b5f61018261017d84610132565b610118565b90508281526020810184848401111561019e5761019d6100a6565b5b6101a9848285610162565b509392505050565b5f82601f8301126101c5576101c46100a2565b5b81356101d5848260208601610170565b91505092915050565b5f602082840312156101f3576101f261009a565b5b5f82013567ffffffffffffffff8111156102105761020f61009e565b5b61021c848285016101b1565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61024e82610225565b9050919050565b61025e81610244565b82525050565b5f6020820190506102775f830184610255565b9291505056fea264697066735822122053059908becc543c4f8d8f401652f4888f3e356e7d1c6567a4f53fcdf0ea6ea364736f6c634300081e0033").unwrap();
         init_precompile_bytecodes(&mut host, true).unwrap();
 
@@ -1631,6 +1693,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         let revert_contract_address = match result_create {
@@ -1672,6 +1735,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1694,7 +1758,7 @@ mod test {
     #[test]
     fn test_store_and_claim_fa_deposit_wrong_id() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         init_precompile_bytecodes(&mut host, true).unwrap();
 
@@ -1754,6 +1818,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1764,7 +1829,7 @@ mod test {
     #[test]
     fn test_empty_authorization_list_are_prohibited() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1813,6 +1878,7 @@ mod test {
             Some(vec![]),
             None,
             false,
+            TransactionOrigin::UserInput,
         );
 
         assert_eq!(
@@ -1826,7 +1892,7 @@ mod test {
     #[test]
     fn deposit_and_claim_fa_with_empty_proxy() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_no_fees();
+        let block_constants = BlockConstants::test_block_with_no_fees();
 
         let proxy = Address::from(&[1u8; 20]);
         let caller = Address::from(&[2u8; 20]);
@@ -1861,6 +1927,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1887,6 +1954,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -1928,6 +1996,7 @@ mod test {
             state::AccountInfo,
         };
         use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_ethereum::block::BlockConstants;
         use tezos_evm_runtime::runtime::MockKernelHost;
         use tezos_protocol::contract::Contract;
         use tezos_smart_rollup_encoding::michelson::{
@@ -1949,14 +2018,13 @@ mod test {
                     MockFaBridgeWrapper::{Burn, Mint},
                 },
                 utilities::{
-                    block_constants_with_no_fees,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
                     Registry, DEFAULT_SPEC_ID,
                 },
                 GAS_LIMIT,
             },
-            ExecutionOutcome, GasData,
+            ExecutionOutcome, GasData, TransactionOrigin,
         };
         use tezos_data_encoding::enc::BinWriter;
         use tezosx_journal::TezosXJournal;
@@ -2052,7 +2120,7 @@ mod test {
                 &registry,
                 &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 FEED_DEPOSIT_ADDR,
                 Some(FA_BRIDGE_SOL_ADDR),
@@ -2063,6 +2131,7 @@ mod test {
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput,
             )
             .unwrap();
             if !outcome.result.is_success() {
@@ -2085,7 +2154,7 @@ mod test {
                 &registry,
                 &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 Some(FA_BRIDGE_SOL_ADDR),
@@ -2100,6 +2169,7 @@ mod test {
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput,
             )
             .unwrap()
         }
@@ -2129,7 +2199,7 @@ mod test {
                 &registry,
                 &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 Some(destination),
@@ -2140,6 +2210,7 @@ mod test {
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput,
             )
             .unwrap()
         }
@@ -2166,7 +2237,7 @@ mod test {
                 &registry,
                 &mut journal,
                 DEFAULT_SPEC_ID,
-                &block_constants_with_no_fees(),
+                &BlockConstants::test_block_with_no_fees(),
                 None,
                 caller,
                 None,
@@ -2177,6 +2248,7 @@ mod test {
                 None,
                 None,
                 false,
+                TransactionOrigin::UserInput,
             );
 
             match result_create {
@@ -2797,7 +2869,7 @@ mod test {
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
-        let block_constants = block_constants_with_fees();
+        let block_constants = BlockConstants::test_block_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -2858,6 +2930,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .unwrap();
 
@@ -2933,7 +3006,7 @@ mod test {
     #[test]
     fn test_alias_forwarder_transfers_preexisting_balance() {
         let mut host = MockKernelHost::default();
-        let mut block_constants = block_constants_with_no_fees();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         // Initialize all precompiles (including AliasForwarder)
@@ -3007,7 +3080,7 @@ mod test {
     #[test]
     fn test_alias_forwarder_forwards_funds_after_creation() {
         let mut host = MockKernelHost::default();
-        let mut block_constants = block_constants_with_no_fees();
+        let mut block_constants = BlockConstants::test_block_with_no_fees();
         block_constants.tezos_experimental_features = true;
 
         // Initialize all precompiles (including AliasForwarder)
@@ -3057,7 +3130,6 @@ mod test {
 
         // Send funds to the alias address
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -3074,6 +3146,7 @@ mod test {
             None,
             None,
             false,
+            TransactionOrigin::UserInput,
         )
         .expect("Transaction should not fail");
 

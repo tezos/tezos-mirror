@@ -10,7 +10,9 @@ use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::{run_transaction, Error, ExecutionOutcome, GasData};
+use revm_etherlink::{
+    run_transaction, Error, ExecutionOutcome, GasData, TransactionOrigin,
+};
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -293,6 +295,7 @@ fn execute_transaction(
         None,
         None,
         false,
+        TransactionOrigin::UserInput,
     )
 }
 

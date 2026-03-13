@@ -130,6 +130,32 @@ impl BlockConstants {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
+impl BlockConstants {
+    pub const TEST_GAS_LIMIT: u64 = 30_000_000;
+    pub const TEST_CHAIN_ID: u64 = 42793;
+
+    pub fn test_block_with_fees() -> Self {
+        Self::first_block(
+            U256::from(1),
+            U256::from(Self::TEST_CHAIN_ID),
+            BlockFees::new(U256::from(1), U256::from(1), U256::from(1)),
+            Self::TEST_GAS_LIMIT,
+            H160::zero(),
+        )
+    }
+
+    pub fn test_block_with_no_fees() -> Self {
+        Self::first_block(
+            U256::from(1),
+            U256::from(Self::TEST_CHAIN_ID),
+            BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+            Self::TEST_GAS_LIMIT,
+            H160::zero(),
+        )
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EthBlock {
     // This choice of a L2 block representation is totally

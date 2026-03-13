@@ -26,5 +26,8 @@ tezosx-journal.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 
+[dev-dependencies]
+tezos_ethereum = { workspace = true, features = ["testing"] }
+
 [features]
 testing = ["tezosx-interfaces/testing"]
