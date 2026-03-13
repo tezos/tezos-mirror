@@ -28,19 +28,21 @@ open Baking_state_types
 open Protocol.Alpha_context
 
 (** [create_initial_state ?canceler context ?dal_node_rpc_ctxt ?synchronize
-    ?monitor_node_operations chain baking_configuration
-    dal_attestable_slots_worker round_durations current_proposal ?constants
-    consensus_keys] creates an initial {!Baking_state.t} by initializing a
-    {!type-Baking_state.global_state}, a {!type-Baking_state.automaton_state},
-    a {!type-Baking_state.level_state} and a {!type-Baking_state.round_state}.
+    ?monitor_node_operations chain baking_configuration current_proposal
+    ?constants consensus_keys] creates an initial {!Baking_state.t} by
+    initializing a {!type-Baking_state.global_state}, a
+    {!type-Baking_state.automaton_state}, a {!type-Baking_state.level_state}
+    and a {!type-Baking_state.round_state}.
 
-    - For the [global_state] initialization, a forge worker is started. If
-    [constants] is not provided, an RPC is called to recover them from the
-    [context].
+    - For the [global_state] initialization, [round_durations] and a DAL
+    attestable slots worker are created from [constants], and a forge worker is
+    started. If [constants] is not provided, an RPC is called to recover them
+    from the [context]. If [canceler] is provided, cancelling it will trigger a
+    shutdown of the DAL attestable slots worker.
 
     - For the [automaton_state] initialization, a validation mode is set based
     on the [baking_configuration] and an operation worker is started. If
-    [canceler] is provided, cancelling it will trigger a shutdown of the
+    [canceler] is provided, cancelling it will also trigger a shutdown of the
     operation worker. See {!Baking_automaton.create_automaton_state}.
 
     - For the [level_state] initialization, information regarding the current
