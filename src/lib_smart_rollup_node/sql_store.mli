@@ -40,12 +40,17 @@ val gc : rw -> level:int32 -> unit tzresult Lwt.t
     they refer to levels after [level]. *)
 val reset_to_level : rw -> level:int32 -> unit tzresult Lwt.t
 
-(** [export_store ~data_dir ~output_db_file] exports the store database with
-    data from the [data_dir] into the [output_db_file]. This function also
-    removes data that is specific to the operator. This function is meant to be
-    used to produce snapshots. *)
+(** [export_store ~data_dir ~output_db_file ?at_level ()] exports the store
+    database with data from the [data_dir] into the [output_db_file]. This
+    function also removes data that is specific to the operator. If [at_level]
+    is provided, data after this level is removed from the exported store. This
+    function is meant to be used to produce snapshots. *)
 val export_store :
-  data_dir:string -> output_db_file:string -> unit tzresult Lwt.t
+  data_dir:string ->
+  output_db_file:string ->
+  ?at_level:int32 ->
+  unit ->
+  unit tzresult Lwt.t
 
 (** [with_transaction store f] executes [f] with a single connection to the
     database in a transaction. I.e., if [f] returns an error or raises an

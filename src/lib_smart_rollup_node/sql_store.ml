@@ -1612,16 +1612,31 @@ let reset_to_level store ~level =
   let* () = L2_levels.delete_after ~conn store ~level in
   return_unit
 
-let export_store ~data_dir ~output_db_file =
+let export_store ~data_dir ~output_db_file ?at_level () =
   let open Lwt_result_syntax in
   let* store = init Read_only ~data_dir in
   Sqlite.use store @@ fun conn ->
   let* () = Sqlite.vacuum ~conn ~output_db_file in
-  (* Remove operator specific information *)
+  let*! () = close store in
+  (* Patch exported store *)
   let* store =
     Sqlite.init ~path:output_db_file ~perm:Read_write (fun _ -> return_unit)
   in
+  (* Remove operator specific information *)
   let* () = State.LPC.delete store in
+  (* Remove data if needed *)
+  let* () =
+    match at_level with
+    | Some level ->
+        let* head = State.L2_head.get store in
+        let is_head =
+          match head with
+          | Some (_, head_level) -> head_level = level
+          | None -> false
+        in
+        if is_head then return_unit else reset_to_level store ~level
+    | None -> return_unit
+  in
   let* () = Sqlite.use store @@ fun conn -> Sqlite.vacuum_self ~conn in
   let*! () = close store in
   return_unit

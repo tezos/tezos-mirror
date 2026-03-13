@@ -764,7 +764,7 @@ let export_dir (header : Header.t) ~unlock ~compression ~data_dir ~dest
       in
       Lwt_utils_unix.with_tempdir "rollup_node_sqlite_export_" @@ fun tmp_dir ->
       let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
-      let* () = Store.export_store ~data_dir ~output_db_file in
+      let* () = Store.export_store ~data_dir ~output_db_file () in
       let files = (output_db_file, Store.sqlite_file_name) :: files in
       let writer =
         match compression with
@@ -859,7 +859,7 @@ let export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename =
       Tezos_stdlib_unix.Utils.copy_file ~src:path ~dst:(tmp_dir // a)
   in
   let output_db_file = Filename.concat tmp_dir Store.sqlite_file_name in
-  let* () = Store.export_store ~data_dir ~output_db_file in
+  let* () = Store.export_store ~data_dir ~output_db_file () in
   copy_file "metadata" ;
   copy_dir "storage" ;
   copy_dir "wasm_2_0_0" ;
