@@ -444,6 +444,16 @@ let test_cli =
   let p = Agnostic_baker.spawn_raw ~arguments baker in
   let* () = check_process_error "Please connect a running DAL node using" p in
 
+  let arguments_with_bad_extra_node =
+    arguments @ ["--without-dal"; "--extra-node"; "file:///etc/passwd"]
+  in
+  let p =
+    Agnostic_baker.spawn_raw ~arguments:arguments_with_bad_extra_node baker
+  in
+  let* () =
+    check_process_error "only http and https endpoints are supported" p
+  in
+
   let arguments = arguments @ ["--without-dal"] in
   let* () = Agnostic_baker.wait_for_ready baker
   and* () = Agnostic_baker.raw ~arguments baker in
