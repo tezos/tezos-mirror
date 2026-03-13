@@ -381,6 +381,9 @@ pub trait ChainConfigTrait: Debug {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
+        // skip_signature_check can be used to simulate the application of
+        // ill-signed Tezos operations, it has no effect in the EVM case.
+        skip_signature_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging;
@@ -637,6 +640,9 @@ impl ChainConfigTrait for EvmChainConfig {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
+        // skip_signature_check can be used to simulate the application of
+        // ill-signed Tezos operations, it has no effect in the EVM case.
+        skip_signature_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging,
@@ -662,6 +668,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 &block_constants.michelson_runtime_block_constants,
                 operation,
                 sequencer_pool_address,
+                skip_signature_check,
             ),
         }
     }
@@ -784,6 +791,7 @@ where
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
@@ -792,6 +800,7 @@ fn apply_tezos_operation<Host>(
     block_constants: &TezlinkBlockConstants<impl context::Context>,
     operation: TezlinkOperation,
     sequencer_pool_address: Option<H160>,
+    skip_signature_check: bool,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1 + Logging,
@@ -813,8 +822,6 @@ where
 
             let required_da_fees =
                 get_required_da_fees(&operation, block_constants.da_fee_per_byte_mutez)?;
-
-            let skip_signature_check = false;
 
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
@@ -1023,6 +1030,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _index: u32,
         sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
+        skip_signature_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging,
@@ -1039,6 +1047,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 block_constants,
                 operation,
                 sequencer_pool_address,
+                skip_signature_check,
             ),
         }
     }
