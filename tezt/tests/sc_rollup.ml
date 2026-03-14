@@ -1278,6 +1278,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   let* rollup_node_3 = create_observer_node None in
   let* rollup_node_4 = create_observer_node None in
   let* rollup_node_5 = create_observer_node preimages_dir in
+  let* rollup_node_6 = create_observer_node None in
   let* () =
     Sc_rollup_node.run
       rollup_node_2
@@ -1400,9 +1401,11 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     bake_until_event ~timeout:60. client ~event_name ~hook:rollup_sync_hook
     @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
   in
-  let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
+  let* level = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
   let*! snapshot_file =
-    Sc_rollup_node.export_snapshot ~compact sc_rollup_node dir
+    (* Use head for snapshot to makes sure it includes the unpublished
+       commitment. *)
+    Sc_rollup_node.export_snapshot ~compact ~level:"head" sc_rollup_node dir
   in
   (* The rollup node should not have published its commitment yet *)
   Log.info "Try importing snapshot without published commitment." ;
@@ -1414,6 +1417,28 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     Process.check_error
       ~msg:(rex "Commitment of snapshot is not published on L1.")
       unpublished
+  in
+  Log.info
+    "Retry importing snapshot with --level %d (before unpublished commitment)."
+    level_snapshot ;
+  let*! () =
+    Sc_rollup_node.import_snapshot
+      ~force:true
+      ~level:(string_of_int (level - 5))
+      rollup_node_2
+      ~snapshot_file
+  in
+  Log.info "Export snapshot at earlier level." ;
+  let*! snapshot_file =
+    Sc_rollup_node.export_snapshot
+      ~compact
+      ~level:(string_of_int (level - 10))
+      sc_rollup_node
+      dir
+  in
+  Log.info "Import snapshot created at earlier level." ;
+  let*! () =
+    Sc_rollup_node.import_snapshot ~force:true rollup_node_6 ~snapshot_file
   in
   unit
 

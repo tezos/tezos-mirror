@@ -791,7 +791,7 @@ let patch_durable_storage sc_rollup_node ~key ~value =
       Process.check process
   | Running _ -> Test.fail "Cannot patch the state of a running node"
 
-let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
+let export_snapshot ?(compress_on_the_fly = false) ?(compact = false) ?level
     sc_rollup_node dir =
   let process =
     spawn_command
@@ -805,7 +805,8 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
          data_dir sc_rollup_node;
        ]
       @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
-      @ Cli_arg.optional_switch "compact" compact)
+      @ Cli_arg.optional_switch "compact" compact
+      @ Cli_arg.optional_arg "level" Fun.id level)
   in
   let parse process =
     let* output = Process.check_and_read_stdout process in
@@ -816,7 +817,7 @@ let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
   Runnable.{value = process; run = parse}
 
 let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
-    ?(no_check = false) sc_rollup_node ~snapshot_file =
+    ?(no_check = false) ?level sc_rollup_node ~snapshot_file =
   let process =
     spawn_command
       sc_rollup_node
@@ -829,7 +830,8 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
        ]
       @ (if apply_unsafe_patches then make_argument Apply_unsafe_patches else [])
       @ Cli_arg.optional_switch "force" force
-      @ Cli_arg.optional_switch "no-check" no_check)
+      @ Cli_arg.optional_switch "no-check" no_check
+      @ Cli_arg.optional_arg "level" Fun.id level)
   in
   Runnable.{value = process; run = Process.check}
 
