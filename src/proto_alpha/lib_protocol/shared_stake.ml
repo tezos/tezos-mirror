@@ -167,7 +167,9 @@ let compute_reward_distrib ctxt delegate stake rewards =
     Delegate_staking_parameters.of_delegate ctxt delegate
   in
   let* (stez_parameters : Clst_delegates_parameters_repr.t option) =
-    Clst_delegates_storage.get_delegate_parameters ctxt delegate
+    if Constants_storage.native_contracts_enable ctxt then
+      Clst_delegates_storage.get_delegate_parameters ctxt delegate
+    else return_none
   in
   let* full_staking_balance =
     Stake_storage.get_full_staking_balance ctxt delegate
