@@ -133,13 +133,20 @@ let set_committee t ~level lookup_fn =
     given level from the cache. *)
 let get_committee t ~level = Level_map.find_opt t.committees level
 
-(** For each slot, the decision
-    depends on how "deep" the attesting block is relative to [~head_level]:
-    - depth >= 2: the attesting block is final by Tenderbake - filter the
-      slot out unconditionally;
-    - depth 0 or 1: the attesting block is not yet final — filter the slot
-      out only if one of the recorded block hashes sits on the current chain
-      (matched against [~head_hash] or [~predecessor_hash]), respectively;
+(** For each slot, the decision depends on how "deep" the attesting block is
+    relative to [~head_level]:
+
+    - depth >= 2: check [block_hashes]:
+      - empty -> not on canonical chain -> allow
+      - non-empty -> on canonical chain -> filter out
+      Note that [apply_depth2_filter] is run when we process each block, so
+      entries at depth 2 (and larger) from the current head have [block_hashes]
+      already filtered by grandparent.
+
+    - depth 0 or 1: filter the slot out only if one of the recorded block
+      hashes sits on the current chain (matched against [~head_hash] or
+      [~predecessor_hash]), respectively;
+
     - depth < 0 (attested_level > head_level): returns an error. *)
 let filter_attestable_slots t ~delegate_id ~published_level ~attestable_slots
     ~head_level ~head_hash ~predecessor_hash =
@@ -156,7 +163,9 @@ let filter_attestable_slots t ~delegate_id ~published_level ~attestable_slots
               | None -> return @@ SlotSet.add slot_index acc
               | Some {attested_level; block_hashes} ->
                   let level_diff = Int32.sub head_level attested_level in
-                  if level_diff >= 2l then return acc
+                  if level_diff >= 2l then
+                    if block_hashes <> [] then return acc
+                    else return @@ SlotSet.add slot_index acc
                   else if level_diff < 0l then
                     tzfail
                       (Attestation_deduplication_cache_internal_error
@@ -285,72 +294,96 @@ let extract_dal_attestations_from_operations t ~attested_level operations =
       in
       return acc
 
-(** [update_slot_attestation ~attested_level ~block_hash ~grandparent
-    existing_slot_attestation_opt] returns the updated [slot_attestation] for
-    a single slot, preserving the invariant that the cache keeps the earliest
+(** [update_slot_attestation ~attested_level ~block_hash
+    existing_slot_attestation_opt] returns the updated [slot_attestation] for a
+    single slot, preserving the invariant that the cache keeps the earliest
     on-chain attestation seen. *)
-let update_slot_attestation ~attested_level ~block_hash ~predecessor_hash
-    ~grandparent = function
+let update_slot_attestation ~attested_level ~block_hash ~predecessor_hash =
+  function
   | None -> {attested_level; block_hashes = [block_hash]}
   | Some existing_slot_attestation ->
-      let level_diff =
-        Int32.sub attested_level existing_slot_attestation.attested_level
-      in
-      if level_diff < 0l then
-        (* Out-of-order block during a reorg - replace. *)
+      (* Update a previously cleared entry (having [block_hashes = []] from a
+         depth-2 filtering on an abandoned fork) when we see a new
+         attestation. *)
+      if existing_slot_attestation.block_hashes = [] then
         {attested_level; block_hashes = [block_hash]}
-      else if level_diff = 0l then
-        (* Competing proposals at the same level - keep both hashes. *)
-        {
-          attested_level;
-          block_hashes = block_hash :: existing_slot_attestation.block_hashes;
-        }
-      else if level_diff = 1l then
-        (* Depth 1, not yet final - check via [predecessor_hash] whether
-           the existing entry is on the current chain. *)
-        if
-          List.exists
-            (Block_hash.equal predecessor_hash)
-            existing_slot_attestation.block_hashes
-        then
-          (* Same chain — keep the earlier entry. *)
-          existing_slot_attestation
-        else
-          (* Different branch — replace:
-             A - B  (attests P)
-               \ B' (predecessor) - C' (new block, attests P). *)
-          {attested_level; block_hashes = [block_hash]}
-      else if level_diff = 2l then
-        (* Depth 2, Tenderbake finality boundary - check via [grandparent]
-           whether the existing entry is on the canonical chain. *)
-        if
-          List.exists
-            (Block_hash.equal grandparent)
-            existing_slot_attestation.block_hashes
-        then
-          (* On the canonical chain — keep:
-             A - B (grandparent, attests P) - C - D (new block, attests P). *)
-          {
-            attested_level = existing_slot_attestation.attested_level;
-            block_hashes = [grandparent];
-          }
-        else
-          (* On an abandoned fork — replace:
-             A - B  (attests P)
-               \ B' (grandparent) - C' - D' (new block, attests P). *)
-          {attested_level; block_hashes = [block_hash]}
       else
-        (* Depth > 2: only [predecessor_hash] (depth 1) and [grandparent]
-           (depth 2) are available, so chain membership at this depth
-           cannot be verified - replace with the fresh attestation. *)
-        {attested_level; block_hashes = [block_hash]}
+        let level_diff =
+          Int32.sub attested_level existing_slot_attestation.attested_level
+        in
+        if level_diff < 0l then
+          (* Out-of-order block during a reorg - replace. *)
+          {attested_level; block_hashes = [block_hash]}
+        else if level_diff = 0l then
+          (* Competing proposals at the same level - keep both hashes. *)
+          {
+            attested_level;
+            block_hashes = block_hash :: existing_slot_attestation.block_hashes;
+          }
+        else if level_diff = 1l then
+          (* Depth 1, not yet final - check via [predecessor_hash] whether
+             the existing entry is on the current chain. *)
+          if
+            List.exists
+              (Block_hash.equal predecessor_hash)
+              existing_slot_attestation.block_hashes
+          then
+            (* Same branch — keep the earlier entry. *)
+            existing_slot_attestation
+          else
+            (* Different branch — replace:
+               A - B  (attests)
+                 \ B' (predecessor) - C' (new block, attests). *)
+            {attested_level; block_hashes = [block_hash]}
+        else
+          (* - Case [level_diff = 2l]: we already handled it by
+               [apply_depth2_filter] at the start of the function;
+             - Case [level_diff > 2l]: we already validated this entry at depth
+               2 when we processed the block at L+2 (blocks come in
+               order). Keeping the earliest level. *)
+          existing_slot_attestation
 
-let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
-    ~grandparent ~operations =
-  let open Result_syntax in
-  let+ attestations =
-    extract_dal_attestations_from_operations t ~attested_level operations
-  in
+(** [apply_depth2_filter t ~block_level ~grandparent] updates all cache entries
+    whose [attested_level] is [block_level - 2]: their [block_hashes] is
+    filtered to only those equal to [grandparent]. So entries on the current
+    chain keep one hash; entries from an abandoned fork become empty.
+
+    Called when we process a block so that slots *not attested* in this block
+    still get their cache validated at depth 2. *)
+let apply_depth2_filter t ~block_level ~grandparent =
+  let level_at_depth_2 = Int32.sub block_level 2l in
+  Delegate_id.Table.iter
+    (fun _delegate_id published_level_cache ->
+      Level_map.fold
+        (fun published_level slot_map () ->
+          let updated_slot_map =
+            SlotMap.fold
+              (fun slot_index slot_att acc ->
+                if slot_att.attested_level = level_at_depth_2 then
+                  let block_hashes =
+                    List.filter
+                      (Block_hash.equal grandparent)
+                      slot_att.block_hashes
+                  in
+                  SlotMap.add slot_index {slot_att with block_hashes} acc
+                else SlotMap.add slot_index slot_att acc)
+              slot_map
+              SlotMap.empty
+          in
+          Level_map.replace
+            published_level_cache
+            published_level
+            updated_slot_map)
+        published_level_cache
+        ())
+    t.cache
+
+let update_slot_attestations t ~attested_level ~block_hash ~predecessor_hash
+    ~grandparent attestations =
+  (* First apply depth-2 grandparent filter to all entries at attested_level =
+     current_block_level - 2. This clears zombie entries (abandoned fork) even
+     when this block does not attest those slots. *)
+  apply_depth2_filter t ~block_level:attested_level ~grandparent ;
   Delegate_id.Table.iter
     (fun delegate_id attested_pairs ->
       let published_level_cache =
@@ -374,7 +407,6 @@ let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
                     ~attested_level
                     ~block_hash
                     ~predecessor_hash
-                    ~grandparent
                     existing_slot_attestation_opt
                 in
                 SlotMap.add slot_index updated_slot_attestation slot_map)
@@ -388,6 +420,20 @@ let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
         attested_pairs)
     attestations
 
+let update_from_proposal t ~attested_level ~block_hash ~predecessor_hash
+    ~grandparent ~operations =
+  let open Result_syntax in
+  let+ attestations =
+    extract_dal_attestations_from_operations t ~attested_level operations
+  in
+  update_slot_attestations
+    t
+    ~attested_level
+    ~block_hash
+    ~predecessor_hash
+    ~grandparent
+    attestations
+
 let create ~attestation_lags ~number_of_slots =
   let max_lag = List.fold_left max 0 attestation_lags in
   {
@@ -396,3 +442,23 @@ let create ~attestation_lags ~number_of_slots =
     attestation_lags;
     number_of_slots;
   }
+
+module Internal_for_tests = struct
+  let update_from_attested_slots t ~delegate_id ~attested_level ~block_hash
+      ~predecessor_hash ~grandparent ~attested_slots =
+    let attested_pairs =
+      List.map
+        (fun (published_level, indices) ->
+          (published_level, SlotSet.of_list indices))
+        attested_slots
+    in
+    let attestations = create_delegate_table () in
+    Delegate_id.Table.replace attestations delegate_id attested_pairs ;
+    update_slot_attestations
+      t
+      ~attested_level
+      ~block_hash
+      ~predecessor_hash
+      ~grandparent
+      attestations
+end

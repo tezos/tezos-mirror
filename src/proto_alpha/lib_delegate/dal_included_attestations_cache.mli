@@ -65,3 +65,20 @@ val update_from_proposal :
   grandparent:Block_hash.t ->
   operations:packed_operation list ->
   unit tzresult
+
+module Internal_for_tests : sig
+  (** [update_from_attested_slots] is a simplified [update_from_proposal] for
+      tests: same interface except [operations] is replaced by
+      [attested_slots] (list of (published_level, slot indices)) and a
+      [delegate_id]. Updates the cache for that delegate only (call for
+      each delegate as needed). *)
+  val update_from_attested_slots :
+    t ->
+    delegate_id:Baking_state_types.Delegate_id.t ->
+    attested_level:int32 ->
+    block_hash:Block_hash.t ->
+    predecessor_hash:Block_hash.t ->
+    grandparent:Block_hash.t ->
+    attested_slots:(int32 * int list) list ->
+    unit
+end

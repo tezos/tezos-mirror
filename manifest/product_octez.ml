@@ -7829,7 +7829,10 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
       opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
       only_if active @@ fun () ->
       tezt
-        ["test_scenario"]
+        (["test_scenario"]
+        @
+        if N.(number >= 025) then ["test_dal_included_attestations_cache"]
+        else [])
         ~path:(path // "lib_delegate/test")
         ~with_macos_security_framework:true
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
@@ -7850,6 +7853,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
             parameters |> if_some |> if_ N.(number >= 012);
             octez_crypto |> if_ N.(number >= 012);
             octez_event_logging_test_helpers |> open_;
+            qcheck_tezt |> if_ N.(number >= 025);
             uri;
           ]
     in
