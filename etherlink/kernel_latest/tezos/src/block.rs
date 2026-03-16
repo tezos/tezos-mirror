@@ -4,7 +4,7 @@
 
 use crate::enc_wrappers::BlockNumber;
 use crate::operation_result::OperationDataAndMetadata;
-use crate::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
+use crate::protocol::Protocol;
 use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{BlockHash, OperationHash};
@@ -106,6 +106,8 @@ impl TezBlock {
     }
 
     pub fn new(
+        protocol: Protocol,
+        next_protocol: Protocol,
         number: BlockNumber,
         timestamp: Timestamp,
         previous_hash: primitive_types::H256,
@@ -116,8 +118,8 @@ impl TezBlock {
             number,
             timestamp,
             previous_hash: BlockHash::from(previous_hash.to_fixed_bytes()),
-            protocol: TARGET_TEZOS_PROTOCOL,
-            next_protocol: TARGET_TEZOS_PROTOCOL,
+            protocol,
+            next_protocol,
             operations: OperationsWithReceipts { list: operations },
         };
         Ok(Self {

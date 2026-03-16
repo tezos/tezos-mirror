@@ -7,6 +7,9 @@
 
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
+use crate::blueprint_storage::{
+    read_current_tez_block_header, store_current_tez_block_header, TezBlockHeader,
+};
 use crate::chains::{
     TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
     TEZOS_BLOCKS_PATH,
@@ -38,6 +41,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
+use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
@@ -495,15 +499,27 @@ impl BlockInProgress {
         );
 
         if enable_tezos_runtime {
+            let protocol = match read_current_tez_block_header(host) {
+                Ok(previous_header) => previous_header.next_protocol,
+                Err(_) => TARGET_TEZOS_PROTOCOL,
+            };
             let tez_block = TezBlock::new(
+                protocol,
+                TARGET_TEZOS_PROTOCOL,
                 block_constants.michelson_runtime_block_constants.level,
                 self.timestamp,
                 self.tezos_parent_hash,
                 self.cumulative_tezos_operation_receipts.list,
             )?;
+            let new_header = TezBlockHeader {
+                hash: H256(*tez_block.hash),
+                next_protocol: tez_block.next_protocol,
+            };
             let tez_block = L2Block::Tezlink(tez_block);
             block_storage::store_current(host, &TEZOS_BLOCKS_PATH, &tez_block)
                 .context("Failed to store the Tezos block")?;
+            store_current_tez_block_header(host, &new_header)
+                .context("Failed to store the current TezBlockHeader")?;
         }
 
         let new_block = EthBlock::new(

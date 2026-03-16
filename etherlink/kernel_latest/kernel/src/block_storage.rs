@@ -185,6 +185,22 @@ pub fn read_current_hash(
 }
 
 #[cfg(test)]
+pub fn read_tezlink_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
+    use crate::chains::TEZLINK_SAFE_STORAGE_ROOT_PATH;
+    let block_path = path::current_block(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
+    let bytes = host.store_read_all(&block_path)?;
+    Ok(bytes)
+}
+
+#[cfg(test)]
+pub fn read_tezos_x_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
+    use crate::chains::TEZOS_BLOCKS_PATH;
+    let block_path = path::current_block(&TEZOS_BLOCKS_PATH)?;
+    let bytes = host.store_read_all(&block_path)?;
+    Ok(bytes)
+}
+
+#[cfg(test)]
 pub mod internal_for_tests {
     use tezos_ethereum::transaction::{TransactionHash, TransactionStatus};
 

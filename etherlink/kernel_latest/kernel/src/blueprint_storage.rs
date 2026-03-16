@@ -34,6 +34,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_storage::{read_rlp, store_read_slice, store_rlp};
 use tezos_tezlink::block::TezBlock;
+use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
@@ -48,6 +49,9 @@ const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/evm/current_block_header");
+
+const EVM_CURRENT_TEZ_BLOCK_HEADER: RefPath =
+    RefPath::assert_from(b"/evm/world_state/tezlink/current_chain_header");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
@@ -132,6 +136,7 @@ pub struct BlockHeader<H> {
 #[derive(PartialEq, Debug, Clone)]
 pub struct TezBlockHeader {
     pub hash: H256,
+    pub next_protocol: Protocol,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -165,6 +170,7 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
             },
             chain_header: ChainHeader::Tez(TezBlockHeader {
                 hash: H256(*block.hash),
+                next_protocol: block.next_protocol,
             }),
         }
     }
@@ -411,18 +417,35 @@ impl Decodable for EVMBlockHeader {
 
 impl Encodable for TezBlockHeader {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let Self { hash } = self;
-        stream.begin_list(1);
+        let Self {
+            hash,
+            next_protocol,
+        } = self;
+        stream.begin_list(2);
         stream.append(hash);
+        stream.append(next_protocol);
     }
 }
 
 impl Decodable for TezBlockHeader {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 1)?;
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        let item_count = decoder.item_count()?;
         let mut it = decoder.iter();
         let hash = decode_field(&rlp_helpers::next(&mut it)?, "hash")?;
-        Ok(Self { hash })
+        let next_protocol: Protocol = match item_count {
+            // V0 format: only hash, default next_protocol to INITIAL_PROTOCOL
+            1 => INITIAL_PROTOCOL,
+            // V1 format: hash + next_protocol
+            2 => decode_field(&rlp_helpers::next(&mut it)?, "protocol")?,
+            _ => return Err(DecoderError::RlpIncorrectListLen),
+        };
+        Ok(Self {
+            hash,
+            next_protocol,
+        })
     }
 }
 
@@ -463,7 +486,7 @@ impl<H: Decodable> Decodable for BlockHeader<H> {
         rlp_helpers::check_list(&decoder, 1)?; // Nesting added for forward-compatibility with multichain
         let mut it = decoder.iter();
         let chain_header =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "block_header")?;
+            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "chain_header")?;
         Ok(Self {
             blueprint_header: BlueprintHeader { number, timestamp },
             chain_header,
@@ -496,6 +519,23 @@ where
 {
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
+}
+
+pub fn store_current_tez_block_header<Host>(
+    host: &mut Host,
+    header: &TezBlockHeader,
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
+    store_rlp(header, host, &EVM_CURRENT_TEZ_BLOCK_HEADER).map_err(Error::from)
+}
+
+pub fn read_current_tez_block_header<Host>(host: &Host) -> Result<TezBlockHeader, Error>
+where
+    Host: StorageV1 + Logging,
+{
+    Ok(read_rlp(host, &EVM_CURRENT_TEZ_BLOCK_HEADER)?)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
@@ -981,6 +1021,7 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
+    use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
@@ -1197,6 +1238,7 @@ mod tests {
         };
         let tez_block_header = TezBlockHeader {
             hash: H256(*TezBlock::genesis_block_hash()),
+            next_protocol: TARGET_TEZOS_PROTOCOL,
         };
         let block_header = BlockHeader {
             blueprint_header,
