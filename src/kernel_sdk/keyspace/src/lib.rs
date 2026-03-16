@@ -105,11 +105,11 @@ impl Name {
     }
 }
 
-/// A key space in the durable storage
+/// A key space in the durable storage.
+///
+/// A `KeySpace` is a flat key-value store. Instances are created via
+/// [`KeySpaceLoader::load_or_create`].
 pub trait KeySpace {
-    /// Find the key space with the given name. If it does not exist, create a new key space.
-    fn load_or_create(name: &Name) -> Self;
-
     /// Read the whole value associated with the key.
     /// Returns `None` if the key does not exist.
     fn get(&self, key: &Key) -> Option<Vec<u8>>;
@@ -146,11 +146,42 @@ pub trait KeySpace {
     /// remove all key-value associations from `other`.
     fn move_from(&mut self, other: &mut Self);
 
-    /// Once all references to this key space are dropped, the key space will
-    /// be deleted.
-    fn mark_for_deletion(self);
-
     /// Obtain the hash that represents the current state of the key space. This hash is
     /// sensitive to the key-value associations and the order in which they were added.
     fn hash(&self) -> Vec<u8>;
+}
+
+/// Error returned by [`KeySpaceLoader::load_or_create`].
+#[derive(Debug)]
+pub enum KeySpaceLoaderError {
+    /// A key space whose name overlaps (is a prefix of, or has as prefix) the
+    /// requested name is already loaded.
+    Overlapping,
+    /// A key space with this exact name is already loaded and has not been
+    /// dropped yet.
+    AlreadyLoaded,
+}
+
+/// A loader for [`KeySpace`] instances backed by a specific storage implementation.
+///
+/// The loader tracks which keyspace names have been used and prevents
+/// overlapping names. Callers receive an owned key space handle; when the
+/// handle is dropped, the same name can be reloaded, but names that overlap
+/// with any previously loaded name are permanently rejected.
+pub trait KeySpaceLoader {
+    /// The type of key space produced by this loader.
+    type KeySpace: KeySpace;
+
+    /// Load or create a key space with the given name.
+    ///
+    /// Returns an owned key space handle. The caller may hold multiple
+    /// key spaces simultaneously as long as their names do not overlap.
+    ///
+    /// Returns an error if the requested name overlaps with any
+    /// previously loaded key space, or if a key space with this exact
+    /// name is already loaded.
+    fn load_or_create(
+        &mut self,
+        name: Name,
+    ) -> Result<Self::KeySpace, KeySpaceLoaderError>;
 }
