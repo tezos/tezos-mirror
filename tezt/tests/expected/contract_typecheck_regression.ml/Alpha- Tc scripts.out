@@ -8302,7 +8302,7 @@ Well typed (Gas remaining: 1039989.380 units remaining)	michelson_test_scripts/m
          /* [ pair address string string bytes : pair address string string bytes ] */ ;
          UNPAIR
          /* [ address : pair string string bytes : pair address string string bytes ] */ ;
-         CONTRACT %call
+         CONTRACT %call_evm
            (pair string (pair string bytes))
          /* [ option (contract (pair string string bytes)) : pair string string bytes
             : pair address string string bytes ] */ ;
