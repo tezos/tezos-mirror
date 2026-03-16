@@ -368,17 +368,18 @@ let subkeys state path =
   let*! res = Evm_state.subkeys state path in
   return res
 
+let entrypoint_config ctxt =
+  Pvm.Kernel.config
+    ~preimage_directory:ctxt.preimages
+    ?preimage_endpoint:ctxt.preimages_endpoint
+    ~kernel_debug:false
+    ~destination:ctxt.smart_rollup_address
+    ~trace_host_funs:ctxt.trace_host_funs
+    ()
+
 let execute_entrypoint ctxt state ~input_path ~input ~output_path ~entrypoint =
   let open Lwt_result_syntax in
-  let config =
-    Pvm.Kernel.config
-      ~preimage_directory:ctxt.preimages
-      ?preimage_endpoint:ctxt.preimages_endpoint
-      ~kernel_debug:false
-      ~destination:ctxt.smart_rollup_address
-      ~trace_host_funs:ctxt.trace_host_funs
-      ()
-  in
+  let config = entrypoint_config ctxt in
   let* result =
     Evm_state.execute_entrypoint
       ~data_dir:ctxt.data_dir
@@ -392,6 +393,34 @@ let execute_entrypoint ctxt state ~input_path ~input ~output_path ~entrypoint =
       ~entrypoint
   in
   return result
+
+let execute_entrypoint_with_insights ctxt state ~input_path ~input
+    ~insight_requests ~entrypoint =
+  let open Lwt_result_syntax in
+  let config = entrypoint_config ctxt in
+  let*! state =
+    Evm_state.modify ~key:input_path ~value:(Bytes.to_string input) state
+  in
+  let execution_input =
+    Simulation.Encodings.
+      {
+        messages = [];
+        reveal_pages = None;
+        insight_requests;
+        log_kernel_debug_file = None;
+      }
+  in
+  let* raw_insights =
+    Evm_state.execute_and_inspect
+      ~pool:ctxt.execution_pool
+      ~native_execution_policy:Configuration.Always
+      ~config
+      ~data_dir:ctxt.data_dir
+      ~wasm_entrypoint:entrypoint
+      ~input:execution_input
+      state
+  in
+  return raw_insights
 
 let pvm_config ctxt =
   Pvm.Kernel.config

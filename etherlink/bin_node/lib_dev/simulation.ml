@@ -406,3 +406,150 @@ let gas_estimation bytes =
   let module Encodings = (val Encodings.Rlp_decoding.select_rlp_decodings bytes)
   in
   Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
+
+(** {2 HTTP trace decoding} *)
+
+type http_trace = {
+  meth : string;
+  url : string;
+  request_headers : (string * string) list;
+  request_body : bytes;
+  response_status : int;
+  response_headers : (string * string) list;
+  response_body : bytes;
+  inner_traces : http_trace list;
+}
+
+let rec decode_http_trace rlp =
+  let open Result_syntax in
+  match rlp with
+  | Rlp.List
+      [meth; url; req_hdrs; req_body; status; resp_hdrs; resp_body; inner] ->
+      let* meth =
+        match meth with
+        | Rlp.Value v -> return (Bytes.to_string v)
+        | _ -> error_with "ill-encoded method"
+      in
+      let* url =
+        match url with
+        | Rlp.Value v -> return (Bytes.to_string v)
+        | _ -> error_with "ill-encoded url"
+      in
+      let* request_headers =
+        match req_hdrs with
+        | Rlp.List pairs ->
+            List.map_e
+              (function
+                | Rlp.List [Rlp.Value k; Rlp.Value v] ->
+                    return (Bytes.to_string k, Bytes.to_string v)
+                | _ -> error_with "ill-encoded header pair")
+              pairs
+        | _ -> error_with "ill-encoded request headers"
+      in
+      let* request_body =
+        match req_body with
+        | Rlp.Value v -> return v
+        | _ -> error_with "ill-encoded request body"
+      in
+      let* response_status =
+        match status with
+        | Rlp.Value v ->
+            let z = Ethereum_types.decode_number_le v in
+            let (Ethereum_types.Qty z) = z in
+            return (Z.to_int z)
+        | _ -> error_with "ill-encoded response status"
+      in
+      let* response_headers =
+        match resp_hdrs with
+        | Rlp.List pairs ->
+            List.map_e
+              (function
+                | Rlp.List [Rlp.Value k; Rlp.Value v] ->
+                    return (Bytes.to_string k, Bytes.to_string v)
+                | _ -> error_with "ill-encoded header pair")
+              pairs
+        | _ -> error_with "ill-encoded response headers"
+      in
+      let* response_body =
+        match resp_body with
+        | Rlp.Value v -> return v
+        | _ -> error_with "ill-encoded response body"
+      in
+      let* inner_traces =
+        match inner with
+        | Rlp.List items -> List.map_e decode_http_trace items
+        | _ -> error_with "ill-encoded inner traces"
+      in
+      return
+        {
+          meth;
+          url;
+          request_headers;
+          request_body;
+          response_status;
+          response_headers;
+          response_body;
+          inner_traces;
+        }
+  | _ -> error_with "ill-encoded HTTP trace"
+
+let decode_http_traces bytes =
+  let open Result_syntax in
+  if Bytes.length bytes = 0 then return []
+  else
+    let* rlp = Rlp.decode bytes in
+    match rlp with
+    | Rlp.List items -> List.map_e decode_http_trace items
+    | _ -> error_with "ill-encoded HTTP traces list"
+
+let http_trace_encoding =
+  let open Data_encoding in
+  mu "http_trace" (fun self ->
+      conv
+        (fun {
+               meth;
+               url;
+               request_headers;
+               request_body;
+               response_status;
+               response_headers;
+               response_body;
+               inner_traces;
+             }
+           ->
+          ( meth,
+            url,
+            request_headers,
+            request_body,
+            response_status,
+            response_headers,
+            response_body,
+            inner_traces ))
+        (fun ( meth,
+               url,
+               request_headers,
+               request_body,
+               response_status,
+               response_headers,
+               response_body,
+               inner_traces )
+           ->
+          {
+            meth;
+            url;
+            request_headers;
+            request_body;
+            response_status;
+            response_headers;
+            response_body;
+            inner_traces;
+          })
+        (obj8
+           (req "method" string)
+           (req "url" string)
+           (req "requestHeaders" (list (tup2 string string)))
+           (req "requestBody" bytes)
+           (req "responseStatus" int31)
+           (req "responseHeaders" (list (tup2 string string)))
+           (req "responseBody" bytes)
+           (dft "innerTraces" (list self) [])))

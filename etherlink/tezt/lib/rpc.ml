@@ -369,6 +369,40 @@ module Request = struct
       method_ = "tez_getEthereumTezosAddress";
       parameters = `A [`String ethereum_address];
     }
+
+  let http_traceCall_evm ~to_ ~data ?gas ?block () =
+    let call =
+      let fields = [("to", `String to_); ("data", `String data)] in
+      let fields =
+        match gas with Some g -> ("gas", `String g) :: fields | None -> fields
+      in
+      `O fields
+    in
+    let block =
+      match block with Some b -> `String b | None -> `String "latest"
+    in
+    let input =
+      `O [("type", `String "evm"); ("call", call); ("block", block)]
+    in
+    {method_ = "http_traceCall"; parameters = `A [input]}
+
+  let http_traceCall_michelson ~operation ?skip_signature ?block () =
+    let skip_sig =
+      match skip_signature with Some b -> `Bool b | None -> `Bool true
+    in
+    let block =
+      match block with Some b -> `String b | None -> `String "latest"
+    in
+    let input =
+      `O
+        [
+          ("type", `String "michelson");
+          ("operation", `String operation);
+          ("skipSignatureCheck", skip_sig);
+          ("block", block);
+        ]
+    in
+    {method_ = "http_traceCall"; parameters = `A [input]}
 end
 
 let net_version ?websocket evm_node =
@@ -918,5 +952,26 @@ module Tezosx = struct
         (Request.tez_getEthereumTezosAddress ethereum_address)
     in
     let decode_result response = JSON.(response |-> "result" |> as_string) in
+    return @@ decode_or_error decode_result response
+
+  let http_traceCall_evm ?websocket ~to_ ~data ?gas ?block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceCall_evm ~to_ ~data ?gas ?block ())
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceCall_michelson ?websocket ~operation ?skip_signature ?block
+      evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceCall_michelson ~operation ?skip_signature ?block ())
+    in
+    let decode_result response = JSON.(response |-> "result") in
     return @@ decode_or_error decode_result response
 end

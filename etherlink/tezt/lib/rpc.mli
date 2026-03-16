@@ -428,4 +428,21 @@ module Tezosx : sig
     string ->
     Evm_node.t ->
     (string, error) result Lwt.t
+
+  val http_traceCall_evm :
+    ?websocket:Websocket.t ->
+    to_:string ->
+    data:string ->
+    ?gas:string ->
+    ?block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val http_traceCall_michelson :
+    ?websocket:Websocket.t ->
+    operation:string ->
+    ?skip_signature:bool ->
+    ?block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
 end
