@@ -40,23 +40,24 @@ let with_version_constant =
 
 let with_version_constant_len = String.length with_version_constant
 
-let proof_of_work_nonce =
-  let out =
+let empty_proof_of_work_nonce =
+  (* A proof-of-work nonce template is hidden in this function closure.
+     A fresh copy is provided at each function call. *)
+  let proof_of_work_nonce =
     Bytes.make Alpha_context.Constants.proof_of_work_nonce_size '\000'
   in
   let () =
-    Bytes.blit_string with_version_constant 0 out 0 with_version_constant_len
+    Bytes.blit_string
+      with_version_constant
+      0
+      proof_of_work_nonce
+      0
+      with_version_constant_len
   in
-  out
-
-(* [proof_of_work_nonce] will be modified in place so we make a clean copy to expose to the outside *)
-let empty_proof_of_work_nonce = Bytes.copy proof_of_work_nonce
+  fun () -> Bytes.copy proof_of_work_nonce
 
 let max_z_len =
   Alpha_context.Constants.proof_of_work_nonce_size - with_version_constant_len
-
-(* Make a string of zeros to restore [proof_of_work_nonce] to its original value in 1 operation *)
-let zeros = String.make max_z_len '\000'
 
 let mine ~proof_of_work_threshold shell builder =
   let open Lwt_result_syntax in
@@ -77,15 +78,7 @@ let mine ~proof_of_work_threshold shell builder =
   with
   | None -> failwith "Cannot compute block header offset"
   | Some offset ->
-      let () =
-        (* Restore proof_of_work_nonce to its original value. *)
-        Bytes.blit_string
-          zeros
-          0
-          proof_of_work_nonce
-          with_version_constant_len
-          max_z_len
-      in
+      let proof_of_work_nonce = empty_proof_of_work_nonce () in
       (* Build the binary of the block header with 0 as proof of work and compute its hash. *)
       let block_0 = builder proof_of_work_nonce in
       let block_header =
@@ -104,8 +97,7 @@ let mine ~proof_of_work_threshold shell builder =
         let z_len = (Z.numbits z + 7) / 8 in
         if z_len > max_z_len then
           failwith
-            "Client_baking_pow.mine: couldn't find nonce for required proof of \
-             work"
+            "Baking_pow.mine: couldn't find nonce for required proof of work"
         else (
           Bytes.blit_string (Z.to_bits z) 0 block_header offset z_len ;
           (if Hacl_star.AutoConfig2.(has_feature VEC256) then
