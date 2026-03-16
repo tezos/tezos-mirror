@@ -257,3 +257,46 @@ val parse_protocol_data :
 
 (** Get round of a block. *)
 val get_block_round : block -> int32 tzresult Lwt.t
+
+(** {2 Additional helpers for integration testing} *)
+
+(** Get default protocol parametric constants from mockup parameters. *)
+val get_default_constants :
+  unit -> Protocol.Alpha_context.Constants.Parametric.t
+
+(** Chain ID used by the mockup simulator. *)
+val get_chain_id : unit -> Chain_id.t
+
+(** Get bootstrap accounts from mockup parameters. *)
+val get_bootstrap_accounts :
+  unit -> Protocol.Alpha_context.Parameters.bootstrap_account list
+
+(** {2 Forge Worker Test Infrastructure} *)
+
+(** Result type for [create_baker_test_env]. Contains everything needed
+    to test baker components like the forge worker. *)
+type baker_test_env = {
+  cctxt : Protocol_client_context.full;
+  delegates : Baking_state_types.Key.t list;
+  global_state : Baking_state.global_state;
+  genesis_block_info : Baking_state_types.block_info;
+}
+
+(** Create a test environment for baker component testing.
+
+    This function reuses the same setup as [baker_process] in [run]:
+    - Creates a fake node state with genesis block
+    - Creates a client context with mocked RPC services
+    - Registers delegates in the wallet
+    - Creates the global_state needed for forge worker
+
+    @param config Optional simulation config (defaults to [default_config])
+    @param num_delegates Number of bootstrap delegates to use (max 5)
+    @return A [baker_test_env] with all components needed for testing
+*)
+val create_baker_test_env :
+  ?config:config -> num_delegates:int -> unit -> baker_test_env tzresult Lwt.t
+
+(** Create a batch_content for consensus vote testing. *)
+val create_batch_content :
+  block_info:Baking_state_types.block_info -> Baking_state.batch_content
