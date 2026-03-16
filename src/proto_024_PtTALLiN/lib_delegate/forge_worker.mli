@@ -67,3 +67,39 @@ val shutdown : worker -> unit Lwt.t
 (** [start global_state] creates and runs a worker based on a baker's
     [global_state]. *)
 val start : global_state -> (worker, tztrace) result Lwt.t
+
+(** Internal module exposed for testing purposes only.
+    Do not use outside of tests. *)
+module Internal_for_tests : sig
+  (** Internal module for delegate signing queues. *)
+  module Delegate_signing_queue : sig
+    type t
+
+    val create : Baking_state_types.Delegate.t -> t
+  end
+
+  (** Internal types module. *)
+  module Types : sig
+    type state = {
+      delegate_signing_queues :
+        Delegate_signing_queue.t Baking_state_types.Key_id.Table.t;
+      baking_state : global_state;
+      push_event : Baking_state.forge_event option -> unit;
+      event_stream : Baking_state.forge_event Lwt_stream.t;
+    }
+  end
+
+  (** Get or create a delegate signing queue. This function is synchronous
+      and therefore thread-safe in Lwt's cooperative concurrency model. *)
+  val get_or_create_queue :
+    Types.state -> Baking_state_types.Delegate.t -> Delegate_signing_queue.t
+
+  (** Create a minimal test state for unit testing. *)
+  val create_test_state : unit -> Types.state
+
+  (** Get the number of queues in the state. *)
+  val queue_count : Types.state -> int
+
+  (** Check if a queue exists for a given delegate. *)
+  val has_queue : Types.state -> Baking_state_types.Delegate.t -> bool
+end

@@ -350,3 +350,34 @@ let push_request (worker : worker) request =
       Worker.Queue.push_request
         worker
         (Request.Forge_and_sign_attestations {unsigned_attestations})
+
+module Internal_for_tests = struct
+  module Delegate_signing_queue = Delegate_signing_queue
+  module Types = Types
+
+  let get_or_create_queue = get_or_create_queue
+
+  let create_test_state () =
+    let delegate_signing_queues = Key_id.Table.create 13 in
+    let event_stream, push_event = Lwt_stream.create () in
+    (* We use Obj.magic to create a dummy baking_state since we won't
+       actually use it in the queue management tests. The tests only
+       exercise get_or_create_queue which doesn't touch baking_state. *)
+    let dummy_baking_state : Baking_state.global_state = Obj.magic () in
+    Types.
+      {
+        delegate_signing_queues;
+        baking_state = dummy_baking_state;
+        event_stream;
+        push_event;
+      }
+
+  let queue_count state =
+    Key_id.Table.length state.Types.delegate_signing_queues
+
+  let has_queue state delegate =
+    Key_id.Table.mem
+      state.Types.delegate_signing_queues
+      delegate.Baking_state_types.Delegate.consensus_key
+        .Baking_state_types.Key.id
+end
