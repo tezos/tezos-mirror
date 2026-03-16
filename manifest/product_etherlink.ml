@@ -494,6 +494,7 @@ let _etherlink_tezts =
       "preconfirmation";
       "tezosx";
       "dev_commands";
+      "cross_runtime";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"

@@ -38,7 +38,8 @@
   tezlink
   preconfirmation
   tezosx
-  dev_commands))
+  dev_commands
+  cross_runtime))
 
 (executable
  (name main)
