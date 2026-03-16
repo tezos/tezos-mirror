@@ -893,7 +893,7 @@ function commit_09_link_in_manifest() {
   elif [[ ${command} == "copy" ]]; then
     sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
   else
-    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${version}_${short_hash} = active (Name.v \"${short_hash}\" ${version})\n" -i manifest/product_octez.ml
+    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${version}_${short_hash} = active (Name.dev \"${version}_${short_hash}\")\n" -i manifest/product_octez.ml
   fi
   ocamlformat -i manifest/product_octez.ml
   commit_no_hooks "manifest: link protocol in the node, client and codec"
@@ -1662,6 +1662,14 @@ function tezt_commit_02_adapt_lib_tezos_protocol() {
     # add $(capitalized_label) -> "$long_hash" before "(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)"
     sed "/\(\* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE \*\)/i \ | ${capitalized_label} -> \"${long_hash}\"" -i.old tezt/lib_tezos/protocol.ml
 
+    # Remove erroneous encoding_prefix entry for stabilised protocol.
+    # The sed above adds an entry to encoding_prefix because the pattern
+    # Alpha -> "alpha" also matches there. Stabilised protocols should use
+    # the default case which computes the prefix from number and hash.
+    if [[ ${command} == "stabilise" ]]; then
+      sed -i.old "s/ | ${capitalized_label} -> \"${label}\"//g" tezt/lib_tezos/protocol.ml
+    fi
+
     if [[ ${command} == "copy" ]]; then
       sed -r "s/(.*) Alpha -> Some (.*)/\1 Alpha -> Some ${capitalized_label}/g" -i.old tezt/lib_tezos/protocol.ml
       sed -r "s/(.*) ${capitalized_source} -> Some (.*)/\1 ${capitalized_source} -> Some \2 | ${capitalized_label} -> Some \2/g" -i.old tezt/lib_tezos/protocol.ml
@@ -2349,6 +2357,7 @@ function docs_commit_04_fix_protocols_rst() {
   sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
     -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
     -e "s,src/proto_${protocol_source},src/proto_${new_protocol_name},g" \
+    -e "s/${uncapitalized_source}_breaking_changes/${full_label}_breaking_changes/g" \
     -e "s/${capitalized_source}/${capitalized_label}/g" \
     -e "s/${uncapitalized_source}/${label}/g" \
     -i "docs/protocols/${new_versioned_name}.rst"
@@ -2489,6 +2498,33 @@ function docs_commit_08_generate_rpc_rst() {
   commit "docs: generate ${label}/rpc.rst"
 }
 
+# DOCS COMMIT 09: Update breaking_changes.rst
+#
+# MODE: stabilise/copy
+# MODIFIES: docs/introduction/breaking_changes.rst
+#
+# DESCRIPTION:
+#   Adds the new protocol's breaking changes label and section to
+#   docs/introduction/breaking_changes.rst. Inserts the anchor, section
+#   header, and changelog link before the first existing protocol section.
+#   Also adds a ref link in the table of contents near the top.
+#
+# CREATES: 0-1 commits — "docs: add <protocol_name> to breaking_changes.rst"
+#          (conditional)
+function docs_commit_09_update_breaking_changes() {
+  local breaking_file="docs/introduction/breaking_changes.rst"
+  if [[ ! -f "${breaking_file}" ]]; then
+    return 0
+  fi
+  local capitalized_full_label
+  capitalized_full_label=$(tr '[:lower:]' '[:upper:]' <<< "${full_label:0:1}")${full_label:1}
+  # Add ref link before the first existing _breaking_changes ref in the TOC
+  sed -i "0,/^- :ref:\`.*_breaking_changes\`/s//- :ref:\`${full_label}_breaking_changes\`\n&/" "${breaking_file}"
+  # Add anchor and section before the first existing protocol anchor
+  sed -i "0,/^\.\. _.*_breaking_changes:/s//.. _${full_label}_breaking_changes:\n\nProtocol ${capitalized_full_label}\n$(printf '%0.s-' $(seq 1 $((${#capitalized_full_label} + 9))))\n\n:doc:\`Full Protocol ${capitalized_full_label} Changelog<..\/protocols\/${new_versioned_name}>\`\n\n(No breaking changes yet.)\n\n\n&/" "${breaking_file}"
+  commit_if_changes "docs: add ${full_label} to breaking_changes.rst"
+}
+
 function generate_doc() {
 
   if [[ $skip_generate_doc ]]; then
@@ -2504,6 +2540,7 @@ function generate_doc() {
   docs_commit_06_update_doc_index
   docs_commit_07_update_docs_makefile
   docs_commit_08_generate_rpc_rst
+  docs_commit_09_update_breaking_changes
 
 }
 
@@ -2520,7 +2557,7 @@ function snapshot_protocol() {
     else
       read -r -p "Please enter the new variant or press enter to keep this one: " -e -i "${expected_variant}" new_variant
     fi
-    expected_label="${label:0:1}"
+    expected_label="${label:0:1}${version}"
     echo -e "Current expected tag is ${magenta}${expected_label}${reset}"
     if [[ ${non_interactive} == true ]]; then
       new_tag="${expected_label}"
