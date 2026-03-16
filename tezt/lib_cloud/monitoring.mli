@@ -6,4 +6,5 @@
 (*****************************************************************************)
 
 (** [run ?cmd_wrapper ()] runs netdata on the VM. *)
-val run : ?cmd_wrapper:Gcloud.cmd_wrapper -> unit -> unit Lwt.t
+val run :
+  ?runner:Runner.t -> ?cmd_wrapper:Gcloud.cmd_wrapper -> unit -> unit Lwt.t

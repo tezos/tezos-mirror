@@ -279,9 +279,9 @@ let rec wait_process ?(sleep = 4) ~is_ready ~run ?(propagate_error = false) () =
       if propagate_error then Lwt.fail (Process_failed e)
       else wait_process ~sleep ~is_ready ~run ()
 
-let run_command ?cmd_wrapper cmd args =
+let run_command ?runner ?cmd_wrapper cmd args =
   match cmd_wrapper with
-  | None -> Process.spawn cmd args
+  | None -> Process.spawn ?runner cmd args
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 

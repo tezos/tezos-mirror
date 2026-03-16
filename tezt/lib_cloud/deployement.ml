@@ -566,6 +566,14 @@ module Ssh_host = struct
         ["-D"; "-p"; guest_port]
       |> Process.check
     in
+    let* () =
+      if Env.monitoring then Monitoring.run ~runner () else Lwt.return_unit
+    in
+    let process_monitor =
+      if Env.process_monitoring then
+        Some (Process_monitor.init ~listening_port:(next_available_port ()))
+      else None
+    in
     let agent =
       Agent.make
         ~vm_name:None
@@ -573,7 +581,7 @@ module Ssh_host = struct
         ~next_available_port
         ~point:(Runner.address (Some runner), ssh_listening_port)
         ~ssh_id:(Env.ssh_private_key_filename ())
-        ~process_monitor:None
+        ~process_monitor
         ~artifacts_dir:Env.artifacts_dir
         ()
     in
@@ -661,16 +669,24 @@ module Ssh_host = struct
               host
               ssh_port
           in
+          let next_available_port =
+            let port = ref (base_port + (i * range)) in
+            fun () ->
+              incr port ;
+              !port
+          in
+          let process_monitor =
+            if Env.process_monitoring then
+              Some
+                (Process_monitor.init ~listening_port:(next_available_port ()))
+            else None
+          in
           let agent =
             Agent.make
               ~vm_name:None
               ~configuration
-              ~next_available_port:
-                (let cpt = ref (base_port + (i * range)) in
-                 fun () ->
-                   incr cpt ;
-                   !cpt)
-              ~process_monitor:None
+              ~next_available_port
+              ~process_monitor
               ~point:(host, ssh_port)
               ~ssh_id:(Env.ssh_private_key_filename ())
               ~artifacts_dir:Env.artifacts_dir

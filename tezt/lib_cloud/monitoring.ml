@@ -5,10 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let run ?cmd_wrapper () =
+let run ?runner ?cmd_wrapper () =
   let* is_already_running =
     let process =
-      Env.run_command ?cmd_wrapper "docker" ["ps"; "--format"; "{{.Names}}"]
+      Env.run_command
+        ?runner
+        ?cmd_wrapper
+        "docker"
+        ["ps"; "--format"; "{{.Names}}"]
     in
     let* status = Process.wait process in
     match status with
@@ -40,5 +44,5 @@ let run ?cmd_wrapper () =
        netdata/netdata" |> String.split_on_char ' '
       |> List.filter (fun s -> s <> "")
     in
-    let* _ = Env.run_command ?cmd_wrapper cmd args |> Process.check in
+    let* _ = Env.run_command ?runner ?cmd_wrapper cmd args |> Process.check in
     Lwt.return_unit
