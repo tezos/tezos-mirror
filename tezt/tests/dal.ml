@@ -2595,6 +2595,12 @@ let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
   let min_published_level = Int32.of_int start in
   let max_published_level = Int32.of_int stop in
   let file = Temp.file ("snapshot-" ^ name) in
+  (* Wait for the DAL node to process finalized blocks up to [stop - 2] before
+     exporting the snapshot. The snapshot export caps [max_published_level] at
+     [last_processed_level - (validation_slack + attestation_lag + 1)], so if
+     the DAL node hasn't caught up yet the snapshot would be missing levels
+     required by [tests_ok]. *)
+  let* () = wait_for_layer1_final_block dal_node (stop - 2) in
   (* Export with default levels (uses first_seen_level and last_processed_level) *)
   let* () =
     Dal_node.snapshot_export
