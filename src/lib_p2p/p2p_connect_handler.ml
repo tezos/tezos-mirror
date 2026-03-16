@@ -187,9 +187,13 @@ let create_connection t p2p_conn id_point point_info peer_info
     Option.map
       (fun qs ->
         ( qs,
-          fun (size, _) ->
-            (Sys.word_size / 8 * 11)
-            + size + Lwt_pipe.Maybe_bounded.push_overhead ))
+          (* The size function returns 1 for every message, making [qs] a cap on
+             the number of decoded application messages buffered per connection
+             (rather than a byte budget). This provides simple, predictable
+             back-pressure: once [qs] messages are queued and waiting to be
+             consumed by the shell, the reader loop stalls until the shell
+             drains the pipe. *)
+          fun _ -> 1 ))
       t.config.incoming_app_message_queue_size
   in
   let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
