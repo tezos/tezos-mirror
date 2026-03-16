@@ -190,6 +190,36 @@ let job_build_layer1_profiling =
       "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
     ]
 
+let job_build_static_linux_binaries =
+  Cacio.parameterize @@ fun arch ->
+  let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
+  CI.job
+    ("oc.build:static-" ^ arch_string ^ "-linux-binaries")
+    ~__POS__
+    ~description:("Build the static Octez binaries for " ^ arch_string ^ ".")
+    ~stage:Build
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~arch
+    ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
+    ~storage:Ramfs
+    ~image:Tezos_ci.Images.CI.build
+    ~variables:
+      [
+        ("ARCH", arch_string);
+        ( "EXECUTABLE_FILES",
+          "script-inputs/octez-released-executables \
+           script-inputs/octez-experimental-executables" );
+        ("DUNE_BUILD_JOBS", "-j 12");
+      ]
+    ~artifacts:(Gitlab_ci.Util.artifacts ["octez-binaries/$ARCH/*"])
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      "eval $(opam env)";
+      "./scripts/ci/build_static_binaries.sh";
+    ]
+
 let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
@@ -200,6 +230,7 @@ let register () =
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
       (Manual, job_build_exp Arm64);
+      (Manual, job_build_static_linux_binaries Arm64);
     ] ;
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
@@ -210,6 +241,7 @@ let register () =
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
       (Auto, job_build_layer1_profiling `test);
+      (Auto, job_build_static_linux_binaries Amd64);
     ] ;
   Cacio.register_jobs
     Schedule_extended_test
@@ -222,6 +254,7 @@ let register () =
       (Auto, job_build_extra_dev Arm64);
       (Auto, job_build_exp Arm64);
       (Auto, job_build_layer1_profiling `test);
+      (Auto, job_build_static_linux_binaries Arm64);
     ] ;
   Cacio.register_jobs
     Master
@@ -229,6 +262,8 @@ let register () =
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
       (Manual, job_build_exp Arm64);
+      (Auto, job_build_static_linux_binaries Amd64);
+      (Auto, job_build_static_linux_binaries Arm64);
     ] ;
   Cacio.register_jobs
     Octez_monitoring

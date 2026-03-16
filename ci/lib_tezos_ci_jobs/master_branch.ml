@@ -15,30 +15,11 @@
    - static binaries, and
    - documentation. *)
 
-open Common.Build
 open Common.Docker
 open Gitlab_ci.Util
 open Tezos_ci
 
 let rules_always = [job_rule ~when_:Always ()]
-
-(* static binaries *)
-let job_static_arm64 =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~storage:Ramfs
-    ~rules:rules_always
-    ()
-
-let job_static_x86_64 =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Amd64
-    ~cpu:Very_high
-    ~storage:Ramfs
-    ~rules:rules_always
-    ()
 
 (* Defines the jobs of the [schedule_docker_build_pipeline] pipeline.
 
@@ -87,29 +68,6 @@ let jobs =
      [changes:] in different pipelines, see
      {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
      GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
-  let job_static_arm64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~rules:rules_always
-      ()
-  in
-  let job_static_x86_64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~rules:rules_always
-      ()
-  in
-  [
-    (* Stage: build *)
-    job_static_x86_64;
-    job_static_arm64;
-    (* Stage: sanity *)
-    job_datadog_pipeline_trace;
-  ]
+  [(* Stage: sanity *) job_datadog_pipeline_trace]
   (* Jobs to build and update on Docker Hub the Octez Docker image.  *)
   @ octez_distribution_docker_jobs
