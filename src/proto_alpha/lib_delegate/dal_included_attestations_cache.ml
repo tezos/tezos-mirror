@@ -7,6 +7,7 @@
 
 open Protocol.Alpha_context
 open Baking_state_types
+open Baking_errors
 
 type error +=
   | Attestation_deduplication_cache_internal_error of {
