@@ -54,10 +54,12 @@ type t = {
       (** Size in bytes of the buffer passed to [Lwt_unix.read]. *)
   read_queue_size : int option;
   write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
-      (** Various bounds for internal queues. *)
+      (** Various bounds for internal queues (in bytes). *)
+  incoming_app_message_queue_size : int option;
+      (** Maximum number of decoded application messages buffered per connection
+      waiting to be handled by the shell (message count, not bytes). *)
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
       (** Optional limitation of internal hashtables (max, target) *)
