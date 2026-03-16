@@ -101,7 +101,7 @@ module Dal = struct
         ~group
         ~desc:"Print SQL statements describing the tables created in the store."
         args
-        (prefixes ["debug"; "dal"; "print"; "store"; "schemas"] @@ stop)
+        (prefixes ["dal"; "debug"; "print"; "store"; "schemas"] @@ stop)
         (fun () _cctxt -> Cli.Action.debug_print_store_schemas ())
     in
     let run =
@@ -139,7 +139,7 @@ module Dal = struct
         ~group
         ~desc:"Run the Octez DAL"
         args
-        (prefixes ["run"; "dal"] @@ stop)
+        (prefixes ["dal"; "run"] @@ stop)
         (fun ( data_dir,
                config_file,
                rpc_addr,
@@ -229,7 +229,7 @@ module Dal = struct
         ~group
         ~desc
         args
-        (prefixes ["config"; "dal"; p] @@ stop)
+        (prefixes ["dal"; "config"; p] @@ stop)
         (fun ( data_dir,
                config_file,
                rpc_addr,

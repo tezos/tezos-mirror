@@ -139,8 +139,9 @@ let spawn_config_init_or_reset ~subcommand ?(expected_pow = 0.) ?(peers = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
-  spawn_command dal_node @@ ["config"]
-  @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+  spawn_command dal_node
+  @@ (if use_baker_to_start_dal_node = Some true then ["dal"; "config"]
+      else ["config"])
   @ [
       subcommand;
       "--data-dir";
@@ -196,14 +197,15 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
   spawn_command dal_node
-  @@ [
-       "config";
-       "update";
-       "--data-dir";
-       data_dir dal_node;
-       "--expected-pow";
-       string_of_float expected_pow;
-     ]
+  @@ (if use_baker_to_start_dal_node = Some true then
+        ["dal"; "config"; "update"]
+      else ["config"; "update"])
+  @ [
+      "--data-dir";
+      data_dir dal_node;
+      "--expected-pow";
+      string_of_float expected_pow;
+    ]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
      else ["--attester-profiles"; String.concat "," attester_profiles])
@@ -525,8 +527,8 @@ let run ?env ?event_level node =
     ?env
     ?event_level
     node
-    (["run"]
-    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    ((if use_baker_to_start_dal_node = Some true then ["dal"; "run"]
+      else ["run"])
     @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
 
 let run ?(wait_ready = true) ?env ?event_level node =
@@ -582,9 +584,8 @@ let load_last_finalized_processed_level dal_node =
 
 let debug_print_store_schemas ?path ?hooks () =
   let args =
-    ["debug"]
-    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
-    @ ["print"; "store"; "schemas"]
+    (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["debug"; "print"; "store"; "schemas"]
   in
   let path =
     Option.value
