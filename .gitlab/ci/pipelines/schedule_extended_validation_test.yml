@@ -83,6 +83,8 @@ oc.build_kernels:
     - tx_kernel.wasm
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
+    - riscv-echo
+    - riscv-echo.checksum
     when: on_success
 
 oc.build_x86_64-exp:

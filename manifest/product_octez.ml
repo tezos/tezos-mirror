@@ -3804,6 +3804,39 @@ let _octez_riscv_nds_memory =
         octez_riscv_durable_storage_in_memory_api;
       ]
 
+let octez_riscv_kernels =
+  let kernels = ["riscv-echo"] in
+  let target_files = List.concat_map (fun k -> [k; k ^ ".checksum"]) kernels in
+  let targets = Dune.(of_list (List.map (fun f -> S f) target_files)) in
+  private_lib
+    "octez_riscv_kernels"
+    ~path:"src/lib_riscv/kernels"
+    ~opam:"octez-riscv-pvm-test"
+    ~modules:[]
+    ~dune:
+      Dune.
+        [
+          [S "dirs"; S ":standard"; S ".cargo"; [S "not"; S "target"]];
+          [
+            S "rule";
+            S "targets" :: targets;
+            (* These tagets could have already been built by `kernels.mk`.
+               In that case, skip them. *)
+            [S "mode"; [S "fallback"]];
+            [
+              S "deps";
+              [S "source_tree"; S ".cargo"];
+              [S "source_tree"; S "echo"];
+              [S "file"; S "Cargo.toml"];
+              [S "file"; S "Cargo.lock"];
+              [S "file"; S "Makefile"];
+              [S "file"; S "rust-toolchain.toml"];
+            ];
+            [S "action"; [S "progn"; [S "run"; S "sh"; S "-c"; S "make build"]]];
+          ];
+          [S "alias"; [S "name"; S "default"]; S "deps" :: targets];
+        ]
+
 let octez_riscv_pvm =
   public_lib
     "octez-riscv-pvm"
@@ -5340,6 +5373,8 @@ let _octez_riscv_pvm_test =
         "../../../riscv/assets/riscv-dummy.elf";
         "../../../riscv/assets/riscv-dummy.elf.checksum";
         "../../../riscv/assets/jstz_proof_initial";
+        "../../kernels/riscv-echo";
+        "../../kernels/riscv-echo.checksum";
       ]
     ~deps:
       [
@@ -5348,6 +5383,8 @@ let _octez_riscv_pvm_test =
         octez_base_test_helpers |> open_;
         alcotezt;
         octez_riscv_pvm;
+        (* This dependency ensures the kernels are built before the tests *)
+        octez_riscv_kernels;
       ]
 
 let _octez_libcrux_ml_dsa_tests =

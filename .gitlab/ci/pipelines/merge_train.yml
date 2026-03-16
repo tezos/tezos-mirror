@@ -1316,6 +1316,8 @@ oc.build_kernels:
     - tx_kernel.wasm
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
+    - riscv-echo
+    - riscv-echo.checksum
     when: on_success
 
 oc.build_x86_64-exp:
@@ -2335,8 +2337,10 @@ oc.unit:non-proto-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
+  - oc.build_kernels
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2421,8 +2425,10 @@ oc.unit:non-proto-arm64:
     when: on_success
   needs:
   - oc.docker:ci:arm64
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:arm64
+  - oc.build_kernels
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG

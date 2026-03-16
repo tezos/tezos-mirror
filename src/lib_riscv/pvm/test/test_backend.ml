@@ -11,7 +11,7 @@ open Octez_riscv_pvm
 let test_advance_dummy_kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
-  let* kernel = Utils.read_riscv_dummy_kernel () in
+  let* kernel = Utils.read_riscv_kernel Dummy in
   let* () = Backend.Mutable_state.install_boot_sector state kernel in
 
   (* This relies on the kernel being able to step at least `sum(step_count)` steps
@@ -95,3 +95,10 @@ let test_proof_immutability kernel () =
 
       return_unit
   | None -> Lwt.fail_with "Could not produce proof"
+
+let test_init_echo_kernel () =
+  let open Lwt_syntax in
+  let state = Storage.empty () in
+  let* kernel = Utils.read_riscv_echo_kernel () in
+  let* () = Backend.Mutable_state.install_boot_sector state kernel in
+  return_unit

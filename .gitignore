@@ -135,6 +135,9 @@ evm_benchmark_kernel.wasm
 evm_unstripped_installer.wasm
 _evm_unstripped_installer_preimages/
 
+riscv-echo
+riscv-echo.checksum
+
 # etherlink
 /etherlink/kernels-*
 etherlink-governance-observer
