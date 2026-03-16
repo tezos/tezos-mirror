@@ -142,13 +142,13 @@ macro_rules! __trace_kernel_add_attrs {
 
 // Must only be used by the procedural macro for kernel tracing.
 #[cfg(feature = "tracing")]
-pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
+pub fn internal_trace_kernel<F, R>(name: &str, f: F) -> R
 where
-    F: FnOnce(&mut H) -> R,
+    F: FnOnce() -> R,
 {
     let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
     debug_str!(&msg);
-    let res = f(host);
+    let res = f();
 
     let msg = format!("[{}] [end] {}", crate::Level::OTel, name);
     debug_str!(&msg);

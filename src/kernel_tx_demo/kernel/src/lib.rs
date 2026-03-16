@@ -121,10 +121,7 @@ where
             Ok(()) => {}
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(
-                    "Failed to delete processed DAL payload. Error: {:?}\n",
-                    _e
-                );
+                debug_msg!("Failed to delete processed DAL payload. Error: {:?}\n", _e);
             }
         }
         return;
