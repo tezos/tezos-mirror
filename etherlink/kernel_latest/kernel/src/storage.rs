@@ -179,6 +179,8 @@ const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
     RefPath::assert_from(b"/evm/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
+pub const SIMULATION_HTTP_TRACES: RefPath =
+    RefPath::assert_from(b"/evm/simulation_http_traces");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
@@ -241,6 +243,19 @@ where
     let encoded = result.to_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
+}
+
+pub fn store_simulation_http_traces(
+    host: &mut impl StorageV1,
+    traces: &[tezosx_journal::HttpTrace],
+) -> Result<(), anyhow::Error> {
+    let mut stream = rlp::RlpStream::new_list(traces.len());
+    for trace in traces {
+        stream.append(trace);
+    }
+    let encoded = stream.out();
+    host.store_write(&SIMULATION_HTTP_TRACES, &encoded, 0)
+        .context("Failed to write the simulation HTTP traces.")
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");

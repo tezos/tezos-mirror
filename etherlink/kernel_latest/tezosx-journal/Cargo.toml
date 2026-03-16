@@ -12,6 +12,12 @@ license = "MIT"
 # VM
 revm.workspace = true
 
+# HTTP
+http.workspace = true
+
+# Encoding
+rlp.workspace = true
+
 # Types
 evm-types.workspace = true
 michelson-types.workspace = true

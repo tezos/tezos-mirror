@@ -75,7 +75,8 @@ impl Registry for RegistryImpl {
     where
         Host: StorageV1 + Logging,
     {
-        match request.uri().host() {
+        journal.record_request(&request);
+        let result = match request.uri().host() {
             Some(h) if h == self.tezos.host() => {
                 self.tezos.serve(self, host, journal, request)
             }
@@ -89,7 +90,11 @@ impl Registry for RegistryImpl {
                         .into_bytes(),
                 )
                 .unwrap()),
+        };
+        if let Ok(ref response) = result {
+            journal.record_response(response.clone());
         }
+        result
     }
 }
 

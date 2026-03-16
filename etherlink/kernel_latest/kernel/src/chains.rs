@@ -139,7 +139,7 @@ impl EvmChainConfig {
 
 #[derive(Debug)]
 pub struct MichelsonChainConfig {
-    chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 pub enum ChainConfig {
@@ -703,19 +703,23 @@ impl ChainConfigTrait for EvmChainConfig {
                 &self.spec_id,
                 &self.limits,
             ),
-            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
-                &self.michelson_chain_config.chain_id,
-                block_in_progress,
-                host,
-                registry,
-                &block_constants.michelson_runtime_block_constants,
-                operation,
-                sequencer_pool_address,
-                skip_signature_check,
-                skip_fees_check,
-                Some(outbox_queue),
-                Some(&block_constants.evm_runtime_block_constants),
-            ),
+            TezosXTransaction::Tezos(operation) => {
+                let mut journal = TezosXJournal::new();
+                apply_tezos_operation(
+                    &self.michelson_chain_config.chain_id,
+                    block_in_progress,
+                    host,
+                    registry,
+                    &block_constants.michelson_runtime_block_constants,
+                    operation,
+                    sequencer_pool_address,
+                    skip_signature_check,
+                    skip_fees_check,
+                    Some(outbox_queue),
+                    Some(&block_constants.evm_runtime_block_constants),
+                    &mut journal,
+                )
+            }
         }
     }
 
@@ -789,6 +793,10 @@ impl EvmChainConfig {
     pub fn get_spec_id(&self) -> &SpecId {
         &self.spec_id
     }
+
+    pub fn michelson_chain_config(&self) -> &MichelsonChainConfig {
+        &self.michelson_chain_config
+    }
 }
 
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
@@ -842,7 +850,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn apply_tezos_operation<Host>(
+pub fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
     block_in_progress: &BlockInProgress,
     host: &mut Host,
@@ -854,6 +862,7 @@ fn apply_tezos_operation<Host>(
     skip_fees_check: bool,
     outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
+    external_journal: &mut TezosXJournal,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1 + Logging,
@@ -899,7 +908,7 @@ where
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
-            let mut tezosx_journal = TezosXJournal::new();
+            let journal = external_journal;
             let fees = if skip_fees_check {
                 None
             } else {
@@ -908,7 +917,7 @@ where
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
-                &mut tezosx_journal,
+                journal,
                 context,
                 hash.clone(),
                 operation,
@@ -952,7 +961,7 @@ where
                     host,
                     registry,
                     evm_block_constants,
-                    &mut tezosx_journal,
+                    journal,
                 )?;
                 push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             }
@@ -1136,19 +1145,23 @@ impl ChainConfigTrait for MichelsonChainConfig {
             TezosXTransaction::Ethereum(_transaction) => {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
             }
-            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
-                &self.chain_id,
-                block_in_progress,
-                host,
-                registry,
-                block_constants,
-                operation,
-                sequencer_pool_address,
-                skip_signature_check,
-                skip_fees_check,
-                None::<&OutboxQueue<'_, RefPath>>,
-                None,
-            ),
+            TezosXTransaction::Tezos(operation) => {
+                let mut journal = TezosXJournal::new();
+                apply_tezos_operation(
+                    &self.chain_id,
+                    block_in_progress,
+                    host,
+                    registry,
+                    block_constants,
+                    operation,
+                    sequencer_pool_address,
+                    skip_signature_check,
+                    skip_fees_check,
+                    None::<&OutboxQueue<'_, RefPath>>,
+                    None,
+                    &mut journal,
+                )
+            }
         }
     }
 

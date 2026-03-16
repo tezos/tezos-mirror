@@ -377,14 +377,21 @@ impl Evaluation {
         }
     }
 
-    /// Execute the simulation
+    /// Execute the simulation, returning both the result and the HTTP
+    /// traces captured during cross-runtime execution.
     pub fn run<Host>(
         &self,
         host: &mut Host,
         registry: &impl Registry,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
-    ) -> Result<SimulationResult<CallResult, String>, Error>
+    ) -> Result<
+        (
+            SimulationResult<CallResult, String>,
+            Vec<tezosx_journal::HttpTrace>,
+        ),
+        Error,
+    >
     where
         Host: StorageV1 + Logging,
     {
@@ -488,7 +495,7 @@ impl Evaluation {
         simulation_caller.set_info_without_code(host, info)?;
 
         let mut journal = TezosXJournal::new();
-        match revm_run_transaction(
+        let sim_result = match revm_run_transaction(
             host,
             registry,
             &mut journal,
@@ -529,7 +536,9 @@ impl Evaluation {
                 Ok(result)
             }
             Err(err) => Ok(SimulationResult::Err(err.to_string())),
-        }
+        };
+        let traces = journal.into_http_traces();
+        sim_result.map(|r| (r, traces))
     }
 }
 
@@ -668,7 +677,9 @@ where
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(host, registry, tracer_input, spec_id)?;
+            let (outcome, traces) =
+                simulation.run(host, registry, tracer_input, spec_id)?;
+            storage::store_simulation_http_traces(host, &traces)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -845,7 +856,7 @@ mod tests {
         let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
 
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
@@ -871,7 +882,7 @@ mod tests {
         let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
             gas_used: _,
@@ -904,7 +915,7 @@ mod tests {
         let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
-        let outcome = outcome.unwrap();
+        let (outcome, _traces) = outcome.unwrap();
         if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
             value,
             gas_used: _,

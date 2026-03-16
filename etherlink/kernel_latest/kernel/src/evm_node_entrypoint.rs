@@ -14,7 +14,7 @@ use crate::{
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
-    chains::{ChainConfigTrait, EvmChainConfig},
+    chains::{self, ChainConfigTrait, EvmChainConfig},
     configuration::fetch_pure_evm_config,
     delayed_inbox::DelayedInbox,
     storage::read_chain_id,
@@ -304,19 +304,41 @@ where
         .expect("WITHDRAWAL_OUTBOX_QUEUE is a valid path");
 
     let skip_fees_check = true;
-    let execution_result = match evm_config.apply_transaction(
-        &block_in_progress,
-        &mut host,
-        &registry,
-        &outbox_queue,
-        &block_constants,
-        transaction,
-        0,
-        None,
-        None,
-        skip_signature_check,
-        skip_fees_check,
-    ) {
+    // For Tezos transactions, call apply_tezos_operation directly with an
+    // external journal so we can capture HTTP traces.  For Ethereum
+    // transactions, go through the normal apply_transaction path.
+    let mut trace_journal = tezosx_journal::TezosXJournal::new();
+    let execution_result = match transaction {
+        chains::TezosXTransaction::Tezos(operation) => chains::apply_tezos_operation(
+            &evm_config.michelson_chain_config().chain_id,
+            &block_in_progress,
+            &mut host,
+            &registry,
+            &block_constants.michelson_runtime_block_constants,
+            operation,
+            None,
+            skip_signature_check,
+            skip_fees_check,
+            Some(&outbox_queue),
+            Some(&block_constants.evm_runtime_block_constants),
+            &mut trace_journal,
+        ),
+        _ => evm_config.apply_transaction(
+            &block_in_progress,
+            &mut host,
+            &registry,
+            &outbox_queue,
+            &block_constants,
+            transaction,
+            0,
+            None,
+            None,
+            skip_signature_check,
+            skip_fees_check,
+        ),
+    };
+
+    let execution_result = match execution_result {
         Ok(result) => result,
         Err(err) => {
             log!(
@@ -328,6 +350,17 @@ where
             return;
         }
     };
+
+    // Store captured HTTP traces.
+    let traces = trace_journal.into_http_traces();
+    if let Err(err) = crate::storage::store_simulation_http_traces(&mut host, &traces) {
+        log!(
+            host,
+            Error,
+            "Tezos X simulation: failed to store HTTP traces: {:?}",
+            err
+        );
+    }
 
     let applied_operation = match execution_result {
         ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(op)) => op,
