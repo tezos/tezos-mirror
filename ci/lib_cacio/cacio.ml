@@ -210,6 +210,7 @@ type job = {
   timeout : Gitlab_ci.Types.time_interval option;
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
+  id_tokens : Gitlab_ci.Types.id_tokens option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -553,6 +554,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     timeout;
                     image_dependencies;
                     services;
+                    id_tokens;
                   };
                 trigger;
                 only_if;
@@ -632,6 +634,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?parallel
                 ?rules
                 ?services
+                ?id_tokens
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
                 ?interruptible_runner:
                   (if interruptible_stage then
@@ -721,6 +724,7 @@ module type COMPONENT_API = sig
     ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
+    ?id_tokens:Gitlab_ci.Types.id_tokens ->
     string ->
     string list ->
     job
@@ -797,6 +801,11 @@ module type COMPONENT_API = sig
     unit
 
   val register_octez_monitoring_jobs : (trigger * job) list -> unit
+
+  val register_global_packaging_revision_jobs : (trigger * job) list -> unit
+
+  val register_global_packaging_revision_test_jobs :
+    (trigger * job) list -> unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -869,6 +878,19 @@ let octez_monitoring_jobs = ref []
 
 let get_octez_monitoring_jobs () =
   convert_jobs ~with_condition:false !octez_monitoring_jobs
+
+let global_packaging_revision_jobs = ref []
+
+let get_global_packaging_revision_jobs () =
+  convert_jobs ~with_condition:false !global_packaging_revision_jobs
+
+let global_packaging_revision_test_jobs = ref []
+
+let get_global_packaging_revision_test_jobs () =
+  convert_jobs
+    ~interruptible_publish:true
+    ~with_condition:false
+    !global_packaging_revision_test_jobs
 
 let release_tag_rexes = ref String_set.empty
 
@@ -957,7 +979,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?(image_dependencies = []) ?services name script =
+      ?timeout ?(image_dependencies = []) ?services ?id_tokens name script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -1008,6 +1030,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       timeout;
       image_dependencies;
       services;
+      id_tokens;
     }
 
   module SH = struct
@@ -1397,6 +1420,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let register_octez_monitoring_jobs jobs =
     octez_monitoring_jobs := jobs @ !octez_monitoring_jobs
+
+  let register_global_packaging_revision_jobs jobs =
+    global_packaging_revision_jobs := jobs @ !global_packaging_revision_jobs
+
+  let register_global_packaging_revision_test_jobs jobs =
+    global_packaging_revision_test_jobs :=
+      jobs @ !global_packaging_revision_test_jobs
 end
 
 module Shared = Make (struct
