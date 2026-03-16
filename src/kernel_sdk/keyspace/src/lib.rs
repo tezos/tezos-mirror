@@ -9,6 +9,8 @@
 //! for a given [`Key`]. Kernels can create and delete [`KeySpace`] instances as required
 //! and can generate hashes representing the entire state of a [`KeySpace`].
 
+use std::str::FromStr;
+
 #[cfg(feature = "irmin-compat")]
 mod irmin_path_validator;
 
@@ -21,7 +23,8 @@ pub const MAX_STORE_V2_KEY_SIZE: usize = 256;
 pub enum KeyError {
     /// Attempted to create a key that exceeds the maximum allowed size.
     KeyTooLarge,
-    /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step).
+    /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step,
+    /// or reserved `/readonly` prefix).
     #[cfg(feature = "irmin-compat")]
     PathError(tezos_smart_rollup_host::path::PathError),
 }
@@ -43,7 +46,7 @@ impl Key {
 
     /// Create a key from raw bytes.
     ///
-    /// Returns an error if `key` fails validation (see [`Key::check_bytes`] for rules).
+    /// Returns an error if `key` fails validation (see `Key::check_bytes` for rules).
     pub fn from_bytes(key: &[u8]) -> Result<&Self, KeyError> {
         Self::check_bytes(key)?;
         // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
@@ -60,6 +63,23 @@ impl Key {
     }
 }
 
+impl core::fmt::Debug for Key {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Key({self})")
+    }
+}
+
+impl core::fmt::Display for Key {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // SAFETY: with irmin-compat, Key bytes are valid ASCII path characters.
+        // Without irmin-compat, we print hex-encoded bytes directly.
+        match core::str::from_utf8(&self.0) {
+            Ok(s) => f.write_str(s),
+            Err(_) => write!(f, "Key({:02x?})", &self.0),
+        }
+    }
+}
+
 /// Name creation error
 #[derive(Debug)]
 pub enum NameError {
@@ -73,8 +93,14 @@ pub enum NameError {
 }
 
 /// A validated keyspace name, used as a path prefix in durable storage.
-#[repr(transparent)]
-pub struct Name(str);
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub struct Name(String);
+
+impl core::fmt::Display for Name {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 impl Name {
     // Fallback: when `irmin-compat` is not enabled, no validation is performed.
@@ -83,25 +109,20 @@ impl Name {
     const fn check_bytes(_bytes: &[u8]) -> Result<(), NameError> {
         Ok(())
     }
+}
 
-    /// Create a name from a string slice.
-    ///
-    /// Returns an error if `name` fails validation (see [`Name::check_bytes`] for rules
-    /// when the `irmin-compat` feature is enabled).
-    pub fn from_slice(name: &str) -> Result<&Self, NameError> {
-        Self::check_bytes(name.as_bytes())?;
-        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
-        Ok(unsafe { std::mem::transmute::<&str, &Name>(name) })
+impl AsRef<str> for Name {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
+}
 
-    /// Create a name from a static string. Should only be used to create constant names.
-    ///
-    /// Panics if the name fails validation (see [`Name::check_bytes`] for rules
-    /// when the `irmin-compat` feature is enabled).
-    pub const fn from_static_str(name: &'static str) -> &'static Self {
-        assert!(Self::check_bytes(name.as_bytes()).is_ok(), "Invalid name");
-        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
-        unsafe { std::mem::transmute(name) }
+impl FromStr for Name {
+    type Err = NameError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::check_bytes(s.as_bytes())?;
+        Ok(Name(s.to_owned()))
     }
 }
 
