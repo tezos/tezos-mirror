@@ -71,6 +71,8 @@ let keep_alive = Cli.keep_alive
 
 let vms = Cli.vms
 
+let netdata_proxy_base_port = 20001
+
 let vm_base_port = Cli.vm_base_port
 
 let ports_per_vm = Cli.ports_per_vm

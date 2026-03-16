@@ -186,15 +186,31 @@ let monitoring_full ~expected ~with_auth () =
     check_http_status ~extra_args ~url:"http://localhost:16686/" ~expected ()
   in
   Log.info "Jaeger UI is healthy" ;
-  (* Netdata on the agent — skip in localhost mode (not exposed on host)
-     and when auth is enabled (firewall blocks direct access; Netdata proxy
-     is planned for Step 7). *)
+  (* Netdata on the agent.
+     - On localhost: Netdata runs inside the agent container and is not
+       exposed on the host. The nginx proxy cannot reach it either -> skip.
+     - Without auth on GCP: Netdata is directly accessible on agent-ip:19999.
+     - With auth on GCP/ssh-host: Netdata is proxied through nginx on the
+       orchestrator (port [Env.netdata_proxy_base_port]+). We check via the proxy — both the
+       "401 without creds" and "200 with creds" variants go through nginx. *)
+  let auth_enabled = with_auth || expected = "401" in
   let* () =
-    if Tezt_cloud_cli.localhost || with_auth || expected = "401" then (
-      Log.info
-        "Skipping Netdata check (%s)"
-        (if Tezt_cloud_cli.localhost then "localhost mode"
-         else "auth enabled, direct access blocked by firewall") ;
+    if Tezt_cloud_cli.localhost then (
+      Log.info "Skipping Netdata check (localhost mode, not exposed on host)" ;
+      Lwt.return_unit)
+    else if auth_enabled then (
+      (* Netdata is behind nginx on the orchestrator. We only check the
+         first agent — if the proxy works for one, the mechanism
+         (add_service + reload) is validated for all. *)
+      let netdata_port = Netdata.proxy_base_port in
+      let* () =
+        check_http_status
+          ~extra_args
+          ~url:(sf "http://localhost:%d/" netdata_port)
+          ~expected
+          ()
+      in
+      Log.info "Netdata is healthy (via nginx proxy on port %d)" netdata_port ;
       Lwt.return_unit)
     else
       let agents = Cloud.agents t in

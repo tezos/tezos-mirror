@@ -86,6 +86,11 @@ val keep_alive : bool
 (** Equivalent to [Cli.vms]. *)
 val vms : int option
 
+(** Base port for Netdata reverse-proxy endpoints on the orchestrator.
+    Agent [i] is proxied on port [netdata_proxy_base_port + i].
+    Hardcoded to 20001. *)
+val netdata_proxy_base_port : int
+
 (** Equivalent to [Cli.vm_base_port]. *)
 val vm_base_port : int
 

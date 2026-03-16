@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let run ?runner ?cmd_wrapper () =
+let run ?runner ?cmd_wrapper ?(interface = "0.0.0.0") () =
   let* is_already_running =
     let process =
       Env.run_command
@@ -31,18 +31,77 @@ let run ?runner ?cmd_wrapper () =
     let cmd = "docker" in
     (* Those arguments are the ones given by netdata on their online
        documentation. We could decide to put it in the eDSL module of docker. *)
-    let args =
-      "run -d --rm --name=netdata   --pid=host   --network=host   -v \
-       netdataconfig:/etc/netdata   -v netdatalib:/var/lib/netdata   -v \
-       netdatacache:/var/cache/netdata   -v /etc/passwd:/host/etc/passwd:ro   \
-       -v /etc/group:/host/etc/group:ro   -v \
-       /etc/localtime:/etc/localtime:ro   -v /proc:/host/proc:ro   -v \
-       /sys:/host/sys:ro   -v /etc/os-release:/host/etc/os-release:ro   -v \
-       /var/log:/host/var/log:ro   -v \
-       /var/run/docker.sock:/var/run/docker.sock:ro --cap-add SYS_PTRACE   \
-       --cap-add SYS_ADMIN   --security-opt apparmor=unconfined   \
-       netdata/netdata" |> String.split_on_char ' '
-      |> List.filter (fun s -> s <> "")
+    let* bind_volume =
+      if interface <> "0.0.0.0" then
+        (* Write a minimal Netdata config that overrides the web server
+           bind address. This is mounted into the container to restrict
+           Netdata to localhost when auth is enabled. *)
+        let conf_dir = Path.tmp_dir // "netdata" in
+        let conf_file = conf_dir // "netdata.conf" in
+        let conf_content = sf "[web]\n    bind to = %s:19999\n" interface in
+        let* () =
+          Process.spawn ?runner "mkdir" ["-p"; conf_dir] |> Process.check
+        in
+        let* () =
+          Process.spawn
+            ?runner
+            "sh"
+            [
+              "-c";
+              sf
+                "printf '%%s' %s > %s"
+                (Filename.quote conf_content)
+                (Filename.quote conf_file);
+            ]
+          |> Process.check
+        in
+        Lwt.return ["-v"; sf "%s:/etc/netdata/netdata.conf:ro" conf_file]
+      else Lwt.return []
     in
-    let* _ = Env.run_command ?runner ?cmd_wrapper cmd args |> Process.check in
+    (* IMPORTANT: [bind_volume] is appended after [base_args] below so that
+       the individual file bind-mount to /etc/netdata/netdata.conf overrides
+       the file inside the netdataconfig named volume. Changing this order
+       would cause the custom config to be shadowed. *)
+    let base_args =
+      [
+        "run";
+        "-d";
+        "--rm";
+        "--name=netdata";
+        "--pid=host";
+        "--network=host";
+        "-v";
+        "netdataconfig:/etc/netdata";
+        "-v";
+        "netdatalib:/var/lib/netdata";
+        "-v";
+        "netdatacache:/var/cache/netdata";
+        "-v";
+        "/etc/passwd:/host/etc/passwd:ro";
+        "-v";
+        "/etc/group:/host/etc/group:ro";
+        "-v";
+        "/etc/localtime:/etc/localtime:ro";
+        "-v";
+        "/proc:/host/proc:ro";
+        "-v";
+        "/sys:/host/sys:ro";
+        "-v";
+        "/etc/os-release:/host/etc/os-release:ro";
+        "-v";
+        "/var/log:/host/var/log:ro";
+        "-v";
+        "/var/run/docker.sock:/var/run/docker.sock:ro";
+        "--cap-add";
+        "SYS_PTRACE";
+        "--cap-add";
+        "SYS_ADMIN";
+        "--security-opt";
+        "apparmor=unconfined";
+      ]
+      @ bind_volume @ ["netdata/netdata"]
+    in
+    let* _ =
+      Env.run_command ?runner ?cmd_wrapper cmd base_args |> Process.check
+    in
     Lwt.return_unit

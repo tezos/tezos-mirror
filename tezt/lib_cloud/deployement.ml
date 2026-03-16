@@ -567,7 +567,12 @@ module Ssh_host = struct
       |> Process.check
     in
     let* () =
-      if Env.monitoring then Monitoring.run ~runner () else Lwt.return_unit
+      if Env.monitoring then
+        let interface =
+          if Option.is_some Env.auth_enabled then "127.0.0.1" else "0.0.0.0"
+        in
+        Monitoring.run ~runner ~interface ()
+      else Lwt.return_unit
     in
     let process_monitor =
       if Env.process_monitoring then

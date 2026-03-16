@@ -317,6 +317,42 @@ let delete_unused_addresses ~project_id ?name_filter ?max_age_hours () =
               Lwt.return_unit))
         candidates
 
+let create_firewall_rule ~name ~network ~ports ~source_ranges ~priority () =
+  let ports_str =
+    List.map (fun p -> sf "tcp:%d" p) ports |> String.concat ","
+  in
+  let source_ranges_str = String.concat "," source_ranges in
+  Process.run
+    "gcloud"
+    [
+      "compute";
+      "firewall-rules";
+      "create";
+      name;
+      "--network";
+      network;
+      "--allow";
+      ports_str;
+      "--source-ranges";
+      source_ranges_str;
+      "--priority";
+      string_of_int priority;
+      "--quiet";
+    ]
+
+let delete_firewall_rule ~name () =
+  Lwt.catch
+    (fun () ->
+      Process.run
+        "gcloud"
+        ["compute"; "firewall-rules"; "delete"; name; "--quiet"])
+    (fun exn ->
+      Log.warn
+        "Failed to delete firewall rule %s (may not exist): %s"
+        name
+        (Printexc.to_string exn) ;
+      Lwt.return_unit)
+
 module DNS = struct
   let create_zone ~domain ~zone () =
     let dns_name = Format.asprintf "%s.%s" zone domain in
