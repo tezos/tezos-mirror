@@ -7844,7 +7844,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
     let _forge_worker_tests =
       opt_map mockup_simulator @@ fun mockup_simulator ->
       opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
-      only_if (active && N.(number >= 025)) @@ fun () ->
+      only_if (active && N.(number >= 024)) @@ fun () ->
       tezt
         ["test_forge_worker"]
         ~path:(path // "lib_delegate/test/workers")
