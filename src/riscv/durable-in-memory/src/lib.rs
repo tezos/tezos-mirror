@@ -26,65 +26,24 @@
 //! Invalid argument errors more refer to attempting to read/write _beyond the end_ of a value, or
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
+mod registry;
+
 use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
-use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
-use octez_riscv_api_common::try_clone::TryClone;
 use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
-use octez_riscv_durable_storage::registry;
-use octez_riscv_durable_storage::storage::in_memory::InMemoryKeyValueStore;
-use octez_riscv_durable_storage::storage::in_memory::InMemoryRepo;
-
-/// Wrapper to enable customing OCaml GC's resource tracking.
-#[repr(transparent)]
-pub struct RegistryState(registry::Registry<InMemoryKeyValueStore, Normal>);
-
-impl RegistryState {
-    /// Construct a new in-memory registry
-    pub fn new() -> Result<Self, ds_errors::OperationalError> {
-        let reg = registry::Registry::new(InMemoryRepo)?;
-        Ok(Self(reg))
-    }
-}
-
-impl std::ops::Deref for RegistryState {
-    type Target = registry::Registry<InMemoryKeyValueStore, Normal>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for RegistryState {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl TryClone for RegistryState {
-    type Error = ds_errors::OperationalError;
-
-    fn try_clone(&self) -> Result<Self, Self::Error> {
-        Ok(RegistryState(self.0.try_clone()?))
-    }
-}
-
-impl CustomGcResource for RegistryState {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state";
-
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state";
-}
+use octez_riscv_durable_storage::registry as ds_registry;
+use registry::RegistryState;
 
 #[ocaml::sig]
-pub type Registry = MutableState<RegistryState>;
+pub type Registry = MutableState<RegistryState<Normal>>;
 
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
@@ -155,7 +114,7 @@ pub fn octez_riscv_durable_in_memory_registry_hash(
 #[ocaml::func]
 #[ocaml::sig("registry -> int64")]
 pub fn octez_riscv_durable_in_memory_registry_size(state: SafePointer<Registry>) -> i64 {
-    state.apply_ro(registry::Registry::len) as i64
+    state.apply_ro(ds_registry::Registry::len) as i64
 }
 
 #[ocaml::func]
