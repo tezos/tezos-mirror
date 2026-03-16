@@ -63,7 +63,7 @@ where
             }
             Err(_err) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Could not execute transaction: {}\n", _err);
+                debug_msg!("Could not execute transaction: {}\n", _err);
             }
         };
     }
@@ -96,16 +96,12 @@ pub(crate) fn get_dac_committee<Host: StorageV1>(
 }
 
 /// Parse external message, logging error if it occurs.
-pub(crate) fn parse_external<'a, Host>(
-    _host: &Host,
-    message: &'a [u8],
-) -> Option<ParsedExternalInboxMessage<'a>> {
+pub(crate) fn parse_external(message: &[u8]) -> Option<ParsedExternalInboxMessage<'_>> {
     match ParsedExternalInboxMessage::parse(message) {
         Ok((remaining, external)) => {
             if !remaining.is_empty() {
                 #[cfg(feature = "debug")]
                 debug_msg!(
-                    _host,
                     "External message had unused remaining bytes: {:?}\n",
                     remaining
                 );
@@ -114,7 +110,7 @@ pub(crate) fn parse_external<'a, Host>(
         }
         Err(_err) => {
             #[cfg(feature = "debug")]
-            debug_msg!(_host, "Error parsing external message payload {}\n", _err);
+            debug_msg!("Error parsing external message payload {}\n", _err);
             None
         }
     }

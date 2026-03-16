@@ -31,7 +31,7 @@ where
         match parsed_msg {
             InboxMessage::External(payload) => {
                 if let Err(e) = host.write_output(payload) {
-                    debug_msg!(host, "Failed to write external message to outbox: {e:?}\n");
+                    debug_msg!("Failed to write external message to outbox: {e:?}\n");
                 }
             }
 
@@ -39,12 +39,12 @@ where
                 payload, ..
             })) => {
                 if let Err(e) = host.write_output(&payload.0) {
-                    debug_msg!(host, "Failed to write internal transfer to outbox: {e:?}\n");
+                    debug_msg!("Failed to write internal transfer to outbox: {e:?}\n");
                 }
             }
 
             other => {
-                debug_msg!(host, "Other inbox message: {other:#?}\n");
+                debug_msg!("Other inbox message: {other:#?}\n");
             }
         }
     }

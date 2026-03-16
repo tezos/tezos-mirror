@@ -151,7 +151,6 @@ where
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match __trace_kernel!(
-            host,
             "apply_transaction",
             chain_config.apply_transaction(
                 block_in_progress,

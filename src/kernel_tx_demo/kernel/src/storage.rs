@@ -496,7 +496,7 @@ where
     account.get_or_set_id(host)?;
 
     #[cfg(feature = "debug")]
-    tezos_smart_rollup_debug::debug_msg!(host, "Depositing {ticket:?} to {destination}\n");
+    tezos_smart_rollup_debug::debug_msg!("Depositing {ticket:?} to {destination}\n");
 
     Ok(())
 }

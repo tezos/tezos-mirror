@@ -34,7 +34,6 @@ fn process_slot<Host>(
             Ok(0) => {
                 // Currently, we send empty pages to kernels for non-attested slots.
                 debug_msg!(
-                    host,
                     "Slot {} not attested for level {}\n",
                     slot_index,
                     published_level
@@ -43,7 +42,6 @@ fn process_slot<Host>(
             }
             Ok(num) => {
                 debug_msg!(
-                    host,
                     "Retrieved page {} for level {}, slot index {} successfully. {} bytes read\n",
                     page_index,
                     published_level,
@@ -59,7 +57,6 @@ fn process_slot<Host>(
             }
             Err(err) => {
                 debug_msg!(
-                    host,
                     "Failed to retrieve one of the pages. Slot {} not processed. Error: {}\n",
                     slot_index,
                     &err.to_string()
@@ -93,7 +90,7 @@ where
     Host: StorageV1 + WasmHost + HostReveal,
 {
     let parameters = host.reveal_dal_parameters();
-    debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
+    debug_msg!("Running kernel with parameters: {:?}\n", parameters);
     let RollupDalParameters {
         number_of_slots: _number_of_slots,
         attestation_lag,
@@ -123,10 +120,10 @@ where
             }
         }
         Ok(None) => {
-            debug_msg!(host, "Input message was empty");
+            debug_msg!("Input message was empty");
         }
         Err(_) => {
-            debug_msg!(host, "Failed to read input message");
+            debug_msg!("Failed to read input message");
         }
     }
 }

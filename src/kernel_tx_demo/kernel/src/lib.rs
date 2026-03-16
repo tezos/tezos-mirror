@@ -72,13 +72,13 @@ where
     Host: StorageV1 + WasmHost + HostReveal,
 {
     #[cfg(feature = "debug")]
-    debug_str!(host, "======\nTX: Entry\n======\n");
+    debug_str!("======\nTX: Entry\n======\n");
 
     let mut account_storage = match init_account_storage() {
         Ok(v) => v,
         Err(_err) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not get account storage: {:?}\n", _err);
+            debug_msg!("Could not get account storage: {:?}\n", _err);
             return;
         }
     };
@@ -86,60 +86,55 @@ where
     let metadata = host.reveal_metadata();
 
     #[cfg(feature = "debug")]
-    debug_msg!(host, "TX: Metadata {metadata:?}\n");
+    debug_msg!("TX: Metadata {metadata:?}\n");
 
     let rollup_address = metadata.address();
     let mut counter = 0;
 
     if let Ok(Some(ValueType::Subtree)) = host.store_has(&CACHED_MESSAGES_STORE_PREFIX) {
         #[cfg(feature = "debug")]
-        debug_msg!(host, "Found cached messages, processing\n");
+        debug_msg!("Found cached messages, processing\n");
         if let Err(_err) = execute_one_operation(host, &mut account_storage) {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Error enumerating cached header payload {}", _err);
+            debug_msg!("Error enumerating cached header payload {}", _err);
         }
         return;
     } else if let Ok(data) = host.store_read_all(&DAL_PAYLOAD_PATH) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6393
         // Enable processing DAL payload incrementally with reboots.
         #[cfg(feature = "debug")]
-        debug_msg!(host, "Found cached DAL payload, processing\n");
+        debug_msg!("Found cached DAL payload, processing\n");
         match ParsedBatch::parse(&data) {
             Ok((_, batch)) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Process parsed batch {:?}\n", batch);
+                debug_msg!("Process parsed batch {:?}\n", batch);
                 for withdrawals in process_batch_message(host, &mut account_storage, batch) {
                     process_withdrawals(host, withdrawals)
                 }
             }
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(host, "Failed to parse DAL payload. Error: {:?}\n", _e);
+                debug_msg!("Failed to parse DAL payload. Error: {:?}\n", _e);
             }
         }
         match host.store_delete(&DAL_PAYLOAD_PATH) {
             Ok(()) => {}
             Err(_e) => {
                 #[cfg(feature = "debug")]
-                debug_msg!(
-                    host,
-                    "Failed to delete processed DAL payload. Error: {:?}\n",
-                    _e
-                );
+                debug_msg!("Failed to delete processed DAL payload. Error: {:?}\n", _e);
             }
         }
         return;
     }
 
     #[cfg(feature = "debug")]
-    debug_str!(host, "Filtering inbox messages...\n");
+    debug_str!("Filtering inbox messages...\n");
     let mut reboot = false;
 
     while let Ok(Some(message)) = host.read_input() {
         reboot = true;
         #[cfg(feature = "debug")]
         debug_msg!(
-            host,
             "Processing MessageData {} at level {}\n",
             message.id,
             message.level
@@ -154,20 +149,20 @@ where
             &rollup_address,
         ) {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Error processing header payload {}\n", _err);
+            debug_msg!("Error processing header payload {}\n", _err);
         }
     }
 
     #[cfg(feature = "debug")]
-    debug_str!(host, "Finished filtering\n");
+    debug_str!("Finished filtering\n");
 
     if reboot {
         #[cfg(feature = "debug")]
-        debug_str!(host, "Reboot for cached mesages\n");
+        debug_str!("Reboot for cached mesages\n");
 
         if let Err(_e) = host.mark_for_reboot() {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Could not mark host for reboot: {}\n", _e);
+            debug_msg!("Could not mark host for reboot: {}\n", _e);
         }
     }
 }
@@ -209,7 +204,7 @@ where
     match message {
         InboxMessage::Internal(_msg @ InternalInboxMessage::StartOfLevel) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            debug_msg!("InboxMetadata: {}\n", _msg);
             #[cfg(feature = "dal")]
             {
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6270
@@ -243,7 +238,6 @@ where
             if rollup_address != destination.hash() {
                 #[cfg(feature = "debug")]
                 debug_msg!(
-                    host,
                     "Skipping message: Internal message targets another rollup. Expected: {}. Found: {}",
                     rollup_address,
                     destination.hash()
@@ -269,7 +263,7 @@ where
             | InternalInboxMessage::DalAttestedSlots(..)),
         ) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            debug_msg!("InboxMetadata: {}\n", _msg);
             Ok(())
         }
 
@@ -280,7 +274,7 @@ where
             | InternalInboxMessage::ProtocolMigration(..)),
         ) => {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            debug_msg!("InboxMetadata: {}\n", _msg);
             Ok(())
         }
 
@@ -295,7 +289,6 @@ where
                     if &rollup_address != address.hash() {
                         #[cfg(feature = "debug")]
                         debug_msg!(
-                            host,
                             "Skipping message: External message targets another rollup. Expected: {}. Found: {}",
                             rollup_address,
                             address.hash()

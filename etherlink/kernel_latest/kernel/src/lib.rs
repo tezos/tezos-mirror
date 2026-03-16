@@ -387,7 +387,6 @@ where
         .expect("The kernel failed to get the number of reboot left");
     if reboot_counter == 1000 {
         tezos_smart_rollup_debug::debug_msg!(
-            host,
             "------------------ Kernel Invocation ------------------\n"
         )
     }

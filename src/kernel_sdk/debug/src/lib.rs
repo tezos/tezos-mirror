@@ -21,25 +21,22 @@ pub use tezos_smart_rollup_core as __core;
 /// On WASM the message is written via the host's `write_debug` import. On all
 /// other targets it is written to `stderr` via `eprint!`.
 ///
-/// The `host` argument is accepted for backward compatibility but is not used.
-///
 /// # Example
 /// ```no_run
 /// extern crate alloc;
 /// use tezos_smart_rollup_debug::debug_msg;
 ///
 /// fn log_something() {
-///   debug_msg!((), "Simple constant string");
-///   debug_msg!((), "A format {} with argument {}", "test", 5);
+///   debug_msg!("Simple constant string");
+///   debug_msg!("A format {} with argument {}", "test", 5);
 /// }
 /// ```
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! debug_msg {
-    ($host: expr, $($args: expr),*) => {{
-        let _host = &$host;
+    ($($args: expr),*) => {{
         extern crate alloc;
-        $crate::debug_str!($host, { &alloc::format!($($args),*) });
+        $crate::debug_str!({ &alloc::format!($($args),*) });
     }};
 }
 
@@ -51,21 +48,18 @@ macro_rules! debug_msg {
 /// On WASM the message is written via the host's `write_debug` import. On all
 /// other targets it is written to `stderr` via `eprint!`.
 ///
-/// The `host` argument is accepted for backward compatibility but is not used.
-///
 /// # Example
 /// ```no_run
 /// use tezos_smart_rollup_debug::debug_str;
 ///
 /// fn do_something() {
-///   debug_str!((), "Simple constant string");
+///   debug_str!("Simple constant string");
 /// }
 /// ```
 #[cfg(pvm_kind = "wasm")]
 #[macro_export]
 macro_rules! debug_str {
-    ($host: expr, $msg: expr) => {{
-        let _host = &$host;
+    ($msg: expr) => {{
         let msg: &str = $msg;
         // SAFETY: msg is a valid UTF-8 string so its pointer/length are valid
         unsafe { $crate::__core::target_impl::write_debug(msg.as_ptr(), msg.len()) };
@@ -80,21 +74,18 @@ macro_rules! debug_str {
 /// On WASM the message is written via the host's `write_debug` import. On all
 /// other targets it is written to `stderr` via `eprint!`.
 ///
-/// The `host` argument is accepted for backward compatibility but is not used.
-///
 /// # Example
 /// ```no_run
 /// use tezos_smart_rollup_debug::debug_str;
 ///
 /// fn do_something() {
-///   debug_str!((), "Simple constant string");
+///   debug_str!("Simple constant string");
 /// }
 /// ```
 #[cfg(not(pvm_kind = "wasm"))]
 #[macro_export]
 macro_rules! debug_str {
-    ($host: expr, $msg: expr) => {{
-        let _host = &$host;
+    ($msg: expr) => {{
         extern crate std;
         std::eprint!("{}", $msg);
     }};

@@ -21,14 +21,14 @@ cfg_if::cfg_if! {
 
         #[macro_export]
         macro_rules! debug_str {
-            ($host: expr, $msg: expr) => {{
+            ($msg: expr) => {{
                 $crate::DEBUG_LOG.with_borrow_mut(|log| log.extend_from_slice($msg.as_bytes()));
             }};
         }
     } else {
         #[macro_export]
         macro_rules! debug_str {
-            ($host: expr, $msg: expr) => {{
+            ($msg: expr) => {{
                 eprint!("{}", $msg);
             }};
         }
@@ -85,7 +85,7 @@ macro_rules! log {
         use $crate::Logging as _;
         if $host.verbosity() >= $level {
             let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
-            $crate::debug_str!($host, &msg);
+            $crate::debug_str!(&msg);
         }
     }};
 }
@@ -93,12 +93,12 @@ macro_rules! log {
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! __trace_kernel {
-    ($host:expr, $name:expr, $expr:expr) => {{
+    ($name:expr, $expr:expr) => {{
         let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
         let __otel_result = { $expr };
         let msg = format!("[{}] [end] {}", tezos_evm_logging::Level::OTel, $name);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
         __otel_result
     }};
 }
@@ -118,7 +118,7 @@ pub enum OTelAttrValue {
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! __trace_kernel_add_attrs {
-    ($host:expr, $attrs:expr) => {{
+    ($attrs:expr) => {{
         use $crate::OTelAttrValue;
 
         let attrs_str = $attrs
@@ -136,22 +136,22 @@ macro_rules! __trace_kernel_add_attrs {
             .join(" ");
 
         let msg = format!("[{}] [attrs] {}", tezos_evm_logging::Level::OTel, attrs_str);
-        $crate::debug_str!($host, &msg);
+        $crate::debug_str!(&msg);
     }};
 }
 
 // Must only be used by the procedural macro for kernel tracing.
 #[cfg(feature = "tracing")]
-pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
+pub fn internal_trace_kernel<F, R>(name: &str, f: F) -> R
 where
-    F: FnOnce(&mut H) -> R,
+    F: FnOnce() -> R,
 {
     let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
-    crate::debug_str!(host, &msg);
-    let res = f(host);
+    debug_str!(&msg);
+    let res = f();
 
     let msg = format!("[{}] [end] {}", crate::Level::OTel, name);
-    crate::debug_str!(host, &msg);
+    debug_str!(&msg);
 
     res
 }
@@ -159,13 +159,13 @@ where
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
 macro_rules! __trace_kernel_add_attrs {
-    ($host:expr, $attrs:expr) => {{}};
+    ($attrs:expr) => {{}};
 }
 
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
 macro_rules! __trace_kernel {
-    ($host:expr, $name:expr, $expr:expr) => {{
+    ($name:expr, $expr:expr) => {{
         $expr
     }};
 }
