@@ -4337,6 +4337,99 @@ let test_tezlink_upgrade_kernel_auto_sync =
 
   unit
 
+(** Query the /entrypoints RPC for [address] via the Tezlink endpoint. *)
+let get_entrypoints ?(normalize_types = false) sequencer address =
+  let path =
+    sf
+      "/tezlink/chains/main/blocks/head/context/contracts/%s/entrypoints%s"
+      address
+      (if normalize_types then "?normalize_types=true" else "")
+  in
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  return @@ JSON.parse ~origin:"entrypoints" res
+
+(** Test that the /entrypoints RPC works for an originated Michelson contract.
+    The faucet contract has a single [%fund : mutez] entrypoint. *)
+let test_entrypoints_originated =
+  let faucet = Michelson_contracts.faucet_contract () in
+  register_tezlink_test
+    ~title:"Entrypoints RPC for originated Michelson contract"
+    ~tags:["rpc"; "entrypoints"; "originated"]
+    ~bootstrap_contracts:[faucet]
+  @@ fun {sequencer; _} _protocol ->
+  let* ep_json = get_entrypoints sequencer faucet.address in
+  let expected =
+    JSON.parse
+      ~origin:"expected_entrypoints"
+      {|{"entrypoints":{"fund":{"prim":"mutez"}}}|}
+  in
+  Check.((ep_json = expected) json ~error_msg:"Expected %R but got %L") ;
+  unit
+
+(** Test that the /entrypoints RPC respects the [normalize_types] query
+    parameter for an originated Michelson contract.  Uses [fa12_reference.tz]
+    whose [%transfer] entrypoint carries [:from], [:to] and [:value] variable
+    annotations that are stripped when [normalize_types=true]. *)
+let test_entrypoints_normalize_types =
+  register_tezlink_test
+    ~title:"Entrypoints RPC normalize_types for originated Michelson contract"
+    ~tags:["rpc"; "entrypoints"; "originated"; "normalize_types"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* _alias, kt1_address =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "Pair {} %S False 0" Constant.bootstrap1.public_key_hash)
+      ~burn_cap:(Tez.of_mutez_int 2_000_000)
+      ~force:true
+      ~endpoint
+      client
+      ["mini_scenarios"; "fa12_reference"]
+      Alpha
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Without normalize_types, %transfer retains its :from/:to/:value annotations. *)
+  let* entrypoints = get_entrypoints sequencer kt1_address in
+  let transfer_type = JSON.(entrypoints |-> "entrypoints" |-> "transfer") in
+  let expected_transfer_without_normalize =
+    JSON.parse
+      ~origin:"expected_transfer_type"
+      {|{"prim":"pair","args":[{"prim":"address","annots":[":from"]},{"prim":"pair","args":[{"prim":"address","annots":[":to"]},{"prim":"nat","annots":[":value"]}]}]}|}
+  in
+  Check.(
+    (transfer_type = expected_transfer_without_normalize)
+      json
+      ~error_msg:"Expected %R but got %L") ;
+  (* With normalize_types=true, all annotations are stripped and the type is in
+     canonical comb form. *)
+  let* entrypoints_normalized =
+    get_entrypoints ~normalize_types:true sequencer kt1_address
+  in
+  let transfer_type_normalized =
+    JSON.(entrypoints_normalized |-> "entrypoints" |-> "transfer")
+  in
+  let expected_transfer_normalized =
+    JSON.parse
+      ~origin:"expected_transfer_type_normalized"
+      {|{"prim":"pair","args":[{"prim":"address"},{"prim":"address"},{"prim":"nat"}]}|}
+  in
+  Check.(
+    (transfer_type_normalized = expected_transfer_normalized)
+      json
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -4403,4 +4496,6 @@ let () =
   test_delayed_deposit_is_included [Alpha] ;
   test_bridged_tez_transfer [Alpha] ;
   test_big_map_transfer [Alpha] ;
-  test_tezlink_upgrade_kernel_auto_sync [Alpha]
+  test_tezlink_upgrade_kernel_auto_sync [Alpha] ;
+  test_entrypoints_originated [Alpha] ;
+  test_entrypoints_normalize_types [Alpha]

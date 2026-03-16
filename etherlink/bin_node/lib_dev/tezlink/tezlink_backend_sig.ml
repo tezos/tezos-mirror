@@ -5,6 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Paths through [or] types that lead to unreachable entrypoints. *)
+type unreachable_paths =
+  Tezlink_imports.Imported_protocol.Michelson_v1_primitives.prim list list
+
+(** Named entrypoints with their Micheline type expressions. *)
+type named_entrypoints =
+  (string * Tezlink_imports.Imported_context.Script.expr) list
+
+(** Unreachable entrypoint paths paired with the named entrypoint type
+    expressions.  Matches the L1 [list_entrypoints] RPC output shape. *)
+type entrypoints_info = unreachable_paths * named_entrypoints
+
 module type S = sig
   type block_param =
     [ `Head of int32
@@ -98,4 +110,11 @@ module type S = sig
     Operation_hash.t ->
     block_param ->
     Tezlink_imports.Imported_protocol.operation_receipt tzresult Lwt.t
+
+  val get_entrypoints :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    normalize_types:bool ->
+    entrypoints_info option tzresult Lwt.t
 end

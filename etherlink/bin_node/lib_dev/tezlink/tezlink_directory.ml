@@ -339,13 +339,14 @@ let build_block_static_directory ~l2_chain_id
          Backend.get_script chain block contract)
   |> opt_register
        ~service:Tezos_services.list_entrypoints
-       ~impl:(fun ((((), chain), block), contract) {normalize_types} () ->
+       ~impl:(fun ((((), chain), block), contract) normalize_types () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         let* code = Backend.get_code chain block contract in
-         match code with
-         | None -> return_none
-         | Some code -> Tezlink_mock.list_entrypoints code normalize_types)
+         Backend.get_entrypoints
+           chain
+           block
+           contract
+           ~normalize_types:normalize_types.normalize_types)
   |> register
        ~service:Tezos_services.balance
        ~impl:(fun ((((), chain), block), contract) _ _ ->

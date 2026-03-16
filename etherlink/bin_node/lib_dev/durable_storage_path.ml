@@ -48,6 +48,14 @@ module Tezosx_simulation = struct
   let result = path ^ "/result"
 end
 
+module Tezosx_entrypoints = struct
+  let path = "/tezosx_entrypoints"
+
+  let input = path ^ "/input"
+
+  let result = path ^ "/result"
+end
+
 module Assemble_block = struct
   let path = World_state.make "/assemble_block"
 

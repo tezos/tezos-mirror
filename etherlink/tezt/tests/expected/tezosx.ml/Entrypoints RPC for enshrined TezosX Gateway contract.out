@@ -1,0 +1,51 @@
+{
+  "entrypoints": {
+    "call_evm": {
+      "prim": "pair",
+      "args": [
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "bytes"
+        }
+      ]
+    },
+    "call": {
+      "prim": "pair",
+      "args": [
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "list",
+          "args": [
+            {
+              "prim": "pair",
+              "args": [
+                {
+                  "prim": "string"
+                },
+                {
+                  "prim": "string"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "prim": "bytes"
+        },
+        {
+          "prim": "nat"
+        }
+      ]
+    },
+    "default": {
+      "prim": "string"
+    }
+  }
+}
