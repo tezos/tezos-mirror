@@ -8,3 +8,12 @@ version = "0.0.0"
 edition = "2021"
 license = "MIT"
 publish = false
+
+[features]
+default = ["irmin-compat"]
+irmin-compat = ["dep:tezos-smart-rollup-host"]
+
+[dependencies.tezos-smart-rollup-host]
+path = "../host"
+default-features = false
+optional = true
