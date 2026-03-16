@@ -75,6 +75,7 @@ val retry :
     - run the automaton loop, see {!automaton_loop} *)
 val run :
   Protocol_client_context.full ->
+  extra_nodes:Protocol_client_context.full list ->
   ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?canceler:Lwt_canceler.t ->
   ?stop_on_event:(event -> bool) ->
