@@ -786,4 +786,199 @@ let register_crac_runner_test ~title ?(tags = []) body =
   in
   body (module Wrapper : CracRunnerWrapper.S)
 
-let () = ()
+(** Simple EVM-to-TEZ cross-runtime call.
+ *
+ *    EVM[evm_runner]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
+ *
+ *)
+let test_crac_evm_to_tez =
+  register_crac_runner_test ~title:"CRAC: EVM runner calls TEZ runner"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  Log.debug ~prefix "Deploy EVM runner calling the bridge" ;
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  Log.debug ~prefix "Call EVM runner" ;
+  let* () = EvmRunner.call_run evm_runner in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  unit
+
+(** Multiple independent CRAC crossings.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_1] ~CRAC~> TEZ[tez_runner_1]
+ *     |-> EVM[evm_bridge_2] ~CRAC~> TEZ[tez_runner_2]
+ *
+ *)
+let test_crac_evm_multiple_independent_crossings =
+  register_crac_runner_test ~title:"CRAC: multiple independent crossings"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runners" ;
+  let* tez_runner_1 = TezMultiRunCaller.originate () in
+  let* tez_runner_2 = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridges" ;
+  let* evm_bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner_1 in
+  let* evm_bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner_2 in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_1, false); (evm_bridge_2, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner_1 in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner_2 in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_1
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_2
+  in
+  unit
+
+(** Double CRAC crossing: EVM calls EVM inner both directly and through
+ *  an EVM->TEZ->EVM round-trip bridge chain.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_inner]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
+ *     |-> EVM[evm_inner]
+ *
+ *)
+let test_crac_evm_double_crossing =
+  register_crac_runner_test
+    ~title:"CRAC: double crossing EVM via TEZ back to EVM"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM inner runner" ;
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM inner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ bridge" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Deploy EVM main calling inner directly and via bridges" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_inner, false); (evm_bridge, false); (evm_inner, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_inner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  unit
+
+(** Shared TEZ leaf called three times: twice directly via the same EVM
+ *  bridge, and once through a 3-CRAC chain that also ends at the same leaf.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_direct] ~CRAC~> TEZ[tez_leaf]
+ *     |-> EVM[evm_bridge_chain] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_bridge_inner] ~CRAC~> TEZ[tez_leaf]
+ *     |-> EVM[evm_bridge_direct] ~CRAC~> TEZ[tez_leaf]
+ *
+ *)
+let test_crac_evm_shared_leaf_via_direct_and_chain =
+  register_crac_runner_test
+    ~title:"CRAC: EVM shared TEZ leaf via direct bridge and 3-CRAC chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ leaf" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge_direct to TEZ leaf" ;
+  let* evm_bridge_direct = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Deploy EVM bridge_inner to TEZ leaf (for chain)" ;
+  let* evm_bridge_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Originate TEZ bridge to EVM bridge_inner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge_inner in
+  Log.debug ~prefix "Deploy EVM bridge_chain to TEZ bridge" ;
+  let* evm_bridge_chain = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:
+        [
+          (evm_bridge_direct, false);
+          (evm_bridge_chain, false);
+          (evm_bridge_direct, false);
+        ]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_leaf in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:4 evm_bridge_direct
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_chain
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_inner
+  in
+  unit
+
+(** EVM 5-crossing chain.
+ *
+ *    EVM[evm_a] ~CRAC~> TEZ[tez_b] ~CRAC~> EVM[evm_c] ~CRAC~> TEZ[tez_d] ~CRAC~> EVM[evm_e] ~CRAC~> TEZ[tez_leaf]
+ *
+ *)
+let test_crac_evm_5_crossing_chain =
+  register_crac_runner_test ~title:"CRAC: EVM 5-crossing chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build 5-crossing CRAC chain (inside-out)" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_e = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* tez_d = TezCrossRuntimeRunnerEvm.originate evm_e in
+  let* evm_c = EvmCrossRuntimeRunnerTez.deploy_and_init tez_d in
+  let* tez_b = TezCrossRuntimeRunnerEvm.originate evm_c in
+  let* evm_a = EvmCrossRuntimeRunnerTez.deploy_and_init tez_b in
+  Log.debug ~prefix "Call EVM a" ;
+  let* () = EvmRunner.call_run evm_a in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_leaf in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_a in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_b in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_c in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_d in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_e in
+  unit
+
+let () =
+  test_crac_evm_to_tez [Alpha] ;
+  test_crac_evm_multiple_independent_crossings [Alpha] ;
+  test_crac_evm_double_crossing [Alpha] ;
+  test_crac_evm_shared_leaf_via_direct_and_chain [Alpha] ;
+  test_crac_evm_5_crossing_chain [Alpha]
