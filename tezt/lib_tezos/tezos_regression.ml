@@ -25,6 +25,11 @@
 
 let replacements =
   [
+    (* Normalize DAL debug print store schemas command for regression (dal-node vs baker). *)
+    ( "\\./octez-baker dal debug print store schemas\\b",
+      "./[octez-dal-executable] debug print store schemas" );
+    ( "\\./octez-dal-node debug print store schemas\\b",
+      "./[octez-dal-executable] debug print store schemas" );
     ("sh\\w{72}\\b", "[DAL_SLOT_HEADER]");
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
        Remove this regexp as soon as the WASM PVM stabilizes. *)
@@ -80,7 +85,7 @@ let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
         arguments
     in
     let message = Log.quote_shell_command command arguments in
-    Regression.capture ("\n" ^ message)
+    Regression.capture ("\n" ^ replace_variables message)
   in
   let on_log output = replace_variables output |> Regression.capture in
   {Process.on_spawn; on_log}
