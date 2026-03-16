@@ -636,16 +636,21 @@ images.ubuntu:
   rules:
   - changes:
     - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-build
     - images/base-images/Dockerfile.debian-systemd
     - images/scripts/install-gcloud-apt.sh
     - images/scripts/install_datadog_static.sh
+    - images/scripts/install_opam_static.sh
+    - images/scripts/install_sccache_static.sh
     - script-inputs/active_protocol_versions_without_number
     - scripts/ci/build-base-images.sh
     - scripts/ci/octez-packages-version.sh
     - scripts/ci/systemd-entrypoint.service
     - scripts/ci/systemd-entrypoint.sh
     - scripts/kiss-fetch.sh
+    - scripts/kiss-logs.sh
     - scripts/packaging/tests/tests-common.inc.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - trigger
@@ -971,6 +976,53 @@ images.debian-build:
       - unstable
       - bookworm
       - trixie
+
+images.ubuntu-build:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-build
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_opam_static.sh
+    - images/scripts/install_sccache_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
+    - scripts/kiss-logs.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - trigger
+  - images.ubuntu
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ubuntu-build
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/ubuntu:${RELEASE}-${CI_COMMIT_REF_SLUG}
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      - "25.10"
 
 images.debian-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

@@ -308,7 +308,10 @@ let jobs ?start_job ?(changeset = false) () =
     make_job_base_image_distribution ~changes Distribution.Debian
   in
   let job_ubuntu_based_images =
-    let changes = Changeset.make (Files.debian_base @ Files.debian_systemd) in
+    let changes =
+      Changeset.make
+        (Files.debian_base @ Files.debian_build @ Files.debian_systemd)
+    in
     make_job_base_image_distribution ~changes Distribution.Ubuntu
   in
   let job_fedora_based_images =
@@ -459,6 +462,17 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make (Files.debian_build @ Files.debian_base))
       "images/base-images/Dockerfile.debian-build"
   in
+  let job_ubuntu_build_base_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"ubuntu-build"
+      ~base_name:(Pipeline_dep "ubuntu")
+      ~dependencies:(Dependent [Job job_ubuntu_based_images])
+      ~matrix:Distribution.(release_matrix Ubuntu)
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make (Files.debian_build @ Files.debian_base))
+      "images/base-images/Dockerfile.debian-build"
+  in
   let job_debian_systemd_base_images =
     make_job_base_images
       ~__POS__
@@ -491,6 +505,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_debian_homebrew_base_images;
     job_docker_ci_based_images;
     job_debian_build_base_images;
+    job_ubuntu_build_base_images;
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
     job_ci_release_based_images;
