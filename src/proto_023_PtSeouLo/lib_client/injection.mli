@@ -33,7 +33,7 @@ type 'kind preapply_result =
 type fee_parameter = {
   minimal_fees : Tez.t;
   minimal_nanotez_per_byte : Q.t option;
-  minimal_nanotez_per_gas_unit : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t option;
   force_low_fee : bool;
   fee_cap : Tez.t;
   burn_cap : Tez.t;

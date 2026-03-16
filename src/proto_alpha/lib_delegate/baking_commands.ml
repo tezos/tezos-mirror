@@ -28,6 +28,16 @@ open Baking_errors
 module Events = Baking_events.Commands
 module Command_run = Octez_agnostic_baker.Command_run
 
+let minimal_nanotez_per_gas_unit_arg =
+  Tezos_clic.default_arg
+    ~long:"minimal-nanotez-per-gas-unit"
+    ~placeholder:"amount"
+    ~doc:
+      "Exclude operations with fees per gas unit lower than this threshold (in \
+       nanotez)."
+    ~default:"100"
+    Client_proto_args.nanotez_parameter
+
 let minimal_nanotez_per_byte_arg =
   Tezos_clic.default_arg
     ~long:"minimal-nanotez-per-byte"
@@ -36,7 +46,7 @@ let minimal_nanotez_per_byte_arg =
       "Exclude operations with fees per byte lower than this threshold (in \
        nanotez)."
     ~default:"1000"
-    Client_proto_args.minimal_nanotez_per_byte_parameter
+    Client_proto_args.nanotez_parameter
 
 let pidfile_arg =
   let open Lwt_result_syntax in

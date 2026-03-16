@@ -42,7 +42,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_contract1.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none originate contract test_transfer_contract2 transferring 20 from bootstrap1 running michelson_test_scripts/opcodes/noop.tz --burn-cap 10 --force
 Node is bootstrapped.
@@ -87,7 +87,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as test_transfer_contract2.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none originate contract transfer_tokens transferring 1000 from bootstrap1 running michelson_test_scripts/opcodes/transfer_tokens.tz --burn-cap 10 --force
 Node is bootstrapped.
@@ -142,7 +142,7 @@ This sequence of operations was run:
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as transfer_tokens.
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -186,7 +186,7 @@ This sequence of operations was run:
             [CONTRACT_HASH] ... -ꜩ100
             [CONTRACT_HASH] ... +ꜩ100
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
@@ -230,4 +230,4 @@ This sequence of operations was run:
             [CONTRACT_HASH] ... -ꜩ100
             [CONTRACT_HASH] ... +ꜩ100
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.

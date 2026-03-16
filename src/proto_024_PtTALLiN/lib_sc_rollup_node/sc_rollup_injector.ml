@@ -301,7 +301,7 @@ module Proto_client = struct
         minimal_fees = Tez.of_mutez_exn fee_parameter.minimal_fees.mutez;
         minimal_nanotez_per_byte = Some fee_parameter.minimal_nanotez_per_byte;
         minimal_nanotez_per_gas_unit =
-          fee_parameter.minimal_nanotez_per_gas_unit;
+          Some fee_parameter.minimal_nanotez_per_gas_unit;
         force_low_fee = fee_parameter.force_low_fee;
         fee_cap = Tez.of_mutez_exn fee_parameter.fee_cap.mutez;
         burn_cap = Tez.of_mutez_exn fee_parameter.burn_cap.mutez;

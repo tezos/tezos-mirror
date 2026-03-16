@@ -188,6 +188,9 @@ val get_minimal_nanotez_per_byte : config -> nanotez
 (** Return a copy of [config] with [minimal_nanotez_per_byte] replaced. *)
 val with_minimal_nanotez_per_byte : nanotez -> config -> config
 
+(** Extract the [minimal_nanotez_per_gas_unit] field from a {!config}. *)
+val get_minimal_nanotez_per_gas_unit : config -> nanotez
+
 (** Protocol context *)
 type ctxt
 

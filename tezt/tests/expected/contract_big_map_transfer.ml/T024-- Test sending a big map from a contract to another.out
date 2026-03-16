@@ -43,7 +43,7 @@ This sequence of operations was run:
           Storage size: 42 bytes
           Consumed gas: 1210.120
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_fresh" to "receiver_store"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -96,7 +96,7 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.0175
             storage fees ........................... +ꜩ0.0175
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_fresh" to "receiver_store_updated"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -151,7 +151,7 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.018
             storage fees ........................... +ꜩ0.018
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored" to "receiver_drop"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -196,7 +196,7 @@ This sequence of operations was run:
           Storage size: 42 bytes
           Consumed gas: 1210.120
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored" to "receiver_store"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -248,7 +248,7 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.0175
             storage fees ........................... +ꜩ0.0175
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored" to "receiver_store_updated"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -302,7 +302,7 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.018
             storage fees ........................... +ꜩ0.018
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored_updated" to "receiver_drop"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -349,7 +349,7 @@ This sequence of operations was run:
           Storage size: 42 bytes
           Consumed gas: 1210.120
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored_updated" to "receiver_store"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -403,7 +403,7 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.0355
             storage fees ........................... +ꜩ0.0355
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.
 Test transferring big map from "sender_stored_updated" to "receiver_store_updated"
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
@@ -459,4 +459,4 @@ This sequence of operations was run:
             [PUBLIC_KEY_HASH] ... -ꜩ0.036
             storage fees ........................... +ꜩ0.036
 
-Failed to fetch minimal_nanotez_per_byte from the node's mempool filter RPC. Using default value (1000 nanotez/byte).
+Failed to fetch mempool filter configuration from the node's RPC. Using defaults: 1000 nanotez/byte, 100 nanotez/gas_unit.

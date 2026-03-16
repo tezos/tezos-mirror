@@ -78,6 +78,12 @@ Client
   (1000 nanotez/byte). User-provided ``--minimal-nanotez-per-byte`` values
   still take priority over the RPC value. (MR :gl:`!21028`)
 
+- ``octez-client`` now fetches ``minimal_nanotez_per_gas_unit`` from the node's
+  mempool filter RPC (``GET /chains/<chain>/mempool/filter``) when estimating
+  fees for manager operations, instead of always using the hardcoded default
+  (100 nanotez/gas unit). User-provided ``--minimal-nanotez-per-gas-unit``
+  values still take priority over the RPC value. (MR :gl:`!21155`)
+
 Signer
 ------
 
