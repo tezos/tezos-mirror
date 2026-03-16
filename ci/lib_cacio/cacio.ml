@@ -81,7 +81,10 @@ module Condition : sig
       [when_] should be positive ([Always], [On_success] or [Manual]).
       It is the [when_] clause for rules when the condition holds. *)
   val encode :
-    ?when_:Gitlab_ci.Types.when_ -> t -> Gitlab_ci.Types.job_rule list option
+    ?when_:Gitlab_ci.Types.when_ ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_rule ->
+    t ->
+    Gitlab_ci.Types.job_rule list option
 end = struct
   type base_predicate =
     | False
@@ -105,13 +108,13 @@ end = struct
 
   let empty_changeset = Tezos_ci.Changeset.make []
 
-  let encode ?when_ condition =
+  let encode ?when_ ?allow_failure condition =
     if List.mem True condition then
       (* If any of the base predicate is [True],
          the whole condition is equivalent to [True]. *)
       match when_ with
       | None -> None
-      | Some when_ -> Some [Gitlab_ci.Util.job_rule ~when_ ()]
+      | Some when_ -> Some [Gitlab_ci.Util.job_rule ~when_ ?allow_failure ()]
     else
       (* Else, the condition can be rewritten to have the form
          [changes or labels] where [changes] is a disjunction of [Changes] predicates
@@ -154,7 +157,7 @@ end = struct
             (* The [changes] part of the disjunction is equivalent to [False].
                  Don't add a rule. *)
             []
-        | _ :: _ -> [Gitlab_ci.Util.job_rule ~changes ?when_ ()]
+        | _ :: _ -> [Gitlab_ci.Util.job_rule ~changes ?when_ ?allow_failure ()]
       in
       let rules_from_labels =
         (* Simplify the disjunction by observing that [a or b] is equivalent to [a]
@@ -175,6 +178,7 @@ end = struct
                      (Tezos_ci.Rules.has_mr_label first_label)
                      other_labels)
                 ?when_
+                ?allow_failure
                 ();
             ]
       in
@@ -402,28 +406,49 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
               let rev_deps = rev_deps |> UID_set.elements |> List.map fix_uid in
               (* Fix [trigger]. *)
               let trigger =
-                let merge_triggers a b =
-                  match (a, b) with
-                  | Manual, Manual -> Manual
-                  | Immediate, (Auto | Immediate | Manual)
-                  | (Auto | Manual), Immediate ->
-                      Immediate
-                  | Auto, (Auto | Manual) | Manual, Auto ->
-                      (* If a job is supposed to run automatically,
-                         its dependencies must run automatically as well. *)
-                      Auto
-                in
-                let initial_trigger =
-                  match trigger with
-                  | None ->
-                      (* We don't know yet.
-                         [Manual] will be upgraded to [Auto] if necessary. *)
-                      Manual
-                  | Some trigger -> trigger
-                in
-                rev_deps
-                |> List.map (fun node -> node.trigger)
-                |> List.fold_left merge_triggers initial_trigger
+                match trigger with
+                | Some Immediate -> Immediate
+                | Some ((Auto | Manual) as trigger) ->
+                    (* If a job A that was requested to be [Immediate] depends
+                       on a job B that was requested to be non-[Immediate],
+                       the job A will not actually be [Immediate].
+                       So this is probably a mistake.
+                       Here we check that this is not the case (with B = [job]). *)
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto | Manual -> ()
+                      | Immediate ->
+                          failwith
+                          @@ sf
+                               "Job %s, which is Immediate, depends on job %s, \
+                                which is non-Immediate; this is probably a \
+                                mistake."
+                               rev_dep.job.name
+                               job.name ) ;
+                    trigger
+                | None ->
+                    (* Job was added automatically because of reverse dependencies.
+                       - If all explicit reverse dependencies are [Manual],
+                         we don't want to trigger this job automatically;
+                         it must also be [Manual].
+                       - If there is an explicit reverse dependency that is [Immediate],
+                         the job must be [Immediate].
+                       - Else it should be [Auto]. *)
+                    let auto_rev_deps = ref false in
+                    let immediate_rev_deps = ref false in
+                    let manual_rev_deps = ref false in
+                    ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
+                      match rev_dep.trigger with
+                      | Auto -> auto_rev_deps := true
+                      | Immediate -> immediate_rev_deps := true
+                      | Manual -> manual_rev_deps := true ) ;
+                    if !immediate_rev_deps then Immediate
+                    else if !auto_rev_deps then Auto
+                    else if !manual_rev_deps then Manual
+                    else
+                      (* No reverse dependency, yet the job was added automatically?
+                         This does not make sense. *)
+                      assert false
               in
               (* Fix the job's conditions so that it becomes the disjunction
                  of the conditions of its transitive dependencies (including itself)
@@ -577,15 +602,25 @@ let convert_graph ?(interruptible_pipeline = true)
                  whether we actually want the condition ([with_condition]),
                  and the [trigger]. *)
               let rules =
-                let when_ : Gitlab_ci.Types.when_ option =
+                let (when_, allow_failure) :
+                    Gitlab_ci.Types.when_ option
+                    * Gitlab_ci.Types.allow_failure_rule option =
                   match trigger with
-                  | Auto | Immediate -> None
-                  | Manual -> Some Manual
+                  | Auto | Immediate -> (None, None)
+                  | Manual ->
+                      ( Some Manual,
+                        match allow_failure with
+                        | Some No ->
+                            (* Make sure that one can disable the [allow_failure: true]
+                               that is added by default (by [Gitlab_ci.Util.job_rule])
+                               by specifying [~allow_failure: No]. *)
+                            Some No
+                        | None | Some (Yes | With_exit_codes _) -> None )
                 in
                 let condition =
                   if with_condition then only_if else Condition.true_
                 in
-                Condition.encode ?when_ condition
+                Condition.encode ?when_ ?allow_failure condition
               in
               let interruptible_stage =
                 match stage with
