@@ -1823,6 +1823,326 @@ let test_crac_evm_revert_after_nested_cracs =
   let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_e in
   unit
 
+(** EVM CRAC target reverts.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_reverter]
+ *                                 |-> REVERT
+ *
+ *)
+let test_crac_evm_target_reverts =
+  register_crac_runner_test
+    ~title:"CRAC: EVM CRAC target reverts"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM reverter" ;
+  let* evm_reverter = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM reverter" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_reverter in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge
+  in
+  unit
+
+(** Second CRAC target EVM reverts, rolling back the first.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_1] ~CRAC~> EVM[evm_runner_1]
+ *     |-> TEZ[tez_bridge_2] ~CRAC~> EVM[evm_runner_2]
+ *                                   |-> REVERT
+ *
+ *)
+let test_crac_second_crac_evm_revert =
+  register_crac_runner_test
+    ~title:"CRAC: second CRAC target EVM reverts"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM runners" ;
+  let* evm_runner_1 = EvmMultiRunCaller.deploy_and_init () in
+  let* evm_runner_2 = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  Log.debug ~prefix "Originate TEZ bridges" ;
+  let* tez_bridge_1 = TezCrossRuntimeRunnerEvm.originate evm_runner_1 in
+  let* tez_bridge_2 = TezCrossRuntimeRunnerEvm.originate evm_runner_2 in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_bridge_1; tez_bridge_2] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner_1 in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner_2 in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_1
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_2
+  in
+  unit
+
+(** TEZ revert rolls back two successful CRACs.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_1] ~CRAC~> EVM[evm_runner_1]
+ *     |-> TEZ[tez_bridge_2] ~CRAC~> EVM[evm_runner_2]
+ *     |-> REVERT
+ *
+ *)
+let test_crac_tez_revert_rolls_back_two_cracs =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ revert rolls back two CRACs"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM runners" ;
+  let* evm_runner_1 = EvmMultiRunCaller.deploy_and_init () in
+  let* evm_runner_2 = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridges" ;
+  let* tez_bridge_1 = TezCrossRuntimeRunnerEvm.originate evm_runner_1 in
+  let* tez_bridge_2 = TezCrossRuntimeRunnerEvm.originate evm_runner_2 in
+  Log.debug ~prefix "Originate TEZ main with revert" ;
+  let* tez_main =
+    TezMultiRunCaller.originate
+      ~revert:true
+      ~callees:[tez_bridge_1; tez_bridge_2]
+      ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner_1 in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner_2 in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_1
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_2
+  in
+  unit
+
+(** Deep first branch with EVM revert in second branch.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_1] ~CRAC~> EVM[evm_runner_1] ~CRAC~> TEZ[tez_bridge_inner] ~CRAC~> EVM[evm_leaf]
+ *     |-> TEZ[tez_bridge_2] ~CRAC~> EVM[evm_runner_2]
+ *                                   |-> REVERT
+ *
+ *)
+let test_crac_deep_branch_with_second_evm_revert =
+  register_crac_runner_test
+    ~title:"CRAC: deep first branch with EVM revert in second"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build first branch (deep chain)" ;
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge_inner = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  let* evm_runner_1 =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge_inner
+  in
+  let* tez_bridge_1 = TezCrossRuntimeRunnerEvm.originate evm_runner_1 in
+  Log.debug ~prefix "Build second branch (EVM revert)" ;
+  let* evm_runner_2 = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  let* tez_bridge_2 = TezCrossRuntimeRunnerEvm.originate evm_runner_2 in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_bridge_1; tez_bridge_2] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_leaf in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_runner_1
+  in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner_2 in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_1
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_inner
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_2
+  in
+  unit
+
+(** TEZ nested revert cascade without catch.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]
+ *                                 |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
+ *                                 |-> REVERT
+ *
+ *)
+let test_crac_tez_nested_revert_cascade_without_catch =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ nested revert cascade without catch"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  Log.debug ~prefix "Deploy EVM runner with revert" ;
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init
+      ~revert:true
+      ~callees:[(evm_bridge, false)]
+      ()
+  in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_runner in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
+  in
+  unit
+
+(** Double-nested CRAC with intermediate TEZ revert.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_outer] ~CRAC~> EVM[evm_runner_outer] ~CRAC~> TEZ[tez_runner]
+ *                                                                     |-> TEZ[tez_bridge_inner] ~CRAC~> EVM[evm_runner_inner] ~CRAC~> TEZ[tez_leaf]
+ *                                                                     |-> REVERT
+ *
+ *)
+let test_crac_double_nested_tez_revert =
+  register_crac_runner_test
+    ~title:"CRAC: double-nested CRAC with intermediate TEZ revert"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build inner chain" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_runner_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* tez_bridge_inner = TezCrossRuntimeRunnerEvm.originate evm_runner_inner in
+  Log.debug ~prefix "Originate TEZ runner (calls inner chain then reverts)" ;
+  let* tez_runner =
+    TezMultiRunCaller.originate ~revert:true ~callees:[tez_bridge_inner] ()
+  in
+  Log.debug ~prefix "Build outer chain" ;
+  let* evm_runner_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let* tez_bridge_outer = TezCrossRuntimeRunnerEvm.originate evm_runner_outer in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge_outer] () in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_leaf in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_runner_outer
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_runner_inner
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_outer
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge_inner
+  in
+  unit
+
+(** TEZ deep nesting across 6 CRAC levels.
+ *
+ *    TEZ[a] ~CRAC~> EVM[b] ~CRAC~> TEZ[c] ~CRAC~> EVM[d] ~CRAC~> TEZ[e] ~CRAC~> EVM[f]
+ *                                                                               |-> REVERT
+ *
+ *)
+let test_crac_tez_deep_nesting_6_levels =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ deep nesting across 6 CRAC levels"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build 6-level CRAC chain (inside-out)" ;
+  let* evm_f = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  let* tez_e = TezCrossRuntimeRunnerEvm.originate evm_f in
+  let* evm_d = EvmCrossRuntimeRunnerTez.deploy_and_init tez_e in
+  let* tez_c = TezCrossRuntimeRunnerEvm.originate evm_d in
+  let* evm_b = EvmCrossRuntimeRunnerTez.deploy_and_init tez_c in
+  let* tez_a = TezCrossRuntimeRunnerEvm.originate evm_b in
+  Log.debug ~prefix "Call TEZ a" ;
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_a in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_f in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_a in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_b in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_c in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_d in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_e in
+  unit
+
+(** TEZ revert after nested CRACs.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[a] ~CRAC~> EVM[b] ~CRAC~> TEZ[c] ~CRAC~> EVM[d] ~CRAC~> TEZ[e] ~CRAC~> EVM[f]
+ *     |-> REVERT
+ *
+ *)
+let test_crac_tez_revert_after_nested_cracs =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ revert after nested CRACs"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build 5-crossing CRAC chain (inside-out)" ;
+  let* evm_f = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_e = TezCrossRuntimeRunnerEvm.originate evm_f in
+  let* evm_d = EvmCrossRuntimeRunnerTez.deploy_and_init tez_e in
+  let* tez_c = TezCrossRuntimeRunnerEvm.originate evm_d in
+  let* evm_b = EvmCrossRuntimeRunnerTez.deploy_and_init tez_c in
+  let* tez_a = TezCrossRuntimeRunnerEvm.originate evm_b in
+  Log.debug ~prefix "Originate TEZ main with revert" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~revert:true ~callees:[tez_a] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_f in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_a in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_b in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_c in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_d in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_e in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1849,4 +2169,12 @@ let () =
   test_crac_nested_revert_cascade_without_catch [Alpha] ;
   test_crac_double_nested_evm_revert [Alpha] ;
   test_crac_deep_nesting_6_levels [Alpha] ;
-  test_crac_evm_revert_after_nested_cracs [Alpha]
+  test_crac_evm_revert_after_nested_cracs [Alpha] ;
+  test_crac_evm_target_reverts [Alpha] ;
+  test_crac_second_crac_evm_revert [Alpha] ;
+  test_crac_tez_revert_rolls_back_two_cracs [Alpha] ;
+  test_crac_deep_branch_with_second_evm_revert [Alpha] ;
+  test_crac_tez_nested_revert_cascade_without_catch [Alpha] ;
+  test_crac_double_nested_tez_revert [Alpha] ;
+  test_crac_tez_deep_nesting_6_levels [Alpha] ;
+  test_crac_tez_revert_after_nested_cracs [Alpha]
