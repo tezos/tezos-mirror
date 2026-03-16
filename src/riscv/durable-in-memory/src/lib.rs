@@ -113,8 +113,12 @@ pub fn octez_riscv_durable_in_memory_registry_hash(
 
 #[ocaml::func]
 #[ocaml::sig("registry -> int64")]
-pub fn octez_riscv_durable_in_memory_registry_size(state: SafePointer<Registry>) -> i64 {
-    state.apply_ro(ds_registry::Registry::len) as i64
+pub fn octez_riscv_durable_in_memory_registry_size(
+    state: SafePointer<Registry>,
+) -> OcamlFallible<u64> {
+    let size: usize = state.apply_ro(ds_registry::Registry::len);
+
+    Ok(u64::try_from(size)?)
 }
 
 #[ocaml::func]
@@ -133,11 +137,13 @@ pub fn octez_riscv_durable_in_memory_registry_resize(
 #[ocaml::sig("registry -> int64 -> int64 -> (unit, invalid_argument_error) result")]
 pub fn octez_riscv_durable_in_memory_registry_copy(
     state: SafePointer<Registry>,
-    src_index: i64,
-    dst_index: i64,
+    src_index: u64,
+    dst_index: u64,
 ) -> SplitDsResult<()> {
-    let res =
-        state.apply(|registry| registry.copy_database(src_index as usize, dst_index as usize))?;
+    let src_index = usize::try_from(src_index)?;
+    let dst_index = usize::try_from(dst_index)?;
+
+    let res = state.apply(|registry| registry.copy_database(src_index, dst_index))?;
 
     split_ds_errors(res)
 }
@@ -146,11 +152,13 @@ pub fn octez_riscv_durable_in_memory_registry_copy(
 #[ocaml::sig("registry -> int64 -> int64 -> (unit, invalid_argument_error) result")]
 pub fn octez_riscv_durable_in_memory_registry_move(
     state: SafePointer<Registry>,
-    src_index: i64,
-    dst_index: i64,
+    src_index: u64,
+    dst_index: u64,
 ) -> SplitDsResult<()> {
-    let res =
-        state.apply(|registry| registry.move_database(src_index as usize, dst_index as usize))?;
+    let src_index = usize::try_from(src_index)?;
+    let dst_index = usize::try_from(dst_index)?;
+
+    let res = state.apply(|registry| registry.move_database(src_index, dst_index))?;
 
     split_ds_errors(res)
 }
