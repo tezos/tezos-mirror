@@ -42,7 +42,6 @@ module VM : sig
     docker_image:string ->
     os:Types.Os.t ->
     prometheus_port:int ->
-    auth_enabled:bool ->
     unit Lwt.t
 
   val points : unit -> string list Lwt.t
