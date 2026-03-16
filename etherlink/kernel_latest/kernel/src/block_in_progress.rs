@@ -22,6 +22,7 @@ use crate::tick_model;
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
+use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
@@ -41,6 +42,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
+use tezos_tezlink::operation_result::OperationDataAndMetadata;
 use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
 #[derive(Debug, PartialEq)]
@@ -388,6 +390,7 @@ impl BlockInProgress {
         &mut self,
         execution_info: RuntimeExecutionInfo,
         host: &mut Host,
+        michelson_to_evm_gas_multiplier: u64,
     ) -> Result<(), anyhow::Error>
     where
         Host: WithGas + Logging,
@@ -420,8 +423,21 @@ impl BlockInProgress {
                 self.cumulative_tx_objects.push(tx_object);
             }
             RuntimeExecutionInfo::Tezos(operation_and_receipt) => {
-                // TODO: Add gas used for Tezos transactions to the cumulative gas
-                // https://linear.app/tezos/issue/L2-841/add-gas-used-for-tezos-transactions-to-the-cumulative-gas
+                let OperationDataAndMetadata::OperationWithMetadata(batch) =
+                    &operation_and_receipt.op_and_receipt;
+                let michelson_milligas_used: u64 = batch
+                    .operations
+                    .iter()
+                    .map(|op| op.consumed_milligas())
+                    .filter_map(|consumed_milligas| consumed_milligas.0.to_u64())
+                    .sum();
+                // This conversion is needed to keep consistency with the unit
+                // we use for gas.
+                // The sub-milligas remainder is lost, but it is negligible here.
+                let michelson_gas_used = michelson_milligas_used / 1000;
+                let cumulative_execution_gas =
+                    michelson_gas_used.saturating_mul(michelson_to_evm_gas_multiplier);
+                self.cumulative_execution_gas += U256::from(cumulative_execution_gas);
                 self.cumulative_tezos_operation_receipts
                     .list
                     .push(operation_and_receipt);

@@ -2765,7 +2765,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args15
+       (args16
           (config_key_arg
              ~name:"dal_publishers_whitelist"
              ~placeholder:"tz1...,tz2...,...")
@@ -2784,7 +2784,10 @@ let make_kernel_config_command =
           tez_bootstrap_balance_arg
           tez_bootstrap_account_arg
           tez_bootstrap_contract_arg
-          michelson_runtime_chain_id_arg))
+          michelson_runtime_chain_id_arg
+          (config_key_arg
+             ~name:"michelson_to_evm_gas_multiplier"
+             ~placeholder:"10")))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2829,7 +2832,8 @@ let make_kernel_config_command =
              tez_bootstrap_balance,
              tez_bootstrap_accounts,
              tez_bootstrap_contracts,
-             michelson_runtime_chain_id ) )
+             michelson_runtime_chain_id,
+             michelson_to_evm_gas_multiplier ) )
          output
          ()
        ->
@@ -2849,6 +2853,7 @@ let make_kernel_config_command =
         ?kernel_security_governance
         ?evm_version
         ?minimum_base_fee_per_gas
+        ?michelson_to_evm_gas_multiplier
         ?da_fee_per_byte
         ?delayed_inbox_timeout
         ?delayed_inbox_min_levels

@@ -330,8 +330,16 @@ impl NomReader<'_> for OperationError {
     }
 }
 
+pub trait HasConsumedMilligas {
+    fn consumed_milligas(&self) -> &Narith;
+}
+
 pub trait OperationKind {
-    type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
+    type Success: PartialEq
+        + Debug
+        + BinWriter
+        + for<'a> NomReader<'a>
+        + HasConsumedMilligas;
 }
 
 impl OperationKind for TransferContent {
@@ -372,6 +380,12 @@ impl From<TransferTarget> for TransferSuccess {
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
+}
+
+impl HasConsumedMilligas for RevealSuccess {
+    fn consumed_milligas(&self) -> &Narith {
+        &self.consumed_milligas
+    }
 }
 
 // PlaceHolder Type for temporary unused fields
@@ -448,6 +462,12 @@ pub struct OriginationSuccess {
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
+impl HasConsumedMilligas for OriginationSuccess {
+    fn consumed_milligas(&self) -> &Narith {
+        &self.consumed_milligas
+    }
+}
+
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     #[encoding(option, bytes)]
@@ -465,9 +485,28 @@ pub struct TransferSuccess {
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
+impl HasConsumedMilligas for TransferSuccess {
+    fn consumed_milligas(&self) -> &Narith {
+        &self.consumed_milligas
+    }
+}
+
+impl HasConsumedMilligas for TransferTarget {
+    fn consumed_milligas(&self) -> &Narith {
+        let TransferTarget::ToContrat(success) = self;
+        &success.consumed_milligas
+    }
+}
+
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct EventSuccess {
     pub consumed_milligas: Narith,
+}
+
+impl HasConsumedMilligas for EventSuccess {
+    fn consumed_milligas(&self) -> &Narith {
+        &self.consumed_milligas
+    }
 }
 
 impl Default for TransferSuccess {
@@ -526,6 +565,18 @@ pub struct BacktrackedResult<M: OperationKind> {
 }
 
 impl<M: OperationKind> ContentResult<M> {
+    pub fn consumed_milligas(&self) -> Narith {
+        match self {
+            ContentResult::Applied(success) => success.consumed_milligas().clone(),
+            ContentResult::BackTracked(bt) => bt.result.consumed_milligas().clone(),
+            ContentResult::Failed(_) | ContentResult::Skipped => {
+                // TODO: L2-1034
+                // Handle `Failed` seperatly from `Skipped`.
+                Narith::from(0u64)
+            }
+        }
+    }
+
     pub fn backtrack_if_applied(&mut self) {
         if let ContentResult::Applied(_) = self {
             // Lowkey optimisation: takes the ownership of the content result by replacing
@@ -790,6 +841,20 @@ pub struct OperationBatchWithMetadata {
 pub struct OperationWithMetadata {
     pub content: ManagerOperationContent,
     pub receipt: OperationResultSum,
+}
+
+impl OperationWithMetadata {
+    pub fn consumed_milligas(&self) -> Narith {
+        match &self.receipt {
+            OperationResultSum::Reveal(op_result) => op_result.result.consumed_milligas(),
+            OperationResultSum::Transfer(op_result) => {
+                op_result.result.consumed_milligas()
+            }
+            OperationResultSum::Origination(op_result) => {
+                op_result.result.consumed_milligas()
+            }
+        }
+    }
 }
 
 impl NomReader<'_> for OperationWithMetadata {

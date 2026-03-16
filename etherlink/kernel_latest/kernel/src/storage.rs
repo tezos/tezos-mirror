@@ -154,6 +154,8 @@ pub const CHAIN_CONFIGURATIONS: RefPath =
 
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
+const EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/michelson_to_evm_gas_multiplier");
 const EVM_DA_FEE: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
 const BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
@@ -528,6 +530,17 @@ pub fn store_minimum_base_fee_per_gas(
     price: U256,
 ) -> Result<(), Error> {
     write_u256_le(host, &EVM_MINIMUM_BASE_FEE_PER_GAS, price).map_err(Error::from)
+}
+
+pub fn read_michelson_to_evm_gas_multiplier(host: &impl StorageV1) -> Result<u64, Error> {
+    read_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER).map_err(Error::from)
+}
+
+pub fn store_michelson_to_evm_gas_multiplier(
+    host: &mut impl StorageV1,
+    value: u64,
+) -> Result<(), Error> {
+    write_u64_le(host, &EVM_MICHELSON_TO_EVM_GAS_MULTIPLIER, value).map_err(Error::from)
 }
 
 pub fn store_da_fee(

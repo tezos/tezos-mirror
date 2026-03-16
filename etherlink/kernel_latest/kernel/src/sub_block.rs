@@ -19,9 +19,10 @@ use crate::{
     },
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
+    fees::DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
     gas_price::base_fee_per_gas,
     retrieve_chain_id, retrieve_da_fee,
-    storage::{self, read_sequencer_pool_address},
+    storage::{self, read_michelson_to_evm_gas_multiplier, read_sequencer_pool_address},
     upgrade,
 };
 use anyhow::anyhow;
@@ -168,10 +169,13 @@ where
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
     let da_fee_per_byte_mutez = tezos_ethereum::wei::mutez_from_wei(da_fee_per_byte)
         .map_err(|_| Error::InvalidConversion)?;
+    let michelson_to_evm_gas_multiplier = read_michelson_to_evm_gas_multiplier(host)
+        .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
         context: TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?,
         da_fee_per_byte_mutez,
+        michelson_to_evm_gas_multiplier,
     };
     Ok(TezosXBlockConstants {
         evm_runtime_block_constants: BlockConstants {

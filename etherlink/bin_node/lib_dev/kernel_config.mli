@@ -27,6 +27,7 @@ val make :
   ?kernel_governance:string * string ->
   ?kernel_security_governance:string * string ->
   ?minimum_base_fee_per_gas:string * string ->
+  ?michelson_to_evm_gas_multiplier:string * string ->
   ?da_fee_per_byte:string * string ->
   ?delayed_inbox_timeout:string * string ->
   ?delayed_inbox_min_levels:string * string ->
@@ -65,6 +66,7 @@ val make_l2 :
   ?tez_bootstrap_accounts:Signature.V2.Public_key.t list ->
   ?tez_bootstrap_contracts:(Tezos_types.Contract.t * string * string) list ->
   ?minimum_base_fee_per_gas:string * string ->
+  ?michelson_to_evm_gas_multiplier:string * string ->
   ?da_fee_per_byte:string * string ->
   ?sequencer_pool_address:string * string ->
   ?maximum_gas_per_transaction:string * string ->

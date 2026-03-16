@@ -220,6 +220,7 @@ mod test {
                 )
                 .unwrap(),
                 da_fee_per_byte_mutez: 0,
+                michelson_to_evm_gas_multiplier: 0,
             },
         };
 
