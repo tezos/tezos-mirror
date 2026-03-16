@@ -434,17 +434,17 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                        - If there is an explicit reverse dependency that is [Immediate],
                          the job must be [Immediate].
                        - Else it should be [Auto]. *)
-                    let auto_rev_deps = ref 0 in
-                    let immediate_rev_deps = ref 0 in
-                    let manual_rev_deps = ref 0 in
+                    let auto_rev_deps = ref false in
+                    let immediate_rev_deps = ref false in
+                    let manual_rev_deps = ref false in
                     ( Fun.flip List.iter rev_deps @@ fun rev_dep ->
                       match rev_dep.trigger with
-                      | Auto -> incr auto_rev_deps
-                      | Immediate -> incr immediate_rev_deps
-                      | Manual -> incr manual_rev_deps ) ;
-                    if !immediate_rev_deps > 0 then Immediate
-                    else if !auto_rev_deps > 0 then Auto
-                    else if !manual_rev_deps > 0 then Manual
+                      | Auto -> auto_rev_deps := true
+                      | Immediate -> immediate_rev_deps := true
+                      | Manual -> manual_rev_deps := true ) ;
+                    if !immediate_rev_deps then Immediate
+                    else if !auto_rev_deps then Auto
+                    else if !manual_rev_deps then Manual
                     else
                       (* No reverse dependency, yet the job was added automatically?
                          This does not make sense. *)
