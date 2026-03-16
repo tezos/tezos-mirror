@@ -294,17 +294,66 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
   in
   eval_result.state_info
 
+(** [advance_to_next_block plugin node_ctxt start_state] runs the PVM from the
+    current [start_state] to the end of its block, then builds the start state
+    for the next block with fresh messages. This avoids a context checkout which
+    is expensive for RISC-V. *)
+let advance_to_next_block (module Plugin : Protocol_plugin_sig.PARTIAL)
+    (node_ctxt : _ Node_context.t) start_state =
+  let open Lwt_result_syntax in
+  let level = start_state.Pvm_plugin_sig.info.inbox_level in
+  let* block = Node_context.get_l2_block_by_level node_ctxt level in
+  let end_tick = Z.add block.initial_tick (Z.of_int64 block.num_ticks) in
+  (* Run to the end of the current block. *)
+  let* end_info = run_to_tick (module Plugin) node_ctxt start_state end_tick in
+  assert (Z.equal end_info.tick end_tick) ;
+  (* Build the start state for the next block. *)
+  let next_level = Int32.succ level in
+  let* next_block = Node_context.get_l2_block_by_level node_ctxt next_level in
+  let* inbox = Node_context.get_inbox node_ctxt next_block.header.inbox_hash in
+  let inbox_level = Octez_smart_rollup.Inbox.inbox_level inbox in
+  let*! state_hash = Plugin.Pvm.state_hash node_ctxt.kind start_state.state in
+  let* messages =
+    Node_context.get_messages node_ctxt next_block.header.inbox_witness
+  in
+  let info =
+    Pvm_plugin_sig.
+      {
+        state_hash;
+        inbox_level;
+        tick = end_info.tick;
+        message_counter_offset = 0;
+        remaining_fuel = Fuel.Accounted.of_ticks 0L;
+        remaining_messages = messages;
+      }
+  in
+  return Pvm_plugin_sig.{state = start_state.state; info}
+
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
   let open Lwt_result_syntax in
   let* start_state =
-    match start_state with
-    | Some start_state
+    match (start_state, node_ctxt.Node_context.kind) with
+    | Some start_state, _
       when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
         return start_state
+    | Some start_state, Riscv
+      when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level ->
+        (* For RISC-V, it is cheaper to continue evaluating to the end of the
+           block and advance to the next one rather than checking out a context
+           from disk. The levels are always within the same commitment period
+           during a refutation game, so the distance to advance is bounded. *)
+        let rec advance state =
+          if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
+            return state
+          else
+            let* state = advance_to_next_block plugin node_ctxt state in
+            advance state
+        in
+        advance start_state
     | _ ->
-        (* Recompute start state on level change or if we don't have a
-           starting state on hand. *)
+        (* Recompute start state from checkout on level change (except for
+           RISC-V) or if we don't have a starting state on hand. *)
         start_state_of_block plugin node_ctxt event
   in
   let state = start_state.state in
@@ -314,33 +363,36 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   let+ run_info = run_to_tick plugin node_ctxt start_state tick in
   Pvm_plugin_sig.{state; info = run_info}
 
-(** This function memoizes [f tick], but puts an immutable state copy in the
-    cache, and returns a mutable version. Either the one obtained from [f]
-    directly or a copy of the one in the cache. *)
-let memo_tick_state cache tick f =
-  match Pvm_plugin_sig.Tick_state_cache.bind cache tick Lwt.return with
-  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
-  | None ->
-      let p_mut = f tick in
-      let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
-      Pvm_plugin_sig.Tick_state_cache.put cache tick p_imm ;
-      p_mut
-
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
   Pvm_plugin_sig.make_state_cache 64 (* size of 2 dissections *)
 
-(* Memoized version of [state_of_tick_aux] using global cache. *)
-let global_memo_state_of_tick_aux plugin node_ctxt ~start_state
-    (event : Sc_rollup_block.t) tick =
-  memo_tick_state global_tick_state_cache tick
-  @@ state_of_tick_aux plugin node_ctxt ~start_state event
-
-(* Memoized version of [state_of_tick_aux] using both global and local caches. *)
+(** Memoized version of [state_of_tick_aux] using both global and local caches.
+    A single immutable copy of the state is shared between both caches. *)
 let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     (event : Sc_rollup_block.t) tick =
-  memo_tick_state state_cache tick
-  @@ global_memo_state_of_tick_aux plugin node_ctxt ~start_state event
+  match Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return with
+  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+  | None -> (
+      match
+        Pvm_plugin_sig.Tick_state_cache.bind
+          global_tick_state_cache
+          tick
+          Lwt.return
+      with
+      | Some p_imm ->
+          (* Global hit: share the same immutable copy in local cache. *)
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
+          Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+      | None ->
+          (* Both miss: compute and store a single immutable copy in both. *)
+          let p_mut =
+            state_of_tick_aux plugin node_ctxt ~start_state event tick
+          in
+          let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
+          Pvm_plugin_sig.Tick_state_cache.put global_tick_state_cache tick p_imm ;
+          Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
+          p_mut)
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
     end_state] for [tick] if [tick] happened before
