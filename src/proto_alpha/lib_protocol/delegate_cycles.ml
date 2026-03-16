@@ -258,7 +258,11 @@ let cycle_end ctxt last_cycle =
   in
   (* Reallocate CLST deposits before computing future staking rights,
      so allocations are included. *)
-  let* ctxt = Clst_stake_allocation.rebalance_at_cycle_end ctxt ~new_cycle in
+  let* ctxt =
+    if Constants_storage.native_contracts_enable ctxt then
+      Clst_stake_allocation.rebalance_at_cycle_end ctxt ~new_cycle
+    else return ctxt
+  in
   (* Computing future staking rights *)
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
