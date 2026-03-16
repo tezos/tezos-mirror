@@ -187,6 +187,12 @@ val bootstrap4 : Signature.public_key
 
 val bootstrap5 : Signature.public_key
 
+(** Create a baking delegate key from a bootstrap account and its secret. *)
+val make_baking_delegate :
+  Protocol.Alpha_context.Parameters.bootstrap_account
+  * Tezos_mockup_commands.Mockup_wallet.bootstrap_secret ->
+  Baking_state_types.Key.t
+
 (** Check if a block header is signed by a given delegate. *)
 val check_block_signature :
   block_hash:Block_hash.t ->
