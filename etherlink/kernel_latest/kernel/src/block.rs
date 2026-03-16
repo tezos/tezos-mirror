@@ -148,6 +148,7 @@ where
         }
 
         let skip_signature_check = false;
+        let skip_fees_check = false;
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match __trace_kernel!(
@@ -163,6 +164,7 @@ where
                 sequencer_pool_address,
                 tracer_input,
                 skip_signature_check,
+                skip_fees_check,
             )?
         ) {
             ExecutionResult::Valid(execution_info) => {
