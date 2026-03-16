@@ -16,7 +16,6 @@
    GitLab}, the associated artifacts, and to push releases to opam. *)
 
 open Tezos_ci
-open Common.Build
 open Common.Docker
 
 (* Some jobs have been migrated to Cacio, in the shared component. *)
@@ -66,25 +65,6 @@ let job_docker_merge =
     ~job_docker_amd64:(job_docker mode trigger Amd64)
     ~job_docker_arm64:(job_docker mode trigger Arm64)
 
-(* On release pipelines the static binaries do not have any dependencies
-   on previous stages and can start immediately. *)
-let job_build_static =
-  Cacio.parameterize @@ fun trigger ->
-  Cacio.parameterize @@ fun arch ->
-  job_build_static_binaries
-    ~__POS__
-    ~dependencies:(Dependent [])
-    ?rules:
-      (match trigger with
-      | `manual ->
-          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      | `auto -> None)
-    ~arch
-    ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
-    ~storage:Ramfs
-    ~release:true
-    ()
-
 let job_build_homebrew_release =
   add_artifacts
     ~name:"build-$CI_COMMIT_REF_SLUG"
@@ -101,11 +81,14 @@ let job_gitlab_release =
     ~description:"Create a GitLab release."
     ~image:Images.Base_images.ci_release
     ~stage:Publish
+    ~needs:
+      [
+        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
+        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+      ]
     ~needs_legacy:
       [
         (Job, job_docker_merge mode `auto);
-        (Artifacts, job_build_static `auto Amd64);
-        (Artifacts, job_build_static `auto Arm64);
         (Artifacts, job_build_homebrew_release);
       ]
     ~id_tokens:Tezos_ci.id_tokens
@@ -122,12 +105,12 @@ let job_gitlab_publish =
     ~description:"Create a GitLab package."
     ~image:Images.Base_images.ci_release
     ~stage:Publish
-    ~needs_legacy:
+    ~needs:
       [
-        (Artifacts, job_build_static `auto Amd64);
-        (Artifacts, job_build_static `auto Arm64);
-        (Artifacts, job_build_homebrew_release);
+        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
+        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
       ]
+    ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ?variables:
       (match mode with
       | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
@@ -161,14 +144,14 @@ let job_release_page =
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
          ["./index.md"; "index.html"])
-    ?needs_legacy:
+    ?needs:
       (match wait_for with
       | `wait_for_nothing -> None
       | `wait_for_build ->
           Some
             [
-              (Artifacts, job_build_static `auto Amd64);
-              (Artifacts, job_build_static `auto Arm64);
+              (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
+              (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
             ])
     ~variables:
       (match mode with
@@ -328,8 +311,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
-    job_build_static `auto Amd64;
-    job_build_static `auto Arm64;
     job_docker mode `auto Amd64;
     job_docker mode `auto Arm64;
     job_build_homebrew_release;
@@ -374,10 +355,10 @@ let job_create_gitlab_package =
     ~stage:Publish
     ~description:
       "Create GitLab packages with static binaries from this packaging revision"
-    ~needs_legacy:
+    ~needs:
       [
-        (Artifacts, job_build_static `manual Amd64);
-        (Artifacts, job_build_static `manual Arm64);
+        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
+        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
       ]
     ~id_tokens:Tezos_ci.id_tokens
     ~allow_failure:No
@@ -427,10 +408,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_docker mode `manual Arm64;
     job_docker_merge mode `manual;
     job_docker_promote_to_version mode;
-    (* Static binaries *)
-    job_build_static `manual Amd64;
-    job_build_static `manual Arm64;
-    (* Release update *)
   ]
   @ jobs_debian_repository
   @
