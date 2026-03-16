@@ -476,7 +476,7 @@ type forge_request =
     }
 
 type forge_worker_hooks = {
-  push_request : forge_request -> unit;
+  push_request : forge_request -> bool Lwt.t;
   get_forge_event_stream : unit -> forge_event Lwt_stream.t;
   cancel_all_pending_tasks : unit -> unit;
 }
