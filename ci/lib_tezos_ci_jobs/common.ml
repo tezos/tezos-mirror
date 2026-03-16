@@ -67,62 +67,6 @@ end
 (** {2 Shared build jobs} *)
 
 module Build = struct
-  (* This version of the job builds both released and experimental executables.
-   It is used in the following pipelines:
-   - Before merging: check whether static executables still compile,
-     i.e. that we do pass the -static flag and that when we do it does compile
-   - Master branch: executables (including experimental ones) are used in some test networks
-   Variants:
-   - an arm64 variant exist, but is only used in the master branch pipeline
-     (no need to test that we pass the -static flag twice)
-   - released variants exist, that are used in release tag pipelines
-     (they do not build experimental executables) *)
-  let job_build_static_binaries ~__POS__ ~arch ?(cpu = Runner.CPU.Normal)
-      ?storage ?(executable_files = "script-inputs/octez-released-executables")
-      ?(experimental_executables =
-        "script-inputs/octez-experimental-executables") ?version_executable
-      ?(release = false) ?rules ?dependencies ?retry () : tezos_job =
-    let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-    let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
-    let artifacts =
-      (* Extend the lifespan to prevent failure for external tools using artifacts. *)
-      let expire_in = if release then Some (Duration (Days 90)) else None in
-      artifacts ?expire_in ["octez-binaries/$ARCH/*"]
-    in
-    let executable_files =
-      executable_files
-      ^ if not release then " " ^ experimental_executables else ""
-    in
-    let version_executable =
-      match version_executable with
-      | Some exe -> [("VERSION_EXECUTABLE", exe)]
-      | None -> []
-    in
-    job
-      ?rules
-      ?dependencies
-      ~__POS__
-      ~stage:Stages.build
-      ~arch
-      ~cpu
-      ?storage
-      ~name
-      ?retry
-      ~description:("Build the static Octez binaries for " ^ arch_string ^ ".")
-      ~image:Images.CI.build
-      ~before_script:
-        (Helpers.before_script ~take_ownership:true ~eval_opam:true [])
-      ~variables:
-        ([
-           ("ARCH", arch_string);
-           ("EXECUTABLE_FILES", executable_files);
-           ("DUNE_BUILD_JOBS", "-j 12");
-         ]
-        @ version_executable)
-      ~artifacts
-      ["./scripts/ci/build_static_binaries.sh"]
-    |> enable_cargo_cache |> enable_sccache
-
   let job_build_dynamic_binaries ?(extra = false) ?rules ~__POS__ ~arch ?retry
       ?cpu ?storage ?dependencies ~name executable_files =
     let arch_string = Runner.Arch.show_easy_to_distinguish arch in
