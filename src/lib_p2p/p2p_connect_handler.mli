@@ -41,8 +41,8 @@ type ('msg, 'peer, 'conn) t
 
 type config = {
   incoming_app_message_queue_size : int option;
-      (** Size of the message queue for user messages (messages returned
-      by this module's [read] function. *)
+      (** Maximum number of messages in the queue for user messages
+      (messages returned by this module's [read] function). *)
   private_mode : bool;
       (** If [true], only open outgoing/accept incoming connections
       to/from peers whose addresses are in [trusted_peers], and inform
