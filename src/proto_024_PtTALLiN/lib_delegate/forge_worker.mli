@@ -44,14 +44,12 @@ open Baking_state
 (** Worker type *)
 type worker
 
-type t = worker
-
 (** [push_request worker request] pushes the [request] to the worker
     to be treated. Each [forge_request] is associated to a specific
     delegate. The request will be treated whenever the delegate's
     associated queue is available. If, the delegate's queue did not
     previously exist, it will be created. *)
-val push_request : worker -> forge_request -> unit
+val push_request : worker -> forge_request -> bool Lwt.t
 
 (** [get_event_stream worker] returns the worker's stream of events
     onto which tasks completion results are pushed. *)
@@ -68,4 +66,4 @@ val shutdown : worker -> unit Lwt.t
 
 (** [start global_state] creates and runs a worker based on a baker's
     [global_state]. *)
-val start : global_state -> worker
+val start : global_state -> (worker, tztrace) result Lwt.t
