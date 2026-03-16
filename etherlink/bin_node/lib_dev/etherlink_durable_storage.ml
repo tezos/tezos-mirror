@@ -453,6 +453,12 @@ let base_fee_per_gas read =
         "Attempted to get the base fee per gas from a block which does not \
          have one."
 
+let michelson_to_evm_gas_multiplier read =
+  inspect_durable_and_decode
+    read
+    Durable_storage_path.michelson_to_evm_gas_multiplier
+    Data_encoding.(Binary.of_bytes_exn Little_endian.int64)
+
 let backlog read =
   let open Lwt_result_syntax in
   let+ read_result = read Durable_storage_path.backlog in
