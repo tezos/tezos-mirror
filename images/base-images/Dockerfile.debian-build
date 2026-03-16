@@ -39,13 +39,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-
-ARG OPAM_VERSION
-ENV OPAM_VERSION=${OPAM_VERSION}
-
-RUN /tmp/install_sccache_static.sh && \
-    /tmp/install_opam_static.sh
-
 COPY --link scripts/version.sh /root/tezos/scripts/
 
 #hadolint ignore=SC2154
@@ -54,6 +47,12 @@ RUN . /root/tezos/scripts/version.sh && \
     chmod +x rustup-init.sh && \
     ./rustup-init.sh --profile minimal \
       --default-toolchain "$recommended_rust_version" -y
+
+# opam_version set in scripts/version.sh
+#hadolint ignore=SC2154
+RUN /tmp/install_sccache_static.sh && \
+    . /root/tezos/scripts/version.sh && \
+    OPAM_VERSION="${opam_version}" /tmp/install_opam_static.sh
 
 RUN opam init --bare --disable-sandboxing
 
