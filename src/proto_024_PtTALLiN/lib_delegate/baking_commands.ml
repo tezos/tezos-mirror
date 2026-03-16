@@ -749,6 +749,7 @@ let run_baker
     ?data_dir
     ~keep_alive
     ~state_recorder
+    ~extra_nodes:[]
     delegates
 
 (* /*\ DO NOT MODIFY /!\

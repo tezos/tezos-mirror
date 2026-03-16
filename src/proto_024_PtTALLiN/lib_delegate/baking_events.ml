@@ -1451,3 +1451,19 @@ module Forge_worker = struct
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
 end
+
+module Client_daemon = struct
+  include Internal_event.Simple
+
+  let section = section @ ["client_daemon"]
+
+  let extra_node_warning =
+    declare_0
+      ~section
+      ~name:"extra_node_warning"
+      ~level:Warning
+      ~msg:
+        "the extra-node feature is under development.\n\
+         You must not use it in your baking setup."
+      ()
+end

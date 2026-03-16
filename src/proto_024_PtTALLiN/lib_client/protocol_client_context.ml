@@ -107,6 +107,23 @@ class wrap_full (t : Client_context.full) : full =
         Shell_services.Blocks.path
   end
 
+(** From a [Client_context.full], the class allows to call RPCs from
+    the node and those defined by the protocol. *)
+class wrap_full_with_new_rpc (t : Client_context.full)
+  (rpc_ctxt : Tezos_rpc.Context.generic) :
+  full =
+  object
+    inherit
+      Client_context.proxy_context_with_rpc
+        t
+        (rpc_ctxt :> Tezos_rpc.Context.generic)
+
+    inherit
+      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
+        (rpc_ctxt :> Tezos_rpc.Context.t)
+        Shell_services.Blocks.path
+  end
+
 let register_error_kind category ~id ~title ~description ?pp encoding from_error
     to_error =
   let id = "client." ^ Protocol.name ^ "." ^ id in

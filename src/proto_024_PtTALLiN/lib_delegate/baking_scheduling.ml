@@ -992,7 +992,8 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
         ())
     dal_node_rpc_ctxt
 
-let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
+let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
+    ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
     config delegates =
   let open Lwt_result_syntax in
