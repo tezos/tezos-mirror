@@ -210,6 +210,60 @@ module TezContract = struct
       ~l1_contracts
       ~sequencer
       call_op
+
+  (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
+   *  storage of an originated Michelson contract from the durable storage,
+   *  given its hex-encoded [Contract_repr.t] key. *)
+  let read_michelson_contract_storage sc_rollup_node contract_hex =
+    let path =
+      sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
+    in
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:path
+         ()
+
+  (** [decode_michelson_contract_address hex] decodes a hex-encoded
+   *  [Contract_repr.t] into a b58check KT1 address string. *)
+  let decode_michelson_contract_address hex =
+    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+    Hex.to_bytes (`Hex hex)
+    |> Data_encoding.Binary.of_bytes_exn C.encoding
+    |> C.to_b58check
+
+  (** [decode_micheline_storage hex_str] decodes a hex string from the durable
+   *  storage into a Micheline [JSON.u] value. Returns [None] if decoding
+   *  fails. *)
+  let decode_micheline_storage hex_str =
+    let module S = Tezos_protocol_alpha.Protocol.Script_repr in
+    Data_encoding.Binary.of_bytes_opt
+      S.expr_encoding
+      (Hex.to_bytes (`Hex hex_str))
+    |> Option.map (fun e ->
+           Data_encoding.Json.(
+             construct S.expr_encoding e
+             |> to_string
+             |> JSON.parse ~origin:"decode_micheline_storage"))
+
+  (** Reads and decodes the storage of the Michelson contract identified
+   *  by [contract_hex].  Fails if the storage is missing or cannot be
+   *  decoded. *)
+  let get_storage ~sc_rollup_node contract_hex =
+    let* storage_raw =
+      read_michelson_contract_storage sc_rollup_node contract_hex
+    in
+    match storage_raw with
+    | None ->
+        let kt1 = decode_michelson_contract_address contract_hex in
+        Test.fail "Storage not found for contract %s" kt1
+    | Some hex_str -> (
+        match decode_micheline_storage hex_str with
+        | None ->
+            let kt1 = decode_michelson_contract_address contract_hex in
+            Test.fail "Storage failed to be decoded for contract %s" kt1
+        | Some storage -> return storage)
 end
 
 (** Contracts *)
@@ -261,6 +315,21 @@ module EvmCrossRuntimeRunnerTez = struct
         ()
     in
     unit
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sequencer ~expected_counter cross_runtime_run_tez =
+    let counter_storage_pos = "0x00" in
+    let*@ evm_count =
+      Rpc.get_storage_at
+        ~address:cross_runtime_run_tez
+        ~pos:counter_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_count = expected_counter)
+        int
+        ~error_msg:"Expected EvmCrossRuntimeRunnerTez `count` %R but got %L") ;
+    unit
 end
 
 (** EVM contract that iterates [run()] over its [callees].  Before
@@ -300,6 +369,34 @@ module EvmMultiRunCaller = struct
         ~arguments:[string_of_bool revert; callees_arg]
         ()
     in
+    unit
+
+  (** Asserts that the contract's [catches] and [counter] equal the
+   *  expected values. *)
+  let check_storage ~sequencer ?(expected_catches = 0) ~expected_counter
+      multi_run_caller =
+    let catches_storage_pos = "0x00" in
+    let*@ evm_catches =
+      Rpc.get_storage_at
+        ~address:multi_run_caller
+        ~pos:catches_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_catches = expected_catches)
+        int
+        ~error_msg:"Expected EvmMultiRunCaller `catches` %R but got %L") ;
+    let counter_storage_pos = "0x01" in
+    let*@ evm_count =
+      Rpc.get_storage_at
+        ~address:multi_run_caller
+        ~pos:counter_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_count = expected_counter)
+        int
+        ~error_msg:"Expected EvmMultiRunCaller `count` %R but got %L") ;
     unit
 end
 
@@ -351,6 +448,18 @@ module TezCrossRuntimeRunnerEvm = struct
       ~init_storage_data
       ?init_balance
       protocol
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sc_rollup_node ~expected_counter
+      (cross_runtime_run_tez_hex, _cross_runtime_run_tez_address) =
+    let* storage = get_storage ~sc_rollup_node cross_runtime_run_tez_hex in
+    (* Pair(nat %count, string %destination) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezCrossRuntimeRunnerEvm `count` %R but got %L") ;
+    unit
 end
 
 (** Tezos contract that iterates [%run] over its [callees].  Before
@@ -391,6 +500,18 @@ module TezMultiRunCaller = struct
       ~init_storage_data
       ?init_balance
       protocol
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sc_rollup_node ~expected_counter
+      (multi_run_caller_hex, _multi_run_caller_address) =
+    let* storage = get_storage ~sc_rollup_node multi_run_caller_hex in
+    (* Pair(int %counter, Pair(bool %willRevert, list address %callees)) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezMultiRunCaller `count` %R but got %L") ;
+    unit
 end
 
 (** Wraps the CRAC runner contract modules into a first-class module
@@ -414,6 +535,8 @@ module CracRunnerWrapper = struct
 
     module EvmCrossRuntimeRunnerTez : sig
       val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
+
+      val check_storage : expected_counter:int -> evm_runner -> unit Lwt.t
     end
 
     module EvmMultiRunCaller : sig
@@ -423,6 +546,12 @@ module CracRunnerWrapper = struct
         ?callees:(evm_runner * bool) list ->
         unit ->
         evm_runner Lwt.t
+
+      val check_storage :
+        ?expected_catches:int ->
+        expected_counter:int ->
+        evm_runner ->
+        unit Lwt.t
     end
 
     module TezRunner : sig
@@ -431,6 +560,8 @@ module CracRunnerWrapper = struct
 
     module TezCrossRuntimeRunnerEvm : sig
       val originate : ?init_balance:int -> evm_runner -> tez_runner Lwt.t
+
+      val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
     end
 
     module TezMultiRunCaller : sig
@@ -440,6 +571,8 @@ module CracRunnerWrapper = struct
         ?callees:tez_runner list ->
         unit ->
         tez_runner Lwt.t
+
+      val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
     end
   end
 
@@ -507,6 +640,12 @@ module CracRunnerWrapper = struct
               addr
           in
           return (`Evm_runner addr)
+
+        let check_storage ~expected_counter (`Evm_runner runner) =
+          EvmCrossRuntimeRunnerTez.check_storage
+            ~sequencer
+            ~expected_counter
+            runner
       end
 
       module EvmMultiRunCaller = struct
@@ -536,6 +675,14 @@ module CracRunnerWrapper = struct
               addr
           in
           return (`Evm_runner addr)
+
+        let check_storage ?expected_catches ~expected_counter
+            (`Evm_runner runner) =
+          EvmMultiRunCaller.check_storage
+            ~sequencer
+            ?expected_catches
+            ~expected_counter
+            runner
       end
 
       module TezRunner = struct
@@ -569,6 +716,13 @@ module CracRunnerWrapper = struct
               ()
           in
           return (`Tez_runner (contract_hex, address))
+
+        let check_storage ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCrossRuntimeRunnerEvm.check_storage
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
       end
 
       module TezMultiRunCaller = struct
@@ -592,6 +746,13 @@ module CracRunnerWrapper = struct
               ()
           in
           return (`Tez_runner (runner_hex, runner))
+
+        let check_storage ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezMultiRunCaller.check_storage
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
       end
     end in
     (module Helper)
