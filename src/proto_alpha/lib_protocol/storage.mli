@@ -690,7 +690,7 @@ module Clst : sig
     Indexed_data_storage
       with type t := Raw_context.t * Cycle_repr.t
        and type key = Contract_repr.t
-       and type value = Clst_delegates_parameters_repr.t
+       and type value = Clst_delegates_parameters_repr.update
 end
 
 type consensus_pk_in_R = {

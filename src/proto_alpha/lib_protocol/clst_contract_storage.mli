@@ -16,6 +16,8 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+type error += Total_supply_underflow
+
 (** Type of the storage of the CLST contract.
     It contains the ledger and the total number of CLST tokens. *)
 type t
@@ -142,8 +144,13 @@ val get_token_info :
   ((CLST_types.nat * CLST_types.token_info) option * context) tzresult Lwt.t
 
 (** [is_delegate_registered ctxt delegate] returns [true] if
-    [delegate] has active or pending parameters. *)
+    [delegate] has active parameters. *)
 val is_delegate_registered : context -> public_key_hash -> bool tzresult Lwt.t
+
+(** [is_delegate_eventually_registered ctxt delegate] returns [true] if
+    [delegate] has active or pending parameters that will eventually be activated. Returns false *)
+val is_delegate_eventually_registered :
+  context -> public_key_hash -> bool tzresult Lwt.t
 
 (** [register_delegate context ~delegate
     ~edge_of_clst_staking_over_baking_millionth
@@ -156,3 +163,6 @@ val register_delegate :
   edge_of_clst_staking_over_baking_millionth:CLST_types.nat ->
   ratio_of_clst_staking_over_direct_staking_billionth:CLST_types.nat ->
   (context, error trace) result Lwt.t
+
+val unregister_delegate :
+  context -> delegate:public_key_hash -> (context, error trace) result Lwt.t

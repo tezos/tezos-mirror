@@ -25,7 +25,7 @@ let get_pending_parameters ctxt delegate =
       Option.map (fun param -> (cycle, param)) param_opt)
     Cycle_repr.(current_cycle ---> to_cycle)
 
-let register_pending_parameters ctxt delegate t =
+let add_update ctxt delegate t =
   let open Lwt_result_syntax in
   let update_cycle =
     let current_level = Raw_context.current_level ctxt in
@@ -40,6 +40,11 @@ let register_pending_parameters ctxt delegate t =
   in
   return ctxt
 
+let register_pending_parameters ctxt delegate t =
+  add_update ctxt delegate (Update t)
+
+let unregister ctxt delegate = add_update ctxt delegate Unregister
+
 let activate_parameters ctxt ~new_cycle =
   let open Lwt_syntax in
   let* ctxt =
@@ -48,6 +53,8 @@ let activate_parameters ctxt ~new_cycle =
       ~order:`Undefined
       ~init:ctxt
       ~f:(fun delegate t ctxt ->
-        Storage.Clst.Registered_delegates.add ctxt delegate t)
+        match t with
+        | Update t -> Storage.Clst.Registered_delegates.add ctxt delegate t
+        | Unregister -> Storage.Clst.Registered_delegates.remove ctxt delegate)
   in
   Storage.Clst.Pending_delegate_parameters.clear (ctxt, new_cycle)

@@ -1081,3 +1081,15 @@ val clst_update_delegate_parameters :
   edge_of_clst_staking_over_baking_millionth:Z.t ->
   ratio_of_clst_staking_over_direct_staking_billionth:Z.t ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_unregister_delegate ctxt src] returns a unregister_delegate operation
+    on the CLST contract. *)
+val clst_unregister_delegate :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Operation.packed tzresult Lwt.t

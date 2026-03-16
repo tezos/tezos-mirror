@@ -4699,13 +4699,16 @@ module Clst : sig
     val get_pending_parameters :
       context ->
       Signature.Public_key_hash.t ->
-      (Cycle.t * Clst_delegates_parameters_repr.t) list tzresult Lwt.t
+      (Cycle.t * Clst_delegates_parameters_repr.update) list tzresult Lwt.t
 
     val register_pending_parameters :
       context ->
       Signature.Public_key_hash.t ->
       Clst_delegates_parameters_repr.t ->
       context tzresult Lwt.t
+
+    val unregister :
+      context -> Signature.Public_key_hash.t -> context tzresult Lwt.t
 
     val activate_parameters : context -> new_cycle:Cycle.t -> context Lwt.t
   end

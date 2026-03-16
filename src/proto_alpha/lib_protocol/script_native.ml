@@ -890,12 +890,12 @@ module CLST_contract = struct
               is_delegate
               (Contract_is_not_delegate step_constants.sender)
           in
-          let* is_delegate_registered =
-            Clst_contract_storage.is_delegate_registered ctxt pkh
+          let* is_delegate_eventually_registered =
+            Clst_contract_storage.is_delegate_eventually_registered ctxt pkh
           in
           let*? () =
             error_unless
-              (not is_delegate_registered)
+              (not is_delegate_eventually_registered)
               (Delegate_is_already_registered step_constants.sender)
           in
           return pkh
@@ -944,12 +944,12 @@ module CLST_contract = struct
               is_delegate
               (Contract_is_not_delegate step_constants.sender)
           in
-          let* is_delegate_registered =
-            Clst_contract_storage.is_delegate_registered ctxt pkh
+          let* is_delegate_eventually_registered =
+            Clst_contract_storage.is_delegate_eventually_registered ctxt pkh
           in
           let*? () =
             error_unless
-              is_delegate_registered
+              is_delegate_eventually_registered
               (Delegate_is_not_registered step_constants.sender)
           in
           return pkh
@@ -962,6 +962,38 @@ module CLST_contract = struct
         ~edge_of_clst_staking_over_baking_millionth
         ~ratio_of_clst_staking_over_direct_staking_billionth
     in
+    return (Script_list.empty, storage, [], ctxt)
+
+  let execute_unregister_delegate (ctxt, (step_constants : step_constants)) ()
+      (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        Tez.(step_constants.amount <> zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let* pkh =
+      match step_constants.sender with
+      | Contract (Implicit pkh) ->
+          let* is_delegate = Contract.is_delegate ctxt pkh in
+          let*? () =
+            error_unless
+              is_delegate
+              (Contract_is_not_delegate step_constants.sender)
+          in
+          let* is_eventually_registered =
+            Clst_contract_storage.is_delegate_eventually_registered ctxt pkh
+          in
+          let*? () =
+            error_unless
+              is_eventually_registered
+              (Delegate_is_not_registered step_constants.sender)
+          in
+          return pkh
+      | sender -> tzfail (Non_implicit_contract sender)
+    in
+    let* ctxt = Clst_contract_storage.unregister_delegate ctxt ~delegate:pkh in
     return (Script_list.empty, storage, [], ctxt)
 
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
@@ -977,6 +1009,8 @@ module CLST_contract = struct
           (ctxt, step_constants)
           parameters
           storage
+    | Unregister_delegate () ->
+        execute_unregister_delegate (ctxt, step_constants) () storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
     | Balance_of requests ->
@@ -1350,13 +1384,13 @@ let () =
     ~id:"clst.delegate_is_not_registered"
     ~title:"Delegate is not registered on CLST contract"
     ~description:
-      "A delegate cannot update its parameters without being registered on \
-       CLST contract"
+      "A delegate cannot update its parameters or unregister without being \
+       registered on CLST contract"
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
-        "Delegate %a cannot update its parameters without being registered on \
-         CLST contract"
+        "Delegate %a cannot update its parameters or unregister without being \
+         registered on CLST contract"
         Destination.pp
         address)
     Data_encoding.(obj1 (req "address" Destination.encoding))

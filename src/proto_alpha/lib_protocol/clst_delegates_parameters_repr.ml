@@ -10,6 +10,8 @@ type t = {
   ratio_of_clst_staking_over_direct_staking_billionth : int32;
 }
 
+type update = Update of t | Unregister
+
 let maximum_ratio_of_clst_staking_over_direct_staking_billionth =
   (* max is 20% (200_000_000) *)
   200_000_000l
@@ -85,3 +87,33 @@ let encoding =
     (obj2
        (req "edge_of_clst_staking_over_baking_millionth" int32)
        (req "ratio_of_clst_staking_over_direct_staking_billionth" int32))
+
+let update_encoding =
+  let open Data_encoding in
+  (* The `update` type being isomorphic to option, we reuse the `option`
+     encoding for the binary case. However, we use a custom encoding in JSON, as
+     it will provide more information for the tooling. *)
+  let json_encoding =
+    union
+      [
+        case
+          ~title:"update"
+          (Tag 0)
+          (obj2 (req "kind" (constant "update")) (req "parameters" encoding))
+          (function Update p -> Some ((), p) | Unregister -> None)
+          (fun ((), p) -> Update p);
+        case
+          ~title:"unregister"
+          (Tag 1)
+          (obj1 (req "kind" (constant "unregister")))
+          (function Unregister -> Some () | Update _ -> None)
+          (fun () -> Unregister);
+      ]
+  in
+  let binary_encoding =
+    conv
+      (function Update p -> Some p | Unregister -> None)
+      (function Some p -> Update p | None -> Unregister)
+      (option encoding)
+  in
+  splitted ~json:json_encoding ~binary:binary_encoding

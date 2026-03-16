@@ -198,12 +198,28 @@ let is_delegate_registered ctxt delegate =
   let* registered_parameters =
     Clst.Delegates.get_delegate_parameters ctxt delegate
   in
+  return (Option.is_some registered_parameters)
+
+let delegate_last_pending_update ctxt delegate =
+  let open Lwt_result_syntax in
   let* pending_parameters =
     Clst.Delegates.get_pending_parameters ctxt delegate
   in
-  return
-    (not
-       (Option.is_none registered_parameters && List.is_empty pending_parameters))
+  let rec check = function
+    | [] -> None
+    | [(_, update)] -> Some update
+    | _ :: rem -> check rem
+  in
+  return (check pending_parameters)
+
+let is_delegate_eventually_registered ctxt delegate =
+  let open Lwt_result_syntax in
+  let* last_pending_update = delegate_last_pending_update ctxt delegate in
+  match last_pending_update with
+  (* If it has no pending updates, we simply look at the active parameters *)
+  | None -> is_delegate_registered ctxt delegate
+  | Some (Clst_delegates_parameters_repr.Update _) -> return_true
+  | Some Unregister -> return_false
 
 let register_delegate ctxt ~delegate ~edge_of_clst_staking_over_baking_millionth
     ~ratio_of_clst_staking_over_direct_staking_billionth =
@@ -233,3 +249,5 @@ let register_delegate ctxt ~delegate ~edge_of_clst_staking_over_baking_millionth
     ctxt
     delegate
     parameters
+
+let unregister_delegate ctxt ~delegate = Clst.Delegates.unregister ctxt delegate
