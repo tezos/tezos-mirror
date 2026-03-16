@@ -1550,6 +1550,20 @@ module Stake = struct
          (Public_key_hash_index)
       (Full_staking_balance_repr)
 
+  (* TODO: Remove after next protocol *)
+  module Staking_balance_up_to_T =
+    Make_indexed_data_storage
+      (Make_subcontext (Ghost) (Raw_context)
+         (struct
+           let name = ["staking_balance"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Full_staking_balance_repr.t
+
+        let encoding = Full_staking_balance_repr.encoding_up_to_t
+      end)
+
   module Active_delegates_with_minimal_stake =
     Make_data_set_storage
       (Make_subcontext (Registered) (Raw_context)

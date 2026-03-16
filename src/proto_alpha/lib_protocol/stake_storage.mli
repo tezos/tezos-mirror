@@ -62,6 +62,15 @@ val add_delegated_stake :
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+val set_stez_frozen_stake :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+val clear_stez_frozen_stake :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+
 val add_frozen_stake_only_call_from_token :
   Raw_context.t ->
   Frozen_staker_repr.t ->
