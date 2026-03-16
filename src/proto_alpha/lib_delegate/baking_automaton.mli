@@ -127,3 +127,10 @@ val automaton_loop :
   state ->
   event ->
   event option tzresult Lwt.t
+
+val create_automaton_state :
+  ?canceler:Lwt_canceler.t ->
+  ?monitor_node_operations:bool ->
+  global_state:global_state ->
+  Protocol_client_context.full ->
+  automaton_state tzresult Lwt.t

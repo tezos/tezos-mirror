@@ -58,31 +58,14 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let* constants =
     Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
-  let*? round_durations =
-    Round.Durations.create
-      ~first_round_duration:constants.parametric.minimal_block_delay
-      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
-    |> Environment.wrap_tzresult
-  in
-  let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
-  in
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~attestation_lags:constants.parametric.dal.attestation_lags
-      ~number_of_slots:constants.parametric.dal.number_of_slots
-  in
   let* state =
     Baking_scheduling.create_initial_state
       cctxt
       ?dal_node_rpc_ctxt
+      ?monitor_node_operations
       ?synchronize
       ~chain
       config
-      operation_worker
-      dal_attestable_slots_worker
-      round_durations
       ~current_proposal
       ~constants
       delegates
