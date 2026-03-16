@@ -48,6 +48,9 @@ type 'msg conn_info = {
           has been successfully sent, [Ok false] if the message has been
           dropped, or fails with a corresponding error otherwise. *)
   messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
+  conn_lost : unit Lwt.t;
+      (** Resolves when the underlying TCP connection is lost (either the read
+          or the write side fails). *)
 }
 
 type request_info = {
