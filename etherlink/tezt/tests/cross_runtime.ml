@@ -393,4 +393,236 @@ module TezMultiRunCaller = struct
       protocol
 end
 
+(** Wraps the CRAC runner contract modules into a first-class module
+ *  that manages the shared test state (nonces, counters, sequencer
+ *  setup) so that tests only provide scenario-specific parameters.
+ *  Contracts are represented as {!evm_runner} and {!tez_runner}
+ *  values to distinguish EVM and Tezos contracts at the type level. *)
+module CracRunnerWrapper = struct
+  type evm_runner = [`Evm_runner of string]
+
+  type tez_runner = [`Tez_runner of string * string]
+
+  (** Simplified interface over the CRAC runner contracts.  Each
+   *  sub-module mirrors its namesake but with nonces, counters and
+   *  sequencer setup already applied. *)
+  module type S = sig
+    module EvmRunner : sig
+      val call_run :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> unit Lwt.t
+    end
+
+    module EvmCrossRuntimeRunnerTez : sig
+      val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
+    end
+
+    module EvmMultiRunCaller : sig
+      val deploy_and_init :
+        ?value:Wei.t ->
+        ?revert:bool ->
+        ?callees:(evm_runner * bool) list ->
+        unit ->
+        evm_runner Lwt.t
+    end
+
+    module TezRunner : sig
+      val call_run : ?amount:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezCrossRuntimeRunnerEvm : sig
+      val originate : ?init_balance:int -> evm_runner -> tez_runner Lwt.t
+    end
+
+    module TezMultiRunCaller : sig
+      val originate :
+        ?init_balance:int ->
+        ?revert:bool ->
+        ?callees:tez_runner list ->
+        unit ->
+        tez_runner Lwt.t
+    end
+  end
+
+  (** Builds a {!S} module from the given test setup.  [nonce] and
+   *  [counter] are the initial EVM nonce and Tezos operation counter;
+   *  both are auto-incremented on each use. *)
+  let build ?(nonce = 0) ?(counter = 0)
+      ~sequencer_setup:
+        ({
+           sc_rollup_address;
+           sc_rollup_node;
+           client;
+           l1_contracts;
+           sequencer;
+           evm_version;
+           _;
+         } :
+          Tezt_etherlink.Setup.sequencer_setup) ~sender ~source protocol :
+      (module S) =
+    let ref_nonce = ref nonce in
+    let ref_counter = ref counter in
+
+    let evm_nonce () =
+      let nonce = !ref_nonce in
+      incr ref_nonce ;
+      nonce
+    in
+    let tez_counter () =
+      let counter = !ref_counter in
+      incr ref_counter ;
+      counter
+    in
+    let module Helper = struct
+      module EvmRunner = struct
+        let call_run ?expected_status ?(value = Wei.zero) (`Evm_runner runner) =
+          let* () =
+            EvmRunner.call_run
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+      end
+
+      module EvmCrossRuntimeRunnerTez = struct
+        let deploy_and_init ?(value = Wei.zero) (`Tez_runner (_, address)) =
+          let* addr =
+            EvmCrossRuntimeRunnerTez.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmCrossRuntimeRunnerTez.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~tez_contract_target_address:address
+              addr
+          in
+          return (`Evm_runner addr)
+      end
+
+      module EvmMultiRunCaller = struct
+        let deploy_and_init ?(value = Wei.zero) ?(revert = false)
+            ?(callees = []) () =
+          let callees =
+            List.map
+              (fun (`Evm_runner addr, do_catch) -> (addr, do_catch))
+              callees
+          in
+          let* addr =
+            EvmMultiRunCaller.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmMultiRunCaller.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~revert
+              ~callees
+              addr
+          in
+          return (`Evm_runner addr)
+      end
+
+      module TezRunner = struct
+        let call_run ?amount (`Tez_runner (_, runner)) =
+          TezRunner.call_run
+            ~sc_rollup_address
+            ~sc_rollup_node
+            ~client
+            ~l1_contracts
+            ~sequencer
+            ~source
+            ~counter:(tez_counter ())
+            ?amount
+            runner
+      end
+
+      module TezCrossRuntimeRunnerEvm = struct
+        let originate ?init_balance (`Evm_runner address) =
+          let* contract_hex, address =
+            TezCrossRuntimeRunnerEvm.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~evm_contract_target_address:address
+              ()
+          in
+          return (`Tez_runner (contract_hex, address))
+      end
+
+      module TezMultiRunCaller = struct
+        let originate ?init_balance ?(revert = false) ?(callees = []) () =
+          let callees =
+            List.map (fun (`Tez_runner (_runner_hex, runner)) -> runner) callees
+          in
+          let* runner_hex, runner =
+            TezMultiRunCaller.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~revert
+              ~callees
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+    end in
+    (module Helper)
+end
+
+(** Registers a fullstack CRAC runner test.  Sets up the sequencer,
+ *  builds a {!CracRunnerWrapper.S} and passes it to [body]. *)
+let register_crac_runner_test ~title ?(tags = []) body =
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["crac"; "runner"] @ tags
+  in
+  Setup.register_test
+    ~__FILE__
+    ~rpc_server:Evm_node.Resto
+    ~title
+    ~time_between_blocks:Nothing
+    ~tags
+    ~kernel:Latest
+    ~with_runtimes
+    ~enable_dal:false
+    ~enable_multichain:false
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer_setup protocol ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let source = Constant.bootstrap5 in
+  let (module Wrapper) =
+    CracRunnerWrapper.build ~counter:1 ~sequencer_setup ~sender ~source protocol
+  in
+  body (module Wrapper : CracRunnerWrapper.S)
+
 let () = ()
