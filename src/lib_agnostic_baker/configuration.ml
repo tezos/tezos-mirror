@@ -326,7 +326,7 @@ let extra_nodes_arg =
        resilience."
     ~long:"extra-node"
     ~placeholder:"Endpoint of an octez-node, e.g. 'http://localhost:8733'"
-    uri_parameter
+    (Client_config.endpoint_parameter ())
 
 let baker_args =
   Tezos_clic.args18
