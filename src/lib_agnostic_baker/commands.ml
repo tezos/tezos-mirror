@@ -91,6 +91,57 @@ module Dal = struct
 
   let publish_slots_regularly = arg_to_clic publish_slots_regularly_arg
 
+  (* Snapshot-specific arguments (not in Cli.Term). *)
+  let positive_int_parameter name =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        match int_of_string_opt s with
+        | Some i when i >= 0 -> return i
+        | _ -> failwith "Expected a non-negative integer for %s, got %s" name s)
+
+  let min_published_level =
+    Tezos_clic.arg
+      ~doc:"Minimum published level to export/import."
+      ~long:"min-published-level"
+      ~placeholder:"INT"
+      (positive_int_parameter "min-published-level")
+
+  let max_published_level =
+    Tezos_clic.arg
+      ~doc:"Maximum published level to export/import."
+      ~long:"max-published-level"
+      ~placeholder:"INT"
+      (positive_int_parameter "max-published-level")
+
+  let slots_parameter =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        let parts = String.split_on_char ',' s in
+        let rec parse = function
+          | [] -> return []
+          | p :: rest -> (
+              let* rest_parsed = parse rest in
+              match int_of_string_opt (String.trim p) with
+              | Some i when i >= 0 -> return (i :: rest_parsed)
+              | _ -> failwith "Invalid slot index in slots list: %s" p)
+        in
+        parse parts)
+
+  let slots =
+    Tezos_clic.arg
+      ~doc:
+        "Comma-separated slot indexes to export/import. If omitted, all slots \
+         are handled."
+      ~long:"slots"
+      ~placeholder:"INDEX1,INDEX2,..."
+      slots_parameter
+
+  let no_check =
+    Tezos_clic.switch
+      ~doc:"Skip validation checks during import."
+      ~long:"no-check"
+      ()
+
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -103,6 +154,126 @@ module Dal = struct
         args
         (prefixes ["dal"; "debug"; "print"; "store"; "schemas"] @@ stop)
         (fun () _cctxt -> Cli.Action.debug_print_store_schemas ())
+    in
+    (* With Seq, options are parsed first; the remaining args are passed as a
+       sequence. We take the last one as PATH so "snapshot export [OPTIONS] PATH"
+       matches the DAL node interface. *)
+    let path_from_seq (path_list : string list) =
+      let open Lwt_result_syntax in
+      match List.rev path_list with
+      | path :: _ when path <> "" && path.[0] <> '-' -> return path
+      | path :: _ ->
+          failwith
+            "Invalid path %s: path must be last and not look like an option."
+            path
+      | [] -> failwith "The path argument is required."
+    in
+    let snapshot_export =
+      let open Tezos_clic in
+      let args =
+        args6
+          data_dir
+          config_file
+          endpoint
+          min_published_level
+          max_published_level
+          slots
+      in
+      command
+        ~group
+        ~desc:"Export DAL node store data to a snapshot directory."
+        args
+        (prefixes ["dal"; "snapshot"; "export"]
+        @@ seq_of_param (fun next ->
+               param
+                 ~name:"PATH"
+                 ~desc:"Path to the destination directory for the snapshot."
+                 (parameter (fun _ s -> Lwt_result_syntax.return s))
+                 next))
+        (fun ( data_dir,
+               config_file,
+               endpoint,
+               min_published_level,
+               max_published_level,
+               slots )
+             path_list
+             _cctxt
+           ->
+          let open Lwt_result_syntax in
+          let* path = path_from_seq path_list in
+          let data_dir =
+            Option.value ~default:Configuration_file.default.data_dir data_dir
+          in
+          let config_file =
+            Option.value
+              ~default:(Configuration_file.default_config_file data_dir)
+              config_file
+          in
+          let min_level = Option.map Int32.of_int min_published_level in
+          let max_level = Option.map Int32.of_int max_published_level in
+          Snapshot.export
+            ~data_dir
+            ~config_file
+            ~endpoint
+            ~min_published_level:min_level
+            ~max_published_level:max_level
+            ~slots
+            path)
+    in
+    let snapshot_import =
+      let open Tezos_clic in
+      let args =
+        args7
+          data_dir
+          config_file
+          endpoint
+          min_published_level
+          max_published_level
+          slots
+          no_check
+      in
+      command
+        ~group
+        ~desc:"Import DAL node store data from a snapshot directory."
+        args
+        (prefixes ["dal"; "snapshot"; "import"]
+        @@ seq_of_param (fun next ->
+               param
+                 ~name:"PATH"
+                 ~desc:"Path to the source directory of the snapshot to import."
+                 (parameter (fun _ s -> Lwt_result_syntax.return s))
+                 next))
+        (fun ( data_dir,
+               config_file,
+               endpoint,
+               min_published_level,
+               max_published_level,
+               slots,
+               no_check )
+             path_list
+             _cctxt
+           ->
+          let open Lwt_result_syntax in
+          let* path = path_from_seq path_list in
+          let data_dir =
+            Option.value ~default:Configuration_file.default.data_dir data_dir
+          in
+          let config_file =
+            Option.value
+              ~default:(Configuration_file.default_config_file data_dir)
+              config_file
+          in
+          let min_level = Option.map Int32.of_int min_published_level in
+          let max_level = Option.map Int32.of_int max_published_level in
+          Snapshot.import
+            ~check:(not no_check)
+            ~data_dir
+            ~config_file
+            ~endpoint
+            ~min_published_level:min_level
+            ~max_published_level:max_level
+            ~slots
+            path)
     in
     let run =
       let open Tezos_clic in
@@ -302,7 +473,14 @@ module Dal = struct
         ~prefix:"update"
         Cli.Action.config_update
     in
-    [run; config_init; config_update; debug_print_store_schemas]
+    [
+      run;
+      config_init;
+      config_update;
+      snapshot_export;
+      snapshot_import;
+      debug_print_store_schemas;
+    ]
 end
 
 module Baker = struct

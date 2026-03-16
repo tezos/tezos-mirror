@@ -198,6 +198,12 @@ Commands related to the DAL daemon.:
     This command updates the configuration file with the parameters provided on the
     command-line. If no configuration file exists already, the command will fail.
   
+  dal snapshot export [<PATH>...]
+    Export DAL node store data to a snapshot directory.
+  
+  dal snapshot import [<PATH>...]
+    Import DAL node store data from a snapshot directory.
+  
   dal debug print store schemas
     Print SQL statements describing the tables created in the store.
 

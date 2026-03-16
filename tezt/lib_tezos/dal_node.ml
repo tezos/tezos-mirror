@@ -623,7 +623,8 @@ let snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
         ["--slots"; String.concat "," (List.map string_of_int indices)]
   in
   let args =
-    ["snapshot"; cmd] @ ["--data-dir"; data_dir] @ endpoint_args
+    (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["snapshot"; cmd] @ ["--data-dir"; data_dir] @ endpoint_args
     @ min_level_args @ max_level_args @ slot_args @ extra @ [output_file]
   in
   let path =
