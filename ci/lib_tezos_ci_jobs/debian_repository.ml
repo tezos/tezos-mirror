@@ -57,6 +57,45 @@ let build_dependency_image =
     ~image_path:
       "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
+let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
+    ~name ~matrix ~distribution ~script ~dependencies ?(variables = []) () =
+  job
+    ~__POS__
+    ~name
+    ~image:build_dependency_image
+    ~stage:Stages.build
+    ~variables:
+      (make_variables
+         (("DISTRIBUTION", distribution)
+         ::
+         (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+         )
+      @ variables)
+    ~parallel:(Matrix matrix)
+    ~dependencies
+    ?timeout
+    ~tag:Dynamic
+    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+      "export CARGO_NET_OFFLINE=false";
+      script;
+    ]
+  |> Tezos_ci.Cache.enable_sccache
+
 let make_debian_variables distribution image_kind release version =
   ( "DEP_IMAGE",
     sf
