@@ -209,7 +209,7 @@ check_redirects() {
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.88.0")
+  authorized_version=("1.94.0")
 
   declare -a rust_toolchain_files
   mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"

@@ -483,10 +483,9 @@ fn execute_transaction<
 where
     Host: KeyspaceHost<KS>,
 {
-    let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
-        if transaction_hash.is_some() && cfg!(feature = "tracing") {
-            // The following unwrap is safe, see condition above.
-            let hash = B256::from(transaction_hash.unwrap());
+    let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> = match transaction_hash {
+        Some(hash) if cfg!(feature = "tracing") => {
+            let hash = B256::from(hash);
             let pretty_hash = format!("{hash}");
             let __attrs = [(
                 "etherlink.transaction.hash".to_string(),
@@ -496,9 +495,9 @@ where
                 let _ = __host;
                 __trace_kernel_add_attrs!(__attrs);
             })
-        } else {
-            Box::new(|__host| ())
-        };
+        }
+        _ => Box::new(|__host| ()),
+    };
     __trace_kernel!("evm_context.transact_commit", {
         opt_attrs_fun(evm_context.db_mut().rk.host_mut());
         evm_context.set_tx(tx);

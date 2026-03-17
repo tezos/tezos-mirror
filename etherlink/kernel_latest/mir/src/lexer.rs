@@ -173,7 +173,7 @@ pub enum Noun {
     MacroPrim(Macro),
 }
 
-pub(crate) fn ann_from_str(value: &str) -> Result<Annotation, LexerError> {
+pub(crate) fn ann_from_str(value: &str) -> Result<Annotation<'_>, LexerError> {
     match value {
         s @ ("@%" | "@%%" | "%@") => Ok(Annotation::Special(Cow::Borrowed(s))),
         "" => Err(LexerError::InvalidAnnotation(String::new())),

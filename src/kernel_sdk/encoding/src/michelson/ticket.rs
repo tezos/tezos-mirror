@@ -135,7 +135,7 @@ where
 
 /// Extract the four fields of a ticket from the given input
 /// and return them as `Node`
-fn get_ticket_arguments(input: &[u8]) -> NomResult<[Node; 4]> {
+fn get_ticket_arguments(input: &[u8]) -> NomResult<'_, [Node; 4]> {
     let (fst, node) = Node::nom_read(input)?;
     let Node::Prim {
         prim_tag,
@@ -160,7 +160,7 @@ fn get_ticket_arguments(input: &[u8]) -> NomResult<[Node; 4]> {
 }
 
 impl<Contents: MichelsonTicketContent> NomReader<'_> for TypedTicket<Contents> {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         // 1st: extract each field of the input
         let (fst, [arg0, arg1, arg2, arg3]) = get_ticket_arguments(input)?;
 
@@ -257,7 +257,7 @@ impl<Expr> NomReader<'_> for Ticket<Expr>
 where
     Expr: MichelsonTicketContent,
 {
-    fn nom_read(bytes: &[u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
         use nom::branch::alt;
 
         map(

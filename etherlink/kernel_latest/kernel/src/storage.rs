@@ -1225,7 +1225,7 @@ mod tests {
         rk.host_mut()
             .store_write_all(
                 &RefPath::assert_from(b"/base/dal_publishers_whitelist"),
-                &encode_dal_publishers_whitelist(&[pkh.clone()]),
+                &encode_dal_publishers_whitelist(std::slice::from_ref(&pkh)),
             )
             .unwrap();
 

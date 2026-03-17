@@ -106,7 +106,7 @@ impl Into<String> for Contract {
 has_encoding!(Contract, CONTRACT_ENCODING, { Encoding::Custom });
 
 impl NomReader<'_> for Contract {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         alt((
             map(
                 preceded(tag([0]), PublicKeyHash::nom_read),

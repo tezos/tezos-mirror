@@ -83,6 +83,7 @@ pub struct ExecutionResult {
 type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
 
 #[derive(Debug, PartialEq, Clone)]
+#[allow(dead_code)]
 pub struct ValidationResult {
     transaction_object: TransactionObject,
 }

@@ -870,7 +870,7 @@ mod tests {
                 if let Some((first_chunk, rem_chunks)) = remaining_chunks.split_first() {
                     prepare_dal_slot(
                         host,
-                        &[first_chunk.clone()],
+                        std::slice::from_ref(first_chunk),
                         published_level as i32,
                         *slot,
                     );

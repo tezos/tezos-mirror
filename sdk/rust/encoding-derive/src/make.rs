@@ -9,7 +9,7 @@ use crate::symbol;
 
 type Result<T> = std::result::Result<T, syn::Error>;
 
-pub fn make_encoding(input: &syn::DeriveInput) -> Result<DataWithEncoding> {
+pub fn make_encoding(input: &syn::DeriveInput) -> Result<DataWithEncoding<'_>> {
     let meta = &mut get_encoding_meta(&input.attrs)?;
     let data_with_encoding = make_data_with_encoding(&input.data, &input.ident, meta)?;
     Ok(data_with_encoding)
@@ -67,7 +67,7 @@ fn field_kind<'b>(meta: &[syn::Meta]) -> Option<FieldKind<'b>> {
     })
 }
 
-fn make_field(field: &syn::Field) -> Result<FieldEncoding> {
+fn make_field(field: &syn::Field) -> Result<FieldEncoding<'_>> {
     let meta = &mut get_encoding_meta(&field.attrs)?;
     let name = field.ident.as_ref().unwrap();
     let kind = field_kind(meta);
@@ -250,7 +250,7 @@ fn assert_builtin_encoding(meta: &mut Vec<syn::Meta>, kind: &PrimitiveEncoding) 
 }
 
 /// Constructs encoding from the content of the `composite` meta attribute.
-fn make_composite_encoding(ty: &syn::Path, mut meta: Vec<syn::Meta>) -> Result<Encoding> {
+fn make_composite_encoding(ty: &syn::Path, mut meta: Vec<syn::Meta>) -> Result<Encoding<'_>> {
     let meta = &mut meta;
     let mut encoding = make_basic_encoding_from_meta(ty, meta)?;
     loop {

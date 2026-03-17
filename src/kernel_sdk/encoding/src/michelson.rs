@@ -295,7 +295,7 @@ impl HasEncoding for MichelsonNat {
 // DECODING
 // --------
 impl NomReader<'_> for MichelsonContract {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(
             nom_read_micheline_bytes(Contract::nom_read),
             MichelsonContract,
@@ -304,7 +304,7 @@ impl NomReader<'_> for MichelsonContract {
 }
 
 impl NomReader<'_> for MichelsonUnit {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(
             MichelinePrimNoArgsNoAnnots::<{ prim::UNIT_TAG }>::nom_read,
             |_prim| MichelsonUnit,
@@ -678,31 +678,31 @@ where
 }
 
 impl NomReader<'_> for MichelsonString {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_string, MichelsonString)(input)
     }
 }
 
 impl NomReader<'_> for MichelsonBytes {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_bytes(nom_read::bytes), MichelsonBytes)(input)
     }
 }
 
 impl NomReader<'_> for MichelsonInt {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_int, MichelsonInt)(input)
     }
 }
 
 impl NomReader<'_> for MichelsonTimestamp {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         map(nom_read_micheline_int, MichelsonTimestamp)(input)
     }
 }
 
 impl NomReader<'_> for MichelsonNat {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         use nom::error::{ErrorKind, ParseError};
         use tezos_data_encoding::nom::error::*;
 

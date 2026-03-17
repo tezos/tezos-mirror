@@ -308,7 +308,7 @@ impl<'a> V0SliceHashPage<'a> {
 
         let end_offset = 4 + size; // for prefix bytes
 
-        if slice.len() < end_offset || size % PREIMAGE_HASH_SIZE != 0 {
+        if slice.len() < end_offset || !size.is_multiple_of(PREIMAGE_HASH_SIZE) {
             return Err(SlicePageError::InvalidSizePrefix);
         }
 

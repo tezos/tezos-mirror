@@ -100,12 +100,12 @@ mod raw_encodings {
                     "More than one instruction deserialized {:#?}",
                     &value
                 ))
-            } else if value.move_.is_some() {
-                Ok(Instr::Move(value.move_.unwrap()))
-            } else if value.reveal.is_some() {
-                Ok(Instr::Reveal(value.reveal.unwrap()))
-            } else if value.set.is_some() {
-                Ok(Instr::Set(value.set.unwrap()))
+            } else if let Some(move_) = value.move_ {
+                Ok(Instr::Move(move_))
+            } else if let Some(reveal) = value.reveal {
+                Ok(Instr::Reveal(reveal))
+            } else if let Some(set) = value.set {
+                Ok(Instr::Set(set))
             } else {
                 Err(format!("Unknown instruction {value:#?}"))
             }

@@ -129,7 +129,7 @@ impl BinWriter for Entrypoint {
 }
 
 impl NomReader<'_> for Entrypoint {
-    fn nom_read(input: &[u8]) -> NomResult<Self> {
+    fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
         alt((
             map(tag([EntrypointTag::Default as u8]), |_| {
                 Entrypoint::default()

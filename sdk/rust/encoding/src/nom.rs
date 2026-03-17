@@ -235,13 +235,13 @@ pub trait NomReader<'a>: Sized {
 }
 
 impl NomReader<'_> for Zarith {
-    fn nom_read(bytes: &[u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
         map(z_bignum, |big_int| big_int.into())(bytes)
     }
 }
 
 impl NomReader<'_> for Narith {
-    fn nom_read(bytes: &[u8]) -> NomResult<Self> {
+    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
         map(n_bignum, |big_uint| big_uint.into())(bytes)
     }
 }
@@ -846,7 +846,7 @@ mod test {
     }
 
     impl NomReader<'_> for TestStruct {
-        fn nom_read(input: &[u8]) -> NomResult<Self> {
+        fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
             let (input, flag) = boolean(input)?;
             let (input, value) = u32(input)?;
             Ok((input, TestStruct { flag, value }))
@@ -860,7 +860,7 @@ mod test {
     }
 
     impl NomReader<'_> for TestEnum {
-        fn nom_read(input: &[u8]) -> NomResult<Self> {
+        fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
             let (input, tag) = u8(input)?;
             match tag {
                 0 => {
@@ -878,7 +878,7 @@ mod test {
     }
 
     impl NomReader<'_> for bool {
-        fn nom_read(input: &[u8]) -> NomResult<Self> {
+        fn nom_read(input: &[u8]) -> NomResult<'_, Self> {
             boolean(input)
         }
     }
