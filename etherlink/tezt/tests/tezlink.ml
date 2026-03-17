@@ -3800,12 +3800,21 @@ let test_michelson_gas_backlog =
     | Ok block -> block.Block.baseFeePerGas
     | Error _ -> Stdlib.failwith "Couldn't retrieve latest block"
   in
+  (* With multiplier = 1,000,000 and gas_limit = 1,040,000 milligas,
+     execution gas fee = 1,040,000 * 1,000,000 * 10^9 / 10^12 = 1,040,000,000 mutez.
+     We provide a fee above this threshold to pass kernel fee validation.
+     The auto-estimated fee is rejected by the kernel. *)
+  let gas_limit = 1_040_000 in
+  let fee = Tez.of_mutez_int 1_100_000_000 in
+  let fee_cap = fee in
   let* () =
     Client.transfer
       ~amount:Tez.one
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
-      ~burn_cap:Tez.one
+      ~fee
+      ~fee_cap
+      ~gas_limit
       client_tezlink
   in
   (* Produce block containing the transfer, then another whose
