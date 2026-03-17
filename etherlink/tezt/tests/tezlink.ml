@@ -3420,11 +3420,16 @@ let test_tezlink_validation_gas_limit =
   let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
 
   (* Sanity check: can fit two op in a blueprint *)
+  (* fee = 10_000 mutez covers execution gas fee (gas_limit * 10 * base_fee / 10^12
+     ≤ 693_332 * 10 * 10^9 / 10^12 = 6_933 mutez) so operations are not
+     rejected for insufficient fees before the gas limit check. *)
+  let fee = 10_000 in
   let* (`OpHash op1) =
     Operation.inject_transfer
       ~counter:1
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:almost_half_block
       client_tezlink
   in
@@ -3433,6 +3438,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:2
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:almost_half_block
       client_tezlink
   in
@@ -3447,6 +3453,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:3
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
   in
@@ -3455,6 +3462,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:4
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
   in
