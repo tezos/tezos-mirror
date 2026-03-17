@@ -260,6 +260,31 @@ val get_attestation_lags : t -> level:int32 -> int32 list tzresult
     migration, or [None] if no known migration is pending. *)
 val get_next_migration_level : t -> int32 option tzresult Lwt.t
 
+(** [get_cached_or_fetch_attestation_ops cctxt node_ctxt parameters ~attested_level]
+    returns the attestation operations for [attested_level] from the cache if
+    available. Otherwise, fetches them from L1 using the appropriate plugin,
+    converts them to cache format, stores them, and returns the result. *)
+val get_cached_or_fetch_attestation_ops :
+  Rpc_context.t ->
+  t ->
+  Types.proto_parameters ->
+  attested_level:int32 ->
+  Attestation_ops_cache.cached_ops tzresult Lwt.t
+
+(** [store_attestations_in_cache plugin ctxt parameters attestations ~block_level]
+    converts raw [attestations] obtained from the plugin into cache format and
+    stores them in the attestation operations cache for [block_level] and
+    returns them. *)
+val store_attestations_in_cache :
+  (module Dal_plugin.T
+     with type tb_slot = 'tb_slot
+      and type dal_attestations = 'dal_attestations) ->
+  t ->
+  Types.proto_parameters ->
+  ('tb_slot * 'attestation_operation * 'dal_attestations option) list ->
+  block_level:int32 ->
+  Attestation_ops_cache.cached_ops tzresult Lwt.t
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point
