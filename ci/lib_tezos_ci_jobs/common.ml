@@ -15,7 +15,6 @@
     - helpers for making jobs;
     - jobs shared between pipelines *)
 
-open Gitlab_ci.Types
 open Tezos_ci
 
 (** {2 Shared Helpers} *)
@@ -93,30 +92,4 @@ module Packaging = struct
     :: ( "DEP_IMAGE_PROTECTED",
          sf "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-$DISTRIBUTION" kind )
     :: add
-
-  let make_docker_build_dependencies ~__POS__ ?rules ~name ~matrix ~distribution
-      ~base_image ~script () =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ?rules
-      ~stage:Stages.images
-      ~variables:
-        (make_variables
-           [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      script
-
-  let make_job_merge_build_dependencies ~distribution ~dependencies ~matrix =
-    job_docker_authenticated
-      ~__POS__
-      ~name:(Format.sprintf "oc.docker-build-merge-manifest.%s" distribution)
-      ~stage:Stages.images
-      ~dependencies
-      ~variables:
-        (make_variables
-           [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
-      ~parallel:(Matrix matrix)
-      ["scripts/ci/docker-merge-base-images.sh"]
 end
