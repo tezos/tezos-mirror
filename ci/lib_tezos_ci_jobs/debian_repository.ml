@@ -142,9 +142,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
       ()
   in
-  let make_job_build_debian_packages =
-    make_job_build_packages ~limit_dune_build_jobs
-  in
   (* docker merge jobs *)
   let job_merge_build_debian_dependencies =
     make_job_merge_build_dependencies
@@ -180,23 +177,25 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   (* These jobs build the packages in a matrix using the
      build dependencies images *)
   let job_build_debian_package : tezos_job =
-    make_job_build_debian_packages
+    make_job_build_packages
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
+      ~limit_dune_build_jobs
       ()
   in
   let job_build_ubuntu_package : tezos_job =
-    make_job_build_debian_packages
+    make_job_build_packages
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_merge_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
+      ~limit_dune_build_jobs
       ()
   in
 
