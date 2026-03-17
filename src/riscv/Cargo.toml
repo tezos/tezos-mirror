@@ -23,7 +23,7 @@ version = "2.1.1"
 features = ["deref", "deref_mut"]
 
 [workspace.dependencies.strum]
-version = "0.27"
+version = "0.28"
 features = ["derive"]
 
 [workspace.dependencies.octez-riscv]

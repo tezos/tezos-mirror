@@ -85,12 +85,15 @@ impl CustomGcResource for RegistryState {
 pub type Registry = MutableState<RegistryState>;
 
 #[derive(ocaml::FromValue, ocaml::ToValue)]
-#[ocaml::sig("Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds")]
+#[ocaml::sig(
+    "Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
+)]
 pub enum InvalidArgumentError {
     KeyNotFound,
     KeyTooLong,
     OffsetTooLarge,
     DatabaseIndexOutOfBounds,
+    RegistryResizeTooLarge,
 }
 
 impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
@@ -102,6 +105,7 @@ impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
             ds_errors::InvalidArgumentError::DatabaseIndexOutOfBounds => {
                 Self::DatabaseIndexOutOfBounds
             }
+            ds_errors::InvalidArgumentError::RegistryResizeTooLarge => Self::RegistryResizeTooLarge,
         }
     }
 }
@@ -149,7 +153,7 @@ pub fn octez_riscv_durable_in_memory_registry_resize(
     size: u64,
 ) -> SplitDsResult<()> {
     let size = usize::try_from(size)?;
-    let res = state.apply(|registry| registry.resize(size))?;
+    let res = state.apply(|registry| registry.resize_tick(size))?;
 
     split_ds_errors(res)
 }

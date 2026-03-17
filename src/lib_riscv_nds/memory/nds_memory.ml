@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
 (* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -19,6 +20,7 @@ let invalid_argument_error_encoding =
       ("key_too_long", Api.Key_too_long);
       ("offset_too_large", Api.Offset_too_large);
       ("database_index_out_of_bounds", Api.Database_index_out_of_bounds);
+      ("registry_resize_too_large", Api.Registry_resize_too_large);
     ]
 
 let pp_invalid_argument_error fmt = function
@@ -27,6 +29,8 @@ let pp_invalid_argument_error fmt = function
   | Api.Offset_too_large -> Format.pp_print_string fmt "offset too large"
   | Api.Database_index_out_of_bounds ->
       Format.pp_print_string fmt "database index out of bounds"
+  | Api.Registry_resize_too_large ->
+      Format.pp_print_string fmt "registry resize too large"
 
 let () =
   register_error_kind
