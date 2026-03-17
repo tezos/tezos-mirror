@@ -179,4 +179,124 @@ mod tests {
         let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
         assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
     }
+
+    // --- Amount edge cases ---
+
+    #[test]
+    fn amount_zero_parsed_correctly() {
+        let hdrs = required_headers(); // default amount is "0"
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.amount, AlloyU256::ZERO);
+    }
+
+    #[test]
+    fn amount_one_wei() {
+        let mut hdrs = required_headers();
+        // Smallest fractional TEZ: 10^-18 TEZ = 1 wei
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, "0.000000000000000001");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.amount, AlloyU256::from(1u64));
+    }
+
+    #[test]
+    fn amount_rejects_negative() {
+        let mut hdrs = required_headers();
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, "-1");
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+    }
+
+    #[test]
+    fn amount_rejects_excess_decimals() {
+        let mut hdrs = required_headers();
+        // 19 decimals — exceeds Ethereum's 18-decimal limit
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
+            (X_TEZOS_AMOUNT, "0.0000000000000000001");
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+    }
+
+    // --- Gas limit edge cases ---
+
+    #[test]
+    fn gas_limit_zero() {
+        let mut hdrs = required_headers();
+        *hdrs
+            .iter_mut()
+            .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
+            .unwrap() = (X_TEZOS_GAS_LIMIT, "0");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.gas_limit, 0);
+    }
+
+    #[test]
+    fn gas_limit_max_u64() {
+        let mut hdrs = required_headers();
+        *hdrs
+            .iter_mut()
+            .find(|(k, _)| *k == X_TEZOS_GAS_LIMIT)
+            .unwrap() = (X_TEZOS_GAS_LIMIT, "18446744073709551615");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.gas_limit, u64::MAX);
+    }
+
+    // --- Block number edge cases ---
+
+    #[test]
+    fn block_number_zero() {
+        let mut hdrs = required_headers();
+        *hdrs
+            .iter_mut()
+            .find(|(k, _)| *k == X_TEZOS_BLOCK_NUMBER)
+            .unwrap() = (X_TEZOS_BLOCK_NUMBER, "0");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.block_number, U256::from(0));
+    }
+
+    #[test]
+    fn block_number_max_u32() {
+        let mut hdrs = required_headers();
+        *hdrs
+            .iter_mut()
+            .find(|(k, _)| *k == X_TEZOS_BLOCK_NUMBER)
+            .unwrap() = (X_TEZOS_BLOCK_NUMBER, "4294967295");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.block_number, U256::from(u32::MAX));
+    }
+
+    // --- Timestamp edge cases ---
+
+    #[test]
+    fn timestamp_zero() {
+        let mut hdrs = required_headers();
+        *hdrs
+            .iter_mut()
+            .find(|(k, _)| *k == X_TEZOS_TIMESTAMP)
+            .unwrap() = (X_TEZOS_TIMESTAMP, "0");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.timestamp, U256::from(0));
+    }
+
+    // --- Sender address format ---
+
+    #[test]
+    fn sender_without_0x_prefix_accepted() {
+        // alloy's Address::from_hex accepts addresses without the 0x prefix
+        let mut hdrs = required_headers();
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
+            (X_TEZOS_SENDER, "d8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.sender, Address::from_hex(ADDR).unwrap());
+    }
+
+    #[test]
+    fn sender_short_address_rejected() {
+        let mut hdrs = required_headers();
+        *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_SENDER).unwrap() =
+            (X_TEZOS_SENDER, "0x1234");
+        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
+        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+    }
 }

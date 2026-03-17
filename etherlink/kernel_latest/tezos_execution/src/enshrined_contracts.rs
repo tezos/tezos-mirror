@@ -702,13 +702,14 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 mod tests {
     use mir::ast::AddressHash;
     use mir::lexer::Prim;
+    use num_bigint::BigInt;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::RuntimeId;
 
     use crate::enshrined_contracts::*;
     use crate::mir_ctx::mock::MockCtx;
-    use crate::test_utils::MockRegistry;
+    use crate::test_utils::{MockRegistry, MockRegistryWithStatus};
 
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
     const ERC20_WRAPPER_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb";
@@ -1048,5 +1049,463 @@ mod tests {
         let typed = typecheck_call(&value).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
+    }
+
+    // --- Cross-runtime call: amount edge cases ---
+
+    #[test]
+    fn test_cross_runtime_call_zero_amount() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 0i64;
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_ok());
+
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls.len(), 1);
+        assert_eq!(serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(), "0");
+    }
+
+    #[test]
+    fn test_cross_runtime_call_negative_amount_rejected() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = -1i64;
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("Negative amount"),
+            "error should mention negative amount: {err}"
+        );
+    }
+
+    #[test]
+    fn test_cross_runtime_call_non_success_response() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistryWithStatus::new(
+            generated_alias,
+            500,
+            b"internal server error".to_vec(),
+        );
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 100i64;
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("500"),
+            "error should contain status code: {err}"
+        );
+    }
+
+    #[test]
+    fn test_cross_runtime_call_400_response() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry =
+            MockRegistryWithStatus::new(generated_alias, 400, b"bad request".to_vec());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("bad request"),
+            "error should contain response body: {err}"
+        );
+    }
+
+    // --- address_hash_bytes encoding ---
+
+    #[test]
+    fn test_address_hash_bytes_gateway() {
+        let bytes = EnshrinedContracts::TezosXGateway.address_hash_bytes();
+        assert_eq!(bytes[0], 0x01);
+        assert_eq!(&bytes[1..21], &GATEWAY_ADDRESS);
+        assert_eq!(bytes[21], 0x00);
+    }
+
+    #[test]
+    fn test_address_hash_bytes_erc20_wrapper() {
+        let bytes = EnshrinedContracts::ERC20Wrapper.address_hash_bytes();
+        assert_eq!(bytes[0], 0x01);
+        assert_eq!(&bytes[1..21], &ERC20_WRAPPER_ADDRESS);
+        assert_eq!(bytes[21], 0x00);
+    }
+
+    // --- bigint_to_u256 / biguint_to_u256 edge cases ---
+
+    #[test]
+    fn test_bigint_to_u256_zero() {
+        let result = bigint_to_u256(&BigInt::from(0));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), U256::zero());
+    }
+
+    #[test]
+    fn test_bigint_to_u256_positive() {
+        let result = bigint_to_u256(&BigInt::from(42));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), U256::from(42));
+    }
+
+    #[test]
+    fn test_bigint_to_u256_large_value() {
+        // U256::MAX = 2^256 - 1
+        let max_u256_bytes = [0xFFu8; 32];
+        let value =
+            num_bigint::BigInt::from_bytes_le(num_bigint::Sign::Plus, &max_u256_bytes);
+        let result = bigint_to_u256(&value);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), U256::MAX);
+    }
+
+    #[test]
+    fn test_bigint_to_u256_overflow() {
+        // Value larger than 32 bytes overflows
+        let mut bytes = vec![0xFF; 33];
+        bytes[32] = 0x01;
+        let value = num_bigint::BigInt::from_bytes_le(num_bigint::Sign::Plus, &bytes);
+        let result = bigint_to_u256(&value);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_biguint_to_u256_zero() {
+        let result = biguint_to_u256(num_bigint::BigUint::from(0u32));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), U256::zero());
+    }
+
+    #[test]
+    fn test_biguint_to_u256_overflow() {
+        let mut bytes = vec![0xFF; 33];
+        bytes[32] = 0x01;
+        let value = num_bigint::BigUint::from_bytes_le(&bytes);
+        let result = biguint_to_u256(value);
+        assert!(result.is_err());
+    }
+
+    // --- inject_context_headers_raw edge cases ---
+
+    #[test]
+    fn test_inject_context_headers_raw_zero_amount() {
+        let mut headers = http::HeaderMap::new();
+        inject_context_headers_raw(&mut headers, b"sender", b"source", 0u64, 0, 0u64, 0)
+            .unwrap();
+        assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0");
+        assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "0");
+        assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "0");
+        assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "0");
+    }
+
+    #[test]
+    fn test_inject_context_headers_raw_max_values() {
+        let mut headers = http::HeaderMap::new();
+        inject_context_headers_raw(
+            &mut headers,
+            b"sender",
+            b"source",
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u32::MAX,
+        )
+        .unwrap();
+        // u64::MAX mutez is a very large TEZ amount
+        let amount = headers.get("X-Tezos-Amount").unwrap().to_str().unwrap();
+        assert!(!amount.is_empty());
+        assert_eq!(
+            headers.get("X-Tezos-Gas-Limit").unwrap(),
+            &u64::MAX.to_string()
+        );
+        assert_eq!(
+            headers.get("X-Tezos-Timestamp").unwrap(),
+            &u64::MAX.to_string()
+        );
+        assert_eq!(
+            headers.get("X-Tezos-Block-Number").unwrap(),
+            &u32::MAX.to_string()
+        );
+    }
+
+    // --- ERC20 wrapper edge cases ---
+
+    #[test]
+    fn test_abi_encode_address_uint256_zero_amount() {
+        let addr = vec![0x11; 20];
+        let amount = BigInt::from(0);
+        let result =
+            abi_encode_address_uint256("transfer(address,uint256)", &addr, &amount);
+        assert!(result.is_ok());
+        let calldata = result.unwrap();
+        // 4 bytes selector + 32 bytes address + 32 bytes value
+        assert_eq!(calldata.len(), 68);
+        // The uint256 part should be all zeros
+        assert!(calldata[36..68].iter().all(|&b| b == 0));
+    }
+
+    #[test]
+    fn test_abi_encode_address_uint256_negative_amount() {
+        let addr = vec![0x11; 20];
+        let amount = BigInt::from(-1);
+        let result =
+            abi_encode_address_uint256("transfer(address,uint256)", &addr, &amount);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("non-negative"),
+            "error should mention non-negative: {err}"
+        );
+    }
+
+    #[test]
+    fn test_abi_encode_address_exceeding_20_bytes() {
+        let addr = vec![0x11; 21]; // 21 bytes — too long
+        let amount = BigInt::from(100);
+        let result =
+            abi_encode_address_uint256("transfer(address,uint256)", &addr, &amount);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("20 bytes"),
+            "error should mention 20 bytes: {err}"
+        );
+    }
+
+    #[test]
+    fn test_abi_encode_amount_exceeding_uint256() {
+        let addr = vec![0x11; 20];
+        // 33 bytes — exceeds uint256 (32 bytes)
+        let bytes = vec![0xFF; 33];
+        let amount = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &bytes);
+        let result =
+            abi_encode_address_uint256("transfer(address,uint256)", &addr, &amount);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("uint256"),
+            "error should mention uint256: {err}"
+        );
+    }
+
+    #[test]
+    fn test_abi_encode_address_short_address() {
+        // Address shorter than 20 bytes should be left-padded
+        let addr = vec![0xAB; 4]; // Only 4 bytes
+        let amount = BigInt::from(1);
+        let result =
+            abi_encode_address_uint256("transfer(address,uint256)", &addr, &amount);
+        assert!(result.is_ok());
+        let calldata = result.unwrap();
+        // First 4 bytes are selector, next 32 bytes are left-padded address
+        // 28 zero bytes followed by 4 bytes of 0xAB
+        assert!(calldata[4..32].iter().all(|&b| b == 0));
+        assert!(calldata[32..36].iter().all(|&b| b == 0xAB));
+    }
+
+    // --- Non-enshrined contract detection ---
+
+    #[test]
+    fn test_non_enshrined_contract() {
+        let non_enshrined = ContractKt1Hash::try_from_bytes(&[0x01; 20]).unwrap();
+        assert!(!is_enshrined(&non_enshrined));
+        assert_eq!(from_kt1(&non_enshrined), None);
+    }
+
+    #[test]
+    fn test_enshrined_prefix_mismatch() {
+        // Starts with ENSHRINED_PREFIX but doesn't match either contract
+        let mut bytes = ENSHRINED_PREFIX.to_vec();
+        bytes.extend_from_slice(&[0x99; 14]);
+        let contract = ContractKt1Hash::try_from_bytes(&bytes).unwrap();
+        assert!(!is_enshrined(&contract));
+        assert_eq!(from_kt1(&contract), None);
+    }
+
+    // --- Gateway entrypoint edge cases ---
+
+    #[test]
+    fn test_gateway_unknown_entrypoint() {
+        let entrypoints =
+            get_enshrined_contract_entrypoint(EnshrinedContracts::TezosXGateway).unwrap();
+        let unknown = Entrypoint::try_from("nonexistent").unwrap();
+        assert!(!entrypoints.contains_key(&unknown));
+    }
+
+    #[test]
+    fn test_erc20_wrapper_entrypoints() {
+        let entrypoints =
+            get_enshrined_contract_entrypoint(EnshrinedContracts::ERC20Wrapper).unwrap();
+        assert!(entrypoints.contains_key(&Entrypoint::try_from("transfer").unwrap()));
+        assert!(entrypoints.contains_key(&Entrypoint::try_from("approve").unwrap()));
+        assert!(!entrypoints.contains_key(&Entrypoint::default()));
+    }
+
+    // --- HTTP call method mapping ---
+
+    #[test]
+    fn test_http_call_method_0_is_get() {
+        let arena = typed_arena::Arena::new();
+        let value =
+            build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
+        let typed = typecheck_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        assert_eq!(request.method(), http::Method::GET);
+    }
+
+    #[test]
+    fn test_http_call_method_1_is_post() {
+        let arena = typed_arena::Arena::new();
+        let value =
+            build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 1);
+        let typed = typecheck_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        assert_eq!(request.method(), http::Method::POST);
+    }
+
+    #[test]
+    fn test_http_call_unknown_method_defaults_to_post() {
+        let arena = typed_arena::Arena::new();
+        let value =
+            build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 99);
+        let typed = typecheck_call(&value).unwrap();
+        let request = extract_http_call_request(typed).unwrap();
+        assert_eq!(request.method(), http::Method::POST);
+    }
+
+    // --- Amount header formatting in cross-runtime call ---
+
+    #[test]
+    fn test_cross_runtime_call_large_amount_header() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        // 1_000_000 mutez = 1 TEZ
+        let amount = 1_000_000i64;
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_ok());
+
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(), "1");
+    }
+
+    #[test]
+    fn test_cross_runtime_call_fractional_amount_header() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        // 1 mutez = 0.000001 TEZ
+        let amount = 1i64;
+
+        let mut journal = TezosXJournal::new();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_ok());
+
+        let serve_calls = registry.serve_calls.borrow();
+        assert_eq!(
+            serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(),
+            "0.000001"
+        );
+    }
+
+    // --- Typecheck entrypoint value errors ---
+
+    #[test]
+    fn test_typecheck_unknown_entrypoint_returns_error() {
+        let value = Micheline::String("hello".to_string());
+        let result = typecheck_entrypoint_value(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("nonexistent").unwrap(),
+            &value,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("Unknown entrypoint"),
+            "error should mention unknown entrypoint: {err}"
+        );
+    }
+
+    #[test]
+    fn test_typecheck_wrong_type_for_default_entrypoint() {
+        // Default entrypoint expects a string, not bytes
+        let value = Micheline::Bytes(vec![0x01, 0x02]);
+        let result = typecheck_entrypoint_value(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::default(),
+            &value,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("Invalid parameters"),
+            "error should mention invalid parameters: {err}"
+        );
     }
 }

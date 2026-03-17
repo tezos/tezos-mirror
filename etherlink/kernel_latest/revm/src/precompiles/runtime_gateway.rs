@@ -679,4 +679,296 @@ mod tests {
             Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
         ));
     }
+
+    // --- inject_tezos_headers: amount edge cases ---
+
+    #[test]
+    fn test_inject_tezos_headers_zero_amount() {
+        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+
+        let sender_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+        let source_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+
+        inject_tezos_headers(
+            request.headers_mut(),
+            &sender_alias.to_bytes().unwrap(),
+            &source_alias.to_bytes().unwrap(),
+            U256::ZERO,
+            100_000,
+            U256::from(1_700_000_000u64),
+            U256::from(1u64),
+        )
+        .unwrap();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_AMOUNT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "0"
+        );
+    }
+
+    #[test]
+    fn test_inject_tezos_headers_fractional_amount() {
+        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+
+        let sender_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+        let source_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+        // 500_000 mutez = 0.5 TEZ
+        let amount = U256::from(500_000u64);
+
+        inject_tezos_headers(
+            request.headers_mut(),
+            &sender_alias.to_bytes().unwrap(),
+            &source_alias.to_bytes().unwrap(),
+            amount,
+            100_000,
+            U256::from(1_700_000_000u64),
+            U256::from(1u64),
+        )
+        .unwrap();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_AMOUNT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "0.5"
+        );
+    }
+
+    #[test]
+    fn test_inject_tezos_headers_zero_gas_and_block() {
+        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+
+        let sender_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+        let source_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+
+        inject_tezos_headers(
+            request.headers_mut(),
+            &sender_alias.to_bytes().unwrap(),
+            &source_alias.to_bytes().unwrap(),
+            U256::ZERO,
+            0,
+            U256::ZERO,
+            U256::ZERO,
+        )
+        .unwrap();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_GAS_LIMIT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_TIMESTAMP)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_BLOCK_NUMBER)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "0"
+        );
+    }
+
+    // --- build_http_request edge cases ---
+
+    #[test]
+    fn test_build_http_request_empty_body() {
+        let request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        assert!(request.body().is_empty());
+        assert_eq!(request.method(), http::Method::POST);
+    }
+
+    #[test]
+    fn test_build_http_request_preserves_large_body() {
+        let body = vec![0xAB; 1024];
+        let request = build_http_request("http://tezos/KT1abc", &[], &body, 1).unwrap();
+        assert_eq!(request.body().len(), 1024);
+        assert!(request.body().iter().all(|&b| b == 0xAB));
+    }
+
+    #[test]
+    fn test_build_http_request_rejects_x_tezos_mixed_case() {
+        let result = build_http_request(
+            "http://tezos/KT1abc",
+            &[("X-TEZOS-Sender".to_string(), "bad".to_string())],
+            &[],
+            1,
+        );
+        assert!(matches!(
+            result,
+            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+        ));
+    }
+
+    // --- ABI decoding edge cases ---
+
+    #[test]
+    fn test_transfer_abi_decode() {
+        use alloy_sol_types::SolCall;
+
+        let call = RuntimeGateway::transferCall {
+            implicitAddress: "tz1abc123".to_string(),
+        };
+        let encoded = call.abi_encode();
+
+        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+        match decoded {
+            RuntimeGatewayCalls::transfer(decoded_call) => {
+                assert_eq!(decoded_call.implicitAddress, "tz1abc123");
+            }
+            _ => panic!("expected transfer variant"),
+        }
+    }
+
+    #[test]
+    fn test_call_michelson_abi_decode() {
+        use alloy_sol_types::SolCall;
+
+        let call = RuntimeGateway::callMichelsonCall {
+            destination: "KT1abc".to_string(),
+            entrypoint: "transfer".to_string(),
+            parameters: vec![0x01, 0x02].into(),
+        };
+        let encoded = call.abi_encode();
+
+        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+        match decoded {
+            RuntimeGatewayCalls::callMichelson(decoded_call) => {
+                assert_eq!(decoded_call.destination, "KT1abc");
+                assert_eq!(decoded_call.entrypoint, "transfer");
+                assert_eq!(decoded_call.parameters.as_ref(), &[0x01, 0x02]);
+            }
+            _ => panic!("expected callMichelson variant"),
+        }
+    }
+
+    #[test]
+    fn test_call_return_encoding_with_body() {
+        let body = vec![0xCA, 0xFE, 0xBA, 0xBE];
+        let output: Vec<u8> = (true, body).abi_encode_params();
+        // bool (true) + offset to bytes + length of bytes + padded bytes
+        assert!(output.len() >= 128);
+        assert_eq!(output[31], 1); // bool = true
+    }
+
+    #[test]
+    fn test_inject_tezos_headers_overwrites_all_existing() {
+        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+
+        // Pre-populate with old values
+        request
+            .headers_mut()
+            .insert(X_TEZOS_SENDER, "old-sender".parse().unwrap());
+        request
+            .headers_mut()
+            .insert(X_TEZOS_SOURCE, "old-source".parse().unwrap());
+        request
+            .headers_mut()
+            .insert(X_TEZOS_AMOUNT, "old-amount".parse().unwrap());
+        request
+            .headers_mut()
+            .insert(X_TEZOS_GAS_LIMIT, "old-gas".parse().unwrap());
+        request
+            .headers_mut()
+            .insert(X_TEZOS_TIMESTAMP, "old-ts".parse().unwrap());
+        request
+            .headers_mut()
+            .insert(X_TEZOS_BLOCK_NUMBER, "old-block".parse().unwrap());
+
+        let sender_alias =
+            Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
+
+        inject_tezos_headers(
+            request.headers_mut(),
+            &sender_alias.to_bytes().unwrap(),
+            &sender_alias.to_bytes().unwrap(),
+            U256::from(1_000_000u64),
+            50_000,
+            U256::from(100u64),
+            U256::from(42u64),
+        )
+        .unwrap();
+
+        // All values should be overwritten
+        assert_ne!(
+            request
+                .headers()
+                .get(X_TEZOS_SENDER)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "old-sender"
+        );
+        assert_ne!(
+            request
+                .headers()
+                .get(X_TEZOS_SOURCE)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "old-source"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_AMOUNT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "1"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_GAS_LIMIT)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "50000"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_TIMESTAMP)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "100"
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_BLOCK_NUMBER)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "42"
+        );
+    }
 }

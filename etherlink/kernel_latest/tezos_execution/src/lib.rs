@@ -1429,6 +1429,71 @@ pub(crate) mod test_utils {
             Ok(http::Response::builder().status(200).body(vec![]).unwrap())
         }
     }
+
+    /// Mock Registry that returns a configurable HTTP status code from serve().
+    /// Used to test error handling when the target runtime returns non-success
+    /// responses.
+    pub struct MockRegistryWithStatus {
+        pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
+        generated_alias: Vec<u8>,
+        status_code: u16,
+        response_body: Vec<u8>,
+    }
+
+    impl MockRegistryWithStatus {
+        pub fn new(
+            generated_alias: Vec<u8>,
+            status_code: u16,
+            response_body: Vec<u8>,
+        ) -> Self {
+            Self {
+                serve_calls: RefCell::new(Vec::new()),
+                generated_alias,
+                status_code,
+                response_body,
+            }
+        }
+    }
+
+    impl Registry for MockRegistryWithStatus {
+        fn generate_alias<Host>(
+            &self,
+            _host: &mut Host,
+            _journal: &mut TezosXJournal,
+            _native_address: &[u8],
+            _runtime_id: RuntimeId,
+            _context: CrossRuntimeContext,
+        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
+            Ok(self.generated_alias.clone())
+        }
+
+        fn address_from_string(
+            &self,
+            address_str: &str,
+            _runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            Ok(address_str.as_bytes().to_vec())
+        }
+
+        fn serve<Host>(
+            &self,
+            _host: &mut Host,
+            _journal: &mut TezosXJournal,
+            request: http::Request<Vec<u8>>,
+        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        where
+            Host: StorageV1 + Logging,
+        {
+            self.serve_calls.borrow_mut().push(request);
+            Ok(http::Response::builder()
+                .status(self.status_code)
+                .body(self.response_body.clone())
+                .unwrap())
+        }
+    }
 }
 
 #[cfg(test)]
