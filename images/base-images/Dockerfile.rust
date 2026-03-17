@@ -55,17 +55,17 @@ RUN rustup update 1.88.0 1.94.0 && \
     rustup update nightly-2025-01-30 nightly-2026-02-24 && \
     rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
     rustup component add --toolchain=nightly-2026-02-24 rustfmt miri rust-src && \
-    rustup default 1.88.0
+    rustup default 1.94.0
 
 ENV PATH=/root/.cargo/bin:$PATH
 
 # Install Taplo
-RUN cargo +1.88.0 install taplo-cli --version 0.9.3 --locked && \
+RUN cargo +1.94.0 install taplo-cli --version 0.9.3 --locked && \
     taplo --version
 
 # Install cargo-audit
-RUN cargo +1.88.0 install --locked cargo-audit --version 0.22.0 && \
+RUN cargo +1.94.0 install --locked cargo-audit --version 0.22.0 && \
     cargo audit --version
 
 # Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
-RUN cargo +1.88.0 install cargo-expand
+RUN cargo +1.94.0 install cargo-expand
