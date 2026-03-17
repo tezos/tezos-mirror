@@ -305,32 +305,25 @@ let tezt_etherlink =
     ~release_status:Unreleased
 
 let evm_node_lib_dev_tezlink =
-  let tezlink_target_proto =
-    List.find (fun proto -> Protocol.short_hash proto = "PtSeouLo") Protocol.all
+  let proto_deps proto_hash =
+    let proto =
+      List.find
+        (fun proto -> Protocol.short_hash proto = proto_hash)
+        Protocol.all
+    in
+    let protocol_plugin =
+      match Protocol.plugin proto with
+      | Some target -> target
+      | None -> (* unreachable *) assert false
+    in
+    let protocol_parameters =
+      match Protocol.parameters proto with
+      | Some target -> target
+      | None -> (* unreachable *) assert false
+    in
+    [protocol_plugin; protocol_parameters; Protocol.test_helpers_exn proto]
   in
-  let tezlink_protocol_plugin =
-    match Protocol.plugin tezlink_target_proto with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let tezlink_protocol_parameters =
-    match Protocol.parameters tezlink_target_proto with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let tezlink_target_proto_024 =
-    List.find (fun proto -> Protocol.short_hash proto = "PtTALLiN") Protocol.all
-  in
-  let tezlink_protocol_plugin_024 =
-    match Protocol.plugin tezlink_target_proto_024 with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
-  let tezlink_protocol_parameters_024 =
-    match Protocol.parameters tezlink_target_proto_024 with
-    | Some target -> target
-    | None -> (* unreachable *) assert false
-  in
+  let proto_deps = List.concat_map proto_deps ["PtSeouLo"; "PtTALLiN"] in
   let tezlink_genesis_proto =
     List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
   in
@@ -345,21 +338,16 @@ let evm_node_lib_dev_tezlink =
     ~path:"etherlink/bin_node/lib_dev/tezlink"
     ~synopsis:"Tezlink dependencies for the EVM node"
     ~deps:
-      [
-        evm_node_lib_dev_encoding |> open_;
-        tezlink_protocol_plugin;
-        tezlink_protocol_parameters;
-        tezlink_protocol_plugin_024;
-        tezlink_protocol_parameters_024;
-        tezlink_genesis_protocol_plugin;
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_shell_services;
-        octez_version;
-        octez_micheline;
-        Protocol.test_helpers_exn tezlink_target_proto;
-        Protocol.test_helpers_exn tezlink_target_proto_024;
-        lwt_watcher;
-      ]
+      ([
+         evm_node_lib_dev_encoding |> open_;
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_shell_services;
+         octez_version;
+         octez_micheline;
+         lwt_watcher;
+         tezlink_genesis_protocol_plugin;
+       ]
+      @ proto_deps)
 
 let evm_node_config =
   octez_evm_node_lib

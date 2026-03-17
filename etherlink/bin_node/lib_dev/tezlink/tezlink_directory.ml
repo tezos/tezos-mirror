@@ -188,40 +188,18 @@ struct
 
   let bootstrap_transfers_receipt chain_id backend =
     let open Lwt_result_syntax in
-    let* transfers =
-      Current_block_services.activate_bootstraps_with_transfers backend
-    in
-    let*? transfers =
-      List.fold_left
-        (fun acc (receipt, operation) ->
-          let open Result_syntax in
-          let* acc = acc in
-          let* receipt =
-            Tezos_types.convert_using_serialization
-              ~name:"operation_receipt"
-              ~src:Tezlink_imports.Imported_protocol.operation_receipt_encoding
-              ~dst:Block_services.Proto.operation_receipt_encoding
-              receipt
-          in
-          let* operation =
-            Tezos_types.convert_using_serialization
-              ~name:"operation_data"
-              ~src:Tezlink_imports.Imported_protocol.operation_data_encoding
-              ~dst:Block_services.Proto.operation_data_encoding
-              operation
-          in
-          let item =
-            Block_services.
-              {
-                chain_id;
-                hash = Operation_hash.zero;
-                shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
-                protocol_data = operation;
-                receipt = Receipt receipt;
-              }
-          in
-          Ok (item :: acc))
-        (Ok [])
+    let* transfers = Proto.activate_bootstraps_with_transfers backend in
+    let transfers =
+      List.map
+        (fun (receipt, operation) ->
+          Block_services.
+            {
+              chain_id;
+              hash = Operation_hash.zero;
+              shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
+              protocol_data = operation;
+              receipt = Receipt receipt;
+            })
         transfers
     in
     return transfers
@@ -272,10 +250,6 @@ end
 
 module Current_block_header =
   Make_block_header (Tezlink_imported_protocol) (Tezlink_imported_protocol)
-module Zero_block_header =
-  Make_block_header (Tezlink_zero_protocol) (Tezlink_genesis_protocol)
-module Genesis_block_header =
-  Make_block_header (Tezlink_genesis_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -546,7 +520,7 @@ let tezlink_protocol_of_protocol = function
   | L2_types.Tezos_block.Protocol.T024 ->
       (module Tezlink_TALLiN_protocol : Tezlink_protocol)
 
-let protocol_for_block_or_level block_result :
+let protocol_for_block_or_level ~allowing_mock block_result :
     (module Tezlink_protocol) * (module Tezlink_protocol) =
   let imported =
     ( (module Tezlink_imported_protocol : Tezlink_protocol),
@@ -555,10 +529,10 @@ let protocol_for_block_or_level block_result :
   match block_result with
   | Ok (block : L2_types.Tezos_block.t) -> (
       match block.level with
-      | 0l ->
+      | 0l when allowing_mock ->
           ( (module Tezlink_zero_protocol : Tezlink_protocol),
             (module Tezlink_genesis_protocol : Tezlink_protocol) )
-      | 1l ->
+      | 1l when allowing_mock ->
           ( (module Tezlink_genesis_protocol : Tezlink_protocol),
             tezlink_protocol_of_protocol block.next_protocol )
       | _ ->
@@ -584,11 +558,7 @@ let register_dynamic_block_services ~l2_chain_id
   let*! tezlink_block = retrieve_block (module Backend) chain block in
   let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
       =
-    match block with
-    | `Head 0 ->
-        ( (module Tezlink_imported_protocol : Tezlink_protocol),
-          (module Tezlink_imported_protocol : Tezlink_protocol) )
-    | _ -> protocol_for_block_or_level tezlink_block
+    protocol_for_block_or_level ~allowing_mock:(block <> `Head 0) tezlink_block
   in
   let module Block_header = Make_block_header (Proto) (Next_proto) in
   let module S = Block_header.Block_services.S in

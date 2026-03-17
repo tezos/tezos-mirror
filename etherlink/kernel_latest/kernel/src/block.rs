@@ -2530,15 +2530,7 @@ mod tests {
         host.store_write_all(&path, &[4; 32])
             .expect("Write in durable storage should have succeeded");
 
-        // The upgrade direction here is T024 -> S023 which is
-        // numerically "backwards". This is because TARGET_TEZOS_PROTOCOL
-        // is hardcoded to S023 and we cannot change it for a test.
-        // When TARGET_TEZOS_PROTOCOL switches to T024, update
-        // previous_protocol to S023 so the test upgrades in the natural
-        // order.
-        assert_eq!(TARGET_TEZOS_PROTOCOL, Protocol::S023);
-
-        let previous_protocol = Protocol::T024;
+        let previous_protocol = Protocol::S023;
         let current_protocol = TARGET_TEZOS_PROTOCOL;
 
         // Store a dummy block header with [next_protocol] set to the
@@ -2619,15 +2611,7 @@ mod tests {
         let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
-        // The upgrade direction here is T024 -> S023 which is
-        // numerically "backwards". This is because TARGET_TEZOS_PROTOCOL
-        // is hardcoded to S023 and we cannot change it for a test.
-        // When TARGET_TEZOS_PROTOCOL switches to T024, update
-        // previous_protocol to S023 so the test upgrades in the natural
-        // order.
-        assert_eq!(TARGET_TEZOS_PROTOCOL, Protocol::S023);
-
-        let previous_protocol = Protocol::T024;
+        let previous_protocol = Protocol::S023;
         let current_protocol = TARGET_TEZOS_PROTOCOL;
 
         // Store a TezBlockHeader with next_protocol set to the previous

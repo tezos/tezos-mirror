@@ -2676,7 +2676,9 @@ module Handlers = struct
               let open Tezos_services in
               let ( (module Proto : Tezlink_protocol),
                     (module Next_proto : Tezlink_protocol) ) =
-                Tezlink_directory.protocol_for_block_or_level (Ok block)
+                Tezlink_directory.protocol_for_block_or_level
+                  ~allowing_mock:false
+                  (Ok block)
               in
               let module Block_services =
                 Make_block_service (Proto) (Next_proto)

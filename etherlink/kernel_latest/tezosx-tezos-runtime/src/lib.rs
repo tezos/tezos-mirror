@@ -322,6 +322,7 @@ mod tests {
             paid_storage_size_diff: Zarith(0.into()),
             allocated_destination_contract: false,
             lazy_storage_diff: None,
+            address_registry_diff: vec![],
         }
     }
 

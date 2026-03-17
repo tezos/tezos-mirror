@@ -78,11 +78,7 @@ let contents : Imported_context.Block_header.contents =
       Bytes.make
         Imported_protocol.Constants_repr.proof_of_work_nonce_size
         '\000';
-    per_block_votes =
-      {
-        liquidity_baking_vote = Per_block_vote_pass;
-        adaptive_issuance_vote = Per_block_vote_pass;
-      };
+    per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
   }
 
 let signature : Imported_protocol.Alpha_context.signature =
@@ -137,6 +133,7 @@ module Operation_metadata = struct
                   ticket_receipt = [];
                   originated_contracts = [];
                   consumed_gas = consumed_gas length;
+                  address_registry_diff = [];
                   storage_size = Z.zero;
                   paid_storage_size_diff = Z.zero;
                   allocated_destination_contract = false;
@@ -419,17 +416,23 @@ module Voting_period = struct
                respect to the first level of the Alpha family of protocols."
             "start_position"
             int32))
-
-  let convert =
-    Tezos_types.convert_using_serialization
-      ~name:"voting_period_info"
-      ~src:encoding
-      ~dst:Imported_context.Voting_period.encoding
 end
 
-let balance_udpdate_rewards ~(baker : Imported_context.public_key_hash) ~amount
-    =
-  let open Imported_context.Receipt in
+let seoulo_balance_udpdate_rewards ~(baker : SeouLo_context.public_key_hash)
+    ~amount =
+  let open SeouLo_context.Receipt in
+  let debited_rewards =
+    item Baking_rewards (Debited amount) Block_application
+  in
+  let baker = frozen_baker baker in
+  let credited_rewards =
+    item (Deposits baker) (Credited amount) Block_application
+  in
+  [debited_rewards; credited_rewards]
+
+let tallin_balance_udpdate_rewards ~(baker : TALLiN_context.public_key_hash)
+    ~amount =
+  let open TALLiN_context.Receipt in
   let debited_rewards =
     item Baking_rewards (Debited amount) Block_application
   in
@@ -632,3 +635,164 @@ let script_of_entrypoints entries =
   in
   Imported_context.Script.
     {code = lazy_expr code_expr; storage = lazy_expr unit_val}
+
+(* Bootstrap balances functions for different protocols *)
+
+(* Unfortunately TALLiN and SeouLo transaction receipt have different fields so we can't use convert_with_serialization on the whole structure. *)
+(* We could use convert_serialization on balance_updates but it's not a big win. *)
+
+let faucet_counter ~dst =
+  Tezos_types.convert_using_serialization
+    ~name:"faucet_counter"
+    ~src:Data_encoding.z
+    ~dst
+    Z.zero
+
+let tallin_bootstrap_receipt (account : Signature.V2.public_key_hash)
+    (balance : TALLiN_context.Tez.t) :
+    TALLiN_protocol.operation_receipt tzresult =
+  let open TALLiN_context.Receipt in
+  let open TALLiN_protocol.Apply_results in
+  let contract = TALLiN_context.Contract.Implicit account in
+  let mint =
+    item
+      (Contract (TALLiN_context.Contract.Implicit faucet_public_key_hash))
+      (Debited balance)
+      Block_application
+  in
+  let bootstrap =
+    item (Contract contract) (Credited balance) Block_application
+  in
+  let balance_updates = [mint; bootstrap] in
+  let operation_result =
+    Transaction_result
+      (Transaction_to_contract_result
+         {
+           storage = None;
+           lazy_storage_diff = None;
+           balance_updates;
+           ticket_receipt = [];
+           originated_contracts = [];
+           consumed_gas = TALLiN_context.Gas.Arith.zero;
+           storage_size = Z.zero;
+           paid_storage_size_diff = Z.zero;
+           allocated_destination_contract = false;
+           address_registry_diff = [];
+         })
+  in
+  let internal_operation_results = [] in
+  let operation_result =
+    TALLiN_protocol.Apply_operation_result.Applied operation_result
+  in
+  let contents =
+    Single_result
+      (Manager_operation_result
+         {balance_updates = []; operation_result; internal_operation_results})
+  in
+  Result.return (Operation_metadata {contents})
+
+let tallin_bootstrap_transfer (account : TALLiN_context.public_key_hash)
+    (balance : TALLiN_context.Tez.t) =
+  let open Result_syntax in
+  let open TALLiN_context in
+  let operation =
+    Transaction
+      {
+        amount = balance;
+        parameters = Script.unit_parameter;
+        entrypoint = Entrypoint.default;
+        destination = Implicit account;
+      }
+  in
+  let* counter =
+    faucet_counter ~dst:TALLiN_context.Manager_counter.encoding_for_RPCs
+  in
+  let contents =
+    Single
+      (Manager_operation
+         {
+           source = faucet_public_key_hash;
+           fee = Tez.zero;
+           counter;
+           operation;
+           gas_limit = Gas.Arith.zero;
+           storage_limit = Z.zero;
+         })
+  in
+  let signature = None in
+  let* receipt = tallin_bootstrap_receipt account balance in
+  return (receipt, Operation_data {contents; signature})
+
+let seoulo_bootstrap_receipt (account : Signature.V2.public_key_hash)
+    (balance : SeouLo_context.Tez.t) :
+    SeouLo_protocol.operation_receipt tzresult =
+  let open SeouLo_context.Receipt in
+  let open SeouLo_protocol.Apply_results in
+  let contract = SeouLo_context.Contract.Implicit account in
+  let mint =
+    item
+      (Contract (SeouLo_context.Contract.Implicit faucet_public_key_hash))
+      (Debited balance)
+      Block_application
+  in
+  let bootstrap =
+    item (Contract contract) (Credited balance) Block_application
+  in
+  let balance_updates = [mint; bootstrap] in
+  let operation_result =
+    Transaction_result
+      (Transaction_to_contract_result
+         {
+           storage = None;
+           lazy_storage_diff = None;
+           balance_updates;
+           ticket_receipt = [];
+           originated_contracts = [];
+           consumed_gas = SeouLo_context.Gas.Arith.zero;
+           storage_size = Z.zero;
+           paid_storage_size_diff = Z.zero;
+           allocated_destination_contract = false;
+         })
+  in
+  let internal_operation_results = [] in
+  let operation_result =
+    SeouLo_protocol.Apply_operation_result.Applied operation_result
+  in
+  let contents =
+    Single_result
+      (Manager_operation_result
+         {balance_updates = []; operation_result; internal_operation_results})
+  in
+  Result.return (Operation_metadata {contents})
+
+let seoulo_bootstrap_transfer (account : SeouLo_context.public_key_hash)
+    (balance : SeouLo_context.Tez.t) =
+  let open Result_syntax in
+  let open SeouLo_context in
+  let operation =
+    Transaction
+      {
+        amount = balance;
+        parameters = Script.unit_parameter;
+        entrypoint = Entrypoint.default;
+        destination = Implicit account;
+      }
+  in
+  let* counter =
+    faucet_counter ~dst:SeouLo_context.Manager_counter.encoding_for_RPCs
+  in
+  let contents =
+    Single
+      (Manager_operation
+         {
+           source = faucet_public_key_hash;
+           fee = Tez.zero;
+           counter;
+           operation;
+           gas_limit = Gas.Arith.zero;
+           storage_limit = Z.zero;
+         })
+  in
+  let signature = None in
+  let* receipt = seoulo_bootstrap_receipt account balance in
+  return (receipt, Operation_data {contents; signature})
