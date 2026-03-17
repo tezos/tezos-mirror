@@ -55,7 +55,7 @@ fi
 # Check which commits are not signed
 unsigned_commits=()
 for commit in $(git rev-list --no-merges "$base_branch..HEAD"); do
-  if ! git verify-commit "$commit" > /dev/null 2>&1; then
+  if ! git log -1 --format='%G?' "$commit" | grep -qv 'N'; then
     unsigned_commits+=("$commit")
   fi
 done
