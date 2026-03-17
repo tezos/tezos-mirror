@@ -44,7 +44,7 @@ RUN apt-get update && \
 # install rust toolchains and compilation targets
 # nightly toolchains are installed separately as they're only used for formatting
 # set the default to the last stable toolchain installed.
-RUN rustup update 1.88.0 1.94.0 && \
+RUN rustup update 1.94.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -52,8 +52,7 @@ RUN rustup update 1.88.0 1.94.0 && \
         rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
         rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
     done && \
-    rustup update nightly-2025-01-30 nightly-2026-02-24 && \
-    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
+    rustup update nightly-2026-02-24 && \
     rustup component add --toolchain=nightly-2026-02-24 rustfmt miri rust-src && \
     rustup default 1.94.0
 
