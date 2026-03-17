@@ -397,6 +397,9 @@ pub trait ChainConfigTrait: Debug {
         // skip_signature_check can be used to simulate the application of
         // ill-signed Tezos operations, it has no effect in the EVM case.
         skip_signature_check: bool,
+        // skip_fees_check can be used to simulate the application of Tezos
+        // operations with no fees, it has no effect in the EVM case.
+        skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging;
@@ -680,6 +683,9 @@ impl ChainConfigTrait for EvmChainConfig {
         // skip_signature_check can be used to simulate the application of
         // ill-signed Tezos operations, it has no effect in the EVM case.
         skip_signature_check: bool,
+        // skip_fees_check can be used to simulate the application of Tezos
+        // operations with no fees, it has no effect in the EVM case.
+        skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging,
@@ -706,6 +712,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 operation,
                 sequencer_pool_address,
                 skip_signature_check,
+                skip_fees_check,
                 Some(outbox_queue),
                 Some(&block_constants.evm_runtime_block_constants),
             ),
@@ -844,6 +851,7 @@ fn apply_tezos_operation<Host>(
     operation: TezlinkOperation,
     sequencer_pool_address: Option<H160>,
     skip_signature_check: bool,
+    skip_fees_check: bool,
     outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
@@ -892,6 +900,11 @@ where
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let mut tezosx_journal = TezosXJournal::new();
+            let fees = if skip_fees_check {
+                None
+            } else {
+                Some(required_fees)
+            };
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -901,7 +914,7 @@ where
                 operation,
                 &block_ctx,
                 skip_signature_check,
-                Some(required_fees),
+                fees,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
@@ -1114,6 +1127,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
         skip_signature_check: bool,
+        skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1 + Logging,
@@ -1131,6 +1145,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 operation,
                 sequencer_pool_address,
                 skip_signature_check,
+                skip_fees_check,
                 None::<&OutboxQueue<'_, RefPath>>,
                 None,
             ),
