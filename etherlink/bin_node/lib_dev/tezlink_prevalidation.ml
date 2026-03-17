@@ -506,8 +506,7 @@ let compute_minimal_fees ~op_raw_size ~da_fee_per_byte_mutez =
   let da_fees_mutez = Int64.(mul (of_int op_raw_size) da_fee_per_byte_mutez) in
   Tez.of_mutez_exn da_fees_mutez
 
-let parse_and_validate_for_queue ?(check_signature = true)
-    ?(check_minimal_fees = true) ~read ~data_model raw =
+let parse_and_validate_for_queue ~simulator_mode ~read ~data_model raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -524,6 +523,14 @@ let parse_and_validate_for_queue ?(check_signature = true)
     | Single only_operation -> (Contents only_operation, [])
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
+  in
+  (* During operation simulation, fees are not yet estimated and the
+     operation is not properly signed yet. For this reason, the
+     simulator bypasses the corresponding checks during validation. *)
+  let check_signature, check_minimal_fees =
+    match simulator_mode with
+    | Tezlink_backend_sig.Simulation -> (false, false)
+    | Preapplication -> (true, true)
   in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =

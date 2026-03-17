@@ -374,14 +374,7 @@ module Tezlink = struct
        produce any receipt). *)
     let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
       Tezlink_prevalidation.parse_and_validate_for_queue
-        ~check_signature:
-          (match simulator_mode with
-          | Tezlink_backend_sig.Simulation -> false
-          | Preapplication -> true)
-        ~check_minimal_fees:
-          (match simulator_mode with
-          | Tezlink_backend_sig.Simulation -> false
-          | Preapplication -> true)
+        ~simulator_mode
         ~read
         ~data_model
         input
@@ -425,21 +418,10 @@ module TezosX = struct
       |> Result.map_error_e @@ fun e ->
          Result_syntax.tzfail (Operation_serialization_error e)
     in
-    let check_signature =
-      match simulator_mode with
-      | Tezlink_backend_sig.Simulation -> false
-      | Preapplication -> true
-    in
-    let check_minimal_fees =
-      match simulator_mode with
-      | Tezlink_backend_sig.Simulation -> false
-      | Preapplication -> true
-    in
     (* Prevalidate the operation: invalid operations don't produce receipts. *)
     let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
       Tezlink_prevalidation.parse_and_validate_for_queue
-        ~check_signature
-        ~check_minimal_fees
+        ~simulator_mode
         ~read
         ~data_model
         input
