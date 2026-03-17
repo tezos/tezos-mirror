@@ -4704,6 +4704,20 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
+let boot_sector kernel_path =
+  let read_kernel ?(suffix = ".wasm") name : string =
+    let load_kernel_file name : string =
+      let open Tezt.Base in
+      let kernel_file = project_root // name in
+      read_file kernel_file
+    in
+    let hex_encode (input : string) : string =
+      match Hex.of_string input with `Hex s -> s
+    in
+    hex_encode (load_kernel_file (name ^ suffix))
+  in
+  read_kernel ~suffix:"" (Uses.path kernel_path)
+
 (* A migration test for smart rollups importing a DAL page.
    There are 5 levels involved when a DAL page is imported by a rollup:
    1. The publication level (P),
@@ -4777,29 +4791,15 @@ let test_migration_with_rollup ~migrate_from ~migrate_to =
     (* Originate rollup BEFORE migration but do NOT start rollup node yet.
        This guarantees the import happens after migration when we start it. *)
     log_step "Originating rollup (kernel will import page after migration)" ;
-    let read_kernel ?(suffix = ".wasm") name : string =
-      let load_kernel_file name : string =
-        let open Tezt.Base in
-        let kernel_file = project_root // name in
-        read_file kernel_file
-      in
-      let hex_encode (input : string) : string =
-        match Hex.of_string input with `Hex s -> s
-      in
-      hex_encode (load_kernel_file (name ^ suffix))
-    in
-    let boot_sector =
-      read_kernel
-        ~suffix:""
-        (Uses.path Constant.WASM.echo_dal_reveal_pages_with_external_message)
-    in
     let* rollup_address =
       Client.Sc_rollup.originate
         ~burn_cap:(Tez.of_int 999)
         ~alias:"rollup"
         ~src:Constant.bootstrap1.public_key_hash
         ~kind:"wasm_2_0_0"
-        ~boot_sector
+        ~boot_sector:
+          (boot_sector
+             Constant.WASM.echo_dal_reveal_pages_with_external_message)
         ~parameters_ty:"string"
         client
     in
@@ -4919,6 +4919,554 @@ let test_migration_with_rollup ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to
     ()
+
+(* Test that a refutation game over a DAL page import is correctly resolved even
+   when a protocol migration occurs between the DAL slot publication and the
+   refutation game.
+
+   Timeline:
+   - [old protocol] origination level: smart rollup is originated
+   - [old protocol] published_level: DAL slot is published
+   - [old protocol] attestation_level: DAL slot is attested
+   - migration at migration_level
+   - [new protocol] ~migration_level + 6: both rollup nodes process the DAL
+     page import; the loser flips the page content
+   - [new protocol] refutation game resolves: honest player keeps bond,
+     loser player is slashed
+
+   The key property verified: the refutation game proof validation uses the DAL
+   cryptobox parameters at the slot's publication level (old protocol), not the
+   import level (new protocol).  This ensures the dal_snapshot stored in the
+   game is correctly populated from the old protocol's history. *)
+let test_refutation_with_dal_page_import_across_migration ~migrate_from
+    ~migrate_to =
+  let tags = ["rollup"; "refutation"; "page_import"] in
+  let description =
+    "refutation game over DAL page import across protocol migration"
+  in
+  let {log_step} = init_logger () in
+  (* Must match the toy kernel hardcoded constants. *)
+  let published_level = 15 in
+  let slot_index = 1 in
+  (* Pick a migration level strictly after the attestation level
+     matching the approach of test_migration_with_rollup.
+     Since the legacy lag is 8, we take a level after 15+8=23. *)
+  let migration_level = 25 in
+  let commitment_period = 10 in
+  let challenge_window = 10 in
+  (* Timeout period per move in the refutation game.  We reduce it from the
+     mainnet default (one week) to something reasonable for a test. *)
+  let timeout_period = 50 in
+
+  let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
+      dal_node =
+    (* For migration from T024, one must NOT override the attestation_lag:
+       the migration code in dal_slot_storage.ml asserts
+         min alpha_attestation_lags < prev_attestation_lag
+       as min alpha_attestation_lags is 1, we need prev_attestation_lag >= 2.
+       With T024's default lag = 8 we get 5 < 8 which is satisfied.
+
+       DAL availability condition (sc_rollup_proof_repr.ml):
+       attested_level = published_level + attestation_lag_at_published_level
+       not_too_recent = attested_level <= import_inbox_level
+       With T024's lag = 8: attested_level = 15 + 8 = 23.
+       This gives a theoretical lower bound (23) for import availability.
+       In practice, when rollup nodes start post-migration and replay history,
+       the first observed DAL-page decision can occur later than 23.
+
+       The migration must happen AFTER the attestation (level 23) so that:
+       - the skip list cell for level 15 is fully finalized before migration
+         (preventing "DAL attestation status not found" errors in the rollup node),
+       - the migration loop [current_level - prev_lag .. current_level] =
+         [26-8..26] = [18..26] does not include level 15 and therefore does not
+         alter its attestation status.
+       The rollup nodes start after migration (level 26).  The refutation game is
+       entirely in Alpha, but the proof must fetch T024's cryptobox parameters via
+       find_dal_parameters(published_level=15) to validate the import. *)
+    let dal_lag = dal_parameters.attestation_lag in
+    let expected_import_level_from_old_lag = published_level + dal_lag in
+    (* Run long enough for commitments, the challenge window, and the full
+     refutation game dissection to complete.
+
+     The "+70" budget accounts for:
+
+     1. Dissection rounds. The WASM PVM refutation game has two phases:
+        - Snapshot-level: isolate the faulty kernel_run among
+          [commitment_period] snapshots. With [number_of_sections_in_dissection]
+          (currently 32) > [commitment_period] (10), this takes 1 round.
+        - Tick-level: binary-search within [ticks_per_snapshot] (5 * 10^13)
+          ticks, narrowing by a factor of ~([number_of_sections] - 1) = 31
+          per round. This takes ceil(log_31(5 * 10^13)) ≈ 10 rounds.
+        Including the final proof step, the game needs ~12 moves total.
+
+     2. Rollup-node reaction time. Each move is not instant: the node must
+        detect its turn, compute the dissection, inject the operation, and
+        wait for inclusion. Empirically this takes ~3-4 blocks per move,
+        giving ~48 blocks for the dissection.
+
+     3. Overhead (~20 blocks) for conflict detection, game initiation,
+        and node catch-up after migration.
+
+     If [number_of_sections_in_dissection] or [ticks_per_snapshot] change,
+     the number of dissection moves changes as
+       ceil(log_{sections - 1}(commitment_period))
+       + ceil(log_{sections - 1}(ticks_per_snapshot))
+       + 1 (for the final proof move)
+     and this budget should be adjusted accordingly. *)
+    let final_level =
+      expected_import_level_from_old_lag + commitment_period + challenge_window
+      + 70
+    in
+    (* If no loser_mode flip happened by this level, the scenario is almost
+     certainly misconfigured; fail early instead of baking to [final_level]. *)
+    let flip_deadline_level =
+      max
+        (migration_level + 3)
+        (expected_import_level_from_old_lag + challenge_window)
+    in
+    let diagnostic_from = max 2 (expected_import_level_from_old_lag - 2) in
+    let diagnostic_to =
+      max (migration_level + 3) (expected_import_level_from_old_lag + 5)
+    in
+
+    log_step
+      "Scenario parameters: published_level=%d slot_index=%d lag(runtime)=%d \
+       expected_import_level_from_old_lag=%d migration_level=%d \
+       flip_deadline_level=%d final_level=%d diagnostic_window=[%d..%d]"
+      published_level
+      slot_index
+      dal_lag
+      expected_import_level_from_old_lag
+      migration_level
+      flip_deadline_level
+      final_level
+      diagnostic_from
+      diagnostic_to ;
+
+    let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
+
+    (* Originate rollup BEFORE migration. We do NOT start the rollup node
+       yet; it will be started after migration so the import inbox_level is
+       strictly greater than the migration level. *)
+    log_step "Originating rollup (kernel: echo_dal_reveal_pages)" ;
+    let* rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:(Tez.of_int 999)
+        ~alias:"rollup"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:"wasm_2_0_0"
+        ~boot_sector:(boot_sector Constant.WASM.echo_dal_reveal_pages)
+        ~parameters_ty:"string"
+        client
+    in
+    let* () = bake_for ~dal_node_endpoint client in
+    let* current_level = Client.level client in
+    Check.((current_level < published_level) int)
+      ~error_msg:
+        "The level is already too high, we did not have the opportunity to \
+         publish" ;
+
+    (* Publish and attest the DAL slot BEFORE migration so the dal_snapshot
+       carried in the game (created post-migration) still contains this slot. *)
+    log_step
+      "Publishing slot at level %d (slot_index=%d), baking until attested"
+      published_level
+      slot_index ;
+    let old_slot_size = dal_parameters.cryptobox.slot_size in
+    let slot =
+      Cryptobox.Internal_for_tests.generate_slot ~slot_size:old_slot_size
+      |> Bytes.to_string
+      |> Helpers.make_slot ~slot_size:old_slot_size
+    in
+    let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+    (* Bake to published_level - 1 so the next block is published_level. *)
+    let levels_to_pre_publish = published_level - 1 - current_level in
+    let* () =
+      if levels_to_pre_publish > 0 then
+        bake_for ~count:levels_to_pre_publish ~dal_node_endpoint client
+      else unit
+    in
+    log_step "Injecting DAL publish_commitment for slot_index=%d" slot_index ;
+    let* _op_hash =
+      publish_commitment
+        ~force:true
+        ~fee:5000
+        ~source:Constant.bootstrap2
+        ~index:slot_index
+        ~commitment
+        ~proof
+        client
+    in
+    (* Bake one block: publication is included at exactly published_level. *)
+    let* () = bake_for ~dal_node_endpoint client in
+    (* Bake until attestation_level + 1 = published_level + dal_lag + 1 so the
+       slot attestation is processed.  The ~dal_node_endpoint flag ensures DAL
+       attestations are included automatically by the bake command. *)
+    let* () = bake_for ~count:dal_lag ~dal_node_endpoint client in
+
+    (* Bake to one block past the migration level.  The migration block is
+       special: its binary-encoded constants may not be decodable by the new
+       protocol's rollup-node plugin (the new field
+       dal.minimal_participation_ratio is not yet present in the old binary
+       format).  Starting rollup nodes only after level M+1 ensures the HEAD
+       they observe has fully-migrated constants. *)
+    log_step
+      "Baking to migration level M=%d + 1 (switch to next protocol)"
+      migration_level ;
+    let* current_level = Client.level client in
+    let to_migration = migration_level + 1 - current_level in
+    let* () =
+      repeat to_migration (fun () -> bake_for ~dal_node_endpoint client)
+    in
+
+    (* Start the HONEST rollup node after migration so the DAL page import
+       inbox_level is greater than the migration level. *)
+    log_step "Starting honest rollup node (bootstrap1) after migration" ;
+    let honest_node =
+      Sc_rollup_node.create
+        ~name:"honest-rollup-node"
+        ~base_dir:(Client.base_dir client)
+        ~default_operator:Constant.bootstrap1.alias
+        ~kind:"wasm_2_0_0"
+        ~dal_node
+        Sc_rollup_node.Operator
+        node
+    in
+    let* () =
+      Sc_rollup_node.run ~event_level:`Debug honest_node rollup_address []
+    in
+
+    (* Start the LOSER rollup node after migration.  It uses a loser mode that
+       flips the content of the imported DAL page for this target
+       (published_level, slot_index, page_index), creating a divergence with
+       the honest rollup node. *)
+    log_step
+      "Starting loser rollup node (bootstrap2) with loser_mode reveal_dal_page \
+       ... strategy:flip inbox_level:*" ;
+    let loser_mode =
+      Format.sprintf
+        "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
+         strategy:flip inbox_level:*"
+        published_level
+        slot_index
+    in
+    let loser_node =
+      Sc_rollup_node.create
+        ~name:"loser-rollup-node"
+        ~base_dir:(Client.base_dir client)
+        ~default_operator:Constant.bootstrap2.alias
+        ~kind:"wasm_2_0_0"
+        ~dal_node
+        ~loser_mode
+        ~allow_degraded:true
+        Sc_rollup_node.Operator
+        node
+    in
+    let* () =
+      Sc_rollup_node.run ~event_level:`Debug loser_node rollup_address []
+    in
+
+    (* Set up a conflict-detection monitor on the honest node.  We flip this
+       flag from a background Lwt promise so we can assert later that a
+       refutation game actually started. *)
+    let conflict_detected_honest = ref false in
+    let conflict_detected_loser = ref false in
+    let _conflict_monitor_honest =
+      let* json =
+        Sc_rollup_node.wait_for
+          honest_node
+          "smart_rollup_node_conflict_detected.v0"
+        @@ fun json -> Some json
+      in
+      conflict_detected_honest := true ;
+      log_step "honest conflict event detected: %s" (JSON.encode json) ;
+      Lwt.return_unit
+    in
+    let _conflict_monitor_loser =
+      let* json =
+        Sc_rollup_node.wait_for
+          loser_node
+          "smart_rollup_node_conflict_detected.v0"
+        @@ fun json -> Some json
+      in
+      conflict_detected_loser := true ;
+      log_step "loser conflict event detected: %s" (JSON.encode json) ;
+      Lwt.return_unit
+    in
+
+    (* Monitor loser-mode DAL decisions to pinpoint exactly which inbox level
+       first matches (or fails to match) the configured reveal selector. *)
+    let loser_mode_events = ref 0 in
+    let loser_mode_misses = ref 0 in
+    let loser_mode_flips = ref 0 in
+    let first_mismatch_level = ref None in
+    let first_flip_level = ref None in
+    let rec watch_loser_mode_dal_decisions () =
+      let* json =
+        Sc_rollup_node.wait_for loser_node "loser_mode_dal_decision.v0"
+        @@ fun json -> Some json
+      in
+      incr loser_mode_events ;
+      let decision =
+        match JSON.(json |-> "decision" |> as_string_opt) with
+        | Some d -> d
+        | None -> "<unknown>"
+      in
+      let inbox_level = JSON.(json |-> "inbox_level" |> as_int_opt) in
+      (match (decision, inbox_level) with
+      | "didn't match", Some l ->
+          incr loser_mode_misses ;
+          if !first_mismatch_level = None then first_mismatch_level := Some l
+      | d, Some l when String.starts_with ~prefix:"flipped" d ->
+          incr loser_mode_flips ;
+          if !first_flip_level = None then first_flip_level := Some l
+      | _ -> ()) ;
+      let inbox_level_s =
+        match inbox_level with None -> "<none>" | Some l -> string_of_int l
+      in
+      if String.starts_with ~prefix:"flipped" decision then
+        log_step
+          "loser_mode flip event #%d: decision=%s inbox_level=%s raw=%s"
+          !loser_mode_events
+          decision
+          inbox_level_s
+          (JSON.encode json)
+      else if decision = "didn't match" && !first_mismatch_level = inbox_level
+      then
+        log_step
+          "loser_mode first mismatch at inbox_level=%s (event #%d)"
+          inbox_level_s
+          !loser_mode_events ;
+      watch_loser_mode_dal_decisions ()
+    in
+    let _loser_mode_monitor = watch_loser_mode_dal_decisions () in
+
+    (* Bake one block at a time until the refutation game resolves or
+       final_level is reached.  Each bake_for call deterministically produces
+       one block, giving rollup nodes time to react and inject their moves
+       into the mempool before the next block. *)
+    log_step
+      "Baking to level %d (max) to allow refutation game to complete"
+      final_level ;
+    let* current_level = Client.level client in
+    let game_seen = ref false in
+    let first_game_level = ref None in
+    let rec bake_and_check level =
+      if level >= final_level then unit
+      else
+        let next_level = level + 1 in
+        let* () = bake_for ~dal_node_endpoint client in
+        (* Poll game state.  Once the game has been seen, poll every level
+           to detect resolution promptly and terminate early. *)
+        let should_poll_games =
+          !game_seen || next_level <= diagnostic_to || next_level mod 5 = 0
+        in
+        let* no_active_games =
+          if should_poll_games then (
+            let* honest_games =
+              Client.RPC.call client
+              @@ RPC
+                 .get_chain_block_context_smart_rollups_smart_rollup_staker_games
+                   ~staker:Constant.bootstrap1.public_key_hash
+                   rollup_address
+                   ()
+            in
+            let* loser_games =
+              Client.RPC.call client
+              @@ RPC
+                 .get_chain_block_context_smart_rollups_smart_rollup_staker_games
+                   ~staker:Constant.bootstrap2.public_key_hash
+                   rollup_address
+                   ()
+            in
+            log_step
+              "level=%d: staker_games sizes (honest=%d loser=%d)"
+              next_level
+              (List.length (JSON.as_list honest_games))
+              (List.length (JSON.as_list loser_games)) ;
+            if JSON.as_list honest_games <> [] || JSON.as_list loser_games <> []
+            then (
+              game_seen := true ;
+              if !first_game_level = None then (
+                first_game_level := Some next_level ;
+                log_step "First refutation game observed at level=%d" next_level)) ;
+            let no_active =
+              JSON.as_list honest_games = [] && JSON.as_list loser_games = []
+            in
+            return no_active)
+          else return false
+        in
+        let* () =
+          if next_level >= diagnostic_from && next_level <= diagnostic_to then (
+            let* honest_state_hash =
+              Sc_rollup_node.RPC.call ~rpc_hooks honest_node
+              @@ Sc_rollup_rpc.get_global_block_state_hash ()
+            in
+            let* loser_state_hash =
+              Sc_rollup_node.RPC.call ~rpc_hooks loser_node
+              @@ Sc_rollup_rpc.get_global_block_state_hash ()
+            in
+            log_step
+              "level=%d: state_hashes honest=%s loser=%s equal=%b"
+              next_level
+              honest_state_hash
+              loser_state_hash
+              (String.equal honest_state_hash loser_state_hash) ;
+            unit)
+          else unit
+        in
+        let* () =
+          if next_level >= flip_deadline_level && !loser_mode_flips = 0 then
+            Test.fail
+              "No loser_mode flip observed by level %d (migration_level=%d, \
+               expected_import_level_from_old_lag=%d)"
+              flip_deadline_level
+              migration_level
+              expected_import_level_from_old_lag
+          else unit
+        in
+        if !game_seen && no_active_games then (
+          log_step
+            "Refutation game resolved at level=%d (early termination)"
+            next_level ;
+          unit)
+        else bake_and_check next_level
+    in
+    let* () = bake_and_check current_level in
+
+    log_step
+      "Summary: conflict_detected(honest=%b loser=%b) loser_mode(events=%d \
+       misses=%d flips=%d first_mismatch=%s first_flip=%s)"
+      !conflict_detected_honest
+      !conflict_detected_loser
+      !loser_mode_events
+      !loser_mode_misses
+      !loser_mode_flips
+      (match !first_mismatch_level with
+      | None -> "<none>"
+      | Some l -> string_of_int l)
+      (match !first_flip_level with
+      | None -> "<none>"
+      | Some l -> string_of_int l) ;
+
+    if not !game_seen then
+      Test.fail
+        "No refutation game was observed during the scenario (staker_games \
+         stayed empty)" ;
+
+    if !loser_mode_flips = 0 then
+      Test.fail
+        "No loser_mode flipped decision observed (events=%d, misses=%d, \
+         first_mismatch=%s). Divergence was not injected."
+        !loser_mode_events
+        !loser_mode_misses
+        (match !first_mismatch_level with
+        | None -> "<none>"
+        | Some l -> string_of_int l) ;
+
+    (match !first_flip_level with
+    | None -> ()
+    | Some first_flip ->
+        if first_flip < migration_level + 1 then
+          Test.fail
+            "First loser_mode flip must be post-migration (expected >= %d, got \
+             %d)"
+            (migration_level + 1)
+            first_flip) ;
+
+    (* Assert that the honest node detected the conflict. *)
+    if not !conflict_detected_honest then
+      Test.fail
+        "Honest node did not detect conflict (loser_mode: events=%d, \
+         misses=%d, flips=%d, first_mismatch=%s, first_flip=%s)"
+        !loser_mode_events
+        !loser_mode_misses
+        !loser_mode_flips
+        (match !first_mismatch_level with
+        | None -> "<none>"
+        | Some l -> string_of_int l)
+        (match !first_flip_level with
+        | None -> "<none>"
+        | Some l -> string_of_int l) ;
+
+    (* Assert no active games remain (game resolved). *)
+    log_step "Checking no active refutation games remain" ;
+    let* games =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_staker_games
+           ~staker:Constant.bootstrap1.public_key_hash
+           rollup_address
+           ()
+    in
+    if JSON.as_list games <> [] then
+      Test.fail
+        "Expected no active refutation games after final_level=%d, but found \
+         some"
+        final_level ;
+
+    (* Assert the loser's frozen bond is zero (slashed by the protocol). *)
+    log_step
+      "Checking deposits: loser should be slashed, honest should keep bond" ;
+    let* loser_deposit =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_frozen_bonds
+           ~id:Constant.bootstrap2.public_key_hash
+           ()
+    in
+    Check.(
+      (loser_deposit = Tez.zero)
+        Tez.typ
+        ~__LOC__
+        ~error_msg:
+          "Loser should have been slashed (expected deposit = 0), got %L") ;
+
+    (* Assert the honest player's frozen bond is non-zero (intact). *)
+    let* honest_deposit =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_frozen_bonds
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
+    in
+    if honest_deposit = Tez.zero then
+      Test.fail
+        "Honest player's bond should be non-zero after winning the refutation \
+         game" ;
+
+    log_step
+      "OK: honest player won the refutation game over a DAL page import that \
+       crosses a protocol migration" ;
+
+    let* () = Sc_rollup_node.terminate honest_node in
+    let* () = Sc_rollup_node.terminate loser_node in
+    unit
+  in
+  if Protocol.number migrate_from >= 024 then
+    test_l1_migration_scenario
+      ~scenario
+      ~tags
+      ~description
+      ~uses:
+        [
+          Constant.octez_dal_node;
+          Constant.octez_smart_rollup_node;
+          Constant.WASM.echo_dal_reveal_pages;
+        ]
+      ~activation_timestamp:Now
+      ~operator_profiles:[slot_index]
+      ~parameter_overrides:
+        (make_int_parameter
+           ["smart_rollup_commitment_period_in_blocks"]
+           (Some commitment_period)
+        @ make_int_parameter
+            ["smart_rollup_challenge_window_in_blocks"]
+            (Some challenge_window)
+        @ make_int_parameter
+            ["smart_rollup_timeout_period_in_blocks"]
+            (Some timeout_period))
+      ~migration_level
+      ~migrate_from
+      ~migrate_to
+      ()
 
 (* Test that the DAL node's skip-list store contains the expected published
    levels after a protocol migration. This verifies that the data store is
@@ -14342,6 +14890,9 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to ;
   test_migration_with_rollup ~migrate_from ~migrate_to ;
+  test_refutation_with_dal_page_import_across_migration
+    ~migrate_from
+    ~migrate_to ;
   test_skip_list_store_with_migration
     ~migration_level:11
     ~migrate_from
