@@ -5491,10 +5491,20 @@ let octez_sqlite =
         caqti_lwt_unix;
         caqti_sqlite;
         opentelemetry_lwt;
-        re;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
+
+let _gen_migrations =
+  public_exe
+    "gen-migrations"
+    ~internal_name:"gen_migrations"
+    ~path:("src" // "lib_sqlite" // "gen_migrations")
+    ~release_status:Unreleased
+    ~synopsis:"Internal dev tools"
+    ~opam:"internal-devtools"
+    ~deps:[re]
+    ~bisect_ppx:No
 
 let _octez_layer2_indexed_store_test =
   tezt
@@ -5530,29 +5540,19 @@ let octez_dal_node_migrations =
     "dal_node_migrations"
     ~path:"src/lib_dal_node/migrations"
     ~synopsis:"Tezos: SQL migrations for the DAL node store"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
           [
             S "rule";
-            [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [S "target"; S "dal_node_migrations.ml"];
             [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
             ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
           ];
         ]
 
@@ -5776,29 +5776,19 @@ let rollup_node_sqlite_migrations =
     "rollup_node_sqlite_migrations"
     ~path:"src/lib_smart_rollup_node/migrations"
     ~synopsis:"SQL migrations for the Rollup node store"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
           [
             S "rule";
-            [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [S "target"; S "rollup_node_sqlite_migrations.ml"];
             [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
             ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
           ];
         ]
 

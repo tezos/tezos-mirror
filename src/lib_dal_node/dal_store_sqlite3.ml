@@ -19,7 +19,9 @@ type conn = Sqlite.conn
 
     - Create a .sql file led by the next migration number [N = version + 1]
       (with leading 0s) followed by the name of the migration (e.g.
-      [005_create_blueprints_table.sql])
+      [005_create_blueprints_table.sql]), or
+    - Create a .ml file of with name [mN_migration_name.ml] (e.g.
+      [m005_create_blueprints_table.ml])
     - Run [src/lib_dal_node/scripts/check_dal_store_migrations.sh promote]
     - Regenerate the schemas, using [[
           dune exec tezt/tests/main.exe -- --file dal.ml store \
@@ -35,10 +37,7 @@ module Migrations = Sqlite.Migration.Make (struct
 
   let version = 1
 
-  let all_migrations =
-    Sqlite.Migration.from_ocaml_crunch
-      Dal_node_migrations.Migrations.file_list
-      Dal_node_migrations.Migrations.read
+  let all_migrations = Dal_node_migrations.all
 end)
 
 module Types = struct

@@ -282,24 +282,21 @@ end
 
 (** Database migration system with tracking and versioning.
 
-    Provides types for defining migrations, helpers for creating and applying
-    them, and a functor for managing migration state via a tracking table. *)
+    Provides types for defining migrations (SQL or OCaml), helpers for creating
+    and applying them, and a functor for managing migration state via a tracking
+    table. *)
 module Migration : sig
-  (** A migration with a name and its SQL content. The SQL is split on
-      semicolons and executed statement-by-statement when applied. *)
-  type t = {name : string; steps : string}
+  (** A single migration step: either a SQL statement or an OCaml function. *)
+  type step =
+    | Sql of (unit, unit, [`Zero]) Request.t
+    | Ocaml of (Db.conn -> unit tzresult Lwt.t)
 
-  (** [make_sql ~name sql] creates a migration from raw SQL content.
-      The SQL will be split on semicolons and executed when the migration
-      is applied. *)
+  (** A migration with a name and a list of steps to apply in order. *)
+  type t = {name : string; steps : step list}
+
+  (** [make_sql ~name sql] creates a SQL-only migration by splitting [sql] on
+      semicolons into individual statements. Empty statements are ignored. *)
   val make_sql : name:string -> string -> t
-
-  (** [from_ocaml_crunch file_list read] builds a migration list from
-      ocaml-crunch output. [file_list] is the sorted list of filenames
-      (e.g. ["000_initial.sql"; ...]) and [read] retrieves file content.
-      Migration names are extracted from filenames using the pattern
-      [NNN_name.sql]. *)
-  val from_ocaml_crunch : string list -> (string -> string option) -> t list
 
   (** Configuration for the {!Make} functor. *)
   module type MIGRATION_CONFIG = sig

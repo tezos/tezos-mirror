@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name gen_migrations)
+ (public_name gen-migrations)
+ (package internal-devtools)
+ (libraries
+  re)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp)))

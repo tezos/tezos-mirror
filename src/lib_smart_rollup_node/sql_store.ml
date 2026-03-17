@@ -297,10 +297,7 @@ module Migration = Sqlite.Migration.Make (struct
 
   let version = 1
 
-  let all_migrations =
-    Sqlite.Migration.from_ocaml_crunch
-      Rollup_node_sqlite_migrations.Migrations.file_list
-      Rollup_node_sqlite_migrations.Migrations.read
+  let all_migrations = Rollup_node_sqlite_migrations.all
 end)
 
 let sqlite_file_name = "store.sqlite"

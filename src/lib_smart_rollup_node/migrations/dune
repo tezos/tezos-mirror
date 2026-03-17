@@ -14,6 +14,6 @@
   -open Octez_sqlite))
 
 (rule
- (target migrations.ml)
- (deps (glob_files *.sql))
- (action (run ocaml-crunch -e sql -m plain -o %{target} -s .)))
+ (target rollup_node_sqlite_migrations.ml)
+ (deps (glob_files *.sql) (glob_files m[0-9]*.ml))
+ (action (run gen-migrations . %{target})))
