@@ -16,7 +16,8 @@ let applied_migration =
     ~msg:"Applied migration {name} to the store in {duration} second(s)"
     ~level:Info
     ("name", Data_encoding.string)
-    ("duration", Data_encoding.float)
+    ("duration", Time.System.Span.encoding)
+    ~pp2:Time.System.Span.pp_hum
 
 let migrations_from_the_future =
   declare_2

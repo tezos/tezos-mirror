@@ -27,12 +27,6 @@ val init :
 (** name of the sqlite file *)
 val sqlite_file_name : string
 
-module Schemas : sig
-  (** [get_all conn] returns the list of SQL statements allowing to recreate
-      the tables in the current store. *)
-  val get_all : conn -> string list tzresult Lwt.t
-end
-
 module Blueprints : sig
   val store : conn -> Blueprint_types.t -> unit tzresult Lwt.t
 

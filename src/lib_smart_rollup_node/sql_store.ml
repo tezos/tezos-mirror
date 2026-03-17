@@ -22,12 +22,14 @@ module Events = struct
       ()
 
   let applied_migration =
-    declare_1
+    declare_2
       ~section
       ~name:"smart_rollup_node_store_applied_migration"
-      ~msg:"Applied migration {name} to the store"
+      ~msg:"Applied migration {name} to the store in {time}"
       ~level:Notice
       ("name", Data_encoding.string)
+      ("time", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
 
   let migrations_from_the_future =
     declare_2
@@ -290,75 +292,16 @@ module Types = struct
     @@ proj_end
 end
 
-let table_exists_req =
-  (string ->! bool)
-  @@ {sql|
-    SELECT EXISTS (
-      SELECT name FROM sqlite_master
-      WHERE type='table'
-        AND name=?
-    )|sql}
+module Migration = Sqlite.Migration.Make (struct
+  let table_name = "migrations"
 
-module Migrations = struct
-  module Q = struct
-    let create_table =
-      (unit ->. unit)
-      @@ {sql|
-      CREATE TABLE migrations (
-        id SERIAL PRIMARY KEY,
-        name TEXT
-      )|sql}
+  let version = 1
 
-    let current_migration =
-      (unit ->? int) @@ {|SELECT id FROM migrations ORDER BY id DESC LIMIT 1|}
-
-    let register_migration =
-      (t2 int string ->. unit)
-      @@ {sql|
-      INSERT INTO migrations (id, name) VALUES (?, ?)
-      |sql}
-
-    let version = 1
-
-    let all : Rollup_node_sqlite_migrations.migration list =
-      Rollup_node_sqlite_migrations.migrations version
-  end
-
-  let create_table store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.exec conn Q.create_table ()
-
-  let table_exists store =
-    Sqlite.with_connection store @@ fun conn ->
-    Sqlite.Db.find conn table_exists_req "migrations"
-
-  let missing_migrations store =
-    let open Lwt_result_syntax in
-    let all_migrations = List.mapi (fun i m -> (i, m)) Q.all in
-    let* current =
-      Sqlite.with_connection store @@ fun conn ->
-      Sqlite.Db.find_opt conn Q.current_migration ()
-    in
-    match current with
-    | Some current ->
-        let applied = current + 1 in
-        let known = List.length all_migrations in
-        if applied <= known then return (List.drop_n applied all_migrations)
-        else
-          let*! () =
-            Events.(emit migrations_from_the_future) (applied, known)
-          in
-          failwith
-            "Cannot use a store modified by a more up-to-date version of the \
-             EVM node"
-    | None -> return all_migrations
-
-  let apply_migration store id (module M : Rollup_node_sqlite_migrations.S) =
-    let open Lwt_result_syntax in
-    Sqlite.with_connection store @@ fun conn ->
-    let* () = List.iter_es (fun up -> Sqlite.Db.exec conn up ()) M.apply in
-    Sqlite.Db.exec conn Q.register_migration (id, M.name)
-end
+  let all_migrations =
+    Sqlite.Migration.from_ocaml_crunch
+      Rollup_node_sqlite_migrations.Migrations.file_list
+      Rollup_node_sqlite_migrations.Migrations.read
+end)
 
 let sqlite_file_name = "store.sqlite"
 
@@ -371,43 +314,22 @@ type rw = Access_mode.rw t
 type ro = Access_mode.ro t
 
 let init (type m) (mode : m Access_mode.t) ~data_dir : m t tzresult Lwt.t =
-  let open Lwt_result_syntax in
   let path = Filename.concat data_dir sqlite_file_name in
-  let*! exists = Lwt_unix.file_exists path in
+  let read_only =
+    match mode with Access_mode.Read_only -> true | Read_write -> false
+  in
   let migration conn =
     Sqlite.assert_in_transaction conn ;
-    let* () =
-      if not exists then
-        let* () = Migrations.create_table conn in
-        let*! () = Events.(emit init_store) () in
-        return_unit
-      else
-        let* table_exists = Migrations.table_exists conn in
-        let* () =
-          when_ (not table_exists) (fun () ->
-              failwith "A store already exists, but its content is incorrect.")
-        in
-        return_unit
-    in
-    let* migrations = Migrations.missing_migrations conn in
-    let*? () =
-      match (mode, migrations) with
-      | Read_only, _ :: _ ->
-          error_with
-            "The store has %d missing migrations but was opened in read-only \
-             mode."
-            (List.length migrations)
-      | _, _ -> Ok ()
-    in
-    let* () =
-      List.iter_es
-        (fun (i, ((module M : Rollup_node_sqlite_migrations.S) as mig)) ->
-          let* () = Migrations.apply_migration conn i mig in
-          let*! () = Events.(emit applied_migration) M.name in
-          return_unit)
-        migrations
-    in
-    return_unit
+    Sqlite.with_connection conn @@ fun db_conn ->
+    Migration.apply
+      db_conn
+      ~read_only
+      ~on_init:Events.(emit init_store)
+      ~on_future:(fun ~applied ~known ->
+        Events.(emit migrations_from_the_future) (applied, known))
+      ~on_applied:(fun ~name ~duration ->
+        Events.(emit applied_migration) (name, duration))
+      ()
   in
   let perm =
     match mode with

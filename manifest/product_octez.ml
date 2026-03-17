@@ -5530,14 +5530,7 @@ let octez_dal_node_migrations =
     "dal_node_migrations"
     ~path:"src/lib_dal_node/migrations"
     ~synopsis:"Tezos: SQL migrations for the DAL node store"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        caqti_lwt;
-        crunch;
-        re;
-        octez_sqlite |> open_;
-      ]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
@@ -5783,14 +5776,7 @@ let rollup_node_sqlite_migrations =
     "rollup_node_sqlite_migrations"
     ~path:"src/lib_smart_rollup_node/migrations"
     ~synopsis:"SQL migrations for the Rollup node store"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        caqti_lwt;
-        crunch;
-        re;
-        octez_sqlite |> open_;
-      ]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
