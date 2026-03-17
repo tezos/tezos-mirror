@@ -7,10 +7,15 @@
 
 use std::{
     borrow::{Borrow, BorrowMut},
+    cell::Cell,
+    collections::BTreeMap,
     marker::PhantomData,
+    ops::Bound,
+    rc::Rc,
 };
 
 use crate::extensions::WithGas;
+use crate::keyspace::StorageV1KeySpaceCompat;
 use tezos_evm_logging::{tracing::instrument, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
@@ -21,9 +26,10 @@ use tezos_smart_rollup_host::{
     path::{Path, RefPath},
     reveal::HostReveal,
     runtime::{RuntimeError, ValueType},
-    storage::StorageV1,
+    storage::{CoreStorage, StorageV1},
     wasm::WasmHost,
 };
+use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 use tezos_smart_rollup_mock::MockHost;
 
 // Set by the node, contains the verbosity for the logs
@@ -54,6 +60,7 @@ pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub execution_gas_used: u64,
     pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
+    loaded_keyspaces: BTreeMap<Name, Rc<Cell<bool>>>,
 }
 
 impl<R: HostReveal, Host: BorrowMut<R> + Borrow<R>> HostReveal for KernelHost<R, Host> {
@@ -273,20 +280,6 @@ impl<R: WasmHost, Host: BorrowMut<R> + Borrow<R>> WasmHost for KernelHost<R, Hos
     }
 }
 
-impl<R, Host: Borrow<R> + BorrowMut<R>> KernelHost<R, Host>
-where
-    for<'a> &'a mut Host: BorrowMut<R>,
-{
-    pub fn to_ref_host(&mut self) -> KernelHost<R, &mut Host> {
-        KernelHost {
-            host: &mut self.host,
-            execution_gas_used: self.execution_gas_used,
-            is_evm_node: self.is_evm_node,
-            _pd: PhantomData,
-        }
-    }
-}
-
 pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
     match host.store_read(&VERBOSITY_PATH, 0, 1) {
         Ok(value) if value.len() == 1 => {
@@ -333,6 +326,7 @@ impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
             execution_gas_used: 0,
             is_evm_node,
             _pd: PhantomData,
+            loaded_keyspaces: BTreeMap::new(),
         }
     }
 }
@@ -345,6 +339,7 @@ impl Default for MockKernelHost {
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,
+            loaded_keyspaces: BTreeMap::new(),
         }
     }
 }
@@ -357,6 +352,298 @@ impl MockKernelHost {
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,
+            loaded_keyspaces: BTreeMap::new(),
         }
+    }
+}
+
+impl<R: StorageV1 + CoreStorage, Host: BorrowMut<R> + Borrow<R>> KeySpaceLoader
+    for KernelHost<R, Host>
+{
+    type KeySpace = StorageV1KeySpaceCompat<R::Storage>;
+
+    fn load_or_create(
+        &mut self,
+        name: Name,
+    ) -> Result<Self::KeySpace, KeySpaceLoaderError> {
+        // Check for exact duplicate or re-load a dropped keyspace.
+        if let Some(guard) = self.loaded_keyspaces.get(&name) {
+            if guard.get() {
+                return Err(KeySpaceLoaderError::AlreadyLoaded);
+            }
+            // Keyspace was previously loaded and dropped — re-load
+            // immediately. Overlap checks are unnecessary: the name was
+            // already validated, and overlapping names are permanently
+            // rejected.
+            guard.set(true);
+            let guard = Rc::clone(guard);
+            return Ok(StorageV1KeySpaceCompat::new(
+                // SAFETY: same as below — non-overlapping prefix.
+                unsafe { self.host.borrow_mut().new_storage() },
+                name,
+                guard,
+            ));
+        }
+
+        let name_str: &str = name.as_ref();
+
+        // Check for overlapping descendants using BTreeMap::range.
+        // In the sorted map, any name starting with `name/` sorts right
+        // after `name` (only '-' and '.' are valid path chars below '/').
+        for (existing, _) in self
+            .loaded_keyspaces
+            .range::<Name, _>((Bound::Excluded(&name), Bound::Unbounded))
+        {
+            let existing_str: &str = existing.as_ref();
+            if !existing_str.starts_with(name_str) {
+                break;
+            }
+            if existing_str.as_bytes()[name_str.len()] == b'/' {
+                return Err(KeySpaceLoaderError::Overlapping);
+            }
+        }
+
+        // Check for overlapping ancestors via point lookups at each '/'
+        // boundary. The number of lookups is bounded by the path depth.
+        for (i, &b) in name_str.as_bytes().iter().enumerate().skip(1) {
+            if b == b'/' {
+                if let Ok(ancestor) = name_str[..i].parse::<Name>() {
+                    if self.loaded_keyspaces.contains_key(&ancestor) {
+                        return Err(KeySpaceLoaderError::Overlapping);
+                    }
+                }
+            }
+        }
+
+        let guard = self
+            .loaded_keyspaces
+            .entry(name.clone())
+            .or_insert_with(|| Rc::new(Cell::new(false)));
+        guard.set(true);
+        let guard = Rc::clone(guard);
+
+        Ok(StorageV1KeySpaceCompat::new(
+            // SAFETY: each keyspace gets its own storage handle, scoped
+            // to a unique Name prefix. Handles access non-overlapping
+            // parts of the same underlying storage.
+            unsafe { self.host.borrow_mut().new_storage() },
+            name,
+            guard,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_smart_rollup_keyspace::{
+        Key, KeySpace, KeySpaceLoader, KeySpaceLoaderError,
+    };
+
+    fn key(s: &[u8]) -> &Key {
+        Key::from_bytes(s).unwrap()
+    }
+
+    #[test]
+    fn load_or_create_returns_usable_keyspace() {
+        let mut host = MockKernelHost::default();
+        let mut ks = host.load_or_create("/test".parse().unwrap()).unwrap();
+        ks.set(key(b"/a"), b"hello").unwrap();
+        assert_eq!(ks.get(key(b"/a")), Some(b"hello".to_vec()));
+    }
+
+    #[test]
+    fn load_or_create_persists_after_drop() {
+        let mut host = MockKernelHost::default();
+
+        host.load_or_create("/test".parse().unwrap())
+            .unwrap()
+            .set(key(b"/a"), b"v1")
+            .unwrap();
+        // keyspace dropped here, name released
+
+        let ks = host.load_or_create("/test".parse().unwrap()).unwrap();
+        assert_eq!(ks.get(key(b"/a")), Some(b"v1".to_vec()));
+    }
+
+    #[test]
+    fn load_or_create_rejects_duplicate_while_loaded() {
+        let mut host = MockKernelHost::default();
+        let _ks = host.load_or_create("/evm".parse().unwrap()).unwrap();
+
+        let err = host.load_or_create("/evm".parse().unwrap());
+        assert!(matches!(err, Err(KeySpaceLoaderError::AlreadyLoaded)));
+    }
+
+    #[test]
+    fn load_or_create_rejects_overlapping_names() {
+        let mut host = MockKernelHost::default();
+        let _ks = host.load_or_create("/evm".parse().unwrap()).unwrap();
+
+        let err = host.load_or_create("/evm/world".parse().unwrap());
+        assert!(matches!(err, Err(KeySpaceLoaderError::Overlapping)));
+    }
+
+    #[test]
+    fn load_or_create_overlap_is_symmetric() {
+        let mut host = MockKernelHost::default();
+        let _ks = host.load_or_create("/evm/world".parse().unwrap()).unwrap();
+
+        let err = host.load_or_create("/evm".parse().unwrap());
+        assert!(matches!(err, Err(KeySpaceLoaderError::Overlapping)));
+    }
+
+    #[test]
+    fn load_or_create_rejects_overlapping_even_after_drop() {
+        let mut host = MockKernelHost::default();
+        let ks = host.load_or_create("/evm".parse().unwrap()).unwrap();
+        drop(ks);
+
+        // Even though `/evm` was dropped, `/evm/world` still overlaps.
+        let err = host.load_or_create("/evm/world".parse().unwrap());
+        assert!(matches!(err, Err(KeySpaceLoaderError::Overlapping)));
+    }
+
+    // --- Branch coverage for range-based overlap detection ---
+
+    // Range iterator hits entry `/evm-stuff` after `/evm`: starts with
+    // `name` but next char is '-' (0x2D < '/'), not a descendant.
+    // Verifies both keyspaces are usable and isolated.
+    #[test]
+    fn range_skips_dash_suffix() {
+        let mut host = MockKernelHost::default();
+        let mut ks1 = host.load_or_create("/evm".parse().unwrap()).unwrap();
+        let mut ks2 = host.load_or_create("/evm-stuff".parse().unwrap()).unwrap();
+
+        ks1.set(key(b"/a"), b"v1").unwrap();
+        ks2.set(key(b"/a"), b"v2").unwrap();
+
+        assert_eq!(ks1.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(ks2.get(key(b"/a")), Some(b"v2".to_vec()));
+    }
+
+    // Same as above with '.' (0x2E < '/').
+    #[test]
+    fn range_skips_dot_suffix() {
+        let mut host = MockKernelHost::default();
+        let mut ks1 = host.load_or_create("/evm".parse().unwrap()).unwrap();
+        let mut ks2 = host.load_or_create("/evm.backup".parse().unwrap()).unwrap();
+
+        ks1.set(key(b"/a"), b"v1").unwrap();
+        ks2.set(key(b"/a"), b"v2").unwrap();
+
+        assert_eq!(ks1.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(ks2.get(key(b"/a")), Some(b"v2".to_vec()));
+    }
+
+    // Ancestor point lookup: `/a/b` in map, loading `/a/b/c` must detect
+    // the overlap. A range-only approach (`range(/a/b/..=/a/b/c)`) would
+    // miss `/a/b` since it sorts before `/a/b/`.
+    #[test]
+    fn ancestor_found_by_point_lookup() {
+        let mut host = MockKernelHost::default();
+        let _ks = host.load_or_create("/a/b".parse().unwrap()).unwrap();
+
+        let err = host.load_or_create("/a/b/c".parse().unwrap());
+        assert!(matches!(err, Err(KeySpaceLoaderError::Overlapping)));
+    }
+
+    #[test]
+    fn multiple_keyspaces_are_isolated() {
+        let mut host = MockKernelHost::default();
+        let mut ks1 = host.load_or_create("/ks1".parse().unwrap()).unwrap();
+        let mut ks2 = host.load_or_create("/ks2".parse().unwrap()).unwrap();
+
+        ks1.set(key(b"/a"), b"from_ks1").unwrap();
+        ks2.set(key(b"/a"), b"from_ks2").unwrap();
+
+        assert_eq!(ks1.get(key(b"/a")), Some(b"from_ks1".to_vec()));
+        assert_eq!(ks2.get(key(b"/a")), Some(b"from_ks2".to_vec()));
+    }
+
+    #[test]
+    fn copy_from_between_keyspaces() {
+        let mut host = MockKernelHost::default();
+        let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        src.set(key(b"/a"), b"v1").unwrap();
+        dst.copy_from(&src);
+
+        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert_eq!(src.get(key(b"/a")), Some(b"v1".to_vec()));
+    }
+
+    #[test]
+    fn move_from_between_keyspaces() {
+        let mut host = MockKernelHost::default();
+        let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        src.set(key(b"/a"), b"v1").unwrap();
+        dst.move_from(&mut src);
+
+        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!src.contains(key(b"/a")));
+    }
+
+    #[test]
+    fn copy_from_after_clear() {
+        let mut host = MockKernelHost::default();
+        let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        src.set(key(b"/a"), b"v1").unwrap();
+        dst.set(key(b"/x"), b"old").unwrap();
+
+        dst.clear();
+        dst.copy_from(&src);
+
+        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!dst.contains(key(b"/x")));
+    }
+
+    #[test]
+    fn move_from_after_clear() {
+        let mut host = MockKernelHost::default();
+        let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        src.set(key(b"/a"), b"v1").unwrap();
+        dst.set(key(b"/x"), b"old").unwrap();
+
+        dst.clear();
+        dst.move_from(&mut src);
+
+        assert_eq!(dst.get(key(b"/a")), Some(b"v1".to_vec()));
+        assert!(!dst.contains(key(b"/x")));
+        assert!(!src.contains(key(b"/a")));
+    }
+
+    #[test]
+    fn copy_from_empty_source_clears_destination() {
+        let mut host = MockKernelHost::default();
+        let src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        dst.set(key(b"/a"), b"v1").unwrap();
+        dst.set(key(b"/b"), b"v2").unwrap();
+
+        // src is empty (never written to), dst should be cleared.
+        dst.copy_from(&src);
+        assert!(!dst.contains(key(b"/a")));
+        assert!(!dst.contains(key(b"/b")));
+    }
+
+    #[test]
+    fn move_from_empty_source_clears_destination() {
+        let mut host = MockKernelHost::default();
+        let mut src = host.load_or_create("/src".parse().unwrap()).unwrap();
+        let mut dst = host.load_or_create("/dst".parse().unwrap()).unwrap();
+
+        dst.set(key(b"/a"), b"v1").unwrap();
+
+        dst.move_from(&mut src);
+        assert!(!dst.contains(key(b"/a")));
     }
 }
