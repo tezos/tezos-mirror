@@ -57,8 +57,8 @@ let build_dependency_image =
     ~image_path:
       "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
-let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
-    ~name ~matrix ~distribution ~script ~dependencies ?(variables = []) () =
+let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
+    ~matrix ~distribution ~script ~dependencies () =
   job
     ~__POS__
     ~name
@@ -69,11 +69,9 @@ let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
          (("DISTRIBUTION", distribution)
          ::
          (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-         )
-      @ variables)
+         ))
     ~parallel:(Matrix matrix)
     ~dependencies
-    ?timeout
     ~tag:Dynamic
     ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     [
