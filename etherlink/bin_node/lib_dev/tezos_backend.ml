@@ -492,7 +492,13 @@ let make (ctxt : Evm_ro_context.t) =
 
     let simulate_operation ~chain_id ~simulator_mode op hash block =
       let open Lwt_result_syntax in
-      let* block = shell_block_param_to_eth_block_param block in
+      let* () =
+        match block with
+        | `Head 0l -> return_unit
+        | _ ->
+            failwith "operation simulation is only possible on the head block"
+      in
+      let block = Ethereum_types.Block_parameter.(Block_parameter Latest) in
       let* state = Evm_ro_context.get_state ctxt ~block () in
       let read = Evm_ro_context.read_state state in
       Simulator.TezosX.simulate_operation

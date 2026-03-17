@@ -685,9 +685,9 @@ module Handlers = struct
     let read = Types.read session.state in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
+        ~simulator_mode
         ~read
         ~data_model
-        ~simulator_mode
         raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
