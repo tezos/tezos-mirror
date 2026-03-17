@@ -934,9 +934,9 @@ let get_release_tag_rexes () = String_set.elements !release_tag_rexes
 (* [job_select_tezts] will be initialized further down. *)
 let job_select_tezts = ref None
 
-let number_of_declared_jobs = ref 0
+let declared_jobs = ref String_map.empty
 
-let get_number_of_declared_jobs () = !number_of_declared_jobs
+let get_declared_jobs () = !declared_jobs
 
 (* Data to be written using [output_tezt_job_list]. *)
 type tezt_job_info = {
@@ -1015,8 +1015,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
       ?timeout ?(image_dependencies = []) ?services ?id_tokens name script =
-    incr number_of_declared_jobs ;
     let name = make_name name in
+    declared_jobs := String_map.add name source_location !declared_jobs ;
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
       if compare_stages dep.stage stage > 0 then

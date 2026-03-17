@@ -817,9 +817,9 @@ let enc_git_strategy = function
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let number_of_declared_jobs = ref 0
+let declared_jobs = ref String_map.empty
 
-let get_number_of_declared_jobs () = !number_of_declared_jobs
+let get_declared_jobs () = !declared_jobs
 
 let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
@@ -830,7 +830,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?interruptible_runner ?git_strategy ?retry ?parallel ?description
     ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
     ~name script : tezos_job =
-  incr number_of_declared_jobs ;
+  declared_jobs := String_map.add name __POS__ !declared_jobs ;
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
     let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
