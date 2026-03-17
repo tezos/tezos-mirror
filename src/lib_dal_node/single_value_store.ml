@@ -30,6 +30,8 @@ module type S = sig
   val load : _ t -> value option tzresult Lwt.t
 
   val save : rw t -> value -> unit tzresult Lwt.t
+
+  val close : _ t -> unit tzresult Lwt.t
 end
 
 module Make (Value : VALUE) : S with type value = Value.t = struct
@@ -90,4 +92,8 @@ module Make (Value : VALUE) : S with type value = Value.t = struct
 
   let save (RW kvs) value =
     KVS.write_value ~override:true kvs file_layout () () value
+
+  let close : type a. a t -> unit tzresult Lwt.t = function
+    | RO kvs -> KVS.Read.close kvs
+    | RW kvs -> KVS.close kvs
 end

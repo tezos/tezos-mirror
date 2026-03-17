@@ -40,6 +40,9 @@ module type S = sig
   (** [save t value] saves the [value] into the store [t], overriding
     any previous value. *)
   val save : rw t -> value -> unit tzresult Lwt.t
+
+  (** [close t] closes the store [t]. *)
+  val close : _ t -> unit tzresult Lwt.t
 end
 
 module Make : functor (Value : VALUE) -> S with type value = Value.t

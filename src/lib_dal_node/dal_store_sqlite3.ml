@@ -190,13 +190,14 @@ module Skip_list_cells = struct
 
     let find_by_level :
         ( level,
-          Skip_list_cell.t * Skip_list_hash.t * int,
+          Skip_list_cell.t * Skip_list_hash.t * int * int,
           [`Zero | `One | `Many] )
         t =
       let open Caqti_type.Std in
-      (published_level ->* t3 skip_list_cell skip_list_hash int)
+      published_level
+      ->* t4 skip_list_cell skip_list_hash dal_slot_index attestation_lag
       @@ {sql|
-        SELECT c.cell, c.hash, s.slot_index
+        SELECT c.cell, c.hash, s.slot_index, s.attestation_lag
         FROM skip_list_cells AS c
         JOIN skip_list_slots AS s
         ON s.skip_list_cell_hash = c.hash
