@@ -65,25 +65,19 @@ continuing the cycle of consensus.
 Support for ``tz4`` (BLS) Keys
 ------------------------------
 
-Tezos supports the use of :ref:`tz4 keys <tz4_accounts>` using BLS cryptography (starting with protocol Seoul) as consensus keys for delegates. This enables (pre)attestation aggregation, a feature that significantly improves efficiency by allowing many (pre)attestations to be compressed into a single operation within blocks.
+Tezos supports the use of :ref:`tz4 keys <tz4_accounts>` using BLS cryptography (starting with protocol Seoul) as consensus keys for delegates. This enables (pre)attestation aggregation, a feature that reduces the size of blocks by allowing many (pre)attestations to be compressed into a single operation.
 
-BLS (Boneh–Lynn–Shacham) signatures have the unique property that multiple signatures over the same payload can be aggregated into a single signature. This makes them ideal for consensus, where many bakers attest to the same block. However, for this to work efficiently, all (pre)attestations must have identical payloads.
-
-This becomes a challenge when DAL (Data Availability Layer) data is involved. DAL attestations are included as part of the regular Layer 1 attestation operation, and the set of DAL slots attested to is different for each delegate. This means the payloads differ, which prevents simple BLS aggregation.
+BLS (Boneh-Lynn-Shacham) signatures have the unique property that multiple signatures over the same message can be aggregated into a single compact signature. This makes them ideal for consensus: since all delegates attest to the same block, the block producer combines all their ``tz4`` (pre)attestations into a single aggregated operation when building the next block.
 
 The Role of the Companion Key
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To enable aggregation even when DAL slot data is included, a separate :ref:`companion_key` is used (introduced in protocol Seoul):
+This picture becomes more complex when DAL (Data Availability Layer) attestations are involved. Each delegate may attest to a different set of DAL slots, so their attestation payloads are no longer identical, which would prevent aggregation.
 
-- This is a second BLS key, separate from the consensus key.
+The :ref:`companion_key` (introduced in protocol Seoul) solves this. It is a second BLS key registered alongside the consensus key. When attesting with DAL data, the baker signs a payload that omits the DAL slots, using both its consensus key and its companion key. Since the payload omits the DAL slots, it is identical across all delegates, keeping aggregation possible. What is used as the attestation signature is a linear combination of the two signatures, whose coefficients depend on the delegate's specific DAL attestation. This ensures the integrity of the DAL payload while keeping aggregation possible. These attestation signatures can then be aggregated by the block producer just as in the DAL-free case.
 
-- The consensus key signs the common part of the attestation (the block reference and quorum vote).
+Using a companion key is therefore required for a ``tz4`` baker to participate in DAL attestation.
 
-- The companion key signs the delegate-specific DAL payload (the set of DAL slots being attested).
-
-Both signatures, one from the consensus key and one from the companion key, are
-aggregated and included in the attestation.
 When a baker produces the next block, they aggregate all ``tz4`` attestations
 (including both already aggregated signatures) into a single aggregated attestation.
 

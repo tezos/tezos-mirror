@@ -297,10 +297,10 @@ their roles, constraints, and when each is needed:
      - Can drain spendable balance
      - Optional: defaults to baking (manager) key; recommended for operational security
    * - **Companion key**
-     - Signs DAL-specific payload included in aggregated attestations
+     - Signs consensus operations that contains DAL-attestations
      - tz4 only
      - None
-     - Only needed for DAL participation when using a tz4 consensus key
+     - Required for DAL participation when using a tz4 consensus key
 
 By default, the baking (manager) key is also the consensus key. A separate consensus key is recommended for bakers who want
 to keep their manager key offline (cold storage) while still baking. A companion key is only
@@ -566,9 +566,8 @@ Frequently Asked Questions
    data. If you don't use the DAL, you don't need a companion key.
 
 **Can I use the same tz4 key as both consensus key and companion key?**
-   No. The consensus key and companion key must be distinct keys. They serve different
-   cryptographic roles: the consensus key signs the common attestation payload (enabling
-   aggregation across bakers), while the companion key signs the baker-specific DAL payload.
+   No. The consensus key and companion key must be distinct. Together they
+   enable the aggregation of attestations containing DAL payloads.
 
 **How do I check which consensus key is currently active?**
    Query the delegate's information via RPC::
