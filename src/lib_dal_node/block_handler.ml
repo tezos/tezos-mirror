@@ -416,61 +416,43 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
     let published_level = Int32.(sub block_level (of_int max_lag)) in
     if published_level < 1l then return_unit
     else
-      let cache = Node_context.get_attestation_ops_cache node_ctxt in
-      let get_cached_ops attested_level =
-        match Attestation_ops_cache.find cache ~level:attested_level with
-        | Some cached_ops -> return cached_ops
-        | None ->
-            let* attestations =
-              Plugin.get_attestations ~block_level:attested_level cctxt
-            in
-            let*? attestation_ops =
-              convert_attestations_to_cache_format
-                (module Plugin)
-                ~number_of_slots:parameters.number_of_slots
-                ~number_of_lags:(List.length parameters.Types.attestation_lags)
-                attestations
-            in
-            Attestation_ops_cache.add
-              cache
-              ~level:attested_level
-              ~attestation_ops ;
-            return attestation_ops
-      in
-      let* attestations_per_lag =
-        List.mapi_es
-          (fun lag_index lag ->
-            let attested_level = Int32.(add published_level (of_int lag)) in
-            if attested_level <= block_level then
-              let* cached_ops = get_cached_ops attested_level in
-              return_some (lag_index, lag, attested_level, cached_ops)
-            else return_none)
-          parameters.Types.attestation_lags
-      in
-      let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
       let number_of_slots = parameters.number_of_slots in
+      let* total_attested_shards =
+        compute_total_attested_shards_per_slot
+          cctxt
+          node_ctxt
+          parameters
+          slot_to_committee
+          ~published_level
+          ~block_level
+          (module Plugin)
+      in
       let threshold =
         parameters.cryptobox_parameters.number_of_shards
         / parameters.cryptobox_parameters.redundancy_factor
       in
       let are_slots_protocol_attested =
-        let total_attested_shards = Array.make number_of_slots 0 in
-        List.iter
-          (fun (lag_index, _lag, _attested_level, cached_ops) ->
-            let shards =
-              attested_shards_per_slot
-                cached_ops
-                slot_to_committee
-                ~number_of_slots
-                ~lag_index
-            in
-            Array.iteri
-              (fun i n ->
-                total_attested_shards.(i) <- total_attested_shards.(i) + n)
-              shards)
-          attestations_per_lag ;
         Array.map (fun n -> n >= threshold) total_attested_shards
       in
+      (* Rebuild attestations_per_lag for per-attester checks below.
+         All ops are already cached by [compute_total_attested_shards_per_slot]. *)
+      let* attestations_per_lag =
+        List.mapi_es
+          (fun lag_index lag ->
+            let attested_level = Int32.(add published_level (of_int lag)) in
+            if attested_level <= block_level then
+              let* cached_ops =
+                Node_context.get_cached_or_fetch_attestation_ops
+                  cctxt
+                  node_ctxt
+                  parameters
+                  ~attested_level
+              in
+              return_some (lag_index, lag, attested_level, cached_ops)
+            else return_none)
+          parameters.Types.attestation_lags
+      in
+      let attestations_per_lag = List.filter_map Fun.id attestations_per_lag in
       let should_be_attested ~slot_index =
         are_slots_protocol_attested.(slot_index)
       in
