@@ -41,10 +41,10 @@ local graph = base.graph;
 
 
   countQuery(endpoint):
-    'sum(' + base.namespace + '_rpc_calls_count{endpoint=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
+    'sum(' + base.namespace + '_rpc_calls_count{' + base.endpoint_label + '=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
 
   sumQuery(endpoint):
-    'sum(' + base.namespace + '_rpc_calls_sum{endpoint=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
+    'sum(' + base.namespace + '_rpc_calls_sum{' + base.endpoint_label + '=~' + endpoint + ',' + base.node_instance + '="$node_instance"})',
 
   averageQuery(endpoint):
     self.sumQuery(endpoint) + '/' + self.countQuery(endpoint),
@@ -100,7 +100,7 @@ local graph = base.graph;
 
   //The rate of calls from the last hour
   callsRate(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', 'sum(' + 'rate(' + base.namespace + '_rpc_calls_count{endpoint=~".*",' + base.node_instance + '="$node_instance"}' + '[1h]))')
+    local q = grafonnet.query.prometheus.new('Prometheus', 'sum(' + 'rate(' + base.namespace + '_rpc_calls_count{' + base.endpoint_label + '=~".*",' + base.node_instance + '="$node_instance"}' + '[1h]))')
               + query.prometheus.withLegendFormat('calls rate');
     info.new('RPC calls rate per hour', q, h, w, x, y)
     + info.withThreshold([['Base', 'light-yellow']])

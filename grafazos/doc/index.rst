@@ -74,7 +74,6 @@ using a particular label for the instance names, you can use ``NODE_INSTANCE_LAB
 
     NODE_INSTANCE_LABEL=my_instance_label
 
-
 By default, the logs are filtered using the ``job`` label. If you need to use
 a different label for filtering logs (e.g., ``service``), you can configure it with ``LOGS_LABEL``:
 
@@ -82,6 +81,12 @@ a different label for filtering logs (e.g., ``service``), you can configure it w
 
     LOGS_LABEL=service
 
+By default, the RPC endpoints label is set to ``endpoint``. If you need to use
+a different label for RPC endpoints (e.g., ``exported_endpoint``), you can configure it with ``ENDPOINT_LABEL``:
+
+.. code-block:: shell
+
+    ENDPOINT_LABEL=exported_endpoint
 
 If you need hardware metrics, note that, by default, the storage stat considered is the used
 space of the whole disk. Optionnally you can enable storage monitoring with ``filecheck``:
