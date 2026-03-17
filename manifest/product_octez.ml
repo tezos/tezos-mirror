@@ -5491,6 +5491,7 @@ let octez_sqlite =
         caqti_lwt_unix;
         caqti_sqlite;
         opentelemetry_lwt;
+        re;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]

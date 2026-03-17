@@ -11,7 +11,8 @@
   caqti-lwt
   caqti-lwt.unix
   caqti-driver-sqlite3
-  opentelemetry-lwt)
+  opentelemetry-lwt
+  re)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

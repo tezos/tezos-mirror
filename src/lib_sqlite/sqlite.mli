@@ -23,21 +23,14 @@ type perm = Read_only of {pool_size : int} | Read_write
 
 (** {2 Initialization and backup} *)
 
-(** [init ~path ~perm migratrion] returns a handler to the database
+(** [init ~path ~perm migration] returns a handler to the database
     located at [path] and executes the given [migration] code.
 
-    If [sqlite_journal_mode] is [`Force mode], then the journal mode of the
-    SQLite database is updated if necessary to match the requested
-    configuration. With [`Identity], the journal mode is left untouched.
-
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected.
-
-    [pool_size] defaults to 8 and is the size of the connection pool.
+    If [perm] is [Read_only], then SQL requests requiring write access will
+    fail. With [Read_write], they will succeed as expected.
 
     If [?max_conn_reuse_count:n] is provided, every connection in the pool will
-    be reused at most [n] times, after which it will be disposed of.
-*)
+    be reused at most [n] times, after which it will be disposed of. *)
 val init :
   path:string ->
   perm:perm ->
@@ -62,8 +55,8 @@ val vacuum_self : conn:conn -> unit tzresult Lwt.t
 (** [use db k] executes [k] with a fresh connection to [db]. *)
 val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-(** [with_transaction conn k] wraps the accesses to the database from [conn] made
-    in the continuation [k] within
+(** [with_transaction conn k] wraps the accesses to the database from [conn]
+    made in the continuation [k] within
     {{:https://www.sqlite.org/lang_transaction.html}a SQL transaction}. If [k]
     fails, the transaction is rollbacked. Otherwise, the transaction is
     committed. *)
@@ -273,3 +266,77 @@ end
     database from [conn]. [with_connection] can be used in the continuation of
     {!with_transaction}. *)
 val with_connection : conn -> (Db.conn -> 'a) -> 'a
+
+(** {2 Schemas} *)
+
+(** Utilities for introspecting the database schema. *)
+module Schemas : sig
+  (** [get_all conn] returns the SQL definitions of all user-created tables and
+      other objects in the database, excluding internal SQLite tables and the
+      [migrations] tracking table. Useful for debugging and regression
+      testing. *)
+  val get_all : conn -> string list tzresult Lwt.t
+end
+
+(** {2 Migrations} *)
+
+(** Database migration system with tracking and versioning.
+
+    Provides types for defining migrations, helpers for creating and applying
+    them, and a functor for managing migration state via a tracking table. *)
+module Migration : sig
+  (** A migration with a name and its SQL content. The SQL is split on
+      semicolons and executed statement-by-statement when applied. *)
+  type t = {name : string; steps : string}
+
+  (** [make_sql ~name sql] creates a migration from raw SQL content.
+      The SQL will be split on semicolons and executed when the migration
+      is applied. *)
+  val make_sql : name:string -> string -> t
+
+  (** [from_ocaml_crunch file_list read] builds a migration list from
+      ocaml-crunch output. [file_list] is the sorted list of filenames
+      (e.g. ["000_initial.sql"; ...]) and [read] retrieves file content.
+      Migration names are extracted from filenames using the pattern
+      [NNN_name.sql]. *)
+  val from_ocaml_crunch : string list -> (string -> string option) -> t list
+
+  (** Configuration for the {!Make} functor. *)
+  module type MIGRATION_CONFIG = sig
+    (** Name of the tracking table (e.g. ["migrations"]). *)
+    val table_name : string
+
+    (** Current version: only the first [version + 1] entries from
+        [all_migrations] will be considered. *)
+    val version : int
+
+    (** The full ordered list of all known migrations. *)
+    val all_migrations : t list
+  end
+
+  (** Functor that creates a migration manager for a given configuration.
+
+      Internally creates the tracking table if needed, computes missing
+      migrations, and applies them. *)
+  module Make (C : MIGRATION_CONFIG) : sig
+    (** [apply conn ?read_only ?on_init ?on_future ?on_applied ()] creates
+        the tracking table if absent (calling [on_init]), determines which
+        migrations are missing, and applies them in order.
+
+        @param read_only If [true], fails when there are unapplied migrations
+          instead of applying them. Default: [false].
+        @param on_init Called once when the tracking table is first created.
+        @param on_future Called when the database has more migrations applied
+          than are known — typically indicates a version mismatch.
+        @param on_applied Called after each migration is applied, with the
+          migration name and wall-clock duration in seconds. *)
+    val apply :
+      Db.conn ->
+      ?read_only:bool ->
+      ?on_init:(unit -> unit Lwt.t) ->
+      ?on_future:(applied:int -> known:int -> unit Lwt.t) ->
+      ?on_applied:(name:string -> duration:Ptime.span -> unit Lwt.t) ->
+      unit ->
+      unit tzresult Lwt.t
+  end
+end
