@@ -15,6 +15,15 @@ open Tezos_ci
 open Common.Helpers
 open Common.Packaging
 
+let make_variables ?(kind = "build") add =
+  ( "DEP_IMAGE",
+    sf "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/%s-$DISTRIBUTION" kind )
+  (* this second variable is for a read only registry and we want it to be
+            tezos/tezos *)
+  :: ( "DEP_IMAGE_PROTECTED",
+       sf "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-$DISTRIBUTION" kind )
+  :: add
+
 let make_docker_build_dependencies ~__POS__ ?rules ~name ~matrix ~distribution
     ~base_image ~script () =
   job_docker_authenticated
@@ -412,7 +421,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_rpm_repo_fedora;
              ])
         ~variables:
-          (Common.Packaging.make_variables
+          (make_variables
              ~kind:"systemd-tests"
              [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
         [
@@ -443,7 +452,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_rpm_repo_rockylinux;
              ])
         ~variables:
-          (Common.Packaging.make_variables
+          (make_variables
              ~kind:"systemd-tests"
              [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9")])
         [

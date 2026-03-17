@@ -83,13 +83,4 @@ module Packaging = struct
       ( "ARCHITECTURES",
         String.concat " " (List.map Runner.Arch.show_uniform archs) );
     ]
-
-  let make_variables ?(kind = "build") add =
-    ( "DEP_IMAGE",
-      sf "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/%s-$DISTRIBUTION" kind )
-    (* this second variable is for a read only registry and we want it to be
-            tezos/tezos *)
-    :: ( "DEP_IMAGE_PROTECTED",
-         sf "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-$DISTRIBUTION" kind )
-    :: add
 end
