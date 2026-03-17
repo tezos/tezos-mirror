@@ -1,7 +1,7 @@
 
 ./octez-client --log-requests --wait none transfer 1 from '[PUBLIC_KEY_HASH]' to '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 1039000 units (will add 0 for safety)
+Estimated gas: 2168.748 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,18 +12,22 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.104
+    Fee to the baker: ꜩ0.000317
     Expected counter: 1
-    Gas limit: 1039000
+    Gas limit: 2169
     Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000317
+      payload fees(the block proposer) ....... +ꜩ0.000317
     Transaction:
       Amount: ꜩ1
       From: [PUBLIC_KEY_HASH]
       To: [PUBLIC_KEY_HASH]
       This transaction was successfully applied
-      Consumed gas: 1039000
+      Consumed gas: 2168.681
       Balance updates:
-        simulation minted ... +ꜩ0.000043
+        [PUBLIC_KEY_HASH] ... -ꜩ1
+        [PUBLIC_KEY_HASH] ... +ꜩ1
 
 >>>>0: http://[HOST]:[PORT]/tezlink/version
 <<<<0: 200 OK
@@ -148,8 +152,13 @@ This sequence of operations was run:
             { "operation_result":
                 { "status": "applied",
                   "balance_updates":
-                    [ { "kind": "minted", "category": "minted", "change": "43",
-                        "origin": "simulation" } ], "consumed_milligas": "1039000000" } } } ] }
+                    [ { "kind": "contract",
+                        "contract": "[PUBLIC_KEY_HASH]",
+                        "change": "-1000000", "origin": "block" },
+                      { "kind": "contract",
+                        "contract": "[PUBLIC_KEY_HASH]",
+                        "change": "1000000", "origin": "block" } ],
+                  "consumed_milligas": "2168748" } } } ] }
 >>>>11: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head~2/hash
 <<<<11: 200 OK
   "[BLOCK_HASH]"
@@ -161,23 +170,31 @@ This sequence of operations was run:
       "branch": "[BLOCK_HASH]",
       "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "104000", "counter": "1", "gas_limit": "1039000", 
-            "storage_limit": "0", "amount": "1000000",
-            "destination": "[PUBLIC_KEY_HASH]" } ],
+            "fee": "317", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]" } ],
       "signature":
         "[SIGNATURE]" } ]
 <<<<13: 200 OK
   [ { "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "104000", "counter": "1", "gas_limit": "1039000", 
-            "storage_limit": "0", "amount": "1000000",
-            "destination": "[PUBLIC_KEY_HASH]",
+            "fee": "317", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]",
             "metadata":
-              { "operation_result":
+              { "balance_updates":
+                  [ { "kind": "contract", "contract": "[PUBLIC_KEY_HASH]",
+                      "change": "-317", "origin": "block" },
+                    { "kind": "accumulator", "category": "block fees", 
+                      "change": "317", "origin": "block" } ],
+                "operation_result":
                   { "status": "applied",
                     "balance_updates":
-                      [ { "kind": "minted", "category": "minted", "change": "43",
-                          "origin": "simulation" } ], "consumed_milligas": "1039000000" } } } ],
+                      [ { "kind": "contract",
+                          "contract": "[PUBLIC_KEY_HASH]",
+                          "change": "-1000000", "origin": "block" },
+                        { "kind": "contract",
+                          "contract": "[PUBLIC_KEY_HASH]",
+                          "change": "1000000", "origin": "block" } ],
+                    "consumed_milligas": "2168681" } } } ],
       "signature":
         "[SIGNATURE]" } ]
 >>>>14: http://[HOST]:[PORT]/tezlink/injection/operation?chain=main

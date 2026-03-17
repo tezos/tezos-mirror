@@ -399,51 +399,43 @@ module TezosX = struct
   open Tezlink_imports
   open Imported_protocol
 
-  let set_balance_update minted metadata =
-    let open Apply_results in
-    let update_op_result : type kind.
-        kind manager_operation_result -> kind manager_operation_result =
-      function
-      | Applied (Transaction_result (Transaction_to_contract_result r)) ->
-          let open Alpha_context in
-          let balance_updates =
-            [
-              Receipt.item Minted (Credited (Tez.of_mutez_exn minted)) Simulation;
-            ]
-          in
-          Applied
-            (Transaction_result
-               (Transaction_to_contract_result {r with balance_updates}))
-      | other -> other
-    in
-    match metadata with
-    | Operation_metadata {contents = Single_result (Manager_operation_result r)}
-      ->
-        Operation_metadata
-          {
-            contents =
-              Single_result
-                (Manager_operation_result
-                   {
-                     r with
-                     operation_result = update_op_result r.operation_result;
-                   });
-          }
-    | _ -> metadata
-
-  let simulate_operation ctxt ~skip_signature
-      (op : Imported_context.packed_operation) hash block =
+  let simulate_operation ctxt ~chain_id ~skip_signature ~read ~data_model
+      (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
-    (* TODO: https://linear.app/tezos/issue/L2-895
-       Replace the integer scaffold with actual operation simulation once the
-       kernel entrypoint handles Tezos operations. *)
-    let* state = Evm_ro_context.get_state ctxt ~block () in
-    let skip_sig_bytes = Rlp.encode_bool skip_signature in
-    let raw_input = Bytes.create 8 in
-    Bytes.set_int64_le raw_input 0 42L ;
-    let encoded_input =
-      Rlp.encode (Rlp.List [Rlp.Value skip_sig_bytes; Rlp.Value raw_input])
+    let*? input =
+      Data_encoding.Binary.to_string Alpha_context.Operation.encoding op
+      |> Result.map_error_e @@ fun e ->
+         Result_syntax.tzfail (Operation_serialization_error e)
     in
+    (* Prevalidate the operation: invalid operations don't produce receipts. *)
+    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
+      Tezlink_prevalidation.parse_and_validate_for_queue
+        ~check_signature:(not skip_signature)
+        ~check_da_fees:false
+        ~read
+        ~data_model
+        input
+    in
+    let* () =
+      match prevalidation_res with
+      | Ok _op -> return_unit
+      | Error message -> Error_monad.failwith "Prevalidation error: %s" message
+    in
+    (* Actual simulation via the kernel entrypoint.
+       The input is RLP-encoded as a list: [skip_signature_flag, transaction_bytes]
+       where transaction_bytes is in blueprint v1 format: runtime_tag + serialized
+       operation. The result is RLP-encoded as a value containing the serialized
+       operation receipt. *)
+    let skip_sig_bytes =
+      if skip_signature then Bytes.make 1 '\001' else Bytes.make 1 '\000'
+    in
+    let tx_bytes =
+      Bytes.of_string (Sequencer_blueprint.tag_transaction (Michelson input))
+    in
+    let encoded_input =
+      Rlp.encode (Rlp.List [Rlp.Value skip_sig_bytes; Rlp.Value tx_bytes])
+    in
+    let* state = Evm_ro_context.get_state ctxt ~block () in
     let* result =
       Evm_ro_context.execute_entrypoint
         ctxt
@@ -455,10 +447,21 @@ module TezosX = struct
     in
     let*? rlp_item = Rlp.decode result in
     let*? result_bytes = Rlp.decode_as_bytes rlp_item in
-    let minted = Bytes.get_int64_le result_bytes 0 in
-    let op = op.protocol_data in
-    let*? mock_result =
-      Tezlink_mock.Operation_metadata.operation_metadata hash op
+    let*? operations =
+      Tezos_services.Current_block_services.deserialize_operations
+        ~chain_id
+        result_bytes
     in
-    return (set_balance_update minted mock_result)
+    let* simulation_receipt =
+      match operations with
+      | [op] -> (
+          match op.receipt with
+          | Receipt receipt -> return receipt
+          | Empty -> failwith "Simulation produced an empty receipt"
+          | Too_large -> failwith "Produced simulation receipt was too large")
+      | _ ->
+          failwith
+            "Simulation produced a list of operations whose length is not 1"
+    in
+    return simulation_receipt
 end

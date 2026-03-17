@@ -490,13 +490,20 @@ let make (ctxt : Evm_ro_context.t) =
       let* number = shell_block_param_to_block_number block in
       Evm_ro_context.tezosx_nth_block_hash ctxt (Z.of_int32 number)
 
-    let simulate_operation ~chain_id:_ ~skip_signature op hash _block =
+    let simulate_operation ~chain_id ~skip_signature op hash block =
+      let open Lwt_result_syntax in
+      let* block = shell_block_param_to_eth_block_param block in
+      let* state = Evm_ro_context.get_state ctxt ~block () in
+      let read = Evm_ro_context.read_state state in
       Simulator.TezosX.simulate_operation
         ctxt
+        ~chain_id
+        ~read
+        ~data_model:Tezlink_durable_storage.Rlp
         ~skip_signature
         op
         hash
-        (Block_parameter Latest)
+        block
 
     let get_entrypoints chain block contract ~normalize_types =
       let open Lwt_result_syntax in
