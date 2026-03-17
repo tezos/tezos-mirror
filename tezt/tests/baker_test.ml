@@ -1771,7 +1771,7 @@ let baker_shutdown_on_node_shutdown =
     ~__FILE__
     ~title:"Baker shutdown on node shutdown"
     ~tags:[team; "baker"; "shutdown"]
-    ~supports:Protocol.(From_protocol 025)
+    ~supports:Protocol.(From_protocol 024)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
