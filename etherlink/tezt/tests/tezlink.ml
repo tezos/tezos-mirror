@@ -3337,6 +3337,7 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
   let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
     check_operations
+      ~__LOC__
       ~client:client_tezlink
       ~block:"5"
       ~expected:[op_just_enough_hash]
@@ -3444,7 +3445,11 @@ let test_tezlink_validation_gas_limit =
   in
   let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"5" ~expected:[op1; op2]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"5"
+      ~expected:[op1; op2]
   in
 
   (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
@@ -3469,10 +3474,10 @@ let test_tezlink_validation_gas_limit =
   let* () = produce_block_and_wait_for ~sequencer 6 in
   let* () = produce_block_and_wait_for ~sequencer 7 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"6" ~expected:[op3]
+    check_operations ~__LOC__ ~client:client_tezlink ~block:"6" ~expected:[op3]
   in
   let* () =
-    check_operations ~client:client_tezlink ~block:"7" ~expected:[op4]
+    check_operations ~__LOC__ ~client:client_tezlink ~block:"7" ~expected:[op4]
   in
   unit
 
@@ -3523,7 +3528,11 @@ let test_tezlink_validation_counter =
   in
   let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"5" ~expected:[op1; op2; op3]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"5"
+      ~expected:[op1; op2; op3]
   in
   unit
 
@@ -3568,7 +3577,11 @@ let test_tezlink_validation_balance =
   in
   let* () = produce_block_and_wait_for ~sequencer 6 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"6" ~expected:[op_reveal]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"6"
+      ~expected:[op_reveal]
   in
 
   (* sanity check *)
@@ -3595,7 +3608,11 @@ let test_tezlink_validation_balance =
   let* () = produce_block_and_wait_for ~sequencer 7 in
   (* big transfer should go in but fail *)
   let* () =
-    check_operations ~client:client_tezlink ~block:"7" ~expected:[big_transfer]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"7"
+      ~expected:[big_transfer]
   in
   let* receipt =
     Client.get_receipt_for ~operation:big_transfer client_tezlink
@@ -3630,10 +3647,16 @@ let test_tezlink_validation_balance =
   in
   let* () = produce_block_and_wait_for ~sequencer 8 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"8" ~expected:[big_but_in]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"8"
+      ~expected:[big_but_in]
   in
   let* () = produce_block_and_wait_for ~sequencer 9 in
-  let* () = check_operations ~client:client_tezlink ~block:"9" ~expected:[] in
+  let* () =
+    check_operations ~__LOC__ ~client:client_tezlink ~block:"9" ~expected:[]
+  in
   unit
 
 (** Sends a Michelson transfer with zero fees and verifies it is rejected.
@@ -3870,7 +3893,9 @@ let test_michelson_execution_gas_fee =
       client_tezlink
   in
   let* () = produce_block_and_wait_for ~sequencer 3 in
-  let* () = check_operations ~client:client_tezlink ~block:"3" ~expected:[] in
+  let* () =
+    check_operations ~__LOC__ ~client:client_tezlink ~block:"3" ~expected:[]
+  in
   (* Fee = 10_000 mutez: covers execution gas → included. *)
   let* (`OpHash accepted) =
     Operation.inject_transfer
@@ -3883,7 +3908,11 @@ let test_michelson_execution_gas_fee =
   in
   let* () = produce_block_and_wait_for ~sequencer 4 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"4" ~expected:[accepted]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"4"
+      ~expected:[accepted]
   in
   unit
 
