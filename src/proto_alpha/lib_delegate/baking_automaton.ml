@@ -34,6 +34,7 @@ end
 
 type loop_state = {
   heads_stream : proposal Lwt_stream.t;
+  on_head_proposal_callback : proposal -> unit;
   get_valid_blocks_stream : proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
   forge_event_stream : forge_event Lwt_stream.t;
@@ -69,7 +70,7 @@ type events =
   Lwt.t
 
 let create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
-    operation_worker =
+    ~on_head_proposal_callback operation_worker =
   let future_block_stream, push_future_block = Lwt_stream.create () in
   let get_valid_blocks_stream =
     match get_valid_blocks_stream with
@@ -78,6 +79,7 @@ let create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
   in
   {
     heads_stream;
+    on_head_proposal_callback;
     get_valid_blocks_stream;
     qc_stream = Operation_worker.get_quorum_event_stream operation_worker;
     forge_event_stream;
@@ -231,6 +233,7 @@ let rec wait_next_event ~timeout loop_state =
       | None -> return_some (New_valid_proposal proposal))
   | `New_head_proposal (Some proposal) -> (
       loop_state.last_get_head_event <- None ;
+      loop_state.on_head_proposal_callback proposal ;
       (* Is the block in the future? *)
       match sleep_until proposal.block.shell.timestamp with
       | Some waiter ->

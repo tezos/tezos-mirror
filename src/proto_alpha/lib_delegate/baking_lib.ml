@@ -676,6 +676,7 @@ let bake_using_automaton ~count config state heads_stream =
     Baking_automaton.create_loop_state
       ~heads_stream
       ~forge_event_stream
+      ~on_head_proposal_callback:ignore
       state.automaton_state.operation_worker
   in
   let stop_on_next_level_block = function
