@@ -2011,8 +2011,6 @@ module State = struct
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
-  let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
-
   let patch_sequencer_key_if_necessary ~sequencer_key_source
       ~next_blueprint_number evm_state ~sequencer_key_path () =
     let open Lwt_result_syntax in
@@ -2046,6 +2044,107 @@ module State = struct
         in
         return (evm_state, true)
     | None -> return (evm_state, false)
+
+  (** Load the existing evm_state from Irmin, read the storage_version
+      and patch the sequencer key if necessary. Used on restart when no
+      kernel execution is needed. *)
+  let load_existing_state ~sequencer_key_source ~next_blueprint_number context =
+    let open Lwt_result_syntax in
+    let*! evm_state = Pvm.State.get context in
+    let* storage_version = Evm_state.storage_version evm_state in
+    let sequencer_key_path =
+      Durable_storage_path.sequencer_key ~storage_version
+    in
+    let* evm_state, _patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path
+        ()
+    in
+    return (evm_state, context, storage_version)
+
+  (** First start: create a fresh evm_state from [kernel], pre-write the
+      sequencer key under both possible paths (since the storage_version
+      is not yet known), execute the kernel, then clean up the stale
+      sequencer key path. *)
+  let init_kernel_and_execute ~pool ~configuration ~smart_rollup_address
+      ~sequencer_key_source ~next_blueprint_number conn context ~kernel =
+    let open Lwt_result_syntax in
+    let* evm_state = Evm_state.init ~kernel in
+    (* Pre-write the sequencer public key into durable storage before
+       the first kernel execution. Without it, the kernel has no
+       sequencer configured and immediately falls back to proxy mode,
+       which causes an unwanted block to be produced on the very first
+       run.
+
+       This is only useful for manual sandbox tests without an
+       installer. In production the installer has already written the
+       key, so this write is a no-op.
+    *)
+    (* The storage version is not yet known at this point (it
+       is determined by the first execution), so we write the
+       key under both possible paths to cover either layout. *)
+    let* evm_state, _legacy_sequencer_key_patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path:Durable_storage_path.sequencer_key_legacy
+        ()
+    in
+    let* evm_state, sequencer_key_patched =
+      patch_sequencer_key_if_necessary
+        ~sequencer_key_source
+        ~next_blueprint_number
+        evm_state
+        ~sequencer_key_path:Durable_storage_path.sequencer_key_world_state
+        ()
+    in
+    let config =
+      Pvm.Kernel.config
+        ~preimage_directory:(Configuration.preimages_path configuration)
+        ?preimage_endpoint:configuration.kernel_execution.preimages_endpoint
+        ~kernel_debug:true
+        ~trace_host_funs:configuration.opentelemetry.trace_host_functions
+        ~destination:smart_rollup_address
+        ()
+    in
+    let* evm_state =
+      Evm_state.execute
+        ~pool
+        ~data_dir:configuration.data_dir
+        ~config
+        ~native_execution:false
+        evm_state
+        (`Inbox [])
+    in
+    let* storage_version = Evm_state.storage_version evm_state in
+    (* Now that the storage version is known, remove whichever
+       key path is not canonical for this version, so no stale
+       entry is left in the state. *)
+    let*! evm_state =
+      if
+        sequencer_key_patched
+        && String.equal
+             Durable_storage_path.sequencer_key_world_state
+             (Durable_storage_path.sequencer_key ~storage_version)
+      then
+        Evm_state.delete
+          ~kind:Value
+          evm_state
+          Durable_storage_path.sequencer_key_legacy
+      else if sequencer_key_patched then
+        Evm_state.delete
+          ~kind:Value
+          evm_state
+          Durable_storage_path.sequencer_key_world_state
+      else Lwt.return evm_state
+    in
+    let (Qty next) = next_blueprint_number in
+    let* context = commit conn context evm_state (Qty Z.(pred next)) in
+    return (evm_state, context, storage_version)
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
       ~store_perm ?sequencer_key_source ?snapshot_source () =
@@ -2129,127 +2228,34 @@ module State = struct
     let*! () = Evm_context_events.start_history_mode history_mode in
 
     let* evm_state, context, storage_version =
-      match kernel_path with
-      | Some kernel ->
-          if init_status = Loaded then
-            let* () =
-              when_ (on_disk_kernel kernel) @@ fun () ->
-              Lwt_result.ok (Events.ignored_kernel_arg ())
-            in
-            let*! evm_state = Pvm.State.get context in
-            let* storage_version = Evm_state.storage_version evm_state in
-            let sequencer_key_path =
-              Durable_storage_path.sequencer_key ~storage_version
-            in
-            let* evm_state, _patched =
-              patch_sequencer_key_if_necessary
-                ~sequencer_key_source
-                ~next_blueprint_number
-                evm_state
-                ~sequencer_key_path
-                ()
-            in
-            return (evm_state, context, storage_version)
-          else
-            let* evm_state = Evm_state.init ~kernel in
-            (* By executing the kernel with a minimal inbox, we preemptively
-               setup Etherlink (in case an installer is used). *)
-            let config =
-              Pvm.Kernel.config
-                ~preimage_directory:(Configuration.preimages_path configuration)
-                ?preimage_endpoint:
-                  configuration.kernel_execution.preimages_endpoint
-                ~kernel_debug:true
-                ~trace_host_funs:
-                  configuration.opentelemetry.trace_host_functions
-                ~destination:smart_rollup_address
-                ()
-            in
-            (* Pre-write the sequencer public key into durable storage before
-               the first kernel execution. Without it, the kernel has no
-               sequencer configured and immediately falls back to proxy mode,
-               which causes an unwanted block to be produced on the very first
-               run.
-
-               This is only useful for manual sandbox tests without an
-               installer. In production the installer has already written the
-               key, so this write is a no-op.
-            *)
-            (* The storage version is not yet known at this point (it
-               is determined by the first execution), so we write the
-               key under both possible paths to cover either
-               layout. *)
-            let* evm_state, _legacy_sequencer_key_patched =
-              patch_sequencer_key_if_necessary
-                ~sequencer_key_source
-                ~next_blueprint_number
-                evm_state
-                ~sequencer_key_path:Durable_storage_path.sequencer_key_legacy
-                ()
-            in
-            let* evm_state, sequencer_key_patched =
-              patch_sequencer_key_if_necessary
-                ~sequencer_key_source
-                ~next_blueprint_number
-                evm_state
-                ~sequencer_key_path:
-                  Durable_storage_path.sequencer_key_world_state
-                ()
-            in
-            let* evm_state =
-              Evm_state.execute
-                ~pool
-                ~data_dir:configuration.data_dir
-                ~config
-                ~native_execution:false
-                evm_state
-                (`Inbox [])
-            in
-            (* Now that the storage version is known, remove whichever
-               key path is not canonical for this version, so no stale
-               entry is left in the state. *)
-            let* storage_version = Evm_state.storage_version evm_state in
-            let*! evm_state =
-              if
-                sequencer_key_patched
-                && String.equal
-                     Durable_storage_path.sequencer_key_world_state
-                     (Durable_storage_path.sequencer_key ~storage_version)
-              then
-                Evm_state.delete
-                  ~kind:Value
-                  evm_state
-                  Durable_storage_path.sequencer_key_legacy
-              else if sequencer_key_patched then
-                Evm_state.delete
-                  ~kind:Value
-                  evm_state
-                  Durable_storage_path.sequencer_key_world_state
-              else Lwt.return evm_state
-            in
-            let (Qty next) = next_blueprint_number in
-            let* context = commit conn context evm_state (Qty Z.(pred next)) in
-            return (evm_state, context, storage_version)
-      | None ->
-          if init_status = Loaded then
-            let*! evm_state = Pvm.State.get context in
-            let* storage_version = Evm_state.storage_version evm_state in
-            let sequencer_key_path =
-              Durable_storage_path.sequencer_key ~storage_version
-            in
-            let* evm_state, _patched_sequencer_key =
-              patch_sequencer_key_if_necessary
-                ~sequencer_key_source
-                ~next_blueprint_number
-                evm_state
-                ~sequencer_key_path
-                ()
-            in
-            return (evm_state, context, storage_version)
-          else
-            failwith
-              "Cannot compute the initial EVM state without the path to the \
-               initial kernel"
+      match (kernel_path, init_status) with
+      | kernel_path, Loaded ->
+          (* The data-dir was already populated or a snapshot was imported.
+             We ignore the kernel argument and just load the existing state. *)
+          let* () =
+            when_ (Option.is_some kernel_path) @@ fun () ->
+            Lwt_result.ok (Events.ignored_kernel_arg ())
+          in
+          load_existing_state
+            ~sequencer_key_source
+            ~next_blueprint_number
+            context
+      | Some kernel, Created ->
+          (* First start: initialize a fresh evm_state from the kernel and
+             execute it once (with an empty inbox) to set up Etherlink. *)
+          init_kernel_and_execute
+            ~pool
+            ~configuration
+            ~smart_rollup_address
+            ~sequencer_key_source
+            ~next_blueprint_number
+            conn
+            context
+            ~kernel
+      | None, Created ->
+          failwith
+            "Cannot compute the initial EVM state without the path to the \
+             initial kernel"
     in
 
     let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
