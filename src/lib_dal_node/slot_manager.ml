@@ -35,7 +35,7 @@ type error +=
   | Invalid_degree of string
   | No_prover_SRS
   | Unable_to_fetch_the_commitment_of_slot_id of Types.Slot_id.t
-  | No_commitment_published_on_l1_for_slot_id of Types.Slot_id.t
+  | No_commitment_found_for_slot_id of Types.Slot_id.t
 
 let () =
   register_error_kind
@@ -157,22 +157,24 @@ let () =
       Unable_to_fetch_the_commitment_of_slot_id {slot_level; slot_index}) ;
   register_error_kind
     `Permanent
-    ~id:"dal.node.No_commitment_published_on_l1_for_slot_id"
-    ~title:"No commitment published on L1 for slot id"
-    ~description:"No commitment was published on L1 for the given slot id."
+    ~id:"dal.node.No_commitment_found_for_slot_id"
+    ~title:"No commitment found on L1 for slot id"
+    ~description:
+      "No commitment found (in memory or in the skip-list) for the given slot \
+       id."
     ~pp:(fun ppf (published_level, slot_index) ->
       Format.fprintf
         ppf
-        "There is no commitment published on L1 at level %ld and index %d."
+        "No commitment found (in memory or in the skip-list) at level %ld and \
+         index %d."
         published_level
         slot_index)
     Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
     (function
-      | No_commitment_published_on_l1_for_slot_id id ->
-          Some (id.slot_level, id.slot_index)
+      | No_commitment_found_for_slot_id id -> Some (id.slot_level, id.slot_index)
       | _ -> None)
     (fun (slot_level, slot_index) ->
-      No_commitment_published_on_l1_for_slot_id {slot_level; slot_index})
+      No_commitment_found_for_slot_id {slot_level; slot_index})
 
 type slot = bytes
 
@@ -611,14 +613,8 @@ let get_commitment_from_slot_id ctxt slot_id =
       let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
       | Ok (Some res) -> return res
-      | Ok None ->
-          (* Here, we managed to fetch the skip list cell, but nothing was
-             published at the given slot id. *)
-          tzfail @@ No_commitment_published_on_l1_for_slot_id slot_id
+      | Ok None -> tzfail @@ No_commitment_found_for_slot_id slot_id
       | Error error ->
-          (* Here, we encountered an error which could be due to various
-             reasons, like not having sufficient L1 history to fetch the skip
-             list cell. *)
           let*! () =
             Event.emit_failed_to_retrieve_commitment_of_slot_id
               ~published_level:slot_id.slot_level
