@@ -979,17 +979,15 @@ open struct
                expected_shards))
 
   let get_attestable_slots_future_level_warning =
-    declare_2
+    declare_1
       ~section
       ~prefix_name_with_section:true
       ~name:"get_attestable_slots_future_level_warning"
       ~msg:
-        "It looks like the DAL node is lagging (its current level is \
-         {current_level}, while the Layer1 node's level is \
-         {current_baker_level})."
+        "It looks like the DAL node is lagging ({levels_to_process} levels to \
+         process)."
       ~level:Warning
-      ("current_level", Data_encoding.int32)
-      ("current_baker_level", Data_encoding.int32)
+      ("levels_to_process", Data_encoding.int32)
 
   let warn_no_attestation =
     declare_2
@@ -1693,11 +1691,8 @@ let emit_get_attestable_slots_not_ok_warning ~attester ~published_level
     get_attestable_slots_not_ok_warning
     (attester, published_level, slots_indices, slot_indexes_with_details)
 
-let emit_get_attestable_slots_future_level_warning ~current_level
-    ~current_baker_level =
-  emit
-    get_attestable_slots_future_level_warning
-    (current_level, current_baker_level)
+let emit_get_attestable_slots_future_level_warning ~levels_to_process =
+  emit get_attestable_slots_future_level_warning levels_to_process
 
 let emit_warn_no_attestation ~attester ~attested_level =
   emit warn_no_attestation (attester, attested_level)
