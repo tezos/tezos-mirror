@@ -52,6 +52,11 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
+let build_dependency_image =
+  Image.mk_external
+    ~image_path:
+      "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+
 let make_debian_variables distribution image_kind release version =
   ( "DEP_IMAGE",
     sf
@@ -161,7 +166,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     job
       ~__POS__
       ~name:"oc.build-data_packages"
-      ~image:Common.Packaging.build_dependency_image
+      ~image:build_dependency_image
       ~stage:Stages.build
       ~variables:
         (Common.Packaging.make_variables
