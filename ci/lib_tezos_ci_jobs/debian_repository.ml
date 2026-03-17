@@ -206,7 +206,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~stage:Stages.build
       ~variables:
         [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
-      ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
+      ~dependencies:(Dependent [])
       ~tag:Dynamic
       ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
@@ -221,7 +221,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
-      ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
+      ~dependencies:(Dependent [])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
       ~limit_dune_build_jobs
@@ -232,7 +232,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
-      ~dependencies:(Dependent [Job job_merge_build_ubuntu_dependencies])
+      ~dependencies:(Dependent [])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
       ~limit_dune_build_jobs

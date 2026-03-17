@@ -163,8 +163,7 @@ oc.build-debian:
   stage: build
   tags:
   - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -205,8 +204,7 @@ oc.build-data_packages:
   stage: build
   tags:
   - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.debian
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -336,8 +334,7 @@ oc.build-ubuntu:
   stage: build
   tags:
   - $TAGS
-  needs:
-  - oc.docker-build-merge-manifest.ubuntu
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
