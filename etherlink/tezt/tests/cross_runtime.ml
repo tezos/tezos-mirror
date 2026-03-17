@@ -187,7 +187,7 @@ module TezContract = struct
    *  JSON, forges and sends the call operation. *)
   let call_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node ~client
       ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
-      ?(entrypoint = "default") ?(amount = 0) () =
+      ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 10000) () =
     let* arg = Client.convert_data_to_json ~data:arg_data client in
     let* call_op =
       Operation.Manager.(
@@ -196,7 +196,7 @@ module TezContract = struct
             make
               ~fee:1000
               ~counter
-              ~gas_limit:10000
+              ~gas_limit
               ~storage_limit:1000
               ~source
               (call ~dest ~arg ~entrypoint ~amount ());
@@ -406,7 +406,7 @@ module TezRunner = struct
 
   (** Calls [%run] with [Unit] via the delayed inbox. *)
   let call_run ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
-      ~sequencer ~source ~counter ?amount runner =
+      ~sequencer ~source ~counter ?amount ?gas_limit runner =
     call_contract_via_delayed_inbox
       ~sc_rollup_address
       ~sc_rollup_node
@@ -416,6 +416,7 @@ module TezRunner = struct
       ~source
       ~counter
       ?amount
+      ?gas_limit
       ~dest:runner
       ~arg_data:"Unit"
       ~entrypoint:"run"
@@ -555,7 +556,7 @@ module CracRunnerWrapper = struct
     end
 
     module TezRunner : sig
-      val call_run : ?amount:int -> tez_runner -> unit Lwt.t
+      val call_run : ?amount:int -> ?gas_limit:int -> tez_runner -> unit Lwt.t
     end
 
     module TezCrossRuntimeRunnerEvm : sig
@@ -686,7 +687,7 @@ module CracRunnerWrapper = struct
       end
 
       module TezRunner = struct
-        let call_run ?amount (`Tez_runner (_, runner)) =
+        let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
           TezRunner.call_run
             ~sc_rollup_address
             ~sc_rollup_node
@@ -696,6 +697,7 @@ module CracRunnerWrapper = struct
             ~source
             ~counter:(tez_counter ())
             ?amount
+            ?gas_limit
             runner
       end
 
@@ -1144,7 +1146,11 @@ let test_crac_tez_5_crossing_chain =
   let* evm_b = EvmCrossRuntimeRunnerTez.deploy_and_init tez_c in
   let* tez_a = TezCrossRuntimeRunnerEvm.originate evm_b in
   Log.debug ~prefix "Call TEZ a" ;
-  let* () = TezRunner.call_run tez_a in
+  (* The default gas_limit (10_000) is too low for 5 crossings: each
+     round-trip costs ~50K EVM gas (~5_000 gas units), exhausting the
+     budget after ~2 crossings. 20_000 units (= 200K EVM gas) provides
+     enough headroom even with correct cross-runtime gas charge-back. *)
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_a in
   Log.debug ~prefix "Verify counters" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_leaf in
   let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_a in
