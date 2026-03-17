@@ -252,7 +252,7 @@ pub fn execute_validation<Host, C: Context>(
     context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
-    required_da_fees: Option<u64>,
+    required_fees: Option<u64>,
 ) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError>
 where
     Host: StorageV1 + Logging,
@@ -328,23 +328,22 @@ where
         validated_operations.push(validated_operation);
     }
 
-    // DA fee enforcement: the total fees of the batch must cover the DA cost
-    // of posting this operation to L1.
-    // When da_fee_per_byte_in_mutez is None (e.g. delayed inbox operations that already
-    // paid L1 fees, or unit tests), this check is skipped entirely.
-    if let Some(required_da_fees) = required_da_fees {
+    // The total fees of the batch must cover the DA cost of posting this
+    // operation to L1 but also the execution gas cost that will be used.
+    // During simulation, this check is omitted.
+    if let Some(required_fees) = required_fees {
         let total_fees: Narith = validated_operations
             .iter()
             .fold(Narith::from(0_u64), |acc, op| {
                 Narith(acc.0 + &op.content.fee.0)
             });
-        if total_fees < Narith(required_da_fees.into()) {
+        if total_fees < Narith(required_fees.into()) {
             log!(
                 host,
                 Error,
-                "Insufficient DA fee: batch provides {:?} mutez but needs {:?} mutez",
+                "Insufficient fees: batch provides {:?} mutez but needs {:?} mutez",
                 total_fees,
-                required_da_fees
+                required_fees
             );
             return Err(ValidityError::InsufficientFee);
         }

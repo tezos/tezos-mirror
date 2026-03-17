@@ -25,6 +25,7 @@ use crate::{
 };
 use anyhow::Context;
 use mir::ast::PublicKeyHash;
+use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::{
@@ -44,6 +45,7 @@ use tezos_ethereum::{
     wei::{eth_from_mutez, mutez_from_wei},
 };
 use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_execution::{
     context::{self, Context as _, TezlinkContext},
@@ -866,6 +868,24 @@ where
             let required_da_fees =
                 get_required_da_fees(&operation, block_constants.da_fee_per_byte_mutez)?;
 
+            let required_execution_gas_fees = {
+                let total_gas_limit: u64 = operation
+                    .content
+                    .iter()
+                    .filter_map(|c| c.gas_limit().ok())
+                    .filter_map(|gl| gl.0.to_u64())
+                    .try_fold(0u64, |acc, x| acc.checked_add(x))
+                    .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+                let gas_fee_wei = block_in_progress.base_fee_per_gas
+                    * U256::from(block_constants.michelson_to_evm_gas_multiplier)
+                    * U256::from(total_gas_limit);
+                // NB: Convert back to mutez with a floor division.
+                // (precision loss if gas_fee_wei < 1 mutez)
+                (gas_fee_wei / U256::exp10(12)).low_u64()
+            };
+            let required_fees =
+                required_da_fees.saturating_add(required_execution_gas_fees);
+
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
 
@@ -881,7 +901,7 @@ where
                 operation,
                 &block_ctx,
                 skip_signature_check,
-                Some(required_da_fees),
+                Some(required_fees),
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
@@ -1232,9 +1252,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         };
         let branch = operation.branch.clone();
         let signature = operation.signature.clone();
-        // During simulation, skip the DA fee check: the client sends fee=0
+        // During simulation, skip the fee check: the client sends fee=0
         // because it doesn't know the fees yet (that's what simulation computes).
-        // The OCaml node-side prevalidation also skips DA fees during simulation.
+        // The OCaml node-side prevalidation also skips fees during simulation.
         let mut tezosx_journal = TezosXJournal::new();
         let operations = tezos_execution::validate_and_apply_operation(
             host,

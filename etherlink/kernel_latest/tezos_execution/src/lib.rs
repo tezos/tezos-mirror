@@ -1083,7 +1083,7 @@ pub fn validate_and_apply_operation<Host, C: Context>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
-    required_da_fees: Option<u64>,
+    required_fees: Option<u64>,
 ) -> Result<Vec<OperationWithMetadata>, OperationError>
 where
     Host: StorageV1 + Logging,
@@ -1102,7 +1102,7 @@ where
         context,
         operation,
         skip_signature_check,
-        required_da_fees,
+        required_fees,
     ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {

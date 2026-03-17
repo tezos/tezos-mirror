@@ -3420,11 +3420,16 @@ let test_tezlink_validation_gas_limit =
   let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
 
   (* Sanity check: can fit two op in a blueprint *)
+  (* fee = 10_000 mutez covers execution gas fee (gas_limit * 10 * base_fee / 10^12
+     ≤ 693_332 * 10 * 10^9 / 10^12 = 6_933 mutez) so operations are not
+     rejected for insufficient fees before the gas limit check. *)
+  let fee = 10_000 in
   let* (`OpHash op1) =
     Operation.inject_transfer
       ~counter:1
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:almost_half_block
       client_tezlink
   in
@@ -3433,6 +3438,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:2
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:almost_half_block
       client_tezlink
   in
@@ -3447,6 +3453,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:3
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
   in
@@ -3455,6 +3462,7 @@ let test_tezlink_validation_gas_limit =
       ~counter:4
       ~source:Constant.bootstrap1
       ~dest:Constant.bootstrap2
+      ~fee
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
   in
@@ -3800,12 +3808,21 @@ let test_michelson_gas_backlog =
     | Ok block -> block.Block.baseFeePerGas
     | Error _ -> Stdlib.failwith "Couldn't retrieve latest block"
   in
+  (* With multiplier = 1,000,000 and gas_limit = 1,040,000 milligas,
+     execution gas fee = 1,040,000 * 1,000,000 * 10^9 / 10^12 = 1,040,000,000 mutez.
+     We provide a fee above this threshold to pass kernel fee validation.
+     The auto-estimated fee is rejected by the kernel. *)
+  let gas_limit = 1_040_000 in
+  let fee = Tez.of_mutez_int 1_100_000_000 in
+  let fee_cap = fee in
   let* () =
     Client.transfer
       ~amount:Tez.one
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
-      ~burn_cap:Tez.one
+      ~fee
+      ~fee_cap
+      ~gas_limit
       client_tezlink
   in
   (* Produce block containing the transfer, then another whose
@@ -3818,6 +3835,56 @@ let test_michelson_gas_backlog =
   let*@ new_block = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((new_block.Block.baseFeePerGas > initial_base_fee) int64)
     ~error_msg:"baseFeePerGas should have increased: expected > %R, got %L" ;
+  unit
+
+(** Tests that Michelson operations in TezosX validate execution gas fees.
+    With base_fee_per_gas = 10^9 (1 Gwei) and MICHELSON_TO_EVM_GAS_MULTIPLIER = 10,
+    gas_limit = 500_000 requires execution gas fee =
+    500_000 * 10 * 10^9 / 10^12 = 5_000 mutez.
+
+    A fee of 1_000 mutez does not cover execution gas: the operation
+    passes mempool injection but is rejected during block production.
+    A fee of 10_000 mutez covers execution gas: the operation is included. *)
+let test_michelson_execution_gas_fee =
+  register_tezosx_test
+    ~title:"Michelson transfer validates execution gas fee"
+    ~tags:["kernel"; "validation"; "execution"; "gas"; "fee"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  (* Fee = 1_000 mutez: below execution gas cost → rejected at
+     block production time. *)
+  let* (`OpHash _rejected) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~fee:1_000
+      ~gas_limit:500_000
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = check_operations ~client:client_tezlink ~block:"3" ~expected:[] in
+  (* Fee = 10_000 mutez: covers execution gas → included. *)
+  let* (`OpHash accepted) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap1
+      ~fee:10_000
+      ~gas_limit:500_000
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"4" ~expected:[accepted]
+  in
   unit
 
 let test_tezlink_gas_vs_l1 =
@@ -4548,6 +4615,7 @@ let () =
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_michelson_gas_backlog [Alpha] ;
+  test_michelson_execution_gas_fee [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
