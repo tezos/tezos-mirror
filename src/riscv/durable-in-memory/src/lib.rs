@@ -48,6 +48,11 @@ pub type Registry = MutableState<RegistryState<Normal>>;
 pub struct RegistryProve;
 ocaml::custom!(RegistryProve);
 
+// TODO (TZX-113): implement proof
+#[ocaml::sig]
+pub struct Proof;
+ocaml::custom!(Proof);
+
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
     "Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
@@ -374,6 +379,53 @@ pub fn octez_riscv_durable_in_memory_prove_database_hash(
     _db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>> {
     todo!("TZX-113 wire-up proof mode")
+}
+
+// Proof utilities
+
+#[ocaml::func]
+#[ocaml::sig("registry -> registry_prove")]
+pub fn octez_riscv_durable_in_memory_start_proof(
+    _state: SafePointer<Registry>,
+) -> SafePointer<RegistryProve> {
+    // TODO (TZX-113): wire-up proof mode
+    SafePointer::from(RegistryProve)
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_prove -> proof")]
+pub fn octez_riscv_durable_in_memory_produce_proof(
+    _state: SafePointer<RegistryProve>,
+) -> SafePointer<Proof> {
+    // TODO (TZX-113): wire-up proof mode
+    SafePointer::from(Proof)
+}
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub fn octez_riscv_durable_in_memory_proof_start_state(
+    _state: SafePointer<Proof>,
+) -> BytesWrapper<Hash> {
+    // TODO (TZX-113): wire-up proof mode
+    BytesWrapper::from(Hash::hash_bytes(&[]))
+}
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub fn octez_riscv_durable_in_memory_proof_stop_state(
+    _state: SafePointer<Proof>,
+) -> BytesWrapper<Hash> {
+    // TODO (TZX-113): wire-up proof mode
+    BytesWrapper::from(Hash::hash_bytes(&[]))
+}
+
+#[ocaml::func]
+#[ocaml::sig("proof -> bytes")]
+pub fn octez_riscv_durable_in_memory_serialise_proof(
+    _state: SafePointer<Proof>,
+) -> BytesWrapper<Vec<u8>> {
+    // TODO (TZX-113): wire-up proof mode
+    BytesWrapper::from(vec![])
 }
 
 /// Split handling of durable storage errors.

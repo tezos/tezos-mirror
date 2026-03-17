@@ -6,6 +6,7 @@ open! Bigarray
 
 type registry
 type registry_prove
+type proof
 type invalid_argument_error = Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large
 external octez_riscv_durable_in_memory_registry_new: unit -> registry = "octez_riscv_durable_in_memory_registry_new"
 external octez_riscv_durable_in_memory_registry_hash: registry -> bytes = "octez_riscv_durable_in_memory_registry_hash"
