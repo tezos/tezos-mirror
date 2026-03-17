@@ -5,6 +5,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Entrypoints_decode_error of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezosx.entrypoints_decode_error"
+    ~title:"Entrypoints result decode error"
+    ~description:
+      "Failed to decode the entrypoints result returned by the kernel."
+    ~pp:(fun ppf msg -> Format.fprintf ppf "Entrypoints decode error: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Entrypoints_decode_error msg -> Some msg | _ -> None)
+    (fun msg -> Entrypoints_decode_error msg)
+
+(* Decode the entrypoints result written by the kernel's
+   tezosx_michelson_entrypoints entrypoint. RLP encoding:
+     List []        → None (contract not found)
+     List [entries] → Some ([], entries)
+   where entries is an RLP list of [name_bytes, micheline_type_bytes] pairs. *)
+let decode_entrypoints_result bytes =
+  let open Lwt_result_syntax in
+  let decode_entry = function
+    | Rlp.List [Value name_bytes; Value type_bytes] -> (
+        let open Result_syntax in
+        let name = Bytes.to_string name_bytes in
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Imported_context.Script.expr_encoding
+            type_bytes
+        with
+        | None ->
+            tzfail
+              (Entrypoints_decode_error "Failed to decode Micheline type bytes")
+        | Some type_expr -> return (name, type_expr))
+    | _ ->
+        Result_syntax.tzfail
+          (Entrypoints_decode_error "Invalid RLP entry format")
+  in
+  let*? rlp = Rlp.decode bytes in
+  match rlp with
+  | Rlp.List [] -> return_none
+  | Rlp.List [entries_rlp] ->
+      let*? entries = Rlp.decode_list decode_entry entries_rlp in
+      (* The kernel does not encode unreachable entrypoints; always return
+         an empty list for the unreachable field. *)
+      return_some ([], entries)
+  | _ ->
+      tzfail
+        (Entrypoints_decode_error "Invalid RLP structure for entrypoints result")
+
 let make (ctxt : Evm_ro_context.t) =
   (module struct
     type block_param =
@@ -210,14 +260,47 @@ let make (ctxt : Evm_ro_context.t) =
       | Some c -> return_some c
       | None -> (
           let* code = get_code chain block c in
-          let* storage = get_storage chain block c in
-          match (code, storage) with
-          | Some code, Some storage ->
-              return
-              @@ Some
-                   Tezlink_imports.Imported_context.Script.
-                     {code = lazy_expr code; storage = lazy_expr storage}
-          | _ -> return_none)
+          match code with
+          | Some code -> (
+              let* storage = get_storage chain block c in
+              match storage with
+              | Some storage ->
+                  return_some
+                    Tezlink_imports.Imported_context.Script.
+                      {code = lazy_expr code; storage = lazy_expr storage}
+              | None -> return_none)
+          | None -> (
+              match c with
+              | Implicit _ -> return_none
+              | Originated _ -> (
+                  (* Enshrined TezosX contract — no code in durable storage.
+                     Derive the script from the entrypoints returned by the
+                     kernel, using a unit storage and FAILWITH code as stubs. *)
+                  let* eth_block = shell_block_param_to_eth_block_param block in
+                  let addr_bytes =
+                    Data_encoding.Binary.to_bytes_exn
+                      Tezos_types.Contract.encoding
+                      c
+                  in
+                  let* state =
+                    Evm_ro_context.get_state ctxt ~block:eth_block ()
+                  in
+                  let* bytes =
+                    Evm_ro_context.execute_entrypoint
+                      ctxt
+                      state
+                      ~input_path:Durable_storage_path.Tezosx_entrypoints.input
+                      ~input:addr_bytes
+                      ~output_path:
+                        Durable_storage_path.Tezosx_entrypoints.result
+                      ~entrypoint:"tezosx_michelson_entrypoints"
+                  in
+                  let* result = decode_entrypoints_result bytes in
+                  match result with
+                  | None -> return_none
+                  | Some (_, entries) ->
+                      return_some (Tezlink_mock.script_of_entrypoints entries)))
+          )
 
     let manager_key _chain block contract =
       let open Lwt_result_syntax in
@@ -443,7 +526,7 @@ let make (ctxt : Evm_ro_context.t) =
               ~output_path:Durable_storage_path.Tezosx_entrypoints.result
               ~entrypoint:"tezosx_michelson_entrypoints"
           in
-          let* result = Simulator.decode_entrypoints_result bytes in
+          let* result = decode_entrypoints_result bytes in
           match result with
           | None -> return_none
           | Some (unreachable, entries) ->
