@@ -53,7 +53,7 @@ use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
-    HasContractAccount, HasHost, OperationCtx, TcCtx,
+    HasContractAccount, HasHost, HasOperationGas, OperationCtx, TcCtx,
 };
 
 extern crate alloc;
@@ -1033,7 +1033,7 @@ fn execute_smart_contract<'a, Host>(
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError>
