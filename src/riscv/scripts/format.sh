@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cargo +nightly-2025-01-30 fmt "$@"
+cargo +nightly-2026-02-24 fmt "$@"
