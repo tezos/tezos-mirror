@@ -33,7 +33,9 @@ use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_api_common::try_clone::TryClone;
+use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
+use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
@@ -138,6 +140,16 @@ pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer
     let registry = RegistryState::new()?;
 
     Ok(SafePointer::from(MutableState::owned(registry)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry -> bytes")]
+pub fn octez_riscv_durable_in_memory_registry_hash(
+    state: SafePointer<Registry>,
+) -> BytesWrapper<Hash> {
+    let hash = state.apply_ro(|registry| registry.fold(HashFold));
+
+    BytesWrapper::from(hash)
 }
 
 #[ocaml::func]
