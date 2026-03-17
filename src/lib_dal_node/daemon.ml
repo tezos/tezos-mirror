@@ -352,9 +352,16 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     (fun exn ->
       match exn with
       | Lwt.Canceled ->
-          (* This is expected when the daemon loop terminates and Lwt.pick
+          (* This is expected when the daemon loop terminates and [Lwt.pick]
              cancels us. Re-raise so the actual error can surface. *)
           Lwt.fail exn
+      | Effect.Unhandled Eio.Private.Effects.Get_context ->
+          (* When [gs] is canceled (e.g. daemon loop failed and [Lwt.pick]
+             canceled us), code inside [Lwt_eio.run_eio] can surface as
+             unhandled Eio [Cancel.Get_context] instead of [Lwt.Canceled]. Treat
+             that as cancellation so the real error (e.g. daemon failure) can
+             surface. *)
+          Lwt.fail Lwt.Canceled
       | _ ->
           let msg =
             "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
