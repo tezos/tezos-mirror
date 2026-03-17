@@ -17,6 +17,10 @@ type named_entrypoints =
     expressions.  Matches the L1 [list_entrypoints] RPC output shape. *)
 type entrypoints_info = unreachable_paths * named_entrypoints
 
+(* In simulation mode, skip signature check and allow null fees. In
+   preapplication mode, check signature and fees. *)
+type simulator_mode = Simulation | Preapplication
+
 module type S = sig
   type block_param =
     [ `Head of int32
@@ -105,7 +109,7 @@ module type S = sig
 
   val simulate_operation :
     chain_id:Chain_id.t ->
-    skip_signature:bool ->
+    simulator_mode:simulator_mode ->
     Tezlink_imports.Imported_protocol.operation ->
     Operation_hash.t ->
     block_param ->

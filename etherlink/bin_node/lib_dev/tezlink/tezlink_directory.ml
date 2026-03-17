@@ -445,7 +445,7 @@ let build_block_static_directory ~l2_chain_id
          let* result =
            Backend.simulate_operation
              ~chain_id
-             ~skip_signature:true
+             ~simulator_mode:Simulation
              operation
              hash
              block
@@ -460,7 +460,7 @@ let build_block_static_directory ~l2_chain_id
          let* result =
            Backend.simulate_operation
              ~chain_id
-             ~skip_signature:true
+             ~simulator_mode:Simulation
              operation
              (Tezlink_imports.Imported_context.Operation.hash_packed operation)
              block
@@ -486,7 +486,7 @@ let build_block_static_directory ~l2_chain_id
                let* result =
                  Backend.simulate_operation
                    ~chain_id
-                   ~skip_signature:false
+                   ~simulator_mode:Preapplication
                    operation
                    hash
                    block
