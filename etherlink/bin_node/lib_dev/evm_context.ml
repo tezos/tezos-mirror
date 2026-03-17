@@ -60,13 +60,18 @@ type future_block_info_state =
   | Awaiting_next_block_info
   | Executing of future_block_info
 
+type kernel_change =
+  | Force_change
+  | Kernel_upgrade of Evm_store.pending_kernel_upgrade
+  | No
+
 type session_state = {
   mutable context : Pvm.Context.rw;
   mutable storage_version : int;
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
-  mutable pending_upgrade : Evm_store.pending_kernel_upgrade option;
+  mutable kernel_change : kernel_change;
   mutable pending_sequencer_upgrade :
     Evm_store.pending_sequencer_upgrade option;
   mutable evm_state : Evm_state.t;
@@ -231,7 +236,7 @@ module State = struct
           finalized_number;
           next_blueprint_number;
           current_block_hash;
-          pending_upgrade;
+          kernel_change;
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
@@ -245,7 +250,7 @@ module State = struct
         finalized_number;
         next_blueprint_number;
         current_block_hash;
-        pending_upgrade;
+        kernel_change;
         pending_sequencer_upgrade;
         evm_state;
         last_split_block;
@@ -262,7 +267,7 @@ module State = struct
           finalized_number;
           next_blueprint_number;
           current_block_hash;
-          pending_upgrade;
+          kernel_change;
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
@@ -275,7 +280,7 @@ module State = struct
       session.finalized_number <- finalized_number ;
       session.next_blueprint_number <- next_blueprint_number ;
       session.current_block_hash <- current_block_hash ;
-      session.pending_upgrade <- pending_upgrade ;
+      session.kernel_change <- kernel_change ;
       session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
       session.evm_state <- evm_state ;
       session.last_split_block <- last_split_block ;
@@ -290,9 +295,9 @@ module State = struct
         next_blueprint_number = session.next_blueprint_number;
         current_block_hash = session.current_block_hash;
         pending_upgrade =
-          Option.map
-            (fun pending_upgrade -> pending_upgrade.Evm_store.kernel_upgrade)
-            session.pending_upgrade;
+          (match session.kernel_change with
+          | Kernel_upgrade upgrade -> Some upgrade.kernel_upgrade
+          | _ -> None);
         pending_sequencer_upgrade =
           Option.map
             (fun pending_upgrade -> pending_upgrade.Evm_store.sequencer_upgrade)
@@ -607,6 +612,11 @@ module State = struct
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let kernel_change =
+      match pending_upgrade with
+      | None -> No
+      | Some upgrade -> Kernel_upgrade upgrade
+    in
     let* pending_sequencer_upgrade =
       Evm_store.Sequencer_upgrades.find_latest_pending conn
     in
@@ -626,7 +636,7 @@ module State = struct
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.current_block_hash <- current_block_hash ;
     ctxt.session.context <- context ;
-    ctxt.session.pending_upgrade <- pending_upgrade ;
+    ctxt.session.kernel_change <- kernel_change ;
     ctxt.session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
     return_unit
 
@@ -705,9 +715,9 @@ module State = struct
           expected_block_hash
 
   let check_pending_upgrade ctxt timestamp =
-    match ctxt.session.pending_upgrade with
-    | None -> None
-    | Some upgrade ->
+    match ctxt.session.kernel_change with
+    | No | Force_change -> None
+    | Kernel_upgrade upgrade ->
         if Time.Protocol.(upgrade.kernel_upgrade.timestamp <= timestamp) then
           Some upgrade
         else None
@@ -1447,8 +1457,8 @@ module State = struct
         in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ?split_info ctxt ~applied_kernel_upgrade
-      ~applied_sequencer_upgrade evm_state context block blueprint_with_events =
+  let on_new_head ?split_info ctxt ~kernel_change ~applied_sequencer_upgrade
+      evm_state context block blueprint_with_events =
     let open Lwt_syntax in
     let block_hash = L2_types.block_hash block in
     let (Qty level) = ctxt.session.next_blueprint_number in
@@ -1472,10 +1482,10 @@ module State = struct
     if applied_sequencer_upgrade then
       ctxt.session.pending_sequencer_upgrade <- None ;
     let* () =
-      if applied_kernel_upgrade then (
+      if kernel_change then (
         let* storage_version = Evm_state.storage_version evm_state in
         let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
-        ctxt.session.pending_upgrade <- None ;
+        ctxt.session.kernel_change <- No ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
              should never happen. *)
@@ -1587,8 +1597,8 @@ module State = struct
           expected_block_hash
       in
       let kernel_upgrade =
-        match ctxt.session.pending_upgrade with
-        | Some {injected_before; kernel_upgrade}
+        match ctxt.session.kernel_change with
+        | Kernel_upgrade {injected_before; kernel_upgrade}
           when injected_before = ctxt.session.next_blueprint_number ->
             Some kernel_upgrade
         | _ -> None
@@ -1618,7 +1628,8 @@ module State = struct
         on_new_head
           ?split_info
           ctxt
-          ~applied_kernel_upgrade
+          ~kernel_change:
+            (applied_kernel_upgrade || ctxt.session.kernel_change = Force_change)
           ~applied_sequencer_upgrade
           evm_state
           context
@@ -1640,8 +1651,8 @@ module State = struct
     let*! () = Evm_events_follower_events.new_event event in
     match event with
     | Evm_events.Upgrade_event upgrade ->
-        ctxt.session.pending_upgrade <-
-          Some
+        ctxt.session.kernel_change <-
+          Kernel_upgrade
             {
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
@@ -2073,6 +2084,11 @@ module State = struct
           failwith "Store has pending confirmation, state is not final")
     in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
+    let kernel_change =
+      match pending_upgrade with
+      | None -> No
+      | Some upgrade -> Kernel_upgrade upgrade
+    in
     let* pending_sequencer_upgrade =
       Evm_store.Sequencer_upgrades.find_latest_pending conn
     in
@@ -2264,7 +2280,7 @@ module State = struct
             finalized_number;
             next_blueprint_number;
             current_block_hash;
-            pending_upgrade;
+            kernel_change;
             pending_sequencer_upgrade;
             evm_state;
             last_split_block;
@@ -2353,6 +2369,7 @@ module State = struct
                 Ethereum_types.pp_quantity
                 block_number)
     in
+    if key = "/kernel/boot.wasm" then ctxt.session.kernel_change <- Force_change ;
     let*! previous_value = Evm_state.inspect ctxt.session.evm_state key in
     let new_value = patch (Option.map Bytes.to_string previous_value) in
     let*! () =
