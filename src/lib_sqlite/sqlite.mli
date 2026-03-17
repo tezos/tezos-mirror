@@ -284,7 +284,66 @@ end
 
     Provides types for defining migrations (SQL or OCaml), helpers for creating
     and applying them, and a functor for managing migration state via a tracking
-    table. *)
+    table.
+
+    {3 Writing SQL migrations}
+
+    SQL migrations are plain [.sql] files named [N_name.sql] where [N] is a
+    sequence number (e.g. [000_initial.sql], [001_add_index.sql]). The SQL
+    content is split on semicolons and each statement is executed in order.
+
+    {3 Writing OCaml migrations}
+
+    OCaml migrations are [.ml] files named [mN_name.ml] where [N] matches the
+    sequence number (e.g. [m002_backfill.ml]). The module must expose:
+
+    {[
+      val name : string
+      val up : Sqlite.Migration.step list
+    ]}
+
+    Steps can be SQL statements or arbitrary OCaml functions:
+
+    {[
+      let name = "backfill"
+
+      let up =
+        [
+          Sqlite.Migration.Sql
+            (Sqlite.Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit)
+            @@ "CREATE INDEX idx_foo ON bar(baz)");
+          Sqlite.Migration.Ocaml
+            (fun conn ->
+              let open Lwt_result_syntax in
+              (* ... arbitrary logic using Db.exec, Db.find, etc. ... *)
+              return_unit);
+        ]
+    ]}
+
+    {3 Mixing SQL and OCaml in a single step}
+
+    An [Ocaml] step can execute raw SQL via {!Db.exec}:
+
+    {[
+      Sqlite.Migration.Ocaml
+        (fun conn ->
+          let open Lwt_result_syntax in
+          let* () =
+            Db.exec conn
+              (Sqlite.Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit)
+              @@ "ALTER TABLE t ADD COLUMN c INTEGER")
+              ()
+          in
+          (* ... then do OCaml logic ... *)
+          return_unit)
+    ]}
+
+    {3 Numbering rules}
+
+    SQL and OCaml migrations share the same numbering sequence. The
+    [gen_migrations] tool validates that numbering starts at [0], has no gaps,
+    and has no duplicates. SQL and OCaml files can be freely interleaved
+    (e.g. [000_init.sql], [m001_backfill.ml], [002_add_column.sql]). *)
 module Migration : sig
   (** A single migration step: either a SQL statement or an OCaml function. *)
   type step =
