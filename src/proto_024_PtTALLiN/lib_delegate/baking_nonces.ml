@@ -624,8 +624,7 @@ let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
                    [@profiler.record_s {verbosity = Info} "save nonces"]))))
   else return_unit
 
-(* We suppose that the block stream is cloned by the caller *)
-let start_revelation_worker cctxt config chain_id constants block_stream =
+let start_revelation_worker cctxt config chain_id constants =
   let open Lwt_syntax in
   let legacy_location = Baking_files.resolve_location ~chain_id `Legacy_nonce in
   let stateful_location =
@@ -656,6 +655,7 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
   Lwt_canceler.on_cancel canceler (fun () ->
       should_shutdown := true ;
       Lwt.return_unit) ;
+  let block_stream, push_block_stream = Lwt_stream.create () in
   let rec worker_loop () =
     let* new_proposal = Lwt_stream.get block_stream in
     match new_proposal with
@@ -689,4 +689,4 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
           (* never ending loop *) Lwt.return_unit)
         (fun () -> (* TODO *) Lwt.return_unit))
     (fun _exn -> ()) ;
-  Lwt.return canceler
+  Lwt.return (canceler, fun proposal -> push_block_stream (Some proposal))

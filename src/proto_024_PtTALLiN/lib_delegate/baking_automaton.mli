@@ -87,13 +87,15 @@ val compute_next_potential_baking_time_at_next_level :
     previous round) to check whether we need to propose at this level or not. *)
 val compute_bootstrap_event : state -> event tzresult
 
-(** [create_loop_state ?get_valid_blocks_stream heads_stream forge_event_stream
-    operation_worker] creates a loop state with the streams of valid blocks, new
-    heads, forged events and operations from the node's mempool. *)
+(** [create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
+    ~on_head_proposal_callback operation_worker] creates a loop state with the
+    streams of valid blocks, new heads, forged events and operations from the
+    node's mempool. *)
 val create_loop_state :
   ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
   heads_stream:proposal Lwt_stream.t ->
   forge_event_stream:forge_event Lwt_stream.t ->
+  on_head_proposal_callback:(proposal -> unit) ->
   Operation_worker.t ->
   loop_state
 

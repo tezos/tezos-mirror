@@ -325,14 +325,12 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
       initial_state.global_state.dal_node_rpc_ctxt
       delegates
   in
-  let cloned_block_stream = Lwt_stream.clone heads_stream in
-  let*! revelation_worker_canceler =
+  let*! revelation_worker_canceler, revelation_worker_push_proposal =
     Baking_nonces.start_revelation_worker
       cctxt
       initial_state.global_state.config.nonce
       initial_state.global_state.chain_id
       initial_state.global_state.constants
-      cloned_block_stream
   in
   Option.iter
     (fun canceler ->
@@ -354,6 +352,7 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
       ~get_valid_blocks_stream
       ~forge_event_stream
       ~heads_stream
+      ~on_head_proposal_callback:revelation_worker_push_proposal
       initial_state.automaton_state.operation_worker
   in
   let on_error err =
