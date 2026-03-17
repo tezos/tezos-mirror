@@ -39,10 +39,19 @@ use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
 use octez_riscv_durable_storage::registry;
 use octez_riscv_durable_storage::storage::in_memory::InMemoryKeyValueStore;
+use octez_riscv_durable_storage::storage::in_memory::InMemoryRepo;
 
 /// Wrapper to enable customing OCaml GC's resource tracking.
 #[repr(transparent)]
 pub struct RegistryState(registry::Registry<InMemoryKeyValueStore, Normal>);
+
+impl RegistryState {
+    /// Construct a new in-memory registry
+    pub fn new() -> Result<Self, ds_errors::OperationalError> {
+        let reg = registry::Registry::new(InMemoryRepo)?;
+        Ok(Self(reg))
+    }
+}
 
 impl std::ops::Deref for RegistryState {
     type Target = registry::Registry<InMemoryKeyValueStore, Normal>;
@@ -117,6 +126,14 @@ impl<'a> From<BytesParam<'a>> for Bytes {
     fn from(value: BytesParam<'a>) -> Self {
         Bytes::copy_from_slice(value.0)
     }
+}
+
+#[ocaml::func]
+#[ocaml::sig("unit -> registry")]
+pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer<Registry>> {
+    let registry = RegistryState::new()?;
+
+    Ok(SafePointer::from(MutableState::owned(registry)))
 }
 
 #[ocaml::func]
