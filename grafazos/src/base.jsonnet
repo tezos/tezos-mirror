@@ -192,7 +192,7 @@ local logs = panel.logs;
         + logs.panelOptions.withGridPos(h, w, x, y)
         + logs.queryOptions.withTargets(q)
         + logs.options.withSortOrder('Descending')
-        + logs.options.withWrapLogMessage(true)
+        + logs.options.withWrapLogMessage(false)
         + logs.queryOptions.withDatasource(d, dn),
     },
 

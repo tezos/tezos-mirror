@@ -3,6 +3,7 @@ all: basic logs full compact dal-basic profiling tezt_cloud-layer1
 NODE_INSTANCE_LABEL ?= instance
 LOGS_LABEL ?= job
 ENDPOINT_LABEL ?= endpoint
+HARDWARE_SRC ?= netdata
 STORAGE_MODE ?= default
 UID ?= default
 DATASOURCE_SELECTION ?= false
@@ -14,6 +15,7 @@ DATASOURCE_DEFAULT ?= Prometheus
 		--ext-str node_instance_label="$(NODE_INSTANCE_LABEL)" \
 		--ext-str logs_label="$(LOGS_LABEL)" \
 		--ext-str endpoint_label="$(ENDPOINT_LABEL)" \
+		--ext-str hardware_src="$(HARDWARE_SRC)" \
 		--ext-str storage_mode="$(STORAGE_MODE)" \
 		--ext-str mountpoint="$(MOUNTPOINT)" \
 		--ext-str logsrc="$(LOGSRC)" \
