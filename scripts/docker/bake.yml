@@ -5,13 +5,13 @@ services:
     environment:
       - HISTORY_MODE=${HISTORY_MODE:-rolling}
       - NETWORK_URL=${NETWORK_URL:-https://teztnets.com/${NETWORK:-shadownet}}
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
     command: >-
       /bin/sh -c \
-      "if [ ! -f /var/run/tezos/node/data/config.json ]; then \
+      "if [ ! -f $$TEZOS_NODE_DIR/config.json ]; then \
       octez-node config init \
       --network $$NETWORK_URL \
       --history-mode $$HISTORY_MODE \
-      --data-dir /var/run/tezos/node/data \
       --rpc-addr [::]:8732 --allow-all-rpc [::]:8732; \
       fi"
     volumes:
@@ -24,13 +24,14 @@ services:
       - HISTORY_MODE=${HISTORY_MODE:-rolling}
       - NETWORK=${NETWORK:-shadownet}
       - NETWORK_URL=${NETWORK_URL:-https://teztnets.com/$$NETWORK}
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
     command:  >-
       /bin/sh -c "if [ $$HISTORY_MODE = \"archive\" ]; then SNAPSHOT_MODE=\"full\"; fi; \
       export SNAPSHOT_NAME=${SNAPSHOT_NAME:-$${NETWORK}.$${SNAPSHOT_MODE:-$$HISTORY_MODE}}; \
       export SNAPSHOT_URL=${SNAPSHOT_URL:-https://snapshots.tzinit.org/$${NETWORK}/$${SNAPSHOT_MODE:-$$HISTORY_MODE}};
-      if [[ ! -f /var/run/tezos/node/data/daily_logs/daily-$$(date +%Y%m%d).log ]] || ${FORCE_IMPORT_SNAPSHOT:-${FORCE_DOWNLOAD_SNAPSHOT:-false}}; then
+      if [[ ! -f $$TEZOS_NODE_DIR/daily_logs/daily-$$(date +%Y%m%d).log ]] || ${FORCE_IMPORT_SNAPSHOT:-${FORCE_DOWNLOAD_SNAPSHOT:-false}}; then
       if [[ ! -f $$SNAPSHOT_URL ]] || ${FORCE_DOWNLOAD_SNAPSHOT:-false}; then wget -O $$SNAPSHOT_NAME $$SNAPSHOT_URL; fi; \
-      octez-node snapshot import --force $$(if [ ! ${CHECK_SNAPSHOT:-false} ]; then echo -n --no-check; fi) --data-dir /var/run/tezos/node/data $$SNAPSHOT_NAME; \
+      octez-node snapshot import --force $$(if [ ! ${CHECK_SNAPSHOT:-false} ]; then echo -n --no-check; fi) $$SNAPSHOT_NAME; \
       fi"
     depends_on:
       config-set:
@@ -42,7 +43,10 @@ services:
     container_name: octez-node-box
     image: tezos/tezos-bare:latest
     hostname: octez-node
-    command: octez-node run --data-dir /var/run/tezos/node/data
+    environment:
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
+      - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+    command: octez-node run
     ports:
       - 9732:9732
       - 8732:8732
@@ -68,7 +72,7 @@ services:
     container_name: octez-dal-box
     image: tezos/tezos-bare:latest
     hostname: octez-dal
-    command: octez-dal-node run  --data-dir /var/run/tezos/dal --endpoint http://node:8732 --attester-profile=$BAKER_ADDRESS
+    command: octez-dal-node run  --data-dir /var/run/tezos/dal/data --endpoint http://node:8732 --attester-profile=$BAKER_ADDRESS
     ports:
       - 10732:10732
       - 11732:11732
@@ -107,10 +111,10 @@ services:
     hostname: octez-baker
     environment:
       - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+      - TEZOS_NODE_DIR=/var/run/tezos/node/data
       - TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=yes
     command: >-
       octez-baker
-      --base-dir /var/run/tezos/client/data
       --endpoint http://node:8732 run with local node /var/run/tezos/node/data
       --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
       --dal-node http://dal-node:10732 signing-key
@@ -127,7 +131,7 @@ services:
     container_name: octez-accuser-box
     image: tezos/tezos-bare:latest
     hostname: octez-accuser
-    command: octez-accuser --base-dir /var/run/tezos/client/data --endpoint http://node:8732 run
+    command: octez-accuser --endpoint http://node:8732 run
     volumes:
       - ./client_data:/var/run/tezos/client
     depends_on:

@@ -385,7 +385,6 @@ Note that you must have already:
 
 	and then in the shell set up the baker keys::
 
-		export TEZOS_CLIENT_DIR=/var/run/tezos/client/data
 		octez-client gen keys mybaker
 		octez-client show address mybaker -S
 		# Note down the address and secret of mybaker
@@ -402,7 +401,7 @@ Note that you must have already:
 		octez-client set companion key for mybaker to mycompanion
 		exit
 
-	and finally stop the node service with Ctrl-C in the node's terminal).
+	and finally stop the node service with ``docker compose -f bake.yml down``.
 
 Create an environment file called ``.env`` in your current directory with a content of the following form::
 
@@ -466,7 +465,6 @@ For example, if you don't want to use auxiliary keys (consensus key and companio
 
 	then in the shell interact with the node directly::
 
-		export TEZOS_NODE_DIR=/var/run/tezos/node/data
 		octez-node config show
 		octez-node config update ...
 
