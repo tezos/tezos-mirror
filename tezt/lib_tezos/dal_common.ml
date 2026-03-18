@@ -756,33 +756,36 @@ module Dal_RPC = struct
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        node rpc =
+        ?log_response_body_max node rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers node rpc =
+        ?log_response_body_max ?extra_headers node rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         (Dal_node.as_rpc_endpoint node)
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body node rpc =
+        ?log_response_body ?log_response_body_max node rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         (Dal_node.as_rpc_endpoint node)
         rpc
   end
@@ -790,33 +793,36 @@ module Dal_RPC = struct
   module Remote :
     RPC_core.CALLERS with type uri_provider := remote_uri_provider = struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        endpoint rpc =
+        ?log_response_body_max endpoint rpc =
       RPC_core.call
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         endpoint
         rpc
 
     let call_raw ?rpc_hooks ?log_request ?log_response_status ?log_response_body
-        ?extra_headers endpoint rpc =
+        ?log_response_body_max ?extra_headers endpoint rpc =
       RPC_core.call_raw
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         ?extra_headers
         endpoint
         rpc
 
     let call_json ?rpc_hooks ?log_request ?log_response_status
-        ?log_response_body endpoint rpc =
+        ?log_response_body ?log_response_body_max endpoint rpc =
       RPC_core.call_json
         ?rpc_hooks
         ?log_request
         ?log_response_status
         ?log_response_body
+        ?log_response_body_max
         endpoint
         rpc
   end

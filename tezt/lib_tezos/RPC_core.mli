@@ -138,12 +138,16 @@ module type CALLERS = sig
     If [log_response_body] is [true], log the response body after the RPC call.
 
     For [call] and [call_json], if the response is valid JSON, it is pretty-printed
-    with indentation. Default is [true]. *)
+    with indentation. Default is [true].
+
+    If [log_response_body_max] is [Some n], at most [n] bytes of the body are
+    logged, then a truncation line. [None] means no limit. Default is [Some 4096]. *)
   val call :
     ?rpc_hooks:rpc_hooks ->
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     uri_provider ->
     'result t ->
     'result Lwt.t
@@ -156,6 +160,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     ?extra_headers:(string * string) list ->
     uri_provider ->
     'result t ->
@@ -170,6 +175,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     uri_provider ->
     'result t ->
     JSON.t response Lwt.t
