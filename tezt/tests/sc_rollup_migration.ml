@@ -378,6 +378,14 @@ let test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to =
         tezos_client
     in
     let* () =
+      (* Bake one commitment period before starting the refutation game. *)
+      let* constants = get_sc_rollup_constants tezos_client in
+      let commitment_period_in_blocks = constants.commitment_period_in_blocks in
+      Client.bake_for_and_wait
+        ~count:(commitment_period_in_blocks - 1)
+        tezos_client
+    in
+    let* () =
       Sc_rollup_helpers.start_refute
         tezos_client
         ~sc_rollup
