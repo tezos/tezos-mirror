@@ -3187,6 +3187,67 @@ let test_trace_call_evm ~runtime () =
   Log.info "First trace URL: %s" trace_url ;
   unit
 
+(** Test RPC/kernel consistency over Michelson aliases of EVM address.
+    Uses a Michelson contract that stores the sender and perform a cross-runtime
+    call. Compare the storage contents with the result of the RPC. *)
+let test_cross_runtime_evm_sender_is_alias =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime EVM to Michelson: sender is alias of EVM source"
+    ~tags:["cross_runtime"; "sender"; "alias"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        observer;
+        _;
+      }
+      protocol
+    ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* Step 1: Originate sender.tz with a dummy initial address. *)
+  let* _, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source:Constant.bootstrap1
+      ~counter:1
+      ~script_name:["opcodes"; "sender"]
+      ~init_storage_data:(sf {|"%s"|} Constant.bootstrap1.public_key_hash)
+      protocol
+  in
+  (* Step 2: Call the contract from EVM via the gateway precompile. *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"callMichelson(string,string,bytes)"
+      ~arguments:[kt1_address; ""; "0x"]
+      ()
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* Step 3: Resolve the expected KT1 alias for the EVM sender. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let expected = "\"" ^ Result.get_ok alias_result ^ "\"\n" in
+  let* tezos_node = tezos_client observer in
+  let* storage = Client.contract_storage kt1_address tezos_node in
+  Check.((storage = expected) string ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3228,4 +3289,5 @@ let () =
   test_tezosx_simulation () ;
   test_entrypoints_enshrined () ;
   test_script_coherency_enshrined () ;
-  test_trace_call_evm ~runtime:Tezos ()
+  test_trace_call_evm ~runtime:Tezos () ;
+  test_cross_runtime_evm_sender_is_alias [Alpha]
