@@ -24,193 +24,259 @@ local dashboard = grafonnet.dashboard;
 local panel = grafonnet.panel;
 local query = grafonnet.query;
 local timeSeries = panel.timeSeries;
+local variableCustom = dashboard.variable.custom;
 
 // Base
 local base = import './base.jsonnet';
 local graph = base.graph;
 
 //##
-// Comparison dashboard: netdata vs prom-exporters
+// Comparison dashboard: hardware exporters side-by-side
 //##
 
 local panelHeight = 8;
-local panelWidth = 12;
+local inst = base.node_instance + '="$node_instance"';
 
 // Helper to create queries
+local datasource = if base.enable_datasource_selection then '$prometheus_datasource' else base.datasource_default;
 local queryHelper(q, legendFormat) =
-  query.prometheus.new('Prometheus', q)
+  query.prometheus.new(datasource, q)
   + query.prometheus.withLegendFormat(legendFormat);
 
 // ============================================
-// NETDATA METRICS (left column)
+// EXPORTER DEFINITIONS
+// ============================================
+// Each exporter defines its available metrics. Panels are generated
+// at build time based on the configured hardware_src exporters.
+
+local exporterOrder = ['netdata', 'process-exporter', 'cadvisor', 'node-exporter', 'local-storage-exporter'];
+
+local allExporters = {
+  netdata: {
+    ios: {
+      queries: [
+        queryHelper('rate(netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + inst + '}[1m])', 'reads'),
+        queryHelper('rate(netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + inst + '}[1m])', 'writes'),
+      ],
+      unit: 'kbytes',
+      colors: [['reads', 'light-green'], ['writes', 'light-yellow']],
+    },
+    cpu: {
+      queries: [
+        queryHelper('sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + inst + '})', 'CPU Load'),
+      ],
+      unit: 'percent',
+      colors: [['CPU Load', 'light-yellow']],
+    },
+    memory: {
+      queries: [
+        queryHelper('netdata_app_mem_usage_MiB_average{app_group="octez",' + inst + '}', 'RAM'),
+        queryHelper('netdata_app_swap_usage_MiB_average{app_group="octez",' + inst + '}', 'Swap'),
+      ],
+      unit: 'mbytes',
+      calcs: ['mean', 'max'],
+      colors: [['RAM', 'light-green'], ['Swap', 'light-orange']],
+    },
+    fds: {
+      queries: [
+        queryHelper('netdata_app_fds_open_fds_average{app_group="octez",' + inst + '}', 'Open FDs'),
+      ],
+      unit: 'short',
+      colors: [['Open FDs', 'light-blue']],
+    },
+    storage: {
+      queries: [
+        queryHelper('netdata_disk_space_GiB_average{dimension="used",' + inst + '}', 'Used Space'),
+      ],
+      unit: 'decgbytes',
+      colors: [['Used Space', 'light-red']],
+    },
+  },
+
+  'process-exporter': {
+    ios: {
+      queries: [
+        queryHelper('rate(namedprocess_namegroup_read_bytes_total{groupname=~"octez.*",' + inst + '}[1m])/1024', 'reads ({{ groupname }})'),
+        queryHelper('rate(namedprocess_namegroup_write_bytes_total{groupname=~"octez.*",' + inst + '}[1m])/1024', 'writes ({{ groupname }})'),
+      ],
+      unit: 'kbytes',
+      colors: [['reads', 'light-green'], ['writes', 'light-yellow']],
+    },
+    cpu: {
+      queries: [
+        queryHelper('rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"octez.*",mode="user",' + inst + '}[5m])*100', 'CPU Load ({{ groupname }})'),
+      ],
+      unit: 'percent',
+      colors: [['CPU Load', 'light-yellow']],
+    },
+    memory: {
+      queries: [
+        queryHelper('namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="resident",' + inst + '} / 1024 / 1024', 'RAM ({{ groupname }})'),
+        queryHelper('namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="swapped",' + inst + '} / 1024 / 1024', 'Swap ({{ groupname }})'),
+      ],
+      unit: 'mbytes',
+      calcs: ['mean', 'max'],
+      colors: [['RAM', 'light-green'], ['Swap', 'light-orange']],
+    },
+    fds: {
+      queries: [
+        queryHelper('namedprocess_namegroup_open_filedesc{groupname=~"octez.*",' + inst + '}', 'Open FDs ({{ groupname }})'),
+      ],
+      unit: 'short',
+      colors: [['Open FDs', 'light-blue']],
+    },
+  },
+
+  cadvisor: {
+    ios: {
+      queries: [
+        queryHelper('rate(container_fs_reads_bytes_total{pod=~"octez-.*",' + inst + '}[1m]) / 1024', 'reads ({{ pod }})'),
+        queryHelper('rate(container_fs_writes_bytes_total{pod=~"octez-.*",' + inst + '}[1m]) / 1024', 'writes ({{ pod }})'),
+      ],
+      unit: 'kbytes',
+      colors: [['reads', 'light-green'], ['writes', 'light-yellow']],
+    },
+    cpu: {
+      queries: [
+        queryHelper('rate(container_cpu_usage_seconds_total{pod=~"octez-.*",' + inst + '}[5m]) * 100', 'CPU Load ({{ pod }})'),
+      ],
+      unit: 'percent',
+      colors: [['CPU Load', 'light-yellow']],
+    },
+    memory: {
+      queries: [
+        queryHelper('sum by (pod)(container_memory_working_set_bytes{pod=~"octez-.*",' + inst + '}) / 1024 / 1024', 'RAM ({{ pod }})'),
+        queryHelper('sum by (pod)(container_memory_swap{pod=~"octez-.*",' + inst + '}) / 1024 / 1024', 'Swap ({{ pod }})'),
+      ],
+      unit: 'mbytes',
+      calcs: ['mean', 'max'],
+      colors: [['RAM', 'light-green'], ['Swap', 'light-orange']],
+    },
+    fds: {
+      queries: [
+        queryHelper('sum(process_open_fds{pod=~"octez-.*",' + inst + '})', 'Open FDs'),
+      ],
+      unit: 'short',
+      colors: [['Open FDs', 'light-blue']],
+    },
+    storage: {
+      queries: [
+        queryHelper('sum(container_fs_usage_bytes{pod=~"octez-.*",' + inst + '}) / 1024 / 1024 / 1024', 'Used Space'),
+      ],
+      unit: 'decgbytes',
+      colors: [['Used Space', 'light-red']],
+    },
+  },
+
+  'node-exporter': {
+    storage: {
+      queries: [
+        queryHelper('node_filesystem_size_bytes{mountpoint=~"^/$",' + inst + '}', 'Total Size ({{ device }})'),
+      ],
+      unit: 'bytes',
+      colors: [['Total Size', 'light-red']],
+    },
+  },
+
+  'local-storage-exporter': {
+    storage: {
+      queries: [
+        queryHelper('local_storage_pv_used_bytes{' + inst + '}', 'Used Space ({{ persistentvolume }})'),
+      ],
+      unit: 'bytes',
+      colors: [['Used Space', 'light-red']],
+    },
+  },
+};
+
+// ============================================
+// DYNAMIC LAYOUT
 // ============================================
 
-local netdata_ios = graph.new(
-                      '[netdata] Disk IOs',
-                      [
-                        queryHelper('rate(netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + base.node_instance + '="$node_instance"}[1m])', 'reads'),
-                        queryHelper('rate(netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + base.node_instance + '="$node_instance"}[1m])', 'writes'),
-                      ],
-                      panelHeight,
-                      panelWidth,
-                      0,
-                      0
-                    )
-                    + timeSeries.standardOptions.withUnit('kbytes')
-                    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                    + graph.withQueryColor([['reads', 'light-green'], ['writes', 'light-yellow']]);
+// Active exporters in display order
+local activeExporters = [
+  e
+  for e in exporterOrder
+  if std.member(base.hardware_exporters, e) && std.objectHas(allExporters, e)
+];
 
-local netdata_cpu = graph.new(
-                      '[netdata] CPU Activity',
-                      [
-                        queryHelper('sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + base.node_instance + '="$node_instance"})', 'CPU Load'),
-                      ],
-                      panelHeight,
-                      panelWidth,
-                      0,
-                      panelHeight
-                    )
-                    + timeSeries.standardOptions.withUnit('percent')
-                    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                    + graph.withQueryColor([['CPU Load', 'light-yellow']]);
+// Metric rows in display order
+local metricRows = [
+  { key: 'ios', title: 'Disk IOs' },
+  { key: 'cpu', title: 'CPU Activity' },
+  { key: 'memory', title: 'Memory Usage' },
+  { key: 'fds', title: 'Open File Descriptors' },
+  { key: 'storage', title: 'Storage' },
+];
 
-local netdata_memory = graph.new(
-                         '[netdata] Memory Usage',
-                         [
-                           queryHelper('netdata_app_mem_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', 'RAM'),
-                           queryHelper('netdata_app_swap_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', 'Swap'),
-                         ],
-                         panelHeight,
-                         panelWidth,
-                         0,
-                         panelHeight * 2
-                       )
-                       + timeSeries.standardOptions.withUnit('mbytes')
-                       + graph.withLegendBottom(calcs=['mean', 'max'])
-                       + graph.withQueryColor([['RAM', 'light-green'], ['Swap', 'light-orange']]);
+// For each metric, find which exporters support it
+local exportersForMetric(metricKey) = [
+  e
+  for e in activeExporters
+  if std.objectHas(allExporters[e], metricKey)
+];
 
-local netdata_fds = graph.new(
-                      '[netdata] Open File Descriptors',
-                      [
-                        queryHelper('netdata_app_fds_open_fds_average{app_group="octez",' + base.node_instance + '="$node_instance"}', 'Open FDs'),
-                      ],
-                      panelHeight,
-                      panelWidth,
-                      0,
-                      panelHeight * 3
-                    )
-                    + timeSeries.standardOptions.withUnit('short')
-                    + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                    + graph.withQueryColor([['Open FDs', 'light-blue']]);
+// Generate one panel; width adapts to how many exporters share this row
+local makePanel(exporter, metricTitle, config, colIdx, numCols, yPos) =
+  local w = std.floor(24 / numCols);
+  graph.new(
+    '[' + exporter + '] ' + metricTitle,
+    config.queries,
+    panelHeight,
+    w,
+    colIdx * w,
+    yPos,
+  )
+  + timeSeries.standardOptions.withUnit(config.unit)
+  + graph.withLegendBottom(calcs=std.get(config, 'calcs', ['mean', 'lastNotNull', 'max']))
+  + graph.withQueryColor(config.colors);
 
-local netdata_storage = graph.new(
-                          '[netdata] Storage',
-                          [
-                            queryHelper('netdata_disk_space_GiB_average{dimension="used",' + base.node_instance + '="$node_instance"}', 'Used Space'),
-                          ],
-                          panelHeight,
-                          panelWidth,
-                          0,
-                          panelHeight * 4
-                        )
-                        + timeSeries.standardOptions.withUnit('short')
-                        + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                        + graph.withQueryColor([['Used Space', 'light-red']]);
+// Build panels with row headers; each metric row gets a row panel + exporter columns
+// rowHeight = 1 (row header) + panelHeight
+local rowHeight = panelHeight + 1;
+local panels = std.flattenArrays([
+  local exporters = exportersForMetric(metric.key);
+  local numCols = std.length(exporters);
+  local yBase = rowIdx * rowHeight;
+  // Row header
+  [panel.row.new(metric.title) + panel.row.withGridPos(y=yBase)]
+  // Exporter panels below the row header
+  + [
+    makePanel(
+      exporters[colIdx],
+      metric.title,
+      allExporters[exporters[colIdx]][metric.key],
+      colIdx,
+      numCols,
+      yBase + 1,
+    )
+    for colIdx in std.range(0, numCols - 1)
+  ]
+  for rowIdx in std.range(0, std.length(metricRows) - 1)
+  for metric in [metricRows[rowIdx]]
+]);
 
 // ============================================
-// PROM-EXPORTERS METRICS (right column)
+// EXPORTER VARIABLE (informational dropdown)
 // ============================================
 
-local promexporters_ios = graph.new(
-                            '[prom-exporters] Disk IOs',
-                            [
-                              queryHelper('rate(namedprocess_namegroup_read_bytes_total{groupname=~"octez.*",' + base.node_instance + '="$node_instance"}[1m])/1024', 'reads ({{ groupname }})'),
-                              queryHelper('rate(namedprocess_namegroup_write_bytes_total{groupname=~"octez.*",' + base.node_instance + '="$node_instance"}[1m])/1024', 'writes ({{ groupname }})'),
-                            ],
-                            panelHeight,
-                            panelWidth,
-                            panelWidth,
-                            0
-                          )
-                          + timeSeries.standardOptions.withUnit('kbytes')
-                          + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                          + graph.withQueryColor([['reads', 'light-green'], ['writes', 'light-yellow']]);
-
-local promexporters_cpu = graph.new(
-                            '[prom-exporters] CPU Activity',
-                            [
-                              queryHelper('rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"octez.*",mode="user",' + base.node_instance + '="$node_instance"}[5m])*100', 'CPU Load ({{ groupname }})'),
-                            ],
-                            panelHeight,
-                            panelWidth,
-                            panelWidth,
-                            panelHeight
-                          )
-                          + timeSeries.standardOptions.withUnit('percent')
-                          + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                          + graph.withQueryColor([['CPU Load', 'light-yellow']]);
-
-local promexporters_memory = graph.new(
-                               '[prom-exporters] Memory Usage',
-                               [
-                                 queryHelper('namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="resident",' + base.node_instance + '="$node_instance"} / 1024 / 1024', 'RAM ({{ groupname }})'),
-                                 queryHelper('namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="swapped",' + base.node_instance + '="$node_instance"} / 1024 / 1024', 'Swap ({{ groupname }})'),
-                               ],
-                               panelHeight,
-                               panelWidth,
-                               panelWidth,
-                               panelHeight * 2
-                             )
-                             + timeSeries.standardOptions.withUnit('mbytes')
-                             + graph.withLegendBottom(calcs=['mean', 'max'])
-                             + graph.withQueryColor([['RAM', 'light-green'], ['Swap', 'light-orange']]);
-
-local promexporters_fds = graph.new(
-                            '[prom-exporters] Open File Descriptors',
-                            [
-                              queryHelper('namedprocess_namegroup_open_filedesc{groupname=~"octez.*",' + base.node_instance + '="$node_instance"}', 'Open FDs ({{ groupname }})'),
-                            ],
-                            panelHeight,
-                            panelWidth,
-                            panelWidth,
-                            panelHeight * 3
-                          )
-                          + timeSeries.standardOptions.withUnit('short')
-                          + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                          + graph.withQueryColor([['Open FDs', 'light-blue']]);
-
-local promexporters_storage = graph.new(
-                                '[prom-exporters] Storage',
-                                [
-                                  queryHelper('node_filesystem_size_bytes{mountpoint=~"^/$"}', 'Total Size ({{ device }})'),
-                                ],
-                                panelHeight,
-                                panelWidth,
-                                panelWidth,
-                                panelHeight * 4
-                              )
-                              + timeSeries.standardOptions.withUnit('bytes')
-                              + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-                              + graph.withQueryColor([['Total Size', 'light-red']]);
+local exporterVariable =
+  variableCustom.new(
+    name='exporter',
+    values=activeExporters,
+  )
+  + variableCustom.generalOptions.withLabel('Exporter')
+  + variableCustom.selectionOptions.withIncludeAll(true)
+  + variableCustom.selectionOptions.withMulti(true)
+  + variableCustom.generalOptions.withCurrent('All', '$__all');
 
 // ============================================
 // MAIN DASHBOARD
 // ============================================
 
-dashboard.new('Hardware Metrics Comparison: netdata vs prom-exporters')
-+ dashboard.withDescription('Side-by-side comparison of hardware metrics from netdata (left) vs process-exporter + node-exporter (right)')
-+ dashboard.withTags(['comparison', 'hardware', 'metrics', 'netdata', 'prom-exporters'])
-+ dashboard.withVariables([base.nodeInstance])
+dashboard.new('Hardware Metrics Comparison')
++ dashboard.withDescription('Side-by-side comparison of hardware metrics across configured exporters')
++ dashboard.withTags(['comparison', 'hardware', 'metrics'] + activeExporters)
++ dashboard.withVariables([exporterVariable] + base.standardVariables)
 + dashboard.withRefresh('30s')
-+ dashboard.withPanels([
-  netdata_ios,
-  netdata_cpu,
-  netdata_memory,
-  netdata_fds,
-  netdata_storage,
-  promexporters_ios,
-  promexporters_cpu,
-  promexporters_memory,
-  promexporters_fds,
-  promexporters_storage,
-])
++ dashboard.withPanels(panels)

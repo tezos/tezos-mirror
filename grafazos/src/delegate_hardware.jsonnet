@@ -111,3 +111,4 @@ local graph = base.graph;
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
     + graph.withQueryColor(allColors),
 }
+// test change
