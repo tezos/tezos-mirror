@@ -131,6 +131,29 @@ let init_cryptoboxes ~cctxt ~header ~config ~first_seen_level proto_plugins =
   in
   return_unit
 
+(** Verify that two chain ids match. [expected_name] and [found_name]
+    describe the origin of each id for the error message.
+
+    Two chain ids must be consistent during snapshot operations:
+    - The {b L1 node} chain id (fetched via RPC),
+    - The {b source store} chain id (read from the DAL node data directory).
+
+    The L1 node is used as the reference. The source is checked against it in
+    {!init_export_context}. The destination store is checked against the source
+    in {!Merge.merge}. *)
+let check_chain_id ~expected ~found ~expected_name ~found_name =
+  let open Lwt_result_syntax in
+  if Chain_id.(expected <> found) then
+    failwith
+      "Chain id mismatch: %s chain id is %a but %s chain id is %a."
+      found_name
+      Chain_id.pp
+      found
+      expected_name
+      Chain_id.pp
+      expected
+  else return_unit
+
 (** Shared initialization for export and import operations.
     Loads config, connects to L1, reads source store metadata,
     initializes cryptographic parameters, and computes level bounds. *)
@@ -148,6 +171,14 @@ let init_export_context ~frozen_only ~src_root_dir ~config_file ~endpoint
   in
   let* chain_id =
     read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
+  in
+  let* l1_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
+  let* () =
+    check_chain_id
+      ~expected:l1_chain_id
+      ~found:chain_id
+      ~expected_name:"L1 node"
+      ~found_name:"source store"
   in
   let* last_processed_level =
     read_from_store ~root_dir:src_root_dir (module Store.Last_processed_level)
@@ -460,6 +491,23 @@ module Merge = struct
         ~status:"start"
         ~min_level:(Some min_published_level)
         ~max_level:(Some max_published_level)
+    in
+    (* Verify destination store chain_id matches, if it already exists *)
+    let* () =
+      let*! dir_exists = Lwt_unix.file_exists dst_root_dir in
+      if not dir_exists then return_unit
+      else
+        let*! result =
+          read_from_store ~root_dir:dst_root_dir (module Store.Chain_id)
+        in
+        match result with
+        | Ok dst_chain_id ->
+            check_chain_id
+              ~expected:chain_id
+              ~found:dst_chain_id
+              ~expected_name:"source"
+              ~found_name:"destination store"
+        | _ -> return_unit
     in
     (* Export slots *)
     let* () =
