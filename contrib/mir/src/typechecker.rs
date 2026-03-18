@@ -9046,4 +9046,146 @@ mod typecheck_tests {
             ))
         );
     }
+
+    // -- View restriction tests (L2-1049) --
+    // Ref: https://gitlab.com/tezos/tezos/-/blob/5781c10e4e7d/src/proto_024_PtTALLiN/lib_protocol/script_tc_context.ml#L57-69
+
+    fn typecheck_script_with_view(view_body: &str) -> Result<(), TcError> {
+        let src = format!(
+            "parameter unit; storage unit; code {{ CAR; NIL operation; PAIR }}; \
+             view \"v\" unit unit {{ {view_body} }};",
+        );
+        parse_contract_script(&src)
+            .unwrap()
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)?;
+        Ok(())
+    }
+
+    fn typecheck_script_toplevel(code: &str) -> Result<(), TcError> {
+        let src = format!("parameter unit; storage unit; code {{ {code} }};");
+        parse_contract_script(&src)
+            .unwrap()
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)?;
+        Ok(())
+    }
+
+    // -- Forbidden direct in view body --
+
+    #[test]
+    fn transfer_tokens_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view(
+                r#"DROP; PUSH address "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"; CONTRACT unit; IF_NONE { FAIL } {}; PUSH mutez 0; UNIT; TRANSFER_TOKENS"#
+            ),
+            Err(TcError::ForbiddenInView(Prim::TRANSFER_TOKENS))
+        );
+    }
+
+    #[test]
+    fn set_delegate_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view("DROP; NONE key_hash; SET_DELEGATE"),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    #[test]
+    fn create_contract_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view(
+                "DROP; NONE key_hash; PUSH mutez 0; UNIT; \
+                 CREATE_CONTRACT { parameter unit; storage unit; code { CDR; NIL operation; PAIR } }"
+            ),
+            Err(TcError::ForbiddenInView(Prim::CREATE_CONTRACT))
+        );
+    }
+
+    // -- Allowed in view body --
+
+    #[test]
+    fn balance_allowed_in_view() {
+        assert!(typecheck_script_with_view("DROP; BALANCE; DROP; UNIT").is_ok());
+    }
+
+    #[test]
+    fn amount_allowed_in_view() {
+        assert!(typecheck_script_with_view("DROP; AMOUNT; DROP; UNIT").is_ok());
+    }
+
+    // -- Lambda escape: forbidden instruction inside LAMBDA in view is ok --
+
+    #[test]
+    fn set_delegate_in_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; LAMBDA (option key_hash) operation { SET_DELEGATE }; DROP; UNIT"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn create_contract_in_lambda_in_view_ok() {
+        let result = typecheck_script_with_view(
+            "DROP; LAMBDA unit operation { \
+               DROP; UNIT; PUSH mutez 0; NONE key_hash; \
+               CREATE_CONTRACT { parameter unit; storage unit; code { CDR; NIL operation; PAIR } }; \
+               SWAP; DROP \
+             }; DROP; UNIT",
+        );
+        assert!(result.is_ok(), "Expected Ok but got: {result:?}");
+    }
+
+    // -- Toplevel: not affected --
+
+    #[test]
+    fn transfer_tokens_ok_in_toplevel() {
+        // SET_DELEGATE is side-effectful but allowed at toplevel
+        let result = typecheck_script_toplevel(
+            "DROP; NONE key_hash; SET_DELEGATE; NIL operation; SWAP; CONS; UNIT; SWAP; PAIR",
+        );
+        assert!(result.is_ok(), "Expected Ok but got: {result:?}");
+    }
+
+    // -- Nested: forbidden in IF/ITER inside view --
+
+    #[test]
+    fn set_delegate_in_if_in_view_forbidden() {
+        assert_eq!(
+            typecheck_script_with_view(
+                "DROP; PUSH bool True; IF { NONE key_hash; SET_DELEGATE; DROP; UNIT } { UNIT }"
+            ),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    // -- Code after lambda in view still has restriction --
+
+    #[test]
+    fn forbidden_after_lambda_in_view() {
+        assert_eq!(
+            typecheck_script_with_view(
+                "DROP; \
+                 LAMBDA unit unit { }; DROP; \
+                 NONE key_hash; SET_DELEGATE"
+            ),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    // -- Nested lambda: forbidden in nested lambda escape is still ok --
+
+    #[test]
+    fn forbidden_in_nested_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; \
+             LAMBDA unit operation { \
+               DROP; LAMBDA (option key_hash) operation { SET_DELEGATE }; \
+               NONE key_hash; EXEC \
+             }; DROP; UNIT"
+        )
+        .is_ok());
+    }
 }
