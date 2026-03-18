@@ -170,6 +170,11 @@ pub enum TcError {
     /// View instructions must be a sequence
     #[error("{0} instructions are not a sequence")]
     NonSeqViewInstrs(String),
+    /// Side-effectful instruction used directly in a view body.
+    /// Allowed in lambdas within views (they can be returned and executed elsewhere).
+    /// See https://gitlab.com/tezos/tezos/-/blob/5781c10e4e7d/src/proto_024_PtTALLiN/lib_protocol/script_tc_context.ml#L57-69
+    #[error("{0} is forbidden in view context")]
+    ForbiddenInView(Prim),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -316,6 +321,7 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
                             Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
                             output_type.clone(),
                             false,
+                            true, // view body: side-effectful instructions forbidden
                         )?;
                     }
                     _ => return Err(TcError::NonSeqViewInstrs(name)),
@@ -343,7 +349,7 @@ impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
             },
         )?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
-        let code = typecheck_instruction(code, gas, Some(&entrypoints), &mut stack)?;
+        let code = typecheck_instruction(code, gas, Some(&entrypoints), &mut stack, false)?;
         unify_stacks(
             gas,
             &mut tc_stk![Type::new_pair(
@@ -400,7 +406,7 @@ impl<'a> Micheline<'a> {
             .map(|ty| parse_ty(gas, ty))
             .collect::<Result<_, TcError>>()?;
         let mut opt_stack = FailingTypeStack::Ok(checked_stack);
-        typecheck_instruction(self, gas, entrypoints.as_ref(), &mut opt_stack)
+        typecheck_instruction(self, gas, entrypoints.as_ref(), &mut opt_stack, false)
     }
 
     /// Parse `Micheline` as a type. Validates the type.
@@ -719,9 +725,10 @@ fn typecheck<'a>(
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
+    in_view: bool,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
     ast.iter()
-        .map(|i| typecheck_instruction(i, gas, self_entrypoints, opt_stack))
+        .map(|i| typecheck_instruction(i, gas, self_entrypoints, opt_stack, in_view))
         .collect()
 }
 
@@ -747,6 +754,7 @@ pub(crate) fn typecheck_instruction<'a>(
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
+    in_view: bool,
 ) -> Result<Instruction<'a>, TcError> {
     use Instruction as I;
     use NoMatchingOverloadReason as NMOR;
@@ -1172,7 +1180,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // Here we split off the protected portion of the stack, typecheck the code with the
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
             opt_stack
                 .access_mut(TcError::FailNotInTail)?
                 .append(&mut protected);
@@ -1288,8 +1296,8 @@ pub(crate) fn typecheck_instruction<'a>(
             // Clone the stack so that we have a copy to run one branch on.
             // We can run the other branch on the live stack.
             let mut f_opt_stack = opt_stack.clone();
-            let nested_t = typecheck(nested_t, gas, self_entrypoints, opt_stack)?;
-            let nested_f = typecheck(nested_f, gas, self_entrypoints, &mut f_opt_stack)?;
+            let nested_t = typecheck(nested_t, gas, self_entrypoints, opt_stack, in_view)?;
+            let nested_f = typecheck(nested_f, gas, self_entrypoints, &mut f_opt_stack, in_view)?;
             // If stacks unify after typecheck, all is good.
             unify_stacks(gas, opt_stack, f_opt_stack)?;
             I::If(nested_t, nested_f)
@@ -1307,8 +1315,14 @@ pub(crate) fn typecheck_instruction<'a>(
             let mut some_stack: TypeStack = stack.clone();
             some_stack.push(ty.as_ref().clone());
             let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
-            let when_none = typecheck(when_none, gas, self_entrypoints, opt_stack)?;
-            let when_some = typecheck(when_some, gas, self_entrypoints, &mut some_opt_stack)?;
+            let when_none = typecheck(when_none, gas, self_entrypoints, opt_stack, in_view)?;
+            let when_some = typecheck(
+                when_some,
+                gas,
+                self_entrypoints,
+                &mut some_opt_stack,
+                in_view,
+            )?;
             // If stacks unify, all is good
             unify_stacks(gas, opt_stack, some_opt_stack)?;
             I::IfNone(when_none, when_some)
@@ -1327,8 +1341,14 @@ pub(crate) fn typecheck_instruction<'a>(
             // push it to the cons stack
             cons_stack.push(ty.as_ref().clone());
             let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
-            let when_cons = typecheck(when_cons, gas, self_entrypoints, &mut cons_opt_stack)?;
-            let when_nil = typecheck(when_nil, gas, self_entrypoints, opt_stack)?;
+            let when_cons = typecheck(
+                when_cons,
+                gas,
+                self_entrypoints,
+                &mut cons_opt_stack,
+                in_view,
+            )?;
+            let when_nil = typecheck(when_nil, gas, self_entrypoints, opt_stack, in_view)?;
             // If stacks unify, all is good
             unify_stacks(gas, opt_stack, cons_opt_stack)?;
             I::IfCons(when_cons, when_nil)
@@ -1347,8 +1367,14 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(tl);
             right_stack.push(tr);
             let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
-            let when_left = typecheck(when_left, gas, self_entrypoints, opt_stack)?;
-            let when_right = typecheck(when_right, gas, self_entrypoints, &mut opt_right_stack)?;
+            let when_left = typecheck(when_left, gas, self_entrypoints, opt_stack, in_view)?;
+            let when_right = typecheck(
+                when_right,
+                gas,
+                self_entrypoints,
+                &mut opt_right_stack,
+                in_view,
+            )?;
             // If stacks unify, all is good
             unify_stacks(gas, opt_stack, opt_right_stack)?;
             I::IfLeft(when_left, when_right)
@@ -1418,7 +1444,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // Pop the bool off the top
             pop!();
             // Typecheck body with the current stack
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
             // If the starting stack and result stack unify, all is good.
             unify_stacks(gas, opt_stack, opt_copy)?;
             // pop the remaining bool off (if not failed)
@@ -1437,7 +1463,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let (l_ty, r_ty) = pop!(T::Or).as_ref().clone();
             // loop body consumes left leaf and returns `or` again
             stack.push(l_ty);
-            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack, in_view)?;
             unify_stacks(gas, opt_stack, opt_copy)?;
             // the loop leaves the right leaf of `or` on the stack at the end
             // this FailNotInTail should be impossible to get
@@ -1458,7 +1484,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
             // If the starting stack (sans list) and result stack unify, all is good.
             unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::List, nested)
@@ -1471,7 +1497,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
             // If the starting stack (sans set) and result stack unify, all is good.
             unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::Set, nested)
@@ -1484,7 +1510,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(T::Pair(kty_vty_box));
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack, in_view)?;
             // If the starting stack (sans map) and result stack unify, all is good.
             unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::Map, nested)
@@ -1499,7 +1525,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
             // Typecheck the nested instructions.
             let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack)?;
+                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
 
             stack.push(Type::new_list(ty2));
             I::Map(overloads::Map::List, nested_instrs)
@@ -1510,7 +1536,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
             // Typecheck the nested instructions.
             let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack)?;
+                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack, in_view)?;
 
             stack.push(Type::new_option(ty2));
             I::Map(overloads::Map::Option, nested_instrs)
@@ -1526,6 +1552,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 gas,
                 self_entrypoints,
                 stack,
+                in_view,
             )?;
 
             stack.push(Type::new_map(kty, ty2));
@@ -1968,6 +1995,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNPACK, [_], _), []) => no_overload!(UNPACK, len 1),
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(TRANSFER_TOKENS, [], _), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::TRANSFER_TOKENS))?
+        }
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
             ensure_ty_eq(gas, ct, arg_t)?;
             stack.drop_top(3);
@@ -1978,6 +2008,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(TRANSFER_TOKENS, [], _), [] | [_] | [_, _]) => no_overload!(TRANSFER_TOKENS, len 3),
         (App(TRANSFER_TOKENS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SET_DELEGATE, [], _), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))?
+        }
         (App(SET_DELEGATE, [], _), [.., T::Option(ot)]) if matches!(ot.as_ref(), T::KeyHash) => {
             pop!();
             stack.push(T::Operation);
@@ -2032,7 +2065,15 @@ pub(crate) fn typecheck_instruction<'a>(
             let in_ty = parse_ty(gas, ty1)?;
             let out_ty = parse_ty(gas, ty2)?;
             stack.push(Type::new_lambda(in_ty.clone(), out_ty.clone()));
-            let res = typecheck_lambda(instrs, gas, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
+            // in_view=false: LAMBDA creates a new scope, view restrictions don't propagate
+            let res = typecheck_lambda(
+                instrs,
+                gas,
+                in_ty,
+                out_ty,
+                matches!(prim, LAMBDA_REC),
+                false,
+            )?;
             I::Lambda(res)
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
@@ -2299,6 +2340,9 @@ pub(crate) fn typecheck_instruction<'a>(
         #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(CREATE_CONTRACT, ..), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::CREATE_CONTRACT))?
+        }
         (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
@@ -2362,7 +2406,13 @@ pub(crate) fn typecheck_instruction<'a>(
             Err(TcError::TodoInstr(*prim))?
         }
 
-        (Seq(nested), _) => I::Seq(typecheck(nested, gas, self_entrypoints, opt_stack)?),
+        (Seq(nested), _) => I::Seq(typecheck(
+            nested,
+            gas,
+            self_entrypoints,
+            opt_stack,
+            in_view,
+        )?),
     })
 }
 
@@ -2650,6 +2700,7 @@ pub fn typecheck_value<'a>(
                 in_ty.clone(),
                 out_ty.clone(),
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
+                false,
             )?))
         }
         (
@@ -2724,6 +2775,7 @@ pub fn typecheck_lambda<'a>(
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
+    in_view: bool,
 ) -> Result<Lambda<'a>, TcError> {
     let stk = &mut if recursive {
         let self_ty = Type::new_lambda(in_ty.clone(), out_ty.clone());
@@ -2731,7 +2783,7 @@ pub fn typecheck_lambda<'a>(
     } else {
         tc_stk![in_ty.clone()]
     };
-    let code = Rc::from(typecheck(instrs, gas, None, stk)?);
+    let code = Rc::from(typecheck(instrs, gas, None, stk, in_view)?);
     unify_stacks(gas, stk, tc_stk![out_ty.clone()])?;
     let micheline_code = Micheline::Seq(instrs);
     Ok(if recursive {
@@ -2761,6 +2813,7 @@ fn typecheck_map_block<'a>(
     gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     stack: &TypeStack,
+    in_view: bool,
 ) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
     let mut nested_stack = stack.clone();
     nested_stack.push(ty1);
@@ -2771,8 +2824,13 @@ fn typecheck_map_block<'a>(
     //   opt_nested_stack :: ty1 : A
 
     // Typecheck the nested instructions.
-    let nested: Vec<Instruction<'a>> =
-        typecheck(nested, gas, self_entrypoints, &mut opt_nested_stack)?;
+    let nested: Vec<Instruction<'a>> = typecheck(
+        nested,
+        gas,
+        self_entrypoints,
+        &mut opt_nested_stack,
+        in_view,
+    )?;
 
     // Assert that the `opt_nested_stack` now has the type `ty2 : A`, for some `ty2`.
     // NB: the nested instruction block cannot fail, otherwise we cannot infer `ty2`.
@@ -3026,7 +3084,7 @@ mod typecheck_tests {
         gas: &mut Gas,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<Instruction<'a>, TcError> {
-        super::typecheck_instruction(i, gas, None, opt_stack)
+        super::typecheck_instruction(i, gas, None, opt_stack, false)
     }
 
     #[test]
@@ -7067,7 +7125,13 @@ mod typecheck_tests {
     fn pack_instr() {
         let stk = &mut tc_stk![Type::new_pair(Type::Int, Type::Unit)];
         assert_eq!(
-            super::typecheck_instruction(&parse("PACK").unwrap(), &mut Gas::default(), None, stk),
+            super::typecheck_instruction(
+                &parse("PACK").unwrap(),
+                &mut Gas::default(),
+                None,
+                stk,
+                false
+            ),
             Ok(Instruction::Pack)
         );
         assert_eq!(stk, &tc_stk![Type::Bytes]);
@@ -7096,7 +7160,8 @@ mod typecheck_tests {
                 &parse("SELF").unwrap(),
                 &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
-                stk
+                stk,
+                false,
             ),
             Ok(Instruction::ISelf(Entrypoint::default()))
         );
@@ -7117,7 +7182,8 @@ mod typecheck_tests {
                     ]
                     .into()
                 ),
-                stk
+                stk,
+                false,
             ),
             Ok(Instruction::ISelf(Entrypoint::try_from("foo").unwrap()))
         );
@@ -7132,7 +7198,8 @@ mod typecheck_tests {
                 &parse("SELF %bar").unwrap(),
                 &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
-                stk
+                stk,
+                false,
             ),
             Err(TcError::NoSuchEntrypoint("bar".try_into().unwrap()))
         );
@@ -7146,7 +7213,8 @@ mod typecheck_tests {
                 &parse("SELF %bar %baz").unwrap(),
                 &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
-                stk
+                stk,
+                false,
             ),
             Err(AnnotationError::TooManyFieldAnns("baz".into()).into())
         );
