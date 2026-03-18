@@ -112,14 +112,11 @@ module Tezos_runtime = struct
     Rlp.encode Rlp.(List [Value balance; Value nonce; public_key])
 
   let generate_alias bytes =
-    let blake_hash = Tezos_crypto.Blake2B.hash_bytes [bytes] in
-    let bytes = Tezos_crypto.Blake2B.to_bytes blake_hash in
-    let tezos_alias =
-      Tezos_types.Contract.of_originated
-        (Tezlink_imports.Imported_protocol.Contract_hash.of_bytes_exn
-           (Bytes.sub bytes 0 20))
+    let (Tezos_crypto.Hacl.Blake2b.Hash hash) =
+      Tezos_crypto.Hacl.Blake2b.direct bytes 20
     in
-    tezos_alias
+    Tezos_types.Contract.of_originated
+      (Tezlink_imports.Imported_protocol.Contract_hash.of_bytes_exn hash)
 end
 
 module Foreign_address = struct
