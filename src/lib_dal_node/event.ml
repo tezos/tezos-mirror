@@ -1366,38 +1366,6 @@ open struct
       ~level:Warning
       ("level", Data_encoding.int32)
 
-  let slots_exported_successfully =
-    declare_0
-      ~section
-      ~name:"slots_exported_successfully"
-      ~msg:"slots exported successfully"
-      ~level:Notice
-      ()
-
-  let shards_exported_successfully =
-    declare_0
-      ~section
-      ~name:"shards_exported_successfully"
-      ~msg:"shards exported successfully"
-      ~level:Notice
-      ()
-
-  let skip_lists_exported_successfully =
-    declare_0
-      ~section
-      ~name:"skip_lists_exported_successfully"
-      ~msg:"skip lists exported successfully"
-      ~level:Notice
-      ()
-
-  let snapshot_exported_successfully =
-    declare_1
-      ~section
-      ~name:"snapshot_exported_successfully"
-      ~msg:"snapshot exported successfully at {path}"
-      ~level:Notice
-      ("path", Data_encoding.string)
-
   let cannot_export_snapshot_data =
     declare_3
       ~section
@@ -1422,6 +1390,28 @@ open struct
       ("published_level", Data_encoding.int32)
       ("migration_level", Data_encoding.int32)
       ("attested_level", Data_encoding.int32)
+
+  let snapshot_copying =
+    declare_2
+      ~section
+      ~name:"snapshot_copying"
+      ~msg:"snapshot copy {resource}: {step}"
+      ~level:Notice
+      ("resource", Data_encoding.string)
+      ("step", Data_encoding.string)
+
+  let snapshot_status =
+    declare_5
+      ~section
+      ~name:"snapshot_status"
+      ~msg:
+        "snapshot {status} ({kind}): {path} (levels {min_level} to {max_level})"
+      ~level:Notice
+      ("path", Data_encoding.string)
+      ("kind", Data_encoding.string)
+      ("status", Data_encoding.string)
+      ("min_level", Data_encoding.string)
+      ("max_level", Data_encoding.string)
 end
 
 (* DAL node event emission functions *)
@@ -1815,15 +1805,12 @@ let emit_skipped_protocol_without_dal_plugin ~level =
 let emit_cannot_export_snapshot_data ~level ~index ~kind =
   emit cannot_export_snapshot_data (level, index, kind)
 
-let emit_slots_exported_successfully () = emit slots_exported_successfully ()
+let emit_snapshot_copying ~resource ~step =
+  emit snapshot_copying (resource, step)
 
-let emit_shards_exported_successfully () = emit shards_exported_successfully ()
-
-let emit_skip_lists_exported_successfully () =
-  emit skip_lists_exported_successfully ()
-
-let emit_snapshot_exported_successfully ~dst_root_dir =
-  emit snapshot_exported_successfully dst_root_dir
+let emit_snapshot_status ~path ~kind ~status ~min_level ~max_level =
+  let fmt = function None -> "?" | Some l -> Int32.to_string l in
+  emit snapshot_status (path, kind, status, fmt min_level, fmt max_level)
 
 let emit_publish_crosses_migration ~published_level ~migration_level
     ~attested_level =
