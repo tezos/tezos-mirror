@@ -1,0 +1,7 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
+(*                                                                           *)
+(*****************************************************************************)

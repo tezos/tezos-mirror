@@ -1,0 +1,1173 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Testing
+   -------
+
+   Requirement:  make -f etherlink.mk build
+                 make octez-node octez-client octez-smart-rollup-node octez-evm-node
+   Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file cross_runtime.ml
+ *)
+
+open Rpc.Syntax
+
+module EvmContract = struct
+  let tezosx_evm_chain_id = 1337
+
+  (** [deploy_contract ~sequencer ~sender ~nonce ~init_code ()] deploys an
+   *  EVM contract from [init_code], produces a block, and returns the deployed
+   *  contract address.  Fails if the deployment transaction reverts or yields no
+   *  contract address. *)
+  let deploy_contract ~sequencer ~sender ~nonce ~init_code () =
+    let* raw_tx =
+      Cast.craft_deploy_tx
+        ~source_private_key:sender.Eth_account.private_key
+        ~chain_id:tezosx_evm_chain_id
+        ~nonce
+        ~gas:2_000_000
+        ~gas_price:1_000_000_000
+        ~data:init_code
+        ()
+    in
+    let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+    let*@ _block_number = Rpc.produce_block sequencer in
+    let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    match receipt with
+    | Some {contractAddress = Some addr; status = true; _} -> return addr
+    | Some {status = false; _} ->
+        Test.fail "Contract deployment transaction failed"
+    | _ -> Test.fail "No receipt or no contract address for deployment tx"
+
+  (** [deploy_solidity_contract ~sequencer ~sender ~nonce ~contract ()]
+   *  compiles and deploys a Solidity contract. *)
+  let deploy_solidity_contract ?(evm_version = Evm_version.Shanghai) ~sequencer
+      ~sender ~nonce ~contract () =
+    let* contract = contract evm_version in
+    let init_code =
+      "0x" ^ Tezt.Base.read_file contract.Solidity_contracts.bin
+    in
+    deploy_contract ~sequencer ~sender ~nonce ~init_code ()
+
+  (** [craft_and_send_transaction ~sequencer ~sender ~nonce ~value ~address
+   *  ~abi_signature ~arguments ()] crafts an EVM transaction, sends it, produces
+   *  a block, asserts the receipt status matches [expected_status] (default
+    [true]), and returns the receipt. *)
+  let craft_and_send_transaction ~sequencer ~sender ~nonce ~value ~address
+      ~abi_signature ~arguments ?(expected_status = true) () =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:sender.Eth_account.private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas:300_000
+        ~gas_price:1_000_000_000
+        ~value
+        ~address
+        ~signature:abi_signature
+        ~arguments
+        ()
+    in
+    let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+    let*@ _block_number = Rpc.produce_block sequencer in
+    let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    match receipt with
+    | Some r ->
+        Check.(
+          (r.status = expected_status)
+            bool
+            ~error_msg:"Expected receipt status %R but got %L") ;
+        return r
+    | None -> Test.fail "No receipt for EVM transaction to %s" address
+end
+
+module TezContract = struct
+  (** Durable storage path where Michelson originated contracts are indexed in
+   *  Tezos X. Each subkey is the hex-encoded [Contract_repr.t] of the
+   *  Michelson contract. *)
+  let tezosx_michelson_contracts_index = "/evm/world_state/contracts/index"
+
+  (** [decode_contract_address hex] decodes a hex-encoded
+   *  [Contract_repr.t] into a b58check KT1 address string. *)
+  let decode_contract_address hex =
+    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+    Hex.to_bytes (`Hex hex)
+    |> Data_encoding.Binary.of_bytes_exn C.encoding
+    |> C.to_b58check
+
+  (** [send_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
+   *  delayed inbox and waits until it is included and the delayed inbox is
+   *  empty. *)
+  let send_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
+      ~client ~l1_contracts ~sequencer operation =
+    let* _hash =
+      Delayed_inbox.send_tezos_operation_to_delayed_inbox
+        ~sc_rollup_address
+        ~sc_rollup_node
+        ~client
+        ~l1_contracts
+        ~tezosx_format:true
+        operation
+    in
+    let* () =
+      Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+        ~sequencer
+        ~sc_rollup_node
+        ~client
+    in
+    let* () =
+      Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+    in
+    Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
+
+  (** [originate_contract_via_delayed_inbox] originates a Michelson
+   *  contract via the delayed inbox. Loads the script from
+   *  [michelson_test_scripts], converts code and initial storage to JSON,
+   *  forges and sends the origination operation, then returns the hex key and
+   *  KT1 address of the new contract. *)
+  let originate_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
+      ~client ~l1_contracts ~sequencer ~source ~counter ~script_name
+      ~init_storage_data ?(init_balance = 0) protocol =
+    let* contracts_before =
+      Delayed_inbox.subkeys
+        tezosx_michelson_contracts_index
+        (Sc_rollup_node sc_rollup_node)
+    in
+    let script_path = Michelson_script.(find script_name protocol |> path) in
+    let* code = Client.convert_script_to_json ~script:script_path client in
+    let* init_storage =
+      Client.convert_data_to_json ~data:init_storage_data client
+    in
+    let* origination_op =
+      Operation.Manager.(
+        operation
+          [
+            make
+              ~fee:1000
+              ~counter
+              ~gas_limit:10000
+              ~storage_limit:1000
+              ~source
+              (origination ~code ~init_storage ~init_balance ());
+          ])
+        client
+    in
+    let* () =
+      send_op_to_delayed_inbox_and_wait
+        ~sc_rollup_address
+        ~sc_rollup_node
+        ~client
+        ~l1_contracts
+        ~sequencer
+        origination_op
+    in
+    let* contracts_after =
+      Delayed_inbox.subkeys
+        tezosx_michelson_contracts_index
+        (Sc_rollup_node sc_rollup_node)
+    in
+    let new_contracts =
+      List.filter (fun c -> not (List.mem c contracts_before)) contracts_after
+    in
+    Check.(
+      (List.length new_contracts = 1)
+        int
+        ~error_msg:"Expected %R new contract but got %L") ;
+    let contract_hex = List.hd new_contracts in
+    let kt1_address = decode_contract_address contract_hex in
+    Log.info "Originated contract: %s" kt1_address ;
+    return (contract_hex, kt1_address)
+
+  (** [call_contract_via_delayed_inbox] calls a Michelson contract
+   *  via the delayed inbox. Converts the argument from Michelson notation to
+   *  JSON, forges and sends the call operation. *)
+  let call_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node ~client
+      ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
+      ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 10000) () =
+    let* arg = Client.convert_data_to_json ~data:arg_data client in
+    let* call_op =
+      Operation.Manager.(
+        operation
+          [
+            make
+              ~fee:1000
+              ~counter
+              ~gas_limit
+              ~storage_limit:1000
+              ~source
+              (call ~dest ~arg ~entrypoint ~amount ());
+          ])
+        client
+    in
+    send_op_to_delayed_inbox_and_wait
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      call_op
+
+  (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
+   *  storage of an originated Michelson contract from the durable storage,
+   *  given its hex-encoded [Contract_repr.t] key. *)
+  let read_michelson_contract_storage sc_rollup_node contract_hex =
+    let path =
+      sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
+    in
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:path
+         ()
+
+  (** [decode_michelson_contract_address hex] decodes a hex-encoded
+   *  [Contract_repr.t] into a b58check KT1 address string. *)
+  let decode_michelson_contract_address hex =
+    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+    Hex.to_bytes (`Hex hex)
+    |> Data_encoding.Binary.of_bytes_exn C.encoding
+    |> C.to_b58check
+
+  (** [decode_micheline_storage hex_str] decodes a hex string from the durable
+   *  storage into a Micheline [JSON.u] value. Returns [None] if decoding
+   *  fails. *)
+  let decode_micheline_storage hex_str =
+    let module S = Tezos_protocol_alpha.Protocol.Script_repr in
+    Data_encoding.Binary.of_bytes_opt
+      S.expr_encoding
+      (Hex.to_bytes (`Hex hex_str))
+    |> Option.map (fun e ->
+           Data_encoding.Json.(
+             construct S.expr_encoding e
+             |> to_string
+             |> JSON.parse ~origin:"decode_micheline_storage"))
+
+  (** Reads and decodes the storage of the Michelson contract identified
+   *  by [contract_hex].  Fails if the storage is missing or cannot be
+   *  decoded. *)
+  let get_storage ~sc_rollup_node contract_hex =
+    let* storage_raw =
+      read_michelson_contract_storage sc_rollup_node contract_hex
+    in
+    match storage_raw with
+    | None ->
+        let kt1 = decode_michelson_contract_address contract_hex in
+        Test.fail "Storage not found for contract %s" kt1
+    | Some hex_str -> (
+        match decode_micheline_storage hex_str with
+        | None ->
+            let kt1 = decode_michelson_contract_address contract_hex in
+            Test.fail "Storage failed to be decoded for contract %s" kt1
+        | Some storage -> return storage)
+end
+
+(** Contracts *)
+
+(** Common [run()] caller for EVM contracts. *)
+module EvmRunner = struct
+  open EvmContract
+
+  (** Calls [run()] on the given EVM contract. *)
+  let call_run ?expected_status ~sequencer ~sender ~nonce ~value runner =
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:runner
+        ~abi_signature:"run()"
+        ~arguments:[]
+        ?expected_status
+        ()
+    in
+    unit
+end
+
+(** EVM contract that forwards [run()] to a Tezos target via the
+ *  CRAC gateway.  Increments [counter] before and after the
+ *  cross-runtime call. *)
+module EvmCrossRuntimeRunnerTez = struct
+  open EvmContract
+  include EvmRunner
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.cross_runtime_run_tez
+
+  (** Initialises the contract.  [tez_contract_target_address] is the
+   *  KT1 address that will be called on [run()]. *)
+  let init ~sequencer ~sender ~nonce ~value ~tez_contract_target_address
+      cross_runtime_run_tez =
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:cross_runtime_run_tez
+        ~abi_signature:"initialize(string)"
+        ~arguments:[tez_contract_target_address]
+        ()
+    in
+    unit
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sequencer ~expected_counter cross_runtime_run_tez =
+    let counter_storage_pos = "0x00" in
+    let*@ evm_count =
+      Rpc.get_storage_at
+        ~address:cross_runtime_run_tez
+        ~pos:counter_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_count = expected_counter)
+        int
+        ~error_msg:"Expected EvmCrossRuntimeRunnerTez `count` %R but got %L") ;
+    unit
+end
+
+(** EVM contract that iterates [run()] over its [callees].  Before
+ *  each call, increments [counter].  If a callee's revert is caught,
+ *  increments [catches] instead of propagating.  After all calls,
+ *  reverts if initialised to do so, otherwise increments [counter]. *)
+module EvmMultiRunCaller = struct
+  open EvmContract
+  include EvmRunner
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.multi_run_caller
+
+  (** Initialises the contract.  [callees] is the list of contracts
+   *  that will be called on [run()], together with whether their
+   *  revert should be caught.  [revert] controls whether the contract
+   *  reverts after all calls. *)
+  let init ~sequencer ~sender ~nonce ~value ~revert ~callees multi_run_caller =
+    let callees_arg =
+      let pp_comma fmt () = Format.fprintf fmt "," in
+      let pp_callee fmt (addr, do_catch) =
+        Format.fprintf fmt "(%s,%b)" addr do_catch
+      in
+      Format.asprintf
+        "[%a]"
+        (Format.pp_print_list ~pp_sep:pp_comma pp_callee)
+        callees
+    in
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:multi_run_caller
+        ~abi_signature:"initialize(bool,(address,bool)[])"
+        ~arguments:[string_of_bool revert; callees_arg]
+        ()
+    in
+    unit
+
+  (** Asserts that the contract's [catches] and [counter] equal the
+   *  expected values. *)
+  let check_storage ~sequencer ?(expected_catches = 0) ~expected_counter
+      multi_run_caller =
+    let catches_storage_pos = "0x00" in
+    let*@ evm_catches =
+      Rpc.get_storage_at
+        ~address:multi_run_caller
+        ~pos:catches_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_catches = expected_catches)
+        int
+        ~error_msg:"Expected EvmMultiRunCaller `catches` %R but got %L") ;
+    let counter_storage_pos = "0x01" in
+    let*@ evm_count =
+      Rpc.get_storage_at
+        ~address:multi_run_caller
+        ~pos:counter_storage_pos
+        sequencer
+    in
+    Check.(
+      (int_of_string evm_count = expected_counter)
+        int
+        ~error_msg:"Expected EvmMultiRunCaller `count` %R but got %L") ;
+    unit
+end
+
+(** Common [%run] caller for Tezos contracts. *)
+module TezRunner = struct
+  open TezContract
+
+  (** Calls [%run] with [Unit] via the delayed inbox. *)
+  let call_run ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ?amount ?gas_limit runner =
+    call_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ?amount
+      ?gas_limit
+      ~dest:runner
+      ~arg_data:"Unit"
+      ~entrypoint:"run"
+      ()
+end
+
+(** Tezos contract that forwards [%run] to an EVM target via the
+ *  CRAC gateway.  Increments [counter] before and after the
+ *  cross-runtime call. *)
+module TezCrossRuntimeRunnerEvm = struct
+  open TezContract
+  include TezRunner
+
+  (** Originates the contract.  [evm_contract_target_address] is the
+   *  EVM address that will be called on [%run]. *)
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance
+      ~evm_contract_target_address () =
+    let script_name = ["mini_scenarios"; "cross_runtime_run_evm"] in
+    let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sc_rollup_node ~expected_counter
+      (cross_runtime_run_tez_hex, _cross_runtime_run_tez_address) =
+    let* storage = get_storage ~sc_rollup_node cross_runtime_run_tez_hex in
+    (* Pair(nat %count, string %destination) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezCrossRuntimeRunnerEvm `count` %R but got %L") ;
+    unit
+end
+
+(** Tezos contract that iterates [%run] over its [callees].  Before
+ *  each call, increments [counter].  After all calls, reverts if
+ *  initialised to do so, otherwise increments [counter]. *)
+module TezMultiRunCaller = struct
+  open TezContract
+  include TezRunner
+
+  (** Originates the contract.  [callees] is the list of contracts
+   *  that will be called on [%run].  [revert] controls whether the
+   *  contract reverts after all calls. *)
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~revert ~callees () =
+    let script_name = ["mini_scenarios"; "multi_run_caller"] in
+    let init_storage_data =
+      let pp_bool fmt b =
+        if b then Format.fprintf fmt "True" else Format.fprintf fmt "False"
+      in
+      let pp_semicolon fmt () = Format.fprintf fmt ";" in
+      let pp_callee fmt = Format.fprintf fmt {|"%s"|} in
+      Format.asprintf
+        {|Pair 0 (Pair %a {%a})|}
+        pp_bool
+        revert
+        (Format.pp_print_list ~pp_sep:pp_semicolon pp_callee)
+        callees
+    in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_storage ~sc_rollup_node ~expected_counter
+      (multi_run_caller_hex, _multi_run_caller_address) =
+    let* storage = get_storage ~sc_rollup_node multi_run_caller_hex in
+    (* Pair(int %counter, Pair(bool %willRevert, list address %callees)) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezMultiRunCaller `count` %R but got %L") ;
+    unit
+end
+
+(** Wraps the CRAC runner contract modules into a first-class module
+ *  that manages the shared test state (nonces, counters, sequencer
+ *  setup) so that tests only provide scenario-specific parameters.
+ *  Contracts are represented as {!evm_runner} and {!tez_runner}
+ *  values to distinguish EVM and Tezos contracts at the type level. *)
+module CracRunnerWrapper = struct
+  type evm_runner = [`Evm_runner of string]
+
+  type tez_runner = [`Tez_runner of string * string]
+
+  (** Simplified interface over the CRAC runner contracts.  Each
+   *  sub-module mirrors its namesake but with nonces, counters and
+   *  sequencer setup already applied. *)
+  module type S = sig
+    module EvmRunner : sig
+      val call_run :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> unit Lwt.t
+    end
+
+    module EvmCrossRuntimeRunnerTez : sig
+      val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
+
+      val check_storage : expected_counter:int -> evm_runner -> unit Lwt.t
+    end
+
+    module EvmMultiRunCaller : sig
+      val deploy_and_init :
+        ?value:Wei.t ->
+        ?revert:bool ->
+        ?callees:(evm_runner * bool) list ->
+        unit ->
+        evm_runner Lwt.t
+
+      val check_storage :
+        ?expected_catches:int ->
+        expected_counter:int ->
+        evm_runner ->
+        unit Lwt.t
+    end
+
+    module TezRunner : sig
+      val call_run : ?amount:int -> ?gas_limit:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezCrossRuntimeRunnerEvm : sig
+      val originate : ?init_balance:int -> evm_runner -> tez_runner Lwt.t
+
+      val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezMultiRunCaller : sig
+      val originate :
+        ?init_balance:int ->
+        ?revert:bool ->
+        ?callees:tez_runner list ->
+        unit ->
+        tez_runner Lwt.t
+
+      val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+  end
+
+  (** Builds a {!S} module from the given test setup.  [nonce] and
+   *  [counter] are the initial EVM nonce and Tezos operation counter;
+   *  both are auto-incremented on each use. *)
+  let build ?(nonce = 0) ?(counter = 0)
+      ~sequencer_setup:
+        ({
+           sc_rollup_address;
+           sc_rollup_node;
+           client;
+           l1_contracts;
+           sequencer;
+           evm_version;
+           _;
+         } :
+          Tezt_etherlink.Setup.sequencer_setup) ~sender ~source protocol :
+      (module S) =
+    let ref_nonce = ref nonce in
+    let ref_counter = ref counter in
+
+    let evm_nonce () =
+      let nonce = !ref_nonce in
+      incr ref_nonce ;
+      nonce
+    in
+    let tez_counter () =
+      let counter = !ref_counter in
+      incr ref_counter ;
+      counter
+    in
+    let module Helper = struct
+      module EvmRunner = struct
+        let call_run ?expected_status ?(value = Wei.zero) (`Evm_runner runner) =
+          let* () =
+            EvmRunner.call_run
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+      end
+
+      module EvmCrossRuntimeRunnerTez = struct
+        let deploy_and_init ?(value = Wei.zero) (`Tez_runner (_, address)) =
+          let* addr =
+            EvmCrossRuntimeRunnerTez.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmCrossRuntimeRunnerTez.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~tez_contract_target_address:address
+              addr
+          in
+          return (`Evm_runner addr)
+
+        let check_storage ~expected_counter (`Evm_runner runner) =
+          EvmCrossRuntimeRunnerTez.check_storage
+            ~sequencer
+            ~expected_counter
+            runner
+      end
+
+      module EvmMultiRunCaller = struct
+        let deploy_and_init ?(value = Wei.zero) ?(revert = false)
+            ?(callees = []) () =
+          let callees =
+            List.map
+              (fun (`Evm_runner addr, do_catch) -> (addr, do_catch))
+              callees
+          in
+          let* addr =
+            EvmMultiRunCaller.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmMultiRunCaller.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~revert
+              ~callees
+              addr
+          in
+          return (`Evm_runner addr)
+
+        let check_storage ?expected_catches ~expected_counter
+            (`Evm_runner runner) =
+          EvmMultiRunCaller.check_storage
+            ~sequencer
+            ?expected_catches
+            ~expected_counter
+            runner
+      end
+
+      module TezRunner = struct
+        let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
+          TezRunner.call_run
+            ~sc_rollup_address
+            ~sc_rollup_node
+            ~client
+            ~l1_contracts
+            ~sequencer
+            ~source
+            ~counter:(tez_counter ())
+            ?amount
+            ?gas_limit
+            runner
+      end
+
+      module TezCrossRuntimeRunnerEvm = struct
+        let originate ?init_balance (`Evm_runner address) =
+          let* contract_hex, address =
+            TezCrossRuntimeRunnerEvm.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~evm_contract_target_address:address
+              ()
+          in
+          return (`Tez_runner (contract_hex, address))
+
+        let check_storage ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCrossRuntimeRunnerEvm.check_storage
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
+      end
+
+      module TezMultiRunCaller = struct
+        let originate ?init_balance ?(revert = false) ?(callees = []) () =
+          let callees =
+            List.map (fun (`Tez_runner (_runner_hex, runner)) -> runner) callees
+          in
+          let* runner_hex, runner =
+            TezMultiRunCaller.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~revert
+              ~callees
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+
+        let check_storage ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezMultiRunCaller.check_storage
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
+      end
+    end in
+    (module Helper)
+end
+
+(** Registers a fullstack CRAC runner test.  Sets up the sequencer,
+ *  builds a {!CracRunnerWrapper.S} and passes it to [body]. *)
+let register_crac_runner_test ~title ?(tags = []) body =
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["crac"; "runner"] @ tags
+  in
+  Setup.register_test
+    ~__FILE__
+    ~rpc_server:Evm_node.Resto
+    ~title
+    ~time_between_blocks:Nothing
+    ~tags
+    ~kernel:Latest
+    ~with_runtimes
+    ~enable_dal:false
+    ~enable_multichain:false
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer_setup protocol ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let source = Constant.bootstrap5 in
+  let (module Wrapper) =
+    CracRunnerWrapper.build ~counter:1 ~sequencer_setup ~sender ~source protocol
+  in
+  body (module Wrapper : CracRunnerWrapper.S)
+
+(** Simple EVM-to-TEZ cross-runtime call.
+ *
+ *    EVM[evm_runner]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
+ *
+ *)
+let test_crac_evm_to_tez =
+  register_crac_runner_test ~title:"CRAC: EVM runner calls TEZ runner"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  Log.debug ~prefix "Deploy EVM runner calling the bridge" ;
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  Log.debug ~prefix "Call EVM runner" ;
+  let* () = EvmRunner.call_run evm_runner in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  unit
+
+(** Multiple independent CRAC crossings.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_1] ~CRAC~> TEZ[tez_runner_1]
+ *     |-> EVM[evm_bridge_2] ~CRAC~> TEZ[tez_runner_2]
+ *
+ *)
+let test_crac_evm_multiple_independent_crossings =
+  register_crac_runner_test ~title:"CRAC: multiple independent crossings"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ runners" ;
+  let* tez_runner_1 = TezMultiRunCaller.originate () in
+  let* tez_runner_2 = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridges" ;
+  let* evm_bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner_1 in
+  let* evm_bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner_2 in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_1, false); (evm_bridge_2, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner_1 in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner_2 in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_1
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_2
+  in
+  unit
+
+(** Double CRAC crossing: EVM calls EVM inner both directly and through
+ *  an EVM->TEZ->EVM round-trip bridge chain.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_inner]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
+ *     |-> EVM[evm_inner]
+ *
+ *)
+let test_crac_evm_double_crossing =
+  register_crac_runner_test
+    ~title:"CRAC: double crossing EVM via TEZ back to EVM"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM inner runner" ;
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM inner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ bridge" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Deploy EVM main calling inner directly and via bridges" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_inner, false); (evm_bridge, false); (evm_inner, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_inner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  unit
+
+(** Shared TEZ leaf called three times: twice directly via the same EVM
+ *  bridge, and once through a 3-CRAC chain that also ends at the same leaf.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_direct] ~CRAC~> TEZ[tez_leaf]
+ *     |-> EVM[evm_bridge_chain] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_bridge_inner] ~CRAC~> TEZ[tez_leaf]
+ *     |-> EVM[evm_bridge_direct] ~CRAC~> TEZ[tez_leaf]
+ *
+ *)
+let test_crac_evm_shared_leaf_via_direct_and_chain =
+  register_crac_runner_test
+    ~title:"CRAC: EVM shared TEZ leaf via direct bridge and 3-CRAC chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ leaf" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge_direct to TEZ leaf" ;
+  let* evm_bridge_direct = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Deploy EVM bridge_inner to TEZ leaf (for chain)" ;
+  let* evm_bridge_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Originate TEZ bridge to EVM bridge_inner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge_inner in
+  Log.debug ~prefix "Deploy EVM bridge_chain to TEZ bridge" ;
+  let* evm_bridge_chain = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:
+        [
+          (evm_bridge_direct, false);
+          (evm_bridge_chain, false);
+          (evm_bridge_direct, false);
+        ]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* () = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_leaf in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:4 evm_bridge_direct
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_chain
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_inner
+  in
+  unit
+
+(** EVM 5-crossing chain.
+ *
+ *    EVM[evm_a] ~CRAC~> TEZ[tez_b] ~CRAC~> EVM[evm_c] ~CRAC~> TEZ[tez_d] ~CRAC~> EVM[evm_e] ~CRAC~> TEZ[tez_leaf]
+ *
+ *)
+let test_crac_evm_5_crossing_chain =
+  register_crac_runner_test ~title:"CRAC: EVM 5-crossing chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build 5-crossing CRAC chain (inside-out)" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  let* evm_e = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* tez_d = TezCrossRuntimeRunnerEvm.originate evm_e in
+  let* evm_c = EvmCrossRuntimeRunnerTez.deploy_and_init tez_d in
+  let* tez_b = TezCrossRuntimeRunnerEvm.originate evm_c in
+  let* evm_a = EvmCrossRuntimeRunnerTez.deploy_and_init tez_b in
+  Log.debug ~prefix "Call EVM a" ;
+  let* () = EvmRunner.call_run evm_a in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_leaf in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_a in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_b in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_c in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_d in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_e in
+  unit
+
+(** Simple TEZ-to-EVM cross-runtime call.
+ *
+ *     TEZ[tez_runner]
+ *      |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]
+ *
+ *)
+let test_crac_tez_to_evm =
+  register_crac_runner_test ~title:"CRAC: TEZ runner calls EVM runner"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM runner" ;
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  Log.debug ~prefix "Originate TEZ runner calling the bridge" ;
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Call TEZ runner" ;
+  let* () = TezRunner.call_run tez_runner in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:2 tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  unit
+
+(** Multiple independent TEZ-to-EVM crossings from a single TEZ caller.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_1] ~CRAC~> EVM[evm_runner_1]
+ *     |-> TEZ[tez_bridge_2] ~CRAC~> EVM[evm_runner_2]
+ *
+ *)
+let test_crac_tez_multiple_independent_crossings =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ multiple independent crossings to EVM"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM runners" ;
+  let* evm_runner_1 = EvmMultiRunCaller.deploy_and_init () in
+  let* evm_runner_2 = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridges" ;
+  let* tez_bridge_1 = TezCrossRuntimeRunnerEvm.originate evm_runner_1 in
+  let* tez_bridge_2 = TezCrossRuntimeRunnerEvm.originate evm_runner_2 in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_bridge_1; tez_bridge_2] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner_1 in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner_2 in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge_1
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge_2
+  in
+  unit
+
+(** TEZ-to-EVM-to-TEZ double crossing.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_inner]
+ *     |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_bridge] ~CRAC~> TEZ[tez_inner]
+ *     |-> TEZ[tez_inner]
+ *
+ *)
+let test_crac_tez_double_crossing =
+  register_crac_runner_test ~title:"CRAC: TEZ-to-EVM-to-TEZ double crossing"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ inner runner" ;
+  let* tez_inner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ inner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_inner in
+  Log.debug ~prefix "Originate TEZ bridge from EVM bridge" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_inner; tez_bridge; tez_inner] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_inner in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  unit
+
+(** Shared EVM leaf called three times: twice directly via the same TEZ
+ *  bridge, and once through a 3-CRAC chain that also ends at the same leaf.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge_direct] ~CRAC~> EVM[evm_leaf]
+ *     |-> TEZ[tez_bridge_chain] ~CRAC~> EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge_inner] ~CRAC~> EVM[evm_leaf]
+ *     |-> TEZ[tez_bridge_direct] ~CRAC~> EVM[evm_leaf]
+ *
+ *)
+let test_crac_tez_shared_leaf_via_direct_and_chain =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ shared EVM leaf via direct bridge and 3-CRAC chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM leaf" ;
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge_direct to EVM leaf" ;
+  let* tez_bridge_direct = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  Log.debug ~prefix "Originate TEZ bridge_inner to EVM leaf (for chain)" ;
+  let* tez_bridge_inner = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ bridge_inner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge_inner in
+  Log.debug ~prefix "Originate TEZ bridge_chain to EVM bridge" ;
+  let* tez_bridge_chain = TezCrossRuntimeRunnerEvm.originate evm_bridge in
+  Log.debug ~prefix "Originate TEZ main" ;
+  let* tez_main =
+    TezMultiRunCaller.originate
+      ~callees:[tez_bridge_direct; tez_bridge_chain; tez_bridge_direct]
+      ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_leaf in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:4 tez_bridge_direct
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge_chain
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge_inner
+  in
+  unit
+
+(** TEZ 5-crossing chain.
+ *
+ *    TEZ[tez_a] ~CRAC~> EVM[evm_b] ~CRAC~> TEZ[tez_c] ~CRAC~> EVM[evm_d] ~CRAC~> TEZ[tez_e] ~CRAC~> EVM[evm_leaf]
+ *
+ *)
+let test_crac_tez_5_crossing_chain =
+  register_crac_runner_test ~title:"CRAC: TEZ 5-crossing chain"
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Build 5-crossing CRAC chain (inside-out)" ;
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_e = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  let* evm_d = EvmCrossRuntimeRunnerTez.deploy_and_init tez_e in
+  let* tez_c = TezCrossRuntimeRunnerEvm.originate evm_d in
+  let* evm_b = EvmCrossRuntimeRunnerTez.deploy_and_init tez_c in
+  let* tez_a = TezCrossRuntimeRunnerEvm.originate evm_b in
+  Log.debug ~prefix "Call TEZ a" ;
+  (* The default gas_limit (10_000) is too low for 5 crossings: each
+     round-trip costs ~50K EVM gas (~5_000 gas units), exhausting the
+     budget after ~2 crossings. 20_000 units (= 200K EVM gas) provides
+     enough headroom even with correct cross-runtime gas charge-back. *)
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_a in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_leaf in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_a in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_b in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_c in
+  let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_d in
+  let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_e in
+  unit
+
+let () =
+  test_crac_evm_to_tez [Alpha] ;
+  test_crac_evm_multiple_independent_crossings [Alpha] ;
+  test_crac_evm_double_crossing [Alpha] ;
+  test_crac_evm_shared_leaf_via_direct_and_chain [Alpha] ;
+  test_crac_evm_5_crossing_chain [Alpha] ;
+  test_crac_tez_to_evm [Alpha] ;
+  test_crac_tez_multiple_independent_crossings [Alpha] ;
+  test_crac_tez_double_crossing [Alpha] ;
+  test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
+  test_crac_tez_5_crossing_chain [Alpha]

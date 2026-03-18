@@ -1,0 +1,66 @@
+parameter (or (unit %run) (unit %_incrementWitness)) ;
+storage (pair (nat %count) (string %destination)) ;
+# Michelson-to-EVM bridge for CRAC test scenarios.
+#
+# %run calls the CRAC gateway to invoke the EVM function `run()` on
+# `destination` with empty calldata (0x). The destination contract
+# must expose a parameterless `run()` function.
+#
+# Before and after the gateway call, the contract increments count
+# via self-calls to %_incrementWitness.
+#
+# %run: emits [incr, gateway.call, incr]
+# %_incrementWitness: count++
+#
+# The gateway address (KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw) is the
+# enshrined CRAC contract with a deterministic address.
+#
+# Since this contract itself exposes %run, it can be composed
+# with multi_run_caller.tz, multi_run_caller.sol and
+# cross_runtime_run_tez.sol to build arbitrary cross-runtime
+# call trees.
+#
+# EVM counterpart: cross_runtime_run_tez.sol (EVM-to-Michelson bridge).
+code
+  { UNPAIR ;
+    IF_LEFT
+      { # run()
+        DROP ;
+        DUP ; CDR ;
+        # destination : storage
+        DIP { PUSH @gateway address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+              CONTRACT %call_evm (pair string (pair string bytes)) ;
+              ASSERT_SOME } ;
+        # destination : (contract %call_evm ...) : storage
+        PUSH bytes 0x ;
+        PUSH string "run()" ;
+        PAIR ;
+        # (pair "run()" 0x) : destination : (contract ...) : storage
+        SWAP ;
+        PAIR ;
+        # Pair destination (Pair "run()" 0x) : (contract ...) : storage
+        AMOUNT ; SWAP ;
+        # param : amount : (contract ...) : storage
+        TRANSFER_TOKENS ;
+        # gateway_op : storage
+        # Build post-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # post_incr : gateway_op : storage
+        # Build ops list: [gateway_op, post_incr]
+        NIL operation ; SWAP ; CONS ; SWAP ; CONS ;
+        # [gateway_op, post_incr] : storage
+        # Build pre-increment operation
+        SELF %_incrementWitness ;
+        PUSH mutez 0 ; UNIT ; TRANSFER_TOKENS ;
+        # pre_incr : [gateway_op, post_incr] : storage
+        CONS ;
+        # [pre_incr, gateway_op, post_incr] : storage
+        PAIR
+      }
+      { # _incrementWitness()
+        DROP ;
+        UNPAIR ; PUSH nat 1 ; ADD ; PAIR ;
+        NIL operation ; PAIR
+      }
+  } ;
