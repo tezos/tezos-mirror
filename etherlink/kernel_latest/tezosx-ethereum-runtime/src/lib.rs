@@ -182,7 +182,6 @@ where
         call_data,
         gas_data,
         hdrs.amount,
-        revm::context::transaction::AccessList(vec![]),
         None,
         None,
         false,
@@ -293,10 +292,9 @@ impl RuntimeInterface for EthereumRuntime {
             Bytes::from(call_data),
             gas_data,
             AlloyU256::ZERO, // no value transfer
-            revm::context::transaction::AccessList(vec![]),
-            None,  // no authorization list
-            None,  // no tracer
-            false, // not a simulation
+            None,            // no authorization list
+            None,            // no tracer
+            false,           // not a simulation
             TransactionOrigin::CrossRuntime { credit: None },
         )
         .map_err(|e| {

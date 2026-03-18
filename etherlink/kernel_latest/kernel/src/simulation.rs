@@ -29,7 +29,6 @@ use revm_etherlink::{
     ExecutionOutcome, TransactionOrigin,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
@@ -508,13 +507,14 @@ impl Evaluation {
             gas,
             gas_price,
             max_gas_limit,
-            // TODO: Replace this by the decoded access lists if any.
-            empty_access_list(),
             None,
             spec_id,
             tracer_input,
             true,
-            TransactionOrigin::UserInput,
+            // TODO: Replace this by the decoded access lists if any.
+            TransactionOrigin::UserInput {
+                access_list: revm::context::transaction::AccessList::default(),
+            },
         ) {
             Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
@@ -817,11 +817,12 @@ mod tests {
             call_data.into(),
             GasData::new(gas_limit, gas_price.try_into().unwrap(), gas_limit),
             revm::primitives::U256::ZERO,
-            vec![].into(),
             None,
             None,
             false,
-            TransactionOrigin::UserInput,
+            TransactionOrigin::UserInput {
+                access_list: revm::context::transaction::AccessList::default(),
+            },
         );
         assert!(
             outcome.is_ok(),

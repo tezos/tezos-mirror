@@ -31,7 +31,6 @@ use revm_etherlink::{
     ExecutionOutcome, TransactionOrigin,
 };
 use tezos_crypto_rs::hash::HashTrait;
-use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
     TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
@@ -287,7 +286,6 @@ pub fn revm_run_transaction<Host>(
     gas_limit: u64,
     effective_gas_price: U256,
     maximum_gas_per_transaction: u64,
-    access_list: AccessList,
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
@@ -335,25 +333,6 @@ where
         Bytes::from(call_data),
         gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
-        revm::context::transaction::AccessList::from(
-            access_list
-                .into_iter()
-                .map(
-                    |AccessListItem {
-                         address,
-                         storage_keys,
-                     }| {
-                        revm::context::transaction::AccessListItem {
-                            address: Address::from_slice(&address.0),
-                            storage_keys: storage_keys
-                                .into_iter()
-                                .map(|key| B256::from_slice(&key.0))
-                                .collect(),
-                        }
-                    },
-                )
-                .collect::<Vec<revm::context::transaction::AccessListItem>>(),
-        ),
         authorization_list.map(signed_authorization),
         tracer_input.map(|tracer_input| match tracer_input {
             TracerInput::CallTracer(CallTracerInput {
@@ -445,12 +424,15 @@ where
         gas_limit,
         effective_gas_price,
         limits.maximum_gas_limit,
-        transaction.access_list.clone(),
         transaction.authorization_list.clone(),
         spec_id,
         tracer_input,
         false,
-        TransactionOrigin::UserInput,
+        TransactionOrigin::UserInput {
+            access_list: revm_etherlink::helpers::legacy::access_list_to_revm(
+                transaction.access_list.clone(),
+            ),
+        },
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -538,12 +520,13 @@ where
         gas_limit,
         effective_gas_price,
         maximum_gas_limit,
-        Vec::new(),
         None,
         spec_id,
         tracer_input,
         false,
-        TransactionOrigin::UserInput,
+        TransactionOrigin::UserInput {
+            access_list: revm::context::transaction::AccessList::default(),
+        },
     ) {
         Ok(execution_outcome) => Ok(execution_outcome),
         Err(err) => {
@@ -661,12 +644,13 @@ where
         gas_limit,
         effective_gas_price,
         maximum_gas_limit,
-        Vec::new(),
         None,
         spec_id,
         tracer_input,
         false,
-        TransactionOrigin::UserInput,
+        TransactionOrigin::UserInput {
+            access_list: revm::context::transaction::AccessList::default(),
+        },
     ) {
         Ok(outcome) => Ok(outcome),
         Err(err) => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
