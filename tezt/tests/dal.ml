@@ -6393,7 +6393,7 @@ let dal_slots_retrievability =
       get_slot_rpc invalid_dal_fetcher_bad_uri ~published_level ~slot_index:4
       |> fetch_500_expected
            ~__LOC__
-           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
+           ~expected_error:"No_commitment_found_for_slot_id"
     in
 
     (* C.10 No slot published at level 0: expect 404 *)
@@ -6436,7 +6436,7 @@ let dal_slots_retrievability =
       get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:3
       |> fetch_500_expected
            ~__LOC__
-           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
+           ~expected_error:"No_commitment_found_for_slot_id"
     in
 
     unit
