@@ -14894,10 +14894,11 @@ let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
-  Skip_list_rpcs.test_skip_list_rpcs_with_migration
-    ~migration_level:11
-    ~migrate_from
-    ~migrate_to ;
+  if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
+    Skip_list_rpcs.test_skip_list_rpcs_with_migration
+      ~migration_level:11
+      ~migrate_from
+      ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
   test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;
