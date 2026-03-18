@@ -52,6 +52,48 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
+let build_dependency_image =
+  Image.mk_external
+    ~image_path:
+      "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+
+let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
+    ~matrix ~distribution ~script ~dependencies () =
+  job
+    ~__POS__
+    ~name
+    ~image:build_dependency_image
+    ~stage:Stages.build
+    ~variables:
+      (make_variables
+         (("DISTRIBUTION", distribution)
+         ::
+         (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+         ))
+    ~parallel:(Matrix matrix)
+    ~dependencies
+    ~tag:Dynamic
+    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+      "export CARGO_NET_OFFLINE=false";
+      script;
+    ]
+  |> Tezos_ci.Cache.enable_sccache
+
 let make_debian_variables distribution image_kind release version =
   ( "DEP_IMAGE",
     sf
@@ -142,9 +184,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
       ()
   in
-  let make_job_build_debian_packages =
-    make_job_build_packages ~limit_dune_build_jobs
-  in
   (* docker merge jobs *)
   let job_merge_build_debian_dependencies =
     make_job_merge_build_dependencies
@@ -164,7 +203,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     job
       ~__POS__
       ~name:"oc.build-data_packages"
-      ~image:Common.Packaging.build_dependency_image
+      ~image:build_dependency_image
       ~stage:Stages.build
       ~variables:
         (Common.Packaging.make_variables
@@ -180,23 +219,25 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   (* These jobs build the packages in a matrix using the
      build dependencies images *)
   let job_build_debian_package : tezos_job =
-    make_job_build_debian_packages
+    make_job_build_packages
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
+      ~limit_dune_build_jobs
       ()
   in
   let job_build_ubuntu_package : tezos_job =
-    make_job_build_debian_packages
+    make_job_build_packages
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_merge_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
+      ~limit_dune_build_jobs
       ()
   in
 
