@@ -6,7 +6,16 @@ open! Bigarray
 
 type registry
 type invalid_argument_error = Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds
+external octez_riscv_durable_in_memory_registry_new: unit -> registry = "octez_riscv_durable_in_memory_registry_new"
 external octez_riscv_durable_in_memory_registry_size: registry -> int64 = "octez_riscv_durable_in_memory_registry_size"
 external octez_riscv_durable_in_memory_registry_resize: registry -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_resize"
 external octez_riscv_durable_in_memory_registry_copy: registry -> int64 -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_copy"
 external octez_riscv_durable_in_memory_registry_move: registry -> int64 -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_move"
+external octez_riscv_durable_in_memory_registry_clear: registry -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_clear"
+external octez_riscv_durable_in_memory_database_exists: registry -> int64 -> bytes -> (bool, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_exists"
+external octez_riscv_durable_in_memory_database_set: registry -> int64 -> bytes -> bytes -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_set"
+external octez_riscv_durable_in_memory_database_write: registry -> int64 -> bytes -> int64 -> bytes -> (int64, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_write"
+external octez_riscv_durable_in_memory_database_read: registry -> int64 -> bytes -> int64 -> int64 -> (bytes, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_read"
+external octez_riscv_durable_in_memory_database_value_length: registry -> int64 -> bytes -> (int64, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_value_length"
+external octez_riscv_durable_in_memory_database_delete: registry -> int64 -> bytes -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_delete"
+external octez_riscv_durable_in_memory_database_hash: registry -> int64 -> (bytes, invalid_argument_error) result = "octez_riscv_durable_in_memory_database_hash"

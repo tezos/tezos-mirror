@@ -32,6 +32,7 @@ use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::storage::StorageError;
 use octez_riscv_api_common::OcamlFallible;
+use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::ImmutableState;
 use octez_riscv_api_common::move_semantics::MutableState;
@@ -143,24 +144,6 @@ impl From<Status> for PvmStatus {
     }
 }
 
-/// Wrapper to convert a Rust allocated byte-array to an OCaml allocated Bytes type
-pub struct BytesWrapper(Box<[u8]>);
-
-unsafe impl ocaml::ToValue for BytesWrapper {
-    fn to_value(&self, _rt: &ocaml::Runtime) -> ocaml::Value {
-        unsafe { ocaml::Value::bytes(&self.0) }
-    }
-}
-
-unsafe impl ocaml::FromValue for BytesWrapper {
-    fn from_value(value: ocaml::Value) -> Self {
-        // SAFETY: The ToValue implementation for this type uses the OCaml bytes type.
-        // and ocaml-rs will only call this function on an OCaml value coming from BytesWrapper.
-        let bytes: &[u8] = unsafe { value.bytes_val() };
-        BytesWrapper(bytes.into())
-    }
-}
-
 /// Input values are passed into the PVM after an input request has been made.
 /// Analogous to the [`PvmInput`] type.
 #[derive(ocaml::FromValue, ocaml::ToValue)]
@@ -213,7 +196,9 @@ impl From<PvmInputRequest> for InputRequest {
             PvmInputRequest::FirstAfter { level, counter } => {
                 InputRequest::FirstAfter { level, counter }
             }
-            PvmInputRequest::NeedsReveal(data) => InputRequest::NeedsReveal(BytesWrapper(data)),
+            PvmInputRequest::NeedsReveal(data) => {
+                InputRequest::NeedsReveal(BytesWrapper::from(data))
+            }
         }
     }
 }
@@ -279,7 +264,7 @@ impl From<PvmOutput> for Output {
     fn from(output: PvmOutput) -> Self {
         Self {
             info: output.info.into(),
-            encoded_message: BytesWrapper(output.message.into()),
+            encoded_message: BytesWrapper::from(Box::from(output.message)),
         }
     }
 }
@@ -289,7 +274,7 @@ impl TryFrom<Output> for PvmOutput {
 
     fn try_from(output: Output) -> Result<Self, String> {
         Ok(Self {
-            message: OutboxMessage::try_from(output.encoded_message.0)
+            message: OutboxMessage::try_from(Box::<[u8]>::from(output.encoded_message))
                 .map_err(|e| e.to_string())?,
             info: output.info.into(),
         })
@@ -750,7 +735,7 @@ pub unsafe fn octez_riscv_serialise_proof(proof: SafePointer<Proof>) -> BytesWra
     // Safety: the function needs to return the same `ocaml::Value` as in the signature.
     // In this case, an OCaml bytes value has to be returned.
     let bytes = proof.serialised_proof.clone();
-    BytesWrapper(bytes)
+    BytesWrapper::from(bytes)
 }
 
 #[ocaml::func]
@@ -837,14 +822,14 @@ pub fn octez_riscv_mut_get_outbox_for_level(
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_get_reveal_request(state: SafePointer<State>) -> BytesWrapper {
     let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
-    BytesWrapper(serialised_reveal_request.into_boxed_slice())
+    BytesWrapper::from(serialised_reveal_request.into_boxed_slice())
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> bytes")]
 pub fn octez_riscv_mut_get_reveal_request(state: SafePointer<MutState>) -> BytesWrapper {
     let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
-    BytesWrapper(serialised_reveal_request.into_boxed_slice())
+    BytesWrapper::from(serialised_reveal_request.into_boxed_slice())
 }
 
 #[ocaml::func]
