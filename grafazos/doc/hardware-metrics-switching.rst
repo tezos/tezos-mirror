@@ -1,39 +1,40 @@
-Hardware Metrics Sourcing: netdata vs Prometheus Exporters
-===========================================================
+Hardware Metrics Sourcing: Multi-Exporter Configuration
+========================================================
 
 Overview
 --------
 
-Grafazos provides **configurable hardware metrics sourcing** for Octez Grafana dashboards, allowing users to choose between two different monitoring backends:
+Grafazos provides **configurable hardware metrics sourcing** for Octez Grafana dashboards, allowing users to combine any set of metric exporters:
 
 1. **netdata** (default): Application-aware metrics from netdata daemon
-2. **prom-exporters** (alternative): System and process-level metrics from Prometheus exporters (process-exporter + node-exporter)
+2. **process-exporter**: Process-level metrics (CPU, memory, disk I/O, file descriptors) via ``namedprocess_namegroup_*`` metrics
+3. **node-exporter**: System-level metrics (storage, network) via ``node_*`` metrics
+4. **local-storage-exporter**: Size on disk via ``local_storage_pv_used_bytes``
 
-Additionally, the system supports **configurable log filtering labels** via the ``LOGS_LABEL`` parameter, enabling users to query logs by custom label fields.
+``HARDWARE_SRC`` accepts a **comma-separated list** of exporters. When multiple exporters provide the same metric, all variants appear in the same Grafana panel with an ``[exporter-name]`` legend suffix.
 
 Key Features
 ~~~~~~~~~~~~
 
-- **Metric Source Switching**: Runtime selection of metric backend via ``HARDWARE_SRC`` environment variable
-- **Process-Level Monitoring**: Visibility into individual process group performance
-- **Self-Documenting Dashboards**: Legend labels display process group names and device identifiers at runtime
+- **Multi-Exporter Panels**: Multiple exporters can contribute queries to the same panel
+- **Legend Suffixes**: When multiple exporters match, legends are suffixed with ``[exporter-name]``
+- **Granular Selection**: Choose exactly which exporters to use (e.g., ``netdata,node-exporter``)
 - **Side-by-Side Comparison**: Comparison dashboard showing netdata and prom-exporters metrics side-by-side
-- **Flexible Backend Selection**: Default configuration uses netdata, with easy opt-in to prom-exporters
 - **Build Integration**: Seamless integration with existing Makefile build system
 
 Motivation
 ----------
 
-Hardware metrics can be sourced from different monitoring backends. This system supports both netdata and Prometheus exporters, allowing users to choose their preferred monitoring infrastructure.
+Hardware metrics can be sourced from different monitoring backends. This system supports netdata, process-exporter, node-exporter, and local-storage-exporter, allowing users to combine them as needed.
 
 Solution Approach
 ~~~~~~~~~~~~~~~~~
 
 This implementation provides **flexible metric sourcing** through:
 
-- **selectMetric()** pattern: Each hardware metric function conditionally selects between netdata and prom-exporter variants
-- **Environment Variable Control**: Users specify ``HARDWARE_SRC=netdata`` or ``HARDWARE_SRC=prom-exporters`` at build time
-- **Process-Exporter**: The ``process-exporter`` (namedprocess_namegroup_* metrics) provides process-level monitoring with clear groupname labels
+- **selectMetrics()** pattern: Each hardware metric function declares which exporters can provide it via a mapping object. All matching exporters contribute queries to the panel.
+- **Environment Variable Control**: Users specify a comma-separated list of exporters via ``HARDWARE_SRC``
+- **Exporter Mapping**: Each metric explicitly declares its exporter (``netdata``, ``process-exporter``, ``node-exporter``, or ``local-storage-exporter``)
 - **Comparison Dashboard**: Visual reference showing both approaches side-by-side for evaluation
 
 Configuration Parameters
@@ -42,23 +43,25 @@ Configuration Parameters
 HARDWARE_SRC Parameter
 ~~~~~~~~~~~~~~~~~~~~~~
 
-**Type**: Environment variable
+**Type**: Environment variable (comma-separated list)
 
 **Default Value**: ``netdata``
 
-**Valid Values**:
+**Valid Exporter Names**:
 
-- ``netdata`` - Use netdata application-aware metrics
-- ``prom-exporters`` - Use Prometheus exporters (process-exporter + node-exporter)
+- ``netdata`` - Application-aware metrics from netdata daemon
+- ``process-exporter`` - Process-level metrics (``namedprocess_namegroup_*``)
+- ``node-exporter`` - System-level metrics (``node_filesystem_*``, ``node_network_*``)
+- ``local-storage-exporter`` - Size on disk metrics (``local_storage_pv_used_bytes``)
 
 **How It Works**:
 
-1. User sets environment variable: ``export HARDWARE_SRC=prom-exporters``
+1. User sets environment variable: ``export HARDWARE_SRC=process-exporter,node-exporter``
 2. Makefile receives value: ``HARDWARE_SRC ?= netdata``
 3. Passed to jsonnet compiler: ``--ext-str hardware_src="$(HARDWARE_SRC)"``
-4. Imported in base.jsonnet: ``hardware_src: std.extVar('hardware_src')``
-5. Used in metric functions: ``if base.hardware_src == 'prom-exporters' then ...``
-6. Compiled dashboard contains only selected metrics
+4. Parsed in base.jsonnet into a list of exporters (``hardware_exporters``)
+5. ``selectMetrics()`` finds all matching exporters and returns queries for each
+6. When multiple match, legend suffixes are added automatically
 
 **Example Usage**:
 
@@ -67,13 +70,16 @@ HARDWARE_SRC Parameter
     # Build with default netdata metrics
     make
 
-    # Build with prom-exporters metrics
-    HARDWARE_SRC=prom-exporters make
+    # Build with both prometheus exporters
+    HARDWARE_SRC=process-exporter,node-exporter make
 
-    # Build specific dashboard with prom-exporters
-    HARDWARE_SRC=prom-exporters make octez-full.jsonnet
+    # Combine netdata with node-exporter (netdata for process metrics, node-exporter for system metrics)
+    HARDWARE_SRC=netdata,node-exporter make
 
-    # Build comparison dashboard (shows both side-by-side)
+    # Show both netdata and process-exporter in same panels (with legend suffixes)
+    HARDWARE_SRC=netdata,process-exporter make
+
+    # Build comparison dashboard (shows both side-by-side, independent of HARDWARE_SRC)
     make compare-hardware.jsonnet
 
 LOGS_LABEL Parameter
@@ -110,17 +116,16 @@ Metrics Comparison
 Comparison
 ~~~~~~~~~~
 
-=================== ======= ==============
-Metric Category     netdata prom-exporters
-=================== ======= ==============
+=================== ======= ================= ============= ======================
+Metric Category     netdata process-exporter  node-exporter local-storage-exporter
+=================== ======= ================= ============= ======================
 Disk I/O (Process)  ✅      ✅
 CPU Utilization     ✅      ✅
 Memory Usage        ✅      ✅
 Open FDs            ✅      ✅
-Storage/Filesystem  ✅      ✅
-Network I/O         ✅      ✅
-Label Clarity       ⚠️      ✅
-=================== ======= ==============
+Storage/Filesystem  ✅                         ✅            ✅
+Network I/O         ✅                         ✅
+=================== ======= ================= ============= ======================
 
 Disk I/O Metrics
 ~~~~~~~~~~~~~~~~
@@ -149,7 +154,7 @@ Disk I/O Metrics
 - Limited to application group filtering
 - Logical I/O only (no physical device information)
 
-**prom-exporters Approach:**
+**process-exporter Approach:**
 
 ::
 
@@ -190,7 +195,7 @@ CPU Utilization Metrics
 - **Coverage**: CPU usage aggregated per app_group
 - **Time Aggregation**: Already averaged by netdata
 
-**prom-exporters Approach:**
+**process-exporter Approach:**
 
 ::
 
@@ -222,7 +227,7 @@ Memory Usage Metrics
 - **Coverage**: Memory and swap usage per app_group
 - **Breakdown**: Separate metrics for RAM vs Swap
 
-**prom-exporters Approach:**
+**process-exporter Approach:**
 
 ::
 
@@ -250,7 +255,7 @@ Storage/Filesystem Metrics
 - **Granularity**: Single value for all filesystems
 - **Units**: GiB (gibibytes)
 
-**prom-exporters Approach:**
+**node-exporter Approach:**
 
 ::
 
@@ -272,14 +277,17 @@ When to Use Each
 - Prefer pre-aggregated, immediately-readable values
 - Simple deployment without additional exporters
 
-**Choose prom-exporters when:**
+**Choose process-exporter when:**
 
-- Already using Prometheus ecosystem (node-exporter, process-exporter)
 - Need explicit process group identification (groupname labels)
-- Require device-level filesystem metrics
-- Want standardized Prometheus counter/gauge patterns
 - Need fine-grained process-level insights (individual FD counts, per-group CPU time)
 - Running multiple process groups and need clear separation
+
+**Choose node-exporter when:**
+
+- Require device-level filesystem metrics
+- Need system-level network traffic monitoring
+- Want standardized Prometheus counter/gauge patterns
 
 Usage Instructions
 ------------------
@@ -294,23 +302,35 @@ Default Build (netdata)
 
 This compiles all dashboards using netdata metrics. Generated files appear in ``output/`` directory.
 
-Build with prom-exporters Metrics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Build with Prometheus Exporters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: shell
 
     cd grafazos
-    HARDWARE_SRC=prom-exporters make
+    HARDWARE_SRC=process-exporter,node-exporter make
 
-This recompiles all dashboards substituting prom-exporter metrics for netdata equivalents.
+This recompiles all dashboards using process-exporter and node-exporter metrics.
+
+Build with Multiple Exporters in Same Panel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: shell
+
+    cd grafazos
+    HARDWARE_SRC=netdata,process-exporter make
+
+When both exporters provide the same metric (e.g., CPU), both queries appear in
+the same panel with legend suffixes like ``Cpu load [netdata]`` and
+``Cpu load [process-exporter]``.
 
 Build Specific Dashboard
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: shell
 
-    # octez-full with prom-exporters
-    HARDWARE_SRC=prom-exporters make octez-full.jsonnet
+    # octez-full with both prometheus exporters
+    HARDWARE_SRC=process-exporter,node-exporter make octez-full.jsonnet
 
     # octez-basic with netdata (default)
     make octez-basic.jsonnet

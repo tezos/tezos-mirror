@@ -93,6 +93,7 @@ a different label for RPC endpoints (e.g., ``exported_endpoint``), you can confi
 
     ENDPOINT_LABEL=exported_endpoint
 
+
 If you need hardware metrics, note that, by default, the storage stat considered is the used
 space of the whole disk. Optionnally you can enable storage monitoring with ``filecheck``:
 

@@ -28,6 +28,35 @@ local timeSeries = panel.timeSeries;
 local query = grafonnet.query;
 local logs = panel.logs;
 
+// Parse HARDWARE_SRC as comma-separated list of exporters.
+// Valid values: netdata, process-exporter, node-exporter, local-storage-exporter
+local hardwareExporters = std.split(std.extVar('hardware_src'), ',');
+
+// Returns array of {metric: string, legend: string} for all matching exporters.
+// When multiple exporters match, appends ' [exporter-name]' to legend.
+// legendFormat can be:
+//   - a string: used for all exporters (original behavior)
+//   - an object { exporter-name: legend }: per-exporter legend templates
+local selectMetrics(metricsByExporter, legendFormat) =
+  local activeKeys = [
+    k
+    for k in std.objectFields(metricsByExporter)
+    if std.member(hardwareExporters, k)
+  ];
+  local addSuffix = std.length(activeKeys) > 1;
+  local legendFor(k) =
+    local base = if std.isString(legendFormat) then legendFormat else legendFormat[k];
+    if addSuffix then base + ' [' + k + ']' else base;
+  [
+    {
+      metric: metricsByExporter[k],
+      legend: legendFor(k),
+    }
+    for k in activeKeys
+  ];
+
+local hasExporter(name) = std.member(hardwareExporters, name);
+
 {
 
   // Parameters
@@ -51,6 +80,10 @@ local logs = panel.logs;
   endpoint_label: std.extVar('endpoint_label'),
 
   hardware_src: std.extVar('hardware_src'),
+
+  hardware_exporters: hardwareExporters,
+  selectMetrics: selectMetrics,
+  hasExporter: hasExporter,
 
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index"}',
 
@@ -194,7 +227,7 @@ local logs = panel.logs;
         + logs.panelOptions.withGridPos(h, w, x, y)
         + logs.queryOptions.withTargets(q)
         + logs.options.withSortOrder('Descending')
-        + logs.options.withWrapLogMessage(false)
+        + logs.options.withWrapLogMessage(true)
         + logs.queryOptions.withDatasource(d, dn),
     },
 

@@ -3,7 +3,12 @@ all: basic logs full compact dal-basic profiling tezt_cloud-layer1 compare-hardw
 NODE_INSTANCE_LABEL ?= instance
 LOGS_LABEL ?= job
 ENDPOINT_LABEL ?= endpoint
-# HARDWARE_SRC can be: netdata (default) or prom-exporters (node-exporter + process-exporter)
+# HARDWARE_SRC: comma-separated list of metric exporters.
+# Valid values: netdata, process-exporter, node-exporter, local-storage-exporter
+# Examples:
+#   HARDWARE_SRC=netdata                              (default)
+#   HARDWARE_SRC=process-exporter,node-exporter       (both prometheus exporters)
+#   HARDWARE_SRC=netdata,process-exporter             (both in same panel)
 HARDWARE_SRC ?= netdata
 STORAGE_MODE ?= default
 UID ?= default
