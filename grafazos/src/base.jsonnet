@@ -50,6 +50,8 @@ local logs = panel.logs;
 
   endpoint_label: std.extVar('endpoint_label'),
 
+  hardware_src: std.extVar('hardware_src'),
+
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index"}',
 
   pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh=~"$pkh"}',

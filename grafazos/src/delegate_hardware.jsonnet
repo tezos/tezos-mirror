@@ -39,15 +39,31 @@ local graph = base.graph;
     query.prometheus.new(base.datasource, q)
     + query.prometheus.withLegendFormat(legendFormat),
 
+  // Metric selector for hardware_src switching
+  selectMetric(netdataMetric, promExporterMetric):
+    if base.hardware_src == 'prom-exporters' then promExporterMetric else netdataMetric,
+
   ios(h, w, x, y):
     local readsAccuser = 'reads accuser';
     local writesAccuser = 'writes accuser';
     local readsBaker = 'reads baker';
     local writesBaker = 'writes baker';
-    local readsAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', readsAccuser);
-    local writesAccuserQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', writesAccuser);
-    local readsBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-baker",' + base.node_instance + '="$node_instance"}', readsBaker);
-    local writesBakerQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-baker",' + base.node_instance + '="$node_instance"}', writesBaker);
+    local readsAccuserQuery = self.query(self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_read_bytes_total{groupname=~"octez-accuser.*",' + base.node_instance + '="$node_instance"}[5m])/1024'  // process-exporter
+    ), readsAccuser);
+    local writesAccuserQuery = self.query(self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-accuser",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_write_bytes_total{groupname=~"octez-accuser.*",' + base.node_instance + '="$node_instance"}[5m])/1024'  // process-exporter
+    ), writesAccuser);
+    local readsBakerQuery = self.query(self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{dimension="reads", app_group="octez-baker",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_read_bytes_total{groupname=~"octez-baker.*",' + base.node_instance + '="$node_instance"}[5m])/1024'  // process-exporter
+    ), readsBaker);
+    local writesBakerQuery = self.query(self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{dimension="writes", app_group="octez-baker",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_write_bytes_total{groupname=~"octez-baker.*",' + base.node_instance + '="$node_instance"}[5m])/1024'  // process-exporter
+    ), writesBaker);
     graph.new('IOs', [readsAccuserQuery, writesAccuserQuery, readsBakerQuery, writesBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('kbytes')
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
@@ -56,8 +72,14 @@ local graph = base.graph;
   cpu(h, w, x, y):
     local loadAccuser = 'Cpu load accuser';
     local loadBaker = 'Cpu load baker';
-    local loadAccuserQuery = self.query('netdata_app_cpu_utilization_percentage_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', loadAccuser);
-    local loadBakerQuery = self.query('netdata_app_cpu_utilization_percentage_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', loadBaker);
+    local loadAccuserQuery = self.query(self.selectMetric(
+      'netdata_app_cpu_utilization_percentage_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"octez-accuser.*",mode="user",' + base.node_instance + '="$node_instance"}[5m])*100'  // process-exporter
+    ), loadAccuser);
+    local loadBakerQuery = self.query(self.selectMetric(
+      'netdata_app_cpu_utilization_percentage_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}',
+      'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"octez-baker.*",mode="user",' + base.node_instance + '="$node_instance"}[5m])*100'  // process-exporter
+    ), loadBaker);
     graph.new('Cpu activity', [loadAccuserQuery, loadBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('percent')
     + graph.withQueryColor([[loadAccuser, 'light-yellow'], [loadBaker, 'light-red']]),
@@ -67,10 +89,22 @@ local graph = base.graph;
     local swapAccuser = 'Swap usage accuser';
     local ramBaker = 'Memory usage baker';
     local swapBaker = 'Swap usage baker';
-    local ramAccuserQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', ramAccuser);
-    local swapAccuserQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}', swapAccuser);
-    local ramBakerQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', ramBaker);
-    local swapBakerQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}', swapBaker);
+    local ramAccuserQuery = self.query(self.selectMetric(
+      'netdata_app_mem_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"octez-accuser.*",memtype="resident",' + base.node_instance + '="$node_instance"}/1024/1024'  // process-exporter
+    ), ramAccuser);
+    local swapAccuserQuery = self.query(self.selectMetric(
+      'netdata_app_swap_usage_MiB_average{app_group="octez-accuser",' + base.node_instance + '="$node_instance"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"octez-accuser.*",memtype="swapped",' + base.node_instance + '="$node_instance"}/1024/1024'  // process-exporter
+    ), swapAccuser);
+    local ramBakerQuery = self.query(self.selectMetric(
+      'netdata_app_mem_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"octez-baker.*",memtype="resident",' + base.node_instance + '="$node_instance"}/1024/1024'  // process-exporter
+    ), ramBaker);
+    local swapBakerQuery = self.query(self.selectMetric(
+      'netdata_app_swap_usage_MiB_average{app_group="octez-baker",' + base.node_instance + '="$node_instance"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"octez-baker.*",memtype="swapped",' + base.node_instance + '="$node_instance"}/1024/1024'  // process-exporter
+    ), swapBaker);
     graph.new('Memory usage', [ramAccuserQuery, swapAccuserQuery, ramBakerQuery, swapBakerQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('mbytes')
     + graph.withLegendBottom(calcs=['current', 'mean', 'max'])

@@ -1,8 +1,9 @@
-all: basic logs full compact dal-basic profiling tezt_cloud-layer1
+all: basic logs full compact dal-basic profiling tezt_cloud-layer1 compare-hardware
 
 NODE_INSTANCE_LABEL ?= instance
 LOGS_LABEL ?= job
 ENDPOINT_LABEL ?= endpoint
+# HARDWARE_SRC can be: netdata (default) or prom-exporters (node-exporter + process-exporter)
 HARDWARE_SRC ?= netdata
 STORAGE_MODE ?= default
 UID ?= default
@@ -49,3 +50,5 @@ dal-basic: dal/dal-basic.jsonnet
 profiling: octez-profiling.jsonnet
 
 tezt_cloud-layer1: tezt_cloud-layer1.jsonnet
+
+compare-hardware: compare-hardware.jsonnet

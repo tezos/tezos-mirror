@@ -30,6 +30,10 @@ local graph = base.graph;
     + variable.query.withDatasourceFromVariable(self.datasource)
     + query.prometheus.withLegendFormat(legendFormat),
 
+  // Metric selector for hardware_src switching
+  selectMetric(netdataMetric, promExporterMetric):
+    if base.hardware_src == 'prom-exporters' then promExporterMetric else netdataMetric,
+
   // Node
 
   headHistory(agg='', h, w, x, y):
@@ -46,34 +50,50 @@ local graph = base.graph;
   // Hardware
 
   cpu(agg='', app_group, h, w, x, y):
-    local avgUser = 'User ' + agg;
-    local avgSystem = 'System ' + agg;
-    local avgUserQuery = self.query(agg, 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="user"}', avgUser);
-    local avgSystemQuery = self.query(agg, 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="system"}', avgSystem);
+    local avgUserQuery = self.query(agg, self.selectMetric(
+      'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="user"}',
+      'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"' + app_group + '.*",mode="user"}[5m])*100'  // process-exporter
+    ), 'User ' + agg + ' ({{ groupname }})');
+    local avgSystemQuery = self.query(agg, self.selectMetric(
+      'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="system"}',
+      'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"' + app_group + '.*",mode="system"}[5m])*100'  // process-exporter
+    ), 'System ' + agg + ' ({{ groupname }})');
     graph.new('[' + app_group + '] ' + 'Cpu activity', [avgUserQuery, avgSystemQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('percent'),
 
   memory(agg='', app_group, h, w, x, y):
-    local ram = 'RAM ' + agg;
-    local swap = 'swap ' + agg;
-    local avgRamQuery = self.query(agg, 'netdata_app_mem_usage_MiB_average{app_group="' + app_group + '"}', ram);
-    local avgSwapQuery = self.query(agg, 'netdata_app_swap_usage_MiB_average{app_group="' + app_group + '"}', swap);
+    local avgRamQuery = self.query(agg, self.selectMetric(
+      'netdata_app_mem_usage_MiB_average{app_group="' + app_group + '"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"' + app_group + '.*",memtype="resident"}/1024/1024'  // process-exporter
+    ), 'RAM ' + agg + ' ({{ groupname }})');
+    local avgSwapQuery = self.query(agg, self.selectMetric(
+      'netdata_app_swap_usage_MiB_average{app_group="' + app_group + '"}',
+      'namedprocess_namegroup_memory_bytes{groupname=~"' + app_group + '.*",memtype="swapped"}/1024/1024'  // process-exporter
+    ), 'swap ' + agg + ' ({{ groupname }})');
     graph.new('[' + app_group + '] ' + 'Memory usage', [avgRamQuery, avgSwapQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('MB'),
 
   ios(agg='', app_group, h, w, x, y):
-    local reads = 'Reads ' + agg;
-    local writes = 'Writes ' + agg;
-    local readsQuery = self.query(agg, 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}', reads);
-    local writesQuery = self.query(agg, 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}', writes);
+    local readsQuery = self.query(agg, self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}',
+      'rate(namedprocess_namegroup_read_bytes_total{groupname=~"' + app_group + '.*"}[5m])/1024'  // process-exporter
+    ), 'Reads ' + agg + ' ({{ groupname }})');
+    local writesQuery = self.query(agg, self.selectMetric(
+      'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}',
+      'rate(namedprocess_namegroup_write_bytes_total{groupname=~"' + app_group + '.*"}[5m])/1024'  // process-exporter
+    ), 'Writes ' + agg + ' ({{ groupname }})');
     graph.new('[' + app_group + '] ' + 'Disk IOs', [readsQuery, writesQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('kB/s'),
 
   networkIOS(agg='', h, w, x, y):
-    local received = 'Received ' + agg;
-    local transmitted = 'Transmitted ' + agg;
-    local avgReceivedQuery = self.query(agg, 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received"}) / 8', received);
-    local avgTransmittedQuery = self.query(agg, 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent"}) / 8', transmitted);
+    local avgReceivedQuery = self.query(agg, self.selectMetric(
+      'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received"}) / 8',
+      'rate(node_network_receive_bytes_total{device=~".+"}[5m])*8/1000'  // node-exporter (system-level network)
+    ), 'Received ' + agg + ' ({{ device }})');
+    local avgTransmittedQuery = self.query(agg, self.selectMetric(
+      'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent"}) / 8',
+      'rate(node_network_transmit_bytes_total{device=~".+"}[5m])*8/1000'  // node-exporter (system-level network)
+    ), 'Transmitted ' + agg + ' ({{ device }})');
     graph.new('Network traffic', [avgReceivedQuery, avgTransmittedQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('kB/s'),
 

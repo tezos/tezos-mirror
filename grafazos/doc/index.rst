@@ -8,6 +8,11 @@ It relies on the metrics exposed by the Octez node, see :doc:`../developer/openm
 Resources
 ---------
 
+.. toctree::
+   :maxdepth: 2
+
+   hardware-metrics-switching
+
 Jsonnet
 ~~~~~~~
 
@@ -102,9 +107,9 @@ to ``/`` and another specific mountpoint, you can enable and add it with the ``M
 
     MOUNTPOINT="/opt"
 
-By default, the logs are fetched from Loki. If you want to use GCP logs, you can enable it with
-the ``LOGSRC`` variable, the GCP project id with the ``GCP`` variable and the
-``GCP_DATASOURCE_UID`` for it's unique id in grafana.
+By default, the logs are fetched from Loki. If you want to use GCP logs, you can enable them with
+the ``LOGSRC`` variable, specifying the GCP project id with the ``GCP_PROJECT_ID`` variable and the
+data source unique id with ``GCP_DATASOURCE_UID``.
 
 .. code-block:: shell
 
