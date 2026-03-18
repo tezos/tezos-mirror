@@ -11,10 +11,7 @@
    This pipeline builds the old and old Debian (and Ubuntu)
    packages. *)
 
-open Gitlab_ci.Util
 open Tezos_ci
-open Common.Packaging
-open Common.Helpers
 
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
@@ -35,7 +32,7 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
 let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial ->
+  | Common.Packaging.Partial ->
       [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full ->
       [
@@ -65,7 +62,7 @@ let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~image:build_dependency_image
     ~stage:Stages.build
     ~variables:
-      (make_variables
+      (Common.Packaging.make_variables
          (("DISTRIBUTION", distribution)
          ::
          (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
@@ -73,7 +70,7 @@ let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~parallel:(Matrix matrix)
     ~dependencies
     ~tag:Dynamic
-    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     [
       (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
@@ -117,7 +114,8 @@ let make_debian_variables distribution image_kind release version =
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
 let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial -> [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Common.Packaging.Partial ->
+      [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
@@ -143,7 +141,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~tag:Gcp_not_interruptible
     ?retry
     ~before_script:
-      (before_script
+      (Common.Helpers.before_script
          ~source_version:true
          ["apt-get install -y --update apt-utils debsigs"])
     ~variables
@@ -155,7 +153,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let make_job_docker_build_debian_dependencies =
-    make_docker_build_dependencies
+    Common.Packaging.make_docker_build_dependencies
       ?rules:
         (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
          else None)
@@ -186,13 +184,13 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   in
   (* docker merge jobs *)
   let job_merge_build_debian_dependencies =
-    make_job_merge_build_dependencies
+    Common.Packaging.make_job_merge_build_dependencies
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~matrix:(debian_package_release_matrix ~arm64:false pipeline_type)
   in
   let job_merge_build_ubuntu_dependencies =
-    make_job_merge_build_dependencies
+    Common.Packaging.make_job_merge_build_dependencies
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
@@ -210,7 +208,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
            [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
       ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~tag:Dynamic
-      ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+      ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
         "export CARGO_NET_OFFLINE=false";
         "./scripts/ci/build-debian-packages.sh zcash";
@@ -253,7 +251,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
              Artifacts job_build_debian_package;
              Artifacts job_build_data_packages;
            ])
-      ~variables:(archs_variables pipeline_type)
+      ~variables:(Common.Packaging.archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~image:Images.Base_images.debian_trixie
       ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
@@ -269,7 +267,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
              Artifacts job_build_ubuntu_package;
              Artifacts job_build_data_packages;
            ])
-      ~variables:(archs_variables pipeline_type)
+      ~variables:(Common.Packaging.archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~image:Images.Base_images.ubuntu_24_04
       ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
@@ -311,7 +309,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~stage:Stages.publishing_tests
       ~variables
       ~before_script:
-        (before_script
+        (Common.Helpers.before_script
            ~source_version:true
            [
              "export DEBIAN_FRONTEND=noninteractive";
@@ -465,7 +463,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
 let register ~auto ~description pipeline_type =
   let pipeline_name =
     match (pipeline_type, auto) with
-    | Partial, false -> "debian_repository_partial"
+    | Common.Packaging.Partial, false -> "debian_repository_partial"
     | Partial, true -> "debian_repository_partial_auto"
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
