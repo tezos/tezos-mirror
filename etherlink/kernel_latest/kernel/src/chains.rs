@@ -849,6 +849,73 @@ where
     Ok(())
 }
 
+enum CreditDaFees {
+    Skip,
+    Execute {
+        sequencer_pool_address: Option<H160>,
+        da_fees_mutez: u64,
+    },
+}
+
+impl CreditDaFees {
+    fn apply<Host: Logging + StorageV1>(
+        self,
+        host: &mut Host,
+    ) -> Result<(), anyhow::Error> {
+        match self {
+            CreditDaFees::Skip => Ok(()),
+            CreditDaFees::Execute {
+                sequencer_pool_address,
+                da_fees_mutez,
+            } => credit_da_fees(host, sequencer_pool_address, da_fees_mutez),
+        }
+    }
+}
+
+/// Returns the required fees if any and the function to execute
+/// regarding DA fees, either skipped if operation is a simulation
+/// or credit sequencer pool address accordingly.
+fn get_fees_data(
+    operation: &Operation,
+    skip_fees_check: bool,
+    da_fee_per_byte_mutez: u64,
+    base_fee_per_gas: U256,
+    michelson_to_evm_gas_multiplier: u64,
+    sequencer_pool_address: Option<H160>,
+) -> Result<(Option<u64>, CreditDaFees), anyhow::Error> {
+    if skip_fees_check {
+        Ok((None, CreditDaFees::Skip))
+    } else {
+        let required_da_fees = get_required_da_fees(operation, da_fee_per_byte_mutez)?;
+
+        let required_execution_gas_fees = {
+            let total_gas_limit: u64 = operation
+                .content
+                .iter()
+                .filter_map(|c| c.gas_limit().ok())
+                .filter_map(|gl| gl.0.to_u64())
+                .try_fold(0u64, |acc, x| acc.checked_add(x))
+                .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+            let gas_fee_wei = base_fee_per_gas
+                * U256::from(michelson_to_evm_gas_multiplier)
+                * U256::from(total_gas_limit);
+            // NB: Convert back to mutez with a floor division.
+            // (precision loss if gas_fee_wei < 1 mutez)
+            (gas_fee_wei / U256::exp10(12)).low_u64()
+        };
+
+        let required_fees = required_da_fees.saturating_add(required_execution_gas_fees);
+
+        Ok((
+            Some(required_fees),
+            CreditDaFees::Execute {
+                sequencer_pool_address,
+                da_fees_mutez: required_da_fees,
+            },
+        ))
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn apply_tezos_operation<Host>(
     chain_id: &ChainId,
@@ -882,26 +949,14 @@ where
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
-            let required_da_fees =
-                get_required_da_fees(&operation, block_constants.da_fee_per_byte_mutez)?;
-
-            let required_execution_gas_fees = {
-                let total_gas_limit: u64 = operation
-                    .content
-                    .iter()
-                    .filter_map(|c| c.gas_limit().ok())
-                    .filter_map(|gl| gl.0.to_u64())
-                    .try_fold(0u64, |acc, x| acc.checked_add(x))
-                    .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
-                let gas_fee_wei = block_in_progress.base_fee_per_gas
-                    * U256::from(block_constants.michelson_to_evm_gas_multiplier)
-                    * U256::from(total_gas_limit);
-                // NB: Convert back to mutez with a floor division.
-                // (precision loss if gas_fee_wei < 1 mutez)
-                (gas_fee_wei / U256::exp10(12)).low_u64()
-            };
-            let required_fees =
-                required_da_fees.saturating_add(required_execution_gas_fees);
+            let (fees, credit_da_fees) = get_fees_data(
+                &operation,
+                skip_fees_check,
+                block_constants.da_fee_per_byte_mutez,
+                block_in_progress.base_fee_per_gas,
+                block_constants.michelson_to_evm_gas_multiplier,
+                sequencer_pool_address,
+            )?;
 
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
@@ -909,11 +964,6 @@ where
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let journal = external_journal;
-            let fees = if skip_fees_check {
-                None
-            } else {
-                Some(required_fees)
-            };
             let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -952,7 +1002,7 @@ where
                 ),
             };
 
-            credit_da_fees(host, sequencer_pool_address, required_da_fees)?;
+            credit_da_fees.apply(host)?;
 
             if let (Some(outbox_queue), Some(evm_block_constants)) =
                 (outbox_queue, evm_block_constants)
