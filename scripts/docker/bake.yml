@@ -83,6 +83,21 @@ services:
         condition: service_completed_successfully
     restart: on-failure
 
+  manual-config:
+    container_name: manual-config
+    image: tezos/tezos-bare:latest
+    stdin_open: true
+    tty: true
+    environment:
+      - TEZOS_CLIENT_DIR=/var/run/tezos/client/data
+      - TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=yes
+    command: /bin/sh
+    volumes:
+      - ./client_data:/var/run/tezos/client
+    depends_on:
+      bootstrap-checker:
+        condition: service_completed_successfully
+
   baker-config-checker:
     container_name: baker_config_checker
     image: tezos/tezos-bare:latest

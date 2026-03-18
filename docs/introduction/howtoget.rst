@@ -346,7 +346,7 @@ Docker compose files
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 A predefined Docker compose file is available at :src:`scripts/docker/bake.yml`.
-It aims at helping you to easily launch services for an Octez node, a DAL node, a baker, and an accuser.
+It aims at helping you to easily launch services **on a testnet** for an Octez node, a DAL node, a baker, and an accuser.
 You may copy the compose file in the directory where you want to run the baker::
 
     wget https://gitlab.com/tezos/tezos/-/blob/master/scripts/docker/bake.yml
@@ -375,13 +375,13 @@ Note that you must have already:
 
 .. note::
 
-	If you don't have yet configured the baker keys, you can first start just the node::
+	If you don't have yet configured the baker keys, you can first do this::
 
-		docker compose -f bake.yml up node
+		docker compose -f bake.yml up manual-config
 
 	wait until the node is bootstraped from the snapshot, and then open a new terminal, placed in the same directory::
 
-		docker compose -f bake.yml exec node sh
+		docker compose -f bake.yml exec manual-config sh
 
 	and then in the shell set up the baker keys::
 
@@ -401,7 +401,7 @@ Note that you must have already:
 		octez-client set companion key for mybaker to mycompanion
 		exit
 
-	and finally stop the node service with ``docker compose -f bake.yml down``.
+	and finally stop the services with ``docker compose -f bake.yml down``.
 
 Create an environment file called ``.env`` in your current directory with a content of the following form::
 
@@ -458,10 +458,9 @@ For example, if you don't want to use auxiliary keys (consensus key and companio
 
 .. note::
 
-	If you want to manually configure the node, open a new terminal
-	while the node is running, from within the same directory::
+	If you want to manually configure the node, use the same ``manual-config`` service as for configuring the baker keys::
 
-		docker compose -f bake.yml exec node sh
+		docker compose -f bake.yml exec manual-config sh
 
 	then in the shell interact with the node directly::
 
