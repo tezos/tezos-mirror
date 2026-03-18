@@ -656,5 +656,6 @@ val job_datadog_pipeline_trace : tezos_job
 (** Add common variables used by jobs compiling kernels *)
 val enable_kernels : tezos_job -> tezos_job
 
-(** Get the number of times the [job] function was called. *)
-val get_number_of_declared_jobs : unit -> int
+(** Get the names and locations of the jobs that were registered with the [job] function. *)
+val get_declared_jobs :
+  unit -> (string * int * int * int) Gitlab_ci.Base.String_map.t
