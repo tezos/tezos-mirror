@@ -127,6 +127,7 @@ type t = {
   verbose : bool;
   ignore_l1_config_peers : bool;
   disable_amplification : bool;
+  banned_addrs : P2p_addr.t list;
   batching_configuration : batching_configuration;
   publish_slots_regularly : publish_slots_regularly option;
 }
@@ -207,6 +208,7 @@ let default =
     verbose = false;
     ignore_l1_config_peers = false;
     disable_amplification = false;
+    banned_addrs = [];
     batching_configuration = default_batching_configuration;
     publish_slots_regularly = None;
   }
@@ -253,6 +255,7 @@ let encoding : t Data_encoding.t =
            verbose;
            ignore_l1_config_peers;
            disable_amplification;
+           banned_addrs;
            batching_configuration;
            publish_slots_regularly;
          }
@@ -276,7 +279,7 @@ let encoding : t Data_encoding.t =
               verbose,
               ignore_l1_config_peers,
               disable_amplification ) ) ),
-        (batching_configuration, publish_slots_regularly) ))
+        (banned_addrs, batching_configuration, publish_slots_regularly) ))
     (fun ( ( ( data_dir,
                rpc_addr,
                listen_addr,
@@ -296,7 +299,7 @@ let encoding : t Data_encoding.t =
                  verbose,
                  ignore_l1_config_peers,
                  disable_amplification ) ) ),
-           (batching_configuration, publish_slots_regularly) )
+           (banned_addrs, batching_configuration, publish_slots_regularly) )
        ->
       {
         data_dir;
@@ -320,6 +323,7 @@ let encoding : t Data_encoding.t =
         verbose;
         ignore_l1_config_peers;
         disable_amplification;
+        banned_addrs;
         batching_configuration;
         publish_slots_regularly;
       })
@@ -435,7 +439,14 @@ let encoding : t Data_encoding.t =
                    ~description:"Disable amplification"
                    bool
                    default.disable_amplification))))
-       (obj2
+       (obj3
+          (dft
+             "banned_addrs"
+             ~description:
+               "List of IP addresses to ban. Connections from/to these \
+                addresses will be rejected by the P2P layer."
+             (list P2p_addr.encoding)
+             [])
           (dft
              "batching_configuration"
              ~description:"Set the batching delay for shard verification"

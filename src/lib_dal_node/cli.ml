@@ -65,8 +65,8 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     ?metrics_addr ?profile ?(peers = []) ?history_mode ?service_name
     ?service_namespace ?telemetry_env ?experimental_features
     ?fetch_trusted_setup ?(verbose = false) ?(ignore_l1_config_peers = false)
-    ?(disable_amplification = false) ?batching_configuration
-    ?publish_slots_regularly configuration =
+    ?(disable_amplification = false) ?(banned_addrs = [])
+    ?batching_configuration ?publish_slots_regularly configuration =
   let profile =
     match profile with
     | None -> configuration.Configuration_file.profile
@@ -114,6 +114,7 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
       configuration.ignore_l1_config_peers || ignore_l1_config_peers;
     disable_amplification =
       configuration.disable_amplification || disable_amplification;
+    banned_addrs = banned_addrs @ configuration.banned_addrs;
     batching_configuration =
       Option.value
         ~default:configuration.batching_configuration
@@ -633,6 +634,22 @@ module Term = struct
 
   let disable_amplification = switch_to_cmdliner disable_amplification_switch
 
+  let banned_addrs_arg =
+    make_arg_list
+      ~doc:
+        "A list of IP addresses to ban. Connections from/to these addresses \
+         will be rejected by the P2P layer."
+      ~placeholder:"ADDR1,ADDR2,..."
+      ~format:
+        ( (fun s ->
+            match P2p_addr.of_string_opt s with
+            | Some addr -> Ok addr
+            | None -> Error (Format.asprintf "Cannot parse IP address: %s" s)),
+          P2p_addr.pp )
+      "ban-addr"
+
+  let banned_addrs = arg_to_cmdliner banned_addrs_arg
+
   let ignore_topics_arg =
     make_arg_list
       ~doc:
@@ -760,6 +777,7 @@ module Run = struct
        verbose
        ignore_l1_config_peers
        disable_amplification
+       banned_addrs
        ignore_topics
        batching_configuration
        publish_slots_regularly ->
@@ -795,6 +813,7 @@ module Run = struct
         ~verbose
         ~ignore_l1_config_peers
         ~disable_amplification
+        ?banned_addrs
         ?batching_configuration
         ?publish_slots_regularly
     in
@@ -861,8 +880,8 @@ module Run = struct
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ telemetry_env
        $ fetch_trusted_setup $ disable_shard_validation $ verbose
-       $ ignore_l1_config_peers $ disable_amplification $ ignore_topics
-       $ batching_configuration $ publish_slots_regularly))
+       $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
+       $ ignore_topics $ batching_configuration $ publish_slots_regularly))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -901,6 +920,7 @@ module Config = struct
        verbose
        ignore_l1_config_peers
        disable_amplification
+       banned_addrs
        batching_configuration ->
     let open Lwt_result_syntax in
     let data_dir =
@@ -932,6 +952,7 @@ module Config = struct
         ~verbose
         ~ignore_l1_config_peers
         ~disable_amplification
+        ?banned_addrs
         ?batching_configuration
     in
     action ~config_file ~configuration_override
@@ -946,7 +967,7 @@ module Config = struct
        $ trust_slots_backup_uris $ metrics_addr $ attester_profile
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ verbose $ ignore_l1_config_peers $ disable_amplification
+       $ verbose $ ignore_l1_config_peers $ disable_amplification $ banned_addrs
        $ batching_configuration))
 
   let print_trace ~error_trace =
@@ -1300,7 +1321,8 @@ module Action = struct
       ?service_namespace ?telemetry_env ?fetch_trusted_setup
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
-      ?ignore_topics ?batching_configuration ?publish_slots_regularly () =
+      ?banned_addrs ?ignore_topics ?batching_configuration
+      ?publish_slots_regularly () =
     Run.action
       data_dir
       config_file
@@ -1326,6 +1348,7 @@ module Action = struct
       verbose
       ignore_l1_config_peers
       disable_amplification
+      banned_addrs
       ignore_topics
       batching_configuration
       publish_slots_regularly
@@ -1353,6 +1376,7 @@ module Action = struct
        ?(verbose = false)
        ?(ignore_l1_config_peers = false)
        ?(disable_amplification = false)
+       ?banned_addrs
        ?batching_configuration
        () ->
     action
@@ -1378,6 +1402,7 @@ module Action = struct
       verbose
       ignore_l1_config_peers
       disable_amplification
+      banned_addrs
       batching_configuration
 
   let config_init = mk_config_action Config.Init.action

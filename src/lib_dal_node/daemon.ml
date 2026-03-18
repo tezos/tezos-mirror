@@ -659,6 +659,12 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
         Gossipsub.Transport_layer.shutdown transport_layer)
   in
+  (* Ban addresses specified in the configuration. *)
+  let*! () =
+    List.iter_s
+      (Gossipsub.Transport_layer.ban_addr transport_layer)
+      config.banned_addrs
+  in
   (* Initialize store *)
   let* store = Store.init config profile_ctxt proto_parameters in
   let* current_chain_id = L1_helpers.fetch_l1_chain_id cctxt in

@@ -91,6 +91,8 @@ module Dal = struct
 
   let publish_slots_regularly = arg_to_clic publish_slots_regularly_arg
 
+  let banned_addrs = arg_to_clic banned_addrs_arg
+
   (* Snapshot-specific arguments (not in Cli.Term). *)
   let positive_int_parameter name =
     Tezos_clic.parameter (fun _ s ->
@@ -278,7 +280,7 @@ module Dal = struct
     let run =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args26
+        Tezos_clic.args27
           data_dir
           config_file
           rpc_addr
@@ -303,6 +305,7 @@ module Dal = struct
           ignore_l1_config_peers
           disable_amplification
           ignore_topics
+          banned_addrs
           batching_configuration
           publish_slots_regularly
       in
@@ -335,6 +338,7 @@ module Dal = struct
                ignore_l1_config_peers,
                disable_amplification,
                ignore_topics,
+               banned_addrs,
                batching_configuration,
                publish_slots_regularly )
              _cctxt
@@ -364,6 +368,7 @@ module Dal = struct
             ~ignore_l1_config_peers
             ~disable_amplification
             ?ignore_topics
+            ?banned_addrs
             ?batching_configuration
             ?publish_slots_regularly
             ())
@@ -371,7 +376,7 @@ module Dal = struct
     let mk_config_command ~prefix:p ~desc action =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args23
+        Tezos_clic.args24
           data_dir
           config_file
           rpc_addr
@@ -394,6 +399,7 @@ module Dal = struct
           verbose
           ignore_l1_config_peers
           disable_amplification
+          banned_addrs
           batching_configuration
       in
       command
@@ -423,6 +429,7 @@ module Dal = struct
                verbose,
                ignore_l1_config_peers,
                disable_amplification,
+               banned_addrs,
                batching_configuration )
              _cctxt
            ->
@@ -449,6 +456,7 @@ module Dal = struct
             ?verbose:(Some verbose)
             ?ignore_l1_config_peers:(Some ignore_l1_config_peers)
             ?disable_amplification:(Some disable_amplification)
+            ?banned_addrs
             ?batching_configuration
             ())
     in

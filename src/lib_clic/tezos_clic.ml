@@ -1157,6 +1157,45 @@ let args26 a b c d e f g h i j k l m n o p q r s t u v w x y z =
        (args16 a b c d e f g h i j k l m n o p)
        (args10 q r s t u v w x y z))
 
+let args27 a b c d e f g h i j k l m n o p q r s t u v w x y z aa =
+  map_arg
+    ~f:(fun
+        _
+        ( (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p),
+          (q, r, s, t, u, v, w, x, y, z, aa) )
+      ->
+      Lwt_result_syntax.return
+        ( a,
+          b,
+          c,
+          d,
+          e,
+          f,
+          g,
+          h,
+          i,
+          j,
+          k,
+          l,
+          m,
+          n,
+          o,
+          p,
+          q,
+          r,
+          s,
+          t,
+          u,
+          v,
+          w,
+          x,
+          y,
+          z,
+          aa ))
+    (args2
+       (args16 a b c d e f g h i j k l m n o p)
+       (args11 q r s t u v w x y z aa))
+
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
 type occurrence = Occ_empty | Occ_with_value of string
