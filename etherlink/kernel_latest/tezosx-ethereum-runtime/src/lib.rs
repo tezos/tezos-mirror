@@ -803,6 +803,70 @@ mod tests {
         }
     }
 
+    /// Test that serve() handles zero-amount transfers correctly.
+    #[test]
+    fn test_serve_zero_amount_transfer() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        let mut journal = TezosXJournal::new();
+        let request = build_serve_request(&sender, &destination, "0", vec![]);
+        let resp = runtime
+            .serve(&registry, &mut host, &mut journal, request)
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        // Destination should have 0 balance (no transfer)
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+        let info = destination_account.info(&mut host).unwrap();
+        assert_eq!(info.balance, revm::primitives::U256::ZERO);
+    }
+
+    /// Test that serve() correctly handles fractional TEZ amounts.
+    #[test]
+    fn test_serve_fractional_amount_transfer() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let block_constants = BlockConstants::test_block_with_no_fees();
+        let registry = StubRegistry;
+
+        let sender = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+
+        // 0.5 TEZ = 500_000_000_000_000_000 wei
+        let half_tez_wei = revm::primitives::U256::from(500_000_000_000_000_000u64);
+
+        let mut journal = TezosXJournal::new();
+        let request = build_serve_request(&sender, &destination, "0.5", vec![]);
+        let resp = runtime
+            .serve(&registry, &mut host, &mut journal, request)
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        commit_evm_journal_from_external(
+            &mut host,
+            &registry,
+            &block_constants,
+            &mut journal,
+        )
+        .unwrap();
+
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+        let info = destination_account.info(&mut host).unwrap();
+        assert_eq!(info.balance, half_tez_wei);
+    }
+
     #[test]
     fn test_serve_calls_contract() {
         let mut host = MockKernelHost::default();
