@@ -488,11 +488,9 @@ let () =
           Format.asprintf "%a" Distributed_db_version.Name.pp chain_name
         in
         (* We assume the chain_name to be formatted as "TEZOS_<CHAIN-NAME>_<TIMESTAMP>". *)
-        String.lowercase_ascii
-        @@
         match String.split '_' chain_name with
-        | _ :: chain_name :: _ -> chain_name
-        | _ -> ""
+        | _ :: chain_name :: _ -> String.lowercase_ascii chain_name
+        | _ -> chain_name
       in
       let expected_chain_name = get_chain_name_info expected in
       let chain_name = get_chain_name_info got in
