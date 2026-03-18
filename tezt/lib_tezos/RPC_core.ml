@@ -86,6 +86,19 @@ type rpc_hooks = {
   on_response : Cohttp.Code.status_code -> body:string -> unit;
 }
 
+(** [log_response_body_max], if given, is a byte length ([String.length]). *)
+let string_for_rpc_log ~log_response_body_max body =
+  match log_response_body_max with
+  | None -> body
+  | Some max_len ->
+      let n = String.length body in
+      if n <= max_len then body
+      else
+        Printf.sprintf
+          "%s\n... (truncated, %d bytes total)"
+          (String.sub body 0 max_len)
+          n
+
 module type CALLERS = sig
   type uri_provider
 
@@ -94,6 +107,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     uri_provider ->
     'result t ->
     'result Lwt.t
@@ -103,6 +117,7 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     ?extra_headers:(string * string) list ->
     uri_provider ->
     'result t ->
@@ -113,13 +128,15 @@ module type CALLERS = sig
     ?log_request:bool ->
     ?log_response_status:bool ->
     ?log_response_body:bool ->
+    ?log_response_body_max:int option ->
     uri_provider ->
     'result t ->
     JSON.t response Lwt.t
 end
 
 let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
-    ?(log_response_body = true) ?(extra_headers = []) endpoint rpc =
+    ?(log_response_body = true) ?(log_response_body_max = Some 4096)
+    ?(extra_headers = []) endpoint rpc =
   let uri = make_uri endpoint rpc in
   let () =
     Option.iter
@@ -163,7 +180,11 @@ let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
       (fun {on_response; _} -> on_response response.status ~body)
       rpc_hooks
   in
-  if log_response_body then Log.debug ~prefix:"RPC" "%s" body ;
+  let () =
+    if log_response_body then
+      Log.debug ~prefix:"RPC" "%s"
+      @@ string_for_rpc_log ~log_response_body_max body
+  in
   let headers =
     Cohttp.Header.to_list (Cohttp.Response.headers response)
     |> List.to_seq |> HeaderMap.of_seq
@@ -171,7 +192,8 @@ let call_raw ?rpc_hooks ?(log_request = true) ?(log_response_status = true)
   return {body; code = Cohttp.Code.code_of_status response.status; headers}
 
 let call_json ?rpc_hooks ?log_request ?log_response_status
-    ?(log_response_body = true) endpoint rpc =
+    ?(log_response_body = true) ?(log_response_body_max = Some 4096) endpoint
+    rpc =
   let* response =
     call_raw
       endpoint
@@ -179,14 +201,20 @@ let call_json ?rpc_hooks ?log_request ?log_response_status
       ?log_request
       ?log_response_status
       ~log_response_body:false
+      ~log_response_body_max
       rpc
+  in
+  let log_body s =
+    if log_response_body then
+      Log.debug ~prefix:"RPC" "%s"
+      @@ string_for_rpc_log ~log_response_body_max s
   in
   match JSON.parse ~origin:"RPC response" response.body with
   | exception (JSON.Error _ as exn) ->
-      if log_response_body then Log.debug ~prefix:"RPC" "%s" response.body ;
+      log_body response.body ;
       raise exn
   | body ->
-      if log_response_body then Log.debug ~prefix:"RPC" "%s" (JSON.encode body) ;
+      log_body (JSON.encode body) ;
       return {response with body}
 
 let check_status_code node rpc code =
@@ -197,14 +225,15 @@ let check_status_code node rpc code =
       (Uri.to_string (make_uri node rpc))
       (Cohttp.Code.string_of_status (Cohttp.Code.status_of_code code))
 
-let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body node
-    rpc =
+let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
+    ?log_response_body_max node rpc =
   let* response =
     call_json
       ?rpc_hooks
       ?log_request
       ?log_response_status
       ?log_response_body
+      ?log_response_body_max
       node
       rpc
   in
