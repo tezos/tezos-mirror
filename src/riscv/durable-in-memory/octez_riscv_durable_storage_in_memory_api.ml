@@ -56,3 +56,5 @@ external octez_riscv_durable_in_memory_produce_proof: registry_prove -> proof = 
 external octez_riscv_durable_in_memory_proof_start_state: proof -> bytes = "octez_riscv_durable_in_memory_proof_start_state"
 external octez_riscv_durable_in_memory_proof_stop_state: proof -> bytes = "octez_riscv_durable_in_memory_proof_stop_state"
 external octez_riscv_durable_in_memory_serialise_proof: proof -> bytes = "octez_riscv_durable_in_memory_serialise_proof"
+external octez_riscv_durable_in_memory_deserialise_proof: bytes -> (proof, string) result = "octez_riscv_durable_in_memory_deserialise_proof"
+external octez_riscv_durable_in_memory_start_verify: proof -> registry_verify = "octez_riscv_durable_in_memory_start_verify"

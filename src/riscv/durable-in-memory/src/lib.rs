@@ -591,6 +591,25 @@ pub fn octez_riscv_durable_in_memory_serialise_proof(
     BytesWrapper::from(vec![])
 }
 
+#[ocaml::func]
+#[ocaml::sig("bytes -> (proof, string) result")]
+pub fn octez_riscv_durable_in_memory_deserialise_proof(
+    _proof: BytesParam,
+) -> Result<SafePointer<Proof>, String> {
+    todo!("TZX-114: wire-up verify mode")
+}
+
+// Verify utilities
+
+#[ocaml::func]
+#[ocaml::sig("proof -> registry_verify")]
+pub fn octez_riscv_durable_in_memory_start_verify(
+    _proof: SafePointer<Proof>,
+) -> SafePointer<RegistryVerify> {
+    // TODO (TZX-114): wire-up verification mode
+    SafePointer::from(RegistryVerify)
+}
+
 /// Split handling of durable storage errors.
 ///
 /// - Operational errors are converted to OCaml exceptions. These *must not* be returned to the kernel.
