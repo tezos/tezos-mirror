@@ -33,7 +33,9 @@ use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_api_common::try_clone::TryClone;
+use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
+use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
@@ -85,12 +87,15 @@ impl CustomGcResource for RegistryState {
 pub type Registry = MutableState<RegistryState>;
 
 #[derive(ocaml::FromValue, ocaml::ToValue)]
-#[ocaml::sig("Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds")]
+#[ocaml::sig(
+    "Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
+)]
 pub enum InvalidArgumentError {
     KeyNotFound,
     KeyTooLong,
     OffsetTooLarge,
     DatabaseIndexOutOfBounds,
+    RegistryResizeTooLarge,
 }
 
 impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
@@ -102,6 +107,7 @@ impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
             ds_errors::InvalidArgumentError::DatabaseIndexOutOfBounds => {
                 Self::DatabaseIndexOutOfBounds
             }
+            ds_errors::InvalidArgumentError::RegistryResizeTooLarge => Self::RegistryResizeTooLarge,
         }
     }
 }
@@ -137,6 +143,16 @@ pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer
 }
 
 #[ocaml::func]
+#[ocaml::sig("registry -> bytes")]
+pub fn octez_riscv_durable_in_memory_registry_hash(
+    state: SafePointer<Registry>,
+) -> BytesWrapper<Hash> {
+    let hash = state.apply_ro(|registry| registry.fold(HashFold));
+
+    BytesWrapper::from(hash)
+}
+
+#[ocaml::func]
 #[ocaml::sig("registry -> int64")]
 pub fn octez_riscv_durable_in_memory_registry_size(state: SafePointer<Registry>) -> i64 {
     state.apply_ro(registry::Registry::len) as i64
@@ -149,7 +165,7 @@ pub fn octez_riscv_durable_in_memory_registry_resize(
     size: u64,
 ) -> SplitDsResult<()> {
     let size = usize::try_from(size)?;
-    let res = state.apply(|registry| registry.resize(size))?;
+    let res = state.apply(|registry| registry.resize_tick(size))?;
 
     split_ds_errors(res)
 }

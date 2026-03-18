@@ -5,8 +5,9 @@ open! Bigarray
 (* file: lib.rs *)
 
 type registry
-type invalid_argument_error = Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds
+type invalid_argument_error = Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large
 external octez_riscv_durable_in_memory_registry_new: unit -> registry = "octez_riscv_durable_in_memory_registry_new"
+external octez_riscv_durable_in_memory_registry_hash: registry -> bytes = "octez_riscv_durable_in_memory_registry_hash"
 external octez_riscv_durable_in_memory_registry_size: registry -> int64 = "octez_riscv_durable_in_memory_registry_size"
 external octez_riscv_durable_in_memory_registry_resize: registry -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_resize"
 external octez_riscv_durable_in_memory_registry_copy: registry -> int64 -> int64 -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_registry_copy"
