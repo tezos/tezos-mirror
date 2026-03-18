@@ -548,7 +548,7 @@ let () =
     ~jobs:
       ([
          Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page ~test:true ();
+         Release_tag.job_release_page `test `wait_for_nothing;
        ]
       @ Cacio.get_global_test_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the test release page." ;
@@ -558,7 +558,7 @@ let () =
     ~jobs:
       ([
          Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_release_page ~test:false ();
+         Release_tag.job_release_page `real `wait_for_nothing;
        ]
       @ Cacio.get_global_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the release page."

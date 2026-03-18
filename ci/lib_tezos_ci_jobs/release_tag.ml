@@ -61,7 +61,118 @@ let monitoring_child_pipeline =
             ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
        ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_octez_monitoring_jobs ()))
 
-let job_release_page ~test ?dependencies () =
+let job_docker =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun trigger ->
+  Cacio.parameterize @@ fun arch ->
+  job_docker_build
+    ~__POS__
+    ~dependencies:(Dependent [])
+    ?rules:
+      (match trigger with
+      | `manual ->
+          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      | `auto -> None)
+    ~arch
+    ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
+    (match mode with `test -> Test | `real -> Release)
+
+let job_docker_merge =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun trigger ->
+  job_docker_merge_manifests
+    ~__POS__
+    ~ci_docker_hub:(match mode with `test -> false | `real -> true)
+    ~job_docker_amd64:(job_docker mode trigger Amd64)
+    ~job_docker_arm64:(job_docker mode trigger Arm64)
+
+(* On release pipelines the static binaries do not have any dependencies
+   on previous stages and can start immediately. *)
+let job_build_static =
+  Cacio.parameterize @@ fun trigger ->
+  Cacio.parameterize @@ fun arch ->
+  job_build_static_binaries
+    ~__POS__
+    ~dependencies:(Dependent [])
+    ?rules:
+      (match trigger with
+      | `manual ->
+          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      | `auto -> None)
+    ~arch
+    ?cpu:(match arch with Amd64 -> Some Very_high | _ -> None)
+    ~storage:Ramfs
+    ~release:true
+    ()
+
+let job_build_homebrew_release =
+  add_artifacts
+    ~name:"build-$CI_COMMIT_REF_SLUG"
+    ~expire_in:(Duration (Days 1))
+    ~when_:On_success
+    ["public/homebrew/*"]
+    Homebrew.job_create_homebrew_formula
+
+let job_gitlab_release =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~interruptible:false
+    ~dependencies:
+      (Dependent
+         [
+           Job (job_docker_merge mode `auto);
+           Artifacts (job_build_static `auto Amd64);
+           Artifacts (job_build_static `auto Arm64);
+           Artifacts job_build_homebrew_release;
+         ])
+    ~id_tokens:Tezos_ci.id_tokens
+    ~name:"gitlab:release"
+    [
+      "./scripts/ci/restrict_export_to_octez_source.sh";
+      "./scripts/releases/gitlab-release.sh";
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_gitlab_publish =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~interruptible:false
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts (job_build_static `auto Amd64);
+           Artifacts (job_build_static `auto Arm64);
+           Artifacts job_build_homebrew_release;
+         ])
+    ?before_script:
+      (match mode with
+      | `scheduled_test -> Some ["git tag octez-v0.0"]
+      | `non_release_tag -> None)
+    ?variables:
+      (match mode with
+      | `scheduled_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
+      | `non_release_tag -> None)
+    ~id_tokens:Tezos_ci.id_tokens
+    ~name:"gitlab:publish"
+    [
+      ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
+      ^
+      match mode with `scheduled_test -> " --dry-run" | `non_release_tag -> "");
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_release_page =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize
+  @@ fun (wait_for : [`wait_for_nothing | `wait_for_build]) ->
   job
     ~__POS__
     ~image:Images.CI.release_page
@@ -79,27 +190,79 @@ let job_release_page ~test ?dependencies () =
          ["./index.md"; "index.html"])
     ~before_script:["eval $(opam env)"]
     ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
-    ?dependencies
+    ?dependencies:
+      (match wait_for with
+      | `wait_for_nothing -> None
+      | `wait_for_build ->
+          Some
+            (Dependent
+               [
+                 Artifacts (job_build_static `auto Amd64);
+                 Artifacts (job_build_static `auto Arm64);
+               ]))
     ~variables:
-      (if test then
-         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+      (match mode with
+      | `test ->
+          (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
             depends on the release type (tests or not). *)
-         [
-           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
-           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
-           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
-           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
-         ]
-       else
-         [
-           ("S3_BUCKET", "site-prod.octez.tezos.com");
-           ("BUCKET_PATH", "/releases");
-           ("URL", "octez.tezos.com");
-           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
-         ])
+          [
+            ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+            ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+          ]
+      | `real ->
+          [
+            ("S3_BUCKET", "site-prod.octez.tezos.com");
+            ("BUCKET_PATH", "/releases");
+            ("URL", "octez.tezos.com");
+            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+          ])
     ["./scripts/releases/publish_release_page.sh"]
     ~retry:no_retry
     ~tag:Gcp_not_interruptible
+
+let job_opam_release =
+  Cacio.parameterize @@ fun mode ->
+  job
+    ~__POS__
+    ~image:Images.CI.prebuild
+    ~stage:Stages.publish
+    ~description:
+      "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
+       This job does preliminary work for releasing Octez opam packages on \
+       opam repository, by pushing a branch with updated package descriptions \
+       (.opam files) to https://github.com/tezos/opam-repository. It _does \
+       not_ automatically create a corresponding pull request on the official \
+       opam repository."
+    ~interruptible:false
+    ~name:"opam:release"
+    [
+      ("./scripts/ci/opam-release.sh"
+      ^ match mode with `test -> " --dry-run" | `real -> "");
+    ]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_dispatch_call =
+  job
+    ~__POS__
+    ~image:Images.CI.prebuild
+    ~stage:Stages.publish
+    ~description:
+      "A job release that triggers pipelines from other repositories after a \
+       release.\n\
+       For now, it triggers the release pipeline from \
+       tez-capital/tezos-macos-pipeline"
+    ~interruptible:false
+    ~name:"dispatch-call"
+    ~dependencies:
+      (Dependent
+         [
+           Job (job_release_page `real `wait_for_build);
+           Job (job_gitlab_release `real);
+         ])
+    ["./scripts/releases/dispatch-call.sh"]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -112,171 +275,22 @@ let job_release_page ~test ?dependencies () =
 
     On release pipelines these jobs can start immediately *)
 let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
-  let variables =
-    match release_tag_pipeline_type with
-    | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
-    | _ -> None
-  in
-  let job_docker_amd64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      (if test then Test else Release)
-  in
-  let job_docker_arm64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      (if test then Test else Release)
-  in
-  let job_docker_merge =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:(not test)
-      ~job_docker_amd64
-      ~job_docker_arm64
-  in
-  (* on release pipelines the static binaries do not have any dependencies
-     on previous stages and can start immediately *)
-  let job_static_arm64_release =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~release:true
-      ()
-  in
-  let job_static_x86_64_release =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~release:true
-      ()
-  in
-  let job_build_homebrew_release =
-    add_artifacts
-      ~name:"build-$CI_COMMIT_REF_SLUG"
-      ~expire_in:(Duration (Days 1))
-      ~when_:On_success
-      ["public/homebrew/*"]
-      Homebrew.job_create_homebrew_formula
-  in
-  let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~interruptible:false
-      ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
-      ~id_tokens:Tezos_ci.id_tokens
-      ~name:"gitlab:release"
-      ?variables
-      [
-        "./scripts/ci/restrict_export_to_octez_source.sh";
-        "./scripts/releases/gitlab-release.sh";
-      ]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
-  let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
-    let before_script =
-      match release_tag_pipeline_type with
-      | Schedule_test -> Some ["git tag octez-v0.0"]
-      | _ -> None
-    in
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~interruptible:false
-      ~dependencies:(Dependent dependencies)
-      ?before_script
-      ?variables
-      ~id_tokens:Tezos_ci.id_tokens
-      ~name:"gitlab:publish"
-      [
-        ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
-        ^
-        match release_tag_pipeline_type with
-        | Schedule_test -> " --dry-run"
-        | _ -> "");
-      ]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
+  let mode = if test then `test else `real in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
   let job_gitlab_release_or_publish =
-    let dependencies =
-      [
-        Artifacts job_static_x86_64_release;
-        Artifacts job_static_arm64_release;
-        Artifacts job_build_homebrew_release;
-      ]
-    in
     match release_tag_pipeline_type with
-    | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
-    | _ -> job_gitlab_release ~dependencies
+    | Non_release_tag -> job_gitlab_publish `non_release_tag
+    | Schedule_test -> job_gitlab_publish `scheduled_test
+    | _ -> job_gitlab_release mode
   in
-  let job_release_page =
-    job_release_page
-      ~test
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts job_static_x86_64_release;
-             Artifacts job_static_arm64_release;
-           ])
-      ()
-  in
-  let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
-    job
-      ~__POS__
-      ~image:Images.CI.prebuild
-      ~stage:Stages.publish
-      ~description:
-        "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
-         This job does preliminary work for releasing Octez opam packages on \
-         opam repository, by pushing a branch with updated package \
-         descriptions (.opam files) to \
-         https://github.com/tezos/opam-repository. It _does not_ automatically \
-         create a corresponding pull request on the official opam repository."
-      ~interruptible:false
-      ?variables
-      ~name:"opam:release"
-      [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
+  let job_release_page = job_release_page mode `wait_for_build in
   let job_promote_to_latest_test =
     job_docker_promote_to_latest
       ~ci_docker_hub:false
-      ~dependencies:(Dependent [Job job_docker_merge])
+      ~dependencies:(Dependent [Job (job_docker_merge mode `auto)])
       ()
-  in
-  let job_dispatch_call =
-    job
-      ~__POS__
-      ~image:Images.CI.prebuild
-      ~stage:Stages.publish
-      ~description:
-        "A job release that triggers pipelines from other repositories after a \
-         release.\n\
-         For now, it triggers the release pipeline from \
-         tez-capital/tezos-macos-pipeline"
-      ~interruptible:false
-      ~name:"dispatch-call"
-      ~dependencies:
-        (Dependent [Job job_release_page; Job job_gitlab_release_or_publish])
-      ["./scripts/releases/dispatch-call.sh"]
   in
   let job_trigger_monitoring =
     trigger_job
@@ -289,12 +303,12 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
-    job_static_x86_64_release;
-    job_static_arm64_release;
-    job_docker_amd64;
-    job_docker_arm64;
+    job_build_static `auto Amd64;
+    job_build_static `auto Arm64;
+    job_docker mode `auto Amd64;
+    job_docker mode `auto Arm64;
     job_build_homebrew_release;
-    job_docker_merge;
+    job_docker_merge mode `auto;
     job_gitlab_release_or_publish;
     job_trigger_monitoring;
   ]
@@ -315,7 +329,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   @
   match (test, release_tag_pipeline_type) with
   | false, Release_tag ->
-      [job_opam_release (); job_release_page; job_dispatch_call]
+      [job_opam_release `real; job_release_page; job_dispatch_call]
   | true, Release_tag ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -324,125 +338,85 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
            release testers are not required to trigger two separate pipelines
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
-        job_opam_release ~dry_run:true ();
+        job_opam_release `test;
         job_release_page;
       ]
   | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
   | true, Beta_release_tag -> [job_release_page]
   | _ -> []
 
+let job_docker_promote_to_version =
+  Cacio.parameterize @@ fun mode ->
+  job_docker_authenticated
+    ~__POS__
+    ~dependencies:(Dependent [Job (job_docker_merge mode `manual)])
+    ~stage:Stages.publish
+    ~name:"oc.docker:promote_revision_to_version"
+    ~description:
+      "Promote the Docker image from the packaging revision tag to the \
+       canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+    ~ci_docker_hub:(match mode with `test -> false | `real -> true)
+    ["./scripts/ci/docker_promote_to_version.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_create_gitlab_package =
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~name:"gitlab:create_package"
+    ~description:
+      "Create GitLab packages with static binaries from this packaging revision"
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts (job_build_static `manual Amd64);
+           Artifacts (job_build_static `manual Arm64);
+         ])
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+    ~id_tokens:Tezos_ci.id_tokens
+    ["./scripts/ci/create_gitlab_package.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
+let job_update_gitlab_release =
+  job
+    ~__POS__
+    ~image:Images.Base_images.ci_release
+    ~stage:Stages.publish
+    ~name:"gitlab:update_release"
+    ~description:
+      "Update existing GitLab release with new static binaries from this \
+       packaging revision"
+    ~dependencies:(Dependent [Job job_create_gitlab_package])
+    ~id_tokens:Tezos_ci.id_tokens
+    ["./scripts/releases/update_gitlab_release.sh"]
+    ~retry:no_retry
+    ~tag:Gcp_not_interruptible
+
 let octez_packaging_revision_jobs ?(test = false) () =
+  let mode = if test then `test else `real in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
-  in
-  let job_docker_amd64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~__POS__
-      ~arch:Amd64
-      (if test then Test else Release)
-  in
-  let job_docker_arm64 =
-    job_docker_build
-      ~dependencies:(Dependent [])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      (if test then Test else Release)
-  in
-  let job_docker_merge =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:(not test)
-      ~job_docker_amd64
-      ~job_docker_arm64
-  in
-  let job_docker_promote_to_version =
-    job_docker_authenticated
-      ~__POS__
-      ~dependencies:(Dependent [Job job_docker_merge])
-      ~stage:Stages.publish
-      ~name:"oc.docker:promote_revision_to_version"
-      ~description:
-        "Promote the Docker image from the packaging revision tag to the \
-         canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~ci_docker_hub:(not test)
-      ["./scripts/ci/docker_promote_to_version.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
   in
   (* We want to be able to trigger each "batch" of jobs manually.
      There are two batches: one with the static jobs, and one that publishes.
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  let job_static_arm64 =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~release:true
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ()
-  in
-  let job_static_x86_64 =
-    job_build_static_binaries
-      ~dependencies:(Dependent [])
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~release:true
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ()
-  in
-  let job_create_gitlab_package =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~name:"gitlab:create_package"
-      ~description:
-        "Create GitLab packages with static binaries from this packaging \
-         revision"
-      ~dependencies:
-        (Dependent [Artifacts job_static_x86_64; Artifacts job_static_arm64])
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      ~id_tokens:Tezos_ci.id_tokens
-      ["./scripts/ci/create_gitlab_package.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
-  let job_update_gitlab_release =
-    job
-      ~__POS__
-      ~image:Images.Base_images.ci_release
-      ~stage:Stages.publish
-      ~name:"gitlab:update_release"
-      ~description:
-        "Update existing GitLab release with new static binaries from this \
-         packaging revision"
-      ~dependencies:(Dependent [Job job_create_gitlab_package])
-      ~id_tokens:Tezos_ci.id_tokens
-      ["./scripts/releases/update_gitlab_release.sh"]
-      ~retry:no_retry
-      ~tag:Gcp_not_interruptible
-  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Docker images *)
-    job_docker_amd64;
-    job_docker_arm64;
-    job_docker_merge;
-    job_docker_promote_to_version;
+    job_docker mode `manual Amd64;
+    job_docker mode `manual Arm64;
+    job_docker_merge mode `manual;
+    job_docker_promote_to_version mode;
     (* Static binaries *)
-    job_static_x86_64;
-    job_static_arm64;
+    job_build_static `manual Amd64;
+    job_build_static `manual Arm64;
     (* Release update *)
     job_create_gitlab_package;
     job_update_gitlab_release;
