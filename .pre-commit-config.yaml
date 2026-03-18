@@ -19,10 +19,14 @@ repos:
       - id: jsonnet-format
       - id: jsonnet-lint
         name: jsonnet-lint
-        # jsonnet-lint hook doesn't work
-        # We check every file in parallel as a workaround
+        # Workaround for go-jsonnet linter panic (issue #544/#591):
+        # Lint files one at a time to avoid crashes when multiple files
+        # with shared imports are linted simultaneously.
         require_serial: true
-        entry: jsonnet-lint -J grafazos/vendor
+        # The trailing '--' is consumed as $0 by bash -c, so $@ correctly
+        # receives all file arguments from pre-commit without skipping the first.
+        entry: bash -c 'for f in "$@"; do jsonnet-lint -J grafazos/vendor "$f" || exit 1; done' --
+        types: [jsonnet]
   - repo: https://github.com/cisagov/pre-commit-shfmt
     rev: v0.0.2
     hooks:
