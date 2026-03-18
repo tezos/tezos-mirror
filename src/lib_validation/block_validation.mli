@@ -93,7 +93,8 @@ module Shell_header_hash : Tezos_crypto.Intfs.HASH
 
 type result = {
   shell_header_hash : Shell_header_hash.t;
-      (** This field is used as a (local) unique identifier for blocks
+  protocol_data : Bytes.t;
+      (** These two fields are used as a (local) unique identifier for blocks
           in order to implement the preapply cache mechanism. *)
   validation_store : validation_store;
   block_metadata : bytes * Block_metadata_hash.t option;

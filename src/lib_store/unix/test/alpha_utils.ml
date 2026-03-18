@@ -696,6 +696,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
       block_metadata = (block_header_metadata, block_metadata_hash);
       ops_metadata;
       shell_header_hash = Block_validation.Shell_header_hash.zero;
+      protocol_data = Bytes.empty;
     }
   in
   let operations =

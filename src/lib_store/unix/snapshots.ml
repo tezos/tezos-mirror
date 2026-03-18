@@ -3694,6 +3694,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       block_metadata;
       ops_metadata;
       shell_header_hash = _;
+      protocol_data = _;
     } =
       block_validation_result
     in
