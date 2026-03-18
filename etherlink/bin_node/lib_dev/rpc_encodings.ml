@@ -1256,6 +1256,91 @@ module Tezosx = struct
 
     type ('input, 'output) method_ += Method : (input, output) method_
   end
+
+  module Trace_call = struct
+    type evm_input = {
+      call : Ethereum_types.call;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type michelson_input = {
+      operation : Ethereum_types.hex;
+      skip_signature : bool;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type input = Evm of evm_input | Michelson of michelson_input
+
+    type trace_output = {
+      result : Data_encoding.json option;
+      traces : Simulation.http_trace list;
+    }
+
+    type output = trace_output
+
+    let evm_input_encoding =
+      Data_encoding.(
+        conv
+          (fun {call; block} -> (call, block))
+          (fun (call, block) -> {call; block})
+          (obj2
+             (req "call" Ethereum_types.call_encoding)
+             (dft
+                "block"
+                Ethereum_types.Block_parameter.extended_encoding
+                (Ethereum_types.Block_parameter.Block_parameter Latest))))
+
+    let michelson_input_encoding =
+      Data_encoding.(
+        conv
+          (fun {operation; skip_signature; block} ->
+            (operation, skip_signature, block))
+          (fun (operation, skip_signature, block) ->
+            {operation; skip_signature; block})
+          (obj3
+             (req "operation" Ethereum_types.hex_encoding)
+             (dft "skipSignatureCheck" bool true)
+             (dft
+                "block"
+                Ethereum_types.Block_parameter.extended_encoding
+                (Ethereum_types.Block_parameter.Block_parameter Latest))))
+
+    let input_encoding =
+      Data_encoding.(
+        tup1
+          (union
+             [
+               case
+                 (Tag 0)
+                 ~title:"evm"
+                 (merge_objs
+                    (obj1 (req "type" (constant "evm")))
+                    evm_input_encoding)
+                 (function Evm e -> Some ((), e) | _ -> None)
+                 (fun ((), e) -> Evm e);
+               case
+                 (Tag 1)
+                 ~title:"michelson"
+                 (merge_objs
+                    (obj1 (req "type" (constant "michelson")))
+                    michelson_input_encoding)
+                 (function Michelson m -> Some ((), m) | _ -> None)
+                 (fun ((), m) -> Michelson m);
+             ]))
+
+    let output_encoding =
+      Data_encoding.(
+        conv
+          (fun {result; traces} -> (result, traces))
+          (fun (result, traces) -> {result; traces})
+          (obj2
+             (opt "result" json)
+             (req "traces" (list Simulation.http_trace_encoding))))
+
+    let method_ = "http_traceCall"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
 end
 
 type map_result =
@@ -1330,6 +1415,7 @@ let evm_supported_methods : (module METHOD) list =
     (* Tezos X rpcs *)
     (module Tezosx.Get_tezos_ethereum_address);
     (module Tezosx.Get_ethereum_tezos_address);
+    (module Tezosx.Trace_call);
     (module Send_raw_tezlink_operation);
   ]
 

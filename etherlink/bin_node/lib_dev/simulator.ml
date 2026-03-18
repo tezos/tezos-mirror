@@ -6,8 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let simulate_and_read (ctxt : Evm_ro_context.t) ?state_override simulate_state
-    ~input =
+let simulate_and_read_multi (ctxt : Evm_ro_context.t) ?state_override
+    simulate_state ~input =
   let open Lwt_result_syntax in
   let config =
     Pvm.Kernel.config
@@ -29,6 +29,13 @@ let simulate_and_read (ctxt : Evm_ro_context.t) ?state_override simulate_state
       ~data_dir:ctxt.data_dir
       ~input
       simulate_state
+  in
+  return raw_insights
+
+let simulate_and_read ctxt ?state_override simulate_state ~input =
+  let open Lwt_result_syntax in
+  let* raw_insights =
+    simulate_and_read_multi ctxt ?state_override simulate_state ~input
   in
   match raw_insights with
   | [Some bytes] -> return bytes
@@ -464,4 +471,108 @@ module TezosX = struct
             "Simulation produced a list of operations whose length is not 1"
     in
     return simulation_receipt
+end
+
+module Http_trace = struct
+  type trace_result = {
+    simulation_result :
+      Simulation.call_result Simulation.simulation_result option;
+    traces : Simulation.http_trace list;
+  }
+
+  let trace_evm_call ctxt call block_param =
+    let open Lwt_result_syntax in
+    let* simulation_state =
+      Evm_ro_context.get_state ctxt ~block:block_param ()
+    in
+    let timestamp = Misc.now () in
+    let* simulation_version = Etherlink.simulation_version simulation_state in
+    let*? messages =
+      Simulation.encode
+        (Etherlink.simulation_input
+           ~timestamp
+           ~simulation_version
+           ~with_da_fees:false
+           call)
+    in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"];
+        Simulation.Encodings.Durable_storage_key
+          ["evm"; "simulation_http_traces"];
+      ]
+    in
+    let* raw_insights =
+      simulate_and_read_multi
+        ctxt
+        simulation_state
+        ~input:
+          {
+            messages;
+            reveal_pages = None;
+            insight_requests;
+            log_kernel_debug_file = Some "trace_call";
+          }
+    in
+    match raw_insights with
+    | [sim_bytes; trace_bytes] ->
+        let sim_result =
+          match sim_bytes with
+          | Some bytes -> (
+              match Simulation.simulation_result bytes with
+              | Ok r -> Some r
+              | Error _ -> None)
+          | None -> None
+        in
+        let traces =
+          match trace_bytes with
+          | Some bytes -> (
+              match Simulation.decode_http_traces bytes with
+              | Ok t -> t
+              | Error _ -> [])
+          | None -> []
+        in
+        return {simulation_result = sim_result; traces}
+    | _ -> Error_monad.failwith "Invalid insights format for HTTP trace"
+
+  let trace_michelson_call ctxt ~skip_signature ~operation ~block =
+    let open Lwt_result_syntax in
+    let* state = Evm_ro_context.get_state ctxt ~block () in
+    let skip_sig_bytes =
+      if skip_signature then Bytes.make 1 '\001' else Bytes.make 1 '\000'
+    in
+    let tx_bytes =
+      Bytes.of_string
+        (Sequencer_blueprint.tag_transaction (Michelson operation))
+    in
+    let encoded_input =
+      Rlp.encode (Rlp.List [Rlp.Value skip_sig_bytes; Rlp.Value tx_bytes])
+    in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key
+          ["evm"; "simulation_http_traces"];
+      ]
+    in
+    let* raw_insights =
+      Evm_ro_context.execute_entrypoint_with_insights
+        ctxt
+        state
+        ~input_path:Durable_storage_path.Tezosx_simulation.input
+        ~input:encoded_input
+        ~insight_requests
+        ~entrypoint:"tezosx_simulate"
+    in
+    match raw_insights with
+    | [trace_bytes] ->
+        let traces =
+          match trace_bytes with
+          | Some bytes -> (
+              match Simulation.decode_http_traces bytes with
+              | Ok t -> t
+              | Error _ -> [])
+          | None -> []
+        in
+        return {simulation_result = None; traces}
+    | _ -> Error_monad.failwith "Invalid insights format for HTTP trace"
 end

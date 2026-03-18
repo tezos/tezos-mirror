@@ -3557,8 +3557,10 @@ name = "tezosx-journal"
 version = "0.1.0"
 dependencies = [
  "evm-types",
+ "http",
  "michelson-types",
  "revm",
+ "rlp",
  "tezos-evm-logging-latest",
  "tezos_crypto_rs",
 ]

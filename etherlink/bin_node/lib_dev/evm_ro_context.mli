@@ -165,6 +165,17 @@ val execute_entrypoint :
   entrypoint:string ->
   bytes tzresult Lwt.t
 
+(** Like [execute_entrypoint] but reads multiple insight paths from durable
+    storage after calling the kernel entrypoint. *)
+val execute_entrypoint_with_insights :
+  t ->
+  Evm_state.t ->
+  input_path:string ->
+  input:bytes ->
+  insight_requests:Simulation.Encodings.insight_request list ->
+  entrypoint:string ->
+  bytes option list tzresult Lwt.t
+
 (** {2 Etherlink backend operations} *)
 
 module Etherlink : sig

@@ -449,4 +449,28 @@ module Tezosx : sig
     METHOD
       with type input = Ethereum_types.address
        and type output = Tezos_types.Contract.t
+
+  module Trace_call : sig
+    type evm_input = {
+      call : Ethereum_types.call;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type michelson_input = {
+      operation : Ethereum_types.hex;
+      skip_signature : bool;
+      block : Ethereum_types.Block_parameter.extended;
+    }
+
+    type input = Evm of evm_input | Michelson of michelson_input
+
+    type trace_output = {
+      result : Data_encoding.json option;
+      traces : Simulation.http_trace list;
+    }
+
+    type output = trace_output
+
+    include METHOD with type input := input and type output := output
+  end
 end

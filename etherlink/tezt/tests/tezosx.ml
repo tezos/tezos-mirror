@@ -3120,6 +3120,73 @@ let test_script_coherency_enshrined () =
          /script parameter type (%L)") ;
   unit
 
+(** Test the http_traceCall RPC with an EVM call that triggers a
+    cross-runtime call.
+
+    1. Originate a Michelson store_input.tz contract.
+    2. Call http_traceCall with an EVM call targeting the gateway
+       precompile, sending data to the Michelson contract.
+    3. Verify the response contains HTTP traces for the cross-runtime call. *)
+let test_trace_call_evm ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:"http_traceCall traces EVM-to-Michelson cross-runtime call"
+    ~tags:["rpc"; "cross_runtime"; "trace_call"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer = _} ->
+  (* Step 1: Originate store_input.tz *)
+  let* tez_client = tezos_client sandbox in
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "store_input"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"store_input_trace"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:{|""|}
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Step 2: Encode calldata for the gateway precompile's call() function.
+     call(string,(string,string)[],bytes,uint8) *)
+  let url = sf "http://tezos/%s/default" kt1_address in
+  let micheline_hello = "0x010000000e48656c6c6f2066726f6d2045564d" in
+  let* calldata =
+    Cast.calldata
+      ~args:[url; "[]"; micheline_hello; "1"]
+      "call(string,(string,string)[],bytes,uint8)"
+  in
+  (* Step 3: Call http_traceCall *)
+  let*@ result =
+    Rpc.Tezosx.http_traceCall_evm
+      ~to_:evm_gateway_address
+      ~data:calldata
+      ~gas:"0x493E0"
+      sandbox
+  in
+  (* Step 4: Verify response structure *)
+  let traces = JSON.(result |-> "traces" |> as_list) in
+  Check.(
+    (List.length traces > 0)
+      int
+      ~error_msg:"Expected at least one HTTP trace but got none") ;
+  let first_trace = List.hd traces in
+  let trace_url = JSON.(first_trace |-> "url" |> as_string) in
+  Check.(
+    (String.length trace_url > 0)
+      int
+      ~error_msg:"Expected non-empty URL in trace") ;
+  Log.info "http_traceCall returned %d traces" (List.length traces) ;
+  Log.info "First trace URL: %s" trace_url ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3160,4 +3227,5 @@ let () =
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
   test_tezosx_simulation () ;
   test_entrypoints_enshrined () ;
-  test_script_coherency_enshrined ()
+  test_script_coherency_enshrined () ;
+  test_trace_call_evm ~runtime:Tezos ()

@@ -1052,6 +1052,55 @@ let dispatch_request (type f) ~websocket
               |> Tezosx_mod.Tezos_runtime.generate_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters
+        | Rpc_encodings.Tezosx.Trace_call.Method ->
+            let f input =
+              let open Lwt_result_syntax in
+              let* result =
+                match input with
+                | Rpc_encodings.Tezosx.Trace_call.Evm {call; block} ->
+                    Simulator.Http_trace.trace_evm_call ro_ctxt call block
+                | Rpc_encodings.Tezosx.Trace_call.Michelson
+                    {operation; skip_signature; block} ->
+                    let (Ethereum_types.Hex hex_str) = operation in
+                    let operation =
+                      Hex.to_string (`Hex hex_str) |> Option.value ~default:""
+                    in
+                    Simulator.Http_trace.trace_michelson_call
+                      ro_ctxt
+                      ~skip_signature
+                      ~operation
+                      ~block
+              in
+              let json_result =
+                match result.simulation_result with
+                | Some (Ok (Ok {value; gas_used})) ->
+                    let open Ethereum_types in
+                    let obj =
+                      `O
+                        (List.filter_map
+                           Fun.id
+                           [
+                             Option.map
+                               (fun (Hash (Hex v)) ->
+                                 ("value", `String ("0x" ^ v)))
+                               value;
+                             Option.map
+                               (fun (Qty z) ->
+                                 ("gasUsed", `String (Z.to_string z)))
+                               gas_used;
+                           ])
+                    in
+                    Some obj
+                | Some (Ok (Error (Hash (Hex reason)))) ->
+                    Some (`O [("error", `String ("0x" ^ reason))])
+                | Some (Error reason) -> Some (`O [("error", `String reason)])
+                | None -> None
+              in
+              rpc_ok
+                Rpc_encodings.Tezosx.Trace_call.
+                  {result = json_result; traces = result.traces}
+            in
+            build_with_input ~f module_ parameters
         | Get_storage_at.Method ->
             let f (address, position, block_param) =
               let* value =
