@@ -15,7 +15,7 @@ class Octez < Formula
   version "%%VERSION%%"
   license "MIT"
 
-  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake rustup]
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake rustup gcc]
   build_dependencies.each do |dependency|
     depends_on dependency => :build
   end
@@ -33,6 +33,13 @@ class Octez < Formula
     ENV["BLST_PORTABLE"]="yes"
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
+    if OS.mac?
+      gcc_version = Formula["gcc"].version.major
+      (buildpath/"cc-override").mkpath
+      ln_sf "#{HOMEBREW_PREFIX}/bin/gcc-#{gcc_version}", buildpath/"cc-override/cc"
+      ln_sf "#{HOMEBREW_PREFIX}/bin/g++-#{gcc_version}", buildpath/"cc-override/c++"
+      ENV.prepend_path "PATH", buildpath/"cc-override"
+    end
 
     # Set the internal variable for CI use
     if ENV["HOMEBREW_KISSCACHE"]
