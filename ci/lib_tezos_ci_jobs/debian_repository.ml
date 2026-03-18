@@ -11,7 +11,6 @@
    This pipeline builds the old and old Debian (and Ubuntu)
    packages. *)
 
-open Gitlab_ci.Util
 open Tezos_ci
 
 let tag_amd64 ~ramfs =
@@ -71,7 +70,7 @@ let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~parallel:(Matrix matrix)
     ~dependencies
     ~tag:Dynamic
-    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     [
       (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
@@ -209,7 +208,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
            [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
       ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~tag:Dynamic
-      ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+      ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
         "export CARGO_NET_OFFLINE=false";
         "./scripts/ci/build-debian-packages.sh zcash";
