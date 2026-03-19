@@ -1,0 +1,340 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Protocol
+open Alpha_context
+
+module type TreeS =
+  Tezos_context_sigs.Context.TREE
+    with type key = string list
+     and type value = bytes
+     and type t := unit
+
+module Make_wrapped_tree (Tree : TreeS) :
+  Tezos_tree_encoding.TREE with type tree = Tree.tree = struct
+  type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
+
+  include Tree
+
+  let select = function
+    | PVM_tree t -> t
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
+
+  let wrap t = PVM_tree t
+end
+
+(** This module manifests the proof format used by the Wasm PVM as defined by
+    the Layer 1 implementation for it.
+
+    It is imperative that this is aligned with the protocol's implementation.
+*)
+module Wasm_2_0_0_proof_format = struct
+  include
+    Irmin_context.Proof
+      (struct
+        include Sc_rollup.State_hash
+
+        let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
+      end)
+      (struct
+        let proof_encoding =
+          Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+          .tree_proof_encoding
+      end)
+
+  type context = Irmin_context.rw_index
+
+  let proof_start_state = proof_before
+
+  let proof_stop_state = proof_after
+
+  module Wrapped_tree = Make_wrapped_tree (Irmin_context.Tree)
+  include Tezos_scoru_wasm.Tree_state.Make (Wrapped_tree)
+
+  let empty_state () = Irmin_context.Tree.empty ()
+
+  let state_hash tree = hash_tree tree |> Lwt.return
+end
+
+(** Durable part of the storage of this PVM. *)
+module type Durable_state = sig
+  type state
+
+  (** [value_length state key] returns the length of data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val value_length : state -> string -> int64 option Lwt.t
+
+  (** [lookup state key] returns the data stored
+        for the [key] in the durable storage of the PVM state [state], if any. *)
+  val lookup : state -> string -> bytes option Lwt.t
+
+  (** [subtrees state key] returns subtrees
+        for the [key] in the durable storage of the PVM state [state].
+        Empty list in case if path doesn't exist. *)
+  val list : state -> string -> string list Lwt.t
+
+  module Tree_encoding_runner :
+    Tezos_tree_encoding.Runner.S with type tree = state
+end
+
+module Make_durable_state
+    (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
+  Durable_state with type state = T.tree = struct
+  module State = Tezos_scoru_wasm.Tree_state.Make (T)
+  module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
+
+  type state = T.tree
+
+  let decode_durable tree = State.Encoding_runner.decode_durable_storage tree
+
+  let value_length tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    let+ res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
+    Option.map Tezos_lazy_containers.Chunked_byte_vector.length res_opt
+
+  let lookup tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    let* res_opt = Tezos_scoru_wasm.Durable.find_value durable key in
+    match res_opt with
+    | None -> return_none
+    | Some v ->
+        let+ bts = Tezos_lazy_containers.Chunked_byte_vector.to_bytes v in
+        Some bts
+
+  let list tree key_str =
+    let open Lwt_syntax in
+    let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+    let* durable = decode_durable tree in
+    Tezos_scoru_wasm.Durable.list durable key
+end
+
+module Durable_state = Make_durable_state (Wasm_2_0_0_proof_format.Wrapped_tree)
+
+type unsafe_patch =
+  | Increase_max_nb_ticks of int64
+  | Patch_durable_storage of {key : string; value : string}
+  | Patch_PVM_version of {version : Tezos_scoru_wasm.Wasm_pvm_state.version}
+
+module Wasm_fast_pvm_machine :
+  Tezos_scoru_wasm.Wasm_pvm_sig.S
+    with type context = Wasm_2_0_0_proof_format.context
+     and type state = Wasm_2_0_0_proof_format.state
+     and type proof = Wasm_2_0_0_proof_format.proof =
+  Tezos_scoru_wasm_fast.Pvm.Make_pvm_machine (Wasm_2_0_0_proof_format)
+
+module Wasm_pvm_on_disk :
+  Sc_rollup.Wasm_2_0_0PVM.S
+    with type context = Wasm_2_0_0_proof_format.context
+     and type state = Wasm_2_0_0_proof_format.state
+     and type proof = Wasm_2_0_0_proof_format.proof =
+Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
+  include Wasm_fast_pvm_machine
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end)
+
+module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
+  include Wasm_pvm_on_disk
+
+  type repo = Irmin_context.repo
+
+  type tree = Irmin_context.tree
+
+  module Ctxt_wrapper = Context_wrapper.Irmin
+
+  let kind = Sc_rollup.Kind.Wasm_2_0_0
+
+  let new_dissection = Game_helpers.Wasm.new_dissection
+
+  module Inspect_durable_state = struct
+    let lookup state keys =
+      let key = "/" ^ String.concat "/" keys in
+      Durable_state.lookup state key
+  end
+
+  let string_of_status : status -> string = function
+    | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
+        Format.asprintf
+          "Waiting for preimage reveal %a"
+          Sc_rollup_reveal_hash.pp
+          hash
+    | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
+    | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
+        Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
+    | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
+        "Waiting for DAL parameters"
+    | Computing -> "Computing"
+    | Waiting_for_reveal (Request_adal_page _) ->
+        (* ADAL/FIXME: https://gitlab.com/tezos/tezos/-/milestones/410
+
+           To be implemented. *)
+        assert false
+
+  let eval_many ?(check_invalid_kernel = true) ?(fallback_to_slow_vm = true)
+      ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
+    Wasm_fast_pvm_machine.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
+      ~hooks:
+        (Wasm_2_0_0_utilities.hooks ~check_invalid_kernel ~fallback_to_slow_vm)
+
+  (** WASM PVM Mutable API works by holding a reference to an immutable state
+      and wrapping all immutable functionality around the reference *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type repo = repo
+       and type status = status
+       and type t = Ctxt_wrapper.mut_state = struct
+    include Irmin_context.PVMState
+
+    type t = state ref
+
+    type hash = Sc_rollup.State_hash.t
+
+    type repo = Irmin_context.repo
+
+    type nonrec status = status
+
+    let get_tick state = get_tick !state
+
+    let state_hash state = state_hash !state
+
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ level = get_current_level !state in
+      Option.map Raw_level.to_int32 level
+
+    let get_outbox level state =
+      get_outbox (Raw_level.of_int32_exn level) !state
+
+    let get_status ~is_reveal_enabled state =
+      get_status ~is_reveal_enabled !state
+
+    let set_initial_state ~empty =
+      let open Lwt_syntax in
+      let+ state = initial_state ~empty:!empty in
+      empty := state
+
+    let install_boot_sector state boot_sector =
+      let open Lwt_syntax in
+      let+ new_state = install_boot_sector !state boot_sector in
+      state := new_state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled !state
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input !state in
+      state := imm_state ;
+      return_unit
+
+    let eval_many ?check_invalid_kernel ?fallback_to_slow_vm ~reveal_builtins
+        ~write_debug ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ?check_invalid_kernel
+          ?fallback_to_slow_vm
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          !mut_state
+      in
+      mut_state := imm_state ;
+      return steps
+
+    module Inspect_durable_state = struct
+      let lookup state keys = Inspect_durable_state.lookup !state keys
+    end
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state = Internal_for_tests.insert_failure !state in
+        state := imm_state ;
+        return_unit
+    end
+  end
+
+  module Unsafe_patches = struct
+    type t = unsafe_patch
+
+    let of_patch (p : Pvm_patches.unsafe_patch) =
+      match p with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          Ok (Increase_max_nb_ticks max_nb_ticks)
+      | Patch_durable_storage {key; value} ->
+          Ok (Patch_durable_storage {key; value})
+      | Patch_PVM_version {version} -> (
+          let version_opt =
+            Tezos_scoru_wasm.Wasm_pvm_state.version_of_string version
+          in
+          match version_opt with
+          | Some version -> Ok (Patch_PVM_version {version})
+          | None ->
+              invalid_arg
+                (Format.sprintf
+                   "Unsafe patch: unknown WASM PVM version %s"
+                   version))
+
+    let apply state unsafe_patch =
+      let open Lwt_syntax in
+      match unsafe_patch with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          let* registered_max_nb_ticks =
+            Wasm_fast_pvm_machine.Unsafe.get_max_nb_ticks state
+          in
+          let max_nb_ticks = Z.of_int64 max_nb_ticks in
+          if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
+            Format.ksprintf
+              invalid_arg
+              "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
+              (Z.to_string registered_max_nb_ticks)
+              (Z.to_string max_nb_ticks) ;
+          Wasm_fast_pvm_machine.Unsafe.set_max_nb_ticks max_nb_ticks state
+      | Patch_durable_storage {key; value} ->
+          Wasm_fast_pvm_machine.Unsafe.durable_set ~key ~value state
+      | Patch_PVM_version {version} ->
+          Wasm_fast_pvm_machine.Unsafe.set_pvm_version ~version state
+
+    let apply_mutable state patch =
+      let open Lwt_syntax in
+      let+ patched_state = apply !state patch in
+      state := patched_state
+  end
+end
+
+include Impl

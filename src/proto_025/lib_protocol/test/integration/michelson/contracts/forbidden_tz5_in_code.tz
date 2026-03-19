@@ -1,0 +1,11 @@
+# This contract uses tz5 account, which is forbidden.
+{
+  storage address ;
+  parameter address ;
+  code {
+         DROP ;
+         PUSH address "tz5fxSJrMeVsmEAVDencuUcpgRe3Kw7CwPFe";
+         NIL operation ;
+         PAIR
+  } ;
+}

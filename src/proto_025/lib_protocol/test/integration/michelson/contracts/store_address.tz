@@ -1,0 +1,10 @@
+# This simple contract replaces the stored address with the parameter address.
+{
+  storage address ;
+  parameter address ;
+  code {
+         CAR ;
+         NIL operation ;
+         PAIR
+  } ;
+}

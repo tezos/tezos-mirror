@@ -1,0 +1,167 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Every function of this file should check the feature flag. *)
+
+open Alpha_context
+open Dal_errors
+
+(* Use this function to select the pkh used in the DAL committee. As long as an
+   epoch does not span across multiple cycles, we could use as well the pkh of
+   the consensus key. *)
+let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
+  consensus_key.delegate
+
+let validate_attestations ctxt ~attestation_level consensus_key attestations =
+  let open Result_syntax in
+  let* () = Dal.assert_feature_enabled ctxt in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
+  let number_of_lags = Constants.dal_number_of_lags ctxt in
+  let maximum_size =
+    Dal.Attestations.expected_max_size_in_bits ~number_of_slots ~number_of_lags
+  in
+  let size = Dal.Attestations.occupied_size_in_bits attestations in
+  let* () =
+    error_unless
+      Compare.Int.(size <= maximum_size)
+      (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
+  in
+  let attested_level = Raw_level.succ attestation_level in
+  let attestation_lags = Constants.dal_attestation_lags ctxt in
+  let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
+  List.iteri_e
+    (fun lag_index lag ->
+      let committee_level_opt =
+        Dal.committee_level_of ctxt ~attested_level ~lag
+      in
+      match committee_level_opt with
+      | None ->
+          (* reachable only when [attested_level < lag]; so cannot happen on
+             Mainnet *)
+          return_unit
+      | Some committee_level -> (
+          match Raw_level.Map.find committee_level delegate_to_shard_count with
+          | None ->
+              (* by construction of [delegate_to_shard_count] should contain
+                 all committee levels *)
+              assert false
+          | Some delegate_map ->
+              let delegate = pkh_of_consensus_key consensus_key in
+              let not_in_committee =
+                match
+                  Signature.Public_key_hash.Map.find delegate delegate_map
+                with
+                | None -> true
+                | Some n ->
+                    (* otherwise, we should be in [None] case *)
+                    assert (Compare.Int.(n > 0)) ;
+                    false
+              in
+              error_when
+                (not_in_committee
+                && not
+                     (Dal.Attestations.is_empty_at_lag_index
+                        attestations
+                        ~lag_index))
+                (Dal_data_availibility_attester_not_in_committee
+                   {
+                     attester = delegate;
+                     committee_level;
+                     attested_level;
+                     lag_index;
+                   })))
+    attestation_lags
+
+let apply_attestations ctxt ~delegate ~attested_level attestations ~tb_slot
+    ~committee_level_to_shard_count =
+  let open Result_syntax in
+  let* () = Dal.assert_feature_enabled ctxt in
+  let ctxt =
+    Dal.only_if_incentives_enabled
+      ctxt
+      ~default:(fun ctxt -> ctxt)
+      (fun ctxt ->
+        Dal.Attestations.record_attestation ctxt ~tb_slot attestations)
+  in
+  return
+    (Dal.Attestations.record_number_of_attested_shards
+       ctxt
+       ~delegate
+       ~attested_level
+       attestations
+       committee_level_to_shard_count)
+
+(* This function should fail if we don't want the operation to be
+   propagated over the L1 gossip network. Because this is a manager
+   operation, there are already checks to ensure the source of
+   operation has enough fees. Among the various checks, there are
+   checks that cannot fail unless the source of the operation is
+   malicious (or if there is a bug). In that case, it is better to
+   ensure fees will be taken. *)
+let validate_publish_commitment ctxt _operation =
+  Dal.assert_feature_enabled ctxt
+
+let apply_publish_commitment ctxt operation ~source =
+  let open Result_syntax in
+  let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_commitment in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
+  let* ctxt, cryptobox = Dal.make ctxt in
+  let current_level = (Level.current ctxt).level in
+  let* slot_header =
+    Dal.Operations.Publish_commitment.slot_header
+      ~cryptobox
+      ~number_of_slots
+      ~current_level
+      operation
+  in
+  let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
+  return (ctxt, slot_header)
+
+let finalisation ctxt =
+  let open Lwt_result_syntax in
+  Dal.only_if_feature_enabled
+    ctxt
+    ~default:(fun ctxt -> return (ctxt, Dal.Slot_availability.empty))
+    (fun ctxt ->
+      let*! ctxt = Dal.Slot.finalize_current_slot_headers ctxt in
+      (* The fact that slots confirmation is done at finalization is very
+         important for the assumptions made by the Dal refutation game. In fact:
+         - {!Dal.Slot.finalize_current_slot_headers} updates the Dal skip list
+         at block finalization, by inserting newly confirmed slots;
+         - {!Sc_rollup.Game.initial}, called when applying a manager operation
+         that starts a refutation game, makes a snapshot of the Dal skip list
+         to use it as a reference if the refutation proof involves a Dal input.
+
+         If confirmed Dal slots are inserted into the skip list during operations
+         application, adapting how refutation games are made might be needed
+         to e.g.,
+         - use the same snapshotted skip list as a reference by L1 and rollup-node;
+         - disallow proofs involving pages of slots that have been confirmed at the
+           level where the game started.
+      *)
+      let+ ctxt, slot_availability =
+        Dal.Slot.finalize_pending_slot_headers ctxt
+      in
+      (ctxt, slot_availability))

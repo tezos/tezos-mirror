@@ -1,0 +1,397 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type error +=
+  | (* `Permanent *) Error_encode_inbox_message
+  | (* `Permanent *) Error_decode_inbox_message
+
+let () =
+  let open Data_encoding in
+  let msg =
+    "Failed to encode a rollup management protocol inbox message value"
+  in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_inbox_message_encoding"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Error_encode_inbox_message -> Some () | _ -> None)
+    (fun () -> Error_encode_inbox_message) ;
+  let msg =
+    "Failed to decode a smart rollup management protocol inbox message value"
+  in
+  register_error_kind
+    `Permanent
+    ~id:"smart_rollup_inbox_message_decoding"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Error_decode_inbox_message -> Some () | _ -> None)
+    (fun () -> Error_decode_inbox_message)
+
+type internal_inbox_message =
+  | Transfer of {
+      payload : Script_repr.expr;
+      sender : Contract_hash.t;
+      source : Signature.public_key_hash;
+      destination : Sc_rollup_repr.Address.t;
+    }
+  | Start_of_level
+  | End_of_level
+  | Info_per_level of {
+      predecessor_timestamp : Time.t;
+      predecessor : Block_hash.t;
+    }
+  | Protocol_migration of string
+  | Dal_attested_slots of {
+      published_level : Raw_level_repr.t;
+      number_of_slots : int;
+      slot_size : int;
+      page_size : int;
+      slots_by_publisher :
+        Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t;
+    }
+
+let internal_inbox_message_encoding =
+  let open Data_encoding in
+  let kind name = req "internal_inbox_message_kind" (constant name) in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Transfer"
+        (obj5
+           (kind "transfer")
+           (req "payload" Script_repr.expr_encoding)
+           (req "sender" Contract_hash.encoding)
+           (req "source" Signature.Public_key_hash.encoding)
+           (req "destination" Sc_rollup_repr.Address.encoding))
+        (function
+          | Transfer {payload; sender; source; destination} ->
+              Some ((), payload, sender, source, destination)
+          | _ -> None)
+        (fun ((), payload, sender, source, destination) ->
+          Transfer {payload; sender; source; destination});
+      case
+        (Tag 1)
+        ~title:"Start_of_level"
+        (obj1 (kind "start_of_level"))
+        (function Start_of_level -> Some () | _ -> None)
+        (fun () -> Start_of_level);
+      case
+        (Tag 2)
+        ~title:"End_of_level"
+        (obj1 (kind "end_of_level"))
+        (function End_of_level -> Some () | _ -> None)
+        (fun () -> End_of_level);
+      case
+        (Tag 3)
+        ~title:"Info_per_level"
+        (obj3
+           (kind "info_per_level")
+           (req "predecessor_timestamp" Time.encoding)
+           (req "predecessor" Block_hash.encoding))
+        (function
+          | Info_per_level {predecessor_timestamp; predecessor} ->
+              Some ((), predecessor_timestamp, predecessor)
+          | _ -> None)
+        (fun ((), predecessor_timestamp, predecessor) ->
+          Info_per_level {predecessor_timestamp; predecessor});
+      case
+        (Tag 4)
+        ~title:"Protocol_migration"
+        (obj2 (kind "protocol_migration") (req "protocol" (string Hex)))
+        (function Protocol_migration proto -> Some ((), proto) | _ -> None)
+        (fun ((), proto) -> Protocol_migration proto);
+      case
+        (Tag 5)
+        ~title:"Dal_attested_slots"
+        (obj6
+           (kind "dal_attested_slots")
+           (req "published_level" Raw_level_repr.encoding)
+           (req "number_of_slots" uint16)
+           (req "slot_size" int31)
+           (req "page_size" uint16)
+           (req
+              "slots_by_publisher"
+              (Signature.Public_key_hash.Map.encoding
+                 Dal_attestation_repr.encoding)))
+        (function
+          | Dal_attested_slots
+              {
+                published_level;
+                number_of_slots;
+                slot_size;
+                page_size;
+                slots_by_publisher;
+              } ->
+              (* Convert list to bitset for compact encoding *)
+              let slots_by_publisher =
+                Signature.Public_key_hash.Map.map
+                  (List.fold_left
+                     Dal_attestation_repr.commit
+                     Dal_attestation_repr.empty)
+                  slots_by_publisher
+              in
+              Some
+                ( (),
+                  published_level,
+                  number_of_slots,
+                  slot_size,
+                  page_size,
+                  slots_by_publisher )
+          | _ -> None)
+        (fun ( (),
+               published_level,
+               number_of_slots,
+               slot_size,
+               page_size,
+               slots_by_publisher )
+           ->
+          (* Convert bitset back to list for internal representation *)
+          let slots_by_publisher =
+            Signature.Public_key_hash.Map.map
+              (fun bitset ->
+                (* Iterate through possible slot indices and collect attested ones *)
+                let rec collect acc i =
+                  if Compare.Int.(i >= number_of_slots) then List.rev acc
+                  else
+                    match Dal_slot_index_repr.of_int_opt ~number_of_slots i with
+                    | None -> List.rev acc
+                    | Some idx ->
+                        if Dal_attestation_repr.is_attested bitset idx then
+                          collect (idx :: acc) (i + 1)
+                        else collect acc (i + 1)
+                in
+                collect [] 0)
+              slots_by_publisher
+          in
+          Dal_attested_slots
+            {
+              published_level;
+              number_of_slots;
+              slot_size;
+              page_size;
+              slots_by_publisher;
+            });
+    ]
+
+type t = Internal of internal_inbox_message | External of string
+
+let encoding =
+  let open Data_encoding in
+  check_size
+    Constants_repr.sc_rollup_message_size_limit
+    (union
+       [
+         case
+           (Tag 0)
+           ~title:"Internal"
+           internal_inbox_message_encoding
+           (function
+             | Internal internal_message -> Some internal_message
+             | External _ -> None)
+           (fun internal_message -> Internal internal_message);
+         case
+           (Tag 1)
+           ~title:"External"
+           Variable.(string Hex)
+           (function External msg -> Some msg | Internal _ -> None)
+           (fun msg -> External msg);
+       ])
+
+type serialized = string
+
+let serialize msg =
+  let open Result_syntax in
+  match Data_encoding.Binary.to_string_opt encoding msg with
+  | None -> tzfail Error_encode_inbox_message
+  | Some str -> return str
+
+let deserialize s =
+  let open Result_syntax in
+  match Data_encoding.Binary.of_string_opt encoding s with
+  | None -> tzfail Error_decode_inbox_message
+  | Some msg -> return msg
+
+let unsafe_of_string s = s
+
+let unsafe_to_string s = s
+
+(* 32 *)
+let hash_prefix = "\003\255\138\145\170" (* srib3(55) *)
+
+module Hash = struct
+  let prefix = "srib3"
+
+  let encoded_size = 55
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Smart_rollup_serialized_message_hash"
+
+        let title =
+          "The hash of a serialized message of the smart rollup inbox."
+
+        let b58check_prefix = hash_prefix
+
+        (* defaults to 32 *)
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
+end
+
+let hash_serialized_message (payload : serialized) =
+  Hash.hash_string [(payload :> string)]
+
+let start_of_level_serialized =
+  (* If [Start_of_level] cannot be serialized, this will be detected at
+     startup time as we are defining a top-level value. *)
+  Data_encoding.Binary.to_string_exn encoding (Internal Start_of_level)
+
+let end_of_level_serialized =
+  (* If [End_of_level] cannot be serialized, this will be detected at
+     startup time as we are defining a top-level value. *)
+  Data_encoding.Binary.to_string_exn encoding (Internal End_of_level)
+
+let info_per_level_serialized ~predecessor_timestamp ~predecessor =
+  match
+    serialize (Internal (Info_per_level {predecessor_timestamp; predecessor}))
+  with
+  | Error _ ->
+      (* The info per level should always be serializable as the encoding
+         functions for this case do not fail. *)
+      assert false
+  | Ok info -> info
+
+let (_dummy_serialized_info_per_level_serialized : serialized) =
+  (* This allows to detect an error, at startup, we might have introduced in the
+     encoding of serialization of info per level messages . *)
+  info_per_level_serialized
+    ~predecessor_timestamp:(Time.of_seconds Int64.min_int)
+    ~predecessor:Block_hash.zero
+
+let dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
+    ~page_size ~slots_by_publisher =
+  match
+    serialize
+      (Internal
+         (Dal_attested_slots
+            {
+              published_level;
+              number_of_slots;
+              slot_size;
+              page_size;
+              slots_by_publisher;
+            }))
+  with
+  | Error _ ->
+      (* The dal attested slots should always be serializable as the encoding
+         functions for this case do not fail. *)
+      assert false
+  | Ok msg -> msg
+
+let dal_attested_slots_messages_of_cells fetch_dal_params cells =
+  let open Lwt_result_syntax in
+  let open Dal_slot_repr.History in
+  let module Pkh_map = Signature.Public_key_hash.Map in
+  let module Level_map = Raw_level_repr.Map in
+  (* Group cells by [published_level] *)
+  let by_level =
+    List.fold_left
+      (fun by_level (_hash, cell) ->
+        let cell_content = content cell in
+        let cell_id = content_id cell_content in
+        let published_level = cell_id.header_id.published_level in
+        match cell_content with
+        | Unpublished _ -> by_level
+        | Published {header; publisher; is_proto_attested; _} ->
+            if is_proto_attested then
+              match publisher with
+              | Contract_repr.Implicit pkh ->
+                  let slot_index = header.id.index in
+                  Level_map.update
+                    published_level
+                    (function
+                      | None -> Some (Pkh_map.singleton pkh [slot_index])
+                      | Some slots_by_publisher ->
+                          Some
+                            (Pkh_map.update
+                               pkh
+                               (function
+                                 | None -> Some [slot_index]
+                                 | Some slots -> Some (slot_index :: slots))
+                               slots_by_publisher))
+                    by_level
+              | Contract_repr.Originated _ ->
+                  (* Skip originated contracts *)
+                  by_level
+            else by_level)
+      Level_map.empty
+      cells
+  in
+  (* Convert to list of messages, ordered ascendingly by [published_level] *)
+  let* messages =
+    Level_map.fold_es
+      (fun published_level slots_by_publisher acc ->
+        (* Only add message if there are attested slots *)
+        if Pkh_map.is_empty slots_by_publisher then return acc
+        else
+          let* number_of_slots, slot_size, page_size =
+            fetch_dal_params ~published_level
+          in
+          let message =
+            Dal_attested_slots
+              {
+                published_level;
+                number_of_slots;
+                slot_size;
+                page_size;
+                slots_by_publisher;
+              }
+          in
+          return @@ (message :: acc))
+      by_level
+      []
+  in
+  return @@ List.rev messages
+
+let (_dummy_serialized_dal_attested_slots : serialized) =
+  (* This allows to detect an error, at startup, we might have introduced in the
+     encoding of serialization of dal attested slots messages. *)
+  dal_attested_slots_serialized
+    ~published_level:Raw_level_repr.root
+    ~number_of_slots:32
+    ~slot_size:126944
+    ~page_size:3967
+    ~slots_by_publisher:Signature.Public_key_hash.Map.empty
