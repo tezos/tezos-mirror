@@ -35,6 +35,24 @@ types:
     seq:
     - id: alpha__mutez
       type: n
+  attestation_lags:
+    seq:
+    - id: attestation_lags_entries
+      type: attestation_lags_entries
+      repeat: eos
+  attestation_lags_0:
+    seq:
+    - id: len_attestation_lags
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: attestation_lags
+      type: attestation_lags
+      size: len_attestation_lags
+  attestation_lags_entries:
+    seq:
+    - id: attestation_lags_elt
+      type: u1
   center_dz:
     seq:
     - id: numerator
@@ -49,10 +67,15 @@ types:
     - id: incentives_enable
       type: u1
       enum: bool
+    - id: dynamic_lag_enable
+      type: u1
+      enum: bool
     - id: number_of_slots
       type: u2be
     - id: attestation_lag
       type: u1
+    - id: attestation_lags
+      type: attestation_lags_0
     - id: attestation_threshold
       type: u1
     - id: minimal_participation_ratio
@@ -169,6 +192,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   radius_dz:
     seq:
     - id: numerator
@@ -221,6 +247,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: consensus_rights_delay
   type: u1
@@ -294,7 +321,7 @@ seq:
 - id: testnet_dictator
   type: public_key_hash
   if: (testnet_dictator_tag == bool::true)
-  doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+  doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
 - id: initial_seed_tag
   type: u1
   enum: bool
@@ -306,6 +333,10 @@ seq:
 - id: cache_stake_distribution_cycles
   type: s1
 - id: cache_sampler_state_cycles
+  type: s1
+- id: cache_stake_info_cycles
+  type: s1
+- id: cache_swrr_selected_distribution_cycles
   type: s1
 - id: dal_parametric
   type: dal_parametric
@@ -372,5 +403,8 @@ seq:
   type: u1
   enum: bool
 - id: swrr_new_baker_lottery_enable
+  type: u1
+  enum: bool
+- id: tz5_account_enable
   type: u1
   enum: bool

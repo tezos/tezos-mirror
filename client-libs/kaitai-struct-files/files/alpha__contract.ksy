@@ -11,7 +11,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (alpha__contract_id_tag == alpha__contract_id_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: originated
       type: originated
       if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
@@ -39,6 +39,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
 enums:
   alpha__contract_id_tag:
     0: implicit
@@ -48,6 +51,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: alpha__contract_id
   type: alpha__contract_id

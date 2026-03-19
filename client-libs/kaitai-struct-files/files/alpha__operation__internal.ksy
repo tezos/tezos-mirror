@@ -60,7 +60,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: originated
       type: originated
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::originated)
@@ -104,7 +104,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   event:
     seq:
     - id: type
@@ -202,7 +202,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: script
       type: alpha__scripted__contracts
   parameters:
@@ -275,6 +275,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   sequence:
     seq:
     - id: sequence_entries
@@ -800,6 +803,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: alpha__apply_internal_results__alpha__operation_result
   type: alpha__apply_internal_results__alpha__operation_result

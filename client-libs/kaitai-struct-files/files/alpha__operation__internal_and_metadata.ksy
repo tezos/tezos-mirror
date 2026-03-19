@@ -63,7 +63,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (alpha__contract_id_tag == alpha__contract_id_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: originated
       type: originated
       if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
@@ -98,15 +98,15 @@ types:
     - id: shared
       type: public_key_hash
       if: (alpha__frozen_staker_tag == alpha__frozen_staker_tag::shared)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: baker
       type: public_key_hash
       if: (alpha__frozen_staker_tag == alpha__frozen_staker_tag::baker)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: baker_edge
       type: public_key_hash
       if: (alpha__frozen_staker_tag == alpha__frozen_staker_tag::baker_edge)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   alpha__michelson__v1__primitives:
     seq:
     - id: alpha__michelson__v1__primitives
@@ -258,6 +258,12 @@ types:
     - id: lost_dal_attesting_rewards
       type: lost_dal_attesting_rewards
       if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::lost_dal_attesting_rewards)
+    - id: clst_deposits
+      type: alpha__operation_metadata__alpha__tez_balance_update
+      if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::clst_deposits)
+    - id: clst_redeemed_deposits
+      type: clst_redeemed_deposits
+      if: (alpha__operation_metadata__alpha__balance_and_update_tag == alpha__operation_metadata__alpha__balance_and_update_tag::clst_redeemed_deposits)
   alpha__operation_metadata__alpha__balance_updates:
     seq:
     - id: alpha__operation_metadata__alpha__balance_updates_entries
@@ -311,7 +317,7 @@ types:
     - id: shared
       type: public_key_hash
       if: (alpha__staker_tag == alpha__staker_tag::shared)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   alpha__transaction_destination:
     seq:
     - id: alpha__transaction_destination_tag
@@ -320,7 +326,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: originated
       type: originated
       if: (alpha__transaction_destination_tag == alpha__transaction_destination_tag::originated)
@@ -454,6 +460,17 @@ types:
         max: 1073741823
     - id: bytes_dyn_uint30
       size: len_bytes_dyn_uint30
+  clst_redeemed_deposits:
+    seq:
+    - id: staker
+      type: alpha__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
+    - id: cycle
+      type: s4be
+    - id: alpha__operation_metadata__alpha__tez_balance_update
+      type: alpha__operation_metadata__alpha__tez_balance_update
   commitments:
     seq:
     - id: committer
@@ -486,7 +503,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: result
       type: alpha__operation__alpha__internal_operation_result__delegation
   deposits:
@@ -565,7 +582,7 @@ types:
     seq:
     - id: delegate
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: participation
       type: u1
       enum: bool
@@ -578,7 +595,7 @@ types:
     seq:
     - id: delegate
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: alpha__operation_metadata__alpha__tez_balance_update
       type: alpha__operation_metadata__alpha__tez_balance_update
   micheline__alpha__michelson_v1__expression:
@@ -691,7 +708,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: script
       type: alpha__scripted__contracts
     - id: result
@@ -766,6 +783,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   sequence:
     seq:
     - id: sequence_entries
@@ -793,7 +813,7 @@ types:
         Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: delegate
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   smart_rollup:
     seq:
     - id: smart_rollup_address
@@ -805,7 +825,7 @@ types:
     seq:
     - id: delegate
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: alpha__operation_metadata__alpha__staking_abstract_quantity
       type: alpha__operation_metadata__alpha__staking_abstract_quantity
   staking_delegator_numerator:
@@ -1452,6 +1472,8 @@ enums:
     28: staking_delegate_denominator
     29: dal_attesting_rewards
     30: lost_dal_attesting_rewards
+    31: clst_deposits
+    32: clst_redeemed_deposits
   alpha__operation_metadata__alpha__update_origin_tag:
     0: block_application
     1: protocol_migration
@@ -1506,6 +1528,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: alpha__apply_internal_results__alpha__operation_result
   type: alpha__apply_internal_results__alpha__operation_result

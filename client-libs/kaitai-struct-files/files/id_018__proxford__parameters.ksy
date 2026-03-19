@@ -282,7 +282,7 @@ types:
       doc: ! 'A Ed25519, Secp256k1, or P256 public key
 
 
-        signature__public_key'
+        signature__v1__public_key'
     - id: public_key_known_field1
       type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
@@ -293,7 +293,7 @@ types:
       doc: ! 'A Ed25519, Secp256k1, or P256 public key
 
 
-        signature__public_key'
+        signature__v1__public_key'
     - id: public_key_known_with_consensus_key_field1
       type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
@@ -302,7 +302,7 @@ types:
       doc: ! 'A Ed25519, Secp256k1, or P256 public key
 
 
-        signature__public_key'
+        signature__v1__public_key'
   public_key_known_with_delegate:
     seq:
     - id: public_key_known_with_delegate_field0
@@ -310,24 +310,26 @@ types:
       doc: ! 'A Ed25519, Secp256k1, or P256 public key
 
 
-        signature__public_key'
+        signature__v1__public_key'
     - id: public_key_known_with_delegate_field1
       type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
     - id: public_key_known_with_delegate_field2
       type: public_key_hash
-      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: ! >-
+        A Ed25519, Secp256k1, P256, or BLS public key hash
 
 
-        signature__public_key_hash'
+        signature__v1__public_key_hash
   public_key_unknown:
     seq:
     - id: public_key_unknown_field0
       type: public_key_hash
-      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: ! >-
+        A Ed25519, Secp256k1, P256, or BLS public key hash
 
 
-        signature__public_key_hash'
+        signature__v1__public_key_hash
     - id: public_key_unknown_field1
       type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
@@ -335,19 +337,21 @@ types:
     seq:
     - id: public_key_unknown_with_delegate_field0
       type: public_key_hash
-      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: ! >-
+        A Ed25519, Secp256k1, P256, or BLS public key hash
 
 
-        signature__public_key_hash'
+        signature__v1__public_key_hash
     - id: public_key_unknown_with_delegate_field1
       type: id_018__proxford__mutez
       doc: id_018__proxford__mutez
     - id: public_key_unknown_with_delegate_field2
       type: public_key_hash
-      doc: ! 'A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: ! >-
+        A Ed25519, Secp256k1, P256, or BLS public key hash
 
 
-        signature__public_key_hash'
+        signature__v1__public_key_hash
   radius_dz:
     seq:
     - id: numerator
@@ -380,7 +384,7 @@ types:
       size: len_whitelist
   whitelist_entries:
     seq:
-    - id: signature__public_key_hash
+    - id: signature__v1__public_key_hash
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   z:
