@@ -258,15 +258,15 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           else return ctxt
         in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
-        (* Start of Alpha stitching. Comment used for automatic snapshot *)
-    | Alpha ->
+        (* Start of U025 stitching. Comment used for automatic snapshot *)
+    | U025 ->
         let* ctxt = Storage.Protocol_activation_level.update ctxt level in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
         return (ctxt, [])
-        (* End of Alpha stitching. Comment used for automatic snapshot *)
+        (* End of U025 stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | T024 ->
         let* ctxt =
