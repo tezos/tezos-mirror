@@ -528,14 +528,15 @@ oc.build_x86_64-exp:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
     - fa-bridge-watchtower
+    - etherlink-governance-observer
+    - octez-evm-node
+    - octez-accuser-alpha
+    - octez-baker-alpha
+    - octez-teztale-snitch
+    - octez-teztale-archiver
+    - octez-teztale-server
+    - src/proto_*/parameters/*.json
     when: on_success
 
 oc.build_x86_64-extra-dev:
@@ -594,14 +595,14 @@ oc.build_x86_64-extra-dev:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - octez-protocol-compiler
+    - octez-snoop
+    - _build/default/src/bin_tps_evaluation/main_tps_evaluation.exe
+    - _build/default/src/bin_octogram/octogram_main.exe
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     when: on_success
 
 oc.build_x86_64-released:
@@ -649,7 +650,17 @@ oc.build_x86_64-released:
     name: build-x86_64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
+    - octez-smart-rollup-node
+    - octez-dal-node
+    - octez-signer
+    - octez-codec
+    - octez-client
+    - octez-admin-client
+    - octez-accuser
+    - octez-baker
+    - octez-node
+    - octez-accuser-PtTALLiN
+    - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
     when: on_success
 
@@ -1772,14 +1783,15 @@ oc.build_arm64-exp:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
     - fa-bridge-watchtower
+    - etherlink-governance-observer
+    - octez-evm-node
+    - octez-accuser-alpha
+    - octez-baker-alpha
+    - octez-teztale-snitch
+    - octez-teztale-archiver
+    - octez-teztale-server
+    - src/proto_*/parameters/*.json
     when: on_success
 
 oc.build_arm64-extra-dev:
@@ -1829,14 +1841,13 @@ oc.build_arm64-extra-dev:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
-    - octez-teztale-*
+    - octez-protocol-compiler
+    - octez-snoop
+    - _build/default/src/bin_tps_evaluation/main_tps_evaluation.exe
+    - _build/default/src/bin_octogram/octogram_main.exe
+    - _build/default/tezt/tests/main.exe
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    - fa-bridge-watchtower
     when: on_success
 
 oc.build_arm64-released:
@@ -1884,7 +1895,17 @@ oc.build_arm64-released:
     name: build-arm64-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
+    - octez-smart-rollup-node
+    - octez-dal-node
+    - octez-signer
+    - octez-codec
+    - octez-client
+    - octez-admin-client
+    - octez-accuser
+    - octez-baker
+    - octez-node
+    - octez-accuser-PtTALLiN
+    - octez-baker-PtTALLiN
     - src/proto_*/parameters/*.json
     when: on_success
 

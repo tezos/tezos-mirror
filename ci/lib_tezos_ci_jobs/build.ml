@@ -42,8 +42,8 @@ let build_octez_source =
     ]
 
 (* Common features of build jobs that use [build_full_unreleased.sh]. *)
-let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = []) ~artifacts
-    ?dune_cache name =
+let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = [])
+    ?(extra_artifacts = []) ?dune_cache name =
   CI.job
     name
     ~__POS__
@@ -67,7 +67,9 @@ let build_job ~__POS__ ~arch ?storage ~executable_files ?(extra = []) ~artifacts
               (Tezos_ci.Runner.Arch.show_easy_to_distinguish arch))
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
-         artifacts)
+         (read_lines_from_file executable_files
+         @ List.map (( // ) "_build/default") extra
+         @ extra_artifacts))
     ?dune_cache
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~policy:Pull_push ())
@@ -89,7 +91,7 @@ let job_build_released =
     ~arch
     ~storage:Ramfs
     ~executable_files:"script-inputs/released-executables"
-    ~artifacts:["octez-*"; "src/proto_*/parameters/*.json"]
+    ~extra_artifacts:["src/proto_*/parameters/*.json"]
 
 let job_build_extra_dev =
   Cacio.parameterize @@ fun arch ->
@@ -114,16 +116,12 @@ let job_build_extra_dev =
       match arch with
       | Amd64 -> ["contrib/octez_injector_server/octez_injector_server.exe"]
       | _ -> [])
-    ~artifacts:
+    ~extra_artifacts:
       [
-        "octez-*";
-        "octez-teztale-*";
         "src/proto_*/parameters/*.json";
+        (* TODO: the protocol compiler executable is already at the root
+           as octez-protocol-compiler, do we actually need the following line? *)
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-        "_build/default/tezt/tests/main.exe";
-        "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-        "etherlink-governance-observer";
-        "fa-bridge-watchtower";
       ]
     ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
@@ -135,20 +133,7 @@ let job_build_exp =
     ~description:"Build the set of experimental executables."
     ~arch
     ~executable_files:"script-inputs/experimental-executables"
-    ~artifacts:
-      [
-        (* TODO: clean up this list, which was originally shared with
-           [job_build_x86_64_extra_dev] but with no good reason since the two jobs
-           do not build the same set of executables. *)
-        "octez-*";
-        "octez-teztale-*";
-        "src/proto_*/parameters/*.json";
-        "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-        "_build/default/tezt/tests/main.exe";
-        "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-        "etherlink-governance-observer";
-        "fa-bridge-watchtower";
-      ]
+    ~extra_artifacts:["src/proto_*/parameters/*.json"]
     ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
 let job_build_layer1_profiling =
