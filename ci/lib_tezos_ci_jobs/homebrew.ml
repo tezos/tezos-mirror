@@ -55,11 +55,13 @@ let job_build_homebrew_formula_macosx : tezos_job =
   job
     ~__POS__
     ~name:"oc.build-homebrew-formula-macosx"
-    ~image:Images.macosx_15
+    ~image:(Image.mk_external ~image_path:"$MACOS_IMAGE")
     ~variables:[("TAGS", "saas-macos-large-m2pro")]
+    ~parallel:
+      (Matrix [[("MACOS_IMAGE", ["macos-15-xcode-16"; "macos-26-xcode-26"])]])
     ~dependencies:(Dependent [Job job_create_homebrew_formula])
     ~stage
-    ~description:"Run the homebrew installation on MacOSX 15"
+    ~description:"Run the homebrew installation on MacOSX"
     ~allow_failure:Yes
     ~tag:Dynamic
     [
