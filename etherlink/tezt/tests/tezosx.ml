@@ -1145,7 +1145,7 @@ let test_get_ethereum_tezos_address_rpc ~runtime () =
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
   let ethereum_address = "0xccef676171871a48bbd6e2be75bbcc09d38830c5" in
-  let expected = "KT1C5w6TSyk4syouR5ncGPVyshR2hvYi8sKE" in
+  let expected = "KT1TzJBdRSNJGME2Qas4s1z4mzvRYuHgoFJk" in
   let* rpc_result =
     Rpc.Tezosx.tez_getEthereumTezosAddress ethereum_address sandbox
   in
