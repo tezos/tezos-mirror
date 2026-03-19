@@ -36,6 +36,7 @@ use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::mode::Normal;
+use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
 use registry::RegistryState;
@@ -47,6 +48,11 @@ pub type Registry = MutableState<RegistryState<Normal>>;
 #[ocaml::sig]
 pub struct RegistryProve;
 ocaml::custom!(RegistryProve);
+
+// TODO (TZX-114 wire-up verify mode): implement registry verify
+#[ocaml::sig]
+pub struct RegistryVerify;
+ocaml::custom!(RegistryVerify);
 
 // TODO (TZX-113): implement proof
 #[ocaml::sig]
@@ -77,6 +83,25 @@ impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
             ds_errors::InvalidArgumentError::RegistryResizeTooLarge => Self::RegistryResizeTooLarge,
         }
     }
+}
+
+#[derive(ocaml::FromValue, ocaml::ToValue)]
+#[ocaml::sig("Not_found")]
+pub enum VerificationError {
+    NotFound,
+}
+
+impl From<NotFound> for VerificationError {
+    fn from(_value: NotFound) -> Self {
+        Self::NotFound
+    }
+}
+
+#[derive(ocaml::FromValue, ocaml::ToValue)]
+#[ocaml::sig("Invalid_argument of invalid_argument_error | Verification of verification_error")]
+pub enum VerificationArgumentError {
+    InvalidArgument(InvalidArgumentError),
+    Verification(VerificationError),
 }
 
 /// KeyParam receiving a `bytes` value from OCaml.
@@ -381,6 +406,144 @@ pub fn octez_riscv_durable_in_memory_prove_database_hash(
     todo!("TZX-113 wire-up proof mode")
 }
 
+// Verify mode — registry
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> (bytes, verification_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_hash(
+    _state: SafePointer<RegistryVerify>,
+) -> Result<BytesWrapper<Hash>, VerificationError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> (int64, verification_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_size(
+    _state: SafePointer<RegistryVerify>,
+) -> OcamlFallible<Result<u64, VerificationError>> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> (unit, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_resize(
+    _state: SafePointer<RegistryVerify>,
+    _size: u64,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> int64 -> (unit, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_copy(
+    _state: SafePointer<RegistryVerify>,
+    _src_index: u64,
+    _dst_index: u64,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> int64 -> (unit, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_move(
+    _state: SafePointer<RegistryVerify>,
+    _src_index: u64,
+    _dst_index: u64,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> (unit, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_registry_clear(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+// Verify mode — database
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> bytes -> (bool, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_database_exists(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+) -> SplitDsResult<bool, VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "registry_verify -> int64 -> bytes -> bytes -> (unit, verification_argument_error) result"
+)]
+pub fn octez_riscv_durable_in_memory_verify_database_set(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+    _value: BytesParam,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "registry_verify -> int64 -> bytes -> int64 -> bytes -> (int64, verification_argument_error) result"
+)]
+pub fn octez_riscv_durable_in_memory_verify_database_write(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+    _offset: u64,
+    _value: BytesParam,
+) -> SplitDsResult<u64, VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig(
+    "registry_verify -> int64 -> bytes -> int64 -> int64 -> (bytes, verification_argument_error) result"
+)]
+pub fn octez_riscv_durable_in_memory_verify_database_read(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+    _offset: u64,
+    _len: u64,
+) -> SplitDsResult<BytesWrapper<Vec<u8>>, VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> bytes -> (int64, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_database_value_length(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+) -> SplitDsResult<u64, VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> bytes -> (unit, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_database_delete(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+    _key: KeyParam,
+) -> SplitDsResult<(), VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry_verify -> int64 -> (bytes, verification_argument_error) result")]
+pub fn octez_riscv_durable_in_memory_verify_database_hash(
+    _state: SafePointer<RegistryVerify>,
+    _db_index: u64,
+) -> SplitDsResult<BytesWrapper<Hash>, VerificationArgumentError> {
+    todo!("TZX-114 wire-up verify mode")
+}
+
 // Proof utilities
 
 #[ocaml::func]
@@ -428,12 +591,31 @@ pub fn octez_riscv_durable_in_memory_serialise_proof(
     BytesWrapper::from(vec![])
 }
 
+#[ocaml::func]
+#[ocaml::sig("bytes -> (proof, string) result")]
+pub fn octez_riscv_durable_in_memory_deserialise_proof(
+    _proof: BytesParam,
+) -> Result<SafePointer<Proof>, String> {
+    todo!("TZX-114: wire-up verify mode")
+}
+
+// Verify utilities
+
+#[ocaml::func]
+#[ocaml::sig("proof -> registry_verify")]
+pub fn octez_riscv_durable_in_memory_start_verify(
+    _proof: SafePointer<Proof>,
+) -> SafePointer<RegistryVerify> {
+    // TODO (TZX-114): wire-up verification mode
+    SafePointer::from(RegistryVerify)
+}
+
 /// Split handling of durable storage errors.
 ///
 /// - Operational errors are converted to OCaml exceptions. These *must not* be returned to the kernel.
 /// - InvalidArgument errors are returned as the error variant of an OCaml result. These need to be returned
 ///   to the kernel.
-pub type SplitDsResult<T> = OcamlFallible<Result<T, InvalidArgumentError>>;
+pub type SplitDsResult<T, Err = InvalidArgumentError> = OcamlFallible<Result<T, Err>>;
 
 fn split_ds_errors<T>(res: Result<T, ds_errors::Error>) -> SplitDsResult<T> {
     let inner_res = match res {

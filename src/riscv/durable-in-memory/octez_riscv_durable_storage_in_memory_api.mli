@@ -6,8 +6,11 @@ open! Bigarray
 
 type registry
 type registry_prove
+type registry_verify
 type proof
 type invalid_argument_error = Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large
+type verification_error = Not_found
+type verification_argument_error = Invalid_argument of invalid_argument_error | Verification of verification_error
 external octez_riscv_durable_in_memory_registry_new: unit -> registry = "octez_riscv_durable_in_memory_registry_new"
 external octez_riscv_durable_in_memory_registry_hash: registry -> bytes = "octez_riscv_durable_in_memory_registry_hash"
 external octez_riscv_durable_in_memory_registry_size: registry -> int64 = "octez_riscv_durable_in_memory_registry_size"
@@ -35,3 +38,23 @@ external octez_riscv_durable_in_memory_prove_database_read: registry_prove -> in
 external octez_riscv_durable_in_memory_prove_database_value_length: registry_prove -> int64 -> bytes -> (int64, invalid_argument_error) result = "octez_riscv_durable_in_memory_prove_database_value_length"
 external octez_riscv_durable_in_memory_prove_database_delete: registry_prove -> int64 -> bytes -> (unit, invalid_argument_error) result = "octez_riscv_durable_in_memory_prove_database_delete"
 external octez_riscv_durable_in_memory_prove_database_hash: registry_prove -> int64 -> (bytes, invalid_argument_error) result = "octez_riscv_durable_in_memory_prove_database_hash"
+external octez_riscv_durable_in_memory_verify_registry_hash: registry_verify -> (bytes, verification_error) result = "octez_riscv_durable_in_memory_verify_registry_hash"
+external octez_riscv_durable_in_memory_verify_registry_size: registry_verify -> (int64, verification_error) result = "octez_riscv_durable_in_memory_verify_registry_size"
+external octez_riscv_durable_in_memory_verify_registry_resize: registry_verify -> int64 -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_registry_resize"
+external octez_riscv_durable_in_memory_verify_registry_copy: registry_verify -> int64 -> int64 -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_registry_copy"
+external octez_riscv_durable_in_memory_verify_registry_move: registry_verify -> int64 -> int64 -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_registry_move"
+external octez_riscv_durable_in_memory_verify_registry_clear: registry_verify -> int64 -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_registry_clear"
+external octez_riscv_durable_in_memory_verify_database_exists: registry_verify -> int64 -> bytes -> (bool, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_exists"
+external octez_riscv_durable_in_memory_verify_database_set: registry_verify -> int64 -> bytes -> bytes -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_set"
+external octez_riscv_durable_in_memory_verify_database_write: registry_verify -> int64 -> bytes -> int64 -> bytes -> (int64, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_write"
+external octez_riscv_durable_in_memory_verify_database_read: registry_verify -> int64 -> bytes -> int64 -> int64 -> (bytes, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_read"
+external octez_riscv_durable_in_memory_verify_database_value_length: registry_verify -> int64 -> bytes -> (int64, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_value_length"
+external octez_riscv_durable_in_memory_verify_database_delete: registry_verify -> int64 -> bytes -> (unit, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_delete"
+external octez_riscv_durable_in_memory_verify_database_hash: registry_verify -> int64 -> (bytes, verification_argument_error) result = "octez_riscv_durable_in_memory_verify_database_hash"
+external octez_riscv_durable_in_memory_start_proof: registry -> registry_prove = "octez_riscv_durable_in_memory_start_proof"
+external octez_riscv_durable_in_memory_produce_proof: registry_prove -> proof = "octez_riscv_durable_in_memory_produce_proof"
+external octez_riscv_durable_in_memory_proof_start_state: proof -> bytes = "octez_riscv_durable_in_memory_proof_start_state"
+external octez_riscv_durable_in_memory_proof_stop_state: proof -> bytes = "octez_riscv_durable_in_memory_proof_stop_state"
+external octez_riscv_durable_in_memory_serialise_proof: proof -> bytes = "octez_riscv_durable_in_memory_serialise_proof"
+external octez_riscv_durable_in_memory_deserialise_proof: bytes -> (proof, string) result = "octez_riscv_durable_in_memory_deserialise_proof"
+external octez_riscv_durable_in_memory_start_verify: proof -> registry_verify = "octez_riscv_durable_in_memory_start_verify"
