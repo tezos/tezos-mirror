@@ -90,6 +90,25 @@ let write_skip_list_record fd record =
   let* () = Lwt_utils_unix.write_bytes fd len_bytes in
   Lwt_utils_unix.write_bytes fd encoded
 
+module KVS = Key_value_store
+
+(** Tar entry names for metadata values. *)
+let chain_id_filename = "chain_id"
+
+let first_seen_level_filename = "first_seen_level"
+
+let last_processed_level_filename = "last_processed_level"
+
+let version_filename = "version"
+
+(** Current snapshot format version.
+
+    Bump this constant whenever the tar archive format changes in a
+    backward-incompatible way (new mandatory entries, changed encoding,
+    removed entries, etc.). The import code rejects archives whose version
+    does not match this value. *)
+let current_snapshot_version = 1
+
 (** Tar entry filename for the skip list binary dump. *)
 let skip_list_binary_filename = Store.Stores_dirs.skip_list_cells // "cells.bin"
 
@@ -736,6 +755,111 @@ module Export_tar = struct
       self-describing so the importer can reconstruct the KVS file without
       consulting proto_parameters. *)
 
+  (** Read the compact shard payload for one KVS file.  Only the bitset
+      ([number_of_shards] bytes) and the occupied shard data are read;
+      the pre-allocated zero-padding is never touched.
+
+      [share_size] and [number_of_shards] are derived from the file size,
+      not from proto_parameters, so the format is independent of the
+      cryptobox configuration at call time. *)
+  let read_compact_shards filepath ~number_of_shards =
+    let open Lwt_syntax in
+    let* stat = Lwt_unix.stat filepath in
+    let file_size = stat.Unix.st_size in
+    if file_size <= KVS.file_prefix_bitset_size then Lwt.return Bytes.empty
+    else
+      let share_size =
+        (file_size - KVS.file_prefix_bitset_size) / number_of_shards
+      in
+      Lwt_io.(
+        with_file ~mode:Input filepath (fun ic ->
+            (* Read only the first [number_of_shards] bytes of the bitset. *)
+            let bitset = Bytes.create number_of_shards in
+            let* () = read_into_exactly ic bitset 0 number_of_shards in
+            let occupied = ref [] in
+            for i = number_of_shards - 1 downto 0 do
+              if Bytes.get bitset i = '\001' then occupied := i :: !occupied
+            done ;
+            let occupied = !occupied in
+            let count = List.length occupied in
+            if count = 0 then Lwt.return Bytes.empty
+            else
+              let payload = Bytes.create (12 + (count * (4 + share_size))) in
+              Bytes.set_int32_be payload 0 (Int32.of_int share_size) ;
+              Bytes.set_int32_be payload 4 (Int32.of_int number_of_shards) ;
+              Bytes.set_int32_be payload 8 (Int32.of_int count) ;
+              let pos = ref 12 in
+              let share_buf = Bytes.create share_size in
+              let* () =
+                Lwt_list.iter_s
+                  (fun i ->
+                    let offset =
+                      KVS.file_prefix_bitset_size + (i * share_size)
+                    in
+                    let* () = set_position ic (Int64.of_int offset) in
+                    let* () = read_into_exactly ic share_buf 0 share_size in
+                    Bytes.set_int32_be payload !pos (Int32.of_int i) ;
+                    pos := !pos + 4 ;
+                    Bytes.blit share_buf 0 payload !pos share_size ;
+                    pos := !pos + share_size ;
+                    Lwt.return_unit)
+                  occupied
+              in
+              Lwt.return payload))
+
+  (** Export shards: for each slot_id in the range, extract only the occupied
+      shard entries from the KVS file and store a compact self-describing
+      gzip-compressed binary in the tar archive.
+
+      KVS shard files are pre-allocated for [number_of_shards] entries (~1.1MB)
+      regardless of occupancy.  For a sparse node only a small fraction of
+      entries are set; the rest is zero-padding.  Reading the whole file and
+      compressing it (even at level 1) scans megabytes of zeros per file.
+      Instead we:
+        1. Read only the bitset ([number_of_shards] bytes) from the KVS file.
+        2. For each occupied index, seek directly to its offset and read
+           [share_size] raw bytes — no [Cryptobox.share_encoding] decode cycle.
+        3. Gzip-compress the compact payload.
+      For a sparse node holding 10 shards per slot (out of 512) this reads
+      ~4KB (bitset) + 10 × share_size ≈ 26KB per file instead of ~1.1MB,
+      reducing total I/O from ~5.4GB to ~130MB for 4883 files. *)
+  let export_shards ?notify tar ~src_shard_dir ~min_published_level
+      ~max_published_level ~slots ~proto_plugins =
+    iterate_levels ?notify ~min_published_level ~max_published_level
+    @@ fun level ->
+    let open Lwt_result_syntax in
+    let*? slots = get_slots_for_level ~proto_plugins ~slots level in
+    let*? _, proto_parameters =
+      Proto_plugins.get_plugin_and_parameters_for_level proto_plugins ~level
+    in
+    let number_of_shards =
+      proto_parameters.cryptobox_parameters.number_of_shards
+    in
+    List.iter_es
+      (fun slot_index ->
+        let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
+        let filepath = src_shard_dir // slot_id_to_filename slot_id in
+        let*! exists = Lwt_unix.file_exists filepath in
+        if not exists then return_unit
+        else
+          let*! payload = read_compact_shards filepath ~number_of_shards in
+          if Bytes.length payload = 0 then return_unit
+          else
+            let compressed = gzip_compress_bytes payload in
+            let tar_filename =
+              Store.Stores_dirs.shard // slot_id_to_filename slot_id
+            in
+            let*! () =
+              add_bytes_to_tar tar ~bytes:compressed ~filename:tar_filename
+            in
+            return_unit)
+      slots
+
+  (** Export skip list: reads from SQLite, serialises each matching row into a
+      compact flat binary file, gzip-compresses it, and streams it into the
+      tar archive.  This avoids carrying the full SQLite overhead (B-tree
+      structure, WAL, indices) in the snapshot. *)
+
   (** Export skip list: reads from SQLite, serialises each matching row into a
       compact flat binary file, gzip-compresses it, and streams it into the
       tar archive.  This avoids carrying the full SQLite overhead (B-tree
@@ -793,6 +917,147 @@ module Export_tar = struct
       |> Data_encoding.Json.to_string |> Bytes.of_string
     in
     add_bytes_to_tar tar ~bytes ~filename:tar_filename
+
+  (** Main export function: reads from source store via KVS.Read,
+      writes a tar archive. *)
+  let run ~progress_display_mode ~src_root_dir ~config_file ~endpoint
+      ~min_published_level ~max_published_level ~slots ~dst_tar_file =
+    let open Lwt_result_syntax in
+    let* {
+           min_published_level;
+           max_published_level;
+           chain_id;
+           proto_parameters = _;
+           proto_plugins;
+         } =
+      init_export_context
+        ~frozen_only:true
+        ~src_root_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level
+        ~max_published_level
+    in
+    let*! () =
+      Event.emit_snapshot_status
+        ~path:dst_tar_file
+        ~kind:"archive"
+        ~status:"start"
+        ~min_level:(Some min_published_level)
+        ~max_level:(Some max_published_level)
+    in
+    let src_slot_dir = src_root_dir // Store.Stores_dirs.slot in
+    let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
+    (* Open tar archive for output *)
+    let*! tar = Octez_tar_helpers.open_out ~file:dst_tar_file in
+    Lwt.finalize
+      (fun () ->
+        let total = nb_levels ~min_published_level ~max_published_level in
+        (* Export skip_list first so import can validate/apply it upfront. *)
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"skip_list" ~step:"start"
+        in
+        let* () =
+          Animation.display_progress
+            ~progress_display_mode
+            ~pp_print_step:(fun fmt i ->
+              Format.fprintf fmt "Exporting skip list: %d/%d levels" i total)
+            (fun notify ->
+              export_skip_list
+                ~notify
+                tar
+                ~src_root_dir
+                ~min_published_level
+                ~max_published_level
+                ~slots
+                ~proto_plugins)
+        in
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"skip_list" ~step:"success"
+        in
+        (* Export slots *)
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"slots" ~step:"start"
+        in
+        let* () =
+          Animation.display_progress
+            ~progress_display_mode
+            ~pp_print_step:(fun fmt i ->
+              Format.fprintf fmt "Exporting slots: %d/%d levels" i total)
+            (fun notify ->
+              export_slots
+                ~notify
+                tar
+                ~src_slot_dir
+                ~min_published_level
+                ~max_published_level
+                ~slots
+                ~proto_plugins)
+        in
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"slots" ~step:"success"
+        in
+        (* Export shards *)
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"shards" ~step:"start"
+        in
+        let* () =
+          Animation.display_progress
+            ~progress_display_mode
+            ~pp_print_step:(fun fmt i ->
+              Format.fprintf fmt "Exporting shards: %d/%d levels" i total)
+            (fun notify ->
+              export_shards
+                ~notify
+                tar
+                ~src_shard_dir
+                ~min_published_level
+                ~max_published_level
+                ~slots
+                ~proto_plugins)
+        in
+        let*! () =
+          Event.emit_snapshot_copying ~resource:"shards" ~step:"success"
+        in
+        (* Export metadata *)
+        let*! () =
+          export_metadata_value
+            tar
+            ~tar_filename:version_filename
+            Data_encoding.int31
+            current_snapshot_version
+        in
+        let*! () =
+          export_metadata_value
+            tar
+            ~tar_filename:chain_id_filename
+            Chain_id.encoding
+            chain_id
+        in
+        let*! () =
+          export_metadata_value
+            tar
+            ~tar_filename:first_seen_level_filename
+            Data_encoding.int32
+            min_published_level
+        in
+        let*! () =
+          export_metadata_value
+            tar
+            ~tar_filename:last_processed_level_filename
+            Data_encoding.int32
+            max_published_level
+        in
+        let*! () =
+          Event.emit_snapshot_status
+            ~path:dst_tar_file
+            ~kind:"archive"
+            ~status:"success"
+            ~min_level:(Some min_published_level)
+            ~max_level:(Some max_published_level)
+        in
+        return_unit)
+      (fun () -> Octez_tar_helpers.close_out tar)
 end
 
 let store_path data_dir =
