@@ -1,0 +1,20 @@
+code { VIEW "get_self" address };
+
+input
+  {
+    Stack_elt unit Unit ;
+    Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+  };
+
+output
+  { Stack_elt (option address) (Some "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d") };
+
+self "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ;
+
+views
+  {
+    Views "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+      { View "get_self" unit address { DROP ; SELF_ADDRESS } }
+  };
+
+storages { Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit };

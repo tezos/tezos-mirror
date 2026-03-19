@@ -1889,15 +1889,16 @@ fn interpret_one<'a>(
                 }
             };
 
-            let Some((view, (storage_ty, storage))) = ctx.lookup_view_and_storage(kt1, name, arena)
+            let Some((view, view_storage_ty, view_storage, view_balance)) =
+                ctx.lookup_view_storage_balance(&kt1, name, arena)
             else {
                 stack.push(V::Option(None));
                 return Ok(());
             };
 
-            let storage_ty = storage_ty.parse_ty(ctx.gas())?;
+            let storage_ty = view_storage_ty.parse_ty(ctx.gas())?;
 
-            let storage = Micheline::decode_raw(arena, &storage)?
+            let storage = Micheline::decode_raw(arena, &view_storage)?
                 .typecheck_value(ctx, &storage_ty.into_micheline_optimized_legacy(arena))?;
 
             let input_type = view.input_type.parse_ty(ctx.gas())?;
@@ -1912,7 +1913,16 @@ fn interpret_one<'a>(
                     false,
                 ) {
                     let mut stk = stk![TypedValue::new_pair(input, storage)];
-                    interpret(code.as_ref(), ctx, arena, &mut stk)?;
+                    let old = (
+                        ctx.self_address(),
+                        ctx.sender(),
+                        ctx.amount(),
+                        ctx.balance(),
+                    );
+                    ctx.set_view_context(AddressHash::Kt1(kt1), old.0.clone(), 0, view_balance);
+                    let result = interpret(code.as_ref(), ctx, arena, &mut stk);
+                    ctx.set_view_context(old.0, old.1, old.2, old.3);
+                    result?;
                     let result =
                         TypedValue::unwrap_rc(stk.pop().unwrap_or_else(|| unreachable_state()));
                     stack.push(V::new_option(Some(result)));
