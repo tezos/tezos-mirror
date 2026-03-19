@@ -34,10 +34,19 @@ class Octez < Formula
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
     if OS.mac?
-      gcc_version = Formula["gcc"].version.major
+      sdk_path = Utils.safe_popen_read("xcrun", "--show-sdk-path").chomp
+      ENV["CPLUS_INCLUDE_PATH"] = "#{sdk_path}/usr/include/c++/v1" unless sdk_path.empty?
       (buildpath/"cc-override").mkpath
-      ln_sf "#{HOMEBREW_PREFIX}/bin/gcc-#{gcc_version}", buildpath/"cc-override/cc"
-      ln_sf "#{HOMEBREW_PREFIX}/bin/g++-#{gcc_version}", buildpath/"cc-override/c++"
+      (buildpath/"cc-override/cc").write <<~SH
+        #!/bin/sh
+        exec xcrun clang "$@"
+      SH
+      chmod 0755, buildpath/"cc-override/cc"
+      (buildpath/"cc-override/c++").write <<~SH
+        #!/bin/sh
+        exec xcrun clang++ "$@"
+      SH
+      chmod 0755, buildpath/"cc-override/c++"
       ENV.prepend_path "PATH", buildpath/"cc-override"
     end
 
