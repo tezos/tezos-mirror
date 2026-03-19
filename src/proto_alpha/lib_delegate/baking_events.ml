@@ -1259,20 +1259,22 @@ module Nonces = struct
       ("level", Raw_level.encoding)
 
   let revealing_nonce =
-    declare_3
+    declare_4
       ~alternative_color:Internal_event.Cyan
       ~section
       ~name:"revealing_nonce"
       ~level:Notice
       ~msg:
         "revealing nonce of level {level} (chain {chain} with operation \
-         {ophash})"
+         {ophash} injected to {node})"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
       ~pp2:Format.pp_print_string
       ("chain", Data_encoding.string)
       ~pp3:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
+      ~pp4:Format.pp_print_string
+      ("node", Data_encoding.string)
 
   let cannot_fetch_chain_head_level =
     declare_0
@@ -1353,6 +1355,18 @@ module Nonces = struct
       ~level:Info
       ~msg:"revelation worker started"
       ()
+
+  let revelation_worker_new_proposal =
+    declare_3
+      ~section
+      ~name:"revelation_worker_new_proposal"
+      ~level:Debug
+      ~msg:"revelation worker received proposal at level {level} from {uri}"
+      ~pp1:pp_int32
+      ("level", Data_encoding.int32)
+      ("uri", Data_encoding.string)
+      ~pp3:Block_hash.pp
+      ("block", Block_hash.encoding)
 
   let success_migrate_nonces =
     declare_0

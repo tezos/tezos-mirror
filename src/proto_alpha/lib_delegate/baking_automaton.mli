@@ -92,12 +92,13 @@ val compute_bootstrap_event : state -> event tzresult
 (** [create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
     ~on_head_proposal_callback operation_worker] creates a loop state with the
     streams of valid blocks, new heads, forged events and operations from the
-    node's mempool. *)
+    node's mempool. The callback takes the [cctxt] of the node that sent the
+    proposal, followed by the [proposal] itself. *)
 val create_loop_state :
   ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
   heads_stream:proposal Lwt_stream.t ->
   forge_event_stream:forge_event Lwt_stream.t ->
-  on_head_proposal_callback:(proposal -> unit) ->
+  on_head_proposal_callback:(Protocol_client_context.full -> proposal -> unit) ->
   Operation_worker.t ->
   loop_state
 
