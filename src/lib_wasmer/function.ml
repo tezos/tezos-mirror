@@ -85,6 +85,15 @@ let () =
      OCaml side. *)
   Foreign.report_leaked_funptr := Fun.const ()
 
+(* Side-channel for host function exceptions. When a host callback raises an
+   OCaml exception, we store it here instead of converting it to a Wasmer trap.
+   This avoids Wasmer's signal-based trap propagation (SIGILL/SIGSEGV) which
+   conflicts with OCaml's runtime signal handlers on macOS ARM64. After WASM
+   execution returns, we check this ref and re-raise the original exception
+   with its full type preserved. This is safe because the Wasmer C API is
+   single-threaded per store. *)
+let host_function_exn : exn option ref = ref None
+
 (** [create store typ f] creates a Wasmer host function from the OCaml
     function [f] with signature [typ]. Returns the owned function pointer
     and a cleanup function that frees the callback closure. *)
@@ -100,10 +109,20 @@ let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
     pack_outputs results result outputs
   in
   let try_run inputs outputs =
-    try
-      let () = run inputs outputs in
-      Trap.none
-    with exn -> Trap.from_string store (Printexc.to_string exn)
+    match !host_function_exn with
+    | Some _ ->
+        (* A previous host callback already failed. Return a no-op success to
+           Wasmer so that it unwinds without triggering signal-based trap
+           propagation. The stored exception will be re-raised after WASM
+           execution returns. *)
+        Trap.none
+    | None -> (
+        try
+          let () = run inputs outputs in
+          Trap.none
+        with exn ->
+          host_function_exn := Some exn ;
+          Trap.none)
   in
   let try_run = Func_callback_maker.of_fun try_run in
   let free () = Func_callback_maker.free try_run in
@@ -122,12 +141,23 @@ let create : type f. Store.t -> f Function_type.t -> f -> owned * (unit -> unit)
 let call_raw func inputs =
   let open Lwt.Syntax in
   let outputs = Value_vector.uninitialized (Functions.Func.result_arity func) in
+  (* Clear side-channel before call *)
+  host_function_exn := None ;
   let+ trap =
     Lwt_preemptive.detach
       (fun (inputs, outputs) ->
         Functions.Func.call func (Ctypes.addr inputs) (Ctypes.addr outputs))
       (inputs, outputs)
   in
+  (* Check side-channel first: if a host callback stored an exception, re-raise
+     it directly. This preserves the original exception type and avoids going
+     through Wasmer's trap mechanism. *)
+  (match !host_function_exn with
+  | Some exn ->
+      host_function_exn := None ;
+      if not (Ctypes.is_null trap) then Functions.Trap.delete trap ;
+      raise exn
+  | None -> ()) ;
   Trap.check trap ;
   outputs
 
