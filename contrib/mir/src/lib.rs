@@ -249,14 +249,9 @@ mod tests {
     fn typecheck_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
-        assert!(typechecker::typecheck_instruction(
-            &ast,
-            &mut Gas::default(),
-            None,
-            &mut stack,
-            false
-        )
-        .is_ok());
+        assert!(
+            typechecker::typecheck_instruction(&ast, &mut Gas::default(), None, &mut stack).is_ok()
+        );
         assert_eq!(stack, tc_stk![Type::Int])
     }
 
@@ -410,8 +405,7 @@ mod tests {
         let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
-            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack, false)
-                .unwrap();
+            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack).unwrap();
         assert_eq!(
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
