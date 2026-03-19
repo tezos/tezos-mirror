@@ -150,15 +150,16 @@ opam:all_6:
       - tezos-dal-node-services
       - tezos-benchmark
       - octez-tar-helpers
-      - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
       - octez-libs
       - octez-lib-upnp
       - octez-l2-libs
+      - octez-internal-libs
+      - octez-distributed-lwt-internal
       - efunc_core
-      - dal_node_migrations
+      - bls12-381
 
 opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -282,6 +283,7 @@ opam:all_2:
       - octez-smart-rollup-node-lib
       - octez-smart-rollup-node-PtSeouLo
       - octez-smart-rollup-node-PtParisB
+      - octez-smart-rollup-node-PsRiotum
       - octez-protocol-023-PtSeouLo-libs
       - octez-protocol-022-PsRiotum-libs
       - octez-protocol-021-PsQuebec-libs
@@ -357,11 +359,12 @@ opam:all_1:
     - package:
       - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtTALLiN
-      - octez-smart-rollup-node-PsRiotum
       - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-PsGXQmSv
       - octez-smart-rollup-node-Proxford
       - octez-protocol-alpha-libs
+      - octez-protocol-025-PsGXQmSv-libs
       - octez-protocol-024-PtTALLiN-libs
 
 opam:all_3:
@@ -438,6 +441,7 @@ opam:all_3:
       - octez-protocol-006-PsCARTHA-libs
       - octez-protocol-005-PsBabyM1-libs
       - octez-protocol-004-Pt24m4xi-libs
+      - octez-crawler
       - octez-baking-common-lib
 
 opam:exec_4:
@@ -558,6 +562,8 @@ opam:all_4:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-013-PtJakart
+      - tezos-protocol-012-Psithaca
       - tezos-protocol-011-PtHangz2
       - tezos-protocol-010-PtGRANAD
       - tezos-protocol-009-PsFLoren
@@ -573,7 +579,83 @@ opam:all_4:
       - tezos-protocol-001-PtCJ7pwo
       - tezos-protocol-000-Ps9mPmXa
       - octez-node-config
-      - octez-crawler
+
+opam:all_5:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 5 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-genesis
+      - tezos-protocol-demo-noops
+      - tezos-protocol-demo-counter
+      - tezos-protocol-alpha
+      - tezos-protocol-025-PsGXQmSv
+      - tezos-protocol-024-PtTALLiN
+      - tezos-protocol-023-PtSeouLo
+      - tezos-protocol-022-PsRiotum
+      - tezos-protocol-021-PsQuebec
+      - tezos-protocol-020-PsParisC
+      - tezos-protocol-019-PtParisB
+      - tezos-protocol-018-Proxford
+      - tezos-protocol-017-PtNairob
+      - tezos-protocol-016-PtMumbai
+      - tezos-protocol-015-PtLimaPt
+      - tezos-protocol-014-PtKathma
+      - octez-shell-libs
+      - dal_node_migrations
 
 opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -643,82 +725,6 @@ opam:exec_1:
       - octez-accuser-PtTALLiN
       - octez-accuser
 
-opam:all_5:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - when: delayed
-    start_in: 5 minutes
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  timeout: 90 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    - $CI_PROJECT_DIR/.cargo/registry/index
-    - $CI_PROJECT_DIR/.cargo/registry/src
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    RUNTEZTALIAS: "true"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  parallel:
-    matrix:
-    - package:
-      - tezos-protocol-genesis
-      - tezos-protocol-demo-noops
-      - tezos-protocol-demo-counter
-      - tezos-protocol-alpha
-      - tezos-protocol-024-PtTALLiN
-      - tezos-protocol-023-PtSeouLo
-      - tezos-protocol-022-PsRiotum
-      - tezos-protocol-021-PsQuebec
-      - tezos-protocol-020-PsParisC
-      - tezos-protocol-019-PtParisB
-      - tezos-protocol-018-Proxford
-      - tezos-protocol-017-PtNairob
-      - tezos-protocol-016-PtMumbai
-      - tezos-protocol-015-PtLimaPt
-      - tezos-protocol-014-PtKathma
-      - tezos-protocol-013-PtJakart
-      - tezos-protocol-012-Psithaca
-
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
@@ -786,9 +792,6 @@ opam:all_7:
       - octez-lwt-domain
       - octez-libcrux-ml-dsa
       - octez-lib-upnp-args
-      - octez-internal-libs
       - octez-igd-next
-      - octez-distributed-lwt-internal
       - octez-distributed-internal
       - octez-alcotezt
-      - bls12-381
