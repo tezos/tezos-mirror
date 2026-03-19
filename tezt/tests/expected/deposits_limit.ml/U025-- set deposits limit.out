@@ -1,0 +1,14 @@
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    Fee to the baker: ꜩ0
+    Expected counter: 1
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Set deposits limit:
+      Delegate: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      Limit: 1000
+      This operation FAILED.
+
+

@@ -1,0 +1,32 @@
+{ parameter mutez ;
+  storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
+  code { DUP ;
+         CAR ;
+         SWAP ;
+         CDR ;
+         { DUP ;
+           DIP { CAR @%% ;
+                 { DUP ;
+                   DIP { CDR @%% ;
+                         { DUP ;
+                           DIP { CDR @%% ;
+                                 { DUP ;
+                                   DIP { CAR @%% ;
+                                         { DUP ;
+                                           DIP { CAR @%% ; { DUP ; CDR %value ; DROP ; CAR @%% ; PAIR %@ %value } } ;
+                                           CDR @%% ;
+                                           SWAP ;
+                                           PAIR %@ %@ } } ;
+                                   CDR @%% ;
+                                   SWAP ;
+                                   PAIR %@ %@ } } ;
+                           CAR @%% ;
+                           PAIR %@ %@ } } ;
+                   CAR @%% ;
+                   PAIR %@ %@ } } ;
+           CDR @%% ;
+           SWAP ;
+           PAIR %@ %@ @toplevel_pair_name } ;
+         NIL operation ;
+         PAIR } }
+

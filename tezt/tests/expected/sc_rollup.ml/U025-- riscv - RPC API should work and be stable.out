@@ -1,0 +1,1065 @@
+
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type string with kernel kernel:src/riscv/assets/riscv-dummy.elf:a81457e55ed4573879e7a246526d885b084c8b09edaec5c0c063e6cb7859fcea --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1933.839 units (will add 100 for safety)
+Estimated storage: 6552 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000545
+    Expected counter: 1
+    Gas limit: 2034
+    Storage limit: 6572 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000545
+      payload fees(the block proposer) ....... +ꜩ0.000545
+    Smart rollup origination:
+      Kind: riscv
+      Parameter type: string
+      Kernel Blake2B hash: 'fc55650a30f5d14fe976bad0a3fe9b22b2a138340850b56e39df8f5629541bb7'
+      This smart rollup origination was successfully applied
+      Consumed gas: 1933.806
+      Storage size: 6552 bytes
+      Address: [SMART_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.638
+        storage fees ........................... +ꜩ1.638
+
+Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+GET http://[HOST]:[PORT]/global/smart_rollup_address
+200 OK
+"[SMART_ROLLUP_HASH]"
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "312d31",
+  "312d32",
+  "312d33",
+  "312d34",
+  "312d35"
+]
+200 OK
+["scmsg2rwuPwGBrYsQHFuusVq5DAZFfJ4iGcAJ6Ttvyobd6b1V1oSpUk","scmsg3WtaZfwmQQzbHobfzcZw3JFy7eYAAJs9RZsGGrnzwEAnzPP5We","scmsg2VDC22BtmBrJD2vGKdjeNBMv7W6uw1uRVvJmW7jRv2z9yiQTcM","scmsg25K99LfhZYmLRgiyFGPswB3YiNoH6Lw97AuPeZEaC1cKpdNaiN","scmsg3j2jViLpky6CbTuQWUguz3HxuvUL3XZYppP8euHHuWeDdW6QZy"]
+
+Hello World
+Hello
+World
+Random letters: hdmywa
+Hello World
+The current working directory is: /
+Debug Foo {
+    a: 0,
+    b: 0,
+    c: 0,
+}
+System time: SystemTime { tv_sec: 0, tv_nsec: 0 }
+Instant: Instant { tv_sec: 0, tv_nsec: 0 }
+Hello World
+
+I am [SMART_ROLLUP_HASH]
+RollupMetadata {
+    raw_rollup_address: [
+        83,
+        11,
+        213,
+        228,
+        38,
+        214,
+        251,
+        30,
+        41,
+        85,
+        218,
+        156,
+        68,
+        97,
+        165,
+        112,
+        197,
+        236,
+        177,
+        195,
+    ],
+    origination_level: 2,
+}
+[09, 90, A8, 2F, DD, B2, 8D, E6, 07, 33, 28, 86, 5C, EF, 23, A4, D5, 2A, CC, 6C, D4, 17, D8, AB, 39, 66, 69, D6, 3C, 3B, A8, BD]
+Signature is [133, 153, 89, 165, 225, 52, 223, 180, 255, 131, 0, 136, 151, 153, 173, 101, 89, 156, 116, 182, 204, 196, 243, 216, 218, 77, 17, 96, 8, 132, 254, 190, 220, 2, 63, 202, 122, 112, 169, 61, 119, 166, 30, 78, 142, 64, 30, 40, 210, 60, 25, 219, 193, 87, 197, 19, 194, 101, 0, 232, 241, 244, 56, 2]
+Reveal metadata...
+
+Reveal metadata succeeded, result: 
+Rollup address: RollupMetadata { raw_rollup_address: [83, 11, 213, 228, 38, 214, 251, 30, 41, 85, 218, 156, 68, 97, 165, 112, 197, 236, 177, 195], origination_level: 2 }
+Reveal preimage...
+
+Preimage: "cafebabe"
+Invalid reveal request...
+
+
+Reveals Done
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "322d31",
+  "322d32",
+  "322d33",
+  "322d34",
+  "322d35"
+]
+200 OK
+["scmsg2Q8u9Ufd95zmF2DmjyhgaHyDNud45t5MXWh4BTdnnVabCT7hFc","scmsg3eoXpnbxkuUcg5DPWLxbLxRaewCjpLnB3GUoT8fa3NdEV1zTj1","scmsg2CcNmHmfTshLkupfyLMsDRQC5bWEVUYJKAY4hWD1QkjeBzqQuU","scmsg2bwoquA7WfWQCmvEpmWV2HNJw6pXX8gojemMhNTdMJuaQvovwt","scmsg2jUikwFvAacRFXSsFiohz8Ac1FzFxUMMDjj2FRn4wwbEue9GE1"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "332d31",
+  "332d32",
+  "332d33",
+  "332d34",
+  "332d35"
+]
+200 OK
+["scmsg3dpi4Ju7FjurV5ygFfchk7AzEs4fkQwP5osyEC7KPwmpShKQsd","scmsg3U7d1dZ6fZnGSkcQaSgQGmCA59fM9HdfaAxn6iUyhMjJ7tzPvg","scmsg2ybFzC2zNxSiU3JGDQXpUFBaMSyruCrTNxncJGaAJWpKGoSwVD","scmsg3JAvYLWsukJD9qdzj71rMsUSVJiM1sgMfRtu9CYmJWL3unEmdw","scmsg2KGintqwnFJ2DpEqPzQ2wwKrqE4aWXePHaac6Wk4dZ2zYDzxq4"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "342d31",
+  "342d32",
+  "342d33",
+  "342d34",
+  "342d35"
+]
+200 OK
+["scmsg3ig6Tfoiqy7J4pvCA69Xq5YGYwazYFwsiUYwjdKKBmVEiM7Bra","scmsg3DuDpF1odPhoS6mVEYT1FFyrmUJWEdqqAL768KE3rV3yWBwEMo","scmsg2M9XdPeq2rrhH9wCVw9EuaUmhvwdkSHMUfBbCKx3TBoV2j8Zzk","scmsg3BwQX5BJdaTdYf9UcqV3G6CwyxJjY5YaTTwSZKmZJi35GCTRk7","scmsg3ZLrgvvQaWKJgHB3nyQPoR5n7HDHbGp6nX2SeB1So3Fv1zVqdR"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "352d31",
+  "352d32",
+  "352d33",
+  "352d34",
+  "352d35"
+]
+200 OK
+["scmsg32tLLi3b6P9nffRaxRYevU9nFKTPLRcdGGDGMuBYxoNp49h9fU","scmsg2WrjiWD88fiebhAnoZokDocz9XF2MqPp15hpJT5xGKG7jvBnph","scmsg3TWeiN93kzSuDei1T7PiBoxjVUxdqvMnDZ1x1bW7deVakpCBaH","scmsg238Qn5sQPP83DUtBamFgXEy3M74Zb23Cd2AuaQNiKWrhhoCMRZ","scmsg2fcex43ebcuDHXPaTFn4gaPsBoUtcZLZ4LatPvEppoxX8USaKb"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        50,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        50,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        50,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        50,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        50,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "362d31",
+  "362d32",
+  "362d33",
+  "362d34",
+  "362d35"
+]
+200 OK
+["scmsg33ufVokVubNNkPvhVC2xVA6YQjePMV9KYHk3suh4aUmZLkxDUJ","scmsg2Veu8WVquo3WghLBoabaFsxJvQmrgRSR3J94RDEp18oecM9jwE","scmsg3UB9prgoMs2tgEE9avT1FMTiUUT6Ub67fHdFsCGFqs3XXTUraS","scmsg2ppDMPFbXGEhnkASETkvG4AdmigQzPjDPZPmAU63nJrXtBG9FD","scmsg3BonQUZ9SLxwfDKKefrJWnkAF4A9cVmaDAKSxnq2dBoX7vmXRp"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        51,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        51,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        51,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        51,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        51,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "372d31",
+  "372d32",
+  "372d33",
+  "372d34",
+  "372d35"
+]
+200 OK
+["scmsg3b7y5ysxfjzRiSQHWygRQ37bf8fVtum2rfk7YuXLQQzyt9bsU5","scmsg3NrtDG5ynFbdEXewroyCm1rcFNHYRWQvBj3ooG1kg1JWB5gSUd","scmsg3CS5J6TrAvHKZ31PLBmLtzciH5xH8rRLsR8tY6kmm7TdkHFbKk","scmsg3i6pSyMeUewYGSEbPX2skk552iKmiq9RPsHCeG8WMJfBGMenXy","scmsg3GbNbAxSSFpnYneMLBRnL4h6byyJpkTCpc5GwzyAEtS2xxpSCB"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        52,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        52,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        52,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        52,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        52,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "382d31",
+  "382d32",
+  "382d33",
+  "382d34",
+  "382d35"
+]
+200 OK
+["scmsg2jSC9soMxLqf9EkgtoZioZbg9q25LBeBKmkwsmGD2a8E9FaZtx","scmsg3tcqypPLNPYVC6Rtx62jZyT6Tqmua6JeSvfqLMg4ENmC78R6VT","scmsg2y9Lzxk9vmPzdijxtV1cisN9GTfWfZYfsShGiaTNqUc15xqGfm","scmsg2pHbd5gcWS41nzKcfhtzQXaC7T1PkZpEqmGrY6LCjBLJzkqZQ8","scmsg3nJkzbFRfd6EQnw3QhyDC3W42WSiJ9t2iqZ46k1Ji6tuCxjSuN"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        53,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        53,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        53,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        53,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        53,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "392d31",
+  "392d32",
+  "392d33",
+  "392d34",
+  "392d35"
+]
+200 OK
+["scmsg3RKmNvZggo7jsdgM71HebGFG3TfY2gh3Z1t4FNPqYReqBHHnxr","scmsg34ExXXaeUBYvf6hRTGAP64S34iYSjyyC9osS5FnRyjdDMpLaPm","scmsg23fBMGvPyBaNKS35AkuZM4PpnHaup3bSrLYX8ZshhX4aZ1c4mE","scmsg3qr7fZEEBrTZxn5YZKMDgQ1hBDf5GwKecJegJXJyLGp6nxcLBA","scmsg2NnWpkUjWnZPgfE2pnCFyY7SA471dnLU8PvGD89YjuJfntfA53"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        54,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        54,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        54,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        54,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        54,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31302d31",
+  "31302d32",
+  "31302d33",
+  "31302d34",
+  "31302d35"
+]
+200 OK
+["scmsg23W2XaqYXEuxFFmQRZwgWwXiJ972nU4Tk1Um3KGGdr3AkqGBhV","scmsg24JUWpQyRvpYVRc2tgtMUJbzMrJWNLtidsZsLEfjBGiMFNuMTK","scmsg3bfLJRgEbj7FTBCnJ6ZsuxMf8KNVLLCZ8EkpTQbiLDAVmWB3rS","scmsg3NGcoW9bSrz6A5BvXcnxk2255yAWCGsJgrGadjzE4JpKpFveZe","scmsg3eAbwnP55Vg8rGZRBQtWHeLDWmWEJhXvm62cNa2r6mj7Y8iMxH"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        55,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        55,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        55,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        55,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        55,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31312d31",
+  "31312d32",
+  "31312d33",
+  "31312d34",
+  "31312d35"
+]
+200 OK
+["scmsg2vRX381tupMRsoWfXMYG4rVEkNiVZZxAhjSDmpdHbUjS9RUwQs","scmsg3Mph77VXyCm4m7FEDFoqyPzuevdN7W3UNqnXJttYRTtvY3vVVW","scmsg3dZBvX4ArK26LoCqR7mKhMa5DnWm9T5CEYZPfrUo8xhz6bbofd","scmsg237KVpGjKJxKPnGvYSLqkqtEURVG6ive7dNqPo2x6X4SDhsctC","scmsg2rFWrXD9jQ8UjL6XRcKRq6HJQ9fgdKgXxf4Auj5F5bxzYwqkXG"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        56,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        56,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        56,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        56,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        56,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31322d31",
+  "31322d32",
+  "31322d33",
+  "31322d34",
+  "31322d35"
+]
+200 OK
+["scmsg2k1HPFjtZFMUJUHKFbMkaijLa5ns8UMRb5h2d8iynf1gzeFCHZ","scmsg3UdpWDaa29XQ3hYHZwe2kiLfZ24KrkcVh58TR2yzYJsAoBGVwa","scmsg2qG2uiM8p8i49D1xp8NiznNAe6e3CFPwQgb4nzty9Wmp4qspzq","scmsg3B2psrEy3hxFURDzLtYqPckSycE8NWbuB2pZwKk6LaRhPUR3jh","scmsg3ccqjHaRH7gE98cZGvFBNHj1QgnPNZiByvB5rGpQMMC7MthkR8"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        57,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        57,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        57,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        57,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        57,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31332d31",
+  "31332d32",
+  "31332d33",
+  "31332d34",
+  "31332d35"
+]
+200 OK
+["scmsg3ifsPVXRWwo4BiBUcFJcNNpdCGhnJrcFQqH8accCscdE6Jdgys","scmsg3TsK1LMasQkWUcXhoVZBCaEJDFk8jVUxQkjEzRUi7AJU8KGXRE","scmsg3R5hqiXmVL8aQTzzTKwfiFXsoDj9dE96A3B3cd2VsUBZGdjszC","scmsg27jkAx3C8K2w8m6bPUHMsBNKqZ6y1A2XN5Ujw4nCmbVWzK6iHr","scmsg38gfhAaeaNovx4XAKCQ97D9zEGmebYXvkKioDWd5DMLdAbVCDF"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        48,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        48,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        48,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        48,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        48,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31342d31",
+  "31342d32",
+  "31342d33",
+  "31342d34",
+  "31342d35"
+]
+200 OK
+["scmsg3SQfcD9VuNoUzUpQqGtETZXiMmDVLHUkHVxKiA87kYaYVsjDNJ","scmsg25qzqinLMRAeezYjTR4gh3srY4H6mMRpGARJeqTm31mKSKjnE7","scmsg322sHe82ordku5DRR4xQ6Di3SdxjxV8kg7CBAdE7sxAmcD8yA5","scmsg2xCTmrcSLzzxUP5aXpdGS4zLttFQiuTLzEafuRrXGmsAyDXqVg","scmsg3CjDyDbTJcNtexxdqhqUPLoWgW9bjyvgsFnpQDNbDK2MK7Ju9o"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        49,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        49,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        49,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        49,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        49,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+POST http://[HOST]:[PORT]/local/batcher/injection
+Content-type: application/json
+[
+  "31352d31",
+  "31352d32",
+  "31352d33",
+  "31352d34",
+  "31352d35"
+]
+200 OK
+["scmsg1zCJDwhb18RRCCXJgXxXXeapZWzCz1zn89xqnKf1esT7kvMWUb","scmsg3idErXZUCGh2rHHUvuWqGgCXH523QLfPEdXh7JzVUGZ2acJbCC","scmsg2sfmQTX5TmmLKkAeRg4sWHXLnmWjnouYUXUNCLVsSNWPnNtLR9","scmsg2xipcKaxHRPtpk4qCZ2tB6JG8h4UPtr9GP7fyyZFxXB69NSNDi","scmsg21cRa6ffrFxAQVXQvA5MsVfNSN9NP2ku7NdYvNywfHA4U4Jp65"]
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        50,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        50,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        50,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        50,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        50,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        51,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        51,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        51,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        51,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        51,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
+GET http://[HOST]:[PORT]/global/block/head/hash
+200 OK
+"[BLOCK_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/5/hash
+200 OK
+"[BLOCK_HASH]"
+
+GET http://[HOST]:[PORT]/global/block/finalized/level
+200 OK
+18
+
+GET http://[HOST]:[PORT]/global/block/head/num_messages
+200 OK
+"8"
+
+GET http://[HOST]:[PORT]/global/block/head/status
+200 OK
+"Waiting for input message"
+
+GET http://[HOST]:[PORT]/global/block/head/ticks
+200 OK
+"84436"
+
+GET http://[HOST]:[PORT]/global/block/head/state_hash
+200 OK
+"[SC_ROLLUP_PVM_STATE_HASH]"
+
+GET http://[HOST]:[PORT]/global/tezos_head
+200 OK
+"[BLOCK_HASH]"
+
+GET http://[HOST]:[PORT]/global/tezos_level
+200 OK
+18
+
+Internal(
+    StartOfLevel,
+)
+
+Internal(InfoPerLevel)
+
+External(
+    [
+        49,
+        52,
+        45,
+        49,
+    ],
+)
+
+External(
+    [
+        49,
+        52,
+        45,
+        50,
+    ],
+)
+
+External(
+    [
+        49,
+        52,
+        45,
+        51,
+    ],
+)
+
+External(
+    [
+        49,
+        52,
+        45,
+        52,
+    ],
+)
+
+External(
+    [
+        49,
+        52,
+        45,
+        53,
+    ],
+)
+
+Internal(
+    EndOfLevel,
+)
+
