@@ -1910,7 +1910,6 @@ fn interpret_one<'a>(
                     Type::Pair(Rc::new((input_type, storage_ty))),
                     output_type,
                     false,
-                    true, // view body
                 ) {
                     let mut stk = stk![TypedValue::new_pair(input, storage)];
                     interpret(code.as_ref(), ctx, arena, &mut stk)?;
