@@ -54,13 +54,13 @@ let gzip_compress_bytes ?(level = 6) input =
     ~transform:(Zlib.compress ~level ~header:true)
     ~buf_size:(Bytes.length input / 2)
     input
+
 (** {2 Skip list binary format}
 
     The skip list data is serialised as a flat binary stream to avoid the
     overhead of a full SQLite snapshot (B-tree structure, WAL, indices).
     Records are written in [published_level] order with no file header or
-    trailer; the end of the stream is detected by EOF.  The per-entry
-    compression is applied at the tar-entry level (gzip).
+    trailer; the end of the stream is detected by EOF.
 
     Each record is a 4-byte big-endian length prefix followed by the
     [Data_encoding.Binary] serialisation of the 5-tuple
@@ -170,6 +170,16 @@ let iterate_levels ?notify ~min_published_level ~max_published_level f =
 (** Format a slot_id as a tar-entry filename component: [<level>_<index>]. *)
 let slot_id_to_filename (slot_id : Types.Slot_id.t) =
   Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+
+let slot_id_of_filename filename =
+  let basename = Filename.basename filename in
+  match String.split_on_char '_' basename with
+  | level_str :: index_str :: _ -> (
+      match (Int32.of_string_opt level_str, int_of_string_opt index_str) with
+      | Some level, Some index ->
+          Some Types.Slot_id.{slot_level = level; slot_index = index}
+      | _ -> None)
+  | _ -> None
 
 (** Copy a value from source KVS to destination KVS.
     Returns [Ok ()] if the value was copied or if src value is not found. *)
@@ -856,14 +866,9 @@ module Export_tar = struct
       slots
 
   (** Export skip list: reads from SQLite, serialises each matching row into a
-      compact flat binary file, gzip-compresses it, and streams it into the
-      tar archive.  This avoids carrying the full SQLite overhead (B-tree
-      structure, WAL, indices) in the snapshot. *)
-
-  (** Export skip list: reads from SQLite, serialises each matching row into a
-      compact flat binary file, gzip-compresses it, and streams it into the
-      tar archive.  This avoids carrying the full SQLite overhead (B-tree
-      structure, WAL, indices) in the snapshot. *)
+      compact flat binary file, and streams it into the tar archive.  This
+      avoids carrying the full SQLite overhead (B-tree structure, WAL,
+      indices) in the snapshot. *)
   let export_skip_list ?notify tar ~src_root_dir ~min_published_level
       ~max_published_level ~slots ~proto_plugins =
     let open Lwt_result_syntax in
@@ -1058,6 +1063,553 @@ module Export_tar = struct
         in
         return_unit)
       (fun () -> Octez_tar_helpers.close_out tar)
+end
+
+(** {2 Gzip decompress helpers} *)
+
+(** Decompress gzip-compressed [input] bytes.
+
+    The output buffer is initialized with capacity [size * 2] as a cheap
+    initial guess mirroring {!gzip_compress_bytes}. We do not need a precise
+    estimate here because [zlib_transform] uses a growable buffer and will
+    expand it automatically if needed. *)
+let gzip_decompress_bytes input =
+  zlib_transform
+    ~transform:(Zlib.uncompress ~header:true)
+    ~buf_size:(Bytes.length input * 2)
+    input
+
+(** Try to read one skip list record.  Returns [None] at EOF; raises
+    [End_of_file] if the stream is truncated mid-record. *)
+let read_skip_list_record ic =
+  let header = Bytes.create 4 in
+  let n = input ic header 0 4 in
+  if n = 0 then None
+  else (
+    if n < 4 then really_input ic header n (4 - n) ;
+    let len = Int32.to_int (Bytes.get_int32_be header 0) in
+    let encoded = Bytes.create len in
+    really_input ic encoded 0 len ;
+    Some (Data_encoding.Binary.of_bytes_exn skip_list_record_encoding encoded))
+
+(** Load a tar entry, decompress it, and return raw bytes. *)
+let load_and_decompress tar file =
+  let open Lwt_syntax in
+  let* raw = Octez_tar_helpers.load_file tar file in
+  Lwt.return (gzip_decompress_bytes (Bytes.of_string raw))
+
+(** Import skip list records from a binary file into the destination SQLite
+    store.  Records are filtered by [min_published_level],
+    [max_published_level], and [slots].  Inserts are batched in transactions
+    of [batch_size] records grouped by [attested_level].  [notify] is called
+    after each matching record so that [display_progress ~every:batch_size]
+    shows the actual record count. *)
+let import_skip_list_binary ?notify ~dst_db ~bin_file ~min_published_level
+    ~max_published_level ~slots () =
+  let open Lwt_result_syntax in
+  let ic = open_in_bin bin_file in
+  Lwt.finalize
+    (fun () ->
+      Dal_store_sqlite3.Skip_list_cells.use dst_db @@ fun conn ->
+      let batch_size = 1000 in
+      (* Each pending element: (hash, cell, slot_index, attestation_lag)
+         grouped under a common attested_level, ready for [insert ~conn]. *)
+      let pending_attested = ref Int32.minus_one in
+      let pending = ref [] in
+      let flush_batch () =
+        let records = List.rev !pending in
+        pending := [] ;
+        match records with
+        | [] -> return_unit
+        | _ ->
+            let attested_level = !pending_attested in
+            Sqlite.with_transaction conn @@ fun conn ->
+            Dal_store_sqlite3.Skip_list_cells.insert
+              ~conn
+              dst_db
+              ~attested_level
+              records
+              Fun.id
+      in
+      let rec loop count =
+        match read_skip_list_record ic with
+        | None -> flush_batch ()
+        | Some (published_level, slot_index, attestation_lag, hash, cell) ->
+            let level_ok =
+              Compare.Int32.(published_level >= min_published_level)
+              && Compare.Int32.(published_level <= max_published_level)
+            in
+            let slot_ok =
+              match slots with
+              | None -> true
+              | Some s -> List.mem ~equal:Int.equal slot_index s
+            in
+            if level_ok && slot_ok then (
+              let attested_level =
+                Int32.(add published_level (of_int attestation_lag))
+              in
+              (* Flush when the attested_level changes or the batch is full. *)
+              let* () =
+                if
+                  !pending_attested <> attested_level
+                  || count mod batch_size = 0
+                then (
+                  let* () = flush_batch () in
+                  pending_attested := attested_level ;
+                  return_unit)
+                else return_unit
+              in
+              pending := (hash, cell, slot_index, attestation_lag) :: !pending ;
+              (* Call notify once per record so that [display_progress
+                 ~every:batch_size] displays the true record count. *)
+              let*! () =
+                match notify with None -> Lwt.return_unit | Some n -> n ()
+              in
+              loop (count + 1))
+            else loop count
+      in
+      loop 0)
+    (fun () ->
+      Stdlib.close_in ic ;
+      Lwt.return_unit)
+
+(** {1 Compressed tar archive import} *)
+
+(** Buffer size in bytes for streaming large files (e.g., SQLite databases) to
+    tar archives during snapshot import. 64KB provides a good balance between
+    memory usage and I/O efficiency. *)
+let snapshot_tar_streaming_buffer_size = 64 * 1024
+
+module Import_tar = struct
+  (** Check whether a tar entry should be imported given optional
+      slot and level filters. Metadata and skip_list entries are always
+      imported. Slot and shard entries are filtered by slot index and
+      published level. *)
+  let should_import_file ~slots ~min_published_level ~max_published_level
+      filename =
+    let dirname = Filename.dirname filename in
+    if dirname = Store.Stores_dirs.slot || dirname = Store.Stores_dirs.shard
+    then
+      match slot_id_of_filename filename with
+      | None -> false
+      | Some slot_id ->
+          let level_ok =
+            (match min_published_level with
+            | None -> true
+            | Some min_level -> Compare.Int32.(slot_id.slot_level >= min_level))
+            &&
+            match max_published_level with
+            | None -> true
+            | Some max_level -> Compare.Int32.(slot_id.slot_level <= max_level)
+          in
+          let slot_ok =
+            match slots with
+            | None -> true
+            | Some allowed_slots ->
+                List.mem ~equal:Int.equal slot_id.slot_index allowed_slots
+          in
+          level_ok && slot_ok
+    else true
+
+  (** Decode a JSON-encoded value from a raw tar entry string. *)
+  let decode_json_entry (type a) ~name (encoding : a Data_encoding.t) raw =
+    let open Lwt_result_syntax in
+    match Data_encoding.Json.from_string raw with
+    | Error _ -> failwith "Cannot decode %s from snapshot" name
+    | Ok json -> (
+        try return (Data_encoding.Json.destruct encoding json)
+        with _ -> failwith "Cannot decode %s from snapshot" name)
+
+  (** Pre-scan the tar to find and decode a JSON-encoded metadata entry. *)
+  let read_metadata_entry (type a) tar ~filename ~name
+      (encoding : a Data_encoding.t) =
+    let open Lwt_result_syntax in
+    let*! file_opt = Octez_tar_helpers.find_file tar ~filename in
+    match file_opt with
+    | None -> failwith "Snapshot is missing %s entry" name
+    | Some file ->
+        let*! raw = Octez_tar_helpers.load_file tar file in
+        decode_json_entry ~name encoding raw
+
+  let read_chain_id tar =
+    read_metadata_entry
+      tar
+      ~filename:chain_id_filename
+      ~name:"chain_id"
+      Chain_id.encoding
+
+  let read_first_seen_level tar =
+    read_metadata_entry
+      tar
+      ~filename:first_seen_level_filename
+      ~name:"first_seen_level"
+      Data_encoding.int32
+
+  let read_last_processed_level tar =
+    read_metadata_entry
+      tar
+      ~filename:last_processed_level_filename
+      ~name:"last_processed_level"
+      Data_encoding.int32
+
+  let read_version tar =
+    read_metadata_entry
+      tar
+      ~filename:version_filename
+      ~name:"version"
+      Data_encoding.int31
+
+  (** Import a metadata entry by decoding it and saving via
+      Single_value_store. *)
+  let import_metadata_entry (type value) tar file ~root_dir ~name
+      (module S : Single_value_store.S with type value = value) encoding =
+    let open Lwt_result_syntax in
+    let*! raw = Octez_tar_helpers.load_file tar file in
+    let* value = decode_json_entry ~name encoding raw in
+    save_to_store ~root_dir (module S) value
+
+  let load_int32_metadata tar file ~name =
+    let open Lwt_result_syntax in
+    let*! raw = Octez_tar_helpers.load_file tar file in
+    let* value = decode_json_entry ~name Data_encoding.int32 raw in
+    if Compare.Int32.(value >= 0l) then return value
+    else failwith "Invalid %s: must be non-negative (got %ld)" name value
+
+  (** Import a slot entry: decompress the raw KVS bytes from the tar entry,
+      decode the slot value using [read_values_from_bytes], and write it via
+      [KVS.write_value]. *)
+  let import_slot_entry tar file ~dst_slot_store ~filename =
+    let open Lwt_result_syntax in
+    match slot_id_of_filename filename with
+    | None -> failwith "Cannot parse slot_id from filename: %s" filename
+    | Some slot_id -> (
+        let* file_layout = Store.Slots.get_file_layout ~slot_id in
+        let*! kvs_bytes = load_and_decompress tar file in
+        let result_seq =
+          KVS.Read.read_values_from_bytes
+            file_layout
+            kvs_bytes
+            (Seq.return (slot_id, ()))
+        in
+        let*! slot_data_opt =
+          Seq_s.fold_left
+            (fun _ (_, (), result) ->
+              match result with Ok v -> Some v | Error _ -> None)
+            None
+            result_seq
+        in
+        match slot_data_opt with
+        | None -> return_unit
+        | Some slot_data ->
+            KVS.write_value
+              ~override:false
+              dst_slot_store
+              file_layout
+              slot_id
+              ()
+              slot_data)
+
+  (** Import a shard entry: decompress the compact binary, reconstruct the KVS
+      file in memory, and write it directly to [dst_shard_dir].  No
+      [Cryptobox.share_encoding] decode/re-encode cycle; share bytes are
+      placed at the correct offsets and the bitset is set accordingly. *)
+  let import_shard_entry tar file ~dst_shard_dir ~filename =
+    let open Lwt_result_syntax in
+    match slot_id_of_filename filename with
+    | None -> failwith "Cannot parse slot_id from filename: %s" filename
+    | Some slot_id ->
+        let*! compact_bytes = load_and_decompress tar file in
+        let len = Bytes.length compact_bytes in
+        if len < 12 then return_unit
+        else
+          let share_size = Int32.to_int (Bytes.get_int32_be compact_bytes 0) in
+          let number_of_shards =
+            Int32.to_int (Bytes.get_int32_be compact_bytes 4)
+          in
+          let count = Int32.to_int (Bytes.get_int32_be compact_bytes 8) in
+          let file_size =
+            KVS.file_prefix_bitset_size + (number_of_shards * share_size)
+          in
+          let file_buf = Bytes.make file_size '\000' in
+          let pos = ref 12 in
+          for _ = 0 to count - 1 do
+            let idx = Int32.to_int (Bytes.get_int32_be compact_bytes !pos) in
+            pos := !pos + 4 ;
+            Bytes.set file_buf idx '\001' ;
+            Bytes.blit
+              compact_bytes
+              !pos
+              file_buf
+              (KVS.file_prefix_bitset_size + (idx * share_size))
+              share_size ;
+            pos := !pos + share_size
+          done ;
+          let dst_filepath = dst_shard_dir // slot_id_to_filename slot_id in
+          let*! () =
+            Lwt_io.(
+              with_file ~mode:Output dst_filepath (fun oc ->
+                  write oc (Bytes.to_string file_buf)))
+          in
+          return_unit
+
+  (** Main import function: initializes stores, reads tar entries,
+      and writes data using KVS/Store interfaces. *)
+  let run ~progress_display_mode ~dst_root_dir ~slots ~min_published_level
+      ~max_published_level ~config_file ~endpoint ~tar_file =
+    let open Lwt_result_syntax in
+    let* config, cctxt, header, proto_plugins, _proto_parameters =
+      init_rpc_context ~config_file ~endpoint
+    in
+    (* Open the tar once. Reading metadata triggers one full header scan and
+       caches the file list; the subsequent list_files call reuses that cache
+       without rescanning. *)
+    let*! tar = Octez_tar_helpers.open_in ~file:tar_file in
+    Lwt.finalize
+      (fun () ->
+        let* snapshot_version = read_version tar in
+        let* () =
+          if snapshot_version <> current_snapshot_version then
+            failwith
+              "Snapshot version mismatch: expected %d but got %d. This \
+               snapshot was created with an incompatible version of the DAL \
+               node."
+              current_snapshot_version
+              snapshot_version
+          else return_unit
+        in
+        let* snapshot_chain_id = read_chain_id tar in
+        let* first_seen_level = read_first_seen_level tar in
+        let* last_processed_level = read_last_processed_level tar in
+        (* Validate chain_id against L1 *)
+        let* l1_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
+        let* () =
+          check_chain_id
+            ~expected:l1_chain_id
+            ~found:snapshot_chain_id
+            ~expected_name:"L1 node"
+            ~found_name:"snapshot"
+        in
+        let* () =
+          init_cryptoboxes
+            ~cctxt
+            ~header
+            ~config
+            ~first_seen_level
+            proto_plugins
+        in
+        let dst_slot_dir = dst_root_dir // Store.Stores_dirs.slot in
+        let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
+        let* dst_slot_store =
+          KVS.init
+            ~lru_size:Constants.slots_store_lru_size
+            ~root_dir:dst_slot_dir
+        in
+        let*! () = Lwt_utils_unix.create_dir dst_shard_dir in
+        Lwt.finalize
+          (fun () ->
+            let min_skip_list_level =
+              match min_published_level with
+              | Some l -> max first_seen_level l
+              | None -> first_seen_level
+            in
+            let max_skip_list_level =
+              match max_published_level with
+              | Some l -> min last_processed_level l
+              | None -> last_processed_level
+            in
+            let*! () =
+              Event.emit_snapshot_status
+                ~path:tar_file
+                ~kind:"archive"
+                ~status:"start"
+                ~min_level:(Some min_skip_list_level)
+                ~max_level:(Some max_skip_list_level)
+            in
+            (* Import skip_list first, before all other entries.  Stream the
+               binary dump from the tar entry, then stream-insert rows into
+               the destination SQLite store. *)
+            let*! () =
+              Event.emit_snapshot_copying ~resource:"skip_list" ~step:"start"
+            in
+            let* () =
+              Animation.display_progress
+                ~every:1000
+                ~progress_display_mode
+                ~pp_print_step:(fun fmt i ->
+                  Format.fprintf fmt "Importing skip list: %d records" i)
+                (fun notify ->
+                  let*! skip_list_file_opt =
+                    Octez_tar_helpers.find_file
+                      tar
+                      ~filename:skip_list_binary_filename
+                  in
+                  match skip_list_file_opt with
+                  | None ->
+                      failwith
+                        "Snapshot is missing skip list entry: %s"
+                        skip_list_binary_filename
+                  | Some file ->
+                      let tmp_dir =
+                        Filename.temp_dir "dal_import_skip_list" ""
+                      in
+                      Lwt.finalize
+                        (fun () ->
+                          let bin_path = tmp_dir // "cells.bin" in
+                          let*! () =
+                            Octez_tar_helpers.copy_to_file
+                              tar
+                              file
+                              ~dst:bin_path
+                              ~buffer_size:snapshot_tar_streaming_buffer_size
+                          in
+                          let dst_dir =
+                            dst_root_dir // Store.Stores_dirs.skip_list_cells
+                          in
+                          let*! () = Lwt_utils_unix.create_dir dst_dir in
+                          let* dst_db =
+                            Dal_store_sqlite3.Skip_list_cells.init
+                              ~data_dir:dst_dir
+                              ~perm:Sqlite.Read_write
+                              ()
+                          in
+                          Lwt.finalize
+                            (fun () ->
+                              import_skip_list_binary
+                                ~notify
+                                ~dst_db
+                                ~bin_file:bin_path
+                                ~min_published_level:min_skip_list_level
+                                ~max_published_level:max_skip_list_level
+                                ~slots
+                                ())
+                            (fun () ->
+                              let open Lwt_syntax in
+                              let* _ =
+                                Dal_store_sqlite3.Skip_list_cells.close dst_db
+                              in
+                              Lwt.return_unit))
+                        (fun () ->
+                          let open Lwt_syntax in
+                          let* exists = Lwt_unix.file_exists tmp_dir in
+                          if exists then Lwt_utils_unix.remove_dir tmp_dir
+                          else return_unit))
+            in
+            let*! () =
+              Event.emit_snapshot_copying ~resource:"skip_list" ~step:"success"
+            in
+            let*! files = Octez_tar_helpers.list_files tar in
+            let total = List.length files in
+            let*! () =
+              Event.emit_snapshot_copying
+                ~resource:"shard_and_slot_entries"
+                ~step:"start"
+            in
+            let* () =
+              Animation.display_progress
+                ~progress_display_mode
+                ~pp_print_step:(fun fmt i ->
+                  Format.fprintf
+                    fmt
+                    "Importing shard and slot entries: %d/%d"
+                    i
+                    total)
+                (fun notify ->
+                  List.iter_es
+                    (fun file ->
+                      let filename = Octez_tar_helpers.get_filename file in
+                      let* () =
+                        if
+                          String.equal filename skip_list_binary_filename
+                          || not
+                               (should_import_file
+                                  ~slots
+                                  ~min_published_level
+                                  ~max_published_level
+                                  filename)
+                        then return_unit
+                        else
+                          let dirname = Filename.dirname filename in
+                          if dirname = Store.Stores_dirs.slot then
+                            import_slot_entry tar file ~dst_slot_store ~filename
+                          else if dirname = Store.Stores_dirs.shard then
+                            import_shard_entry tar file ~dst_shard_dir ~filename
+                          else if String.equal filename chain_id_filename then
+                            import_metadata_entry
+                              tar
+                              file
+                              ~root_dir:dst_root_dir
+                              ~name:"chain_id"
+                              (module Store.Chain_id)
+                              Chain_id.encoding
+                          else if
+                            String.equal filename first_seen_level_filename
+                          then
+                            let* tar_value =
+                              load_int32_metadata
+                                tar
+                                file
+                                ~name:first_seen_level_filename
+                            in
+                            let bounded =
+                              match min_published_level with
+                              | None -> tar_value
+                              | Some user_min -> max tar_value user_min
+                            in
+                            save_merged_level
+                              ~root_dir:dst_root_dir
+                              (module Store.First_seen_level)
+                              ~merge:min
+                              bounded
+                          else if
+                            String.equal filename last_processed_level_filename
+                          then
+                            let* tar_value =
+                              load_int32_metadata
+                                tar
+                                file
+                                ~name:last_processed_level_filename
+                            in
+                            let bounded =
+                              match max_published_level with
+                              | None -> tar_value
+                              | Some user_max -> min tar_value user_max
+                            in
+                            save_merged_level
+                              ~root_dir:dst_root_dir
+                              (module Store.Last_processed_level)
+                              ~merge:max
+                              bounded
+                          else if String.equal filename version_filename then
+                            (* Version was already validated before the loop. *)
+                            return_unit
+                          else
+                            failwith
+                              "Snapshot contains unknown file: %s"
+                              filename
+                      in
+                      let*! () = notify () in
+                      return_unit)
+                    files)
+            in
+            let*! () =
+              Event.emit_snapshot_copying
+                ~resource:"shard_and_slot_entries"
+                ~step:"success"
+            in
+            let*! () =
+              Event.emit_snapshot_status
+                ~path:tar_file
+                ~kind:"archive"
+                ~status:"success"
+                ~min_level:(Some min_skip_list_level)
+                ~max_level:(Some max_skip_list_level)
+            in
+            return_unit)
+          (fun () ->
+            let open Lwt_syntax in
+            let* _ = KVS.close dst_slot_store in
+            return_unit))
+      (fun () -> Octez_tar_helpers.close_in tar)
 end
 
 let store_path data_dir =
