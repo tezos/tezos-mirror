@@ -26,65 +26,22 @@
 //! Invalid argument errors more refer to attempting to read/write _beyond the end_ of a value, or
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
+mod api_common;
+mod registry;
+
 use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
-use octez_riscv_api_common::move_semantics::CustomGcResource;
 use octez_riscv_api_common::move_semantics::MutableState;
 use octez_riscv_api_common::safe_pointer::SafePointer;
-use octez_riscv_api_common::try_clone::TryClone;
-use octez_riscv_data::foldable::Foldable;
 use octez_riscv_data::hash::Hash;
-use octez_riscv_data::hash::HashFold;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::key::Key;
-use octez_riscv_durable_storage::registry;
-use octez_riscv_durable_storage::storage::in_memory::InMemoryKeyValueStore;
-use octez_riscv_durable_storage::storage::in_memory::InMemoryRepo;
-
-/// Wrapper to enable customing OCaml GC's resource tracking.
-#[repr(transparent)]
-pub struct RegistryState(registry::Registry<InMemoryKeyValueStore, Normal>);
-
-impl RegistryState {
-    /// Construct a new in-memory registry
-    pub fn new() -> Result<Self, ds_errors::OperationalError> {
-        let reg = registry::Registry::new(InMemoryRepo)?;
-        Ok(Self(reg))
-    }
-}
-
-impl std::ops::Deref for RegistryState {
-    type Target = registry::Registry<InMemoryKeyValueStore, Normal>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for RegistryState {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl TryClone for RegistryState {
-    type Error = ds_errors::OperationalError;
-
-    fn try_clone(&self) -> Result<Self, Self::Error> {
-        Ok(RegistryState(self.0.try_clone()?))
-    }
-}
-
-impl CustomGcResource for RegistryState {
-    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state";
-
-    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state";
-}
+use registry::RegistryState;
 
 #[ocaml::sig]
-pub type Registry = MutableState<RegistryState>;
+pub type Registry = MutableState<RegistryState<Normal>>;
 
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
@@ -147,15 +104,15 @@ pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer
 pub fn octez_riscv_durable_in_memory_registry_hash(
     state: SafePointer<Registry>,
 ) -> BytesWrapper<Hash> {
-    let hash = state.apply_ro(|registry| registry.fold(HashFold));
-
-    BytesWrapper::from(hash)
+    api_common::registry_hash(state)
 }
 
 #[ocaml::func]
 #[ocaml::sig("registry -> int64")]
-pub fn octez_riscv_durable_in_memory_registry_size(state: SafePointer<Registry>) -> i64 {
-    state.apply_ro(registry::Registry::len) as i64
+pub fn octez_riscv_durable_in_memory_registry_size(
+    state: SafePointer<Registry>,
+) -> OcamlFallible<u64> {
+    api_common::registry_size(state)
 }
 
 #[ocaml::func]
@@ -164,36 +121,27 @@ pub fn octez_riscv_durable_in_memory_registry_resize(
     state: SafePointer<Registry>,
     size: u64,
 ) -> SplitDsResult<()> {
-    let size = usize::try_from(size)?;
-    let res = state.apply(|registry| registry.resize_tick(size))?;
-
-    split_ds_errors(res)
+    api_common::registry_resize(state, size)
 }
 
 #[ocaml::func]
 #[ocaml::sig("registry -> int64 -> int64 -> (unit, invalid_argument_error) result")]
 pub fn octez_riscv_durable_in_memory_registry_copy(
     state: SafePointer<Registry>,
-    src_index: i64,
-    dst_index: i64,
+    src_index: u64,
+    dst_index: u64,
 ) -> SplitDsResult<()> {
-    let res =
-        state.apply(|registry| registry.copy_database(src_index as usize, dst_index as usize))?;
-
-    split_ds_errors(res)
+    api_common::registry_copy(state, src_index, dst_index)
 }
 
 #[ocaml::func]
 #[ocaml::sig("registry -> int64 -> int64 -> (unit, invalid_argument_error) result")]
 pub fn octez_riscv_durable_in_memory_registry_move(
     state: SafePointer<Registry>,
-    src_index: i64,
-    dst_index: i64,
+    src_index: u64,
+    dst_index: u64,
 ) -> SplitDsResult<()> {
-    let res =
-        state.apply(|registry| registry.move_database(src_index as usize, dst_index as usize))?;
-
-    split_ds_errors(res)
+    api_common::registry_move(state, src_index, dst_index)
 }
 
 #[ocaml::func]
@@ -202,11 +150,7 @@ pub fn octez_riscv_durable_in_memory_registry_clear(
     state: SafePointer<Registry>,
     db_index: u64,
 ) -> SplitDsResult<()> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply(|registry| registry.clear_database(db_index))?;
-
-    split_ds_errors(res)
+    api_common::registry_clear(state, db_index)
 }
 
 #[ocaml::func]
@@ -216,16 +160,7 @@ pub fn octez_riscv_durable_in_memory_database_exists(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<bool> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database(db_index)?;
-
-        db.exists(&key)
-    });
-
-    split_ds_errors(res)
+    api_common::database_exists(state, db_index, key)
 }
 
 #[ocaml::func]
@@ -236,17 +171,7 @@ pub fn octez_riscv_durable_in_memory_database_set(
     key: KeyParam,
     value: BytesParam,
 ) -> SplitDsResult<()> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database_mut(db_index)?;
-        let data = Bytes::from(value);
-
-        db.set(key, data)
-    })?;
-
-    split_ds_errors(res)
+    api_common::database_set(state, db_index, key, value)
 }
 
 #[ocaml::func]
@@ -260,19 +185,7 @@ pub fn octez_riscv_durable_in_memory_database_write(
     offset: u64,
     value: BytesParam,
 ) -> SplitDsResult<u64> {
-    let db_index = usize::try_from(db_index)?;
-    let offset = usize::try_from(offset)?;
-
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database_mut(db_index)?;
-        let data = Bytes::from(value);
-
-        db.write(key, offset, data)
-    })?;
-
-    let res = split_ds_errors(res)?;
-    map_fallible(res, u64::try_from)
+    api_common::database_write(state, db_index, key, offset, value)
 }
 
 #[ocaml::func]
@@ -286,26 +199,7 @@ pub fn octez_riscv_durable_in_memory_database_read(
     offset: u64,
     len: u64,
 ) -> SplitDsResult<BytesWrapper<Vec<u8>>> {
-    let db_index = usize::try_from(db_index)?;
-    let offset = usize::try_from(offset)?;
-    let len = usize::try_from(len)?;
-
-    // TODO (RV-933): use `read_bytes` to prevent large allocations
-    let mut read = vec![0; len];
-
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database(db_index)?;
-
-        db.read(&key, offset, &mut read)
-    });
-
-    let res = split_ds_errors(res)?.map(|read_bytes| {
-        read.truncate(read_bytes);
-        BytesWrapper::from(read)
-    });
-
-    Ok(res)
+    api_common::database_read(state, db_index, key, offset, len)
 }
 
 #[ocaml::func]
@@ -315,17 +209,7 @@ pub fn octez_riscv_durable_in_memory_database_value_length(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<u64> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply_ro(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database(db_index)?;
-
-        db.value_length(&key)
-    });
-
-    let res = split_ds_errors(res)?;
-    map_fallible(res, u64::try_from)
+    api_common::value_length(state, db_index, key)
 }
 
 #[ocaml::func]
@@ -335,16 +219,7 @@ pub fn octez_riscv_durable_in_memory_database_delete(
     db_index: u64,
     key: KeyParam,
 ) -> SplitDsResult<()> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply(|registry| {
-        let key = Key::try_from(key)?;
-        let db = registry.database_mut(db_index)?;
-
-        db.delete(key)
-    })?;
-
-    split_ds_errors(res)
+    api_common::database_delete(state, db_index, key)
 }
 
 #[ocaml::func]
@@ -353,16 +228,7 @@ pub fn octez_riscv_durable_in_memory_database_hash(
     state: SafePointer<Registry>,
     db_index: u64,
 ) -> SplitDsResult<BytesWrapper<Hash>> {
-    let db_index = usize::try_from(db_index)?;
-
-    let res = state.apply_ro(|registry| {
-        let db = registry.database(db_index)?;
-
-        Ok(db.hash()?)
-    });
-
-    let res = split_ds_errors(res)?.map(BytesWrapper::from);
-    Ok(res)
+    api_common::database_hash(state, db_index)
 }
 
 /// Split handling of durable storage errors.
