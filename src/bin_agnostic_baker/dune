@@ -25,6 +25,12 @@
    (-> void_for_linking-octez-protocol-023-PtSeouLo-libs-dal.empty))
   octez-protocol-024-PtTALLiN-libs.agnostic-baker
   octez-protocol-024-PtTALLiN-libs.dal
+  (select void_for_linking-octez-protocol-025-PsGXQmSv-libs-agnostic-baker from
+   (octez-protocol-025-PsGXQmSv-libs.agnostic-baker -> void_for_linking-octez-protocol-025-PsGXQmSv-libs-agnostic-baker.empty)
+   (-> void_for_linking-octez-protocol-025-PsGXQmSv-libs-agnostic-baker.empty))
+  (select void_for_linking-octez-protocol-025-PsGXQmSv-libs-dal from
+   (octez-protocol-025-PsGXQmSv-libs.dal -> void_for_linking-octez-protocol-025-PsGXQmSv-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-025-PsGXQmSv-libs-dal.empty))
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty))
@@ -53,5 +59,7 @@
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-023-PtSeouLo-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-025-PsGXQmSv-libs-agnostic-baker.empty "")
+   (write-file void_for_linking-octez-protocol-025-PsGXQmSv-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

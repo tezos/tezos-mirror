@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_025_PsGXQmSv_test_migration)
+ (public_name octez-protocol-025-PsGXQmSv-libs.test-migration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt-migration-registry
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-025-PsGXQmSv.protocol
+  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  octez-libs.base-test-helpers
+  tezos-protocol-025-PsGXQmSv.parameters
+  octez-protocol-025-PsGXQmSv-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_025_PsGXQmSv_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_025_PsGXQmSv_parameters
+  -open Tezos_protocol_plugin_025_PsGXQmSv))

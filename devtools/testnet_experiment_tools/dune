@@ -44,6 +44,10 @@
   octez-protocol-024-PtTALLiN-libs.client
   octez-protocol-024-PtTALLiN-libs.client.commands
   tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-025-PsGXQmSv-libs.baking
+  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsGXQmSv-libs.client.commands
+  tezos-protocol-025-PsGXQmSv.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -59,7 +63,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context_ops)
- (modules sigs tool_024_PtTALLiN tool_alpha))
+ (modules sigs tool_024_PtTALLiN tool_025_PsGXQmSv tool_alpha))
 
 (executable
  (name simulation_scenario)

@@ -18,9 +18,11 @@ depends: [
   "octez-protocol-024-PtTALLiN-libs" { = version }
 ]
 depopts: [
+  "octez-protocol-025-PsGXQmSv-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
+  "octez-protocol-025-PsGXQmSv-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

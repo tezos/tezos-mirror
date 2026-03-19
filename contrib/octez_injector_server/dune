@@ -20,6 +20,9 @@
   (select void_for_linking-octez_injector_PtTALLiN from
    (octez_injector_PtTALLiN -> void_for_linking-octez_injector_PtTALLiN.empty)
    (-> void_for_linking-octez_injector_PtTALLiN.empty))
+  (select void_for_linking-octez_injector_PsGXQmSv from
+   (octez_injector_PsGXQmSv -> void_for_linking-octez_injector_PsGXQmSv.empty)
+   (-> void_for_linking-octez_injector_PsGXQmSv.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -42,4 +45,5 @@
  (action
   (progn
    (write-file void_for_linking-octez_injector_PtTALLiN.empty "")
+   (write-file void_for_linking-octez_injector_PsGXQmSv.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))
