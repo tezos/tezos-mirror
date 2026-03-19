@@ -25,10 +25,11 @@
 
 (** Testing
     -------
-    Component:  Protocol (dal slot proof)
+    Component:  Protocol (dal slot proof, dal import level validity)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
                   -- --file test_dal_slot_proof.ml
-    Subject:    These unit tests check proof-related functions of Dal slots.
+    Subject:    Proof-related functions of Dal slots; import-level validity
+                (pre-check/post-check and refutation scenarios).
 *)
 
 open Protocol
@@ -467,6 +468,143 @@ struct
     @ confirmed_slot_on_genesis_unconfirmed_page_tests
 end
 
+module Import_level_validity_tests = struct
+  let import_level_is_valid =
+    Sc_rollup_proof_repr.Dal_helpers.import_level_is_valid
+
+  let level n = Raw_level_repr.of_int32_exn (Int32.of_int n)
+
+  let dal_activation_level = Some (level 0)
+
+  let origination_level = level 0
+
+  let ttl = 50
+
+  let check ~loc ~expected ~lag_check ~published_level ~import_inbox_level =
+    let open Lwt_result_syntax in
+    let result =
+      import_level_is_valid
+        ~dal_activation_level
+        ~lag_check
+        ~origination_level
+        ~import_inbox_level:(level import_inbox_level)
+        ~published_level:(level published_level)
+        ~dal_attested_slots_validity_lag:ttl
+    in
+    let msg =
+      Format.asprintf
+        "import_level_is_valid (published=%d, import=%d)"
+        published_level
+        import_inbox_level
+    in
+    let* () =
+      Assert.equal ~loc Bool.equal msg Format.pp_print_bool result expected
+    in
+    return_unit
+
+  (* --- Exact_lag basics --- *)
+
+  let exact_lag_valid () =
+    check
+      ~loc:__LOC__
+      ~expected:true
+      ~lag_check:(Exact_lag 5)
+      ~published_level:10
+      ~import_inbox_level:15
+
+  let exact_lag_too_recent () =
+    check
+      ~loc:__LOC__
+      ~expected:false
+      ~lag_check:(Exact_lag 5)
+      ~published_level:10
+      ~import_inbox_level:14
+
+  (* Last valid import level: TTL check is (published+lag)+ttl >= import,
+     so 10+5+50 = 65 >= import_inbox_level; 65 is valid, 66 is expired. *)
+  let exact_lag_last_valid_import_level () =
+    check
+      ~loc:__LOC__
+      ~expected:true
+      ~lag_check:(Exact_lag 5)
+      ~published_level:10
+      ~import_inbox_level:65
+
+  let exact_lag_ttl_expired () =
+    check
+      ~loc:__LOC__
+      ~expected:false
+      ~lag_check:(Exact_lag 5)
+      ~published_level:10
+      ~import_inbox_level:66
+
+  (* --- Lag_interval basics --- *)
+
+  let interval_valid_at_min_lag () =
+    check
+      ~loc:__LOC__
+      ~expected:true
+      ~lag_check:(Lag_interval (2, 8))
+      ~published_level:10
+      ~import_inbox_level:12
+
+  let interval_valid_at_max_lag () =
+    check
+      ~loc:__LOC__
+      ~expected:true
+      ~lag_check:(Lag_interval (2, 8))
+      ~published_level:10
+      ~import_inbox_level:18
+
+  let interval_too_recent_for_all_lags () =
+    check
+      ~loc:__LOC__
+      ~expected:false
+      ~lag_check:(Lag_interval (2, 8))
+      ~published_level:10
+      ~import_inbox_level:11
+
+  (* Last valid import level for interval: TTL check uses max_lag 8,
+     so 10 + 8 + 50 = 68 >= import_inbox_level; 68 is valid, 69 expired. *)
+  let interval_last_valid_import_level () =
+    check
+      ~loc:__LOC__
+      ~expected:true
+      ~lag_check:(Lag_interval (2, 8))
+      ~published_level:10
+      ~import_inbox_level:68
+
+  let interval_ttl_expired_for_all_lags () =
+    check
+      ~loc:__LOC__
+      ~expected:false
+      ~lag_check:(Lag_interval (2, 8))
+      ~published_level:10
+      ~import_inbox_level:69
+
+  let tests =
+    let tztest title f = Tztest.tztest title `Quick f in
+    [
+      tztest "Exact_lag: valid import" exact_lag_valid;
+      tztest "Exact_lag: too recent" exact_lag_too_recent;
+      tztest
+        "Exact_lag: last valid import level"
+        exact_lag_last_valid_import_level;
+      tztest "Exact_lag: TTL expired" exact_lag_ttl_expired;
+      tztest "Lag_interval: valid at min lag" interval_valid_at_min_lag;
+      tztest "Lag_interval: valid at max lag" interval_valid_at_max_lag;
+      tztest
+        "Lag_interval: too recent for all lags"
+        interval_too_recent_for_all_lags;
+      tztest
+        "Lag_interval: last valid import level"
+        interval_last_valid_import_level;
+      tztest
+        "Lag_interval: TTL expired for all lags"
+        interval_ttl_expired_for_all_lags;
+    ]
+end
+
 let tests =
   let open Tezos_protocol_alpha_parameters.Default_parameters in
   let module Test = Make (struct
@@ -477,5 +615,11 @@ let tests =
   Test.tests
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("dal slot proof", tests)]
+  Alcotest_lwt.run
+    ~__FILE__
+    Protocol.name
+    [
+      ("dal slot proof", tests);
+      ("dal import level validity", Import_level_validity_tests.tests);
+    ]
   |> Lwt_main.run
