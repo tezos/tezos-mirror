@@ -48,13 +48,21 @@ let between_zero_and_excluding_one_q_encoding =
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
   rewards_ratio : Q.t;
   traps_fraction : Q.t;
+}
+
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+      (** This is the migration level up to which the parameters were used. *)
 }
 
 let minimal_participation_ratio_encoding =
@@ -76,8 +84,10 @@ let dal_encoding =
     (fun {
            feature_enable;
            incentives_enable;
+           dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
+           attestation_lags;
            attestation_threshold;
            cryptobox_parameters;
            minimal_participation_ratio;
@@ -87,8 +97,10 @@ let dal_encoding =
        ->
       ( ( feature_enable,
           incentives_enable,
+          dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
+          attestation_lags,
           attestation_threshold,
           minimal_participation_ratio,
           rewards_ratio,
@@ -96,8 +108,10 @@ let dal_encoding =
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
+             dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
+             attestation_lags,
              attestation_threshold,
              minimal_participation_ratio,
              rewards_ratio,
@@ -107,8 +121,10 @@ let dal_encoding =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;
@@ -116,11 +132,13 @@ let dal_encoding =
         traps_fraction;
       })
     (merge_objs
-       (obj8
+       (obj10
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
+          (req "dynamic_lag_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
+          (req "attestation_lags" (list uint8))
           (req "attestation_threshold" uint8)
           (req
              "minimal_participation_ratio"
@@ -128,6 +146,17 @@ let dal_encoding =
           (req "rewards_ratio" rewards_ratio_encoding)
           (req "traps_fraction" traps_fraction_encoding))
        Dal.parameters_encoding)
+
+let past_dal_parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {dal_parameters; next_protocol_activation} ->
+      (dal_parameters, next_protocol_activation))
+    (fun (dal_parameters, next_protocol_activation) ->
+      {dal_parameters; next_protocol_activation})
+    (obj2
+       (req "dal_parameters" dal_encoding)
+       (req "next_protocol_activation" Raw_level_repr.encoding))
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
@@ -296,6 +325,8 @@ type t = {
   cache_script_size : int;
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
+  cache_stake_info_cycles : int;
+  cache_swrr_selected_distribution_cycles : int;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
@@ -304,6 +335,9 @@ type t = {
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
   all_bakers_attest_activation_threshold : Ratio_repr.t;
+  native_contracts_enable : bool;
+  swrr_new_baker_lottery_enable : bool;
+  tz5_account_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -601,15 +635,19 @@ let encoding =
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
-                  c.cache_sampler_state_cycles ),
+                  c.cache_sampler_state_cycles,
+                  c.cache_stake_info_cycles,
+                  c.cache_swrr_selected_distribution_cycles ),
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
                     ( c.adaptive_issuance,
                       ( c.direct_ticket_spending_enable,
                         c.aggregate_attestation,
                         c.allow_tz4_delegate_enable,
-                        c.all_bakers_attest_activation_threshold ) ) ) ) ) ) )
-        ) ))
+                        c.all_bakers_attest_activation_threshold,
+                        c.native_contracts_enable,
+                        c.swrr_new_baker_lottery_enable,
+                        c.tz5_account_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
@@ -647,15 +685,19 @@ let encoding =
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
-                     cache_sampler_state_cycles ),
+                     cache_sampler_state_cycles,
+                     cache_stake_info_cycles,
+                     cache_swrr_selected_distribution_cycles ),
                    ( dal,
                      ( (sc_rollup, zk_rollup),
                        ( adaptive_issuance,
                          ( direct_ticket_spending_enable,
                            aggregate_attestation,
                            allow_tz4_delegate_enable,
-                           all_bakers_attest_activation_threshold ) ) ) ) ) ) )
-           ) )
+                           all_bakers_attest_activation_threshold,
+                           native_contracts_enable,
+                           swrr_new_baker_lottery_enable,
+                           tz5_account_enable ) ) ) ) ) ) ) ) )
        ->
       {
         consensus_rights_delay;
@@ -696,6 +738,8 @@ let encoding =
         cache_script_size;
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
+        cache_stake_info_cycles;
+        cache_swrr_selected_distribution_cycles;
         dal;
         sc_rollup;
         zk_rollup;
@@ -704,6 +748,9 @@ let encoding =
         aggregate_attestation;
         allow_tz4_delegate_enable;
         all_bakers_attest_activation_threshold;
+        native_contracts_enable;
+        swrr_new_baker_lottery_enable;
+        tz5_account_enable;
       })
     (merge_objs
        (merge_objs
@@ -757,23 +804,28 @@ let encoding =
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
-                   (obj3
+                   (obj5
                       (req "cache_script_size" int31)
                       (req "cache_stake_distribution_cycles" int8)
-                      (req "cache_sampler_state_cycles" int8))
+                      (req "cache_sampler_state_cycles" int8)
+                      (req "cache_stake_info_cycles" int8)
+                      (req "cache_swrr_selected_distribution_cycles" int8))
                    (merge_objs
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj4
+                            (obj7
                                (req "direct_ticket_spending_enable" bool)
                                (req "aggregate_attestation" bool)
                                (req "allow_tz4_delegate_enable" bool)
                                (req
                                   "all_bakers_attest_activation_threshold"
-                                  Ratio_repr.encoding))))))))))
+                                  Ratio_repr.encoding)
+                               (req "native_contracts_enable" bool)
+                               (req "swrr_new_baker_lottery_enable" bool)
+                               (req "tz5_account_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a

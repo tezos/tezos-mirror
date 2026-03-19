@@ -268,44 +268,11 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | T024 ->
-        let* ctxt =
-          let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
-          Storage.Protocol_activation_level.init ctxt level
-        in
+    | U025 ->
+        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
-        in
-        let*! cycles =
-          Storage.Stake.Selected_distribution_for_cycle.keys ctxt
-        in
-        let* ctxt =
-          List.fold_left_es
-            (fun ctxt c ->
-              (* [stake_info_for_cycle] will not only return the stake info but
-                 also compute and store it in the storage since it hasn't already
-                 been done. Since we only need to update the storage here,
-                 the returned stake_info is ignored. *)
-              let* ctxt, _stake_info =
-                Delegate_sampler.stake_info_for_cycle ctxt c
-              in
-              return ctxt)
-            ctxt
-            cycles
-        in
-        (* Migrate staking balances to include stez_frozen field *)
-        let* ctxt =
-          Storage.Stake.Staking_balance_up_to_T.fold
-            ctxt
-            ~order:`Undefined
-            ~init:(Ok ctxt)
-            ~f:(fun delegate balance acc ->
-              let*? ctxt = acc in
-              let*! ctxt =
-                Storage.Stake.Staking_balance.add ctxt delegate balance
-              in
-              return ctxt)
         in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)

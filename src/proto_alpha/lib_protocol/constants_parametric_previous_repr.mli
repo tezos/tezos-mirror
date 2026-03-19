@@ -29,8 +29,10 @@
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
@@ -40,7 +42,14 @@ type dal = {
   traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+}
+
 val dal_encoding : dal Data_encoding.t
+
+val past_dal_parameters_encoding : past_dal_parameters Data_encoding.t
 
 type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
 
@@ -209,6 +218,18 @@ type t = {
   (* in cycles *)
   cache_sampler_state_cycles : int;
   (* in cycles *)
+  cache_stake_info_cycles : int;
+  (* in cycles *)
+  cache_swrr_selected_distribution_cycles : int;
+  (* Cache size (in cycles) for precomputed SWRR selected bakers.
+
+   Limits how many past cycles of baker arrays are kept in memory.
+   Memory usage is O(cache_cycles × bakers_per_cycle).
+
+   Entries are removed by Swrr_sampler.clear_outdated_sampling_data
+   after the preserved_cycles window.
+  
+  *)
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
@@ -219,6 +240,24 @@ type t = {
   allow_tz4_delegate_enable : bool;
   (* Portion of tz4 bakers required to activate all bakers attest *)
   all_bakers_attest_activation_threshold : Ratio_repr.t;
+  (* Native contracts feature flag *)
+  native_contracts_enable : bool;
+  (* Feature flag to enable/disable SWRR baker lottery.
+
+     When true: use deterministic SWRR precomputed selections
+     When false: fall back to legacy alias sampler (Sampler)
+
+     Migration safety:
+     - Can be toggled between cycles without breaking consensus
+     - Both systems maintain independent state (no conflicts)
+     - Smooth protocol upgrade path from alias sampler to deterministic selection
+
+     Toggling behavior:
+     - Disabled → Enabled: SWRR is used to compute future cycles instead of alias; 
+     already computed cycles with alias are used until then. *)
+  swrr_new_baker_lottery_enable : bool;
+  (* Tz5 ML-DSA-44 account feature flag *)
+  tz5_account_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding
