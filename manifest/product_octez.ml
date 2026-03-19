@@ -5737,6 +5737,8 @@ let octez_dal_node_lib =
         octez_crawler |> open_;
         octez_profiler |> open_;
         octez_profiler_complex_backends |> open_;
+        octez_tar |> open_;
+        camlzip;
       ]
     ~preprocess
     ~preprocessor_deps

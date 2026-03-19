@@ -6,8 +6,14 @@
 (*****************************************************************************)
 
 (*
-  This module exports/imports DAL node store data in plain directory format,
-  copying store files directly using the {!Key_value_store.Read} interface.
+  This module exports/imports DAL node store data in two formats:
+
+  1. Plain data directory (default): copies store files directly using
+     the {!Key_value_store.Read} interface.
+
+  2. Compressed tar archive (with [--compress]): exports data as a tar
+     archive with individually gzip-compressed entries. Import detects
+     the format by file extension ([.tar]).
 
   Export reads from the source KVS via the {!Key_value_store.Read}
   interface, ensuring that the export leaves source data untouched,
@@ -15,6 +21,11 @@
 *)
 
 open Filename.Infix
+
+(** Write [bytes] directly as a tar entry named [filename]. *)
+let add_bytes_to_tar tar ~bytes ~filename =
+  Octez_tar_helpers.add_raw_and_finalize tar ~filename ~f:(fun fd ->
+      Lwt_utils_unix.write_bytes fd bytes)
 
 (** Read a value from a Single_value_store module in readonly mode.
     Fails if the value is not found. *)
@@ -607,6 +618,18 @@ module Merge = struct
         ~max_level:(Some max_published_level)
     in
     return_unit
+end
+
+(** {1 Compressed tar archive export} *)
+
+module Export_tar = struct
+  (** Export a single metadata value as a JSON-encoded entry. *)
+  let export_metadata_value tar ~tar_filename encoding value =
+    let bytes =
+      Data_encoding.Json.construct encoding value
+      |> Data_encoding.Json.to_string |> Bytes.of_string
+    in
+    add_bytes_to_tar tar ~bytes ~filename:tar_filename
 end
 
 let store_path data_dir =
