@@ -163,6 +163,9 @@ oc.build-debian:
   stage: build
   tags:
   - $TAGS
+  rules:
+  - when: manual
+    allow_failure: true
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -204,6 +207,9 @@ oc.build-data_packages:
   stage: build
   tags:
   - $TAGS
+  rules:
+  - when: manual
+    allow_failure: true
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -334,6 +340,9 @@ oc.build-ubuntu:
   stage: build
   tags:
   - $TAGS
+  rules:
+  - when: manual
+    allow_failure: true
   needs: []
   dependencies: []
   timeout: 60 minutes

@@ -58,12 +58,14 @@ let build_dependency_image =
          Tezos_ci.Images.Base_images.debian_version)
 
 let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
-    ~matrix ~distribution ~script ~dependencies () =
+    ~matrix ~distribution ~script ~dependencies ?(manual = false) () =
   job
     ~__POS__
     ~name
     ~image:build_dependency_image
     ~stage:Stages.build
+    ?rules:
+      (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
     ~variables:
       (("DISTRIBUTION", distribution)
       :: (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
@@ -204,6 +206,9 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~name:"oc.build-data_packages"
       ~image:build_dependency_image
       ~stage:Stages.build
+      ?rules:
+        (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+         else None)
       ~variables:
         [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
       ~dependencies:(Dependent [])
@@ -225,6 +230,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
       ~limit_dune_build_jobs
+      ~manual
       ()
   in
   let job_build_ubuntu_package : tezos_job =
@@ -236,6 +242,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
       ~limit_dune_build_jobs
+      ~manual
       ()
   in
 
