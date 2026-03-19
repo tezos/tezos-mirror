@@ -346,12 +346,12 @@ Docker compose files
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 A predefined Docker compose file is available at :src:`scripts/docker/bake.yml`.
-It aims at helping you to easily launch services **on a testnet** for an Octez node, a DAL node, a baker, and an accuser.
+It aims at helping you launch **a testnet** baker quickly, providing services for an Octez node, a DAL node, a baker, and an accuser.
 You may copy the compose file in the directory where you want to run the baker::
 
     wget https://gitlab.com/tezos/tezos/-/blob/master/scripts/docker/bake.yml
 
-The client, node, and DAL data are stored in the following subdirectories of your current directory, respectively: ``./client_data/``, ``./node_data/``, and ``./dal_data``.
+The client, node, and DAL data are stored in the following subdirectories of your current directory, respectively: ``./client_data/``, ``./node_data/``, and ``./dal_data/``.
 You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
 
 .. note::
@@ -367,53 +367,56 @@ First, you have to make some choices:
 - choose a :doc:`network <../user/multinetwork>` to connect to (by default, ``shadownet``)
 - specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``off``, or ``pass``)
 
-
-Note that you must have already:
-
-- a baker key on the network you chose, which is sufficiently funded, staked enough tez, and is registered as a delegate,
-- a consensus key and a companion key associated with the baker key (but see next section for how to omit them).
-
-.. note::
-
-	If you don't have yet configured the baker keys, you can first do this::
-
-		docker compose -f bake.yml up manual-config
-
-	wait until the node is bootstraped from the snapshot, and then open a new terminal, placed in the same directory::
-
-		docker compose -f bake.yml exec manual-config sh
-
-	and then in the shell set up the baker keys::
-
-		octez-client gen keys mybaker
-		octez-client show address mybaker -S
-		# Note down the address and secret of mybaker
-		# Fund mybaker with > 6000 tez, e.g. at https://faucet.shadownet.teztnets.com
-		octez-client register key mybaker as delegate
-		octez-client stake 6000 for mybaker
-		octez-client gen keys myconsensus -s bls
-		octez-client show address myconsensus -S
-		# Note down the address and secret of the consensus key
-		octez-client set consensus key for mybaker to myconsensus
-		octez-client gen keys mycompanion -s bls
-		octez-client show address mycompanion -S
-		# Note down the address and secret of the companion key
-		octez-client set companion key for mybaker to mycompanion
-		exit
-
-	and finally stop the services with ``docker compose -f bake.yml down``.
-
 Create an environment file called ``.env`` in your current directory with a content of the following form::
 
-    BAKER_ADDRESS='<address of your baker>'
-    CONSENSUS_SECRET_KEY='<secret key>' # the secret key looks like: unencrypted:...
-    COMPANION_SECRET_KEY='<secret key>' # the secret key looks like: unencrypted:...
     LIQUIDITY_BAKING_VOTE='pass'
     NETWORK='tallinnnet'
 
 and build the compose file::
 
     docker compose --file bake.yml build
+
+Note that you must have already:
+
+- a ``baker`` key on the network you chose, which is sufficiently funded, staked enough tez, and is registered as a delegate,
+- optionally but recommended, a consensus key named ``signing-key`` and a ``companion-key`` associated with the baker key.
+
+This is the case, for instance, if you had already run the baker using this compose file.
+
+.. note::
+
+	If you don't have yet configured the baker keys, you can first do this::
+
+		docker compose -f bake.yml up manual-config -d
+
+	wait until the node is bootstraped from the snapshot, and then do::
+
+		docker compose -f bake.yml exec manual-config sh
+
+	and in the shell set up the baker keys::
+
+		octez-client gen keys baker
+		octez-client show address baker
+		# Fund baker with > 6000 tez, e.g. at https://faucet.shadownet.teztnets.com
+		octez-client register key baker as delegate
+		octez-client stake 6000 for baker
+		# Define auxiliary consensus and companion keys (recommended):
+		octez-client gen keys signing-key -s bls
+		octez-client set consensus key for baker to signing-key
+		octez-client gen keys companion-key -s bls
+		octez-client set companion key for baker to companion-key
+		exit
+
+	Alternatively, if you already have the baker and auxiliary keys, but you never ran this compose file, you can import them by rather doing this in the above shell::
+
+		octez-client import secret key baker unencrypted:<secret-key>
+		octez-client import secret key consensus-key unencrypted:<secret-key>
+		octez-client import secret key companion-key unencrypted:<secret-key>
+		# if your baker was deactivated, reactivate it:
+		octez-client register key baker as delegate
+
+	You can arbitrarily combine the two methods above, at your convenience.
+	For example, if you have a baker key but not auxiliary keys, you can import the baker key and create the auxiliary keys.
 
 Now, you just have to start all the services::
 
@@ -423,7 +426,7 @@ You can see the logs by doing in another terminal (in the same directory)::
 
     docker compose --file bake.yml logs -f
 
-(add a service such as ``node`` or ``baker`` at the end to see only its log).
+(add a service such as ``node`` or ``baker`` at the end of the command line to see only its log).
 
 You should have now running together: the node, the DAL node, the baker and the accuser.
 
@@ -440,21 +443,33 @@ Alternatively, you may stop and restart only one service. For instance if the Oc
 Further customization
 ^^^^^^^^^^^^^^^^^^^^^
 
-Beyond the usage shown above, you can use the following variables in the environment file to customize the behavior of the compose file:
+Beyond the common usage shown above, you can use the following variables in the environment file to customize the behavior of the compose file, grouped by category.
 
-- BAKER_SECRET_KEY: secret key of the baker (only if there is no CONSENSUS_SECRET_KEY)
-- CONSENSUS_SECRET_KEY: secret key of the companion address (not needed if you defined BAKER_SECRET_KEY)
-- COMPANION_SECRET_KEY: secret key of the consensus address (optional, unless CONSENSUS_SECRET_KEY is defined and is a tz4 address)
-- CHECK_SNAPSHOT (default: false): if false, import the snapshot with option --no-check
-- FORCE_DOWNLOAD_SNAPSHOT (default: false): if true, download the snapshot even if it has been found localy (see SNAPSHOT_URL)
-- FORCE_IMPORT_SNAPSHOT (default: false): import the snapshot even if the node has recent data (same day)
-- HISTORY_MODE (default: rolling): set the :doc:`history mode <../user/history_modes>` of your node
+Configuration:
+
+- LIQUIDITY_BAKING_VOTE (mandatory): value to pass to the baker daemon in mandatory flag ``--liquidity-baking-toggle-vote``
 - NETWORK (default: shadownet): network to connect to
-- NETWORK_URL (default: ``https://teztnets.com/$NETWORK``) : URL to get the network configuration
-- SNAPSHOT_URL: URL where download the snapshot if not found localy (see SNAPSHOT_NAME)
-- SNAPSHOT_NAME: name of a local snapshot file
+- NETWORK_URL (default: ``https://teztnets.com/$NETWORK``): URL to get the network configuration
+- HISTORY_MODE (default: rolling): set the :doc:`history mode <../user/history_modes>` of your node
+- TEZOS_NODE_OPTIONS (default: none): extra options to be passed to the node
 
-For example, if you don't want to use auxiliary keys (consensus key and companion key) for baking on a testnet, you may define ``BAKER_SECRET_KEY`` instead of ``CONSENSUS_SECRET_KEY`` and ``COMPANION_SECRET_KEY`` in the environment file.
+Snapshot management:
+
+- IMPORT_SNAPSHOT (default: true): if false, don't import a snapshot, bootstrap from origin; if true, import a snapshot unless the node has recent data (but see FORCE_IMPORT_SNAPSHOT)
+- FORCE_IMPORT_SNAPSHOT (default: false): import the snapshot even if the node has recent data (same day); has no effect when IMPORT_SNAPSHOT is false
+- FORCE_DOWNLOAD_SNAPSHOT (default: false): if true, download the snapshot even if it has been found localy (see SNAPSHOT_URL)
+- CHECK_SNAPSHOT (default: false): if false, import the snapshot with option --no-check
+- SNAPSHOT_URL (default: use teztnet server): URL where download the snapshot if not found localy (see SNAPSHOT_NAME)
+- SNAPSHOT_NAME (default: no local file): name of a local snapshot file
+
+Baking keys management:
+
+- BAKER_ADDRESS: the ``tz...`` address of the baker manager account (not needed if the key ``baker`` has been configured manually)
+- SIGNING_KEY: the name of the signing key (defaults to ``signing-key``)
+- COMPANION_KEY: the name of the companion key (defaults to ``companion-key``; optional, unless the signing key is a tz4 address)
+- BAKER_SECRET_KEY: secret key of the baker (not needed if a baker or signing key has been configured manually, or if CONSENSUS_SECRET_KEY is defined)
+- CONSENSUS_SECRET_KEY: secret key of the consensus key (not needed if a baker or signing key has been configured manually, or if BAKER_SECRET_KEY is defined)
+- COMPANION_SECRET_KEY: secret key of the companion address (optional, unless a baker or signing key has been configured manually as a tz4 address or CONSENSUS_SECRET_KEY is defined as a tz4 address)
 
 .. note::
 
