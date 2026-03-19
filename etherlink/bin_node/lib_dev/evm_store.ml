@@ -191,6 +191,8 @@ module Q = struct
       ~decode:(fun x -> Ok (Qty Z.(of_bits x)))
       string
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(payload AS BLOB)] to support old TEXT rows. *)
   let payload =
     custom
       ~encode:(fun payload ->
@@ -203,7 +205,7 @@ module Q = struct
         @@ Data_encoding.Binary.of_string_opt
              Blueprint_types.payload_encoding
              bytes)
-      string
+      octets
 
   let context_hash =
     custom
@@ -260,6 +262,8 @@ module Q = struct
         Ok (Block_hash (Hex hash)))
       string
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(block AS BLOB)] to support old TEXT rows. *)
   let block =
     custom
       ~encode:(fun payload ->
@@ -287,13 +291,15 @@ module Q = struct
                Data_encoding.Binary.of_string
                  Legacy_encodings.block_encoding
                  bytes)))
-      string
+      octets
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(tez_block AS BLOB)] to support old TEXT rows. *)
   let tezos_block =
     custom
       ~encode:L2_types.Tezos_block.encode_block_for_store
       ~decode:L2_types.Tezos_block.decode_block_for_store
-      string
+      octets
 
   let timestamp =
     custom
@@ -318,6 +324,8 @@ module Q = struct
         Ok Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp})
       (t3 public_key address timestamp)
 
+  (* WARNING: uses [octets] — SELECT queries must use
+     [CAST(payload AS BLOB)] to support old TEXT rows. *)
   let delayed_transaction =
     custom
       ~encode:(fun payload ->
@@ -330,7 +338,7 @@ module Q = struct
         @@ Data_encoding.Binary.of_string_opt
              Evm_events.Delayed_transaction.encoding
              bytes)
-      string
+      octets
 
   let smart_rollup_address =
     custom
@@ -394,13 +402,15 @@ module Q = struct
       (t3 level timestamp payload ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
+    (* See {Note cast} *)
     let select =
       (level ->? t2 payload timestamp) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
+      @@ {eos|SELECT CAST(payload AS BLOB), timestamp FROM blueprints WHERE id = ?|eos}
 
+    (* See {Note cast} *)
     let select_range =
       (t2 level level ->* t2 level payload) ~name:__FUNCTION__ ~table
-      @@ {|SELECT id, payload FROM blueprints
+      @@ {|SELECT id, CAST(payload AS BLOB) FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
@@ -557,13 +567,15 @@ module Q = struct
         ~table
       @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
 
+    (* See {Note cast} *)
     let select_at_level =
       (level ->* delayed_transaction) ~name:__FUNCTION__ ~table
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+      @@ {|SELECT CAST(payload AS BLOB) FROM delayed_transactions WHERE ? = injected_before|}
 
+    (* See {Note cast} *)
     let select_at_hash =
       (root_hash ->? delayed_transaction) ~name:__FUNCTION__ ~table
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+      @@ {|SELECT CAST(payload AS BLOB) FROM delayed_transactions WHERE ? = hash|}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -692,6 +704,8 @@ DO UPDATE SET value = excluded.value
        database storing receipts with [Transaction_info.receipt_fields_encoding]
        to work. If it is ever changed, the SQLite extension will also need to be
        adapted. *)
+    (* WARNING: uses [octets] — SELECT queries must use
+       [CAST(receipt_fields AS BLOB)] to support old TEXT rows. *)
     let receipt_fields =
       custom
         ~encode:(fun payload ->
@@ -704,8 +718,10 @@ DO UPDATE SET value = excluded.value
           @@ Data_encoding.Binary.of_string_opt
                Transaction_info.receipt_fields_encoding
                bytes)
-        string
+        octets
 
+    (* WARNING: uses [octets] — SELECT queries must use
+       [CAST(object_fields AS BLOB)] to support old TEXT rows. *)
     let object_fields =
       custom
         ~encode:(fun payload ->
@@ -718,7 +734,7 @@ DO UPDATE SET value = excluded.value
           @@ Data_encoding.Binary.of_string_opt
                Transaction_info.object_fields_encoding
                bytes)
-        string
+        octets
 
     let insert =
       (t8
@@ -749,7 +765,8 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
 
     let select_receipts_from_block_number =
       (level
@@ -762,7 +779,8 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
 
     let select_receipts_from_block_range =
       (t3 level level (option octets)
@@ -775,7 +793,8 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions
               WHERE $1 <= block_number AND block_number < $2
               AND ($3 IS NULL OR
                    receipt_contains_bloom_filter(receipt_fields, $3))
@@ -793,13 +812,15 @@ DO UPDATE SET value = excluded.value
             object_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
 
     let select_objects_from_block_number =
       (level ->* t5 quantity root_hash address (option address) object_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT index_, hash, from_, to_, object_fields FROM transactions WHERE block_number = ?|eos}
+      (* See {Note cast} *)
+      @@ {eos|SELECT index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -836,21 +857,25 @@ DO UPDATE SET value = excluded.value
       (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
+    (* See {Note cast} *)
     let select_with_level =
       (level ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
 
+    (* See {Note cast} *)
     let tez_select_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
 
+    (* See {Note cast} *)
     let tezosx_select_tez_block_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT tez_block FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(tez_block AS BLOB) FROM blocks WHERE level = ?|eos}
 
+    (* See {Note cast} *)
     let select_with_hash =
       (block_hash ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
+      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE hash = ?|eos}
 
     let select_hash_of_number =
       (level ->? block_hash) ~name:__FUNCTION__ ~table
@@ -1859,3 +1884,8 @@ let reset_before store ~l2_level ~history_mode =
      number of splits plus an additional one. *)
   let* () = Irmin_chunks.clear_before_included store l2_level in
   return_unit
+
+(* {Note cast}
+
+   Backward compatibility cast to avoid a costly migration, as some
+   columns have been stored as TEXT instead of BLOB. *)
