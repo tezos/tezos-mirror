@@ -22,6 +22,38 @@
 
 open Filename.Infix
 
+(** {2 Gzip helpers}
+
+    Per-entry gzip compression/decompression using {!Zlib}. *)
+
+(** Apply a zlib transformation ([compress] or [uncompress]) to [input] bytes,
+    using [buf_size] as the initial output buffer capacity. The buffer grows
+    dynamically if needed. *)
+let zlib_transform ~transform ~buf_size input =
+  let buf = Buffer.create buf_size in
+  let input_ofs = ref 0 in
+  let refill output =
+    let available = Bytes.length input - !input_ofs in
+    let len = min available (Bytes.length output) in
+    Bytes.blit input !input_ofs output 0 len ;
+    input_ofs := !input_ofs + len ;
+    len
+  in
+  let flush output len = Buffer.add_subbytes buf output 0 len in
+  transform refill flush ;
+  Buffer.to_bytes buf
+
+(** Compress [input] bytes using zlib deflate.
+
+    The output buffer is initialized with capacity [size / 2] as a cheap
+    initial guess. The exact compression ratio depends on the input, but we do
+    not need a precise estimate here because [zlib_transform] uses a growable
+    buffer and will expand it automatically if needed. *)
+let gzip_compress_bytes ?(level = 6) input =
+  zlib_transform
+    ~transform:(Zlib.compress ~level ~header:true)
+    ~buf_size:(Bytes.length input / 2)
+    input
 (** {2 Skip list binary format}
 
     The skip list data is serialised as a flat binary stream to avoid the
@@ -115,6 +147,10 @@ let iterate_levels ?notify ~min_published_level ~max_published_level f =
       iterate_levels (Int32.succ level)
   in
   iterate_levels min_published_level
+
+(** Format a slot_id as a tar-entry filename component: [<level>_<index>]. *)
+let slot_id_to_filename (slot_id : Types.Slot_id.t) =
+  Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
 
 (** Copy a value from source KVS to destination KVS.
     Returns [Ok ()] if the value was copied or if src value is not found. *)
@@ -662,6 +698,44 @@ end
 (** {1 Compressed tar archive export} *)
 
 module Export_tar = struct
+  (** Export slots: for each slot_id in the range, gzip-compress and store the
+      raw KVS file verbatim.  No decode/re-encode cycle needed. *)
+  let export_slots ?notify tar ~src_slot_dir ~min_published_level
+      ~max_published_level ~slots ~proto_plugins =
+    iterate_levels ?notify ~min_published_level ~max_published_level
+    @@ fun level ->
+    let open Lwt_result_syntax in
+    let*? slots = get_slots_for_level ~proto_plugins ~slots level in
+    List.iter_es
+      (fun slot_index ->
+        let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
+        let filepath = src_slot_dir // slot_id_to_filename slot_id in
+        let*! exists = Lwt_unix.file_exists filepath in
+        if not exists then return_unit
+        else
+          let*! content = Lwt_io.(with_file ~mode:Input filepath read) in
+          let compressed =
+            gzip_compress_bytes (Bytes.unsafe_of_string content)
+          in
+          let tar_filename =
+            Store.Stores_dirs.slot // slot_id_to_filename slot_id
+          in
+          let*! () =
+            add_bytes_to_tar tar ~bytes:compressed ~filename:tar_filename
+          in
+          return_unit)
+      slots
+
+  (** Compact shard binary format:
+        - share_size:       int32 BE  (4 bytes)  — bytes per share
+        - number_of_shards: int32 BE  (4 bytes)  — total slots in the KVS file
+        - count:            int32 BE  (4 bytes)  — number of occupied slots
+        - for each shard:   index (int32 BE, 4 bytes) + raw share bytes
+      The share bytes are copied verbatim from the KVS file — no
+      [Cryptobox.share_encoding] decode/re-encode cycle.  The format is
+      self-describing so the importer can reconstruct the KVS file without
+      consulting proto_parameters. *)
+
   (** Export skip list: reads from SQLite, serialises each matching row into a
       compact flat binary file, gzip-compresses it, and streams it into the
       tar archive.  This avoids carrying the full SQLite overhead (B-tree
