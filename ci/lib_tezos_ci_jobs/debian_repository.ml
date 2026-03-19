@@ -155,50 +155,6 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  let make_job_docker_build_debian_dependencies =
-    Common.Packaging.make_docker_build_dependencies
-      ?rules:
-        (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
-         else None)
-      ~base_image:
-        Images.Base_images.(
-          sf "%s/$DISTRIBUTION:$RELEASE-%s" path_prefix debian_version)
-      ~script:
-        [
-          "./scripts/ci/build-packages-dependencies.sh \
-           images/packages/debian-deps-build.Dockerfile";
-        ]
-  in
-  let job_docker_build_debian_dependencies : tezos_job =
-    make_job_docker_build_debian_dependencies
-      ~__POS__
-      ~name:"oc.docker-build-debian-dependencies"
-      ~distribution:"debian"
-      ~matrix:(debian_package_release_matrix pipeline_type)
-      ()
-  in
-  let job_docker_build_ubuntu_dependencies : tezos_job =
-    make_job_docker_build_debian_dependencies
-      ~__POS__
-      ~name:"oc.docker-build-ubuntu-dependencies"
-      ~distribution:"ubuntu"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
-      ()
-  in
-  (* docker merge jobs *)
-  let job_merge_build_debian_dependencies =
-    Common.Packaging.make_job_merge_build_dependencies
-      ~distribution:"debian"
-      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~matrix:(debian_package_release_matrix ~arm64:false pipeline_type)
-  in
-  let job_merge_build_ubuntu_dependencies =
-    Common.Packaging.make_job_merge_build_dependencies
-      ~distribution:"ubuntu"
-      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
-  in
-
   (* data packages. we build them once *)
   let job_build_data_packages : tezos_job =
     job
@@ -444,22 +400,9 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     ]
   in
   let debian_jobs =
-    [
-      job_docker_build_debian_dependencies;
-      job_merge_build_debian_dependencies;
-      job_build_debian_package;
-      job_build_data_packages;
-      job_apt_repo_debian;
-    ]
+    [job_build_debian_package; job_build_data_packages; job_apt_repo_debian]
   in
-  let ubuntu_jobs =
-    [
-      job_docker_build_ubuntu_dependencies;
-      job_merge_build_ubuntu_dependencies;
-      job_build_ubuntu_package;
-      job_apt_repo_ubuntu;
-    ]
-  in
+  let ubuntu_jobs = [job_build_ubuntu_package; job_apt_repo_ubuntu] in
   match pipeline_type with
   | Partial -> debian_jobs @ test_debian_packages_jobs
   | Full ->
