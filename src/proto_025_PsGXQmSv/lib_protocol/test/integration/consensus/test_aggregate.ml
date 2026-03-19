@@ -40,7 +40,7 @@ let find_preattestations_aggregate_result receipt =
   let result_opt =
     List.find_map
       (function
-        | Tezos_protocol_alpha__Protocol.Apply_results.Operation_metadata
+        | Tezos_protocol_025_PsGXQmSv__Protocol.Apply_results.Operation_metadata
             {
               contents =
                 Single_result (Preattestations_aggregate_result _ as result);
@@ -57,7 +57,7 @@ let find_attestations_aggregate_result receipt =
   let result_opt =
     List.find_map
       (function
-        | Tezos_protocol_alpha__Protocol.Apply_results.Operation_metadata
+        | Tezos_protocol_025_PsGXQmSv__Protocol.Apply_results.Operation_metadata
             {
               contents =
                 Single_result (Attestations_aggregate_result _ as result);
@@ -84,7 +84,8 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
     ((_block, (_, op_receipts)) : Block.block_with_metadata) =
   let open Lwt_result_syntax in
   let (result
-        : kind Tezos_protocol_alpha__Protocol.Apply_results.contents_result) =
+        : kind
+          Tezos_protocol_025_PsGXQmSv__Protocol.Apply_results.contents_result) =
     match kind with
     | Preattestation -> find_preattestations_aggregate_result op_receipts
     | Attestation -> find_attestations_aggregate_result op_receipts

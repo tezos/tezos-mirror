@@ -670,7 +670,8 @@ let test_attester_with_no_assigned_shards () =
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
   let dal =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_sandbox.dal
+    Tezos_protocol_025_PsGXQmSv_parameters.Default_parameters.constants_sandbox
+      .dal
   in
   let dal =
     (* We need to take a small number of shards to be sure there is a
@@ -840,7 +841,8 @@ let test_dal_attestations_skip_list_insertion_scenario () =
   let attestation_lag = 3 in
   let dal =
     let base =
-      Tezos_protocol_alpha_parameters.Default_parameters.constants_test.dal
+      Tezos_protocol_025_PsGXQmSv_parameters.Default_parameters.constants_test
+        .dal
     in
     {base with attestation_lags; attestation_lag}
   in
@@ -1078,7 +1080,7 @@ let test_dal_rewards () =
   let attestation_lag = 4 in
   let attestation_threshold = 50 in
   let constants =
-    Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+    Tezos_protocol_025_PsGXQmSv_parameters.Default_parameters.constants_test
   in
   let dal =
     {
