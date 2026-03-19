@@ -197,6 +197,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    Tallinn Protocol Reference <active/index>
+   U025 Protocol Reference <u025/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -224,6 +225,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    protocols/naming
    protocols/024_tallinn
+   protocols/025_u025
    protocols/alpha
    protocols/history
 
