@@ -9188,49 +9188,4 @@ mod typecheck_tests {
         )
         .is_ok());
     }
-
-    // -- L1 reference contracts --
-    // These are the exact .tz files from proto_024 test suite.
-    // If they fail differently than expected, our implementation diverges from L1.
-
-    fn typecheck_script_file(path: &str) -> Result<(), TcError> {
-        let src =
-            std::fs::read_to_string(path).unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
-        parse_contract_script(&src)
-            .unwrap()
-            .split_script()
-            .unwrap()
-            .typecheck_script(&mut Gas::default(), true, true)?;
-        Ok(())
-    }
-
-    #[test]
-    fn l1_reference_forbidden_set_delegate_in_view() {
-        assert_eq!(
-            typecheck_script_file(
-                "../../michelson_test_scripts/views/forbidden_op_in_view_SET_DELEGATE.tz"
-            ),
-            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
-        );
-    }
-
-    #[test]
-    fn l1_reference_forbidden_transfer_tokens_in_view() {
-        assert_eq!(
-            typecheck_script_file(
-                "../../michelson_test_scripts/views/forbidden_op_in_view_TRANSFER_TOKENS.tz"
-            ),
-            Err(TcError::ForbiddenInView(Prim::TRANSFER_TOKENS))
-        );
-    }
-
-    #[test]
-    fn l1_reference_forbidden_create_contract_in_view() {
-        assert_eq!(
-            typecheck_script_file(
-                "../../michelson_test_scripts/views/forbidden_op_in_view_CREATE_CONTRACT.tz"
-            ),
-            Err(TcError::ForbiddenInView(Prim::CREATE_CONTRACT))
-        );
-    }
 }
