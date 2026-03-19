@@ -1,0 +1,38 @@
+{
+  "kind": "event",
+  "source": "KT1SHrxmgUojs2hwe4hguExy6BqteeG1rDHi",
+  "nonce": 0,
+  "type": {
+    "prim": "pair",
+    "args": [
+      {
+        "prim": "int",
+        "annots": [
+          "%addAmount"
+        ]
+      },
+      {
+        "prim": "address",
+        "annots": [
+          "%source"
+        ]
+      }
+    ]
+  },
+  "tag": "add",
+  "payload": {
+    "prim": "Pair",
+    "args": [
+      {
+        "int": "10"
+      },
+      {
+        "bytes": "00005b9a5d6ff9b553b9fae37b844d7a907d8d59593e"
+      }
+    ]
+  },
+  "result": {
+    "status": "applied",
+    "consumed_milligas": "100000"
+  }
+}

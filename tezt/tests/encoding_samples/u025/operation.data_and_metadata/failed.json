@@ -1,0 +1,32 @@
+{
+  "contents": [
+    {
+      "kind": "transaction",
+      "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee": "255",
+      "counter": "1",
+      "gas_limit": "0",
+      "storage_limit": "0",
+      "amount": "27942405962072064",
+      "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "metadata": {
+        "operation_result": {
+          "status": "failed",
+          "errors": [
+            {
+              "kind": "permanent",
+              "id": "tezlink_error",
+              "error_message": "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) }))"
+            },
+            {
+              "kind": "permanent",
+              "id": "tezlink_error",
+              "error_message": "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\"))), balance: Narith(55), amount: Narith(1111) }))"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "signature": "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
+}

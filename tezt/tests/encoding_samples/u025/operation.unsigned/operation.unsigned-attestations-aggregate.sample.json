@@ -1,0 +1,30 @@
+{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "attestations_aggregate",
+      "consensus_content": {
+        "level": 1331,
+        "round": 0,
+        "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+      },
+      "committee": [
+        {
+          "slot": 0
+        },
+        {
+          "slot": 23,
+          "dal_attestation": "2048"
+        },
+        {
+          "slot": 51,
+          "dal_attestation": "0"
+        },
+        {
+          "slot": 893,
+          "dal_attestation": "1"
+        }
+       ]
+    }
+  ]
+}

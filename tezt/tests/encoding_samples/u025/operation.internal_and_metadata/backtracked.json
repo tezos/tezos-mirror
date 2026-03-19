@@ -1,0 +1,28 @@
+{
+  "kind": "transaction",
+  "source": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+  "nonce": 0,
+  "amount": "1000000",
+  "destination": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+  "result": {
+    "status": "backtracked",
+    "storage": {
+      "string": "hello"
+    },
+    "consumed_milligas": "100000",
+    "balance_updates": [
+      {
+        "kind": "contract",
+        "contract": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+        "change": "-1000000",
+        "origin": "block"
+      },
+      {
+        "kind": "contract",
+        "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+        "change": "1000000",
+        "origin": "block"
+      }
+    ]
+  }
+}
