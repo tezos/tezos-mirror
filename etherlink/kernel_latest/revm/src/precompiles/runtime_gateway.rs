@@ -9,7 +9,7 @@ use revm::{
 };
 use tezos_data_encoding::nom::NomReader;
 use tezos_protocol::contract::Contract;
-use tezosx_interfaces::headers::format_tez_from_mutez;
+use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
     gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
     X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
@@ -29,7 +29,6 @@ use crate::{
     },
 };
 use evm_types::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges};
-use tezos_ethereum::wei::mutez_from_wei;
 
 sol! {
     contract RuntimeGateway {
@@ -127,11 +126,11 @@ fn inject_tezos_headers(
         .map_err(|_| CustomPrecompileError::Revert("invalid source alias".to_string()))?
         .to_string();
     headers.insert(X_TEZOS_SOURCE, parse_value(&source_alias)?);
-    // The amount is already in mutez; format it as a TEZ decimal string.
-    let amount_mutez = amount.as_limbs()[0];
+    // Format the amount (in wei) as a TEZ decimal string.
+    // The receiving runtime truncates to its own precision (ADR L2-1004).
     headers.insert(
         X_TEZOS_AMOUNT,
-        parse_value(&format_tez_from_mutez(amount_mutez))?,
+        parse_value(&format_tez_from_wei(alloy_to_u256(&amount)))?,
     );
     headers.insert(X_TEZOS_GAS_LIMIT, parse_value(&format!("{gas_limit}"))?);
     headers.insert(X_TEZOS_TIMESTAMP, parse_value(&format!("{timestamp}"))?);
@@ -202,19 +201,11 @@ where
                 .journal_mut()
                 .tezosx_resolve_source_alias(tx_caller)?;
 
-            // Convert amount from wei to mutez for the Tezos runtime
-            let amount_mutez =
-                U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "Failed to convert amount from wei to mutez: {e:?}"
-                    ))
-                })?);
-
             inject_tezos_headers(
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
-                amount_mutez,
+                amount,
                 gas_limit,
                 timestamp,
                 block_number,
@@ -284,19 +275,11 @@ where
                 .journal_mut()
                 .tezosx_resolve_source_alias(tx_caller)?;
 
-            // Convert amount from wei to mutez for the Tezos runtime
-            let amount_mutez =
-                U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "Failed to convert amount from wei to mutez: {e:?}"
-                    ))
-                })?);
-
             inject_tezos_headers(
                 request.headers_mut(),
                 &sender_alias,
                 &source_alias,
-                amount_mutez,
+                amount,
                 gas_limit,
                 timestamp,
                 block_number,
@@ -410,6 +393,27 @@ where
             }
 
             let output: Vec<u8> = (true, response.body()).abi_encode_params();
+
+            // The precompile is expected to have a zero balance at this stage.
+            // However, due to differences in representation precision across runtimes,
+            // it may retain a residual balance caused by truncation.
+            // If value was bridged, this residual balance must be burned by resetting
+            // the precompile's EVM balance to zero, consistent with the transfer/callMichelson
+            // handling below.
+            if !inputs.value.get().is_zero() {
+                let mut account_load = context
+                    .journal_mut()
+                    .load_account_mut_skip_cold_load(
+                        RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                        true,
+                    )
+                    .map_err(|_| {
+                        CustomPrecompileError::Revert(
+                            "failed to load precompile account".into(),
+                        )
+                    })?;
+                account_load.data.set_balance(U256::ZERO);
+            }
 
             return Ok(InterpreterResult {
                 result: InstructionResult::Return,
@@ -569,7 +573,8 @@ mod tests {
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
         let source_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
-        let amount = U256::from(42_000_000u64);
+        // 42 TEZ in wei
+        let amount = U256::from(42u64) * U256::from(10u64).pow(U256::from(18u64));
         let gas_limit = 100_000u64;
         let timestamp = U256::from(1_700_000_000u64);
         let block_number = U256::from(12345u64);
@@ -721,8 +726,8 @@ mod tests {
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
         let source_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
-        // 500_000 mutez = 0.5 TEZ
-        let amount = U256::from(500_000u64);
+        // 0.5 TEZ in wei
+        let amount = U256::from(5u64) * U256::from(10u64).pow(U256::from(17u64));
 
         inject_tezos_headers(
             request.headers_mut(),
@@ -908,7 +913,8 @@ mod tests {
             request.headers_mut(),
             &sender_alias.to_bytes().unwrap(),
             &sender_alias.to_bytes().unwrap(),
-            U256::from(1_000_000u64),
+            // 1 TEZ in wei
+            U256::from(10u64).pow(U256::from(18u64)),
             50_000,
             U256::from(100u64),
             U256::from(42u64),

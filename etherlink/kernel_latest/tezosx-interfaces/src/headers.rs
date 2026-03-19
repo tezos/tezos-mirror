@@ -107,7 +107,7 @@ pub fn parse_tez_to_wei(s: &str) -> Result<U256, TezosXRuntimeError> {
 
 /// Parse a TEZ decimal string into mutez (`10^-6 TEZ`).
 ///
-/// Rejects amounts with more than 6 decimal places.
+/// Truncates excess decimal places beyond 6 (ADR L2-1004).
 pub fn parse_tez_to_mutez(s: &str) -> Result<u64, TezosXRuntimeError> {
     let amount = parse_tez_amount(s, 6).map_err(|e| {
         TezosXRuntimeError::HeaderError(format!("Invalid TEZ amount: {e}"))
@@ -166,12 +166,13 @@ fn parse_tez_amount(s: &str, decimals: usize) -> Result<U256, String> {
         return Err(format!("invalid fractional part: {frac_str:?}"));
     }
 
-    if frac_str.len() > decimals {
-        return Err(format!(
-            "too many decimal places: got {}, max {decimals}",
-            frac_str.len()
-        ));
-    }
+    // Truncate excess decimal places instead of rejecting (ADR L2-1004):
+    // the receiving runtime rounds down to its precision.
+    let frac_str = if frac_str.len() > decimals {
+        &frac_str[..decimals]
+    } else {
+        frac_str
+    };
 
     let integer_part = if integer_str.is_empty() {
         U256::zero()
@@ -368,8 +369,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_mutez_rejects_excess_decimals() {
-        assert!(parse_tez_to_mutez("0.0000001").is_err());
+    fn parse_mutez_truncates_excess_decimals() {
+        // "0.0000001" has 7 decimals; mutez precision is 6.
+        // ADR L2-1004: truncate to "0.000000" = 0 mutez.
+        assert_eq!(parse_tez_to_mutez("0.0000001").unwrap(), 0);
+        // "1.1234567" truncates to "1.123456" = 1_123_456 mutez.
+        assert_eq!(parse_tez_to_mutez("1.1234567").unwrap(), 1_123_456);
     }
 
     // --- Round-trip tests ---

@@ -209,13 +209,13 @@ mod tests {
     }
 
     #[test]
-    fn amount_rejects_excess_decimals() {
+    fn amount_truncates_excess_decimals() {
         let mut hdrs = required_headers();
-        // 19 decimals — exceeds Ethereum's 18-decimal limit
+        // 19 decimals — exceeds Ethereum's 18-decimal limit; truncated to 0 (ADR L2-1004)
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.0000000000000000001");
-        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
-        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.amount, AlloyU256::ZERO);
     }
 
     // --- Gas limit edge cases ---
