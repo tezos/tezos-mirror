@@ -228,11 +228,13 @@ let () =
 
 let hooks ~check_invalid_kernel ~fallback_to_slow_vm =
   let open Tezos_scoru_wasm.Hooks in
-  let panicked_hook exn =
-    let open Lwt_syntax in
-    let* () = Interpreter_event.fast_exec_panic exn in
-    if not fallback_to_slow_vm then raise (Fast_execution_panic exn)
-    else return_unit
+  let panicked_hook = function
+    | Rollup_node_errors.Error_wrapper _ as exn -> Lwt.reraise exn
+    | exn ->
+        let open Lwt_syntax in
+        let* () = Interpreter_event.fast_exec_panic exn in
+        if not fallback_to_slow_vm then raise (Fast_execution_panic exn)
+        else return_unit
   in
   let hooks =
     no_hooks
