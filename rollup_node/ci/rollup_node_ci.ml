@@ -189,16 +189,14 @@ let register () =
       (Auto, job_gitlab_release);
       (Manual, job_release_page `real `build_dependencies);
     ] ;
-  Cacio.register_jobs
-    Release
+  Cacio.register_release_jobs
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_release_page `real `build_dependencies);
     ] ;
-  Cacio.register_jobs
-    Test_release
+  Cacio.register_test_release_jobs
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
