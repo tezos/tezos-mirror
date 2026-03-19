@@ -103,8 +103,9 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
 }
 
-/// [Ctx] includes "outer context" required for typechecking and interpreting
-/// Michelson.
+/// Standalone implementation of the MIR execution context, used for tests,
+/// examples, and the TZT runner. For the real Etherlink kernel context, see
+/// `tezos_execution::mir_ctx::Ctx`.
 pub struct Ctx<'a> {
     /// [Gas] counter. Defaults to [`Gas::default()`]
     pub gas: Gas,
@@ -132,33 +133,31 @@ pub struct Ctx<'a> {
     /// Address of the contract being executed. The result of the `SELF_ADDRESS`
     /// instruction. Defaults to `KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi`.
     pub self_address: AddressHash,
-    /// A function that maps contract addresses to their entrypoints. It only
-    /// needs to work with smart contract and smart rollup addresses, as
-    /// implicit accounts don't really have entrypoints. For a given address,
-    /// the function must return either [None], meaning the contract doesn't
-    /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
-    /// also [Self::set_known_contracts]. Defaults to returning [None] for any
-    /// address.
-    pub lookup_entrypoints: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    /// A map of contract addresses to their entrypoints. It only needs to
+    /// work with smart contract and smart rollup addresses, as implicit
+    /// accounts don't really have entrypoints. For a given address, the map
+    /// returns either [None], meaning the contract doesn't exist, or
+    /// [`Some(entrypoints)`] with the map of its entrypoints. See also
+    /// [Self::set_known_contracts]. Defaults to empty.
+    lookup_entrypoints: HashMap<AddressHash, Entrypoints>,
     /// A map of contract addresses to their views. It only
     /// needs to work with smart contract, defaulting to [None] otherwise.
     pub views: HashMap<AddressHash, HashMap<String, View<'a>>>,
     /// A map of contract addresses to their storage. It only
     /// needs to work with smart contract, defaulting to [None] otherwise.
     pub storage: HashMap<AddressHash, (Type, TypedValue<'a>)>,
-    /// A function that maps public key hashes (i.e. effectively implicit
-    /// account addresses) to their corresponding voting powers. Note that if
-    /// you provide a custom function here, you also must define
-    /// [Self::total_voting_power] to be consistent with your function! See also
-    /// [Self::set_voting_powers]. Defaults to returning `0` for any address.
-    pub voting_powers: Box<dyn Fn(&PublicKeyHash) -> BigUint>,
+    /// A map of public key hashes (i.e. effectively implicit account
+    /// addresses) to their corresponding voting powers. If a given key hash
+    /// is absent, its voting power is assumed to be `0`. See also
+    /// [Self::set_voting_powers], which also sets [Self::total_voting_power]
+    /// consistently. Defaults to empty.
+    voting_powers: HashMap<PublicKeyHash, BigUint>,
     /// The minimal injection time for the current block, as a unix timestamp
     /// (in seconds). Defaults to `0`.
     pub now: BigInt,
-    /// Total voting power. Note that if you are setting this manually, you must
-    /// also provide a consistent implementation for [Self::voting_powers]. See
-    /// also [Self::set_voting_powers]. Defaults to `0`.
-    pub total_voting_power: BigUint,
+    /// Total voting power. Automatically set by [Self::set_voting_powers] to
+    /// the sum of all values in [Self::voting_powers]. Defaults to `0`.
+    total_voting_power: BigUint,
     /// Hash for the current operation group. This will be used to generate
     /// contract addresses for newly-created contracts (via `CREATE_CONTRACT`
     /// instruction). Defaults to
@@ -171,54 +170,37 @@ pub struct Ctx<'a> {
     /// admit a custom implementation of [LazyStorage] trait. Defaults to a new,
     /// empty, [InMemoryLazyStorage].
     pub big_map_storage: InMemoryLazyStorage<'a>,
+    /// Origination counter. Incremented for each `CREATE_CONTRACT`. Defaults to `0`.
     origination_counter: u32,
+    /// Operation counter used as a nonce for operations. Defaults to `0`.
     operation_counter: u128,
 }
 
 impl<'a> Ctx<'a> {
-    /// Increment the internal operation counter and return it. Used as a nonce
-    /// for operations.
-    pub fn operation_counter(&mut self) -> u128 {
-        self.operation_counter += 1;
-        self.operation_counter
-    }
-
     /// Forcibly set the operation counter. This is mostly useful for testing purposes.
     pub fn set_operation_counter(&mut self, v: u128) {
         self.operation_counter = v;
     }
 
-    /// Set a reasonable implementation for [Self::lookup_contract] by providing
-    /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
+    /// Set [Self::lookup_entrypoints] by providing something that can convert
+    /// to [`HashMap<AddressHash, Entrypoints>`].
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
-        let map = v.into();
-        self.lookup_entrypoints = Box::new(move |ah| map.get(ah).cloned());
+        self.lookup_entrypoints = v.into();
     }
 
-    /// Set a resonable implementation for [Self::big_map_storage] by providing
-    /// something that implements the [LazyStorage] trait.
+    /// Set [Self::big_map_storage] by providing an [InMemoryLazyStorage].
     pub fn set_big_map_storage(&mut self, v: InMemoryLazyStorage<'a>) {
         self.big_map_storage = v;
     }
 
-    /// Set a reasonable implementation for [Self::voting_powers] and a
-    /// consistent value for [Self::total_voting_power] by providing something
-    /// that converts into  [`HashMap<PublicKeyHash, BigUint>`], mapping key hashes to
-    /// voting powers. If a given key hash is unspecified, its voting power is
-    /// assumed to be `0`. [Self::total_voting_power] is set to the sum of all
-    /// values.
+    /// Set [Self::voting_powers] and a consistent value for
+    /// [Self::total_voting_power] by providing something that converts into
+    /// [`HashMap<PublicKeyHash, BigUint>`]. [Self::total_voting_power] is set
+    /// to the sum of all values.
     pub fn set_voting_powers(&mut self, v: impl Into<HashMap<PublicKeyHash, BigUint>>) {
         let map: HashMap<PublicKeyHash, BigUint> = v.into();
         self.total_voting_power = map.values().sum();
-        self.voting_powers = Box::new(move |x| map.get(x).unwrap_or(&0u32.into()).clone());
-    }
-
-    /// Increment origination counter and return its new value. Used as a nonce
-    /// to generate unique contract addresses for the `CREATE_CONTRACT`
-    /// instruction.
-    pub fn origination_counter(&mut self) -> u32 {
-        self.origination_counter += 1;
-        self.origination_counter
+        self.voting_powers = map;
     }
 
     /// Forcibly set an origination counter. Mostly useful in tests.
@@ -242,8 +224,8 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            lookup_entrypoints: Box::new(|_| None),
-            voting_powers: Box::new(|_| 0u32.into()),
+            lookup_entrypoints: HashMap::new(),
+            voting_powers: HashMap::new(),
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
             views: HashMap::new(),
@@ -268,7 +250,7 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        (self.lookup_entrypoints)(address)
+        self.lookup_entrypoints.get(address).cloned()
     }
 
     fn big_map_get_type(
@@ -313,7 +295,10 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     }
 
     fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint {
-        (self.voting_powers)(pkh)
+        self.voting_powers
+            .get(pkh)
+            .cloned()
+            .unwrap_or(BigUint::ZERO)
     }
 
     fn now(&self) -> BigInt {
