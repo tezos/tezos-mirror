@@ -605,8 +605,9 @@ let verify_filtered_out_slots_absent dal_node_source dal_node_target tests_error
 
     When not provided, filter options default to no filtering. *)
 let check_snapshot_variation ~operators ~name ~published ~upper_bound_exported
-    ~stop ?(import_steps = [("single", (None, None, None, None, None, None))])
-    node dal_node =
+    ~stop ?(compress = false)
+    ?(import_steps = [("single", (None, None, None, None, None, None))]) node
+    dal_node =
   (* Create a fresh DAL node for all imports *)
   let fresh_dal_node = Dal_node.create ~node () in
   let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
@@ -647,6 +648,7 @@ let check_snapshot_variation ~operators ~name ~published ~upper_bound_exported
     let snapshot_file = Temp.file ("snapshot-" ^ name ^ "-" ^ step_name) in
     let* () =
       Dal_node.snapshot_export
+        ~compress
         ~min_published_level:export_min
         ~max_published_level:export_max
         ?slots:slots_exp
@@ -717,8 +719,8 @@ let check_snapshot_variation ~operators ~name ~published ~upper_bound_exported
   | _ -> Log.info "[%s] Multi-step import completed successfully" name) ;
   unit
 
-let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
-    dal_node =
+let test_dal_node_snapshot ~operators ?(compress = false) _protocol parameters
+    cryptobox node client dal_node =
   (* Publish slots once for all snapshot test variations *)
   let* start = Lwt.map succ (Node.get_level node) in
   let expected_exported_levels = 5 in
@@ -769,6 +771,7 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
       ~published
       ~upper_bound_exported
       ~stop
+      ~compress
       ~import_steps
       node
       dal_node
@@ -853,8 +856,8 @@ let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
     1. Data that was present before import remains present
     2. Newly imported data is correctly added
     3. Metadata (first_seen_level, last_processed_level) is properly merged *)
-let test_dal_node_snapshot_import_merging ~operators _protocol parameters
-    cryptobox node client dal_node =
+let test_dal_node_snapshot_import_merging ~operators ?(compress = false)
+    _protocol parameters cryptobox node client dal_node =
   (* Publish data across multiple levels to test multi-step import *)
   let* start = Lwt.map succ (Node.get_level node) in
   let total_levels = 9 in
@@ -911,11 +914,178 @@ let test_dal_node_snapshot_import_merging ~operators _protocol parameters
       ~published
       ~upper_bound_exported
       ~stop
+      ~compress
       ~import_steps
       node
       dal_node
   in
   unit
+
+(** Test that exporting a snapshot to a destination that already exists fails
+    with an appropriate error for both plain directory and tar formats. *)
+let test_dal_node_snapshot_overwrite_fails ~operators _protocol parameters
+    cryptobox node client dal_node =
+  let* start = Lwt.map succ (Node.get_level node) in
+  let stop =
+    start + 3 + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
+  in
+  let* _published =
+    publish_and_bake
+      ~slots:operators
+      ~from_level:start
+      ~to_level:stop
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let endpoint = Node.as_rpc_endpoint node in
+  let min_published_level = Int32.of_int start in
+  let max_published_level = Int32.of_int stop in
+  (* Plain directory format: second export to existing destination should fail *)
+  let plain_dst = Temp.dir "dal-snapshot-overwrite-plain" in
+  let* () =
+    Dal_node.snapshot_export
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      plain_dst
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "already exists")
+      (Dal_node.spawn_snapshot_export
+         ~min_published_level
+         ~max_published_level
+         ~endpoint
+         dal_node
+         plain_dst)
+  in
+  (* Tar format: second export to the same base path should fail *)
+  let tar_base = Temp.file "dal-snapshot-overwrite-tar" in
+  let* () =
+    Dal_node.snapshot_export
+      ~compress:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      tar_base
+  in
+  Process.check_error
+    ~msg:(rex "already exists")
+    (Dal_node.spawn_snapshot_export
+       ~compress:true
+       ~min_published_level
+       ~max_published_level
+       ~endpoint
+       dal_node
+       tar_base)
+
+(** Tests that importing a tar snapshot fails when the 'version' metadata entry
+    is missing or contains an incompatible version number.
+
+    The test exports a valid snapshot, then creates two corrupted variants by
+    extracting the tar and repacking it with the version entry either removed
+    or replaced with a wrong value.  Each variant must produce a specific error
+    message on import. *)
+let test_dal_node_snapshot_version_check ~operators _protocol parameters
+    cryptobox node client dal_node =
+  let* start = Lwt.map succ (Node.get_level node) in
+  let stop =
+    start + 2 + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
+  in
+  let wait_dal_processed = wait_for_layer1_final_block dal_node (stop - 2) in
+  let* _published =
+    publish_and_bake
+      ~slots:operators
+      ~from_level:start
+      ~to_level:stop
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let* () = wait_dal_processed in
+  let endpoint = Node.as_rpc_endpoint node in
+  let min_published_level = Int32.of_int start in
+  let max_published_level = Int32.of_int stop in
+  (* Export a valid tar snapshot *)
+  let snapshot_base = Temp.file "dal-snapshot-version-check" in
+  let* () =
+    Dal_node.snapshot_export
+      ~compress:true
+      ~min_published_level
+      ~max_published_level
+      ~endpoint
+      dal_node
+      snapshot_base
+  in
+  let snapshot_file = snapshot_base ^ ".tar" in
+  (* Helper: extract [snapshot_file], apply [modify] on the extracted
+     directory, then repack it to [output]. *)
+  let manipulate_tar ~extract_dir ~modify ~output =
+    let rc =
+      Sys.command (Printf.sprintf "tar xf %s -C %s" snapshot_file extract_dir)
+    in
+    if rc <> 0 then Test.fail "tar extract failed (exit code %d)" rc ;
+    modify extract_dir ;
+    let rc =
+      Sys.command
+        (Printf.sprintf
+           "tar cf %s -C %s $(ls -A %s)"
+           output
+           extract_dir
+           extract_dir)
+    in
+    if rc <> 0 then Test.fail "tar repack failed (exit code %d)" rc
+  in
+  (* Test 1: import fails when the version entry is absent *)
+  let extract_dir_1 = Temp.dir "snapshot-no-version-extract" in
+  let no_version_tar = Temp.file "snapshot-no-version" ^ ".tar" in
+  manipulate_tar
+    ~extract_dir:extract_dir_1
+    ~modify:(fun dir ->
+      ignore (Sys.command (Printf.sprintf "rm -f %s/version" dir)))
+    ~output:no_version_tar ;
+  let fresh_node_1 = Dal_node.create ~node () in
+  let* () = Dal_node.init_config fresh_node_1 in
+  let* () =
+    Process.check_error
+      ~msg:(rex "missing version")
+      (Dal_node.spawn_snapshot_import
+         ~no_check:true
+         ~endpoint
+         fresh_node_1
+         no_version_tar)
+  in
+  (* Test 2: import fails when the version number does not match *)
+  let extract_dir_2 = Temp.dir "snapshot-wrong-version-extract" in
+  let wrong_version_tar = Temp.file "snapshot-wrong-version" ^ ".tar" in
+  let wrong_version =
+    Tezos_dal_node_lib.Snapshot.current_snapshot_version + 1
+  in
+  manipulate_tar
+    ~extract_dir:extract_dir_2
+    ~modify:(fun dir ->
+      ignore
+        (Sys.command
+           (Printf.sprintf "printf '%d' > %s/version" wrong_version dir)))
+    ~output:wrong_version_tar ;
+  let fresh_node_2 = Dal_node.create ~node () in
+  let* () = Dal_node.init_config fresh_node_2 in
+  Process.check_error
+    ~msg:(rex "version mismatch")
+    (Dal_node.spawn_snapshot_import
+       ~no_check:true
+       ~endpoint
+       fresh_node_2
+       wrong_version_tar)
 
 let test_dal_node_startup ~__FILE__ =
   Protocol.register_test
@@ -2794,6 +2964,42 @@ let register ~__FILE__ ~protocols =
     ~history_mode:Full
     "dal node snapshot import with merging into existing store"
     (test_dal_node_snapshot_import_merging ~operators:[0; 3])
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "tar"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot export/import (tar)"
+    (test_dal_node_snapshot ~operators:[0; 3] ~compress:true)
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "merge"; "tar"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot import with merging into existing store (tar)"
+    (test_dal_node_snapshot_import_merging ~operators:[0; 3] ~compress:true)
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "overwrite"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot export to existing destination fails"
+    (test_dal_node_snapshot_overwrite_fails ~operators:[0; 3])
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "tar"; "version"; Tag.memory_hungry]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot import rejects missing or wrong version"
+    (test_dal_node_snapshot_version_check ~operators:[0; 3])
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
