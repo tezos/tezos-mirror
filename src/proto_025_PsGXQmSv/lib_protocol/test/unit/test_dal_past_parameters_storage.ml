@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (dal past parameters storage)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/unit/main.exe \
                   -- --file test_dal_past_parameters_storage.ml
     Subject:    These unit tests check Dal past parameter storage functions.
 *)

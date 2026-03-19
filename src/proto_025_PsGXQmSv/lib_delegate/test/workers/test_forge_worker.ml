@@ -8,7 +8,7 @@
 (* Testing
    -------
    Component:    Baker, Forge Worker
-   Invocation:   dune exec src/proto_alpha/lib_delegate/test/workers/main.exe \
+   Invocation:   dune exec src/proto_025_PsGXQmSv/lib_delegate/test/workers/main.exe \
                   -- --file test_forge_worker.ml
    Subject:      Unit and integration tests for the forge worker
 

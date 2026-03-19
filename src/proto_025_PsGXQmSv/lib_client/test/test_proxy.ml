@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Client
-    Invocation:   dune exec src/proto_alpha/lib_client/test/main.exe \
+    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_client/test/main.exe \
                   -- --file test_proxy.ml
     Subject:      Test of --mode proxy heuristic
 *)

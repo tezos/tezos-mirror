@@ -9,7 +9,7 @@
 (** Testing
     -------
     Component:    Baker, DAL included attestations cache
-    Invocation:   dune exec src/proto_alpha/lib_delegate/test/main.exe \
+    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_delegate/test/main.exe \
                    -- --file test_dal_included_attestations_cache.ml
     Subject:      Tests for the DAL included attestations cache.
 
