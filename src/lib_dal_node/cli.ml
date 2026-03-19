@@ -1128,14 +1128,27 @@ module Snapshot = struct
 
   module Export = struct
     let man =
-      [`S "DESCRIPTION"; `P "Export DAL node data to another data directory."]
+      [
+        `S "DESCRIPTION";
+        `P
+          "Export DAL node data to another data directory. By default, the \
+           export produces a plain data directory. Use --compress to produce a \
+           compressed tar archive instead.";
+      ]
+
+    let compress =
+      let open Cmdliner in
+      let doc =
+        "Export as a compressed tar archive instead of a plain data directory."
+      in
+      Arg.(value & flag & info ~doc ["compress"])
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~exits ~doc:"Export snapshot" ~man ~version "export"
 
     let action min_published_level max_published_level slots data_dir endpoint
-        config_file file_path =
+        config_file compress file_path =
       let data_dir =
         Option.value ~default:Configuration_file.default.data_dir data_dir
       in
@@ -1147,6 +1160,7 @@ module Snapshot = struct
       let min_level = Option.map Int32.of_int min_published_level in
       let max_level = Option.map Int32.of_int max_published_level in
       Snapshot.export
+        ~compress
         ~data_dir
         ~config_file
         ~endpoint
@@ -1162,7 +1176,7 @@ module Snapshot = struct
           (const action
           $ min_published_level "Minimum published level to export."
           $ max_published_level "Maximum published level to export."
-          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file
+          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file $ compress
           $ file_path "Path to the destination data directory."))
 
     let cmd = Cmdliner.Cmd.v info term

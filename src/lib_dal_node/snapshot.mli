@@ -5,12 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Current snapshot format version.
+
+    Import rejects archives whose version does not match this value.
+    Bump when making backward-incompatible changes to the archive format. *)
+val current_snapshot_version : int
+
 (** [export ~data_dir ~config_file ~endpoint ~min_published_level
     ~max_published_level ~slots path] exports the DAL node store data for slots
     published between [min_published_level] and [max_published_level]
     (inclusive) to a snapshot at the given [path].
 
-    The snapshot is exported as a plain data directory.
+    When [compress] is [true], the snapshot is written as a tar archive
+    (with [.tar] extension automatically appended if missing) containing
+    individually gzip-compressed entries. When [compress] is [false]
+    (the default), the snapshot is exported as a plain data directory.
 
     If [min_published_level] is [None], the [first_seen_level] from the store
     is used as the default.
@@ -22,6 +31,7 @@
     [progress_display_mode] controls whether progress bars are displayed during
     the export. Defaults to [Auto] (display only when stdout is a TTY). *)
 val export :
+  ?compress:bool ->
   ?progress_display_mode:Animation.progress_display_mode ->
   data_dir:string ->
   config_file:string ->

@@ -21,6 +21,32 @@
 *)
 
 open Filename.Infix
+module KVS = Key_value_store
+
+let ensure_tar_extension path =
+  let tar_extension = ".tar" in
+  if Filename.check_suffix path tar_extension then path
+  else path ^ tar_extension
+
+(** Tar entry filename for the skip list binary dump. *)
+let skip_list_binary_filename = Store.Stores_dirs.skip_list_cells // "cells.bin"
+
+(** Tar entry names for metadata values. *)
+let chain_id_filename = "chain_id"
+
+let first_seen_level_filename = "first_seen_level"
+
+let last_processed_level_filename = "last_processed_level"
+
+let version_filename = "version"
+
+(** Current snapshot format version.
+
+    Bump this constant whenever the tar archive format changes in a
+    backward-incompatible way (new mandatory entries, changed encoding,
+    removed entries, etc.). The import code rejects archives whose version
+    does not match this value. *)
+let current_snapshot_version = 1
 
 (** {2 Gzip helpers}
 
@@ -90,28 +116,6 @@ let write_skip_list_record fd record =
   let* () = Lwt_utils_unix.write_bytes fd len_bytes in
   Lwt_utils_unix.write_bytes fd encoded
 
-module KVS = Key_value_store
-
-(** Tar entry names for metadata values. *)
-let chain_id_filename = "chain_id"
-
-let first_seen_level_filename = "first_seen_level"
-
-let last_processed_level_filename = "last_processed_level"
-
-let version_filename = "version"
-
-(** Current snapshot format version.
-
-    Bump this constant whenever the tar archive format changes in a
-    backward-incompatible way (new mandatory entries, changed encoding,
-    removed entries, etc.). The import code rejects archives whose version
-    does not match this value. *)
-let current_snapshot_version = 1
-
-(** Tar entry filename for the skip list binary dump. *)
-let skip_list_binary_filename = Store.Stores_dirs.skip_list_cells // "cells.bin"
-
 (** Write [bytes] directly as a tar entry named [filename]. *)
 let add_bytes_to_tar tar ~bytes ~filename =
   Octez_tar_helpers.add_raw_and_finalize tar ~filename ~f:(fun fd ->
@@ -171,6 +175,7 @@ let iterate_levels ?notify ~min_published_level ~max_published_level f =
 let slot_id_to_filename (slot_id : Types.Slot_id.t) =
   Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
 
+(** Parse a [<level>_<index>] filename into a slot_id. *)
 let slot_id_of_filename filename =
   let basename = Filename.basename filename in
   match String.split_on_char '_' basename with
@@ -1624,33 +1629,63 @@ let init_logging () =
   in
   Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
 
-let export ?(progress_display_mode = Animation.Auto) ~data_dir ~config_file
-    ~endpoint ~min_published_level ~max_published_level ~slots dst =
+let export ?(compress = false) ?(progress_display_mode = Animation.Auto)
+    ~data_dir ~config_file ~endpoint ~min_published_level ~max_published_level
+    ~slots dst =
   let open Lwt_result_syntax in
   let*! () = init_logging () in
   let src_root_dir = store_path data_dir in
-  let dst_root_dir = store_path dst in
-  let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
-  let* () =
-    if dst_exists then
-      failwith
-        "Destination directory %s already exists. Please remove it or choose a \
-         different destination."
-        dst_root_dir
-    else return_unit
-  in
-  Merge.merge
-    ~progress_display_mode
-    ~frozen_only:true
-    ~src_root_dir
-    ~config_file
-    ~endpoint
-    ~min_published_level
-    ~max_published_level
-    ~slots
-    ~dst_root_dir
-    ~event_path:dst_root_dir
-    ~event_kind:"data dir"
+  if compress then
+    let dst_tar_file = ensure_tar_extension dst in
+    let*! dst_exists = Lwt_unix.file_exists dst_tar_file in
+    let* () =
+      if dst_exists then
+        failwith
+          "Destination file %s already exists. Please remove it or choose a \
+           different destination."
+          dst_tar_file
+      else return_unit
+    in
+    let* () =
+      Export_tar.run
+        ~progress_display_mode
+        ~src_root_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level
+        ~max_published_level
+        ~slots
+        ~dst_tar_file
+    in
+    return_unit
+  else
+    let dst_root_dir = store_path dst in
+    let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
+    let* () =
+      if dst_exists then
+        failwith
+          "Destination directory %s already exists. Please remove it or choose \
+           a different destination."
+          dst_root_dir
+      else return_unit
+    in
+    let* () =
+      Merge.merge
+        ~progress_display_mode
+        ~frozen_only:true
+        ~src_root_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level
+        ~max_published_level
+        ~slots
+        ~dst_root_dir
+        ~event_path:dst_root_dir
+        ~event_kind:"data dir"
+    in
+    return_unit
+
+let is_tar_file path = Filename.check_suffix path ".tar"
 
 let import ?(check = true) ?(progress_display_mode = Animation.Auto)
     ~data_dir:dst ~config_file ~endpoint ~min_published_level
@@ -1662,17 +1697,43 @@ let import ?(check = true) ?(progress_display_mode = Animation.Auto)
       "Import with checks is not yet implemented. Use --no-check if you want \
        to bypass imported data validation.\n"
   else
-    let src_root_dir = store_path src in
-    let dst_root_dir = store_path dst in
-    Merge.merge
-      ~progress_display_mode
-      ~frozen_only:false
-      ~src_root_dir
-      ~config_file
-      ~endpoint
-      ~min_published_level
-      ~max_published_level
-      ~slots
-      ~dst_root_dir
-      ~event_path:src
-      ~event_kind:"data dir"
+    (* Detect tar format: explicit .tar suffix, or <src>.tar file exists
+       (export always appends .tar via [ensure_tar_extension]). *)
+    let tar_candidate = ensure_tar_extension src in
+    let*! is_tar =
+      if is_tar_file src then Lwt.return_true
+      else Lwt_unix.file_exists tar_candidate
+    in
+    if is_tar then
+      let tar_file = if is_tar_file src then src else tar_candidate in
+      let dst_root_dir = store_path dst in
+      let* () =
+        Import_tar.run
+          ~progress_display_mode
+          ~dst_root_dir
+          ~slots
+          ~min_published_level
+          ~max_published_level
+          ~config_file
+          ~endpoint
+          ~tar_file
+      in
+      return_unit
+    else
+      let src_root_dir = store_path src in
+      let dst_root_dir = store_path dst in
+      let* () =
+        Merge.merge
+          ~progress_display_mode
+          ~frozen_only:false
+          ~src_root_dir
+          ~config_file
+          ~endpoint
+          ~min_published_level
+          ~max_published_level
+          ~slots
+          ~dst_root_dir
+          ~event_path:src
+          ~event_kind:"data dir"
+      in
+      return_unit
