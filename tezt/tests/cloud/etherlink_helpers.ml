@@ -98,7 +98,9 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot
           cloud
           agent
       in
-      let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+      let* dal_node =
+        Dal_node.Agent.create ~name:(name ^ "-dal") ~node cloud agent
+      in
       let* () =
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
@@ -396,6 +398,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
   let () = toplog "Init Etherlink: launching the EVM node" in
   let* evm_node =
     Tezos.Evm_node.Agent.init
+      ~wait:false
       ~initial_kernel:output
       ~preimages_dir
       ~private_rpc_port
@@ -435,6 +438,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
       cloud
       agent
   in
+  let* () = Evm_node.wait_for_ready ~timeout:1200. evm_node in
   let () = toplog "Init Etherlink: launching the EVM node: done" in
   let operator =
     {
