@@ -25,12 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = T024 | S023 | Alpha
+type t = U025 | T024 | S023 | Alpha
 
-let all = [T024; Alpha]
+let all = [U025; T024; Alpha]
 
 let encoding =
-  Data_encoding.string_enum [("alpha", Alpha); ("t024", T024); ("s023", S023)]
+  Data_encoding.string_enum
+    [("alpha", Alpha); ("u025", U025); ("t024", T024); ("s023", S023)]
 
 type constants =
   | Constants_sandbox
@@ -44,12 +45,17 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | T024 -> "T024" | S023 -> "S023"
+let name = function
+  | Alpha -> "Alpha"
+  | U025 -> "U025"
+  | T024 -> "T024"
+  | S023 -> "S023"
 
-let number = function S023 -> 023 | T024 -> 024 | Alpha -> 025
+let number = function S023 -> 023 | T024 -> 024 | U025 -> 025 | Alpha -> 026
 
 let directory = function
   | Alpha -> "proto_alpha"
+  | U025 -> "proto_025_PsGXQmSv"
   | T024 -> "proto_024_PtTALLiN"
   | S023 -> "proto_023_PtSeouLo"
 
@@ -60,6 +66,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | S023 -> "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
   | T024 -> "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+  | U025 -> "PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -315,7 +322,8 @@ let parameters_with_custom_consensus_rights_delay ~protocol
   else parameters
 
 let previous_protocol = function
-  | Alpha -> Some T024
+  | Alpha -> Some U025
+  | U025 -> Some T024
   | T024 -> None
   | S023 -> None
 

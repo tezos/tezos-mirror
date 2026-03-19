@@ -16,6 +16,7 @@ calendar of RPCs planned to be removed.
 This page contains the breaking changes and deprecated features of
 current or recent protocols, protocol proposals, and Octez versions:
 
+- :ref:`ushuaia_breaking_changes`
 - :ref:`tallinn_breaking_changes`
 - :ref:`seoul_breaking_changes`
 - :ref:`v24_breaking_changes`
@@ -35,6 +36,16 @@ versions, see :doc:`past_breaking_changes`.
    :hidden:
 
    past_breaking_changes
+
+.. _ushuaia_breaking_changes:
+
+Protocol Ushuaia
+----------------
+
+:doc:`Full Protocol Ushuaia Changelog<../protocols/025_u025>`
+
+(No breaking changes yet.)
+
 
 .. _v25_breaking_changes:
 

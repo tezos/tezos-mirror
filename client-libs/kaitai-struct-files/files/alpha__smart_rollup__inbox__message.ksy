@@ -36,12 +36,31 @@ types:
         max: 1073741823
     - id: bytes_dyn_uint30
       size: len_bytes_dyn_uint30
+  dal_attested_slots:
+    seq:
+    - id: published_level
+      type: s4be
+    - id: number_of_slots
+      type: u2be
+    - id: slot_size
+      type: int31
+    - id: page_size
+      type: u2be
+    - id: slots_by_publisher
+      type: slots_by_publisher_0
   info_per_level:
     seq:
     - id: predecessor_timestamp
       type: timestamp__protocol
     - id: predecessor
       size: 32
+  int31:
+    seq:
+    - id: int31
+      type: s4be
+      valid:
+        min: -1073741824
+        max: 1073741823
   internal:
     seq:
     - id: internal_tag
@@ -56,6 +75,9 @@ types:
     - id: protocol_migration
       type: bytes_dyn_uint30
       if: (internal_tag == internal_tag::protocol_migration)
+    - id: dal_attested_slots
+      type: dal_attested_slots
+      if: (internal_tag == internal_tag::dal_attested_slots)
   micheline__alpha__michelson_v1__expression:
     seq:
     - id: micheline__alpha__michelson_v1__expression_tag
@@ -163,6 +185,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   sequence:
     seq:
     - id: sequence_entries
@@ -181,6 +206,31 @@ types:
     seq:
     - id: sequence_elt
       type: micheline__alpha__michelson_v1__expression
+  slots_by_publisher:
+    seq:
+    - id: slots_by_publisher_entries
+      type: slots_by_publisher_entries
+      repeat: eos
+  slots_by_publisher_0:
+    seq:
+    - id: len_slots_by_publisher
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: slots_by_publisher
+      type: slots_by_publisher
+      size: len_slots_by_publisher
+  slots_by_publisher_entries:
+    seq:
+    - id: slots_by_publisher_elt_field0
+      type: public_key_hash
+      doc: ! >-
+        A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
+
+
+        signature__public_key_hash
+    - id: slots_by_publisher_elt_field1
+      type: z
   transfer:
     seq:
     - id: payload
@@ -189,7 +239,7 @@ types:
       size: 20
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: destination
       size: 20
   z:
@@ -621,6 +671,7 @@ enums:
     2: end_of_level
     3: info_per_level
     4: protocol_migration
+    5: dal_attested_slots
   micheline__alpha__michelson_v1__expression_tag:
     0: int
     1: string
@@ -652,6 +703,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: alpha__smart_rollup__inbox__message_tag
   type: u1

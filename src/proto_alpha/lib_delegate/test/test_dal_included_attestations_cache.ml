@@ -826,73 +826,77 @@ let test_no_duplicate_attestations =
   QCheck2.Test.make
     ~count:10000
     ~print:print_scenario
-    ~name:"no duplicate attestations across forks"
+    ~name:(Protocol.name ^ ": no duplicate attestations across forks")
     gen_scenario
     run_scenario
+
+let proto_tag =
+  String.lowercase_ascii Protocol.name
+  |> String.map (function '-' -> '_' | x -> x)
 
 let () =
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": fork deduplication warm-up")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"]
     test_fork_deduplication ;
   (* Depth 0 *)
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 0 — head in block_hashes -> filtered")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth0"]
     test_depth0_head_in_block_hashes_filtered ;
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 0 — head not in block_hashes -> allowed")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth0"]
     test_depth0_head_not_in_block_hashes_allowed ;
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 0 — same-level accumulation -> filtered")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth0"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth0"]
     test_depth0_head_in_block_hashes_accumulation_filtered ;
   (* Depth 1 *)
   Test.register
     ~__FILE__
     ~title:
       (Protocol.name ^ ": depth 1 — predecessor in block_hashes -> filtered")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth1"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth1"]
     test_depth1_predecessor_in_block_hashes_filtered ;
   Test.register
     ~__FILE__
     ~title:
       (Protocol.name ^ ": depth 1 — predecessor not in block_hashes -> allowed")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth1"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth1"]
     test_depth1_predecessor_not_in_block_hashes_allowed ;
   (* Depth 2 *)
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 2 — empty block_hashes -> allowed")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth2"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth2"]
     test_depth2_empty_block_hashes_allowed ;
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 2 — non-empty block_hashes -> filtered")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth2"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth2"]
     test_depth2_nonempty_block_hashes_filtered ;
   (* Depth 3 *)
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 3 — non-empty block_hashes -> filtered")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth3"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth3"]
     test_depth3_nonempty_block_hashes_filtered ;
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": depth 3 — empty block_hashes -> allowed")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"; "depth3"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"; "depth3"]
     test_depth3_empty_block_hashes_allowed ;
   Test.register
     ~__FILE__
     ~title:(Protocol.name ^ ": multiple slots mixed depths")
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"]
     test_multiple_slots_mixed ;
   Qcheck_tezt.register
     ~__FILE__
-    ~tags:[Protocol.name; "baker"; "dal"; "attestation_cache"]
+    ~tags:[proto_tag; "baker"; "dal"; "attestation_cache"]
     test_no_duplicate_attestations

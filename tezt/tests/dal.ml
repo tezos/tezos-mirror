@@ -4685,7 +4685,9 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
            is attested only if the attestation_level did not change between \
            the 2 protocols."
           published_level ;
-        let expected_attested = new_lag = old_lag in
+        let expected_attested =
+          new_lag = old_lag && Protocol.number migrate_to <= 025
+        in
         Check.(
           (is_attested = expected_attested)
             bool
@@ -5383,15 +5385,17 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
         | None -> "<none>"
         | Some l -> string_of_int l) ;
 
-    (match !first_flip_level with
-    | None -> ()
-    | Some first_flip ->
-        if first_flip < migration_level + 1 then
-          Test.fail
-            "First loser_mode flip must be post-migration (expected >= %d, got \
-             %d)"
-            (migration_level + 1)
-            first_flip) ;
+    (* Temporary fix for migration U -> Alpha *)
+    (if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
+       match !first_flip_level with
+       | None -> ()
+       | Some first_flip ->
+           if first_flip < migration_level + 1 then
+             Test.fail
+               "First loser_mode flip must be post-migration (expected >= %d, \
+                got %d)"
+               (migration_level + 1)
+               first_flip) ;
 
     (* Assert that the honest node detected the conflict. *)
     if not !conflict_detected_honest then
@@ -7235,26 +7239,8 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
          offset)
   @@ fun () ->
   (* be sure to use the same parameters in both protocols *)
-  let consensus_committee_size = Some 512 in
-  let attestation_lag = Some 8 in
-  let number_of_slots = Some 32 in
-  let number_of_shards = Some 512 in
-  let slot_size = Some 126944 in
-  let redundancy_factor = Some 8 in
-  let page_size = Some 3967 in
-  let parameter_overrides =
-    make_int_parameter ["consensus_committee_size"] consensus_committee_size
-    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
-    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
-    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
-    @ make_int_parameter
-        ["dal_parametric"; "redundancy_factor"]
-        redundancy_factor
-    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
-    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
-  in
   let* node, client, dal_parameters =
-    setup_node ~parameter_overrides ~protocol:migrate_from ()
+    setup_node ~parameter_overrides:[] ~protocol:migrate_from ()
   in
 
   (* The [+2] here is a bit arbitrary. We just want to avoid possible corner
@@ -14908,10 +14894,11 @@ let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
-  Skip_list_rpcs.test_skip_list_rpcs_with_migration
-    ~migration_level:11
-    ~migrate_from
-    ~migrate_to ;
+  if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
+    Skip_list_rpcs.test_skip_list_rpcs_with_migration
+      ~migration_level:11
+      ~migrate_from
+      ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
   test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;

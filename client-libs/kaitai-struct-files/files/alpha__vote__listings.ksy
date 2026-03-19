@@ -12,7 +12,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: voting_power
       type: s8be
   public_key_hash:
@@ -32,12 +32,16 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
 enums:
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: len_alpha__vote__listings
   type: u4be

@@ -1,0 +1,23 @@
+{	"branch": "BL2xnxQ6YPmySpE9CZgDUFPKD146Hku36aojiGGF1gWfbijeihZ",
+	"contents":
+  	[ { "kind": "double_consensus_operation_evidence", "slot": 0,
+      	"op1":
+        	{ "branch": "BLkHSfhY7kff5Jzo9Nvj7hCu2hi2SeDaNmSTmUU7SDaGGhEWQo9",
+          	"operations":
+            	{ "kind": "attestation_with_dal", "slot": 0, "level": 150562,
+              	"round": 0,
+              	"block_payload_hash":
+                	"vh2Sqiiseutbb13hthkf2usRi3rko4wTcq5yQKn6zubBDwoCHJoT",
+              	"dal_attestation": "0" },
+          	"signature":
+            	"BLsig9tpbsg9VSzGaeZxvRRR9HJ62AhQmtEX1RFUp6AvBsP62aN3jFEkdNq6u2imXAjPUEQ4Z3Lt4H9h7nHhXkpUXF6WKymJFRxB3aZbm4AydnT7hNnSEWGRQ3wpjMBvQ1giAX7UTodyZi" },
+      	"op2":
+        	{ "branch": "BLkHSfhY7kff5Jzo9Nvj7hCu2hi2SeDaNmSTmUU7SDaGGhEWQo9",
+          	"operations":
+            	{ "kind": "attestation", "slot": 0, "level": 150562,
+              	"round": 0,
+              	"block_payload_hash":
+                	"vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG" },
+          	"signature":
+            	"BLsig9yLWpztFBMJRd4bacFXnE4mgyTruWPWCVNA4vYFP9sgv4t9NVtgVs5Tx1umTiSzYWtmbAsrZhYLCwjhpXQAssTaNNtCHeZAbmXZRHJhqsTee8GWzWftoH36VvDEpg9NnahmMvwwE1" }
+  } ] }

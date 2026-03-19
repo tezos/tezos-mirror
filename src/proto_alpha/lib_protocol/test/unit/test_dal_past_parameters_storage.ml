@@ -34,8 +34,10 @@ let parameters_for_a_level () =
       {
         feature_enable = true;
         incentives_enable = true;
+        dynamic_lag_enable = false;
         number_of_slots = 1;
         attestation_lag = n;
+        attestation_lags = [n];
         attestation_threshold = 1;
         cryptobox_parameters =
           Cryptobox.
@@ -55,8 +57,10 @@ let parameters_for_a_level () =
           {
             feature_enable;
             incentives_enable;
+            dynamic_lag_enable;
             number_of_slots;
             attestation_lag;
+            attestation_lags;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;
@@ -69,10 +73,10 @@ let parameters_for_a_level () =
       {
         feature_enable;
         incentives_enable;
-        dynamic_lag_enable = false;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
-        attestation_lags = [attestation_lag];
+        attestation_lags;
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;
@@ -80,6 +84,7 @@ let parameters_for_a_level () =
         traps_fraction;
       }
   in
+
   let*@ ctxt =
     Dal_storage.save_parameters
       ctxt

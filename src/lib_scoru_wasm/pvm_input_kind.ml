@@ -25,6 +25,7 @@
 
 (* You can only add variants to this type. You cannot remove them. *)
 type protocol =
+  | U025
   | T024
   | S023
   | Nairobi
@@ -83,6 +84,8 @@ let protocol_from_raw payload =
         Some (Protocol_migration S023)
     | payload when String.equal payload Constants.proto_t024_name ->
         Some (Protocol_migration T024)
+    | payload when String.equal payload Constants.proto_u025_name ->
+        Some (Protocol_migration U025)
     | payload when String.equal payload Constants.proto_alpha_name ->
         Some (Protocol_migration Proto_alpha)
     | _ -> None
@@ -123,6 +126,8 @@ module Internal_for_tests = struct
         Data_encoding.(Binary.to_string_exn string Constants.parisc_name)
     | Proto_alpha ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_alpha_name)
+    | U025 ->
+        Data_encoding.(Binary.to_string_exn string Constants.proto_u025_name)
     | T024 ->
         Data_encoding.(Binary.to_string_exn string Constants.proto_t024_name)
     | S023 ->

@@ -1,6 +1,6 @@
-From a71c2f29539264aeaa5b983304e44a72a79c92a4 Mon Sep 17 00:00:00 2001
+From 84e69d24b11ca840d3fb3f9b61f1848ba2354095 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Tue, 10 Mar 2026 17:51:18 +0100
+Date: Thu, 19 Mar 2026 14:07:54 +0100
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
@@ -9,16 +9,16 @@ Subject: [PATCH 1/1] Profiler: patch proto_alpha
  .../sigs/v16/profiler.mli                     | 39 +++++++++
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
  src/proto_alpha/lib_protocol/baking.ml        |  4 +-
- .../lib_protocol/dal_slot_storage.ml          | 10 ++-
+ .../lib_protocol/dal_slot_storage.ml          |  5 +-
  .../lib_protocol/delegate_cycles.ml           | 85 +++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
- src/proto_alpha/lib_protocol/init_storage.ml  | 26 +++++-
+ src/proto_alpha/lib_protocol/init_storage.ml  | 28 +++++-
  src/proto_alpha/lib_protocol/main.ml          | 43 ++++++++--
  src/proto_alpha/lib_protocol/raw_context.ml   |  4 +-
  src/proto_alpha/lib_protocol/script_cache.ml  | 19 +++--
  .../lib_protocol/script_interpreter.ml        | 21 ++++-
  .../lib_protocol/script_ir_translator.ml      | 26 +++---
- 14 files changed, 303 insertions(+), 80 deletions(-)
+ 14 files changed, 301 insertions(+), 79 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v16/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v16.in.ml b/src/lib_protocol_environment/sigs/v16.in.ml
@@ -372,23 +372,18 @@ index 616ca63c32..13043031c1 100644
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~baking_power:0L in
 diff --git a/src/proto_alpha/lib_protocol/dal_slot_storage.ml b/src/proto_alpha/lib_protocol/dal_slot_storage.ml
-index 81ea04fc3e..24ecf1d699 100644
+index 11ddd857f1..1aae4caf15 100644
 --- a/src/proto_alpha/lib_protocol/dal_slot_storage.ml
 +++ b/src/proto_alpha/lib_protocol/dal_slot_storage.ml
-@@ -903,8 +903,14 @@ let finalize_pending_slot_headers ctxt =
+@@ -751,7 +751,10 @@ let finalize_attestation_history ctxt =
    in
-   if dynamic_lag || reset_dummy_genesis then
-     (* Normal path: use new multi-lag attestation history. *)
--    finalize_attestation_history ctxt
--  else finalize_and_migrate_attestation_history_for_U ctxt
-+    finalize_attestation_history
-+      ctxt
-+    [@profiler.record_s {verbosity = Notice} "finalize_attestation_history"]
-+  else
-+    finalize_and_migrate_attestation_history_for_U
-+      ctxt
-+    [@profiler.record_s
-+      {verbosity = Notice} "finalize_and_migrate_attestation_history_for_U"]
+   return (ctxt, attestation_bitset)
+ 
+-let finalize_pending_slot_headers ctxt = finalize_attestation_history ctxt
++let finalize_pending_slot_headers ctxt =
++  finalize_attestation_history
++    ctxt
++  [@profiler.record_s {verbosity = Notice} "finalize_attestation_history"]
  
  module Internal_for_tests = struct
    let get_delegate_ordering = get_delegate_ordering
@@ -529,10 +524,10 @@ index 9ddeb8aa27..fafd84d398 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 7643aafe0c..da9c5a04ae 100644
+index 65e764427f..e62296a0a7 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -260,10 +260,20 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -260,19 +260,39 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
@@ -555,17 +550,16 @@ index 7643aafe0c..da9c5a04ae 100644
          in
          return (ctxt, [])
          (* End of Alpha stitching. Comment used for automatic snapshot *)
-@@ -271,11 +281,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
-     | T024 ->
-         let* ctxt =
-           let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
--          Storage.Protocol_activation_level.init ctxt level
-+          (Storage.Protocol_activation_level.init
+         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
+     | U025 ->
+-        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
++        let* ctxt =
++          (Storage.Protocol_activation_level.update
 +             ctxt
 +             level
 +           [@profiler.record_s
-+             {verbosity = Notice} "Protocol_Activation_level.init"])
-         in
++             {verbosity = Notice} "Protocol_Activation_level.update"])
++        in
          (* Migration of refutation games needs to be kept for each protocol. *)
          let* ctxt =
 -          Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
@@ -575,8 +569,8 @@ index 7643aafe0c..da9c5a04ae 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         let*! cycles =
-           Storage.Stake.Selected_distribution_for_cycle.keys ctxt
+         return (ctxt, [])
+     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
 diff --git a/src/proto_alpha/lib_protocol/main.ml b/src/proto_alpha/lib_protocol/main.ml
 index 4b75e1cd23..7d245e6afa 100644
 --- a/src/proto_alpha/lib_protocol/main.ml
@@ -656,10 +650,10 @@ index 4b75e1cd23..7d245e6afa 100644
    let ctxt =
      (* Store the resulting map in the context as [allowed_consensus]. *)
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index 13e8933e63..20b6918260 100644
+index 36ec3324e3..92e533033c 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1661,12 +1661,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1660,12 +1660,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let+ ctxt =

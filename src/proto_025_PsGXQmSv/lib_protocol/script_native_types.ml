@@ -1,0 +1,813 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Alpha_context
+open Script_typed_ir
+
+(** Types declaration for native contracts. *)
+
+module Helpers = struct
+  open Micheline
+
+  (* Michelson comb-pairs representation *)
+  type ('a, 'b, 'c) tup3 = 'a * ('b * 'c)
+
+  type ('a, 'b, 'c, 'd) tup4 = 'a * ('b, 'c, 'd) tup3
+
+  type ('a, 'b, 'c, 'd, 'e) tup5 = 'a * ('b, 'c, 'd, 'e) tup4
+
+  (* Node describing a type in its typed and untyped version, that serves as
+     combinator to define native contract types. *)
+  type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
+
+  (* We actually don't need the location at all *)
+  let loc = dummy_location
+
+  let prim ?(annot = []) ?named prim args =
+    let annot = match named with Some name -> name :: annot | None -> annot in
+    Prim (loc, prim, args, annot)
+
+  let unit_ty = {untyped = prim Script.T_unit []; typed = Ty_ex_c unit_t}
+
+  (* Some combinators are unused for now but will be used later, and they serve as an
+     example to implement the rest. They are not exported as they are specific
+     to building native contracts types. *)
+  [@@@ocaml.warning "-32"]
+
+  let int_ty = {untyped = prim Script.T_int []; typed = Ty_ex_c int_t}
+
+  let nat_ty = {untyped = prim Script.T_nat []; typed = Ty_ex_c nat_t}
+
+  let bool_ty = {untyped = prim Script.T_bool []; typed = Ty_ex_c bool_t}
+
+  let address_ty =
+    {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
+
+  let string_ty = {untyped = prim Script.T_string []; typed = Ty_ex_c string_t}
+
+  let bytes_ty = {untyped = prim Script.T_bytes []; typed = Ty_ex_c bytes_t}
+
+  let map_ty (type key value) (ty_key : key comparable_ty)
+      (unty_key : Script.node)
+      ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
+      (key, value) map ty_node tzresult =
+    let open Result_syntax in
+    let* map_t : ((key, value) map, _) ty = map_t loc ty_key ty_value in
+    let untyped_map = prim Script.T_map [unty_key; unty_value] in
+    return {untyped = untyped_map; typed = Ty_ex_c map_t}
+
+  let address_map_ty value = map_ty address_t address_ty.untyped value
+
+  let string_map_ty value = map_ty string_t string_ty.untyped value
+
+  let big_map_ty (type key value) (ty_key : key comparable_ty)
+      (unty_key : Script.node)
+      ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
+      (key, value) big_map ty_node tzresult =
+    let open Result_syntax in
+    let* big_map_t : ((key, value) big_map, _) ty =
+      big_map_t loc ty_key ty_value
+    in
+    let untyped_big_map = prim Script.T_big_map [unty_key; unty_value] in
+    return {untyped = untyped_big_map; typed = Ty_ex_c big_map_t}
+
+  let address_big_map_ty value = big_map_ty address_t address_ty.untyped value
+
+  let nat_big_map_ty value = big_map_ty nat_t nat_ty.untyped value
+
+  let pair_ty (type a b) ({untyped = unty1; typed = Ty_ex_c ty1; _} : a ty_node)
+      ({untyped = unty2; typed = Ty_ex_c ty2; _} : b ty_node) :
+      (a * b) ty_node tzresult =
+    let open Result_syntax in
+    let+ pair_t = Script_typed_ir.pair_t loc ty1 ty2 in
+    {untyped = prim Script.T_pair [unty1; unty2]; typed = pair_t}
+
+  let tup3_ty (type a b c) ty1 ty2 ty3 : (a, b, c) tup3 ty_node tzresult =
+    let open Result_syntax in
+    let* r = pair_ty ty2 ty3 in
+    pair_ty ty1 r
+
+  let tup4_ty (type a b c d) ty1 ty2 ty3 ty4 :
+      (a, b, c, d) tup4 ty_node tzresult =
+    let open Result_syntax in
+    let* r = tup3_ty ty2 ty3 ty4 in
+    pair_ty ty1 r
+
+  let tup5_ty (type a b c d e) ty1 ty2 ty3 ty4 ty5 :
+      (a, b, c, d, e) tup5 ty_node tzresult =
+    let open Result_syntax in
+    let* r = tup4_ty ty2 ty3 ty4 ty5 in
+    pair_ty ty1 r
+
+  let or_ty (type l r) ({untyped = untyl; typed = Ty_ex_c tyl; _} : l ty_node)
+      ({untyped = untyr; typed = Ty_ex_c tyr; _} : r ty_node) :
+      (l, r) or_ ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.or_t loc tyl tyr in
+    {untyped = prim Script.T_or [untyl; untyr]; typed}
+
+  let list_ty ({untyped; typed = Ty_ex_c ty_elt} : 'a ty_node) :
+      'a Script_list.t ty_node tzresult =
+    let open Result_syntax in
+    let* ty_list = Script_typed_ir.list_t loc ty_elt in
+    return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
+
+  let option_ty (type t) ({untyped; typed = Ty_ex_c ty; _} : t ty_node) :
+      t option ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.option_t loc ty in
+    {untyped = prim Script.T_option [untyped]; typed = Ty_ex_c typed}
+
+  let contract_ty (type t) ({untyped; typed = Ty_ex_c ty; _} : t ty_node) :
+      t typed_contract ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.contract_t loc ty in
+    {untyped = prim Script.T_contract [untyped]; typed = Ty_ex_c typed}
+
+  let ticket_ty (type t) (ty : t comparable_ty) (untyped : Script.node) :
+      t ticket ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.ticket_t loc ty in
+    {untyped = prim Script.T_ticket [untyped]; typed = Ty_ex_c typed}
+
+  let operation_ty : operation ty_node =
+    {untyped = prim Script.T_operation []; typed = Ty_ex_c operation_t}
+
+  let lambda_ty (type a b)
+      ({untyped = unty_arg; typed = Ty_ex_c ty_arg; _} : a ty_node)
+      ({untyped = unty_ret; typed = Ty_ex_c ty_ret; _} : b ty_node) :
+      (a, b) lambda ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.lambda_t loc ty_arg ty_ret in
+    {untyped = prim Script.T_lambda [unty_arg; unty_ret]; typed = Ty_ex_c typed}
+
+  (** Entrypoints combinator *)
+
+  (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
+
+  (** Annotates a node with a name. *)
+  let add_name name node =
+    let untyped =
+      match node.untyped with
+      | Prim (loc, prim, args, annot) ->
+          Prim (loc, prim, args, ("%" ^ name) :: annot)
+      | (Int _ | String _ | Bytes _ | Seq _) as x -> x
+    in
+    {node with untyped}
+
+  (** Generates the leaf of the entrypoint tree, i.e. an entrypoint. *)
+  let make_entrypoint_leaf (type t) name (node : t ty_node) =
+    let open Result_syntax in
+    let {typed; untyped} = add_name name node in
+    let* name = Entrypoint.of_string_strict ~loc name in
+    let at_node = Some {name; original_type_expr = untyped} in
+    return ({typed; untyped}, {at_node; nested = Entrypoints_None})
+
+  (** Generates a `or` node out of two entrypoints. *)
+  let make_entrypoint_node (type left right)
+      ((left_ty, left_etp) : left ty_node * left entrypoints_node)
+      ((right_ty, right_etp) : right ty_node * right entrypoints_node) =
+    let open Result_syntax in
+    let* node_ty = or_ty left_ty right_ty in
+    let entrypoints = Entrypoints_Or {left = left_etp; right = right_etp} in
+    return (node_ty, {at_node = None; nested = entrypoints})
+
+  (** Generate the entrypoints representation for contract that don't have
+      entrypoint. *)
+  let finalize_no_entrypoint (type t) (ty : t ty_node) =
+    ( ty,
+      {
+        root = {at_node = None; nested = Entrypoints_None};
+        original_type_expr = ty.untyped;
+      } )
+
+  (** Once the entrypoints tree has been built, simply generate the
+      `entrypoints` type out of it. *)
+  let finalize_entrypoint (type t)
+      ((ty, entrypoint) : t ty_node * t entrypoints_node) =
+    (ty, {root = entrypoint; original_type_expr = ty.untyped})
+end
+
+type 'a ty_node = 'a Helpers.ty_node = {
+  untyped : Script.node;
+  typed : 'a ty_ex_c;
+}
+
+type ('arg, 'output) view_type = {
+  input_ty : 'arg ty_ex_c;
+  output_ty : 'output ty_ex_c;
+}
+
+type ('arg, 'storage, 'output) view = {
+  name : Script_string.t;
+  ty : ('arg, 'output) view_type;
+  implementation :
+    context * step_constants ->
+    'arg ->
+    'storage ->
+    ('output * context) tzresult Lwt.t;
+}
+
+type 'storage ex_view =
+  | Ex_view : ('arg, 'storage, 'output) view -> 'storage ex_view
+
+type 'storage view_map = (Script_string.t, 'storage ex_view) map
+
+module CLST_types = struct
+  open Helpers
+
+  type ('a, 'b, 'c) tup3 = ('a, 'b, 'c) Helpers.tup3
+
+  type ('a, 'b, 'c, 'd) tup4 = ('a, 'b, 'c, 'd) Helpers.tup4
+
+  type ('a, 'b, 'c, 'd, 'e) tup5 = ('a, 'b, 'c, 'd, 'e) Helpers.tup5
+
+  type 'a s_list = 'a Script_list.t
+
+  type nat = Script_int.n Script_int.num
+
+  type int = Script_int.z Script_int.num
+
+  type deposit = unit
+
+  type redeem = nat
+
+  type finalize = unit
+
+  type staker_entrypoints = ((deposit, redeem) or_, finalize) or_
+
+  type delegate_parameters =
+    nat (* edge_of_clst_staking *) * nat (* ratio_of_clst_staking *)
+
+  type register_delegate = delegate_parameters option
+
+  type update_delegate_parameters = delegate_parameters
+
+  type unregister_delegate = unit
+
+  type delegate_entrypoints =
+    ( register_delegate,
+      (update_delegate_parameters, unregister_delegate) or_ )
+    or_
+
+  type clst_entrypoints = (staker_entrypoints, delegate_entrypoints) or_
+
+  type transfer =
+    ( address (* from_ *),
+      (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
+      Script_list.t )
+    (* txs *)
+    pair
+    Script_list.t
+
+  type allowance_delta = (nat (* increase *), nat (* decrease *)) or_
+
+  type approval =
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      allowance_delta (* action *) )
+    tup4
+
+  type approve = approval s_list
+
+  type operator =
+    (address (* owner *), address (* operator *), nat (* token_id *)) tup3
+
+  type operator_delta =
+    (operator (* add_operator *), operator (* remove_operator *)) or_
+
+  type update_operators = operator_delta s_list
+
+  type balance_request = address (* owner *) * nat (* token_id *)
+
+  type balance_of =
+    balance_request s_list
+    * (balance_request * nat (* balance*)) s_list typed_contract
+
+  type ticket_with_token_id = (nat (* token_id *) * bytes option) ticket
+
+  type export_ticket =
+    ( (address * ticket_with_token_id s_list) s_list typed_contract option
+    (* destination *),
+      ( address (* to_ *),
+        (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+      (* tickets_to_export *) )
+      pair
+      s_list
+    (* txs *) )
+    pair
+    s_list
+
+  type import_ticket =
+    (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
+
+  type import_ticket_from_implicit = ticket_with_token_id
+
+  type lambda_export =
+    ( (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+    (* tickets_to_export *),
+      (ticket_with_token_id s_list, operation s_list) lambda
+    (* action *) )
+    pair
+
+  type allowance_entrypoints = (approve, update_operators) or_
+
+  type tickets_entrypoints =
+    ( (export_ticket, import_ticket) or_,
+      (lambda_export, import_ticket_from_implicit) or_ )
+    or_
+
+  type fa21_entrypoints =
+    ( (transfer, balance_of) or_,
+      (allowance_entrypoints, tickets_entrypoints) or_ )
+    or_
+
+  type arg = (clst_entrypoints, fa21_entrypoints) or_
+
+  type ledger = (address, nat) big_map
+
+  type total_supply = nat
+
+  type operators = (address, nat option) map
+
+  type operators_table = (address, operators) big_map
+
+  type token_info = (Script_string.t, bytes) map
+
+  type token_metadata = (nat, nat (* token_id *) * token_info) big_map
+
+  type storage = (ledger, total_supply, operators_table, token_metadata) tup4
+
+  type entrypoint =
+    | Deposit of deposit
+    | Redeem of redeem
+    | Finalize of finalize
+    | Register_delegate of register_delegate
+    | Update_delegate_parameters of update_delegate_parameters
+    | Unregister_delegate of unregister_delegate
+    | Transfer of transfer
+    | Balance_of of balance_of
+    | Approve of approve
+    | Update_operators of update_operators
+    | Export_ticket of export_ticket
+    | Import_ticket of import_ticket
+    | Lambda_export of lambda_export
+    | Import_ticket_from_implicit of import_ticket_from_implicit
+
+  let entrypoint_from_arg : arg -> entrypoint = function
+    | L (L (L (L p))) -> Deposit p
+    | L (L (L (R p))) -> Redeem p
+    | L (L (R p)) -> Finalize p
+    | L (R (L p)) -> Register_delegate p
+    | L (R (R (L p))) -> Update_delegate_parameters p
+    | L (R (R (R p))) -> Unregister_delegate p
+    | R (L (L p)) -> Transfer p
+    | R (L (R p)) -> Balance_of p
+    | R (R (L (L p))) -> Approve p
+    | R (R (L (R p))) -> Update_operators p
+    | R (R (R (L (L p)))) -> Export_ticket p
+    | R (R (R (L (R p)))) -> Import_ticket p
+    | R (R (R (R (L p)))) -> Lambda_export p
+    | R (R (R (R (R p)))) -> Import_ticket_from_implicit p
+
+  let entrypoint_to_arg : entrypoint -> arg = function
+    | Deposit p -> L (L (L (L p)))
+    | Redeem p -> L (L (L (R p)))
+    | Finalize p -> L (L (R p))
+    | Register_delegate p -> L (R (L p))
+    | Update_delegate_parameters p -> L (R (R (L p)))
+    | Unregister_delegate p -> L (R (R (R p)))
+    | Transfer p -> R (L (L p))
+    | Balance_of p -> R (L (R p))
+    | Approve p -> R (R (L (L p)))
+    | Update_operators p -> R (R (L (R p)))
+    | Export_ticket p -> R (R (R (L (L p))))
+    | Import_ticket p -> R (R (R (L (R p))))
+    | Lambda_export p -> R (R (R (R (L p))))
+    | Import_ticket_from_implicit p -> R (R (R (R (R p))))
+
+  let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
+    make_entrypoint_leaf "deposit" unit_ty
+
+  let redeem_type : (redeem ty_node * redeem entrypoints_node) tzresult =
+    make_entrypoint_leaf "redeem" nat_ty
+
+  let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* tx =
+      tup3_ty
+        (add_name "to_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    let* txs = list_ty tx in
+    let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
+    let* transfer = list_ty elt in
+    make_entrypoint_leaf "transfer" transfer
+
+  let finalize_type : (finalize ty_node * finalize entrypoints_node) tzresult =
+    make_entrypoint_leaf "finalize" unit_ty
+
+  let delegate_parameters_type : delegate_parameters ty_node tzresult =
+    pair_ty
+      (add_name "edge_of_clst_staking" nat_ty)
+      (add_name "ratio_of_clst_staking" nat_ty)
+
+  let register_delegate_type :
+      (register_delegate ty_node * register_delegate entrypoints_node) tzresult
+      =
+    let open Result_syntax in
+    let* delegate_parameters_type in
+    let* param_ty = option_ty delegate_parameters_type in
+    make_entrypoint_leaf "register_delegate" param_ty
+
+  let update_delegate_parameters_type :
+      (update_delegate_parameters ty_node
+      * update_delegate_parameters entrypoints_node)
+      tzresult =
+    let open Result_syntax in
+    let* delegate_parameters_type in
+    make_entrypoint_leaf "update_delegate_parameters" delegate_parameters_type
+
+  let unregister_delegate_type =
+    make_entrypoint_leaf "unregister_delegate" unit_ty
+
+  let approval_type : approval ty_node tzresult =
+    let open Result_syntax in
+    let* token_id_approval =
+      or_ty (add_name "increase" nat_ty) (add_name "decrease" nat_ty)
+    in
+    tup4_ty
+      (add_name "owner" address_ty)
+      (add_name "spender" address_ty)
+      (add_name "token_id" nat_ty)
+      (add_name "action" token_id_approval)
+
+  let approve_type : (approve ty_node * approve entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* approval_type in
+    let* approve_type = list_ty approval_type in
+    make_entrypoint_leaf "approve" approve_type
+
+  let update_operators_type :
+      (update_operators ty_node * update_operators entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* operator_type =
+      tup3_ty
+        (add_name "owner" address_ty)
+        (add_name "operator" address_ty)
+        (add_name "token_id" nat_ty)
+    in
+    let* operator_delta_type =
+      or_ty
+        (add_name "add_operator" operator_type)
+        (add_name "remove_operator" operator_type)
+    in
+    let* update_operators_type = list_ty operator_delta_type in
+    make_entrypoint_leaf "update_operators" update_operators_type
+
+  let balance_of_type :
+      (balance_of ty_node * balance_of entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* balance_request_type =
+      pair_ty (add_name "owner" address_ty) (add_name "token_id" nat_ty)
+    in
+    let* balance_response_type =
+      pair_ty
+        (add_name "request" balance_request_type)
+        (add_name "balance" nat_ty)
+    in
+    let* balance_requests_type = list_ty balance_request_type in
+    let* balance_responses_type = list_ty balance_response_type in
+    let* callback_type = contract_ty balance_responses_type in
+    let* balance_of_type =
+      pair_ty
+        (add_name "requests" balance_requests_type)
+        (add_name "callback" callback_type)
+    in
+    make_entrypoint_leaf "balance_of" balance_of_type
+
+  let clst_contents_ticket_ty : (nat * bytes option) comparable_ty tzresult =
+    Script_typed_ir.comparable_pair_t loc nat_t Script_typed_ir.option_bytes_t
+
+  let clst_ticket_ty : (ticket_with_token_id, _) ty tzresult =
+    let open Result_syntax in
+    let* clst_contents_ticket_ty in
+    Script_typed_ir.ticket_t loc clst_contents_ticket_ty
+
+  let ticket_with_token_id_type : ticket_with_token_id ty_node tzresult =
+    let open Result_syntax in
+    let* clst_contents_ticket_ty in
+    let untyped =
+      prim
+        Script.T_pair
+        [nat_ty.untyped; prim Script.T_option [bytes_ty.untyped]]
+    in
+    ticket_ty clst_contents_ticket_ty untyped
+
+  let export_ticket_type :
+      (export_ticket ty_node * export_ticket entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_to_export_ty =
+      tup3_ty
+        (add_name "from_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    let* tickets_to_export_ty = list_ty ticket_to_export_ty in
+    let* tx_ty =
+      pair_ty
+        (add_name "to_" address_ty)
+        (add_name "tickets_to_export" tickets_to_export_ty)
+    in
+    let* txs_ty = list_ty tx_ty in
+
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* dest_ty = pair_ty address_ty tickets_ty in
+    let* dests_ty = list_ty dest_ty in
+    let* dests_contract_ty = contract_ty dests_ty in
+    let* destination_ty = option_ty dests_contract_ty in
+    let* export_ticket_ty =
+      pair_ty (add_name "destination" destination_ty) (add_name "txs" txs_ty)
+    in
+    let* export_tickets_ty = list_ty export_ticket_ty in
+    make_entrypoint_leaf "export_ticket" export_tickets_ty
+
+  let import_ticket_type :
+      (import_ticket ty_node * import_ticket entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* import_ticket_ty =
+      pair_ty (add_name "to_" address_ty) (add_name "tickets" tickets_ty)
+    in
+    let* import_tickets_ty = list_ty import_ticket_ty in
+    make_entrypoint_leaf "import_ticket" import_tickets_ty
+
+  let import_ticket_from_implicit_type :
+      (import_ticket_from_implicit ty_node
+      * import_ticket_from_implicit entrypoints_node)
+      tzresult =
+    let open Result_syntax in
+    let* ticket_ty = ticket_with_token_id_type in
+    make_entrypoint_leaf "import_ticket_from_implicit" ticket_ty
+
+  let lambda_export_type :
+      (lambda_export ty_node * lambda_export entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_to_export_ty =
+      tup3_ty
+        (add_name "from_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    let* tickets_to_export_ty = list_ty ticket_to_export_ty in
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* operations_ty = list_ty operation_ty in
+    let* action_ty = lambda_ty tickets_ty operations_ty in
+    let* lambda_export_ty =
+      pair_ty
+        (add_name "tickets_to_export" tickets_to_export_ty)
+        (add_name "action" action_ty)
+    in
+    make_entrypoint_leaf "lambda_export" lambda_export_ty
+
+  let arg_type : (arg ty_node * arg entrypoints) tzresult =
+    let open Result_syntax in
+    let* deposit_type in
+    let* redeem_type in
+    let* finalize_type in
+    let* register_delegate_type in
+    let* update_delegate_parameters_type in
+    let* unregister_delegate_type in
+    let* transfer_type in
+    let* balance_of_type in
+    let* approve_type in
+    let* update_operators_type in
+    let* export_ticket_type in
+    let* import_ticket_type in
+    let* lambda_export_type in
+    let* import_ticket_from_implicit_type in
+    let* clst_staker_entrypoints_type_l =
+      make_entrypoint_node deposit_type redeem_type
+    in
+    let* clst_staker_entrypoints_type =
+      make_entrypoint_node clst_staker_entrypoints_type_l finalize_type
+    in
+    let* clst_delegate_entrypoints_type_r =
+      make_entrypoint_node
+        update_delegate_parameters_type
+        unregister_delegate_type
+    in
+    let* clst_delegate_entrypoints_type =
+      make_entrypoint_node
+        register_delegate_type
+        clst_delegate_entrypoints_type_r
+    in
+    let* clst_entrypoints_type =
+      make_entrypoint_node
+        clst_staker_entrypoints_type
+        clst_delegate_entrypoints_type
+    in
+    let* fa21_entrypoints_type_l =
+      make_entrypoint_node transfer_type balance_of_type
+    in
+    let* allowance_entrypoints_type =
+      make_entrypoint_node approve_type update_operators_type
+    in
+    let* tickets_entrypoints_type_l =
+      make_entrypoint_node export_ticket_type import_ticket_type
+    in
+    let* tickets_entrypoints_type_r =
+      make_entrypoint_node lambda_export_type import_ticket_from_implicit_type
+    in
+    let* tickets_entrypoints_type =
+      make_entrypoint_node tickets_entrypoints_type_l tickets_entrypoints_type_r
+    in
+    let* fa21_entrypoints_type_r =
+      make_entrypoint_node allowance_entrypoints_type tickets_entrypoints_type
+    in
+    let* fa21_entrypoints_type =
+      make_entrypoint_node fa21_entrypoints_type_l fa21_entrypoints_type_r
+    in
+    let* arg_type =
+      make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type
+    in
+    return (finalize_entrypoint arg_type)
+
+  let operators_table_ty : operators_table ty_node tzresult =
+    let open Result_syntax in
+    let* allowance_ty = option_ty nat_ty in
+    let* operators_ty = address_map_ty allowance_ty in
+    address_big_map_ty operators_ty
+
+  let token_info_ty : token_info ty_node tzresult = string_map_ty bytes_ty
+
+  let token_metadata_ty : token_metadata ty_node tzresult =
+    let open Result_syntax in
+    let* token_info_ty in
+    let* token_metadata_one_ty = pair_ty nat_ty token_info_ty in
+    nat_big_map_ty token_metadata_one_ty
+
+  let storage_type : storage ty_node tzresult =
+    let open Result_syntax in
+    let* ledger_ty = address_big_map_ty nat_ty in
+    let* operators_table_ty in
+    let* token_metadata_ty in
+    tup4_ty ledger_ty nat_ty operators_table_ty token_metadata_ty
+
+  type balance_view = (address * nat, nat) view_type
+
+  type total_supply_view = (nat, nat) view_type
+
+  type is_token_view = (nat, bool) view_type
+
+  type get_allowance_view =
+    ( (address (* owner *), address (* spender *), nat (* token_id *)) tup3,
+      nat (* allowance *) )
+    view_type
+
+  type is_operator_view =
+    ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
+      bool (* is_operator *) )
+    view_type
+
+  type get_token_metadata_view = (nat (* token_id *), token_info) view_type
+
+  let balance_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = pair_ty address_ty nat_ty in
+    return {input_ty; output_ty = nat_ty.typed}
+
+  let total_supply_view_ty = {input_ty = nat_ty.typed; output_ty = nat_ty.typed}
+
+  let is_token_view_ty = {input_ty = nat_ty.typed; output_ty = bool_ty.typed}
+
+  let get_allowance_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
+    return {input_ty; output_ty = nat_ty.typed}
+
+  let is_operator_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
+    return {input_ty; output_ty = bool_ty.typed}
+
+  let get_token_metadata_view_ty =
+    let open Result_syntax in
+    let* {typed = output_ty; _} = token_info_ty in
+    return {input_ty = nat_ty.typed; output_ty}
+
+  let transfer_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "from_" address_ty)
+        (add_name "to_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    return @@ add_name "transfer_event" x
+
+  let balance_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "owner" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "new_balance" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "balance_update" x
+
+  let total_supply_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup3_ty
+        (add_name "token_id" nat_ty)
+        (add_name "new_total_supply" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "total_supply_update" x
+
+  let allowance_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup5_ty
+        (add_name "owner" address_ty)
+        (add_name "spender" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "new_allowance" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "allowance_update" x
+
+  let operator_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "owner" address_ty)
+        (add_name "operator" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "is_operator" bool_ty)
+    in
+    return @@ add_name "operator_update" x
+
+  let token_metadata_update_event_type =
+    let open Result_syntax in
+    let* token_info_ty in
+    let* token_info_ty = option_ty token_info_ty in
+    let* x =
+      pair_ty
+        (add_name "token_id" nat_ty)
+        (add_name "new_metadata" token_info_ty)
+    in
+    return @@ add_name "token_metadata_update" x
+end
+
+type ('arg, 'storage) kind =
+  | CLST_kind : (CLST_types.arg, CLST_types.storage) kind
+
+type ex_kind_and_types =
+  | Ex_kind_and_types :
+      (('arg, 'storage) kind * ('arg, _, 'storage, _) types)
+      -> ex_kind_and_types
+
+let get_typed_kind_and_types =
+  let open Result_syntax in
+  function
+  | Script_native_repr.CLST ->
+      let* {typed = Ty_ex_c arg_type; untyped = _}, entrypoints =
+        CLST_types.arg_type
+      in
+      let* {typed = Ty_ex_c storage_type; untyped = _} =
+        CLST_types.storage_type
+      in
+      return
+        (Ex_kind_and_types (CLST_kind, {arg_type; storage_type; entrypoints}))
+
+module Internal_for_tests = struct
+  let eq_native_kind (type arg arg' storage storage')
+      (kind : (arg, storage) kind) (kind' : (arg', storage') kind) =
+    match (kind, kind') with CLST_kind, CLST_kind -> true
+
+  type ('arg, 'storage) tys =
+    'arg Helpers.ty_node * 'arg entrypoints * 'storage Helpers.ty_node
+
+  type ex_ty_node = Ex : ('arg, 'storage) tys -> ex_ty_node
+
+  let types_of_kind =
+    let open Result_syntax in
+    function
+    | Script_native_repr.CLST ->
+        let* arg_type, arg_entrypoints = CLST_types.arg_type in
+        let* storage_type = CLST_types.storage_type in
+        return (Ex (arg_type, arg_entrypoints, storage_type))
+end

@@ -33,4 +33,5 @@ let is_proto_test file =
   | Some "022_PsRiotum" -> ["r022"]
   | Some "023_PtSeouLo" -> ["s023"] (* frozen protocol, kept for test_helpers *)
   | Some "024_PtTALLiN" -> ["t024"]
+  | Some "025_PsGXQmSv" -> ["u025"]
   | Some _ -> assert false

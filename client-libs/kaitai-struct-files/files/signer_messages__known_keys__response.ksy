@@ -21,7 +21,7 @@ types:
     seq:
     - id: signature__public_key_hash
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   public_key_hash:
     seq:
     - id: public_key_hash_tag
@@ -39,12 +39,16 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
 enums:
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: known_keys
   type: known_keys_0

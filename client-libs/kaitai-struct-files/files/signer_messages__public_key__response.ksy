@@ -20,13 +20,17 @@ types:
     - id: bls
       size: 48
       if: (public_key_tag == public_key_tag::bls)
+    - id: mldsa44
+      size: 1312
+      if: (public_key_tag == public_key_tag::mldsa44)
 enums:
   public_key_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: pubkey
   type: public_key
-  doc: A Ed25519, Secp256k1, or P256 public key
+  doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key

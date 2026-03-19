@@ -156,6 +156,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   sequence:
     seq:
     - id: sequence_entries
@@ -244,7 +247,7 @@ types:
     seq:
     - id: signature__public_key_hash
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   whitelist_update:
     seq:
     - id: whitelist_tag
@@ -713,6 +716,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
 seq:
 - id: alpha__smart_rollup__outbox__message_tag
   type: u1

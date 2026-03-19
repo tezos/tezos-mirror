@@ -10,7 +10,7 @@ types:
       repeat: eos
   id_019__ptparisb__smart_rollup__whitelist_entries:
     seq:
-    - id: signature__public_key_hash
+    - id: signature__v1__public_key_hash
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   public_key_hash:

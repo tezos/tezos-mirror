@@ -960,7 +960,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) T024 (* Alpha predecessor *)
+  | (* Alpha predecessor *) U025 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -977,8 +977,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "t024_024") then
-          return (T024, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "u025_025") then
+          return (U025, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1352,9 +1352,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | T024 ->
+    | U025 ->
         (*
-            FIXME chain_id is used for Q to T024 migration and nomore after.
+            FIXME chain_id is used for Q to U025 migration and nomore after.
             We ignored for automatic stabilisation, should it be removed in
             Beta?
         *)
@@ -1365,11 +1365,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           let ({
                  feature_enable;
                  incentives_enable;
-                 number_of_slots = _;
-                 attestation_lag = _;
+                 dynamic_lag_enable;
+                 number_of_slots;
+                 attestation_lag;
+                 attestation_lags;
                  attestation_threshold;
-                 cryptobox_parameters =
-                   {redundancy_factor; page_size; slot_size; number_of_shards};
+                 cryptobox_parameters;
                  minimal_participation_ratio;
                  rewards_ratio;
                  traps_fraction;
@@ -1380,18 +1381,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           {
             Constants_parametric_repr.feature_enable;
             incentives_enable;
-            dynamic_lag_enable = true;
-            number_of_slots = 160;
-            attestation_lag = 5;
-            attestation_lags = [1; 2; 3; 4; 5];
+            dynamic_lag_enable;
+            number_of_slots;
+            attestation_lag;
+            attestation_lags;
             attestation_threshold;
-            cryptobox_parameters =
-              {
-                redundancy_factor;
-                page_size;
-                slot_size = 3 * slot_size;
-                number_of_shards;
-              };
+            cryptobox_parameters;
             minimal_participation_ratio;
             rewards_ratio;
             traps_fraction;
@@ -1587,6 +1582,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  cache_script_size;
                  cache_stake_distribution_cycles;
                  cache_sampler_state_cycles;
+                 cache_stake_info_cycles;
+                 cache_swrr_selected_distribution_cycles;
                  dal = _;
                  sc_rollup = _;
                  zk_rollup = _;
@@ -1595,6 +1592,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_threshold;
+                 native_contracts_enable;
+                 swrr_new_baker_lottery_enable;
+                 tz5_account_enable;
                }
                 : Previous.t) =
             c
@@ -1639,8 +1639,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cache_script_size;
             cache_stake_distribution_cycles;
             cache_sampler_state_cycles;
-            cache_stake_info_cycles = cache_stake_distribution_cycles;
-            cache_swrr_selected_distribution_cycles = cache_sampler_state_cycles;
+            cache_stake_info_cycles;
+            cache_swrr_selected_distribution_cycles;
             dal;
             sc_rollup;
             zk_rollup;
@@ -1649,10 +1649,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_threshold;
-            (* Feature flag should be set to true once the feature has been enabled. *)
-            native_contracts_enable = false;
-            swrr_new_baker_lottery_enable = false;
-            tz5_account_enable = false;
+            native_contracts_enable;
+            swrr_new_baker_lottery_enable;
+            tz5_account_enable;
           }
         in
         let*! ctxt = add_constants ctxt constants in

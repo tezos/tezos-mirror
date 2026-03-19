@@ -1,0 +1,36 @@
+
+./octez-client rpc get /chains/main/blocks/head/context/contracts
+[ "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client rpc get /chains/main/blocks/head/context/delegates
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client rpc get /chains/main/blocks/head/context/clst/contract_hash
+"[CONTRACT_HASH]"
+
+./octez-client rpc get /chains/main/blocks/head/context/clst/total_supply
+"0"
+
+./octez-client rpc get /chains/main/blocks/head/context/clst/total_amount_of_tez
+"0"
+
+./octez-client rpc get /chains/main/blocks/head/context/clst/exchange_rate
+{ "numerator": "1", "denominator": "1" }
+
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_balance'
+"0"
+
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_ticket_balance'
+"0"

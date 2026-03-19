@@ -71,11 +71,15 @@
     "cache_script_size": 100000000,
     "cache_stake_distribution_cycles": 5,
     "cache_sampler_state_cycles": 5,
+    "cache_stake_info_cycles": 5,
+    "cache_swrr_selected_distribution_cycles": 5,
     "dal_parametric": {
         "feature_enable": true,
         "incentives_enable": false,
-        "number_of_slots": 32,
+        "dynamic_lag_enable": false,
+        "number_of_slots": 160,
         "attestation_lag": 8,
+        "attestation_lags": [ 8 ],
         "attestation_threshold": 66,
         "minimal_participation_ratio": {
             "numerator": "16",
@@ -91,7 +95,7 @@
         },
         "redundancy_factor": 8,
         "page_size": 3967,
-        "slot_size": 126944,
+        "slot_size": 380832,
         "number_of_shards": 512
     },
     "smart_rollup_arith_pvm_enable": true,
@@ -159,6 +163,11 @@
     "direct_ticket_spending_enable": false,
     "aggregate_attestation": true,
     "allow_tz4_delegate_enable": true,
-    "all_bakers_attest_activation_threshold":
-      { "numerator": 1, "denominator": 2 }
+    "all_bakers_attest_activation_threshold": {
+        "numerator": 1,
+        "denominator": 2
+    },
+    "native_contracts_enable": true,
+    "swrr_new_baker_lottery_enable": false,
+    "tz5_account_enable": true
 }

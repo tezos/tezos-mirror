@@ -54,6 +54,7 @@ depopts: [
   "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-023-PtSeouLo-libs"
   "octez-protocol-024-PtTALLiN-libs"
+  "octez-protocol-025-PsGXQmSv-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

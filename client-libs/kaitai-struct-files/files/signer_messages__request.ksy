@@ -7,7 +7,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: version
       type: s1
   bytes_dyn_uint30:
@@ -22,7 +22,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: data
       type: bytes_dyn_uint30
     - id: signature_tag
@@ -35,7 +35,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: data
       type: bytes_dyn_uint30
     - id: signature_tag
@@ -61,6 +61,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   sign:
     seq:
     - id: pkh
@@ -78,7 +81,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: override_pk_tag
       type: u1
       enum: bool
@@ -89,7 +92,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   signer_messages__public_key_hash:
     seq:
     - id: signer_messages__public_key_hash_tag
@@ -111,7 +114,7 @@ types:
     seq:
     - id: pkh
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
 enums:
   bool:
     0: false
@@ -121,6 +124,7 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
   signer_messages__public_key_hash_tag:
     0: ed25519
     1: secp256k1

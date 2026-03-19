@@ -22,8 +22,10 @@ let save_parameters ctxt
           {
             feature_enable;
             incentives_enable;
+            dynamic_lag_enable;
             number_of_slots;
             attestation_lag;
+            attestation_lags;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;
@@ -35,10 +37,10 @@ let save_parameters ctxt
     {
       feature_enable;
       incentives_enable;
-      dynamic_lag_enable = false;
+      dynamic_lag_enable;
       number_of_slots;
       attestation_lag;
-      attestation_lags = [attestation_lag];
+      attestation_lags;
       attestation_threshold;
       cryptobox_parameters;
       minimal_participation_ratio;
@@ -46,6 +48,7 @@ let save_parameters ctxt
       traps_fraction;
     }
   in
+
   let*! ctxt =
     Store.Past_parameters.add
       ctxt

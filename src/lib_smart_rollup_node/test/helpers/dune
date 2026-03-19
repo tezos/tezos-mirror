@@ -35,6 +35,9 @@
    (octez_smart_rollup_node_PtSeouLo -> void_for_linking-octez_smart_rollup_node_PtSeouLo.empty)
    (-> void_for_linking-octez_smart_rollup_node_PtSeouLo.empty))
   octez_smart_rollup_node_PtTALLiN
+  (select void_for_linking-octez_smart_rollup_node_PsGXQmSv from
+   (octez_smart_rollup_node_PsGXQmSv -> void_for_linking-octez_smart_rollup_node_PsGXQmSv.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PsGXQmSv.empty))
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
    (-> void_for_linking-octez_smart_rollup_node_alpha.empty)))
@@ -58,4 +61,5 @@
    (write-file void_for_linking-octez_smart_rollup_node_PsQuebec.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PsRiotum.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PtSeouLo.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_PsGXQmSv.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))

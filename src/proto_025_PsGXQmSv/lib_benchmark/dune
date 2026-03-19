@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_025_PsGXQmSv)
+ (public_name tezos-benchmark-025-PsGXQmSv)
+ (libraries
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-025-PsGXQmSv
+  tezos-protocol-025-PsGXQmSv.protocol
+  octez-libs.crypto
+  tezos-protocol-025-PsGXQmSv.parameters
+  hashcons
+  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_025_PsGXQmSv
+  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_025_PsGXQmSv_test_helpers)
+ (private_modules kernel rules state_space))
+
+(rule
+ (targets crypto_samplers.mli)
+ (action
+  (write-file
+   %{targets}
+   "include module type of Tezos_benchmark.Crypto_samplers.V3")))
+
+(rule
+ (targets crypto_samplers.ml)
+ (action (write-file %{targets} "include Tezos_benchmark.Crypto_samplers.V3")))

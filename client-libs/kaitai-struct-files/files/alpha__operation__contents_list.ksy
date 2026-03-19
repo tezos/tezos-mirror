@@ -48,7 +48,7 @@ types:
     - id: implicit
       type: public_key_hash
       if: (alpha__contract_id_tag == alpha__contract_id_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: originated
       type: originated
       if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
@@ -303,7 +303,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: period
       type: s4be
     - id: proposal
@@ -440,6 +440,12 @@ types:
       type: u2be
     - id: slot_index
       type: u1
+    - id: lag_index_tag
+      type: u1
+      enum: bool
+    - id: lag_index
+      type: u1
+      if: (lag_index_tag == bool::true)
     - id: shard_with_proof
       type: shard_with_proof
   dal_page_id:
@@ -454,7 +460,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -469,7 +475,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -484,7 +490,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   dissection:
     seq:
     - id: dissection_entries
@@ -527,13 +533,13 @@ types:
     seq:
     - id: consensus_key
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: delegate
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: destination
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   inbox__proof:
     seq:
     - id: level
@@ -546,7 +552,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -751,7 +757,7 @@ types:
       type: price
     - id: l1_dst
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: rollup_id
       size: 20
     - id: payload
@@ -781,7 +787,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -798,7 +804,7 @@ types:
     - id: delegate
       type: public_key_hash
       if: (delegate_tag == bool::true)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: script
       type: alpha__scripted__contracts
   parameters:
@@ -990,7 +996,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: period
       type: s4be
     - id: proposals
@@ -1016,6 +1022,9 @@ types:
     - id: bls
       size: 48
       if: (public_key_tag == public_key_tag::bls)
+    - id: mldsa44
+      size: 1312
+      if: (public_key_tag == public_key_tag::mldsa44)
   public_key_hash:
     seq:
     - id: public_key_hash_tag
@@ -1033,6 +1042,9 @@ types:
     - id: bls
       size: 20
       if: (public_key_hash_tag == public_key_hash_tag::bls)
+    - id: mldsa44
+      size: 20
+      if: (public_key_hash_tag == public_key_hash_tag::mldsa44)
   raw_data:
     seq:
     - id: raw_data
@@ -1061,7 +1073,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1076,7 +1088,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1087,7 +1099,7 @@ types:
       type: n
     - id: public_key
       type: public_key
-      doc: A Ed25519, Secp256k1, or P256 public key
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key
     - id: proof_tag
       type: u1
       enum: bool
@@ -1133,7 +1145,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1190,7 +1202,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1205,7 +1217,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1220,7 +1232,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1239,7 +1251,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1265,7 +1277,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1282,7 +1294,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1295,12 +1307,12 @@ types:
       size: 20
     - id: staker
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   smart_rollup_refute:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1313,14 +1325,14 @@ types:
       size: 20
     - id: opponent
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: refutation
       type: refutation
   smart_rollup_timeout:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1354,10 +1366,10 @@ types:
     seq:
     - id: alice
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: bob
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   start:
     seq:
     - id: player_commitment_hash
@@ -1379,7 +1391,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1405,7 +1417,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1446,7 +1458,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1457,7 +1469,7 @@ types:
       type: n
     - id: pk
       type: public_key
-      doc: A Ed25519, Secp256k1, or P256 public key
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key
     - id: proof_tag
       type: u1
       enum: bool
@@ -1468,7 +1480,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1479,7 +1491,7 @@ types:
       type: n
     - id: pk
       type: public_key
-      doc: A Ed25519, Secp256k1, or P256 public key
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key
     - id: proof_tag
       type: u1
       enum: bool
@@ -1504,7 +1516,7 @@ types:
     seq:
     - id: signature__public_key_hash
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
   z:
     seq:
     - id: has_tail
@@ -1522,7 +1534,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1543,7 +1555,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -1560,7 +1572,7 @@ types:
     seq:
     - id: source
       type: public_key_hash
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+      doc: A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
     - id: fee
       type: alpha__mutez
     - id: counter
@@ -2090,11 +2102,13 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
   public_key_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
+    4: mldsa44
   pvm_kind:
     0: arith
     1: wasm_2_0_0
