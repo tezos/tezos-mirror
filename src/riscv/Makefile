@@ -82,8 +82,10 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
-	# Install Nightly for formatting with its Rustfmt, and running Miri
-	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
+	# Install Nightly for formatting with its Rustfmt, and running Miri.
+	# Pass components as one comma-separated -c value (rustup 1.28+); otherwise
+	# "miri" is parsed as a second toolchain name.
+	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt,miri,rust-src
 
 	# Iterate through all the toolchains. 'rustup show' (before Rustup 1.28) and
 	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain.
