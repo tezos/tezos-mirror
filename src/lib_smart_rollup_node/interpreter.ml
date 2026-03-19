@@ -396,39 +396,93 @@ let advance_to_next_block (module Plugin : Protocol_plugin_sig.PARTIAL)
   in
   return Pvm_plugin_sig.{state = start_state.state; info}
 
+let eval_state_when_final_tick plugin node_ctxt (event : Sc_rollup_block.t) tick
+    =
+  let open Lwt_result_syntax in
+  let final_tick = Sc_rollup_block.final_tick event in
+  (* When the requested tick is the final tick of the block, try to checkout
+     the committed context directly instead of replaying. *)
+  if Z.equal tick final_tick then
+    let* committed =
+      Node_context.checkout_committed_context node_ctxt event.header.block_hash
+    in
+    match committed with
+    | Some ctxt ->
+        let* state =
+          state_of_head
+            plugin
+            node_ctxt
+            ctxt
+            Layer1.{hash = event.header.block_hash; level = event.header.level}
+        in
+        let*! state_hash =
+          match event.state_hash with
+          | Some sh -> Lwt.return sh
+          | None ->
+              let module Plugin = (val plugin : Protocol_plugin_sig.PARTIAL) in
+              Plugin.Pvm.state_hash node_ctxt.kind state
+        in
+        let* messages =
+          Node_context.get_messages node_ctxt event.header.inbox_witness
+        in
+        let info =
+          Pvm_plugin_sig.
+            {
+              state_hash;
+              inbox_level = event.header.level;
+              tick = final_tick;
+              message_counter_offset = List.length messages;
+              remaining_fuel = Fuel.Accounted.of_ticks 0L;
+              remaining_messages = [];
+            }
+        in
+        return_some Pvm_plugin_sig.{state; info}
+    | None -> return_none
+  else return_none
+
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
   let open Lwt_result_syntax in
-  let* start_state =
-    match (start_state, node_ctxt.Node_context.kind) with
-    | Some start_state, _
-      when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
-        return start_state
-    | Some start_state, Riscv
-      when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level ->
-        (* For RISC-V, it is cheaper to continue evaluating to the end of the
-           block and advance to the next one rather than checking out a context
-           from disk. The levels are always within the same commitment period
-           during a refutation game, so the distance to advance is bounded. *)
-        let rec advance state =
-          if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
-            return state
-          else
-            let* state = advance_to_next_block plugin node_ctxt state in
-            advance state
-        in
-        advance start_state
-    | _ ->
-        (* Recompute start state from checkout on level change (except for
-           RISC-V) or if we don't have a starting state on hand. *)
-        start_state_of_block plugin node_ctxt event
+  let* final_tick_state =
+    eval_state_when_final_tick plugin node_ctxt event tick
   in
-  let state = start_state.state in
-  (* TODO: #3384
-     We should test that we always have enough blocks to find the tick
-     because [state_of_tick] is a critical function. *)
-  let+ run_info = run_to_tick plugin node_ctxt start_state tick in
-  Pvm_plugin_sig.{state; info = run_info}
+  match final_tick_state with
+  | Some state ->
+      (* Requested tick is the final tick and it's committed. *)
+      return state
+  | None ->
+      let* start_state =
+        match (start_state, node_ctxt.Node_context.kind) with
+        | Some start_state, _
+          when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level
+          ->
+            return start_state
+        | Some start_state, Riscv
+          when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level
+          ->
+            (* For RISC-V, it is cheaper to continue evaluating to the end of the
+             block and advance to the next one rather than checking out a context
+             from disk. The levels are always within the same commitment period
+             during a refutation game, so the distance to advance is bounded. *)
+            let rec advance state =
+              if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
+                return state
+              else
+                let* state = advance_to_next_block plugin node_ctxt state in
+                advance state
+            in
+            advance start_state
+        | _ ->
+            (* Recompute start state from checkout on level change (except for
+             RISC-V) or if we don't have a starting state on hand. *)
+            start_state_of_block plugin node_ctxt event
+      in
+      let state = start_state.state in
+      (* TODO: #3384
+       We should test that we always have enough blocks to find the tick
+       because [state_of_tick] is a critical function. *)
+      let+ run_info = run_to_tick plugin node_ctxt start_state tick in
+      Pvm_plugin_sig.{state; info = run_info}
 
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =

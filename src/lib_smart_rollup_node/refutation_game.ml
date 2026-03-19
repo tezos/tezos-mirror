@@ -159,10 +159,17 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
         tzfail
           Rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
     | Octez_smart_rollup.Game.{state_hash = their_hash; tick} :: dissection -> (
-        let start_state =
+        let* start_state =
           match ok with
-          | Hash _, _ -> None
-          | Evaluated ok_state, _ -> Some ok_state.head
+          | Evaluated ok_state, _ -> return_some ok_state.head
+          | Hash _, tick -> (
+              match
+                Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return
+              with
+              | None -> return_none
+              | Some cached ->
+                  let+ cached in
+                  Some (Pvm_plugin_sig.to_mut_eval_state cached))
         in
         let* our =
           Interpreter.state_of_tick
