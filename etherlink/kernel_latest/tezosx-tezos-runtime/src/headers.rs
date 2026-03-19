@@ -149,13 +149,13 @@ mod tests {
     }
 
     #[test]
-    fn amount_rejects_excess_decimals() {
+    fn amount_truncates_excess_decimals() {
         let mut hdrs = required_headers();
-        // 7 decimals — exceeds Michelson's 6-decimal limit
+        // 7 decimals — exceeds Michelson's 6-decimal limit; truncated to 0 (ADR L2-1004)
         *hdrs.iter_mut().find(|(k, _)| *k == X_TEZOS_AMOUNT).unwrap() =
             (X_TEZOS_AMOUNT, "0.0000001");
-        let err = parse_request_headers(&headers_from(&hdrs)).unwrap_err();
-        assert!(matches!(err, TezosXRuntimeError::HeaderError(_)));
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert_eq!(parsed.amount, Narith(0u64.into()));
     }
 
     #[test]
