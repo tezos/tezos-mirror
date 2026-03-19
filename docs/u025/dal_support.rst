@@ -5,10 +5,10 @@ DAL integration
 The :doc:`DAL <../shell/dal>`'s integration within the economic protocol relies on three operations:
 
 #. ``DAL_publish_commitment``: a manager operation, allowing anyone to publish a DAL commitment
-#. ``attestation``: the existing :ref:`consensus operation <consensus_operations_alpha>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
+#. ``attestation``: the existing :ref:`consensus operation <consensus_operations_u025>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
 #. ``DAL_entrapment_evidence``: an anonymous operation to denounce a baker that has attested a trap shard
 
-and on an :ref:`incentives scheme<DAL_incentives_scheme_alpha>` for the DAL.
+and on an :ref:`incentives scheme<DAL_incentives_scheme_u025>` for the DAL.
 
 DAL publish commitment
 ======================
@@ -42,7 +42,7 @@ allows attesters participating to the DAL to announce whether they were able to
 successfully download the shards assigned to them.
 
 Because there are multiple attestation lags (see ``ATTESTATION_LAGS`` in
-:ref:`dal_constants_alpha`), a single attestation can simultaneously cover slots
+:ref:`dal_constants_u025`), a single attestation can simultaneously cover slots
 published at different levels. For each lag in ``ATTESTATION_LAGS``, the
 attester indicates which slots published at the corresponding level are
 available. Concretely, the ``dal_content`` field is encoded as a compact
@@ -65,7 +65,7 @@ In the block’s metadata, there is a specific field for the DAL, called ``"dal_
 
 Shard attestations for a given slot accumulate across all levels in its attestation window (from the smallest to the largest lag). Therefore, a slot committed (published) at level ``n`` may become available as early as the metadata of the block at level ``n + min(ATTESTATION_LAGS)`` -- if enough bakers attest at the first opportunity -- or as late as level ``n + ATTESTATION_LAG`` (the maximum lag). A smart rollup can utilize the slot's data from the level following the one where it was declared available.
 
-.. _DAL_incentives_scheme_alpha:
+.. _DAL_incentives_scheme_u025:
 
 DAL incentives scheme
 =====================
@@ -74,7 +74,7 @@ Overview
 --------
 
 Bakers must meet a 64% minimal participation threshold in a cycle to earn a fixed percentage of the total participation rewards allocated for them.
-As part of participation rewards, the DAL rewards are subject to the adjustments done by :ref:`Adaptive Issuance<adaptive_issuance_alpha>`.
+As part of participation rewards, the DAL rewards are subject to the adjustments done by :ref:`Adaptive Issuance<adaptive_issuance_u025>`.
 
 To ensure DAL attestations match the actual availability of data shards, there are special shards, known as *traps*, which are designed to test whether bakers have genuinely downloaded and processed their assigned shards. Bakers must correctly identify these traps to avoid losing the DAL rewards allocated to them.
 
@@ -118,12 +118,12 @@ corresponding to the following scenario. Suppose there are five delegates with e
 DAL participation rewards
 -------------------------
 
-A fixed percentage, defined by a protocol parameter called ``REWARDS_RATIO``, set to 10%, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
+A fixed percentage, defined by a protocol parameter called ``REWARDS_RATIO``, set to 10%, of the total :ref:`participation rewards<adaptive_rewards_u025>` is allocated to the DAL.
 
-The DAL rewards per level are implicitly given by their weight, ``DAL_REWARDS_WEIGHT``, as for the other types of :ref:`participation rewards<rewards_weights_alpha>`.
+The DAL rewards per level are implicitly given by their weight, ``DAL_REWARDS_WEIGHT``, as for the other types of :ref:`participation rewards<rewards_weights_u025>`.
 The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``REWARDS_RATIO`` of all reward weights.
 
-The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_alpha>`.
+The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_u025>`.
 For instance, the stakers' share of these reward is proportional to the weight of their stake in relation to their baker's baking power.
 
 The metadata of the last block of a cycle contains the :doc:`balance updates<token_management>` corresponding to the allocated DAL rewards for that cycle. These balance updates are identified by two categories for DAL rewards, analogous to consensus attestation rewards, namely:
@@ -146,7 +146,7 @@ The protocol parameter ``TRAPS_FRACTION`` controls the fraction of shards marked
 Bakers detect traps by retrieving shard content via their DAL node and applying the trap function. A trap invalidates the corresponding attestation: the baker should not attest a slot if one of the slot’s shards assigned to him is a trap.
 
 The ``DAL_entrapment_evidence`` accusation operation can be used to accuse a baker of wrongly attesting a slot due to an undetected trap.
-This accusation operation includes the offending attestation operation (either individual or part of an :ref:`aggregate<consensus_operations_alpha>`), the offending baker's consensus slot, the wrongly attested DAL slot, and the undetected shard.
+This accusation operation includes the offending attestation operation (either individual or part of an :ref:`aggregate<consensus_operations_u025>`), the offending baker's consensus slot, the wrongly attested DAL slot, and the undetected shard.
 
 As for double-signing accusations, any baker can include a DAL accusation in its block.
 Accusations can be included during a period of ``DENUNCIATION_PERIOD`` cycles after the misbehavior event, which is that of the corresponding attestation operation.
@@ -156,12 +156,12 @@ Penalties
 
 A baker that is correctly accused, through an accusation operation included in a block, loses their DAL rewards for the cycle containing the block.
 
-.. _dal_rollups_integration_alpha:
+.. _dal_rollups_integration_u025:
 
 Smart Rollups integration
 =========================
 
-The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups_alpha>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
+The DAL is integrated with :doc:`smart rollups <../active/smart_rollups>` so that kernels can request pages from the DAL via the :ref:`reveal data channel <reveal_data_channel_smart_rollups_u025>`. A smart rollup can fetch any page from the DAL node if the commitment respects some conditions:
 
 - The commitment should have been published after the rollup origination (this constraint will be leveraged so that the kernel can request any commitment in the past)
 - The commitment should not have been published in a level in the future after the level of the next commitment of the state (at most 30 levels in the future).
@@ -171,12 +171,12 @@ If the kernel requests a page that does not satisfy the mentioned conditions, th
 
 Moreover, the rollup kernel has access to the protocol constants so that the same kernel code can be used on different test networks.
 
-.. _dal_constants_alpha:
+.. _dal_constants_u025:
 
 DAL-related protocol constants
 ==============================
 
-This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_alpha` on how to find the values for tests networks):
+This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants_u025` on how to find the values for tests networks):
 
 - ``FEATURE_ENABLE`` (true): whether the DAL is available
 - ``INCENTIVES_ENABLE`` (true): whether baker incentives are available
