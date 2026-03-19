@@ -22,6 +22,45 @@
 
 open Filename.Infix
 
+(** {2 Skip list binary format}
+
+    The skip list data is serialised as a flat binary stream to avoid the
+    overhead of a full SQLite snapshot (B-tree structure, WAL, indices).
+    Records are written in [published_level] order with no file header or
+    trailer; the end of the stream is detected by EOF.  The per-entry
+    compression is applied at the tar-entry level (gzip).
+
+    Each record is a 4-byte big-endian length prefix followed by the
+    [Data_encoding.Binary] serialisation of the 5-tuple
+    [(published_level, slot_index, attestation_lag, hash, cell)].
+    Using [Data_encoding] preserves the [Skip_list_hash.t] /
+    [Skip_list_cell.t] abstract types end-to-end without unsafe casts. *)
+
+(** Data encoding for one skip list record. *)
+let skip_list_record_encoding =
+  let open Data_encoding in
+  tup5
+    int32
+    uint16
+    int31
+    Dal_proto_types.Skip_list_hash.encoding
+    Dal_proto_types.Skip_list_cell.encoding
+
+(** Encode and write one skip list record to [fd], prefixed by its 4-byte
+    big-endian length. *)
+let write_skip_list_record fd record =
+  let open Lwt_syntax in
+  let encoded =
+    Data_encoding.Binary.to_bytes_exn skip_list_record_encoding record
+  in
+  let len_bytes = Bytes.create 4 in
+  Bytes.set_int32_be len_bytes 0 (Int32.of_int (Bytes.length encoded)) ;
+  let* () = Lwt_utils_unix.write_bytes fd len_bytes in
+  Lwt_utils_unix.write_bytes fd encoded
+
+(** Tar entry filename for the skip list binary dump. *)
+let skip_list_binary_filename = Store.Stores_dirs.skip_list_cells // "cells.bin"
+
 (** Write [bytes] directly as a tar entry named [filename]. *)
 let add_bytes_to_tar tar ~bytes ~filename =
   Octez_tar_helpers.add_raw_and_finalize tar ~filename ~f:(fun fd ->
@@ -623,6 +662,56 @@ end
 (** {1 Compressed tar archive export} *)
 
 module Export_tar = struct
+  (** Export skip list: reads from SQLite, serialises each matching row into a
+      compact flat binary file, gzip-compresses it, and streams it into the
+      tar archive.  This avoids carrying the full SQLite overhead (B-tree
+      structure, WAL, indices) in the snapshot. *)
+  let export_skip_list ?notify tar ~src_root_dir ~min_published_level
+      ~max_published_level ~slots ~proto_plugins =
+    let open Lwt_result_syntax in
+    let src_skip_list_dir = src_root_dir // Store.Stores_dirs.skip_list_cells in
+    let get_slots = get_slots_for_level ~proto_plugins ~slots in
+    let module SlotsSet = Set.Make (Int) in
+    let* src_db =
+      Dal_store_sqlite3.Skip_list_cells.init
+        ~data_dir:src_skip_list_dir
+        ~perm:Sqlite.(Read_only {pool_size = 1})
+        ()
+    in
+    Lwt.finalize
+      (fun () ->
+        let* () =
+          Octez_tar_helpers.add_raw_and_finalize
+            tar
+            ~filename:skip_list_binary_filename
+            ~f:(fun fd ->
+              iterate_levels ?notify ~min_published_level ~max_published_level
+              @@ fun level ->
+              let*? slots = get_slots level in
+              let slots_set = SlotsSet.of_list slots in
+              let* cells =
+                Dal_store_sqlite3.Skip_list_cells.find_by_level
+                  src_db
+                  ~published_level:level
+              in
+              List.iter_es
+                (fun (cell, hash, slot_index, attestation_lag) ->
+                  if SlotsSet.mem slot_index slots_set then
+                    let*! () =
+                      write_skip_list_record
+                        fd
+                        (level, slot_index, attestation_lag, hash, cell)
+                    in
+                    return_unit
+                  else return_unit)
+                cells)
+        in
+        return_unit)
+      (fun () ->
+        let open Lwt_syntax in
+        let* _ = Dal_store_sqlite3.Skip_list_cells.close src_db in
+        Lwt.return_unit)
+
   (** Export a single metadata value as a JSON-encoded entry. *)
   let export_metadata_value tar ~tar_filename encoding value =
     let bytes =
