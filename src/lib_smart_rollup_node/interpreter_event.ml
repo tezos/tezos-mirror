@@ -95,6 +95,67 @@ module Simple = struct
       ("exception", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let refutation_cache_hit =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_cache_hit"
+      ~msg:"Refutation cache hit for tick {tick} ({source})"
+      ~level:Debug
+      ("tick", Data_encoding.z)
+      ("source", Data_encoding.string)
+      ~pp2:Format.pp_print_string
+
+  let refutation_cache_miss =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_cache_miss"
+      ~msg:"Refutation cache miss for tick {tick}, computing"
+      ~level:Debug
+      ("tick", Data_encoding.z)
+
+  let refutation_run_to_tick =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_run_to_tick"
+      ~msg:
+        "Refutation: running PVM from tick {start_tick} to {end_tick} \
+         ({distance} ticks)"
+      ~level:Debug
+      ("start_tick", Data_encoding.z)
+      ("end_tick", Data_encoding.z)
+      ("distance", Data_encoding.int64)
+
+  let refutation_start_state =
+    declare_3
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_start_state"
+      ~msg:
+        "Refutation: fetching start state for level {level} (predecessor: \
+         {predecessor}, initial_tick: {initial_tick})"
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ~pp2:Block_hash.pp_short
+      ("predecessor", Block_hash.encoding)
+      ("initial_tick", Data_encoding.z)
+
+  let refutation_state_of_tick =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_state_of_tick"
+      ~msg:"Refutation: state_of_tick at level {level} for tick {tick}"
+      ~level:Info
+      ("level", Data_encoding.int32)
+      ("tick", Data_encoding.z)
+
+  let refutation_riscv_advance =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_interpreter_refutation_riscv_advance"
+      ~msg:"Refutation: RISC-V advancing from level {from_level} to {to_level}"
+      ~level:Debug
+      ("from_level", Data_encoding.int32)
+      ("to_level", Data_encoding.int32)
+
   let eval_etherlink_block =
     let ns_in_a_day = Int64.(mul 1_000_000_000L (of_int (24 * 3600))) in
     let ns_to_span ns =
@@ -145,6 +206,23 @@ let fetched_incorrect_pre_image ~expected_hash ~content_hash =
 let patching_genesis_state patch = Simple.(emit patching_genesis_state) patch
 
 let fast_exec_panic exn = Simple.(emit fast_exec_panic) (Printexc.to_string exn)
+
+let refutation_cache_hit ~tick ~source =
+  Simple.(emit refutation_cache_hit) (tick, source)
+
+let refutation_cache_miss ~tick = Simple.(emit refutation_cache_miss) tick
+
+let refutation_run_to_tick ~start_tick ~end_tick ~distance =
+  Simple.(emit refutation_run_to_tick) (start_tick, end_tick, distance)
+
+let refutation_start_state ~level ~predecessor ~initial_tick =
+  Simple.(emit refutation_start_state) (level, predecessor, initial_tick)
+
+let refutation_state_of_tick ~level ~tick =
+  Simple.(emit refutation_state_of_tick) (level, tick)
+
+let refutation_riscv_advance ~from_level ~to_level =
+  Simple.(emit refutation_riscv_advance) (from_level, to_level)
 
 let eval_etherlink_block block_number time_ns =
   Simple.(emit eval_etherlink_block) (block_number, time_ns)

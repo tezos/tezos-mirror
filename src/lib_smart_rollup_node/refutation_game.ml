@@ -118,6 +118,12 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
     Option.map (fun s -> s.Pvm_plugin_sig.info.state_hash) our_state
   in
   let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
+  let*! () =
+    Refutation_game_event.computing_dissection
+      ~opponent
+      ~start_tick
+      ~end_tick:our_tick
+  in
   let* dissection =
     Plugin.Refutation_game_helpers.make_dissection
       (module Plugin)
@@ -192,6 +198,11 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                 our_state.info.state_hash
                 their_hash
             then
+              let*! () =
+                Refutation_game_event.dissection_agree
+                  ~tick
+                  ~state_hash:our_state.info.state_hash
+              in
               let ok =
                 Evaluated
                   {
@@ -200,10 +211,28 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                   }
               in
               traverse (ok, tick) dissection
-            else return (ok, (our, tick)))
+            else
+              let*! () =
+                Refutation_game_event.dissection_disagree
+                  ~tick
+                  ~their_hash
+                  ~our_hash:our_state.info.state_hash
+              in
+              return (ok, (our, tick)))
   in
   match dissection with
   | {state_hash = Some hash; tick} :: dissection ->
+      let end_tick =
+        List.last_opt dissection
+        |> Option.fold ~some:(fun x -> x.tick) ~none:tick
+      in
+      let*! () =
+        Refutation_game_event.traversing_dissection
+          ~opponent
+          ~dissection_length:(List.length dissection + 1)
+          ~start_tick:tick
+          ~end_tick
+      in
       let* ok, ko = traverse (Hash hash, tick) dissection in
       let* dissection =
         new_dissection
@@ -286,6 +315,7 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
 let play_next_move plugin node_ctxt state_cache ~commitment_period_tick_offset
     game opponent =
   let open Lwt_result_syntax in
+  let*! () = Refutation_game_event.playing_next_move ~opponent game in
   let* refutation =
     next_move
       plugin
