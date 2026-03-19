@@ -96,6 +96,8 @@ let variables : variables =
 
 (* This must be done before registering shared pipelines. *)
 
+let () = Release_page_ci.register ()
+
 let () = Grafazos_ci.register ()
 
 let () = Teztale_ci.register ()

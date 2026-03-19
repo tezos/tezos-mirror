@@ -13,7 +13,7 @@
 *)
 
 let version_manager =
-  project_root // "_build/default/ci/bin_release_page/version_manager.exe"
+  project_root // "_build/default/ci/bin_release_page/src/version_manager.exe"
 
 (** [fresh_versions_file ()] creates a temporary file containing an empty
     JSON array, suitable for use as a [versions.json] input. *)
