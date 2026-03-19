@@ -101,9 +101,10 @@ let job_compile_sources_doc =
     ~image_name:"build-debian:trixie"
 
 let register () =
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [(Manual, job_install_opam_ubuntu); (Auto, job_compile_sources_doc)] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, job_install_opam_ubuntu);
       (Auto, job_compile_sources_doc_deps_debian);

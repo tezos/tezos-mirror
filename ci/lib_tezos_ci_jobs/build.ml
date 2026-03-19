@@ -193,7 +193,8 @@ let job_build_layer1_profiling =
 let register () =
   (* We do not add manual jobs to [merge_train] pipelines,
      only to [before_merging] pipelines. *)
-  CI.register_before_merging_jobs
+  Cacio.register_jobs
+    Before_merging
     [
       (Manual, build_octez_source);
       (Manual, job_build_released Arm64);
@@ -203,14 +204,15 @@ let register () =
   (* Even though the build jobs are automatically added by Cacio as dependencies
      of test jobs, we explicitly want to make sure that the build jobs run
      even if the tests need not be run. *)
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [
       (Auto, job_build_released Amd64);
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
       (Auto, job_build_layer1_profiling `test);
     ] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Auto, build_octez_source);
       (Auto, job_build_released Amd64);
@@ -221,12 +223,14 @@ let register () =
       (Auto, job_build_exp Arm64);
       (Auto, job_build_layer1_profiling `test);
     ] ;
-  CI.register_master_jobs
+  Cacio.register_jobs
+    Master
     [
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
       (Manual, job_build_exp Arm64);
     ] ;
-  CI.register_octez_monitoring_jobs
+  Cacio.register_jobs
+    Octez_monitoring
     [(Auto, job_build_layer1_profiling `octez_monitoring)] ;
   ()

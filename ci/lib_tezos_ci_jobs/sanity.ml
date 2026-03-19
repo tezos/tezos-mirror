@@ -213,7 +213,7 @@ let job_commit_titles =
     ]
 
 let register () =
-  CI.register_merge_request_jobs
+  Cacio.register_merge_request_jobs
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);
@@ -224,9 +224,10 @@ let register () =
       (Immediate, job_check_rust_fmt);
       (Immediate, job_nix);
     ] ;
-  CI.register_before_merging_jobs [(Immediate, job_commit_titles `lenient)] ;
-  CI.register_merge_train_jobs [(Immediate, job_commit_titles `strict)] ;
-  CI.register_schedule_extended_test_jobs
+  Cacio.register_jobs Before_merging [(Immediate, job_commit_titles `lenient)] ;
+  Cacio.register_jobs Merge_train [(Immediate, job_commit_titles `strict)] ;
+  Cacio.register_jobs
+    Schedule_extended_test
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);

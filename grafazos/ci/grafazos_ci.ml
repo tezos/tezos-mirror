@@ -84,29 +84,34 @@ let job_release_page =
     ["eval $(opam env)"; "./grafazos/scripts/releases/publish_release_page.sh"]
 
 let register () =
-  CI.register_merge_request_jobs [(Auto, job_build Test)] ;
+  Cacio.register_merge_request_jobs [(Auto, job_build Test)] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Grafazos."
     [(Auto, job_build Test)] ;
-  CI.register_global_release_jobs
+  Cacio.register_jobs
+    Release
     [(Manual, job_release_page `real `build_dependencies)] ;
-  CI.register_global_test_release_jobs
+  Cacio.register_jobs
+    Test_release
     [(Manual, job_release_page `test `build_dependencies)] ;
-  CI.register_global_scheduled_test_release_jobs
+  Cacio.register_jobs
+    Scheduled_test_release
     [
       (* Explicitly include the build job so that it has trigger [Auto]. *)
       (Auto, job_build Build);
       (Manual, job_release_page `test `build_dependencies);
     ] ;
-  CI.register_global_publish_release_page_jobs
+  Cacio.register_jobs
+    Publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run
            as their artifacts are not needed to update the release page. *)
         job_release_page `real `no_build_dependencies );
     ] ;
-  CI.register_global_test_publish_release_page_jobs
+  Cacio.register_jobs
+    Test_publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run

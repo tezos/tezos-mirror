@@ -189,28 +189,32 @@ let register () =
       (Auto, job_gitlab_release);
       (Manual, job_release_page `real `build_dependencies);
     ] ;
-  CI.register_global_release_jobs
+  Cacio.register_jobs
+    Release
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_release_page `real `build_dependencies);
     ] ;
-  CI.register_global_test_release_jobs
+  Cacio.register_jobs
+    Test_release
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_release_page `test `build_dependencies);
     ] ;
-  CI.register_global_publish_release_page_jobs
+  Cacio.register_jobs
+    Publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run
            as their artifacts are not needed to update the release page. *)
         job_release_page `real `no_build_dependencies );
     ] ;
-  CI.register_global_test_publish_release_page_jobs
+  Cacio.register_jobs
+    Test_publish_release_page
     [
       ( Manual,
         (* [no_build_dependencies] because we don't want the build job to run

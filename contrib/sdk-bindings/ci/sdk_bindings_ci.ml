@@ -47,9 +47,9 @@ let job_test =
     ]
 
 let () =
-  CI.register_merge_request_jobs [(Auto, job_test)] ;
+  Cacio.register_merge_request_jobs [(Auto, job_test)] ;
   (* TODO: split into a new pipeline [sdk_bindings.daily] *)
-  Cacio.Shared.register_schedule_extended_test_jobs [(Auto, job_test)] ;
+  Cacio.register_jobs Schedule_extended_test [(Auto, job_test)] ;
   ()
 
 module Release = struct
