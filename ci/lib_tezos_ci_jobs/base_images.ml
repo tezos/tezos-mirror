@@ -87,6 +87,18 @@ module Files = struct
     ]
     @ build_script
 
+  let debian_build =
+    [
+      "images/base-images/Dockerfile.debian-build";
+      (* scripts in Dockerfile *)
+      "images/scripts/install_sccache_static.sh";
+      "images/scripts/install_opam_static.sh";
+      "scripts/kiss-fetch.sh";
+      "scripts/kiss-logs.sh";
+      "scripts/version.sh";
+    ]
+    @ build_script
+
   let debian_systemd =
     [
       "images/base-images/Dockerfile.debian-systemd";
@@ -291,12 +303,15 @@ let jobs ?start_job ?(changeset = false) () =
          [debian-rust] jobs *)
       Changeset.make
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
-       @ Files.debian_rust_merge @ Files.debian_systemd)
+       @ Files.debian_rust_merge @ Files.debian_build @ Files.debian_systemd)
     in
     make_job_base_image_distribution ~changes Distribution.Debian
   in
   let job_ubuntu_based_images =
-    let changes = Changeset.make (Files.debian_base @ Files.debian_systemd) in
+    let changes =
+      Changeset.make
+        (Files.debian_base @ Files.debian_build @ Files.debian_systemd)
+    in
     make_job_base_image_distribution ~changes Distribution.Ubuntu
   in
   let job_fedora_based_images =
@@ -436,6 +451,28 @@ let jobs ?start_job ?(changeset = false) () =
          images/base-images/Dockerfile.alpine-docker-ci";
       ]
   in
+  let job_debian_build_base_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"debian-build"
+      ~base_name:(Pipeline_dep "debian")
+      ~dependencies:(Dependent [Job job_debian_based_images])
+      ~matrix:Distribution.(release_matrix Debian)
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make (Files.debian_build @ Files.debian_base))
+      "images/base-images/Dockerfile.debian-build"
+  in
+  let job_ubuntu_build_base_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"ubuntu-build"
+      ~base_name:(Pipeline_dep "ubuntu")
+      ~dependencies:(Dependent [Job job_ubuntu_based_images])
+      ~matrix:Distribution.(release_matrix Ubuntu)
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make (Files.debian_build @ Files.debian_base))
+      "images/base-images/Dockerfile.debian-build"
+  in
   let job_debian_systemd_base_images =
     make_job_base_images
       ~__POS__
@@ -467,6 +504,8 @@ let jobs ?start_job ?(changeset = false) () =
     job_rust_based_images_merge;
     job_debian_homebrew_base_images;
     job_docker_ci_based_images;
+    job_debian_build_base_images;
+    job_ubuntu_build_base_images;
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
     job_ci_release_based_images;
