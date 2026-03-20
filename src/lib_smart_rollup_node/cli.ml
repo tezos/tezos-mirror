@@ -548,6 +548,47 @@ let compact : (bool, Client_context.full) Tezos_clic.arg =
     ~doc:"Produce a compact snapshot with a single commit for the context."
     ()
 
+type snapshot_level = Head | Finalized | Cemented | Level of int32
+
+let snapshot_level_arg =
+  Tezos_clic.default_arg
+    ~long:"level"
+    ~placeholder:"head|finalized|cemented|<level>"
+    ~default:"finalized"
+    ~doc:
+      "The last level that the snapshot should contain. Accepts 'head', \
+       'finalized' (default), 'cemented', or a block level number. Data after \
+       this level will be excluded from the snapshot."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+         match String.lowercase_ascii s with
+         | "head" -> Lwt_result.return Head
+         | "finalized" -> Lwt_result.return Finalized
+         | "cemented" -> Lwt_result.return Cemented
+         | _ -> (
+             match Int32.of_string_opt s with
+             | Some l when Compare.Int32.(l >= 0l) ->
+                 Lwt_result.return (Level l)
+             | _ ->
+                 cctxt#error
+                   "Invalid snapshot level %S. Expected 'head', 'finalized', \
+                    'cemented', or a positive integer."
+                   s)))
+
+let import_level_arg =
+  Tezos_clic.arg
+    ~long:"level"
+    ~placeholder:"<level>"
+    ~doc:
+      "Reset the imported snapshot to this level. Data after this level will \
+       be removed from the imported store."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+         match Int32.of_string_opt s with
+         | Some l when Compare.Int32.(l > 0l) -> Lwt_result.return l
+         | _ ->
+             cctxt#error
+               "Invalid import level %S. Expected a positive integer."
+               s))
+
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"rollup-node-endpoint"

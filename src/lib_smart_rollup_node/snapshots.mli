@@ -36,13 +36,14 @@ module Header : sig
 end
 
 (** [export ?rollup_node_endpoint cctxt ~no_checks ~compression ~data_dir ~dest
-    ~filename] creates a tar gzipped archive with name [filename] (or a
+    ~filename ~level] creates a tar gzipped archive with name [filename] (or a
     generated name) in [dest] (or the current directory) containing a snapshot
     of the data of the rollup node with data directory [data_dir]. The path of
     the snapshot archive is returned. If [no_checks] is [true], the integrity of
     the snapshot is not checked at the end. This function will first try to
     cancel any GC on the target node if [rollup_node_endpoint] is specified to
-    communicate with it. *)
+    communicate with it. If [level] is provided, the snapshot will only contain
+    data up to this level. *)
 val export :
   ?rollup_node_endpoint:Uri.t ->
   #Client_context.full ->
@@ -51,16 +52,19 @@ val export :
   data_dir:string ->
   dest:string option ->
   filename:string option ->
+  level:Cli.snapshot_level ->
   string tzresult Lwt.t
 
-(** [export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename]
-    creates a tar gzipped archive with name [filename] (or a generated name) in
-    [dest] (or the current directory) containing a snapshot of the data of the
-    rollup node with data directory [data_dir]. The difference with {!export} is
-    that the snapshot contains a single commit for the context (which must be
-    reconstructed on import) but is significantly smaller. If [no_checks] is
-    [true], we don't check if commitments are published on L1 (integrity is not
-    checked because it requires rebuilding the context). *)
+(** [export_compact cctxt ~no_checks ~compression ~data_dir ~dest ~filename
+    ~level] creates a tar gzipped archive with name [filename] (or a generated
+    name) in [dest] (or the current directory) containing a snapshot of the data
+    of the rollup node with data directory [data_dir]. The difference with
+    {!export} is that the snapshot contains a single commit for the context
+    (which must be reconstructed on import) but is significantly smaller. If
+    [no_checks] is [true], we don't check if commitments are published on L1
+    (integrity is not checked because it requires rebuilding the context). If
+    [level] is provided, the snapshot will only contain data up to this
+    level. *)
 val export_compact :
   #Client_context.full ->
   no_checks:bool ->
@@ -68,19 +72,22 @@ val export_compact :
   data_dir:string ->
   dest:string option ->
   filename:string option ->
+  level:Cli.snapshot_level ->
   string tzresult Lwt.t
 
-(** [import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
+(** [import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
     ~snapshot_file] imports the snapshot at path [snapshot_file] into
     the data directory [data_dir]. If [no_checks] is [true], the
     integrity of the imported data is not checked at the end. Import
     will fail if [data_dir] is already populated unless [force] is set
     to [true]. if [apply_unsafe_patches] is [true] and there is
-    [unsafe_pvm_patches] in the configuration they will be applied. *)
+    [unsafe_pvm_patches] in the configuration they will be applied. If
+    [level] is provided, the imported store is reset to this level. *)
 val import :
   apply_unsafe_patches:bool ->
   no_checks:bool ->
   force:bool ->
+  ?level:int32 ->
   #Client_context.full ->
   data_dir:string ->
   snapshot_file:string ->

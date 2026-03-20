@@ -388,6 +388,7 @@ val dump_durable_storage :
 val export_snapshot :
   ?compress_on_the_fly:bool ->
   ?compact:bool ->
+  ?level:string ->
   t ->
   string ->
   string Runnable.process
@@ -399,6 +400,7 @@ val import_snapshot :
   ?apply_unsafe_patches:bool ->
   ?force:bool ->
   ?no_check:bool ->
+  ?level:string ->
   t ->
   snapshot_file:string ->
   unit Runnable.process
