@@ -1356,6 +1356,16 @@ open struct
       ~level:Info
       ("level", Data_encoding.int32)
 
+  let skipped_protocol_without_dal_plugin =
+    declare_1
+      ~section
+      ~name:"skipped_protocol_without_dal_plugin"
+      ~msg:
+        "Skipping protocol activation at level {level}: no DAL plugin is \
+         available for this protocol"
+      ~level:Warning
+      ("level", Data_encoding.int32)
+
   let slots_exported_successfully =
     declare_0
       ~section
@@ -1798,6 +1808,9 @@ let emit_publication_failed ~block_level ~error =
   emit publication_failed (block_level, error)
 
 let emit_cryptobox_registered ~level = emit cryptobox_registered level
+
+let emit_skipped_protocol_without_dal_plugin ~level =
+  emit skipped_protocol_without_dal_plugin level
 
 let emit_cannot_export_snapshot_data ~level ~index ~kind =
   emit cannot_export_snapshot_data (level, index, kind)

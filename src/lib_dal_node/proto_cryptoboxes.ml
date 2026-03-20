@@ -178,29 +178,38 @@ let init ~cctxt ~header ~config ~first_seen_level profile_ctxt proto_plugins =
             if activation_level <= first_seen_level then first_seen_level
             else Int32.add first_proto_level 1l
           in
-          let*? _, proto_params =
+          match
             Proto_plugins.get_plugin_and_parameters_for_level
               proto_plugins
               ~level:first_proto_level
-          in
-          let* () =
-            add_slots_and_shards_layouts
-              ~layout_level:current_layout_level
-              ~proto_parameters:proto_params.cryptobox_parameters
-          in
-          match box with
-          | Some box ->
-              let* new_state = add proto_params ~level:first_proto_level box in
-              return_some new_state
-          | None ->
-              let* new_state =
-                init_state
-                  config
-                  proto_params
-                  profile_ctxt
+          with
+          | Error _ ->
+              let*! () =
+                Event.emit_skipped_protocol_without_dal_plugin
                   ~level:first_proto_level
               in
-              return_some new_state)
+              return box
+          | Ok (_, proto_params) -> (
+              let* () =
+                add_slots_and_shards_layouts
+                  ~layout_level:current_layout_level
+                  ~proto_parameters:proto_params.cryptobox_parameters
+              in
+              match box with
+              | Some box ->
+                  let* new_state =
+                    add proto_params ~level:first_proto_level box
+                  in
+                  return_some new_state
+              | None ->
+                  let* new_state =
+                    init_state
+                      config
+                      proto_params
+                      profile_ctxt
+                      ~level:first_proto_level
+                  in
+                  return_some new_state))
       None
       needed_protocols
   in
