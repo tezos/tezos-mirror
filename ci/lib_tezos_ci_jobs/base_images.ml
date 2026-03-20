@@ -477,9 +477,34 @@ let jobs ?start_job ?(changeset = false) () =
       ~base_name:(Pipeline_dep "debian")
       ~dependencies:(Dependent [Job job_debian_based_images])
       ~matrix:Distribution.(release_matrix Debian)
-      ~compilation:Amd64_only
-      ~changes:(Changeset.make (Files.debian_build @ Files.debian_base))
+      ~compilation:Native
+      ~changes:
+        (Changeset.make
+           (Files.debian_build @ Files.debian_base @ Files.debian_build_merge))
       "images/base-images/Dockerfile.debian-build"
+  in
+  let job_debian_build_base_images_merge =
+    job_docker_authenticated
+      ~__POS__
+      ~name:"images.debian-build.merge"
+      ~stage:Stages.build
+      ~dependencies:(Dependent [Job job_debian_build_base_images])
+      ~rules:
+        (if changeset then
+           [
+             job_rule
+               ~changes:
+                 (Changeset.encode
+                    (Changeset.make
+                       (Files.debian_build_merge @ Files.debian_build
+                      @ Files.debian_base)))
+               ~when_:On_success
+               ();
+           ]
+         else [job_rule ~when_:Always ()])
+      ~parallel:(Matrix [Distribution.(release_matrix Debian)])
+      ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-build")]
+      ["scripts/ci/docker-merge-base-images.sh"]
   in
   let job_ubuntu_build_base_images =
     make_job_base_images
@@ -522,6 +547,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_debian_homebrew_base_images;
     job_docker_ci_based_images;
     job_debian_build_base_images;
+    job_debian_build_base_images_merge;
     job_ubuntu_build_base_images;
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
