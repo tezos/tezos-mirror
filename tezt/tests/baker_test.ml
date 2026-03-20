@@ -2012,6 +2012,55 @@ let test_abaab_with_small_baker =
   in
   check_bootstrap2_present (activation_level + 1) 10
 
+let multi_node_inconsistent_chain_id =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node inconsistent chain id"
+    ~tags:[team; "baker"; "extra_nodes"; "sanity_check"]
+    ~supports:Protocol.(From_protocol 026)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Start node1 with sandbox protocol" ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0]
+      ()
+  in
+  Log.info
+    "Start node2 on a different chain (ghostnet genesis, not connected to \
+     node1)" ;
+  let node2 = Node.create [Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.config_init node2 [] in
+  let* () =
+    Node.Config_file.update
+      node2
+      (Node.Config_file.set_ghostnet_sandbox_network ())
+  in
+  let* () = Node.run node2 [] in
+  let* () = Node.wait_for_ready node2 in
+  Log.info
+    "Start baker with node1 as primary and node2 (different chain) as extra" ;
+  let* baker =
+    Agnostic_baker.init
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      node1
+      client1
+  in
+  Log.info "Baker should terminate due to chain_id mismatch" ;
+  let timeout = 10. in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "Baker did not shut down within %f seconds despite chain_id mismatch"
+        timeout)
+    (fun () -> Agnostic_baker.wait_for_termination baker)
+
 let multi_node_staggered_crash =
   Protocol.register_test
     ~__FILE__
@@ -2249,5 +2298,6 @@ let register ~protocols =
   register_with_abaab ~abaab:false ~protocols ;
   register_with_abaab ~abaab:true ~protocols ;
   baker_shutdown_on_node_shutdown protocols ;
+  multi_node_inconsistent_chain_id protocols ;
   multi_node_staggered_crash protocols ;
   multi_node_crash_resilience protocols
