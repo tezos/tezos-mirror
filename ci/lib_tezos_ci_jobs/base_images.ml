@@ -320,14 +320,16 @@ let jobs ?start_job ?(changeset = false) () =
          [debian-rust] jobs *)
       Changeset.make
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
-       @ Files.debian_rust_merge @ Files.debian_build @ Files.debian_systemd)
+       @ Files.debian_rust_merge @ Files.debian_build @ Files.debian_build_merge
+       @ Files.debian_systemd)
     in
     make_job_base_image_distribution ~changes Distribution.Debian
   in
   let job_ubuntu_based_images =
     let changes =
       Changeset.make
-        (Files.debian_base @ Files.debian_build @ Files.debian_systemd)
+        (Files.debian_base @ Files.debian_build @ Files.debian_build_merge
+       @ Files.debian_systemd)
     in
     make_job_base_image_distribution ~changes Distribution.Ubuntu
   in
