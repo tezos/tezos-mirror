@@ -111,6 +111,18 @@ module Files = struct
     ]
     @ build_script
 
+  let debian_build_merge =
+    [
+      "images/base-images/Dockerfile.debian-build";
+      "images/scripts/install_sccache_static.sh";
+      "images/scripts/install_opam_static.sh";
+      "scripts/kiss-fetch.sh";
+      "scripts/kiss-logs.sh";
+      "scripts/version.sh";
+      (* job script *)
+      "scripts/ci/docker-merge-base-images.sh";
+    ]
+
   let debian_rust_build =
     [
       "images/base-images/Dockerfile.rust";
