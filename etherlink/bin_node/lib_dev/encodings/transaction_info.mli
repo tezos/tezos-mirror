@@ -51,3 +51,7 @@ val of_receipt_and_object :
 val receipt_fields_encoding : receipt_fields Data_encoding.t
 
 val object_fields_encoding : object_fields Data_encoding.t
+
+(** The all-zero bloom filter (no logs), stored as empty bytes in the compact
+    encoding. *)
+val zero_logs_bloom : hex

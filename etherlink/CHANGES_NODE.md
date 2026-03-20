@@ -26,6 +26,11 @@
 
 ### Storage changes
 
+- Store all-zero `logs_bloom` values as empty bytes instead of the
+  full 514-byte ASCII hex representation. This saves ~514 bytes per
+  simple-transfer receipt (the majority of transactions). Backward
+  compatible: existing rows are decoded transparently. (!21299)
+
 ### Documentation changes
 
 ### Experimental features changes
