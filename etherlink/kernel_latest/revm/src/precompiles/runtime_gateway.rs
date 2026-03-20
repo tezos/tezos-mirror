@@ -17,6 +17,7 @@ use tezosx_interfaces::{
 };
 
 use crate::{
+    database::EtherlinkVMDB,
     helpers::legacy::alloy_to_u256,
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
@@ -28,7 +29,9 @@ use crate::{
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
-use evm_types::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges};
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
 
 sol! {
     contract RuntimeGateway {
@@ -143,17 +146,15 @@ fn inject_tezos_headers(
     Ok(())
 }
 
-pub(crate) fn runtime_gateway_precompile<'j, CTX, DB>(
+pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    DB: DatabasePrecompileStateChanges
-        + DatabaseCommitPrecompileStateChanges
-        + revm::Database,
-    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
-    Journal<'j, DB>: CrossRuntimeCall,
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
 

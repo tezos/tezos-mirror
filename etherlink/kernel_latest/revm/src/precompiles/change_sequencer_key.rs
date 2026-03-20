@@ -16,7 +16,12 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::nom::NomReader;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
+    database::EtherlinkVMDB,
     journal::Journal,
     precompiles::{
         change_sequencer_key::ChangeSequencerKey::ChangeSequencerKeyCalls,
@@ -44,14 +49,15 @@ sol! {
     );
 }
 
-pub(crate) fn change_sequencer_key_precompile<'j, CTX, DB>(
+pub(crate) fn change_sequencer_key_precompile<'j, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
