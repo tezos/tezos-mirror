@@ -7,6 +7,7 @@ edition = "2024"
 workspace = true
 
 [dependencies]
+derive_more.workspace = true
 ocaml.workspace = true
 ocaml-boxroot-sys.workspace = true
 ocaml-sys.workspace = true

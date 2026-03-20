@@ -26,6 +26,8 @@
 //! Invalid argument errors more refer to attempting to read/write _beyond the end_ of a value, or
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
+use std::path::Path;
+
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::MutableState;
@@ -33,8 +35,11 @@ use octez_riscv_api_common::safe_pointer::SafePointer;
 use octez_riscv_data::hash::Hash;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::utils::NotFound;
+use octez_riscv_durable_storage::commit::CommitId;
 use octez_riscv_durable_storage::errors as ds_errors;
 use octez_riscv_durable_storage::persistence_layer::PersistenceLayer;
+use octez_riscv_durable_storage::registry as ds_registry;
+use octez_riscv_durable_storage::repo::DirectoryManager;
 use octez_riscv_durable_storage_common::BytesParam;
 use octez_riscv_durable_storage_common::KeyParam;
 use octez_riscv_durable_storage_common::api_common;
@@ -52,6 +57,12 @@ impl GcNames for OnDiskGcNames {
 /// On-disk durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
 pub type Registry = MutableState<RegistryState<PersistenceLayer, OnDiskGcNames, Normal>>;
+
+/// On-disk repository, wrapping a DirectoryManager.
+#[derive(derive_more::Deref)]
+#[ocaml::sig]
+pub struct Repo(DirectoryManager);
+ocaml::custom!(Repo);
 
 /// Stub registry for proof generation. See TZX-113.
 // TODO (TZX-113): implement registry prove
@@ -134,6 +145,52 @@ pub enum VerificationArgumentError {
 }
 
 // Normal mode — registry
+
+#[ocaml::func]
+#[ocaml::sig("bytes -> repo")]
+pub fn octez_riscv_durable_on_disk_repo_new(path: BytesParam) -> OcamlFallible<SafePointer<Repo>> {
+    let path_str = std::str::from_utf8(path.0)?;
+    let dir = DirectoryManager::new(Path::new(path_str))?;
+    Ok(SafePointer::from(Repo(dir)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> registry")]
+pub fn octez_riscv_durable_on_disk_registry_new(
+    repo: SafePointer<Repo>,
+) -> OcamlFallible<SafePointer<Registry>> {
+    let dir = repo.0.clone();
+    let registry = RegistryState::new(dir)?;
+    Ok(SafePointer::from(MutableState::owned(registry)))
+}
+
+#[ocaml::func]
+#[ocaml::sig("registry -> bytes")]
+pub fn octez_riscv_durable_on_disk_registry_commit(
+    state: SafePointer<Registry>,
+) -> OcamlFallible<BytesWrapper<Hash>> {
+    state.apply_ro(|state| {
+        let commit_id = state.commit()?;
+        Ok(BytesWrapper::from(*commit_id.as_hash()))
+    })
+}
+
+#[ocaml::func]
+#[ocaml::sig("repo -> bytes -> registry")]
+pub fn octez_riscv_durable_on_disk_registry_checkout(
+    repo: SafePointer<Repo>,
+    commit_id: BytesParam,
+) -> OcamlFallible<SafePointer<Registry>> {
+    let hash = <[u8; Hash::DIGEST_SIZE]>::try_from(commit_id.0)?;
+    let commit_id = CommitId::from(Hash::from(hash));
+    let repo = repo.clone();
+
+    let registry = ds_registry::Registry::checkout(repo, commit_id)?;
+
+    let state = RegistryState::from(registry);
+
+    Ok(SafePointer::from(MutableState::owned(state)))
+}
 
 #[ocaml::func]
 #[ocaml::sig("registry -> bytes")]

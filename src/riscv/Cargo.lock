@@ -1600,6 +1600,7 @@ dependencies = [
 name = "octez-riscv-durable-storage-on-disk"
 version = "0.1.0"
 dependencies = [
+ "derive_more",
  "ocaml",
  "ocaml-boxroot-sys",
  "ocaml-build",

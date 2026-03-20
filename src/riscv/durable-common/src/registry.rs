@@ -43,6 +43,15 @@ impl<KV: KeyValueStore + Send + Sync + 'static, G> RegistryState<KV, G, Normal> 
     }
 }
 
+impl<KV: KeyValueStore, G> From<registry::Registry<KV, Normal>> for RegistryState<KV, G, Normal> {
+    fn from(value: registry::Registry<KV, Normal>) -> Self {
+        Self {
+            inner: value,
+            _phantom: PhantomData,
+        }
+    }
+}
+
 impl<KV: KeyValueStore, G, M: Mode> Deref for RegistryState<KV, G, M> {
     type Target = registry::Registry<KV, M>;
 
