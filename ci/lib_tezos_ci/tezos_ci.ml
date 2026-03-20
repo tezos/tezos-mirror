@@ -1428,7 +1428,10 @@ module Images_external = struct
 
   (* Image used in [schedule_security_scans] pipeline. Trivy scans
      Docker images and codebase for CVEs and SBOMs. *)
-  let trivy = Image.mk_external ~image_path:"aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
+  let trivy =
+    Image.mk_external
+      ~image_path:
+        "aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
