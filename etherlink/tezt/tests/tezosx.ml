@@ -3248,6 +3248,43 @@ let test_cross_runtime_evm_sender_is_alias =
   Check.((storage = expected) string ~error_msg:"Expected %R but got %L") ;
   unit
 
+(** Transfer tez between two accounts on the Michelson runtime and verify
+    that the receiver balance is updated. *)
+let test_tez_transfer =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Transfer for Michelson runtime"
+    ~tags:["transfer"; "michelson"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; _} _protocol ->
+  let* client = tezos_client sequencer in
+
+  let amount = Tez.one in
+
+  let giver = Constant.bootstrap1.alias in
+  let receiver = Constant.bootstrap2.alias in
+
+  let wait_for_tx_in_tx_queue =
+    Evm_node.wait_for_tx_queue_add_transaction sequencer
+  in
+  let* () = Client.transfer ~amount ~giver ~receiver ~burn_cap:Tez.one client in
+  let* _tx_hash = wait_for_tx_in_tx_queue in
+
+  let*@ nb_txs = Rpc.produce_block sequencer in
+  Check.(
+    (nb_txs = 1)
+      int
+      ~error_msg:"Expected %R transactions in the block but got %L") ;
+
+  let* receiver_balance = Client.get_balance_for ~account:receiver client in
+  Check.(
+    (receiver_balance = amount)
+      Tez.typ
+      ~error_msg:"Expected receiver balance %R mutez but got %L") ;
+
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3290,4 +3327,5 @@ let () =
   test_entrypoints_enshrined () ;
   test_script_coherency_enshrined () ;
   test_trace_call_evm ~runtime:Tezos () ;
-  test_cross_runtime_evm_sender_is_alias [Alpha]
+  test_cross_runtime_evm_sender_is_alias [Alpha] ;
+  test_tez_transfer [Alpha]
