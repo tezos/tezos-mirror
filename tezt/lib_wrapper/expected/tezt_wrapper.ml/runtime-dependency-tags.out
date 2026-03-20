@@ -10,6 +10,7 @@ mainnet_kernel: etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wa
 tezlink_shadownet_kernel: etherlink/kernel_latest/kernel/tests/resources/tezlink_shadownet_kernel.wasm
 evm_kernel: evm_kernel.wasm
 watchtower: fa-bridge-watchtower
+michelson_test_scripts: michelson_test_scripts
 accuser: octez-accuser
 accuser_ushuaia: octez-accuser-PsGXQmSv
 accuser_psriotum: octez-accuser-PsRiotum
