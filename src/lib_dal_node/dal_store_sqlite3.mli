@@ -12,12 +12,6 @@ val sqlite_file_name : string
 (** A direct connection to the database, allowing to interact with it. *)
 type conn = Sqlite.conn
 
-module Schemas : sig
-  (** [get_all conn] returns the list of SQL statements allowing to recreate
-      the tables in the current store. *)
-  val get_all : conn -> string list tzresult Lwt.t
-end
-
 module Skip_list_cells : sig
   open Dal_proto_types
 

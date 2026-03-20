@@ -14,9 +14,7 @@ depends: [
   "bls12-381"
   "octez-libs"
   "octez-version"
-  "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
-  "re" { >= "1.10.0" }
   "octez-l2-libs"
   "efunc_core"
   "dream" { >= "1.0.0~alpha8-octez" }

@@ -16,8 +16,6 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-client-unix
   octez-libs.stdlib-unix
-  caqti-lwt
-  re
   octez-l2-libs.sqlite
   octez-evm-node-libs.evm_node_lib_dev_encoding
   octez-evm-node-libs.evm_node_lib_dev

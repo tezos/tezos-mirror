@@ -7,8 +7,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  caqti-lwt
-  re
   octez-l2-libs.sqlite)
  (flags
   (:standard)

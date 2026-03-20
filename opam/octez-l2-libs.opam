@@ -28,10 +28,10 @@ depends: [
   "caqti"
   "caqti-lwt" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" & < "2.2.0" }
+  "re" { >= "1.10.0" }
   "yaml" { >= "3.1.0" }
   "opentelemetry" { >= "0.12" }
   "crunch" { >= "3.3.0" }
-  "re" { >= "1.10.0" }
   "octez-performance-metrics" { = version }
   "ppx_import"
   "qcheck-alcotest" { >= "0.20" }

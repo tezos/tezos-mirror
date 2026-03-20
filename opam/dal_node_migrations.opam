@@ -11,9 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "caqti-lwt" { >= "2.0.1" }
   "crunch" { >= "3.3.0" }
-  "re" { >= "1.10.0" }
   "octez-l2-libs" { = version }
 ]
 build: [

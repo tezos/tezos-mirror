@@ -48,7 +48,7 @@ let no_l1_latest_level_to_catch_up =
 
 let init_store () = emit init_store ()
 
-let applied_migration name time = emit applied_migration (name, time)
+let applied_migration ~name ~duration = emit applied_migration (name, duration)
 
 let migrations_from_the_future ~applied ~known =
   emit migrations_from_the_future (applied, known)

@@ -8,7 +8,7 @@
 (** [applied_migration ~name ~duration] advertizes that the migration
     [name] is applied on a store that was previously missing it in
     [duration] seconds. *)
-val applied_migration : name:string -> duration:float -> unit Lwt.t
+val applied_migration : name:string -> duration:Ptime.span -> unit Lwt.t
 
 (** [migration_from_the_future ~applied ~known] advertizes that there are more
     migrations applied to the store than known from the DAL node, which

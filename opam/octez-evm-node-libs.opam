@@ -23,10 +23,9 @@ depends: [
   "octez-lwt-domain"
   "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
-  "caqti-lwt" { >= "2.0.1" }
-  "re" { >= "1.10.0" }
   "sqlite3" { = "5.3.1" }
   "octez-smart-rollup-wasm-debugger-plugin"
+  "re" { >= "1.10.0" }
   "uuidm" { >= "0.9.9" }
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }

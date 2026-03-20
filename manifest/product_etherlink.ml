@@ -185,14 +185,7 @@ let tezlink_node_migrations =
     "tezlink_node_migrations"
     ~path:"etherlink/bin_node/tezlink_migrations"
     ~synopsis:"SQL migrations for the EVM node store related to Tezlink"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        caqti_lwt;
-        crunch;
-        re;
-        octez_sqlite |> open_;
-      ]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
@@ -223,14 +216,7 @@ let evm_node_migrations =
     "evm_node_migrations"
     ~path:"etherlink/bin_node/migrations"
     ~synopsis:"SQL migrations for the EVM node store"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        caqti_lwt;
-        crunch;
-        re;
-        octez_sqlite |> open_;
-      ]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
@@ -744,9 +730,7 @@ let _outbox_monitor =
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
-        caqti_lwt;
         crunch;
-        re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
@@ -797,9 +781,7 @@ let _fa_bridge_watchtower =
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
-        caqti_lwt;
         crunch;
-        re;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
