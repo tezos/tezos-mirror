@@ -318,9 +318,24 @@ let register (module Cli : Scenarios_cli.Etherlink) =
     (* The durable storage is patched on startup to pre-fund addresses. If there
        is already a context, we need to wait for the next block for the patch to
        be effective. *)
-    match Cli.kernel with
-    | `Custom _ -> unit
-    | `Mainnet -> Lwt_unix.sleep (time_between_empty_blocks *. 4.)
+    match (Cli.kernel, Cli.network) with
+    | `Custom _, Some _ ->
+        (* FIXME: L2-986
+           Temporary workaround until the EVM node is patched to refresh
+           session.storage_version. When a custom kernel is used with a network
+           snapshot, the kernel may migrate the storage layout (e.g. V50 moving
+           the sequencer key from /evm/sequencer to /evm/world_state/sequencer)
+           on the first blueprint, but the node's cached storage_version is
+           stale and it looks at the old path, causing "No value found under
+           /evm/sequencer". Restarting forces the node to re-read the current
+           storage_version from the migrated state. When fixed, replace this
+           code block with just unit.*)
+        let* () = Lwt_unix.sleep (time_between_empty_blocks *. 4.) in
+        let* () = Evm_node.terminate sequencer in
+        let* () = Evm_node.run sequencer in
+        Evm_node.wait_for_ready ~timeout:1200. sequencer
+    | `Custom _, None -> unit
+    | `Mainnet, _ -> Lwt_unix.sleep (time_between_empty_blocks *. 4.)
   in
   let () = toplog "Setup UniswapV2 benchmark" in
   let* env, shutdown =
