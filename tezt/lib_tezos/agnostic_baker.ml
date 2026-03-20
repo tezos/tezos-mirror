@@ -350,6 +350,25 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "starting baker daemon" promise
 
+let wait_for_message msg ?timeout ?endpoint baker =
+  wait_for ?timeout baker msg (fun json ->
+      let uri = JSON.(json |> as_string) in
+      match endpoint with
+      | Some endpoint ->
+          if String.equal uri (Endpoint.as_string endpoint) then Some ()
+          else None
+      | None -> Some ())
+
+let wait_for_supervisor_automaton_start =
+  wait_for_message "supervisor_starting_automaton.v0"
+
+let wait_for_supervisor_automaton_crash =
+  wait_for_message "supervisor_automaton_crashed.v0"
+
+let wait_for_supervisor_all_automatons_down ?timeout baker =
+  wait_for ?timeout baker "supervisor_all_automatons_down.v0" (fun _json ->
+      Some ())
+
 let wait_for_termination (baker : t) : unit Lwt.t =
   match baker.status with
   | Not_running -> Lwt.return_unit
