@@ -189,6 +189,17 @@ let start_public_server (type f) ~(mode : f Mode.t)
           impl.time_between_blocks
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
+  let add_operation_with_tick raw_op =
+    let* hash =
+      add_operation
+        ~mode
+        ~keep_alive:config.keep_alive
+        ~timeout:config.rpc_timeout
+        raw_op
+    in
+    let*! _ = tick () in
+    return hash
+  in
   let* register_tezos_services =
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
@@ -201,11 +212,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
              (Tezlink_services_impl.make ro_ctxt)
-             ~add_operation:
-               (add_operation
-                  ~mode
-                  ~keep_alive:config.keep_alive
-                  ~timeout:config.rpc_timeout)
+             ~add_operation:add_operation_with_tick
              ~get_da_fee_per_byte_nanotez:
                Prevalidator.get_da_fee_per_byte_nanotez
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
@@ -230,11 +237,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
                  (Tezosx_rpc.add_rpc_directory
                     ro_ctxt
                     ~l2_chain_id
-                    ~add_operation:
-                      (add_operation
-                         ~mode
-                         ~keep_alive:config.keep_alive
-                         ~timeout:config.rpc_timeout))
+                    ~add_operation:add_operation_with_tick)
                  Tezos_rpc.Directory.empty
                  runtimes
         | Error e ->
