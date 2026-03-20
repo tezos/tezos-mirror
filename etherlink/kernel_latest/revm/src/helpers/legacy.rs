@@ -178,6 +178,26 @@ pub fn alloy_to_h256(value: &B256) -> H256 {
     H256::from_slice(value.as_slice())
 }
 
+/// Convert a kernel-side access list (`Vec<tezos_ethereum::access_list::AccessListItem>`)
+/// into the revm-native `AccessList`.
+pub fn access_list_to_revm(
+    access_list: Vec<tezos_ethereum::access_list::AccessListItem>,
+) -> revm::context::transaction::AccessList {
+    revm::context::transaction::AccessList::from(
+        access_list
+            .into_iter()
+            .map(|item| revm::context::transaction::AccessListItem {
+                address: Address::from_slice(&item.address.0),
+                storage_keys: item
+                    .storage_keys
+                    .into_iter()
+                    .map(|key| B256::from_slice(&key.0))
+                    .collect(),
+            })
+            .collect::<Vec<revm::context::transaction::AccessListItem>>(),
+    )
+}
+
 fn bigint_to_u256(value: &BigInt) -> Result<PU256, primitive_types::Error> {
     let (_, bytes) = value.to_bytes_le();
     if bytes.len() > 32 {

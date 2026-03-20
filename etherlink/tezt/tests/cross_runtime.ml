@@ -58,7 +58,8 @@ module EvmContract = struct
    *  a block, asserts the receipt status matches [expected_status] (default
     [true]), and returns the receipt. *)
   let craft_and_send_transaction ~sequencer ~sender ~nonce ~value ~address
-      ~abi_signature ~arguments ?(expected_status = true) () =
+      ~abi_signature ~arguments ?(expected_status = true) ?access_list ?legacy
+      () =
     let* raw_tx =
       Cast.craft_tx
         ~source_private_key:sender.Eth_account.private_key
@@ -70,6 +71,8 @@ module EvmContract = struct
         ~address
         ~signature:abi_signature
         ~arguments
+        ?access_list
+        ?legacy
         ()
     in
     let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
@@ -272,9 +275,11 @@ end
 module EvmRunner = struct
   open EvmContract
 
-  (** Calls [run()] on the given EVM contract. *)
-  let call_run ?expected_status ~sequencer ~sender ~nonce ~value runner =
-    let* _receipt =
+  (** Calls [run()] on the given EVM contract and returns [gasUsed]. *)
+  let call_run ?expected_status ~sequencer ~sender ~nonce ~value ?access_list
+      runner =
+    let legacy = if Option.is_some access_list then Some false else None in
+    let* receipt =
       craft_and_send_transaction
         ~sequencer
         ~sender
@@ -284,9 +289,11 @@ module EvmRunner = struct
         ~abi_signature:"run()"
         ~arguments:[]
         ?expected_status
+        ?access_list
+        ?legacy
         ()
     in
-    unit
+    return receipt.gasUsed
 end
 
 (** EVM contract that forwards [run()] to a Tezos target via the
@@ -531,7 +538,11 @@ module CracRunnerWrapper = struct
   module type S = sig
     module EvmRunner : sig
       val call_run :
-        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> unit Lwt.t
+        ?expected_status:bool ->
+        ?value:Wei.t ->
+        ?access_list:(string * string list) list ->
+        evm_runner ->
+        int64 Lwt.t
     end
 
     module EvmCrossRuntimeRunnerTez : sig
@@ -608,17 +619,22 @@ module CracRunnerWrapper = struct
     in
     let module Helper = struct
       module EvmRunner = struct
-        let call_run ?expected_status ?(value = Wei.zero) (`Evm_runner runner) =
-          let* () =
+        let call_run ?expected_status ?(value = Wei.zero) ?access_list
+            (`Evm_runner runner) =
+          let* gas_used =
             EvmRunner.call_run
               ?expected_status
               ~sequencer
               ~sender
               ~nonce:(evm_nonce ())
               ~value
+              ?access_list
               runner
           in
-          Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
       end
 
       module EvmCrossRuntimeRunnerTez = struct
@@ -808,7 +824,7 @@ let test_crac_evm_to_tez =
     EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
   in
   Log.debug ~prefix "Call EVM runner" ;
-  let* () = EvmRunner.call_run evm_runner in
+  let* _ = EvmRunner.call_run evm_runner in
   Log.debug ~prefix "Verify counters" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
@@ -842,7 +858,7 @@ let test_crac_evm_multiple_independent_crossings =
       ()
   in
   Log.debug ~prefix "Call EVM main" ;
-  let* () = EvmRunner.call_run evm_main in
+  let* _ = EvmRunner.call_run evm_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner_1 in
@@ -883,7 +899,7 @@ let test_crac_evm_double_crossing =
       ()
   in
   Log.debug ~prefix "Call EVM main" ;
-  let* () = EvmRunner.call_run evm_main in
+  let* _ = EvmRunner.call_run evm_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_inner in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
@@ -932,7 +948,7 @@ let test_crac_evm_shared_leaf_via_direct_and_chain =
       ()
   in
   Log.debug ~prefix "Call EVM main" ;
-  let* () = EvmRunner.call_run evm_main in
+  let* _ = EvmRunner.call_run evm_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:4 evm_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_leaf in
@@ -968,7 +984,7 @@ let test_crac_evm_5_crossing_chain =
   let* tez_b = TezCrossRuntimeRunnerEvm.originate evm_c in
   let* evm_a = EvmCrossRuntimeRunnerTez.deploy_and_init tez_b in
   Log.debug ~prefix "Call EVM a" ;
-  let* () = EvmRunner.call_run evm_a in
+  let* _ = EvmRunner.call_run evm_a in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_leaf in
   let* () = EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_a in
@@ -1160,6 +1176,62 @@ let test_crac_tez_5_crossing_chain =
   let* () = TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_e in
   unit
 
+(** Access list preserved across EVM->TEZ->EVM CRAC.
+ *
+ *  Deploys one double-crossing chain:
+ *
+ *    EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
+ *
+ *  Calls [run()] twice on the same chain: first without an access list,
+ *  then with one pre-warming [evm_inner]'s counter storage slot.
+ *  The second call should use strictly less gas.
+ *)
+let test_crac_access_list_preserved =
+  register_crac_runner_test
+    ~title:"CRAC: access list preserved across EVM->TEZ->EVM"
+    ~tags:["access_list"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-AL" in
+  Log.debug ~prefix "Deploy chain" ;
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  (* Call 1: without access list *)
+  Log.debug ~prefix "Call run() without access list" ;
+  let* gas_without = EvmRunner.call_run evm_bridge in
+  (* Call 2: with access list pre-warming evm_inner's counter slot *)
+  let (`Evm_runner evm_inner_addr) = evm_inner in
+  let access_list =
+    [
+      ( evm_inner_addr,
+        ["0x0000000000000000000000000000000000000000000000000000000000000001"]
+      );
+    ]
+  in
+  Log.debug ~prefix "Call run() with access list" ;
+  let* gas_with = EvmRunner.call_run ~access_list evm_bridge in
+  (* The access list warms evm_inner's storage slot before the
+     EVM->TEZ->EVM round-trip, so the 3rd EVM execution (evm_inner
+     after the round-trip) pays warm-access cost instead of cold. *)
+  Log.info "Gas with access list: %Ld, gas without: %Ld" gas_with gas_without ;
+  Check.(
+    (gas_with < gas_without)
+      int64
+      ~error_msg:
+        "Expected gas with access list (%L) to be strictly less than without \
+         (%R)") ;
+  (* Verify correctness: counters incremented twice (once per call) *)
+  Log.debug ~prefix "Verify counters" ;
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:4 evm_bridge
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:4 tez_bridge
+  in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_inner in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1170,4 +1242,5 @@ let () =
   test_crac_tez_multiple_independent_crossings [Alpha] ;
   test_crac_tez_double_crossing [Alpha] ;
   test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
-  test_crac_tez_5_crossing_chain [Alpha]
+  test_crac_tez_5_crossing_chain [Alpha] ;
+  test_crac_access_list_preserved [Alpha]

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm::context::result::EVMError;
-use revm::primitives::{hardfork::SpecId, keccak256, Address, Bytes, B256};
+use revm::primitives::{hardfork::SpecId, keccak256, Bytes};
 use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
@@ -14,7 +14,6 @@ use revm_etherlink::{
     run_transaction, Error, ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::access_list::AccessList;
-use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezosx_journal::TezosXJournal;
 use thiserror::Error;
@@ -242,25 +241,7 @@ fn execute_transaction(
     let call_data = env.tx.data.to_vec();
     let gas_limit = env.tx.gas_limit;
     let transaction_value = env.tx.value;
-    let access_list = revm::context::transaction::AccessList::from(
-        access_list
-            .into_iter()
-            .map(
-                |AccessListItem {
-                     address,
-                     storage_keys,
-                 }| {
-                    revm::context::transaction::AccessListItem {
-                        address: Address::from_slice(&address.0),
-                        storage_keys: storage_keys
-                            .into_iter()
-                            .map(|key| B256::from_slice(&key.0))
-                            .collect(),
-                    }
-                },
-            )
-            .collect::<Vec<revm::context::transaction::AccessListItem>>(),
-    );
+    let access_list = revm_etherlink::helpers::legacy::access_list_to_revm(access_list);
 
     write_host!(
         host,
@@ -290,12 +271,11 @@ fn execute_transaction(
         Bytes::from(call_data),
         GasData::new(gas_limit, u256_to_u128(env.tx.gas_price), gas_limit),
         revm::primitives::U256::from_le_slice(&bytes),
-        access_list,
         // TODO: add authorization list when Prague tests are enabled.
         None,
         None,
         false,
-        TransactionOrigin::UserInput,
+        TransactionOrigin::UserInput { access_list },
     )
 }
 

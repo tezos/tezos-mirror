@@ -424,11 +424,12 @@ pub fn main() {
                             transaction.gas_limit[indexes.gas],
                         ),
                         transaction.value[indexes.value],
-                        access_lists,
                         transaction.authorization_list.clone(),
                         None,
                         false,
-                        TransactionOrigin::UserInput,
+                        TransactionOrigin::UserInput {
+                            access_list: access_lists,
+                        },
                     );
 
                     let total_gas_refunded =
