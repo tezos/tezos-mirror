@@ -75,17 +75,19 @@ val export_compact :
   level:Cli.snapshot_level ->
   string tzresult Lwt.t
 
-(** [import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
+(** [import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
     ~snapshot_file] imports the snapshot at path [snapshot_file] into
     the data directory [data_dir]. If [no_checks] is [true], the
     integrity of the imported data is not checked at the end. Import
     will fail if [data_dir] is already populated unless [force] is set
     to [true]. if [apply_unsafe_patches] is [true] and there is
-    [unsafe_pvm_patches] in the configuration they will be applied. *)
+    [unsafe_pvm_patches] in the configuration they will be applied. If
+    [level] is provided, the imported store is reset to this level. *)
 val import :
   apply_unsafe_patches:bool ->
   no_checks:bool ->
   force:bool ->
+  ?level:int32 ->
   #Client_context.full ->
   data_dir:string ->
   snapshot_file:string ->

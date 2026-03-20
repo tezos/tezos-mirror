@@ -656,7 +656,12 @@ let post_checks ?(apply_unsafe_patches = false) ~action ~message snapshot_header
     Context.load (module C) ~cache_size:100 Read_only context_dir
   in
   let* head = check_head head context in
-  let*? () = check_last_commitment head snapshot_header in
+  let*? () =
+    match action with
+    | `Import _ when head.header.level < snapshot_header.Header.head_level ->
+        Ok ()
+    | _ -> check_last_commitment head snapshot_header
+  in
   let* check_block_data =
     match action with
     | `Export -> return check_block_data
@@ -983,6 +988,18 @@ let pre_import_checks cctxt ~no_checks ~data_dir (snapshot_header : Header.t) =
   in
   let*? () =
     let open Result_syntax in
+    match level with
+    | None -> return_unit
+    | Some level ->
+        error_when (level > snapshot_header.head_level)
+        @@ error_of_fmt
+             "Cannot import a snapshot for level %ld at level %ld."
+             snapshot_header.head_level
+             level
+  in
+
+  let*? () =
+    let open Result_syntax in
     match head with
     | None ->
         (* The rollup node has no L2 chain. *)
@@ -1030,7 +1047,7 @@ let correct_history_mode ~data_dir (snapshot_header : Header.t)
       let* store = Store.init Read_write ~data_dir in
       Store.State.History_mode.set store Full
 
-let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
+let import ~apply_unsafe_patches ~no_checks ~force ?level cctxt ~data_dir
     ~snapshot_file =
   let open Lwt_result_syntax in
   let* () = unless force (check_data_dir_unpopulated data_dir) in
@@ -1064,6 +1081,23 @@ let import ~apply_unsafe_patches ~no_checks ~force cctxt ~data_dir
   let* () = maybe_reconstruct_context cctxt ~data_dir ~apply_unsafe_patches in
   let* () =
     correct_history_mode ~data_dir snapshot_header original_history_mode
+  in
+  let* () =
+    match level with
+    | Some level ->
+        let* store = Store.init Read_write ~data_dir in
+        let* first_avail = first_available_level ~data_dir store in
+        let* () =
+          if level < first_avail then
+            failwith
+              "Requested level %ld is below the first available level %ld."
+              level
+              first_avail
+          else Store.reset_to_level store ~level
+        in
+        let*! () = Store.close store in
+        return_unit
+    | None -> return_unit
   in
   unless no_checks @@ fun () ->
   post_checks

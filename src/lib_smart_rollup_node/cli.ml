@@ -574,6 +574,21 @@ let snapshot_level_arg =
                     'cemented', or a positive integer."
                    s)))
 
+let import_level_arg =
+  Tezos_clic.arg
+    ~long:"level"
+    ~placeholder:"<level>"
+    ~doc:
+      "Reset the imported snapshot to this level. Data after this level will \
+       be removed from the imported store."
+    (Tezos_clic.parameter (fun (cctxt : Client_context.full) s ->
+         match Int32.of_string_opt s with
+         | Some l when Compare.Int32.(l > 0l) -> Lwt_result.return l
+         | _ ->
+             cctxt#error
+               "Invalid import level %S. Expected a positive integer."
+               s))
+
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"rollup-node-endpoint"
