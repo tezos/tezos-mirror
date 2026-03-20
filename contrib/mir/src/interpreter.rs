@@ -5514,14 +5514,9 @@ mod interpreter_tests {
             instr: Instruction<'a>,
             opt_exp_gas: Option<u32>,
         ) {
-            use crate::ast::Entrypoints;
             let mut ctx = Ctx::default();
             if let Some(e) = opt_entrypoints {
-                ctx.set_known_contracts({
-                    let mut x: HashMap<AddressHash, Entrypoints> = HashMap::new();
-                    x.insert(address.hash, HashMap::from_iter(Vec::from(e)));
-                    x
-                })
+                ctx.set_known_contracts([(address.hash, HashMap::from_iter(Vec::from(e)))]);
             }
 
             let start_milligas = ctx.gas().milligas();

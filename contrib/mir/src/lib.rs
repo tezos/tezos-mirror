@@ -567,11 +567,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Int))],
             stk![TypedValue::Address(addr)],
             stk![TypedValue::new_option(None),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -583,11 +579,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Unit))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -601,11 +593,7 @@ mod tests {
             )))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(Some(TypedValue::Contract(addr))),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         let addr = Address::try_from("tz3McZuemh7PCYG2P57n5mN8ecz56jCfSBR6").unwrap();
@@ -617,11 +605,7 @@ mod tests {
             stk![Type::new_option(Type::new_contract(Type::Int))],
             stk![TypedValue::Address(addr.clone())],
             stk![TypedValue::new_option(None),],
-            {
-                let mut c = Ctx::default();
-                c.set_known_contracts(HashMap::new());
-                c
-            },
+            Ctx::default(),
         );
 
         // When contract for the address does exist and is of expected type.
@@ -636,14 +620,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::default(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::default(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -661,14 +641,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -689,14 +665,10 @@ mod tests {
             ))),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    HashMap::from([(Entrypoint::try_from("foo").unwrap(), Type::Unit)]),
+                )]);
                 c
             },
         );
@@ -712,17 +684,14 @@ mod tests {
             stk![TypedValue::new_option(None),],
             {
                 let mut c = Ctx::default();
-                c.set_known_contracts({
-                    let mut x = HashMap::new();
-                    x.insert(
-                        addr.hash,
-                        HashMap::from([
-                            (Entrypoint::try_from("bar").unwrap(), Type::Unit),
-                            (Entrypoint::try_from("foo").unwrap(), Type::Unit),
-                        ]),
-                    );
-                    x
-                });
+                c.set_known_contracts([(
+                    addr.hash,
+                    [
+                        (Entrypoint::try_from("bar").unwrap(), Type::Unit),
+                        (Entrypoint::try_from("foo").unwrap(), Type::Unit),
+                    ]
+                    .into(),
+                )]);
                 c
             },
         );

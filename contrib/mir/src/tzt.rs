@@ -112,7 +112,7 @@ pub struct TztTest<'a> {
 }
 
 fn populate_ctx_with_known_contracts(
-    _ctx: &mut Ctx,
+    ctx: &mut Ctx,
     self_param: Option<(AddressHash, Option<Entrypoints>)>,
     m_other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
 ) {
@@ -133,7 +133,7 @@ fn populate_ctx_with_known_contracts(
     }
 
     // Set known contracts in context.
-    _ctx.set_known_contracts(known_contracts);
+    ctx.set_known_contracts(known_contracts);
 }
 
 fn typecheck_stack<'a>(
@@ -144,7 +144,7 @@ fn typecheck_stack<'a>(
 ) -> Result<Vec<(Type, TypedValue<'a>)>, TcError> {
     let mut ctx = Ctx::default();
     populate_ctx_with_known_contracts(&mut ctx, self_param, m_other_contracts);
-    ctx.set_big_map_storage(m_big_maps.unwrap_or_default());
+    ctx.big_map_storage = m_big_maps.unwrap_or_default();
 
     stk.into_iter()
         .map(|(t, v)| {
@@ -624,7 +624,6 @@ pub fn run_tzt_test<'a>(
     // expectation from the test, and declare the result of the test
     // accordingly.
     let mut ctx = Ctx::default();
-    ctx.gas = Gas::default();
     ctx.amount = test.amount.unwrap_or_default();
     ctx.balance = test.balance.unwrap_or_default();
     ctx.chain_id = test.chain_id.unwrap_or(Ctx::default().chain_id);
@@ -645,7 +644,7 @@ pub fn run_tzt_test<'a>(
 
     ctx.views = test.views.unwrap_or_default();
 
-    ctx.set_big_map_storage(test.big_maps.unwrap_or_default());
+    ctx.big_map_storage = test.big_maps.unwrap_or_default();
 
     ctx.now = test.now.clone().unwrap_or(Ctx::default().now);
 
