@@ -29,7 +29,12 @@ TARGET_PATH="/usr/bin/opam"
 TMP_FILE="$(mktemp)"
 
 echo "Downloading opam ${OPAM_VERSION} for $PLATFORM..."
-curl -L -o "$TMP_FILE" "$BINARY_URL"
+if command -v kiss-fetch.sh > /dev/null 2>&1; then
+  kiss-fetch.sh -o "$TMP_FILE" "$BINARY_URL"
+else
+  echo "Warning: kiss-fetch.sh missing"
+  curl -L -o "$TMP_FILE" "$BINARY_URL"
+fi
 
 DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | cut -d ' ' -f1)
 if [ "$DOWNLOADED_SHA256" != "$EXPECTED_SHA256" ]; then
