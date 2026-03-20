@@ -938,7 +938,9 @@ end
 
     - Create a .sql file led by the next migration number [N = version + 1]
       (with leading 0s) followed by the name of the migration (e.g.
-      [005_create_blueprints_table.sql])
+      [005_create_blueprints_table.sql]), or
+    - Create a .ml file of with name [mN_migration_name.ml] (e.g.
+      [m005_create_blueprints_table.ml])
     - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
     - Increment [Evm_migration.version] or [Tezlink_migration.version] below
       depending on the context
@@ -955,10 +957,7 @@ module Evm_migration = Sqlite.Migration.Make (struct
 
   let version = 24
 
-  let all_migrations =
-    Sqlite.Migration.from_ocaml_crunch
-      Evm_node_migrations.Migrations.file_list
-      Evm_node_migrations.Migrations.read
+  let all_migrations = Evm_node_migrations.all
 end)
 
 module Tezlink_migration = Sqlite.Migration.Make (struct
@@ -966,10 +965,7 @@ module Tezlink_migration = Sqlite.Migration.Make (struct
 
   let version = 0
 
-  let all_migrations =
-    Sqlite.Migration.from_ocaml_crunch
-      Tezlink_node_migrations.Tezlink_migrations.file_list
-      Tezlink_node_migrations.Tezlink_migrations.read
+  let all_migrations = Tezlink_node_migrations.all
 end)
 
 let sqlite_file_name = "store.sqlite"

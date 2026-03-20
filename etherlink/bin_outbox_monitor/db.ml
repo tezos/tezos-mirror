@@ -384,8 +384,7 @@ module Migration = Sqlite.Migration.Make (struct
 
   let version = version
 
-  let all_migrations =
-    Sqlite.Migration.from_ocaml_crunch Migrations.file_list Migrations.read
+  let all_migrations = Migrations.all
 end)
 
 type t = Sqlite.t

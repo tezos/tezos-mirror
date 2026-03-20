@@ -185,29 +185,19 @@ let tezlink_node_migrations =
     "tezlink_node_migrations"
     ~path:"etherlink/bin_node/tezlink_migrations"
     ~synopsis:"SQL migrations for the EVM node store related to Tezlink"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
           [
             S "rule";
-            [S "target"; S "tezlink_migrations.ml"];
-            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [S "target"; S "tezlink_node_migrations.ml"];
             [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
             ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
           ];
         ]
 
@@ -216,29 +206,19 @@ let evm_node_migrations =
     "evm_node_migrations"
     ~path:"etherlink/bin_node/migrations"
     ~synopsis:"SQL migrations for the EVM node store"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; crunch; octez_sqlite |> open_]
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_sqlite |> open_]
     ~dune:
       Dune.
         [
           [
             S "rule";
-            [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [S "target"; S "evm_node_migrations.ml"];
             [
-              S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              S "deps";
+              [S "glob_files"; S "*.sql"];
+              [S "glob_files"; S "m[0-9]*.ml"];
             ];
+            [S "action"; [S "run"; S "gen-migrations"; S "."; S "%{target}"]];
           ];
         ]
 
@@ -730,7 +710,6 @@ let _outbox_monitor =
         octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
-        crunch;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
@@ -742,21 +721,14 @@ let _outbox_monitor =
           [
             S "rule";
             [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "deps";
+              [S "glob_files"; S "migrations/*.sql"];
+              [S "glob_files"; S "migrations/m[0-9]*.ml"];
+            ];
             [
               S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              [S "run"; S "gen-migrations"; S "migrations"; S "%{target}"];
             ];
           ];
         ]
@@ -781,7 +753,6 @@ let _fa_bridge_watchtower =
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
         octez_stdlib_unix |> open_;
-        crunch;
         octez_sqlite |> open_;
         evm_node_lib_dev_encoding |> open_;
         evm_node_lib_dev |> open_;
@@ -795,21 +766,14 @@ let _fa_bridge_watchtower =
           [
             S "rule";
             [S "target"; S "migrations.ml"];
-            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "deps";
+              [S "glob_files"; S "migrations/*.sql"];
+              [S "glob_files"; S "migrations/m[0-9]*.ml"];
+            ];
             [
               S "action";
-              [
-                S "run";
-                S "ocaml-crunch";
-                S "-e";
-                S "sql";
-                S "-m";
-                S "plain";
-                S "-o";
-                S "%{target}";
-                S "-s";
-                S ".";
-              ];
+              [S "run"; S "gen-migrations"; S "migrations"; S "%{target}"];
             ];
           ];
         ]

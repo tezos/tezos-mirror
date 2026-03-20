@@ -282,24 +282,80 @@ end
 
 (** Database migration system with tracking and versioning.
 
-    Provides types for defining migrations, helpers for creating and applying
-    them, and a functor for managing migration state via a tracking table. *)
+    Provides types for defining migrations (SQL or OCaml), helpers for creating
+    and applying them, and a functor for managing migration state via a tracking
+    table.
+
+    {3 Writing SQL migrations}
+
+    SQL migrations are plain [.sql] files named [N_name.sql] where [N] is a
+    sequence number (e.g. [000_initial.sql], [001_add_index.sql]). The SQL
+    content is split on semicolons and each statement is executed in order.
+
+    {3 Writing OCaml migrations}
+
+    OCaml migrations are [.ml] files named [mN_name.ml] where [N] matches the
+    sequence number (e.g. [m002_backfill.ml]). The module must expose:
+
+    {[
+      val name : string
+      val up : Sqlite.Migration.step list
+    ]}
+
+    Steps can be SQL statements or arbitrary OCaml functions:
+
+    {[
+      let name = "backfill"
+
+      let up =
+        [
+          Sqlite.Migration.Sql
+            (Sqlite.Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit)
+            @@ "CREATE INDEX idx_foo ON bar(baz)");
+          Sqlite.Migration.Ocaml
+            (fun conn ->
+              let open Lwt_result_syntax in
+              (* ... arbitrary logic using Db.exec, Db.find, etc. ... *)
+              return_unit);
+        ]
+    ]}
+
+    {3 Mixing SQL and OCaml in a single step}
+
+    An [Ocaml] step can execute raw SQL via {!Db.exec}:
+
+    {[
+      Sqlite.Migration.Ocaml
+        (fun conn ->
+          let open Lwt_result_syntax in
+          let* () =
+            Db.exec conn
+              (Sqlite.Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit)
+              @@ "ALTER TABLE t ADD COLUMN c INTEGER")
+              ()
+          in
+          (* ... then do OCaml logic ... *)
+          return_unit)
+    ]}
+
+    {3 Numbering rules}
+
+    SQL and OCaml migrations share the same numbering sequence. The
+    [gen_migrations] tool validates that numbering starts at [0], has no gaps,
+    and has no duplicates. SQL and OCaml files can be freely interleaved
+    (e.g. [000_init.sql], [m001_backfill.ml], [002_add_column.sql]). *)
 module Migration : sig
-  (** A migration with a name and its SQL content. The SQL is split on
-      semicolons and executed statement-by-statement when applied. *)
-  type t = {name : string; steps : string}
+  (** A single migration step: either a SQL statement or an OCaml function. *)
+  type step =
+    | Sql of (unit, unit, [`Zero]) Request.t
+    | Ocaml of (Db.conn -> unit tzresult Lwt.t)
 
-  (** [make_sql ~name sql] creates a migration from raw SQL content.
-      The SQL will be split on semicolons and executed when the migration
-      is applied. *)
+  (** A migration with a name and a list of steps to apply in order. *)
+  type t = {name : string; steps : step list}
+
+  (** [make_sql ~name sql] creates a SQL-only migration by splitting [sql] on
+      semicolons into individual statements. Empty statements are ignored. *)
   val make_sql : name:string -> string -> t
-
-  (** [from_ocaml_crunch file_list read] builds a migration list from
-      ocaml-crunch output. [file_list] is the sorted list of filenames
-      (e.g. ["000_initial.sql"; ...]) and [read] retrieves file content.
-      Migration names are extracted from filenames using the pattern
-      [NNN_name.sql]. *)
-  val from_ocaml_crunch : string list -> (string -> string option) -> t list
 
   (** Configuration for the {!Make} functor. *)
   module type MIGRATION_CONFIG = sig

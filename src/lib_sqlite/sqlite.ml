@@ -408,41 +408,30 @@ module Schemas = struct
 end
 
 module Migration = struct
-  type t = {name : string; steps : string}
+  type step =
+    | Sql of (unit, unit, [`Zero]) Request.t
+    | Ocaml of (Db.conn -> unit tzresult Lwt.t)
 
-  let make_sql ~name sql = {name; steps = sql}
+  type t = {name : string; steps : step list}
 
-  let apply_one conn {steps; _} =
+  let make_sql ~name sql =
     let migration_step s =
       Request.(Caqti_type.Std.unit ->. Caqti_type.Std.unit) ~oneshot:true s
     in
-    let stmts =
-      String.split_on_char ';' steps
+    let steps =
+      String.split_on_char ';' sql
       |> List.filter_map (fun i ->
              match String.trim i with
              | "" -> None
-             | x -> Some (migration_step x))
+             | x -> Some (Sql (migration_step x)))
     in
-    List.iter_es (fun req -> Db.exec conn req ()) stmts
+    {name; steps}
 
-  let re_t = Re.(compile @@ Posix.re "[0-9]{3}_([a-z0-9_]+).sql")
-
-  let migration_name path =
-    let open Re in
-    let (group : Group.t) = exec re_t path in
-    Group.get group 1
-
-  let from_ocaml_crunch file_list read =
-    List.map
-      (fun path ->
-        let name = migration_name path in
-        let steps =
-          match read path with
-          | Some content -> content
-          | None -> raise (Invalid_argument ("from_ocaml_crunch: " ^ path))
-        in
-        {name; steps})
-      file_list
+  let apply_one conn migration =
+    List.iter_es
+      (fun step ->
+        match step with Sql req -> Db.exec conn req () | Ocaml f -> f conn)
+      migration.steps
 
   let table_exists conn table_name = Db.find conn Q.table_exists table_name
 

@@ -37,5 +37,5 @@
 
 (rule
  (target migrations.ml)
- (deps (glob_files migrations/*.sql))
- (action (run ocaml-crunch -e sql -m plain -o %{target} -s .)))
+ (deps (glob_files migrations/*.sql) (glob_files migrations/m[0-9]*.ml))
+ (action (run gen-migrations migrations %{target})))
