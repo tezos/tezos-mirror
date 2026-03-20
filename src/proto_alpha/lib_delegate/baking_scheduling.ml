@@ -71,51 +71,6 @@ let create_round_durations constants =
   Environment.wrap_tzresult
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
-let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
-    delegates =
-  let open Lwt_result_syntax in
-  let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
-  let register dal_ctxt =
-    let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
-    let warn =
-      Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
-    in
-    let*! () =
-      match profiles with
-      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
-      | Controller controller_profile ->
-          let attesters =
-            Tezos_dal_node_services.Controller_profiles.attesters
-              controller_profile
-          in
-          if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
-            warn ()
-          else Lwt.return_unit
-    in
-    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
-    let delegate_ids = List.map Delegate_id.of_pkh delegates in
-    let*! () =
-      (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)
-      Dal_attestable_slots_worker.update_streams_subscriptions
-        dal_attestable_slots_worker
-        dal_ctxt
-        ~delegate_ids
-    in
-    return_unit
-  in
-  Option.iter_es
-    (fun dal_ctxt ->
-      retry
-        cctxt
-        ~max_delay:2.
-        ~delay:1.
-        ~factor:2.
-        ~msg:(fun _errs ->
-          "Failed to register profiles, DAL node is not reachable. ")
-        (fun () -> register dal_ctxt)
-        ())
-    dal_node_rpc_ctxt
-
 (* initialises attestable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk
    if any *)
@@ -141,8 +96,8 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
-let create_global_state ?canceler ?dal_node_rpc_ctxt ?constants ~chain cctxt
-    config delegates =
+let create_global_state ?dal_node_rpc_ctxt ?constants ~chain cctxt config
+    delegates =
   let open Lwt_result_syntax in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
@@ -157,25 +112,12 @@ let create_global_state ?canceler ?dal_node_rpc_ctxt ?constants ~chain cctxt
       ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~attestation_lags:constants.parametric.dal.attestation_lags
-      ~number_of_slots:constants.parametric.dal.number_of_slots
-  in
-  Option.iter
-    (fun canceler ->
-      Lwt_canceler.on_cancel canceler (fun () ->
-          Dal_attestable_slots_worker.shutdown_worker
-            dal_attestable_slots_worker))
-    canceler ;
   let global_state =
     {
       chain_id;
       config;
-      constants;
       round_durations;
-      dal_attestable_slots_worker;
+      constants;
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
@@ -409,19 +351,11 @@ let run cctxt ~extra_nodes ?dal_node_rpc_ctxt ?canceler
   let cache = Baking_cache.Block_cache.create 10 in
   let* global_state =
     create_global_state
-      ?canceler
       ?dal_node_rpc_ctxt
       ?constants
       ~chain
       cctxt
       config
-      delegates
-  in
-  let _promise =
-    register_dal_profiles
-      cctxt
-      global_state.dal_node_rpc_ctxt
-      global_state.dal_attestable_slots_worker
       delegates
   in
   let*! revelation_worker_canceler, revelation_worker_push_proposal =

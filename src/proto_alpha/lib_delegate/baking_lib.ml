@@ -85,9 +85,9 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
           List.map Baking_state_types.Delegate_id.of_pkh delegates
         in
         (* Ensures the DAL attestable slots cache is populated in time for the
-           first block’s attestation. *)
+           first block's attestation. *)
         Dal_attestable_slots_worker.update_streams_subscriptions
-          state.global_state.dal_attestable_slots_worker
+          state.automaton_state.dal_attestable_slots_worker
           dal_node_rpc_ctxt
           ~delegate_ids)
   in

@@ -411,6 +411,10 @@ type automaton_state = {
   cctxt : Protocol_client_context.full;
   validation_mode : validation_mode;
   operation_worker : Operation_worker.t;
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
+      (** DAL attestable slots worker for monitoring DAL slot availability.
+          Each automaton has its own worker that subscribes to attestable slots
+          from its respective node. *)
   push_forge_event : forge_event -> unit;
       (** [push_forge_event] and [forge_event_stream] form a paired
           producer/consumer channel from the forge worker to a baking automaton.
@@ -464,12 +468,15 @@ type global_state = {
   config : Baking_configuration.t;
   round_durations : Round.round_durations;
   constants : Constants.t;
-  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
+      (** Shared DAL node RPC context. All automatons use the same DAL node
+          endpoint for registering profiles and subscribing to attestable slots. *)
   dal_included_attestations_cache : Dal_included_attestations_cache.t;
+      (** Shared cache for tracking DAL attestations included in blocks.
+          This cache is consulted by all automatons to avoid duplicate work. *)
 }
 
 val pp_global_state : Format.formatter -> global_state -> unit

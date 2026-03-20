@@ -733,10 +733,82 @@ let try_resolve_consensus_keys cctxt key =
       in
       try_find_delegate_key levels_to_inspect
 
+let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
+    delegates =
+  let open Lwt_result_syntax in
+  let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
+  let register dal_ctxt =
+    let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
+    let warn =
+      Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
+    in
+    let*! () =
+      match profiles with
+      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
+      | Controller controller_profile ->
+          let attesters =
+            Tezos_dal_node_services.Controller_profiles.attesters
+              controller_profile
+          in
+          if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
+            warn ()
+          else Lwt.return_unit
+    in
+    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
+    let delegate_ids = List.map Delegate_id.of_pkh delegates in
+    let*! () =
+      (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)
+      Dal_attestable_slots_worker.update_streams_subscriptions
+        dal_attestable_slots_worker
+        dal_ctxt
+        ~delegate_ids
+    in
+    (* Emit event after successful registration and subscription *)
+    let*! () =
+      let dal_endpoint = dal_ctxt#base |> Uri.to_string in
+      let automaton_name =
+        Dal_attestable_slots_worker.get_automaton_name
+          dal_attestable_slots_worker
+      in
+      Dal_attestable_slots_worker.emit_dal_worker_started
+        automaton_name
+        dal_endpoint
+    in
+    return_unit
+  in
+  Option.iter_es
+    (fun dal_ctxt ->
+      retry
+        cctxt
+        ~max_delay:2.
+        ~delay:1.
+        ~factor:2.
+        ~msg:(fun _errs ->
+          "Failed to register profiles, DAL node is not reachable. ")
+        (fun () -> register dal_ctxt)
+        ())
+    dal_node_rpc_ctxt
+
 let create_automaton_state ?canceler ?monitor_node_operations ~global_state
     cctxt =
   let open Lwt_result_syntax in
   let name = Uri.to_string cctxt#base in
+  (* Create DAL worker for this automaton *)
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~automaton_name:name
+      ~attestation_lag:global_state.constants.parametric.dal.attestation_lag
+      ~attestation_lags:global_state.constants.parametric.dal.attestation_lags
+      ~number_of_slots:global_state.constants.parametric.dal.number_of_slots
+  in
+  (* Register DAL profiles and subscribe to attestable slots *)
+  let _promise =
+    register_dal_profiles
+      cctxt
+      global_state.dal_node_rpc_ctxt
+      dal_attestable_slots_worker
+      global_state.delegates
+  in
   let*! operation_worker =
     Operation_worker.run
       ?monitor_node_operations
@@ -746,6 +818,10 @@ let create_automaton_state ?canceler ?monitor_node_operations ~global_state
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
+          let*! () =
+            Dal_attestable_slots_worker.shutdown_worker
+              dal_attestable_slots_worker
+          in
           let*! _ = Operation_worker.shutdown_worker operation_worker in
           Lwt.return_unit))
     canceler ;
@@ -763,11 +839,13 @@ let create_automaton_state ?canceler ?monitor_node_operations ~global_state
     (stream, fun e -> push (Some e))
   in
   return
-    {
-      name;
-      cctxt;
-      validation_mode;
-      operation_worker;
-      forge_event_stream;
-      push_forge_event;
-    }
+    ({
+       name;
+       cctxt;
+       validation_mode;
+       operation_worker;
+       dal_attestable_slots_worker;
+       forge_event_stream;
+       push_forge_event;
+     }
+      : Baking_state.automaton_state)
