@@ -284,3 +284,23 @@ class unix_proxy ~base_dir ?protocol ~chain ~block ~confirmations
 
     method verbose_rpc_error_diagnostics = false
   end
+
+(** Create a new client context with a different RPC endpoint.
+
+    Returns a new context that inherits from the given [cctxt] but uses
+    the specified [endpoint] for RPC calls. *)
+let with_endpoint cctxt rpc_config endpoint =
+  let rpc_config =
+    Tezos_rpc_http_client_unix.RPC_client_unix.{rpc_config with endpoint}
+  in
+  let rpc_ctxt =
+    new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+      rpc_config
+      (Media_type.Command_line.of_command_line rpc_config.media_type)
+  in
+  object
+    inherit
+      Client_context.proxy_context_with_rpc
+        cctxt
+        (rpc_ctxt :> Tezos_rpc.Context.generic)
+  end

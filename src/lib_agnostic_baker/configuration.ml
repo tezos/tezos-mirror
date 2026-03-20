@@ -401,23 +401,6 @@ type t = {
   extra_nodes : Tezos_client_base.Client_context.full list;
 }
 
-let switch_node_endpoint cctxt rpc_config endpoint =
-  let rpc_config =
-    Tezos_rpc_http_client_unix.RPC_client_unix.{rpc_config with endpoint}
-  in
-  let rpc_ctxt =
-    new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-      rpc_config
-      (Tezos_rpc_http.Media_type.Command_line.of_command_line
-         rpc_config.media_type)
-  in
-  object
-    inherit
-      Tezos_client_base.Client_context.proxy_context_with_rpc
-        cctxt
-        (rpc_ctxt :> Tezos_rpc.Context.generic)
-  end
-
 (** Create the configuration from the given arguments. *)
 let create_config cctxt rpc_config
     ( pidfile,
@@ -441,7 +424,7 @@ let create_config cctxt rpc_config
   let extra_nodes =
     Option.fold
       ~none:[]
-      ~some:(List.map (switch_node_endpoint cctxt rpc_config))
+      ~some:(List.map (Client_context_unix.with_endpoint cctxt rpc_config))
       extra_nodes
   in
   {
