@@ -10,8 +10,8 @@
 //! - [`OperationalError`]
 //! - [`InvalidArgumentError`]
 //!
-//! [`OperationalError`]: ds_errors::OperationalError
-//! [`InvalidArgumentError`]: ds_errors::InvalidArgumentError
+//! [`OperationalError`]: octez_riscv_durable_storage::errors::OperationalError
+//! [`InvalidArgumentError`]: octez_riscv_durable_storage::errors::InvalidArgumentError
 //!
 //! The former are 'transient' and/or machine specific, the later are _deterministic_ and purely
 //! arise as a result of logically incorrect arguments being passed.
@@ -26,10 +26,6 @@
 //! Invalid argument errors more refer to attempting to read/write _beyond the end_ of a value, or
 //! attempting to perform an operation on a database that doesn't exist, and such like.
 
-mod api_common;
-mod registry;
-
-use bytes::Bytes;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::MutableState;
@@ -38,36 +34,61 @@ use octez_riscv_data::hash::Hash;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::utils::NotFound;
 use octez_riscv_durable_storage::errors as ds_errors;
-use octez_riscv_durable_storage::key::Key;
-use registry::RegistryState;
+use octez_riscv_durable_storage::storage::in_memory::InMemoryKeyValueStore;
+use octez_riscv_durable_storage::storage::in_memory::InMemoryRepo;
+use octez_riscv_durable_storage_common::BytesParam;
+use octez_riscv_durable_storage_common::KeyParam;
+use octez_riscv_durable_storage_common::api_common;
+use octez_riscv_durable_storage_common::registry::GcNames;
+use octez_riscv_durable_storage_common::registry::RegistryState;
 
+/// OCaml GC names for the in-memory registry state.
+pub struct InMemoryGcNames;
+
+impl GcNames for InMemoryGcNames {
+    const IMMUTABLE_NAME: &'static str = "riscv.imm.registry_state.normal";
+    const MUTABLE_NAME: &'static str = "riscv.mut.registry_state.normal";
+}
+
+/// In-memory durable storage registry, exposed as an OCaml custom block.
 #[ocaml::sig]
-pub type Registry = MutableState<RegistryState<Normal>>;
+pub type Registry = MutableState<RegistryState<InMemoryKeyValueStore, InMemoryGcNames, Normal>>;
 
+/// Stub registry for proof generation. See TZX-113.
 // TODO (TZX-113): implement registry prove
 #[ocaml::sig]
 pub struct RegistryProve;
 ocaml::custom!(RegistryProve);
 
+/// Stub registry for proof verification. See TZX-114.
 // TODO (TZX-114 wire-up verify mode): implement registry verify
 #[ocaml::sig]
 pub struct RegistryVerify;
 ocaml::custom!(RegistryVerify);
 
+/// Stub proof value. See TZX-113.
 // TODO (TZX-113): implement proof
 #[ocaml::sig]
 pub struct Proof;
 ocaml::custom!(Proof);
 
+/// Deterministic errors arising from logically invalid arguments.
+///
+/// These are returned to the kernel as the error variant of an OCaml result.
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
     "Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
 )]
 pub enum InvalidArgumentError {
+    /// The requested key does not exist in the database.
     KeyNotFound,
+    /// The key exceeded the maximum allowed length.
     KeyTooLong,
+    /// The offset exceeded the length of the stored value.
     OffsetTooLarge,
+    /// The database index was outside the bounds of the registry.
     DatabaseIndexOutOfBounds,
+    /// The requested registry size exceeds the allowed limit.
     RegistryResizeTooLarge,
 }
 
@@ -85,9 +106,20 @@ impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
     }
 }
 
+/// Result type for durable storage operations, defaulting to [`InvalidArgumentError`].
+pub type SplitDsResult<T, Err = InvalidArgumentError> =
+    octez_riscv_durable_storage_common::SplitDsResult<T, Err>;
+
+/// Map a fallible conversion over the `Ok` variant; conversion errors become OCaml exceptions.
+pub use octez_riscv_durable_storage_common::map_fallible;
+/// Split [`ds_errors::Error`] into an OCaml exception (operational) or result error (invalid argument).
+pub use octez_riscv_durable_storage_common::split_ds_errors;
+
+/// Error returned by proof verification operations.
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig("Not_found")]
 pub enum VerificationError {
+    /// The requested element was not found in the proof.
     NotFound,
 }
 
@@ -97,33 +129,14 @@ impl From<NotFound> for VerificationError {
     }
 }
 
+/// Combined error for operations that may fail with either an invalid argument or a verification error.
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig("Invalid_argument of invalid_argument_error | Verification of verification_error")]
 pub enum VerificationArgumentError {
+    /// The operation was given an invalid argument.
     InvalidArgument(InvalidArgumentError),
+    /// The operation failed during proof verification.
     Verification(VerificationError),
-}
-
-/// KeyParam receiving a `bytes` value from OCaml.
-#[derive(ocaml::FromValue)]
-pub struct KeyParam<'a>(&'a [u8]);
-
-impl<'a> TryFrom<KeyParam<'a>> for Key {
-    type Error = ds_errors::InvalidArgumentError;
-
-    fn try_from(value: KeyParam) -> Result<Self, Self::Error> {
-        Key::new(value.0)
-    }
-}
-
-/// BytesParam receiving a `bytes` value from OCaml.
-#[derive(ocaml::FromValue)]
-pub struct BytesParam<'a>(&'a [u8]);
-
-impl<'a> From<BytesParam<'a>> for Bytes {
-    fn from(value: BytesParam<'a>) -> Self {
-        Bytes::copy_from_slice(value.0)
-    }
 }
 
 // Normal mode — registry
@@ -131,7 +144,7 @@ impl<'a> From<BytesParam<'a>> for Bytes {
 #[ocaml::func]
 #[ocaml::sig("unit -> registry")]
 pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer<Registry>> {
-    let registry = RegistryState::new()?;
+    let registry = RegistryState::new(InMemoryRepo)?;
 
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
@@ -608,34 +621,4 @@ pub fn octez_riscv_durable_in_memory_start_verify(
 ) -> SafePointer<RegistryVerify> {
     // TODO (TZX-114): wire-up verification mode
     SafePointer::from(RegistryVerify)
-}
-
-/// Split handling of durable storage errors.
-///
-/// - Operational errors are converted to OCaml exceptions. These *must not* be returned to the kernel.
-/// - InvalidArgument errors are returned as the error variant of an OCaml result. These need to be returned
-///   to the kernel.
-pub type SplitDsResult<T, Err = InvalidArgumentError> = OcamlFallible<Result<T, Err>>;
-
-fn split_ds_errors<T>(res: Result<T, ds_errors::Error>) -> SplitDsResult<T> {
-    let inner_res = match res {
-        Ok(inner) => Ok(inner),
-        Err(ds_errors::Error::InvalidArgument(err)) => Err(err.into()),
-        Err(ds_errors::Error::Operational(err)) => return Err(err.into()),
-    };
-
-    Ok(inner_res)
-}
-
-/// Map a fallible operation over inner value. Errors in mapping are converted to OCaml exceptions.
-fn map_fallible<T, U, E: 'static + std::error::Error>(
-    res: Result<T, InvalidArgumentError>,
-    map: impl Fn(T) -> Result<U, E>,
-) -> SplitDsResult<U> {
-    let inner_res = match res {
-        Ok(inner) => Ok(map(inner)?),
-        Err(err) => Err(err),
-    };
-
-    Ok(inner_res)
 }

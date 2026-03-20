@@ -1437,6 +1437,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "octez-riscv-durable-storage-common"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "ocaml",
+ "octez-riscv-api-common",
+ "octez-riscv-data",
+ "octez-riscv-durable-storage",
+]
+
+[[package]]
 name = "octez-riscv-durable-storage-in-memory"
 version = "0.1.0"
 dependencies = [
@@ -1448,6 +1459,7 @@ dependencies = [
  "octez-riscv-api-common",
  "octez-riscv-data",
  "octez-riscv-durable-storage",
+ "octez-riscv-durable-storage-common",
 ]
 
 [[package]]

@@ -14,6 +14,7 @@ ocaml-sys.workspace = true
 octez-riscv-api-common.workspace = true
 octez-riscv-data.workspace = true
 octez-riscv-durable-storage.workspace = true
+octez-riscv-durable-storage-common.workspace = true
 
 [build-dependencies]
 ocaml-build.workspace = true

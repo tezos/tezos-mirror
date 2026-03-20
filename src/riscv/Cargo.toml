@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["api", "common", "durable-in-memory"]
+members = ["api", "common", "durable-common", "durable-in-memory"]
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
@@ -41,6 +41,9 @@ default-features = false
 
 [workspace.dependencies.octez-riscv-api-common]
 path = "./common"
+
+[workspace.dependencies.octez-riscv-durable-storage-common]
+path = "./durable-common"
 
 [workspace.dependencies.ocaml]
 version = "1.2.1"
