@@ -55,7 +55,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 container_scanning_tezos-tezos-latest:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -86,7 +86,7 @@ container_scanning_tezos-tezos-latest:
     - gl-container-scanning-report-tezos-tezos-latest.json
 
 container_scanning_tezos-tezos-octez-evm-node-latest:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -117,7 +117,7 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
     - gl-container-scanning-report-tezos-tezos-octez-evm-node-latest.json
 
 container_scanning_tezos-tezos-master:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -148,7 +148,7 @@ container_scanning_tezos-tezos-master:
     - gl-container-scanning-report-tezos-tezos-master.json
 
 container_scanning_tezos-debian-unstable-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -179,7 +179,7 @@ container_scanning_tezos-debian-unstable-master-3bb7eddc:
     - gl-container-scanning-report-tezos-debian-unstable-master-3bb7eddc.json
 
 container_scanning_tezos-debian-bookworm-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -210,7 +210,7 @@ container_scanning_tezos-debian-bookworm-master-3bb7eddc:
     - gl-container-scanning-report-tezos-debian-bookworm-master-3bb7eddc.json
 
 container_scanning_tezos-debian-trixie-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -241,7 +241,7 @@ container_scanning_tezos-debian-trixie-master-3bb7eddc:
     - gl-container-scanning-report-tezos-debian-trixie-master-3bb7eddc.json
 
 container_scanning_tezos-ubuntu-22.04-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -272,7 +272,7 @@ container_scanning_tezos-ubuntu-22.04-master-3bb7eddc:
     - gl-container-scanning-report-tezos-ubuntu-22.04-master-3bb7eddc.json
 
 container_scanning_tezos-ubuntu-24.04-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -303,7 +303,7 @@ container_scanning_tezos-ubuntu-24.04-master-3bb7eddc:
     - gl-container-scanning-report-tezos-ubuntu-24.04-master-3bb7eddc.json
 
 container_scanning_tezos-ubuntu-25.10-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -334,7 +334,7 @@ container_scanning_tezos-ubuntu-25.10-master-3bb7eddc:
     - gl-container-scanning-report-tezos-ubuntu-25.10-master-3bb7eddc.json
 
 container_scanning_tezos-fedora-39-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -365,7 +365,7 @@ container_scanning_tezos-fedora-39-master-3bb7eddc:
     - gl-container-scanning-report-tezos-fedora-39-master-3bb7eddc.json
 
 container_scanning_tezos-fedora-42-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -396,7 +396,7 @@ container_scanning_tezos-fedora-42-master-3bb7eddc:
     - gl-container-scanning-report-tezos-fedora-42-master-3bb7eddc.json
 
 container_scanning_tezos-rockylinux-9-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
@@ -427,7 +427,7 @@ container_scanning_tezos-rockylinux-9-master-3bb7eddc:
     - gl-container-scanning-report-tezos-rockylinux-9-master-3bb7eddc.json
 
 container_scanning_tezos-rockylinux-10-master-3bb7eddc:
-  image: aquasec/trivy:latest
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
