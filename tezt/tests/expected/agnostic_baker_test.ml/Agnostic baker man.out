@@ -185,20 +185,26 @@ Commands related to the agnostic baker daemon.:
 
 Commands related to the DAL daemon.:
 
-  run dal 
+  dal run 
     Run the Octez DAL
   
-  config dal init 
+  dal config init 
     This command creates a configuration file with the parameters provided on the
     command-line, if no configuration file exists already in the specified or default
     location. Otherwise, the command-line parameters override the existing ones, and old
     parameters are lost. This configuration is then used by the run command.
   
-  config dal update 
+  dal config update 
     This command updates the configuration file with the parameters provided on the
     command-line. If no configuration file exists already, the command will fail.
   
-  debug dal print store schemas
+  dal snapshot export [<PATH>...]
+    Export DAL node store data to a snapshot directory.
+  
+  dal snapshot import [<PATH>...]
+    Import DAL node store data from a snapshot directory.
+  
+  dal debug print store schemas
     Print SQL statements describing the tables created in the store.
 
 Miscellaneous commands:

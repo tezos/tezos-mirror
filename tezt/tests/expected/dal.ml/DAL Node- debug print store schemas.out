@@ -1,5 +1,5 @@
 
-./octez-dal-node debug print store schemas
+./[octez-dal-executable] debug print store schemas
 CREATE TABLE skip_list_cells (
   hash VARCHAR NOT NULL PRIMARY KEY,
   cell VARCHAR NOT NULL
