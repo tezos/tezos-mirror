@@ -91,6 +91,10 @@ module type PROTOCOL_V16 = functor
   (Env : Tezos_protocol_environment_sigs.V16.T)
   -> Env.Updater.PROTOCOL
 
+module type PROTOCOL_V17 = functor
+  (Env : Tezos_protocol_environment_sigs.V17.T)
+  -> Env.Updater.PROTOCOL
+
 module VersionTable = Protocol_hash.Table
 
 type proto_env =
@@ -111,6 +115,7 @@ type proto_env =
   | V14 of (module PROTOCOL_V14)
   | V15 of (module PROTOCOL_V15)
   | V16 of (module PROTOCOL_V16)
+  | V17 of (module PROTOCOL_V17)
 
 let versions : proto_env VersionTable.t = VersionTable.create 20
 
