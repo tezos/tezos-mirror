@@ -1146,11 +1146,11 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
   let* () =
     check_rpc_result
       "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      (Some "0x6c5392ef2db28eeca2b11436e24d22d4e84ea6ef")
+      (Some "0xccef676171871a48bbd6e2be75bbcc09d38830c5")
   in
   check_rpc_result
     "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ"
-    (Some "0x94ba6ab161c14335aa1a5958da717728880c7cf6")
+    (Some "0x9ae7fe293cbb7c039fd4139295f60fd945d99b5c")
 
 let test_get_ethereum_tezos_address_rpc ~runtime () =
   Setup.register_sandbox_test
@@ -3307,24 +3307,14 @@ let test_cross_runtime_michelson_sender_is_alias =
     Rpc.Tezosx.tez_getTezosEthereumAddress source.public_key_hash sequencer
   in
   let rpc_address = Result.get_ok alias_result in
-  (* TODO https://linear.app/tezos/issue/L2-1100/kt1-dont-have-aliases-in-tezos-x
-     The values below are currently not the expected ones. The checks will be
-     modified as we fix the behavior of the node. In the end, we'll check
-     equality (instead of difference right now). *)
+  let expected_stored_sender =
+    (* 32 bytes with 0x moved at the beginning. *)
+    "0x000000000000000000000000" ^ String.sub rpc_address 2 40
+  in
   Check.(
-    (stored_sender
-   = "0x000000000000000000000000ccef676171871a48bbd6e2be75bbcc09d38830c5")
+    (stored_sender = expected_stored_sender)
       string
       ~error_msg:"Expected stored msg.sender %R but got %L") ;
-  Check.(
-    (rpc_address = "0x6c5392ef2db28eeca2b11436e24d22d4e84ea6ef")
-      string
-      ~error_msg:"Expected RPC alias %R but got %L") ;
-  Check.(
-    (stored_sender <> rpc_address)
-      string
-      ~error_msg:
-        "Expected stored msg.sender and RPC alias to differ, but both are %L") ;
   unit
 
 (** Transfer tez between two accounts on the Michelson runtime and verify
