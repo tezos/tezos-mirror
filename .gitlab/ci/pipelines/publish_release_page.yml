@@ -67,17 +67,18 @@ publish:release-page:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - eval $(opam env)
   - ./scripts/releases/publish_release_page.sh
+  - cp /tmp/release_page*/index.md ./index.md
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - cp /tmp/release_page*/index.md ./index.md
   variables:
     S3_BUCKET: site-prod.octez.tezos.com
     BUCKET_PATH: /releases
