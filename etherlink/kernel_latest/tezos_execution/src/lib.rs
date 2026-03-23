@@ -711,9 +711,25 @@ where
         true, // skip_sender_debit: the calling runtime already debited the sender
     ) {
         Ok(success) => {
-            // promote: discard the snapshot, keep changes
-            let _ = tc_ctx.host.store_delete(&tmp_path);
-            Ok(success.into())
+            // transfer() returns Ok even when internal operations FAILWITH,
+            // because execute_internal_operations records failures only in
+            // receipts. We must inspect the receipts to detect this case,
+            // matching the pattern used by produce_operation_result in the
+            // normal Tezos operation path.
+            let all_internal_succeeded = internal_receipts
+                .last()
+                .is_none_or(InternalOperationSum::is_applied);
+            if all_internal_succeeded {
+                // promote: discard the snapshot, keep changes
+                let _ = tc_ctx.host.store_delete(&tmp_path);
+                Ok(success.into())
+            } else {
+                // revert: restore the snapshot
+                let _ = tc_ctx.host.store_move(&tmp_path, &world_state);
+                Err(TransferError::FailedToExecuteInternalOperation(
+                    "internal operation failed during cross-runtime call".into(),
+                ))
+            }
         }
         Err(e) => {
             // revert: restore the snapshot
