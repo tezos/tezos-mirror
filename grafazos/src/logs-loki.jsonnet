@@ -52,7 +52,7 @@ local logs_label = std.extVar('logs_label');
     logs.new('Accuser logs', [q], h, w, x, y, 'loki', 'Loki'),
 
   systemlogs(h, w, x, y):
-    local q = query.prometheus.new('Loki', '{job="varlogs"}')
+    local q = query.prometheus.new('Loki', '{' + logs_label + '="varlogs"}')
               + query.prometheus.withLegendFormat('System logs');
     logs.new('System logs', [q], h, w, x, y, 'loki', 'Loki'),
 

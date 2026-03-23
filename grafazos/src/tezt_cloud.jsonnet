@@ -119,4 +119,3 @@ local graph = base.graph;
     graph.new('[octez-node] GC major word sizes', [majorQuery], h, w, x, y)
     + timeSeries.standardOptions.withUnit('bytes'),
 }
-// test change

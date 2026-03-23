@@ -30,6 +30,9 @@ local variableCustom = dashboard.variable.custom;
 local base = import './base.jsonnet';
 local graph = base.graph;
 
+local uid_ext = std.extVar('uid_ext');
+local isDefaultUid = uid_ext == 'default';
+
 //##
 // Comparison dashboard: hardware exporters side-by-side
 //##
@@ -90,6 +93,14 @@ local allExporters = {
       ],
       unit: 'decgbytes',
       colors: [['Used Space', 'light-red']],
+    },
+    network: {
+      queries: [
+        queryHelper('abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received",' + inst + '}) * 125', 'Bytes received'),
+        queryHelper('abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent",' + inst + '}) * 125', 'Bytes transmitted'),
+      ],
+      unit: 'Bps',
+      colors: [['Bytes received', 'light-blue'], ['Bytes transmitted', 'light-orange']],
     },
   },
 
@@ -166,6 +177,14 @@ local allExporters = {
       unit: 'decgbytes',
       colors: [['Used Space', 'light-red']],
     },
+    network: {
+      queries: [
+        queryHelper('rate(container_network_receive_bytes_total{pod=~"octez-.*",' + inst + '}[5m])', 'Bytes received ({{ pod }})'),
+        queryHelper('rate(container_network_transmit_bytes_total{pod=~"octez-.*",' + inst + '}[5m])', 'Bytes transmitted ({{ pod }})'),
+      ],
+      unit: 'Bps',
+      colors: [['Bytes received', 'light-blue'], ['Bytes transmitted', 'light-orange']],
+    },
   },
 
   'node-exporter': {
@@ -175,6 +194,14 @@ local allExporters = {
       ],
       unit: 'bytes',
       colors: [['Total Size', 'light-red']],
+    },
+    network: {
+      queries: [
+        queryHelper('-(irate(node_network_receive_bytes_total{' + inst + '}[5m]))', 'Bytes received'),
+        queryHelper('irate(node_network_transmit_bytes_total{' + inst + '}[5m])', 'Bytes transmitted'),
+      ],
+      unit: 'Bps',
+      colors: [['Bytes received', 'light-blue'], ['Bytes transmitted', 'light-orange']],
     },
   },
 
@@ -207,6 +234,7 @@ local metricRows = [
   { key: 'memory', title: 'Memory Usage' },
   { key: 'fds', title: 'Open File Descriptors' },
   { key: 'storage', title: 'Storage' },
+  { key: 'network', title: 'Network Traffic' },
 ];
 
 // For each metric, find which exporters support it
@@ -274,9 +302,10 @@ local exporterVariable =
 // MAIN DASHBOARD
 // ============================================
 
-dashboard.new('Hardware Metrics Comparison')
+dashboard.new('Hardware Metrics Comparison' + if !isDefaultUid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + dashboard.withDescription('Side-by-side comparison of hardware metrics across configured exporters')
-+ dashboard.withTags(['comparison', 'hardware', 'metrics'] + activeExporters)
++ dashboard.withTags(['grafazos', 'comparison', 'hardware', 'metrics'] + activeExporters)
 + dashboard.withVariables([exporterVariable] + base.standardVariables)
 + dashboard.withRefresh('30s')
 + dashboard.withPanels(panels)
++ (if !isDefaultUid then dashboard.withUid('compare-hardware' + uid_ext) else {})

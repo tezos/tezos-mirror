@@ -63,4 +63,3 @@ dashboard.new('Tezt Cloud - Layer 1 dashboard' + if !uid && uid_ext != '' then '
   ]
 
 )
-// test change

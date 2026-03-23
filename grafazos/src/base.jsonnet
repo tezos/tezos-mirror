@@ -33,7 +33,9 @@ local logs = panel.logs;
 local hardwareExporters = std.split(std.extVar('hardware_src'), ',');
 
 // Returns array of {metric: string, legend: string} for all matching exporters.
-// When multiple exporters match, appends ' [exporter-name]' to legend.
+// Appends ' [exporter-name]' to every legend whenever more than one exporter is
+// configured (regardless of how many define this particular metric), so the data
+// source is always identifiable in multi-exporter builds.
 // legendFormat can be:
 //   - a string: used for all exporters (original behavior)
 //   - an object { exporter-name: legend }: per-exporter legend templates
@@ -43,7 +45,8 @@ local selectMetrics(metricsByExporter, legendFormat) =
     for k in std.objectFields(metricsByExporter)
     if std.member(hardwareExporters, k)
   ];
-  local addSuffix = std.length(activeKeys) > 1;
+  local isDefault = std.length(hardwareExporters) == 1 && hardwareExporters[0] == 'netdata';
+  local addSuffix = !isDefault;
   local legendFor(k) =
     local base = if std.isString(legendFormat) then legendFormat else legendFormat[k];
     if addSuffix then base + ' [' + k + ']' else base;
@@ -326,4 +329,3 @@ local hasExporter(name) = std.member(hardwareExporters, name);
       [self.nodeInstanceDal, self.slotIndex, self.pkh, self.peer],
 
 }
-// test change
