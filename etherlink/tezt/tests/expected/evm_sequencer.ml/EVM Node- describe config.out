@@ -404,9 +404,9 @@ $bignum:
      Decimal representation of a big number */
   string
 $history_mode:
-  /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with `N`
-     being the number of days to use as the retention period */
-  "archive" | "rolling:n"
+  /* Compact notation for the history mode. Can be `archive`, `full:N`, `rolling:N` or
+     `blueprints_only:N` with `N` being the number of days to use as the retention period */
+  "archive" | "full:n" | "rolling:n" | "blueprints_only:n"
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */

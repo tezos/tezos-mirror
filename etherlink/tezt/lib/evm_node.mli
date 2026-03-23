@@ -111,6 +111,8 @@ type history_mode =
   | Archive
   | Rolling of int  (** Rolling with retention period in days. *)
   | Full of int  (** Full with retention period in days. *)
+  | Blueprints_only of int
+      (** Blueprints_only with retention period in days. *)
 
 (** Node configuration shared across modes.
     Groups mode-agnostic parameters to simplify function signatures. *)
