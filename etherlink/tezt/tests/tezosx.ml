@@ -1121,22 +1121,37 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
     ~tags:["rpc"]
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
-  let tezos_address = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
-  let expected = "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2" in
-  let* rpc_result =
-    Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
+  let check_rpc_result tezos_address expected_evm_address_opt =
+    let* rpc_result =
+      Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
+    in
+    match (rpc_result, expected_evm_address_opt) with
+    | Ok evm_address, Some expected ->
+        Check.(
+          (evm_address = expected) string ~error_msg:"Expected %R but got %L") ;
+        unit
+    | Error _, None -> unit
+    | Error err, Some _ ->
+        Test.fail
+          "Could not get the EVM address corresponding to the Tezos address \
+           %s: %s"
+          tezos_address
+          err.Rpc.message
+    | Ok evm_address, None ->
+        Test.fail
+          "Expected an error for address %s but got the result %s"
+          tezos_address
+          evm_address
   in
-  match rpc_result with
-  | Ok evm_address ->
-      Check.(
-        (evm_address = expected) string ~error_msg:"Expected %R but got %L") ;
-      unit
-  | Error err ->
-      Test.fail
-        "Could not get the EVM address corresponding to the Tezos address %s: \
-         %s"
-        tezos_address
-        err.Rpc.message
+  let* () =
+    check_rpc_result
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Some "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2")
+  in
+  (* TODO https://linear.app/tezos/issue/L2-1100/kt1-dont-have-aliases-in-tezos-x
+     The RPC currently rejects KT1 addresses due to an encoding bug. Once
+     fixed, this should succeed and return the correct alias. *)
+  check_rpc_result "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ" None
 
 let test_get_ethereum_tezos_address_rpc ~runtime () =
   Setup.register_sandbox_test
