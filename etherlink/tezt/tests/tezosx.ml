@@ -1146,12 +1146,11 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
   let* () =
     check_rpc_result
       "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      (Some "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2")
+      (Some "0x6c5392ef2db28eeca2b11436e24d22d4e84ea6ef")
   in
-  (* TODO https://linear.app/tezos/issue/L2-1100/kt1-dont-have-aliases-in-tezos-x
-     The RPC currently rejects KT1 addresses due to an encoding bug. Once
-     fixed, this should succeed and return the correct alias. *)
-  check_rpc_result "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ" None
+  check_rpc_result
+    "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ"
+    (Some "0x94ba6ab161c14335aa1a5958da717728880c7cf6")
 
 let test_get_ethereum_tezos_address_rpc ~runtime () =
   Setup.register_sandbox_test
@@ -3318,7 +3317,7 @@ let test_cross_runtime_michelson_sender_is_alias =
       string
       ~error_msg:"Expected stored msg.sender %R but got %L") ;
   Check.(
-    (rpc_address = "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2")
+    (rpc_address = "0x6c5392ef2db28eeca2b11436e24d22d4e84ea6ef")
       string
       ~error_msg:"Expected RPC alias %R but got %L") ;
   Check.(
