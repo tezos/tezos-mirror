@@ -1742,7 +1742,7 @@ struct
       Backend.state_of_output_proof output_proof
 
     let verify_output_proof output_proof =
-      Backend.verify_output_proof output_proof
+      Backend.verify_output_proof_res output_proof
 
     let output_proof_to_bytes output_proof =
       Backend.serialise_output_proof output_proof

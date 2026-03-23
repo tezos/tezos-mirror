@@ -27,7 +27,24 @@ let tests =
         ( "Etherlink: Proofs are immutable",
           `Quick,
           Test_backend.test_proof_immutability Utils.Etherlink );
-        ("Echo: Initialise kernel", `Quick, Test_backend.test_init_echo_kernel);
+        ( "Echo: Output proof serialisation roundtrip",
+          `Quick,
+          Test_outbox.test_output_proof_serialisation_round_trip );
+        ( "Echo: Produce and verify output proofs",
+          `Quick,
+          Test_outbox.test_produce_output_proofs );
+        ( "Echo: Produce proof fails for invalid message index",
+          `Quick,
+          Test_outbox.test_produce_proof_invalid_message_index );
+        ( "Echo: Produce proof fails for invalid outbox level",
+          `Quick,
+          Test_outbox.test_produce_proof_invalid_outbox_level );
+        ( "Echo: Produce proof fails on empty outbox",
+          `Quick,
+          Test_outbox.test_produce_proof_empty_outbox );
+        ( "Echo: Deserialise invalid bytes fails",
+          `Quick,
+          Test_outbox.test_deserialise_invalid_bytes );
       ] );
     ( "Storage",
       [

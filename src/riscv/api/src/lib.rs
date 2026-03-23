@@ -25,11 +25,13 @@ use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
 use octez_riscv::pvm::outbox::OutboxMessage;
+use octez_riscv::pvm::outbox::OutboxProof;
 use octez_riscv::pvm::outbox::Output as PvmOutput;
 use octez_riscv::pvm::outbox::OutputInfo as PvmOutputInfo;
 use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
+use octez_riscv::stepper::pvm::verify_outbox_proof;
 use octez_riscv::storage::StorageError;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
@@ -225,67 +227,6 @@ unsafe impl ocaml::FromValue for RawLevel {
         RawLevel(u31::new(wrapped_value))
     }
 }
-
-/// Metadata of an output message
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-#[ocaml::sig("{message_index : int32; outbox_level : int32}")]
-pub struct OutputInfo {
-    pub message_index: u32,
-    pub outbox_level: RawLevel,
-}
-
-impl From<PvmOutputInfo> for OutputInfo {
-    fn from(output_info: PvmOutputInfo) -> Self {
-        Self {
-            message_index: output_info.index,
-            outbox_level: RawLevel(u31::new(output_info.level)),
-        }
-    }
-}
-
-impl From<OutputInfo> for PvmOutputInfo {
-    fn from(output_info: OutputInfo) -> Self {
-        Self {
-            level: output_info.outbox_level.0.into(),
-            index: output_info.message_index,
-        }
-    }
-}
-
-/// A value of this type is generated as part of successfully verifying an output proof.
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-#[ocaml::sig("{info : output_info; encoded_message : bytes}")]
-pub struct Output {
-    pub info: OutputInfo,
-    pub encoded_message: BytesWrapper,
-}
-
-impl From<PvmOutput> for Output {
-    fn from(output: PvmOutput) -> Self {
-        Self {
-            info: output.info.into(),
-            encoded_message: BytesWrapper::from(Box::from(output.message)),
-        }
-    }
-}
-
-impl TryFrom<Output> for PvmOutput {
-    type Error = String;
-
-    fn try_from(output: Output) -> Result<Self, String> {
-        Ok(Self {
-            message: OutboxMessage::try_from(Box::<[u8]>::from(output.encoded_message))
-                .map_err(|e| e.to_string())?,
-            info: output.info.into(),
-        })
-    }
-}
-
-// TODO RV-365 Implement OutputProof types
-#[ocaml::sig]
-pub struct OutputProof;
-
-ocaml::custom!(OutputProof);
 
 /// Hooks for the PVM to call into OCaml code
 struct OCamlHooks<F> {
@@ -756,40 +697,120 @@ pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<SafePointer<Proof>,
     .into())
 }
 
+/// Metadata of an output message
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+#[ocaml::sig("{message_index : int32; outbox_level : int32}")]
+pub struct OutputInfo {
+    pub message_index: u32,
+    pub outbox_level: RawLevel,
+}
+
+impl From<PvmOutputInfo> for OutputInfo {
+    fn from(output_info: PvmOutputInfo) -> Self {
+        Self {
+            message_index: output_info.index,
+            // On the OCaml side, this is constructed from  a `Bounded.Non_negative_int32.t`,
+            // which guarantees that the conversion to `u31` does not panic.
+            outbox_level: RawLevel(u31::new(output_info.level)),
+        }
+    }
+}
+
+impl From<OutputInfo> for PvmOutputInfo {
+    fn from(output_info: OutputInfo) -> Self {
+        Self {
+            level: output_info.outbox_level.0.into(),
+            index: output_info.message_index,
+        }
+    }
+}
+
+/// A value of this type is generated as part of successfully verifying an output proof.
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+#[ocaml::sig("{info : output_info; encoded_message : bytes}")]
+pub struct Output {
+    pub info: OutputInfo,
+    pub encoded_message: BytesWrapper,
+}
+
+impl From<PvmOutput> for Output {
+    fn from(output: PvmOutput) -> Self {
+        Self {
+            info: output.info.into(),
+            encoded_message: BytesWrapper::from(Box::from(output.message)),
+        }
+    }
+}
+
+impl TryFrom<Output> for PvmOutput {
+    type Error = String;
+
+    fn try_from(output: Output) -> Result<Self, String> {
+        Ok(Self {
+            message: OutboxMessage::try_from(Box::<[u8]>::from(output.encoded_message))
+                .map_err(|e| e.to_string())?,
+            info: output.info.into(),
+        })
+    }
+}
+
+/// Proof for an outbox message
+#[ocaml::sig]
+pub struct OutputProof(OutboxProof);
+
+ocaml::custom!(OutputProof);
+
+#[ocaml::func]
+#[ocaml::sig("state -> output_info -> (output_proof, string) Result.t")]
+pub fn octez_riscv_produce_output_proof(
+    state: SafePointer<State>,
+    output_info: OutputInfo,
+) -> Result<SafePointer<OutputProof>, String> {
+    let output_info = PvmOutputInfo::from(output_info);
+    let proof = state
+        .apply_ro(|pvm| NodePvm::produce_outbox_proof(pvm, output_info))
+        .map_err(|e| e.to_string())?;
+    Ok(OutputProof(proof).into())
+}
+
+#[ocaml::func]
+#[ocaml::sig("output_proof -> (output, string) Result.t")]
+pub fn octez_riscv_verify_output_proof(
+    output_proof: SafePointer<OutputProof>,
+) -> Result<Output, String> {
+    let output = verify_outbox_proof(&output_proof.0).map_err(|e| e.to_string())?;
+    Ok(output.into())
+}
+
 #[ocaml::func]
 #[ocaml::sig("output_proof -> output_info")]
 pub fn octez_riscv_output_info_of_output_proof(
-    _output_proof: SafePointer<OutputProof>,
-) -> Result<OutputInfo, String> {
-    todo!()
+    output_proof: SafePointer<OutputProof>,
+) -> OutputInfo {
+    output_proof.0.info.into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("output_proof -> bytes")]
-pub fn octez_riscv_state_of_output_proof(_output_proof: SafePointer<OutputProof>) -> [u8; 32] {
-    todo!()
-}
-
-#[ocaml::func]
-#[ocaml::sig("output_proof -> output option")]
-pub fn octez_riscv_verify_output_proof(_output_proof: SafePointer<OutputProof>) -> Option<Output> {
-    todo!()
+pub fn octez_riscv_state_hash_of_output_proof(output_proof: SafePointer<OutputProof>) -> [u8; 32] {
+    output_proof.0.state_hash().into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("output_proof -> bytes")]
-pub fn octez_riscv_serialise_output_proof(_output_proof: SafePointer<OutputProof>) -> ocaml::Value {
-    // TODO RV-365 Implement Output & OutputProof types
-    // Ue similar implementation to octez_riscv_serialise_proof
-    todo!()
+pub unsafe fn octez_riscv_serialise_output_proof(
+    output_proof: SafePointer<OutputProof>,
+) -> BytesWrapper {
+    BytesWrapper::from(output_proof.0.serialise().into_boxed_slice())
 }
 
 #[ocaml::func]
 #[ocaml::sig("bytes -> (output_proof, string) result")]
 pub fn octez_riscv_deserialise_output_proof(
-    _bytes: &[u8],
+    bytes: &[u8],
 ) -> Result<SafePointer<OutputProof>, String> {
-    todo!()
+    let outbox_proof = OutboxProof::deserialise(bytes).map_err(|e| e.to_string())?;
+    Ok(OutputProof(outbox_proof).into())
 }
 
 #[ocaml::func]
