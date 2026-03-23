@@ -251,7 +251,9 @@ module Scripts = struct
 
     let run_code =
       RPC_service.post_service
-        ~description:"Run a Michelson script in the current context"
+        ~description:
+          "Run a Michelson script in the current context. The gas used is \
+           bounded by the protocol's hard gas limit per operation."
         ~query:RPC_query.empty
         ~input:run_code_input_encoding
         ~output:run_code_output_encoding
@@ -1181,7 +1183,8 @@ module Scripts = struct
         ~chain_id ~sender_opt ~payer_opt ~self_opt ~now_opt ~level_opt =
       let gas =
         match gas_opt with
-        | Some gas -> gas
+        | Some gas ->
+            Gas.Arith.max gas (Constants.hard_gas_limit_per_operation ctxt)
         | None -> Constants.hard_gas_limit_per_operation ctxt
       in
       let ctxt = Gas.set_limit ctxt gas in
