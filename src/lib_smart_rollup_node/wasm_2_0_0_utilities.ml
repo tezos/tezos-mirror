@@ -150,39 +150,51 @@ let dump_durable_storage ~block ~data_dir ~file =
 
 let preload_kernel (node_ctxt : _ Node_context.t) header =
   let open Lwt_result_syntax in
-  let* _ctxt, pvm_state =
-    get_wasm_pvm_state
-      node_ctxt.context
-      header.Sc_rollup_block.block_hash
-      header.context
-  in
-  let* (module Plugin) =
-    Protocol_plugins.proto_plugin_for_level node_ctxt header.level
-  in
-  let tree = !(Context_wrapper.Irmin.of_node_pvmstate pvm_state) in
-  let*! durable =
-    Plugin.Pvm.Wasm_2_0_0.decode_durable_state
-      Tezos_scoru_wasm.Tree_state.durable_storage_encoding
-      tree
-  in
-  let*! () =
-    Tezos_scoru_wasm_fast.Exec.preload_kernel
-      ~hooks:Tezos_scoru_wasm.Hooks.no_hooks
-      durable
-  in
-  return_unit
+  match header.Sc_rollup_block.context_hash with
+  | None -> return false
+  | Some context ->
+      let* _ctxt, pvm_state =
+        get_wasm_pvm_state node_ctxt.context header.block_hash context
+      in
+      let* (module Plugin) =
+        Protocol_plugins.proto_plugin_for_level node_ctxt header.level
+      in
+      let tree = !(Context_wrapper.Irmin.of_node_pvmstate pvm_state) in
+      let*! durable =
+        Plugin.Pvm.Wasm_2_0_0.decode_durable_state
+          Tezos_scoru_wasm.Tree_state.durable_storage_encoding
+          tree
+      in
+      let*! () =
+        Tezos_scoru_wasm_fast.Exec.preload_kernel
+          ~hooks:Tezos_scoru_wasm.Hooks.no_hooks
+          durable
+      in
+      return_true
 
 let patch_durable_storage ~data_dir ~key ~value =
   let open Lwt_result_syntax in
   (* Loads the state of the head. *)
   let* _lock = Node_context_loader.lock ~data_dir in
   let* store = Store.init Read_write ~data_dir in
-  let* ({header = {block_hash; level = block_level; _}; _} as l2_block) =
+  let* ( ({header = {block_hash; level = block_level; _}; _} as l2_block),
+         context_hash,
+         reset_needed ) =
     let* r = Store.L2_blocks.find_head store in
     match r with
-    | Some v -> return v
     | None ->
         failwith "Processed L2 head is not found in the rollup node storage"
+    | Some v -> (
+        match v.header.context_hash with
+        | Some h -> return (v, h, false)
+        | None -> (
+            let* r = Store.L2_blocks.find_last_committed store in
+            match r with
+            | None -> failwith "No committed context to disk"
+            | Some v -> (
+                match v.header.context_hash with
+                | None -> assert false
+                | Some h -> return (v, h, true))))
   in
   let* ((module Plugin) as plugin) =
     Protocol_plugins.proto_plugin_for_level_with_store store block_level
@@ -193,9 +205,7 @@ let patch_durable_storage ~data_dir ~key ~value =
       (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
   let* index = load_context ~data_dir plugin Access_mode.Read_write in
-  let* context, state =
-    get_wasm_pvm_state index block_hash l2_block.header.context
-  in
+  let* context, state = get_wasm_pvm_state index block_hash context_hash in
 
   (* Patches the state via an unsafe patch. *)
   let* () =
@@ -210,9 +220,18 @@ let patch_durable_storage ~data_dir ~key ~value =
   let*! () = Context.PVMState.set context state in
   let*! new_commit = Context.commit context in
   let new_l2_block =
-    {l2_block with header = {l2_block.header with context = new_commit}}
+    {
+      l2_block with
+      header = {l2_block.header with context_hash = Some new_commit};
+    }
   in
-  Store.L2_blocks.store store new_l2_block
+  let* () = Store.L2_blocks.store store new_l2_block in
+  let* () =
+    when_ reset_needed @@ fun () ->
+    Format.eprintf "Resetting to last committed block@." ;
+    Store.reset_to_last_committed store
+  in
+  return_unit
 
 exception Fast_execution_panic of exn
 

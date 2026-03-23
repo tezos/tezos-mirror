@@ -221,6 +221,22 @@ module Simple = struct
          exiting safely now"
       ~level:Notice
       ()
+
+  let commit_strategy =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_daemon_commit_strategy"
+      ~msg:"Context commit strategy: {strategy}"
+      ~level:Notice
+      ("strategy", Configuration.commit_on_strategy_encoding)
+
+  let riscv_force_commit_strategy =
+    declare_0
+      ~section
+      ~name:"smart_rollup_node_daemon_riscv_force_commit_strategy"
+      ~msg:"Forcing commit strategy to commitment for RISC-V rollup"
+      ~level:Warning
+      ()
 end
 
 let head_processing hash level = Simple.(emit head_processing (hash, level))
@@ -285,3 +301,8 @@ let main_loop_retry d =
   Simple.(emit main_loop_retry) (Time.System.Span.of_seconds_exn d)
 
 let exit_bailout_mode () = Simple.(emit exit_bailout_mode) ()
+
+let commit_strategy strategy = Simple.(emit commit_strategy) strategy
+
+let riscv_force_commit_strategy () =
+  Simple.(emit riscv_force_commit_strategy) ()

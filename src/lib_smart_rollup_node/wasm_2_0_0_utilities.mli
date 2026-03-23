@@ -32,5 +32,9 @@ val hooks :
   fallback_to_slow_vm:bool ->
   Tezos_scoru_wasm.Hooks.t
 
+(** [preload_kernel node_ctxt header] preloads the kernel for the given block
+    header. Returns [true] if the kernel was preloaded, or [false] if the
+    block's context is not available on disk (e.g. with sparse commit
+    strategies). *)
 val preload_kernel :
-  _ Node_context.t -> Sc_rollup_block.header -> unit tzresult Lwt.t
+  _ Node_context.t -> Sc_rollup_block.header -> bool tzresult Lwt.t

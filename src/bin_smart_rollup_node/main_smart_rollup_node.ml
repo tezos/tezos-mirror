@@ -68,10 +68,11 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args8
+       (args9
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
           slow_vm_fallback_switch
           profiling_arg
@@ -109,6 +110,7 @@ let config_init_command =
            ( allowed_origins,
              allowed_headers,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
              slow_vm_fallback,
              profiling,
@@ -157,6 +159,7 @@ let config_init_command =
           ~apply_unsafe_patches:false
           ~bail_on_disagree
           ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -191,7 +194,7 @@ let legacy_run_command =
           enable_performance_metrics_arg
           disable_performance_metrics_arg
           l1_monitor_finalized_switch)
-       (args22
+       (args23
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -211,6 +214,7 @@ let legacy_run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
           slow_vm_fallback_switch
           profiling_arg))
@@ -246,6 +250,7 @@ let legacy_run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
              slow_vm_fallback,
              profiling ) )
@@ -291,6 +296,7 @@ let legacy_run_command =
           ~apply_unsafe_patches
           ~bail_on_disagree
           ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized
@@ -326,7 +332,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args18
+       (args19
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -342,6 +348,7 @@ let run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
+          commit_on_arg
           unsafe_disable_wasm_kernel_checks_switch
           slow_vm_fallback_switch
           profiling_arg))
@@ -378,6 +385,7 @@ let run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
+             commit_on,
              unsafe_disable_wasm_kernel_checks,
              slow_vm_fallback,
              profiling ) )
@@ -426,6 +434,7 @@ let run_command =
           ~apply_unsafe_patches
           ~bail_on_disagree
           ~slow_vm_fallback
+          ~commit_on
           ~profiling
           ~force_etherlink
           ~l1_monitor_finalized

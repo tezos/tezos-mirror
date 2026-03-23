@@ -69,12 +69,11 @@ CREATE TABLE l2_blocks (
   predecessor VARCHAR(51) NOT NULL ,
   commitment_hash VARCHAR(54) ,
   previous_commitment_hash VARCHAR(54) NOT NULL,
-  context VARCHAR(54) NOT NULL,
   inbox_witness VARCHAR(55) NOT NULL,
   inbox_hash VARCHAR(55) NOT NULL ,
   initial_tick VARCHAR NOT NULL,
   num_ticks INTEGER NOT NULL
-, state_hash VARCHAR(54), pvm_status BLOB);
+, state_hash VARCHAR(54), pvm_status BLOB, context VARCHAR(54));
 CREATE INDEX idx_l2_blocks_level
 ON l2_blocks(level);
 CREATE TABLE l2_levels (

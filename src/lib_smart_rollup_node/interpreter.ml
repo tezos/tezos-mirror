@@ -235,14 +235,98 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
     in
     return {num_messages = 0; num_ticks = 0L; initial_tick = Z.zero; state_hash}
 
+(** [replay_one_block plugin node_ctxt ctxt block] replays the PVM evaluation
+    for [block] on the given context [ctxt], returning the updated context.
+    This is used to reconstruct contexts for blocks that were not committed to
+    disk. *)
+let replay_one_block plugin node_ctxt ctxt (block : Sc_rollup_block.t) =
+  let open Lwt_result_syntax in
+  let predecessor =
+    Layer1.
+      {hash = block.header.predecessor; level = Int32.pred block.header.level}
+  in
+  let head =
+    Layer1.{hash = block.header.block_hash; level = block.header.level}
+  in
+  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash in
+  let* messages =
+    Node_context.get_messages node_ctxt block.header.inbox_witness
+  in
+  let* _result =
+    process_head plugin node_ctxt ctxt ~predecessor head (inbox, messages)
+  in
+  return ctxt
+
+(** [checkout_context_with_replay plugin node_ctxt block_hash] checks out the
+    context for [block_hash]. If the block does not have a committed context
+    (e.g. with sparse commit strategies), finds the nearest committed ancestor
+    using a direct SQL query and replays forward from there. *)
+let checkout_context_with_replay plugin (node_ctxt : _ Node_context.t)
+    block_hash =
+  let open Lwt_result_syntax in
+  let* committed =
+    Node_context.checkout_committed_context node_ctxt block_hash
+  in
+  match committed with
+  | Some ctxt -> return ctxt
+  | None ->
+      let* block = Node_context.get_l2_block node_ctxt block_hash in
+      let*! () =
+        Refutation_game_event.no_committed_context
+          ~block_hash
+          ~level:block.header.level
+      in
+      (* Find the nearest committed ancestor before this block's level. *)
+      let* ctxt, from_level =
+        let* prev =
+          Node_context.find_previous_committed_block
+            node_ctxt
+            block.header.level
+        in
+        match prev with
+        | Some prev_block ->
+            let* ctxt =
+              Node_context.checkout_context
+                node_ctxt
+                prev_block.header.block_hash
+            in
+            return (ctxt, Int32.succ prev_block.header.level)
+        | None ->
+            failwith
+              "No committed ancestor of level %ld, cannot replay with checkout"
+              block.header.level
+      in
+      let* blocks_to_replay =
+        Node_context.get_l2_blocks_by_level_range
+          node_ctxt
+          ~from_level
+          ~to_level:block.header.level
+      in
+      let*! () =
+        Refutation_game_event.replaying_blocks
+          ~count:(List.length blocks_to_replay)
+          ~from_level
+          ~block_hash
+      in
+      List.fold_left_es
+        (fun ctxt b -> replay_one_block plugin node_ctxt ctxt b)
+        ctxt
+        blocks_to_replay
+
 (** Returns the starting evaluation before the evaluation of the block. It
     contains the PVM state at the end of the execution of the previous block and
     the messages the block ([remaining_messages]). *)
 let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let open Lwt_result_syntax in
+  let*! () =
+    Interpreter_event.refutation_start_state
+      ~level:block.header.level
+      ~predecessor:block.header.predecessor
+      ~initial_tick:block.initial_tick
+  in
   let pred_level = Int32.pred block.header.level in
   let* ctxt =
-    Node_context.checkout_context node_ctxt block.header.predecessor
+    checkout_context_with_replay plugin node_ctxt block.header.predecessor
   in
   let* state =
     state_of_head
@@ -279,6 +363,12 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
   let open Lwt_result_syntax in
   let tick_distance =
     Z.sub tick start_state.Pvm_plugin_sig.info.tick |> Z.to_int64
+  in
+  let*! () =
+    Interpreter_event.refutation_run_to_tick
+      ~start_tick:start_state.Pvm_plugin_sig.info.tick
+      ~end_tick:tick
+      ~distance:tick_distance
   in
   let+ eval_result =
     Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_messages"
@@ -329,39 +419,98 @@ let advance_to_next_block (module Plugin : Protocol_plugin_sig.PARTIAL)
   in
   return Pvm_plugin_sig.{state = start_state.state; info}
 
+let eval_state_when_final_tick plugin node_ctxt (event : Sc_rollup_block.t) tick
+    =
+  let open Lwt_result_syntax in
+  let final_tick = Sc_rollup_block.final_tick event in
+  (* When the requested tick is the final tick of the block, try to checkout
+     the committed context directly instead of replaying. *)
+  if Z.equal tick final_tick then
+    let* committed =
+      Node_context.checkout_committed_context node_ctxt event.header.block_hash
+    in
+    match committed with
+    | Some ctxt ->
+        let* state =
+          state_of_head
+            plugin
+            node_ctxt
+            ctxt
+            Layer1.{hash = event.header.block_hash; level = event.header.level}
+        in
+        let*! state_hash =
+          match event.state_hash with
+          | Some sh -> Lwt.return sh
+          | None ->
+              let module Plugin = (val plugin : Protocol_plugin_sig.PARTIAL) in
+              Plugin.Pvm.state_hash node_ctxt.kind state
+        in
+        let* messages =
+          Node_context.get_messages node_ctxt event.header.inbox_witness
+        in
+        let info =
+          Pvm_plugin_sig.
+            {
+              state_hash;
+              inbox_level = event.header.level;
+              tick = final_tick;
+              message_counter_offset = List.length messages;
+              remaining_fuel = Fuel.Accounted.of_ticks 0L;
+              remaining_messages = [];
+            }
+        in
+        return_some Pvm_plugin_sig.{state; info}
+    | None -> return_none
+  else return_none
+
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
   let open Lwt_result_syntax in
-  let* start_state =
-    match (start_state, node_ctxt.Node_context.kind) with
-    | Some start_state, _
-      when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
-        return start_state
-    | Some start_state, Riscv
-      when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level ->
-        (* For RISC-V, it is cheaper to continue evaluating to the end of the
-           block and advance to the next one rather than checking out a context
-           from disk. The levels are always within the same commitment period
-           during a refutation game, so the distance to advance is bounded. *)
-        let rec advance state =
-          if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
-            return state
-          else
-            let* state = advance_to_next_block plugin node_ctxt state in
-            advance state
-        in
-        advance start_state
-    | _ ->
-        (* Recompute start state from checkout on level change (except for
-           RISC-V) or if we don't have a starting state on hand. *)
-        start_state_of_block plugin node_ctxt event
+  let* final_tick_state =
+    eval_state_when_final_tick plugin node_ctxt event tick
   in
-  let state = start_state.state in
-  (* TODO: #3384
-     We should test that we always have enough blocks to find the tick
-     because [state_of_tick] is a critical function. *)
-  let+ run_info = run_to_tick plugin node_ctxt start_state tick in
-  Pvm_plugin_sig.{state; info = run_info}
+  match final_tick_state with
+  | Some state ->
+      (* Requested tick is the final tick and it's committed. *)
+      return state
+  | None ->
+      let* start_state =
+        match (start_state, node_ctxt.Node_context.kind) with
+        | Some start_state, _
+          when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level
+          ->
+            return start_state
+        | Some start_state, Riscv
+          when start_state.Pvm_plugin_sig.info.inbox_level < event.header.level
+          ->
+            (* For RISC-V, it is cheaper to continue evaluating to the end of the
+             block and advance to the next one rather than checking out a context
+             from disk. The levels are always within the same commitment period
+             during a refutation game, so the distance to advance is bounded. *)
+            let*! () =
+              Interpreter_event.refutation_riscv_advance
+                ~from_level:start_state.Pvm_plugin_sig.info.inbox_level
+                ~to_level:event.header.level
+            in
+            let rec advance state =
+              if state.Pvm_plugin_sig.info.inbox_level = event.header.level then
+                return state
+              else
+                let* state = advance_to_next_block plugin node_ctxt state in
+                advance state
+            in
+            advance start_state
+        | _ ->
+            (* Recompute start state from checkout on level change (except for
+             RISC-V) or if we don't have a starting state on hand. *)
+            start_state_of_block plugin node_ctxt event
+      in
+      let state = start_state.state in
+      (* TODO: #3384
+       We should test that we always have enough blocks to find the tick
+       because [state_of_tick] is a critical function. *)
+      let+ run_info = run_to_tick plugin node_ctxt start_state tick in
+      Pvm_plugin_sig.{state; info = run_info}
 
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
@@ -372,7 +521,10 @@ let global_tick_state_cache =
 let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     (event : Sc_rollup_block.t) tick =
   match Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return with
-  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+  | Some p_imm ->
+      let open Lwt_syntax in
+      let* () = Interpreter_event.refutation_cache_hit ~tick ~source:"local" in
+      Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
   | None -> (
       match
         Pvm_plugin_sig.Tick_state_cache.bind
@@ -381,10 +533,16 @@ let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
           Lwt.return
       with
       | Some p_imm ->
+          let open Lwt_syntax in
+          let* () =
+            Interpreter_event.refutation_cache_hit ~tick ~source:"global"
+          in
           (* Global hit: share the same immutable copy in local cache. *)
           Pvm_plugin_sig.Tick_state_cache.put state_cache tick p_imm ;
           Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
       | None ->
+          let open Lwt_syntax in
+          let* () = Interpreter_event.refutation_cache_miss ~tick in
           (* Both miss: compute and store a single immutable copy in both. *)
           let p_mut =
             state_of_tick_aux plugin node_ctxt ~start_state event tick
@@ -410,6 +568,11 @@ let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
   match event with
   | None -> return_none
   | Some event ->
+      let*! () =
+        Interpreter_event.refutation_state_of_tick
+          ~level:event.header.level
+          ~tick
+      in
       assert (event.header.level <= level) ;
       let* result_state =
         if Node_context.is_loser node_ctxt then

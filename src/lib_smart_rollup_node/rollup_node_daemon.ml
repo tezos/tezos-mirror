@@ -188,7 +188,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (Layer1.head_of_header head)
       (inbox, messages)
   in
-  let*! context_hash = Context.commit ctxt in
   finish_block_evaluation state head ctxt ;
   let* commitment_hash =
     Publisher.process_head
@@ -196,6 +195,13 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       node_ctxt
       ~predecessor:predecessor.hash
       head
+      ctxt
+  in
+  let* context_hash =
+    Node_context.commit_context
+      node_ctxt
+      ~level:head.level
+      ~commitment:(Option.is_some commitment_hash)
       ctxt
   in
   let* () = maybe_split_context node_ctxt commitment_hash head.level in
@@ -216,7 +222,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -452,8 +458,7 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
   return_unit
 
 let daemonize state =
-  if state.configuration.l1_monitor_finalized || state.node_ctxt.kind = Riscv
-  then
+  if state.configuration.l1_monitor_finalized then
     Layer1.iter_finalized_heads
       ~name:"daemon"
       state.node_ctxt.l1_ctxt
@@ -871,7 +876,7 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = context_hash;
+          context_hash = Some context_hash;
           inbox_witness;
           inbox_hash;
         }
@@ -914,6 +919,34 @@ let setup_opentelemetry ~data_dir config =
     ~version:
       Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
     config.Configuration.opentelemetry
+
+let check_and_patch_config (kind : Kind.t) (config : Configuration.t) =
+  let open Lwt_result_syntax in
+  match kind with
+  | Riscv ->
+      (* Force to commit context to disk only on commitments and monitoring of
+         finalized levels. *)
+      let*! () =
+        if config.commit_on = Block then
+          Daemon_event.riscv_force_commit_strategy ()
+        else Lwt.return_unit
+      in
+      return {config with l1_monitor_finalized = true; commit_on = Commitment}
+  | _ ->
+      let*? () =
+        if config.l1_monitor_finalized then
+          (* No reorg so can use any commit to disk strategy *)
+          Ok ()
+        else
+          match config.commit_on with
+          | Block -> Ok ()
+          | Commitment ->
+              error_with
+                "Cannot use a sparse commit on commitment strategy when \
+                 following the head of the L1 chain. Use \
+                 --l1-monitor-finalized or --commit-on block."
+      in
+      return config
 
 let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
     (cctxt : Client_context.full) =
@@ -987,6 +1020,8 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       cctxt
       configuration.sc_rollup_address
   in
+  let* configuration = check_and_patch_config kind configuration in
+  let*! () = Daemon_event.commit_strategy configuration.commit_on in
   Metrics.wrap (fun () ->
       Metrics.Info.set_lcc_level_l1 lcc.level ;
       Option.iter
@@ -1034,21 +1069,32 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
   run state
 
 module Replay = struct
-  let preload_wasmer node_ctxt l2_block =
+  let preload_wasmer node_ctxt (l2_block : Sc_rollup_block.full) =
     let open Lwt_result_syntax in
     match node_ctxt.Node_context.kind with
     | Example_arith | Riscv -> return_unit
     | Wasm_2_0_0 ->
+        let* l2_block_header =
+          match l2_block.header.context_hash with
+          | Some _ -> return l2_block.header
+          | None -> (
+              (* Fallback to use last committed block for preloading. *)
+              let+ last_committed =
+                Node_context.last_committed_block node_ctxt
+              in
+              match last_committed with
+              | None -> l2_block.header
+              | Some b -> b.header)
+        in
         Format.eprintf
           "Preloading \
            kernel............................................................. \
            %!" ;
-        let* () =
-          Wasm_2_0_0_utilities.preload_kernel
-            node_ctxt
-            l2_block.Sc_rollup_block.header
+        let* preloaded =
+          Wasm_2_0_0_utilities.preload_kernel node_ctxt l2_block_header
         in
-        Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
+        if preloaded then Format.eprintf "[\x1B[1;32mOK\x1B[0m]@."
+        else Format.eprintf "[\x1B[1;31mKO\x1B[0m]@." ;
         return_unit
 
   let mk_node_ctxt ~data_dir ~profiling cctxt block =
@@ -1122,6 +1168,7 @@ module Replay = struct
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
         ~slow_vm_fallback:false
+        ~commit_on:None
         ~profiling
         ~force_etherlink:false
         ~l1_monitor_finalized:None

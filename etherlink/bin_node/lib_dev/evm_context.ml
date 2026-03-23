@@ -2911,13 +2911,19 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let* rollup_node_store =
     Store.init Read_only ~data_dir:rollup_node_data_dir
   in
-  let* final_l2_block = Store.L2_blocks.find_finalized rollup_node_store in
+  let* final_l2_block =
+    Store.L2_blocks.find_last_committed_finalized rollup_node_store
+  in
   let* final_l2_block =
     match final_l2_block with
     | Some b -> return b
-    | None -> failwith "Rollup node has no finalized l2 block"
+    | None ->
+        failwith
+          "Rollup node has no finalized l2 block with a committed context"
   in
-  let checkpoint = final_l2_block.header.context in
+  let checkpoint =
+    WithExceptions.Option.get ~loc:__LOC__ final_l2_block.header.context_hash
+  in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
   in

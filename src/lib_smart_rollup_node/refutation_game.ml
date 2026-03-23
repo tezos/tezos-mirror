@@ -118,6 +118,12 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
     Option.map (fun s -> s.Pvm_plugin_sig.info.state_hash) our_state
   in
   let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
+  let*! () =
+    Refutation_game_event.computing_dissection
+      ~opponent
+      ~start_tick
+      ~end_tick:our_tick
+  in
   let* dissection =
     Plugin.Refutation_game_helpers.make_dissection
       (module Plugin)
@@ -159,10 +165,17 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
         tzfail
           Rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
     | Octez_smart_rollup.Game.{state_hash = their_hash; tick} :: dissection -> (
-        let start_state =
+        let* start_state =
           match ok with
-          | Hash _, _ -> None
-          | Evaluated ok_state, _ -> Some ok_state.head
+          | Evaluated ok_state, _ -> return_some ok_state.head
+          | Hash _, tick -> (
+              match
+                Pvm_plugin_sig.Tick_state_cache.bind state_cache tick Lwt.return
+              with
+              | None -> return_none
+              | Some cached ->
+                  let+ cached in
+                  Some (Pvm_plugin_sig.to_mut_eval_state cached))
         in
         let* our =
           Interpreter.state_of_tick
@@ -185,6 +198,11 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                 our_state.info.state_hash
                 their_hash
             then
+              let*! () =
+                Refutation_game_event.dissection_agree
+                  ~tick
+                  ~state_hash:our_state.info.state_hash
+              in
               let ok =
                 Evaluated
                   {
@@ -193,10 +211,28 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                   }
               in
               traverse (ok, tick) dissection
-            else return (ok, (our, tick)))
+            else
+              let*! () =
+                Refutation_game_event.dissection_disagree
+                  ~tick
+                  ~their_hash
+                  ~our_hash:our_state.info.state_hash
+              in
+              return (ok, (our, tick)))
   in
   match dissection with
   | {state_hash = Some hash; tick} :: dissection ->
+      let end_tick =
+        List.last_opt dissection
+        |> Option.fold ~some:(fun x -> x.tick) ~none:tick
+      in
+      let*! () =
+        Refutation_game_event.traversing_dissection
+          ~opponent
+          ~dissection_length:(List.length dissection + 1)
+          ~start_tick:tick
+          ~end_tick
+      in
       let* ok, ko = traverse (Hash hash, tick) dissection in
       let* dissection =
         new_dissection
@@ -279,6 +315,7 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt state_cache
 let play_next_move plugin node_ctxt state_cache ~commitment_period_tick_offset
     game opponent =
   let open Lwt_result_syntax in
+  let*! () = Refutation_game_event.playing_next_move ~opponent game in
   let* refutation =
     next_move
       plugin

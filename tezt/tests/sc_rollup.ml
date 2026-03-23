@@ -5694,6 +5694,7 @@ let test_rpcs ~kind
     ~kind
     ~boot_sector
     ~whitelist_enable:true
+    ~commitment_period:10
     ?preimages_dir
     {
       tags = ["rpc"; "api"];
@@ -5916,10 +5917,7 @@ let test_rpcs ~kind
   in
   let* _outbox =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_global_block_outbox
-         ~block:"head"
-         ~outbox_level:l2_finalied_block_level
-         ()
+    @@ Sc_rollup_rpc.get_global_block_outbox ~block:"12" ~outbox_level:9 ()
   in
   let* _head =
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
