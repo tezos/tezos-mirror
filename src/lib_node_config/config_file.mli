@@ -58,6 +58,7 @@ type t = {
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
+  profiling : Tezos_profiler.Profiler.profiling_config;
 }
 
 and p2p = {

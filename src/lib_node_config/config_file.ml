@@ -404,6 +404,7 @@ type t = {
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
+  profiling : Tezos_profiler.Profiler.profiling_config;
 }
 
 and p2p = {
@@ -475,6 +476,7 @@ let default_config =
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
     metrics_addr = [];
+    profiling = Tezos_profiler.Profiler.default_profiling_config;
   }
 
 let p2p =
@@ -784,6 +786,7 @@ let encoding =
            shell;
            blockchain_network;
            metrics_addr;
+           profiling;
          }
        ->
       ( data_dir,
@@ -794,7 +797,8 @@ let encoding =
         internal_events,
         shell,
         blockchain_network,
-        metrics_addr ))
+        metrics_addr,
+        profiling ))
     (fun ( data_dir,
            disable_config_validation,
            rpc,
@@ -803,7 +807,8 @@ let encoding =
            internal_events,
            shell,
            blockchain_network,
-           metrics_addr )
+           metrics_addr,
+           profiling )
        ->
       {
         disable_config_validation;
@@ -815,8 +820,9 @@ let encoding =
         shell;
         blockchain_network;
         metrics_addr;
+        profiling;
       })
-    (obj9
+    (obj10
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
@@ -861,7 +867,12 @@ let encoding =
           "metrics_addr"
           ~description:"Configuration of the Prometheus metrics endpoint"
           (list string)
-          default_config.metrics_addr))
+          default_config.metrics_addr)
+       (dft
+          "profiling"
+          ~description:"Configuration of profiling output"
+          Tezos_profiler.Profiler.profiling_config_encoding
+          default_config.profiling))
 
 let () =
   Data_encoding.Registration.register (Data_encoding.def "node-config" encoding)
@@ -1124,6 +1135,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       shell;
       blockchain_network;
       metrics_addr;
+      profiling = cfg.profiling;
     }
 
 let to_ipv4 ipv6_l =
