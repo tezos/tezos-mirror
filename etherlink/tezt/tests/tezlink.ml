@@ -3341,6 +3341,7 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
       ~client:client_tezlink
       ~block:"5"
       ~expected:[op_just_enough_hash]
+      ()
   in
   let* _ =
     Client.get_receipt_for ~operation:op_just_enough_hash client_tezlink
@@ -3450,6 +3451,7 @@ let test_tezlink_validation_gas_limit =
       ~client:client_tezlink
       ~block:"5"
       ~expected:[op1; op2]
+      ()
   in
 
   (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
@@ -3474,10 +3476,20 @@ let test_tezlink_validation_gas_limit =
   let* () = produce_block_and_wait_for ~sequencer 6 in
   let* () = produce_block_and_wait_for ~sequencer 7 in
   let* () =
-    check_operations ~__LOC__ ~client:client_tezlink ~block:"6" ~expected:[op3]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"6"
+      ~expected:[op3]
+      ()
   in
   let* () =
-    check_operations ~__LOC__ ~client:client_tezlink ~block:"7" ~expected:[op4]
+    check_operations
+      ~__LOC__
+      ~client:client_tezlink
+      ~block:"7"
+      ~expected:[op4]
+      ()
   in
   unit
 
@@ -3533,6 +3545,7 @@ let test_tezlink_validation_counter =
       ~client:client_tezlink
       ~block:"5"
       ~expected:[op1; op2; op3]
+      ()
   in
   unit
 
@@ -3582,6 +3595,7 @@ let test_tezlink_validation_balance =
       ~client:client_tezlink
       ~block:"6"
       ~expected:[op_reveal]
+      ()
   in
 
   (* sanity check *)
@@ -3613,6 +3627,7 @@ let test_tezlink_validation_balance =
       ~client:client_tezlink
       ~block:"7"
       ~expected:[big_transfer]
+      ()
   in
   let* receipt =
     Client.get_receipt_for ~operation:big_transfer client_tezlink
@@ -3652,10 +3667,11 @@ let test_tezlink_validation_balance =
       ~client:client_tezlink
       ~block:"8"
       ~expected:[big_but_in]
+      ()
   in
   let* () = produce_block_and_wait_for ~sequencer 9 in
   let* () =
-    check_operations ~__LOC__ ~client:client_tezlink ~block:"9" ~expected:[]
+    check_operations ~__LOC__ ~client:client_tezlink ~block:"9" ~expected:[] ()
   in
   unit
 
