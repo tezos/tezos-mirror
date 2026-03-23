@@ -40,6 +40,7 @@ type kernel =
   | Farfadet
   | FarfadetR1
   | FarfadetR2
+  | FarfadetR2SU
   | Latest
 
 let kernel_from_string = function
@@ -54,6 +55,7 @@ let kernel_from_string = function
   | "farfadet" -> Some Farfadet
   | "farfadet-r1" -> Some FarfadetR1
   | "farfadet-r2" -> Some FarfadetR2
+  | "farfadet-r2-su" -> Some FarfadetR2SU
   | "latest" -> Some Latest
   | _ -> None
 
@@ -69,6 +71,7 @@ let kernel_to_ordinal = function
   | Farfadet -> 8
   | FarfadetR1 -> 9
   | FarfadetR2 -> 10
+  | FarfadetR2SU -> 11
   | Latest -> Int.max_int
 
 let compare_kernel a b = Int.compare (kernel_to_ordinal a) (kernel_to_ordinal b)
@@ -122,4 +125,8 @@ let root_hash_from_released_kernel = function
       Some
         (`Hex
            "0031c5d2a4b555d151cc521a42500f61db12898cd4f7178aac42541b0c81a82e74")
+  | FarfadetR2SU ->
+      Some
+        (`Hex
+           "00a932181ea0b3446ec1d509c33680a473f133bd1aa92d144d2011fe9fd1e2787f")
   | Latest -> None
