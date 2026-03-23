@@ -88,6 +88,21 @@ local hasExporter(name) = std.member(hardwareExporters, name);
   selectMetrics: selectMetrics,
   hasExporter: hasExporter,
 
+  // Build options description: lists non-default make options for traceability
+  build_options:
+    local opts = [
+      if self.node_instance != 'instance' then 'NODE_INSTANCE_LABEL=' + self.node_instance else '',
+      if self.logs_label != 'job' then 'LOGS_LABEL=' + self.logs_label else '',
+      if self.endpoint_label != 'endpoint' then 'ENDPOINT_LABEL=' + self.endpoint_label else '',
+      if self.datasource_default != 'Prometheus' then 'DATASOURCE_DEFAULT=' + self.datasource_default else '',
+      if self.enable_datasource_selection then 'DATASOURCE_SELECTION=true' else '',
+      if self.hardware_src != 'netdata' then 'HARDWARE_SRC=' + self.hardware_src else '',
+    ];
+    local non_empty = [o for o in opts if o != ''];
+    if std.length(non_empty) > 0
+    then '\n\nBuild options: ' + std.join(' ', non_empty)
+    else '',
+
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index"}',
 
   pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh=~"$pkh"}',

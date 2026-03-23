@@ -303,7 +303,7 @@ local exporterVariable =
 // ============================================
 
 dashboard.new('Hardware Metrics Comparison' + if !isDefaultUid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
-+ dashboard.withDescription('Side-by-side comparison of hardware metrics across configured exporters')
++ dashboard.withDescription('Side-by-side comparison of hardware metrics across configured exporters' + base.build_options)
 + dashboard.withTags(['grafazos', 'comparison', 'hardware', 'metrics'] + activeExporters)
 + dashboard.withVariables([exporterVariable] + base.standardVariables)
 + dashboard.withRefresh('30s')

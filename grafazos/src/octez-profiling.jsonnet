@@ -25,7 +25,7 @@ local block_validator_y = 161;
 // Create the dashboard
 dashboard.new('Octez Profiling Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-profiling' + uid_ext) else {})
-+ dashboard.withDescription('In-depth profiling for Octez function performance, showing average execution times.')
++ dashboard.withDescription('In-depth profiling for Octez function performance, showing average execution times.' + base.build_options)
 + dashboard.withTags(['tezos', 'octez', 'profiling', 'grafazos'])
 + dashboard.time.withFrom('now-8h')
 + dashboard.withRefresh('10s')

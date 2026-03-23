@@ -41,7 +41,7 @@ local p2p_y = gossipsub_y + 24;
 
 dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('dal-basic' + uid_ext) else {})
-+ dashboard.withDescription('A dashboard for Octez DAL node')
++ dashboard.withDescription('A dashboard for Octez DAL node' + base.build_options)
 + dashboard.withTags(['tezos', 'octez', 'dal', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')

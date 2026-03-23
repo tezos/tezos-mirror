@@ -33,7 +33,7 @@ local uid = uid_ext == 'default';
 
 dashboard.new('Octez compact dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-compact' + uid_ext) else {})
-+ dashboard.withDescription('A compact dashboard for Octez')
++ dashboard.withDescription('A compact dashboard for Octez' + base.build_options)
 + dashboard.withTags(['tezos', 'octez', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')

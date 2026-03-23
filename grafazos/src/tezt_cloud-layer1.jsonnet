@@ -8,6 +8,7 @@ local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main
 local dashboard = grafonnet.dashboard;
 local panel = grafonnet.panel;
 
+local base = import './base.jsonnet';
 local tezt_cloud = import './tezt_cloud.jsonnet';
 
 local panel_width = 12;
@@ -29,7 +30,7 @@ local uid = uid_ext == 'default';
 //##
 dashboard.new('Tezt Cloud - Layer 1 dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('tezt-cloud-layer1' + uid_ext) else {})
-+ dashboard.withDescription('A dashboard for Layer 1 related experiments with tezt cloud')
++ dashboard.withDescription('A dashboard for Layer 1 related experiments with tezt cloud' + base.build_options)
 + dashboard.withTags(['tezos', 'tezt', 'cloud', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
