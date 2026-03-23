@@ -321,6 +321,46 @@ let dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
       assert false
   | Ok msg -> msg
 
+let dal_attested_slots_messages_for_level ~published_level ~number_of_slots
+    ~slot_size ~page_size ~slots_by_publisher =
+  let open Result_syntax in
+  let module Pkh_map = Signature.Public_key_hash.Map in
+  let mk_message slots_by_publisher =
+    Dal_attested_slots
+      {
+        published_level;
+        number_of_slots;
+        slot_size;
+        page_size;
+        slots_by_publisher;
+      }
+  in
+  let flush_chunk messages chunk =
+    let msg = mk_message chunk in
+    match serialize (Internal msg) with
+    | Ok _ -> return (msg :: messages)
+    | Error _ -> tzfail Error_encode_inbox_message
+  in
+  let add_or_split pkh slots (messages, current_chunk) =
+    let candidate_chunk = Pkh_map.add pkh slots current_chunk in
+    let candidate_msg = mk_message candidate_chunk in
+    match serialize (Internal candidate_msg) with
+    | Ok _ -> return (messages, candidate_chunk)
+    | Error _ ->
+        if Pkh_map.is_empty current_chunk then tzfail Error_encode_inbox_message
+        else
+          let* messages = flush_chunk messages current_chunk in
+          return (messages, Pkh_map.singleton pkh slots)
+  in
+  let* messages, current_chunk =
+    Pkh_map.fold_e add_or_split slots_by_publisher ([], Pkh_map.empty)
+  in
+  let* messages =
+    if Pkh_map.is_empty current_chunk then return messages
+    else flush_chunk messages current_chunk
+  in
+  return (List.rev messages)
+
 let dal_attested_slots_messages_of_cells fetch_dal_params cells =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
@@ -370,17 +410,15 @@ let dal_attested_slots_messages_of_cells fetch_dal_params cells =
           let* number_of_slots, slot_size, page_size =
             fetch_dal_params ~published_level
           in
-          let message =
-            Dal_attested_slots
-              {
-                published_level;
-                number_of_slots;
-                slot_size;
-                page_size;
-                slots_by_publisher;
-              }
+          let*? messages_for_level =
+            dal_attested_slots_messages_for_level
+              ~published_level
+              ~number_of_slots
+              ~slot_size
+              ~page_size
+              ~slots_by_publisher
           in
-          return @@ (message :: acc))
+          return @@ List.rev_append messages_for_level acc)
       by_level
       []
   in
@@ -395,3 +433,8 @@ let (_dummy_serialized_dal_attested_slots : serialized) =
     ~slot_size:126944
     ~page_size:3967
     ~slots_by_publisher:Signature.Public_key_hash.Map.empty
+
+module Internal_for_tests = struct
+  let dal_attested_slots_messages_for_level =
+    dal_attested_slots_messages_for_level
+end
