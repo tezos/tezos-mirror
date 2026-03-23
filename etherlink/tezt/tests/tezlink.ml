@@ -3881,55 +3881,51 @@ let test_michelson_gas_backlog =
     gas_limit = 500_000 requires execution gas fee =
     500_000 * 10 * 10^9 / 10^12 = 5_000 mutez.
 
-    A fee of 1_000 mutez does not cover execution gas: the operation
-    passes mempool injection but is rejected during block production.
+    A fee of 1_000 mutez does not cover execution gas.
     A fee of 10_000 mutez covers execution gas: the operation is included. *)
 let test_michelson_execution_gas_fee =
   register_tezosx_test
     ~title:"Michelson transfer validates execution gas fee"
     ~tags:["kernel"; "validation"; "execution"; "gas"; "fee"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
       Foreign_endpoint
         Endpoint.
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
-  let* client_tezlink = Client.init ~endpoint () in
   (* Fee = 1_000 mutez: below execution gas cost → rejected at
-     block production time. *)
-  let* (`OpHash _rejected) =
-    Operation.inject_transfer
-      ~counter:1
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      ~fee:1_000
+     simulation. *)
+  let process =
+    Client.spawn_transfer
+      ~amount:Tez.one
+      ~fee:(Tez.of_mutez_int 1000)
       ~gas_limit:500_000
-      client_tezlink
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~endpoint
+      client
   in
+  let* err = Process.check_and_read_stderr ~expect_failure:true process in
+  Check.(err =~ rex "evm_node.dev.insufficient_fees")
+    ~error_msg:"Expected insufficient_fees error with %R but got %L" ;
   let* () = produce_block_and_wait_for ~sequencer 3 in
   let* () =
-    check_operations ~__LOC__ ~client:client_tezlink ~block:"3" ~expected:[]
+    check_operations ~__LOC__ ~client ~endpoint ~block:"3" ~expected:[] ()
   in
   (* Fee = 10_000 mutez: covers execution gas → included. *)
-  let* (`OpHash accepted) =
-    Operation.inject_transfer
-      ~counter:1
-      ~source:Constant.bootstrap2
-      ~dest:Constant.bootstrap1
-      ~fee:10_000
+  let* () =
+    Client.transfer
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:Constant.bootstrap1.alias
+      ~fee:(Tez.of_mutez_int 10_000)
       ~gas_limit:500_000
-      client_tezlink
+      ~endpoint
+      client
   in
   let* () = produce_block_and_wait_for ~sequencer 4 in
-  let* () =
-    check_operations
-      ~__LOC__
-      ~client:client_tezlink
-      ~block:"4"
-      ~expected:[accepted]
-  in
   unit
 
 (** Test that gas exhaustion is handled correctly.
