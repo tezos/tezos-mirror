@@ -50,7 +50,6 @@ find_files() {
   git "${repo_args[@]}" ls-files "${ls_args[@]}" -z --full-name \
     'Cargo.lock' \
     '**/Cargo.lock' \
-    ':!:contrib' \
     ':!:src/riscv' # Uses a nightly formatter which doesn't get picked up automatically
 }
 
