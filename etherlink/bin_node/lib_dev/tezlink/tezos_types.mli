@@ -41,6 +41,8 @@ module Contract : sig
 
   val implicit_encoding : Signature.V2.public_key_hash Data_encoding.t
 
+  val to_b58check : t -> string
+
   val of_b58check : string -> t tzresult
 
   val of_implicit : Signature.V2.public_key_hash -> t
