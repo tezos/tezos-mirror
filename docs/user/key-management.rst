@@ -268,12 +268,80 @@ In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt 
 
 .. _consensus_key_details:
 
-Consensus Key
--------------
+Consensus Key and Companion Key
+-------------------------------
+
+Overview of Baker Key Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A delegate (baker) can use up to three distinct keys. The following table summarizes
+their roles, constraints, and when each is needed:
+
+.. list-table::
+   :widths: 18 22 15 15 30
+   :header-rows: 1
+
+   * - Key
+     - Purpose
+     - Allowed types
+     - Fund access
+     - When needed
+   * - **Baking (aka Manager) key**
+     - Delegate identity; signs manager operations (transfers, staking, key updates)
+     - tz1, tz2, tz3, tz4
+     - Full
+     - Always (every delegate has one; cannot be changed)
+   * - **Consensus key**
+     - Signs blocks and consensus operations (preattestations, attestations)
+     - tz1, tz2, tz3, tz4
+     - Can drain spendable balance
+     - Optional: defaults to baking (manager) key; recommended for operational security
+   * - **Companion key**
+     - Signs consensus operations that contains DAL-attestations
+     - tz4 only
+     - None
+     - Required for DAL participation when using a tz4 consensus key
+
+By default, the baking (manager) key is also the consensus key. A separate consensus key is recommended for bakers who want
+to keep their manager key offline (cold storage) while still baking. A companion key is only
+needed in the specific scenario where the consensus key is a tz4 (BLS) key and the baker
+participates in the :doc:`DAL <../shell/dal>`.
 
 .. note::
 
-   The "consensus key" feature is available starting with the Tezos :doc:`Lima<../protocols/015_lima>` protocol.
+   The "consensus key" feature is available since the :doc:`Lima<../protocols/015_lima>` protocol.
+   The "companion key" feature is available since protocol :doc:`Seoul <../protocols/023_seoul>`.
+
+Do I Need a Consensus Key?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You **should** set up a consensus key if any of the following apply:
+
+- You want to keep your manager key in cold storage (offline) while the baker runs with a separate key.
+- You use a remote signer or cloud-hosted Key Management System (KMS) and want to isolate the signing key from the baker's identity.
+- You want the ability to rotate your consensus key periodically without requiring your delegators to redelegate.
+- You run your baker infrastructure in a cloud environment where you may lose access, and want to be able to switch to a new key quickly.
+
+You can continue baking **without** a consensus key if you are comfortable using
+your manager key directly for signing consensus operations.
+
+Do I Need a Companion Key?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A companion key is only required if your consensus key (or delegate key, if no consensus key is set) is a **tz4** (BLS) key: in this case, without the companion key you cannot participate to the DAL (and get the corresponding  rewards).
+
+If you use a tz1, tz2, or tz3 consensus key, you do **not** need a companion key---DAL attestations are signed with the consensus key directly.
+
+If you have a tz4 consensus key but do **not** register a companion key, your baker
+will still produce regular attestations, but will be unable to include DAL attestation
+data. This means you will not participate in the Data Availability Layer,
+and as a result, you might lose DAL participation rewards when the DAL is active.
+
+For more details on the technical reason behind this requirement, see
+:doc:`../shell/baker` (section "The Role of the Companion Key").
+
+Consensus Key
+~~~~~~~~~~~~~
 
 By default, the baker's key, also called manager key, is used to sign in the consensus protocol, i.e. signing blocks while baking,
 and signing consensus operations (preattestations and attestations).
@@ -285,17 +353,33 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
+Security Model
+^^^^^^^^^^^^^^
+
+Using a consensus key improves operational security compared to baking directly with the manager key:
+
+- **Manager key stays offline**: The manager key can be kept in cold storage (hardware wallet, air-gapped machine). Only the consensus key needs to be accessible to the baker or signer.
+- **Key rotation without redelegation**: If the consensus key is compromised, you can rotate it using the offline manager key. Delegators are unaffected.
+- **Faster incident response**: You can detect compromise and rotate the consensus key while the manager key remains safe.
+
 .. warning::
 
-   Note that the consensus key has also access to the delegate's spendable funds: indeed, the consensus
-   key may sign a ``Drain_delegate`` operation to transfer the delegate's
-   spendable balance to an arbitrary account. In :doc:`relevant
-   RPCs<../api/openapi>` like
-   ``/chains/main/blocks/head/helpers/baking_rights``, both the
-   delegate's manager and consensus keys are listed.
-   As a consequence, the consensus key should be treated with equal care as the manager key.
+   The consensus key can **drain the delegate's spendable balance** via a ``Drain_delegate``
+   operation. Both the delegate's manager and consensus keys are listed in
+   :doc:`relevant RPCs<../api/openapi>` like ``/chains/main/blocks/head/helpers/baking_rights``.
+   The consensus key should therefore be treated with care, even though the manager key
+   remains the primary identity.
 
-Further possible options to counter the risk of fund draining by a compromised consensus key include: staking (nearly) all funds available on the baking key, leaving just a minimum to pay operation fees, and, rotating consensus key regularly, specially before unstaking tez. Note that the activation delay for new consensus key is one cycle shorter than the unstake finalization delay.
+To mitigate the risk of fund draining by a compromised consensus key:
+
+- **Stake most of your funds**: only leave a minimum for operation fees in the spendable balance. Frozen (staked) funds cannot be drained.
+- **Rotate the consensus key regularly**, especially before unstaking tez. The activation delay for a new consensus key is one cycle shorter than the unstake finalization delay.
+
+.. note::
+
+   In contrast, a **companion key** has **no access** to the delegate's funds. It can only
+   sign DAL attestation data. If a companion key is compromised, the worst outcome is
+   that the attacker can produce invalid DAL attestations — no funds are at risk.
 
 Registering a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -312,9 +396,9 @@ The command to update the consensus key is::
 
    octez-client set consensus key for <manager_key> to <consensus_key>
 
-The update becomes active after ``CONSENSUS_RIGHTS_DELAY + 1`` cycles. We therefore distinguish
-the active consensus key and the pending consensus keys.
-The active consensus key is by default the delegate’s manager key, which cannot change.
+The update becomes active after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles
+(see :ref:`cs_constants`). We therefore distinguish the active consensus key and the pending
+consensus keys. The active consensus key is by default the delegate’s manager key, which cannot change.
 
 However, it is also possible to register as a delegate and immediately set the consensus key::
 
@@ -398,9 +482,121 @@ It is even possible to register both a consensus key and a companion key, with t
 
    octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
 
-Please do (re)start the baker and provide the the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
+Please do (re)start the baker and provide the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
 
    octez-baker run with local node ~/.tezos-node <consensus_key> <companion_key> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+
+.. _consensus_companion_example:
+
+End-to-End Example: Setting Up Consensus and Companion Keys
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example walks through a complete setup with a tz4 (BLS) consensus key
+and a companion key for DAL participation.
+
+**Step 1: Generate the keys**
+
+Generate a BLS key for consensus and another for the companion role::
+
+   octez-client gen keys my_consensus_key --sig bls
+   octez-client gen keys my_companion_key --sig bls
+
+**Step 2: Register as a delegate with both keys**
+
+If you are registering as a new delegate::
+
+   octez-client register key my_manager as delegate \
+     --consensus-key my_consensus_key \
+     --companion-key my_companion_key
+
+If you are already a delegate, update each key separately::
+
+   octez-client set consensus key for my_manager to my_consensus_key
+   octez-client set companion key for my_manager to my_companion_key
+
+**Step 3: Wait for activation**
+
+Both keys become active after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles
+(see :ref:`cs_constants`). You can check the pending keys via::
+
+   octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+Look for the ``pending_consensus_keys`` and ``pending_companion_keys`` fields.
+
+**Step 4: Start the baker with all keys**
+
+During the transition period (before the new keys activate), pass all key aliases
+so the baker uses the right key at each point::
+
+   octez-baker run with local node ~/.tezos-node \
+     my_consensus_key my_companion_key my_manager \
+     --liquidity-baking-toggle-vote pass
+
+Once the new keys are active, you may omit the manager key alias, but keeping it
+is harmless and recommended for smooth transitions during future key rotations.
+
+**Step 5: Verify**
+
+After activation, confirm your baker is using the new keys by checking the
+attestation operations it produces, or by querying::
+
+   octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+The ``active_consensus_key`` and ``active_companion_key`` fields should reflect
+your new keys.
+
+.. _consensus_companion_faq:
+
+Frequently Asked Questions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**I set my consensus key, but the baker is still using the old one.**
+   Consensus key updates take ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles to activate
+   (see :ref:`cs_constants`). During the transition, pass both key aliases to the baker
+   command so it can use the right key at each point. Check the pending keys with::
+
+      octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+**I have a tz4 key. Do I need a companion key?**
+   Only if you want to participate in the :doc:`DAL <../shell/dal>`. Without a companion key,
+   your baker will still produce regular attestations, but will not include DAL attestation
+   data. If you don't use the DAL, you don't need a companion key.
+
+**Can I use the same tz4 key as both consensus key and companion key?**
+   No. The consensus key and companion key must be distinct. Together they
+   enable the aggregation of attestations containing DAL payloads.
+
+**How do I check which consensus key is currently active?**
+   Query the delegate's information via RPC::
+
+      octez-client rpc get /chains/main/blocks/head/context/delegates/<delegate_pkh>
+
+   The ``active_consensus_key`` field shows the currently active key. The
+   ``pending_consensus_keys`` field shows upcoming changes.
+
+**I use a remote signer. How do I set up a consensus key with it?**
+   Generate the consensus key on the signer, then import its **public key** on the client::
+
+      # On the signer machine
+      octez-signer gen keys my_consensus_key --sig bls
+
+      # On the client machine (import the public key only)
+      octez-client import public key my_consensus_key unencrypted:<public_key>
+      octez-client set consensus key for my_manager to my_consensus_key
+
+   The private key stays on the signer. The client only needs the public key to register
+   the update. At baking time, the baker will request signatures from the signer.
+   See :ref:`signer` for details on setting up the remote signer connection.
+
+**What happens if my consensus key is compromised?**
+   An attacker with your consensus key can drain your delegate's **spendable** balance
+   (but not staked/frozen funds). To respond:
+
+   1. Use your manager key (which should be in cold storage) to set a new consensus key.
+   2. Consider draining your own account first if you still have access to the consensus key.
+   3. The new key activates after ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles.
+
+   To minimize exposure, keep most funds staked and rotate the consensus key regularly.
 
 .. _activate_fundraiser_account:
 
