@@ -5161,15 +5161,24 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
        flips the content of the imported DAL page for this target
        (published_level, slot_index, page_index), creating a divergence with
        the honest rollup node. *)
+    (* We pin the inbox_level to [migration_level + 1] instead of using the
+       wildcard [*]. When the loser node catches up with the honest node
+       after migration, the U025+ plugin is used to import the DAL page. The
+       wildcard would make the loser node flip pages at every level, including
+       levels that were already processed honestly before migration; pinning
+       avoids that false divergence. *)
+    let loser_inbox_level = migration_level + 1 in
     log_step
       "Starting loser rollup node (bootstrap2) with loser_mode reveal_dal_page \
-       ... strategy:flip inbox_level:*" ;
+       ... strategy:flip inbox_level:%d"
+      loser_inbox_level ;
     let loser_mode =
       Format.sprintf
         "reveal_dal_page published_level:%d slot_index:%d page_index:2 \
-         strategy:flip inbox_level:*"
+         strategy:flip inbox_level:%d"
         published_level
         slot_index
+        loser_inbox_level
     in
     let loser_node =
       Sc_rollup_node.create
@@ -5385,17 +5394,15 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
         | None -> "<none>"
         | Some l -> string_of_int l) ;
 
-    (* Temporary fix for migration U -> Alpha *)
-    (if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
-       match !first_flip_level with
-       | None -> ()
-       | Some first_flip ->
-           if first_flip < migration_level + 1 then
-             Test.fail
-               "First loser_mode flip must be post-migration (expected >= %d, \
-                got %d)"
-               (migration_level + 1)
-               first_flip) ;
+    (match !first_flip_level with
+    | None -> ()
+    | Some first_flip ->
+        if first_flip < migration_level + 1 then
+          Test.fail
+            "First loser_mode flip must be post-migration (expected >= %d, got \
+             %d)"
+            (migration_level + 1)
+            first_flip) ;
 
     (* Assert that the honest node detected the conflict. *)
     if not !conflict_detected_honest then
