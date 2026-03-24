@@ -227,7 +227,9 @@ let () =
   register
     "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
-    ~jobs:(Octez_latest_release.jobs ~test:true ())
+    ~jobs:
+      (Octez_latest_release.jobs ~test:true ()
+      @ Cacio.get_jobs Octez_latest_release_test)
     ~description:
       "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
        This pipeline is used to dry run the 'octez_latest_release' pipeline, \
