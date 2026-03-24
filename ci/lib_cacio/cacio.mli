@@ -416,6 +416,7 @@ type global_pipeline =
   | Non_release_tag_test
   | Packaging_revision
   | Packaging_revision_test
+  | Octez_latest_release
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit

@@ -834,6 +834,7 @@ type global_pipeline =
   | Non_release_tag_test
   | Packaging_revision
   | Packaging_revision_test
+  | Octez_latest_release
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
