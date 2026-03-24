@@ -155,9 +155,13 @@ module Types = struct
     baking_state : Baking_state.global_state;
     push_event : forge_event option -> unit;
     event_stream : forge_event Lwt_stream.t;
+    forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
   }
 
-  type parameters = {baking_state : Baking_state.global_state}
+  type parameters = {
+    baking_state : Baking_state.global_state;
+    forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
+  }
 end
 
 module Worker = Tezos_workers.Worker.MakeSingle (Name) (Request) (Types)
@@ -225,6 +229,12 @@ let handle_forge_consensus_votes (state : Types.state)
   let open Lwt_result_syntax in
   let batch_branch = unsigned_consensus_votes.batch_branch in
   let task unsigned_consensus_vote =
+    (* Execute test hook if present *)
+    let*! () =
+      match state.forge_consensus_vote_hook with
+      | None -> Lwt.return_unit
+      | Some hook_fn -> hook_fn ()
+    in
     let*! signed_consensus_vote_r =
       Baking_actions.forge_and_sign_consensus_vote
         state.baking_state
@@ -279,6 +289,7 @@ module Handlers = struct
           baking_state = parameters.baking_state;
           event_stream;
           push_event;
+          forge_consensus_vote_hook = parameters.forge_consensus_vote_hook;
         }
 
   let on_no_request _ = Lwt.return_unit
@@ -333,7 +344,7 @@ let start global_state =
     launch
       (create_table Worker.Queue)
       global_state.chain_id
-      {baking_state = global_state}
+      {baking_state = global_state; forge_consensus_vote_hook = None}
       (module Handlers))
 
 let push_request (worker : worker) request =
@@ -350,3 +361,43 @@ let push_request (worker : worker) request =
       Worker.Queue.push_request
         worker
         (Request.Forge_and_sign_attestations {unsigned_attestations})
+
+module Internal_for_tests = struct
+  module Delegate_signing_queue = Delegate_signing_queue
+  module Types = Types
+
+  let get_or_create_queue = get_or_create_queue
+
+  let create_test_state () =
+    let delegate_signing_queues = Key_id.Table.create 13 in
+    let event_stream, push_event = Lwt_stream.create () in
+    (* We use Obj.magic to create a dummy baking_state since we won't
+       actually use it in the queue management tests. The tests only
+       exercise get_or_create_queue which doesn't touch baking_state. *)
+    let dummy_baking_state : Baking_state.global_state = Obj.magic () in
+    Types.
+      {
+        delegate_signing_queues;
+        baking_state = dummy_baking_state;
+        event_stream;
+        push_event;
+        forge_consensus_vote_hook = None;
+      }
+
+  let queue_count state =
+    Key_id.Table.length state.Types.delegate_signing_queues
+
+  let has_queue state delegate =
+    Key_id.Table.mem
+      state.Types.delegate_signing_queues
+      delegate.Baking_state_types.Delegate.consensus_key
+        .Baking_state_types.Key.id
+
+  let start ?forge_consensus_vote_hook global_state =
+    Worker.(
+      launch
+        (create_table Worker.Queue)
+        global_state.chain_id
+        {baking_state = global_state; forge_consensus_vote_hook}
+        (module Handlers))
+end

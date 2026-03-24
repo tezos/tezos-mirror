@@ -934,6 +934,36 @@ class tezt_printer : Tezos_client_base.Client_context.printer =
       fun _log_output -> wrap_tezt_log (fun x -> Tezt_core.Log.info x)
   end
 
+(** Create context index from state's context table. *)
+let create_context_index (state : state) : Abstract_context_index.t =
+  let open Abstract_context_index in
+  {
+    sync_fun = Lwt.return;
+    checkout_fun =
+      (fun hash ->
+        Context_hash.Table.find state.ctxt_table hash
+        |> Option.map (fun Tezos_protocol_environment.{context; _} -> context)
+        |> Lwt.return);
+    finalize_fun = Lwt.return;
+  }
+
+(** Register delegates in wallet. *)
+let register_delegates_in_wallet
+    ~(wallet : #Tezos_client_base.Client_context.wallet)
+    ~(delegates : Baking_state_types.Key.t list) =
+  let open Lwt_result_syntax in
+  List.iter_es
+    (fun ({alias; public_key; id; secret_key_uri} : Baking_state_types.Key.t) ->
+      let* public_key_uri = Client_keys.neuterize secret_key_uri in
+      let pkh = Baking_state_types.Key_id.to_pkh id in
+      Client_keys.register_key
+        wallet
+        ~force:false
+        (pkh, public_key_uri, secret_key_uri)
+        ~public_key
+        alias)
+    delegates
+
 (** Start baker process. *)
 let baker_process ~(delegates : Baking_state_types.Key.t list) ~base_dir
     ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
@@ -963,32 +993,8 @@ let baker_process ~(delegates : Baking_state_types.Key.t list) ~base_dir
   in
   let module User_hooks = (val user_hooks : Hooks) in
   let*! () = User_hooks.on_start_baker ~baker_position:i ~delegates ~cctxt in
-  let* () =
-    List.iter_es
-      (fun ({alias; public_key; id; secret_key_uri} : Baking_state_types.Key.t)
-         ->
-        let* public_key_uri = Client_keys.neuterize secret_key_uri in
-        let pkh = Baking_state_types.Key_id.to_pkh id in
-        Client_keys.register_key
-          wallet
-          ~force:false
-          (pkh, public_key_uri, secret_key_uri)
-          ~public_key
-          alias)
-      delegates
-  in
-  let context_index =
-    let open Abstract_context_index in
-    {
-      sync_fun = Lwt.return;
-      checkout_fun =
-        (fun hash ->
-          Context_hash.Table.find state.ctxt_table hash
-          |> Option.map (fun Tezos_protocol_environment.{context; _} -> context)
-          |> Lwt.return);
-      finalize_fun = Lwt.return;
-    }
-  in
+  let* () = register_delegates_in_wallet ~wallet ~delegates in
+  let context_index = create_context_index state in
   let module User_hooks = (val user_hooks : Hooks) in
   let listener_process () = listener ~user_hooks ~state ~broadcast_pipe in
   let stop_on_event event = User_hooks.stop_on_event event in
@@ -1291,6 +1297,22 @@ let make_baking_delegate
     ~public_key:(account.public_key |> WithExceptions.Option.get ~loc:__LOC__)
     ~secret_key_uri:secret.sk_uri
 
+(** Get bootstrap accounts with secrets and create delegates.
+    This is the common setup used by both [run] and [create_baker_test_env]. *)
+let get_bootstrap_delegates ~num_delegates =
+  let open Lwt_result_syntax in
+  if num_delegates <= 0 then failwith "need at least one delegate"
+  else if num_delegates > 5 then failwith "only up to 5 bootstrap accounts"
+  else
+    let* bootstrap_secrets =
+      Tezos_mockup_commands.Mockup_wallet.default_bootstrap_accounts
+    in
+    let accounts_with_secrets =
+      List.combine_drop (List.take_n num_delegates accounts) bootstrap_secrets
+    in
+    let delegates = List.map make_baking_delegate accounts_with_secrets in
+    return (accounts_with_secrets, delegates)
+
 let run ?(config = default_config) bakers_spec =
   let open Lwt_result_syntax in
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
@@ -1311,13 +1333,9 @@ let run ?(config = default_config) bakers_spec =
       | Ok xs -> return xs
     in
     let global_chain_table = Block_hash.Table.create 10 in
-    let* bootstrap_secrets =
-      Tezos_mockup_commands.Mockup_wallet.default_bootstrap_accounts
+    let* accounts_with_secrets, all_delegates =
+      get_bootstrap_delegates ~num_delegates:total_accounts
     in
-    let accounts_with_secrets =
-      List.combine_drop (List.take_n total_accounts accounts) bootstrap_secrets
-    in
-    let all_delegates = List.map make_baking_delegate accounts_with_secrets in
     let* genesis_block =
       make_genesis_context
         ~delegate_selection:config.delegate_selection
@@ -1556,3 +1574,172 @@ let verify_payload_hash
 
 let get_block_round block =
   round_from_raw_fitness block.rpc_context.block_header.fitness
+
+(** {2 Additional helpers for integration testing} *)
+
+(** Get default protocol constants from mockup parameters. *)
+let get_default_constants () =
+  Mockup.Protocol_parameters.default_value.constants
+
+(** Chain ID used by the mockup simulator. *)
+let get_chain_id () = chain_id
+
+(** Get bootstrap accounts from mockup parameters. *)
+let get_bootstrap_accounts () =
+  Mockup.Protocol_parameters.default_value.bootstrap_accounts
+
+(** {2 Forge Worker Test Infrastructure} *)
+
+(** Result type for [create_baker_test_env]. Contains everything needed
+    to test baker components like the forge worker. *)
+type baker_test_env = {
+  cctxt : Protocol_client_context.full;
+  delegates : Baking_state_types.Key.t list;
+  global_state : Baking_state.global_state;
+  genesis_block_info : Baking_state_types.block_info;
+}
+
+(** Create a test environment for baker component testing.
+
+    This function reuses the same setup as [baker_process] in [run]:
+    - Creates a fake node state with genesis block
+    - Creates a client context with mocked RPC services
+    - Registers delegates in the wallet
+    - Creates the global_state needed for forge worker
+
+    @param num_delegates Number of bootstrap delegates to use (max 5)
+    @return A [baker_test_env] with all components needed for testing
+*)
+let create_baker_test_env ?(config = default_config) ~num_delegates () =
+  let open Lwt_result_syntax in
+  (* Register signer - same as run *)
+  Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
+  (* Get bootstrap accounts and delegates - reusing helper *)
+  let* accounts_with_secrets, delegates =
+    get_bootstrap_delegates ~num_delegates
+  in
+  (* Create genesis block - same as run *)
+  let* genesis_block =
+    make_genesis_context
+      ~delegate_selection:config.delegate_selection
+      ~initial_seed:config.initial_seed
+      ~round0:config.round0
+      ~round1:config.round1
+      ~consensus_committee_size:config.consensus_committee_size
+      ~consensus_threshold_size:config.consensus_threshold_size
+      accounts_with_secrets
+      num_delegates
+  in
+  (* Create fake node state - same as baker_process *)
+  let broadcast_pipes = [Lwt_pipe.Unbounded.create ()] in
+  let global_chain_table = Block_hash.Table.create 10 in
+  let* state =
+    create_fake_node_state
+      ~i:0
+      ~live_depth:60
+      ~genesis_block
+      ~global_chain_table
+      ~broadcast_pipes
+  in
+  (* Create client context - same as baker_process *)
+  let base_dir = "test" in
+  let filesystem = String.Hashtbl.create 10 in
+  let wallet = new Faked_client_context.faked_io_wallet ~base_dir ~filesystem in
+  let hooks = make_mocked_services_hooks state (module Default_hooks) in
+  let cctxt =
+    new Protocol_client_context.wrap_full
+      (new Faked_client_context.unix_faked
+         ~base_dir
+         ~filesystem
+         ~chain_id
+         ~hooks)
+  in
+  (* Register delegates in wallet - reusing helper *)
+  let* () = register_delegates_in_wallet ~wallet ~delegates in
+  (* Create context index - reusing helper *)
+  let context_index = create_context_index state in
+  (* Fetch constants via RPC *)
+  let* constants =
+    Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
+  in
+  (* Create round durations - same as Baking_scheduling.create_round_durations *)
+  let*? round_durations =
+    let first_round_duration = constants.parametric.minimal_block_delay in
+    let delay_increment_per_round =
+      constants.parametric.delay_increment_per_round
+    in
+    Environment.wrap_tzresult
+      (Alpha_context.Round.Durations.create
+         ~first_round_duration
+         ~delay_increment_per_round)
+  in
+  (* Create operation worker - for testing we use a minimal state *)
+  let operation_worker =
+    Operation_worker.Internal_for_tests.make_initial_state
+      ~monitor_node_operations:false
+      ()
+  in
+  (* Create global state - same structure as Baking_scheduling.create_initial_state *)
+  let cache = Baking_state.create_cache () in
+  let global_state =
+    Baking_state.
+      {
+        cctxt;
+        chain_id;
+        config =
+          {
+            Baking_configuration.default_config with
+            validation = ContextIndex context_index;
+            state_recorder = Memory;
+          };
+        constants;
+        round_durations;
+        operation_worker;
+        forge_worker_hooks =
+          {
+            push_request = (fun _ -> Lwt.return_false);
+            get_forge_event_stream = (fun () -> Lwt_stream.of_list []);
+            cancel_all_pending_tasks = (fun () -> ());
+          };
+        validation_mode = Local context_index;
+        delegates;
+        cache;
+        dal_node_rpc_ctxt = None;
+      }
+  in
+  (* Extract genesis block info *)
+  let* genesis_block_info =
+    match state.chain with
+    | [] -> failwith "No blocks in chain"
+    | block :: _ ->
+        let shell = block.rpc_context.block_header in
+        let* round_int32 = round_from_raw_fitness shell.fitness in
+        let* round =
+          match Alpha_context.Round.of_int32 round_int32 with
+          | Ok r -> return r
+          | Error e -> Lwt.return (Error (Environment.wrap_tztrace e))
+        in
+        return
+          Baking_state_types.
+            {
+              hash = block.rpc_context.block_hash;
+              shell;
+              payload_hash = block.protocol_data.contents.payload_hash;
+              payload_round = block.protocol_data.contents.payload_round;
+              round;
+              prequorum = None;
+              quorum = [];
+              payload = Operation_pool.empty_payload;
+              grandparent = shell.predecessor;
+            }
+  in
+  return {cctxt; delegates; global_state; genesis_block_info}
+
+(** Create a batch_content for consensus vote testing. *)
+let create_batch_content ~(block_info : Baking_state_types.block_info) :
+    Baking_state.batch_content =
+  {
+    level = Alpha_context.Raw_level.of_int32_exn block_info.shell.level;
+    round = block_info.round;
+    block_payload_hash = block_info.payload_hash;
+  }
