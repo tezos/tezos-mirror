@@ -88,6 +88,14 @@ val remote_metadata : ('msg, 'peer, 'conn) t -> 'conn
 (** [stat t] is a snapshot of current bandwidth usage for [t]. *)
 val stat : ('msg, 'peer, 'conn) t -> P2p_stat.t
 
+(** [wait_reader_closed t] is a promise that resolves when the TCP
+    read side of [t] fails. *)
+val wait_reader_closed : ('msg, 'peer, 'conn) t -> unit Lwt.t
+
+(** [wait_writer_closed t] is a promise that resolves when the TCP
+    write side of [t] fails. *)
+val wait_writer_closed : ('msg, 'peer, 'conn) t -> unit Lwt.t
+
 (** [read t] returns a message popped from [t]'s app message
     queue, or fails with [Connection_closed]. *)
 val read : ('msg, 'peer, 'conn) t -> 'msg tzresult Lwt.t
