@@ -5,4 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val build_rpc_directory : unit -> unit Tezos_rpc.Directory.t
+val build_rpc_directory :
+  profiling_config:Tezos_profiler.Profiler.profiling_config ->
+  unit Tezos_rpc.Directory.t

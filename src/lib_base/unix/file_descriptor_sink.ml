@@ -573,8 +573,8 @@ end) : Internal_event.SINK with type t = t = struct
 
   let write_mutex = Lwt_mutex.create ()
 
-  let remove_older_files n_kept base_path =
-    Daily_file_rotation.remove_older_files_lwt base_path ~days_kept:n_kept
+  let remove_older_files_lwt days_kept base_path =
+    Daily_file_rotation.remove_older_files_lwt base_path ~days_kept
 
   let output_one_with_rotation {rights; base_path; current; days_kept} now
       to_write =
@@ -605,7 +605,8 @@ end) : Internal_event.SINK with type t = t = struct
           in
           let*! () = Lwt_utils_unix.write_string output to_write in
           let*! () =
-            if should_rotate_output then remove_older_files days_kept base_path
+            if should_rotate_output then
+              remove_older_files_lwt days_kept base_path
             else Lwt.return_unit
           in
           return_unit)

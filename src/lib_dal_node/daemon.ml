@@ -39,14 +39,16 @@ module Gossipsub_profiler = struct
     Gossipsub.Profiler.(create_reset_block_section gossipsub_profiler)
 end
 
-let[@warning "-32"] may_start_profiler data_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+let[@warning "-32"] may_start_profiler data_dir profiling_config =
+  match
+    Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+  with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:data_dir in
-          Dal_profiler.init profiler_maker ;
-          Gossipsub.Profiler.init profiler_maker)
+          Dal_profiler.init ~profiling_config profiler_maker ;
+          Gossipsub.Profiler.init ~profiling_config profiler_maker)
         backends
   | None -> ()
 
@@ -889,7 +891,12 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
   let*! () = Event.emit_node_is_ready () in
-  () [@profiler.overwrite may_start_profiler data_dir] ;
+  let[@warning "-26"] profiling_config =
+    Option.value
+      ~default:Tezos_profiler.Profiler.default_profiling_config
+      config.profiling
+  in
+  () [@profiler.overwrite may_start_profiler data_dir profiling_config] ;
   let* () =
     let daemon =
       daemonize [on_new_finalized_head ctxt cctxt crawler amplificator]

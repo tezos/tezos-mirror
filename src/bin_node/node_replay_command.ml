@@ -610,13 +610,16 @@ let replay ~internal_events ~singleprocess ~strict ~repeat ~stats_output
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let[@warning "-32"] may_start_profiler data_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+let[@warning "-32"] may_start_profiler data_dir
+    (profiling_config : Tezos_profiler.Profiler.profiling_config) =
+  match
+    Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+  with
   | Some backends ->
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:data_dir in
-          Shell_profiling.activate_all ~profiler_maker)
+          Shell_profiling.activate_all ~profiling_config ~profiler_maker)
         backends
   | None -> ()
 
@@ -643,7 +646,7 @@ let run ?verbosity ~singleprocess ~strict ~repeat ~stats_output
   let*! () =
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  () [@profiler.overwrite may_start_profiler config.data_dir] ;
+  () [@profiler.overwrite may_start_profiler config.data_dir config.profiling] ;
   Updater.init (Data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit

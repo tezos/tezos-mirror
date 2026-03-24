@@ -31,12 +31,12 @@ let all_profilers =
     ("baker", [baker_profiler; environment_profiler]);
   ]
 
-let activate_all ~profiler_maker =
+let activate_all ~profiling_config ~profiler_maker =
   List.iter
     (fun (name, profilers) ->
       Option.iter
         (fun instance -> List.iter (fun p -> plug p instance) profilers)
-        (profiler_maker ~name))
+        (profiler_maker ~profiling_config ~name))
     all_profilers
 
 let create_reset_block_section =

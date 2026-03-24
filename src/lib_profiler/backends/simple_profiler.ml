@@ -406,14 +406,20 @@ end
 
 let headless = (module Headless : DRIVER with type config = verbosity)
 
+type day = Daily_file_rotation.day
+
+(** [Closed base_path] holds the base path (without date suffix).
+    [Open (base_path, channel, formatter, day)] holds the currently open file
+    along with the day it was opened for. *)
 type output =
   | Closed of string
-  | Open of string * out_channel * Format.formatter
+  | Open of string * out_channel * Format.formatter * day
 
 type auto_writer_state = {
   mutable profiler_state : state;
   mutable output : output;
   time : time;
+  days_kept : int;
 }
 
 type file_format = Plain_text | Json
@@ -421,13 +427,23 @@ type file_format = Plain_text | Json
 type (_, _) Profiler.kind +=
   | Auto_write_to_file :
       file_format
-      -> (string * verbosity, auto_writer_state) Profiler.kind
+      -> (string * verbosity * int, auto_writer_state) Profiler.kind
+
+let open_profiling_file base_path day =
+  let path =
+    Daily_file_rotation.filename_insert_before_ext
+      ~path:base_path
+      (Daily_file_rotation.string_of_day day)
+  in
+  let fp = open_out_gen [Open_wronly; Open_creat; Open_append] 0o644 path in
+  let ppf = Format.formatter_of_out_channel fp in
+  (fp, ppf)
 
 let make_driver ~file_format =
   (module struct
     type nonrec state = auto_writer_state
 
-    type config = string * verbosity
+    type config = string * verbosity * int
 
     let kind = Auto_write_to_file file_format
 
@@ -446,11 +462,12 @@ let make_driver ~file_format =
           | _ -> None)
         (fun () -> View (Auto_write_to_file file_format))
 
-    let create (file_name, verbosity) =
+    let create (file_name, verbosity, days_kept) =
       {
         profiler_state = empty verbosity;
         time = time ~cpu:None ();
         output = Closed file_name;
+        days_kept;
       }
 
     include Base (struct
@@ -476,13 +493,22 @@ let make_driver ~file_format =
       let output_report =
         Some
           (fun state report ->
+            let today = Daily_file_rotation.current_day () in
             let ppf =
               match state.output with
-              | Open (_, _, ppf) -> ppf
-              | Closed fn ->
-                  let fp = open_out fn in
-                  let ppf = Format.formatter_of_out_channel fp in
-                  state.output <- Open (fn, fp, ppf) ;
+              | Open (_, _, ppf, day) when day = today -> ppf
+              | Open (base, old_outf, old_ppf, _old_day) ->
+                  Format.pp_print_newline old_ppf () ;
+                  close_out old_outf ;
+                  let new_outf, new_ppf = open_profiling_file base today in
+                  state.output <- Open (base, new_outf, new_ppf, today) ;
+                  Daily_file_rotation.remove_older_files
+                    base
+                    ~days_kept:state.days_kept ;
+                  new_ppf
+              | Closed base ->
+                  let outf, ppf = open_profiling_file base today in
+                  state.output <- Open (base, outf, ppf, today) ;
                   ppf
             in
             writer_of ppf report state.time)
@@ -490,13 +516,14 @@ let make_driver ~file_format =
 
     let close ({output; _} as state) =
       match output with
-      | Open (fn, fp, ppf) ->
+      | Open (base, outf, ppf, _) ->
           Format.pp_print_newline ppf () ;
-          close_out fp ;
-          state.output <- Closed fn
+          close_out outf ;
+          Daily_file_rotation.remove_older_files base ~days_kept:state.days_kept ;
+          state.output <- Closed base
       | Closed _ -> ()
   end : DRIVER
-    with type config = string * verbosity)
+    with type config = string * verbosity * int)
 
 let auto_write_as_txt_to_file = make_driver ~file_format:Plain_text
 
@@ -504,28 +531,41 @@ let auto_write_as_json_to_file = make_driver ~file_format:Json
 
 (** Default profilers. *)
 
-let profiler ?(suffix = "")
-    (backend : (module DRIVER with type config = string * verbosity)) ~verbosity
-    ~directory ~name =
-  let output_dir =
-    (* If [PROFILING_OUTPUT_DIR] environment variable is set, it overwrites the
-       directory provided by the application *)
-    let output_dir =
-      Sys.getenv_opt "PROFILING_OUTPUT_DIR" |> Option.value ~default:directory
-    in
-    match Sys.is_directory output_dir with
-    | true -> output_dir
-    | false ->
-        Fmt.failwith
-          "Error: Profiling output directory '%s' is not a directory."
-          output_dir
-    | exception Sys_error _ ->
-        Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
+let ensure_dir_exists output_dir =
+  match Sys.is_directory output_dir with
+  | true -> output_dir
+  | false ->
+      Fmt.failwith
+        "Error: Profiling output directory '%s' is not a directory."
         output_dir
+  | exception Sys_error _ ->
+      Tezos_stdlib_unix.Utils.create_dir ~perm:0o777 output_dir ;
+      output_dir
+
+let profiler ?(suffix = "")
+    (backend : (module DRIVER with type config = string * verbosity * int))
+    ~verbosity ~directory
+    ~profiling_config:
+      (Profiler.{days_kept; output_dir = config_output_dir; _} :
+        Profiler.profiling_config) ~name =
+  let profiling_dir =
+    (* Config output_dir and PROFILING_OUTPUT_DIR environment variable
+       override the directory provided by the application *)
+    let output_dir =
+      match config_output_dir with
+      | Some dir -> dir
+      | None ->
+          Sys.getenv_opt "PROFILING_OUTPUT_DIR"
+          |> Option.value ~default:directory
+    in
+    let output_dir = ensure_dir_exists output_dir in
+    let profiling_dir = Filename.concat output_dir "profiling" in
+    ensure_dir_exists profiling_dir
   in
-  Profiler.instance
-    backend
-    Filename.Infix.(output_dir // (name ^ "_profiling" ^ suffix), verbosity)
+  let base_path =
+    Filename.Infix.(profiling_dir // (name ^ "_profiling" ^ suffix))
+  in
+  Profiler.instance backend (base_path, verbosity, days_kept)
 
 let () =
   Profiler_instance.register_backend
