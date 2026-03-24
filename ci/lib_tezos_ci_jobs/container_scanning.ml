@@ -30,23 +30,16 @@ let job_container_scanning image : tezos_job =
     ~__POS__
     ~name:"container_scanning"
     ~stage:Stages.test
-    ~template:Jobs_container_scanning
+    ~image:Images.trivy
     ~variables:
       [
-        ("CS_IMAGE", image_ref image);
-        ("SECURE_LOG_LEVEL", "info");
-        ("CS_DOCKERFILE_PATH", image.dockerfile);
+        ("REPORT", "gl-container-scanning-report.json");
+        ("FULL_IMAGE_NAME", image_ref image);
       ]
     ~description:(Format.sprintf "Scanning image %s" (image_ref image))
-    ~artifacts:
-      (artifacts
-         [
-           "gl-container-scanning-report.json";
-           "gl-dependency-scanning-report.json";
-           "\"**/gl-sbom-*.cdx.json\"";
-         ])
+    ~artifacts:(artifacts ["gl-container-scanning-report.json"])
     ~git_strategy:Fetch
-    ["gtcs scan"]
+    [". ./scripts/ci/container_scanning_generate_reports.sh"]
 
 let job_container_scanning_slack_notification image : tezos_job =
   job
