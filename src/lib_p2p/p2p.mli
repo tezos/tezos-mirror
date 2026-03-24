@@ -256,6 +256,14 @@ val connect :
   P2p_point.Id.t ->
   ('msg, 'peer_meta, 'conn_meta) connection tzresult Lwt.t
 
+(** [wait_reader_closed conn] is a promise that resolves when the TCP
+    read side of [conn] fails. *)
+val wait_reader_closed : ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t
+
+(** [wait_writer_closed conn] is a promise that resolves when the TCP
+    write side of [conn] fails. *)
+val wait_writer_closed : ('msg, 'peer_meta, 'conn_meta) connection -> unit Lwt.t
+
 (** Wait for a message from a given connection. *)
 val recv :
   ('msg, 'peer_meta, 'conn_meta) net ->
