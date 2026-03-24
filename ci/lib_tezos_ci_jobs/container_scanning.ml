@@ -33,10 +33,12 @@ let job_container_scanning image : tezos_job =
     ~image:Images.trivy
     ~variables:
       [
+        ("TRIVY_CACHE_DIR", ".trivycache/");
         ("REPORT", "gl-container-scanning-report.json");
         ("FULL_IMAGE_NAME", image_ref image);
       ]
     ~description:(Format.sprintf "Scanning image %s" (image_ref image))
+    ~cache:[cache ~key:"trivy" [".trivycache/"]]
     ~artifacts:(artifacts ["gl-container-scanning-report.json"])
     [". ./scripts/ci/container_scanning_generate_reports.sh"]
 

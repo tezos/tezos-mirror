@@ -62,6 +62,11 @@ container_scanning:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -72,6 +77,7 @@ container_scanning:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
+    TRIVY_CACHE_DIR: .trivycache/
     REPORT: gl-container-scanning-report.json
     FULL_IMAGE_NAME: tezos/tezos:octez-evm-node-latest
   artifacts:
