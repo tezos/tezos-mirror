@@ -172,6 +172,44 @@ type metadata = {
   history_mode : Configuration.history_mode;
 }
 
+module Compact_transactions_receipt = struct
+  open Ethereum_types
+
+  let strip_log_context (log : transaction_log) =
+    {
+      log with
+      blockNumber = None;
+      transactionHash = None;
+      transactionIndex = None;
+      blockHash = None;
+    }
+
+  let fill_log_context ~hash ~block_hash ~block_number ~index
+      (log : transaction_log) =
+    {
+      log with
+      transactionHash = Some hash;
+      blockHash = Some block_hash;
+      blockNumber = Some block_number;
+      transactionIndex = Some index;
+    }
+
+  (* Compact encoding for receipt fields: strips per-log context fields
+   (blockNumber, transactionHash, transactionIndex, blockHash) that are
+   derivable from the outer transaction row. They are stored as [None] and
+   reconstructed at read time.
+
+   The decoder is identical to [receipt_fields_encoding], so both legacy rows
+   (fields stored as [Some ...]) and compact rows (fields stored as [None])
+   decode transparently. *)
+  let encoding : Transaction_info.receipt_fields Data_encoding.t =
+    Data_encoding.conv
+      (fun rf ->
+        Transaction_info.{rf with logs = List.map strip_log_context rf.logs})
+      Fun.id
+      Transaction_info.receipt_fields_encoding
+end
+
 module Q = struct
   open Sqlite.Request
   open Caqti_type.Std
@@ -711,7 +749,7 @@ DO UPDATE SET value = excluded.value
         ~encode:(fun payload ->
           Ok
             (Data_encoding.Binary.to_string_exn
-               Transaction_info.receipt_fields_encoding
+               Compact_transactions_receipt.encoding
                payload))
         ~decode:(fun bytes ->
           Option.to_result ~none:"Not a valid receipt fields payload"
@@ -1480,7 +1518,14 @@ module Transactions = struct
             cumulativeGasUsed = cumulative_gas_used;
             effectiveGasPrice = effective_gas_price;
             gasUsed = gas_used;
-            logs;
+            logs =
+              List.map
+                (Compact_transactions_receipt.fill_log_context
+                   ~hash
+                   ~block_hash
+                   ~block_number
+                   ~index)
+                logs;
             logsBloom = logs_bloom;
             type_;
             status;
@@ -1522,7 +1567,14 @@ module Transactions = struct
             cumulativeGasUsed = cumulative_gas_used;
             effectiveGasPrice = effective_gas_price;
             gasUsed = gas_used;
-            logs;
+            logs =
+              List.map
+                (Compact_transactions_receipt.fill_log_context
+                   ~hash
+                   ~block_hash
+                   ~block_number:level
+                   ~index)
+                logs;
             logsBloom = logs_bloom;
             type_;
             status;
@@ -1568,7 +1620,14 @@ module Transactions = struct
               cumulativeGasUsed = cumulative_gas_used;
               effectiveGasPrice = effective_gas_price;
               gasUsed = gas_used;
-              logs;
+              logs =
+                List.map
+                  (Compact_transactions_receipt.fill_log_context
+                     ~hash
+                     ~block_hash
+                     ~block_number:(Qty level)
+                     ~index)
+                  logs;
               logsBloom = logs_bloom;
               type_;
               status;

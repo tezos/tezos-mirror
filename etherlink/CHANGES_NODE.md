@@ -31,6 +31,10 @@
   simple-transfer receipt (the majority of transactions). Backward
   compatible: existing rows are decoded transparently. (!21299)
 
+- Store `logs` stripped of redundant infos to reduce stored data.
+  Backward compatible: existing rows are decoded transparently.
+  (!21299)
+
 ### Documentation changes
 
 ### Experimental features changes
