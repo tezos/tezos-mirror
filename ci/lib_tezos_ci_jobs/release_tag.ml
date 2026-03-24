@@ -75,16 +75,31 @@ let job_docker_merge =
    This version of the job is only for testing (mode [`test]);
    the [`real] version is in [octez_latest_release.ml]. *)
 let job_docker_promote_to_latest =
+  Cacio.parameterize @@ fun mode ->
   CI.job
     "docker:promote_to_latest"
     ~__POS__
     ~description:"Add the latest tag to the new Docker images."
     ~image:Images_external.docker
     ~stage:Publish
-    ~needs_legacy:[(Job, job_docker_merge `test `auto)]
+    ~needs_legacy:
+      (match mode with
+      | `test_wait ->
+          (* In pipelines other than latest release pipelines,
+             we want to wait for the Docker image to exist. *)
+          [(Job, job_docker_merge `test `auto)]
+      | `test | `real ->
+          (* In latest release pipelines, the Docker image already exists,
+             as it was created by another pipeline (the tag pipeline). *)
+          [])
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    ~variables:[("DOCKER_VERSION", docker_version); ("CI_DOCKER_HUB", "false")]
+    ~variables:
+      [
+        ("DOCKER_VERSION", docker_version);
+        ( "CI_DOCKER_HUB",
+          match mode with `test | `test_wait -> "false" | `real -> "true" );
+      ]
     [
       "./scripts/ci/docker_initialize.sh";
       "./scripts/ci/docker_promote_to_latest.sh";
@@ -255,7 +270,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
-      (Auto, job_docker_promote_to_latest);
+      (Auto, job_docker_promote_to_latest `test_wait);
     ] ;
   (* Minor *)
   Cacio.register_jobs
@@ -272,7 +287,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
-      (Auto, job_docker_promote_to_latest);
+      (Auto, job_docker_promote_to_latest `test_wait);
     ] ;
   (* Beta *)
   Cacio.register_jobs
@@ -306,6 +321,13 @@ let () =
   Cacio.register_jobs
     Test_publish_release_page
     [(Manual, job_release_page `test `wait_for_nothing)] ;
+  (* Octez Latest Release *)
+  Cacio.register_jobs
+    Octez_latest_release
+    [(Auto, job_docker_promote_to_latest `real)] ;
+  Cacio.register_jobs
+    Octez_latest_release_test
+    [(Auto, job_docker_promote_to_latest `test)] ;
   ()
 
 (** Create an Octez release tag pipeline of type {!pipeline_type},
