@@ -354,7 +354,7 @@ let handle_msg (state : t) msg =
   let* () =
     P2p_reader_event.(emit read_message) (state.gid, P2p_message.Message msg)
   in
-  let* _throttled = throttle state msg in
+  let* throttled = throttle state msg in
   match msg with
   | Get_current_branch chain_id ->
       (Peer_metadata.incr meta @@ Received_request Branch ;
@@ -556,19 +556,23 @@ let handle_msg (state : t) msg =
       [@profiler.span_s {verbosity = Notice} ["Operation"]])
   | Get_protocols hashes ->
       (Peer_metadata.incr meta @@ Received_request Protocols ;
-       List.iter_p
-         (fun hash ->
-           let* o = Store.Protocol.read state.disk hash in
-           match o with
-           | None ->
-               Peer_metadata.incr meta @@ Unadvertised Protocol ;
-               Lwt.return_unit
-           | Some p ->
-               Peer_metadata.update_responses meta Protocols
-               @@ P2p.try_send state.p2p state.conn
-               @@ Protocol p ;
-               Lwt.return_unit)
-         hashes)
+       (* Debouncing: serving protocol data is expensive; drop the request if
+          the peer is sending too many. *)
+       if throttled then return_unit
+       else
+         List.iter_p
+           (fun hash ->
+             let* o = Store.Protocol.read state.disk hash in
+             match o with
+             | None ->
+                 Peer_metadata.incr meta @@ Unadvertised Protocol ;
+                 Lwt.return_unit
+             | Some p ->
+                 Peer_metadata.update_responses meta Protocols
+                 @@ P2p.try_send state.p2p state.conn
+                 @@ Protocol p ;
+                 Lwt.return_unit)
+           hashes)
       [@profiler.span_s {verbosity = Notice} ["Get_protocols"]]
   | Protocol protocol ->
       (let hash = Protocol.hash protocol in
