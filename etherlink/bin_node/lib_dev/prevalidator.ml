@@ -83,7 +83,7 @@ end
 type mode = Minimal | Full
 
 module Types = struct
-  type etherlink_infos = {
+  type tezosx_infos = {
     minimum_base_fee_per_gas : Z.t;
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
@@ -95,7 +95,7 @@ module Types = struct
     state : Evm_state.t;
     ctxt : Evm_ro_context.t;
     storage_version : int;
-    etherlink_infos : etherlink_infos;
+    tezosx_infos : tezosx_infos;
   }
 
   let read state = Evm_ro_context.read_state state
@@ -107,7 +107,7 @@ module Types = struct
     in
     return da_fee_per_bytes
 
-  let etherlink_infos_of_state state =
+  let tezosx_infos_of_state state =
     let open Lwt_result_syntax in
     let* (Qty base_fee_per_gas) =
       Lwt.catch
@@ -143,8 +143,8 @@ module Types = struct
     let* storage_version = Durable_storage.storage_version (read state) in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
-        let* etherlink_infos = etherlink_infos_of_state state in
-        return {state; ctxt; storage_version; etherlink_infos}
+        let* tezosx_infos = tezosx_infos_of_state state in
+        return {state; ctxt; storage_version; tezosx_infos}
     | L2_types.Ex_chain_family Michelson ->
         let*! da_fee_result = da_fee_per_bytes_of_state state in
         let* da_fee_per_bytes =
@@ -161,7 +161,7 @@ module Types = struct
             storage_version;
             (* Michelson chains do not use EVM gas semantics, only
                da_fee_per_bytes is meaningful here. *)
-            etherlink_infos =
+            tezosx_infos =
               {
                 minimum_base_fee_per_gas = Z.zero;
                 base_fee_per_gas = Z.zero;
@@ -320,10 +320,10 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
       ~access_list
       ~authorization_list_len
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~gas_limit
       data
   in
@@ -333,8 +333,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
   then
     if
       Compare.Z.(
-        execution_gas_limit
-        <= session.etherlink_infos.maximum_gas_per_transaction)
+        execution_gas_limit <= session.tezosx_infos.maximum_gas_per_transaction)
     then return (Ok ())
     else
       return
@@ -343,7 +342,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
               "Gas limit for execution is too high. Maximum limit is %a, \
                transaction has %a"
               Z.pp_print
-              session.etherlink_infos.maximum_gas_per_transaction
+              session.tezosx_infos.maximum_gas_per_transaction
               Z.pp_print
               execution_gas_limit))
   else return (Ok ())
@@ -534,8 +533,8 @@ let validate_minimum_gas_requirement ~session
   in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~authorization_list_len
       data
   in
@@ -588,7 +587,7 @@ let validate_balance_and_gas_with_backend ~caller session transaction =
   in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:(Qty session.etherlink_infos.base_fee_per_gas)
+      ~base_fee_per_gas:(Qty session.tezosx_infos.base_fee_per_gas)
       ~transaction
       ~from_balance
   in
@@ -691,11 +690,11 @@ module Handlers = struct
     let open Tezos_types.Tez in
     let read = Types.read session.state in
     let michelson_to_evm_gas_multiplier =
-      ctxt.session.etherlink_infos.michelson_to_evm_gas_multiplier
+      ctxt.session.tezosx_infos.michelson_to_evm_gas_multiplier
     in
     let nanotez_per_evm_gas =
       Tezos_types.Tez.(
-        nanotez_of_wei (Wei session.etherlink_infos.base_fee_per_gas))
+        nanotez_of_wei (Wei session.tezosx_infos.base_fee_per_gas))
     in
     let nanotez_per_michelson_gas =
       let (Nanotez per_evm_gas) = nanotez_per_evm_gas in
@@ -877,7 +876,7 @@ let get_da_fee_per_byte () =
   let* w = get_worker () in
   let state = Worker.state w in
   let da_fee_wei =
-    Tezos_types.Tez.Wei state.session.etherlink_infos.da_fee_per_bytes
+    Tezos_types.Tez.Wei state.session.tezosx_infos.da_fee_per_bytes
   in
   return (Tezos_types.Tez.nanotez_of_wei da_fee_wei)
 
