@@ -38,7 +38,6 @@ let job_container_scanning image : tezos_job =
       ]
     ~description:(Format.sprintf "Scanning image %s" (image_ref image))
     ~artifacts:(artifacts ["gl-container-scanning-report.json"])
-    ~git_strategy:Fetch
     [". ./scripts/ci/container_scanning_generate_reports.sh"]
 
 let job_container_scanning_slack_notification image : tezos_job =

@@ -72,7 +72,6 @@ container_scanning:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    GIT_STRATEGY: fetch
     REPORT: gl-container-scanning-report.json
     FULL_IMAGE_NAME: tezos/tezos:octez-v22.0-rc3
   artifacts:
