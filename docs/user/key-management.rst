@@ -328,10 +328,7 @@ your manager key directly for signing consensus operations.
 Do I Need a Companion Key?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A companion key is only required if **both** of the following conditions are true:
-
-1. Your active consensus key (or baking (manager) key, if a different consensus key is not active) is a **tz4** (BLS) key.
-2. You want your baker to include **DAL attestations** in its consensus operations.
+A companion key is only required if your consensus key (or delegate key, if no consensus key is set) is a **tz4** (BLS) key: in this case, without the companion key you cannot participate to the DAL (and get the corresponding  rewards).
 
 If you use a tz1, tz2, or tz3 consensus key, you do **not** need a companion key---DAL attestations are signed with the consensus key directly.
 
