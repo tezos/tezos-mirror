@@ -1983,7 +1983,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2019,7 +2019,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2055,7 +2055,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2105,7 +2105,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2173,7 +2173,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2236,7 +2236,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -2281,7 +2281,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2359,7 +2359,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2441,7 +2441,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2537,7 +2537,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2658,7 +2658,7 @@ mod tests {
         let res = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -2797,7 +2797,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -2916,7 +2916,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3000,7 +3000,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3069,7 +3069,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation.clone(),
@@ -3155,7 +3155,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &ctx,
             OperationHash::default(),
             batch.clone(),
@@ -3342,7 +3342,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &ctx,
             OperationHash::default(),
             batch,
@@ -3439,7 +3439,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             batch,
@@ -3556,7 +3556,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -3780,7 +3780,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -3946,7 +3946,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -4012,7 +4012,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -4082,7 +4082,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -4163,7 +4163,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -4362,7 +4362,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation.clone(),
@@ -4591,7 +4591,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &ctx,
             OperationHash::default(),
             batch.clone(),
@@ -4870,7 +4870,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -4948,7 +4948,7 @@ mod tests {
         let receipts1 = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -4992,7 +4992,7 @@ mod tests {
         let receipts2 = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -5037,7 +5037,7 @@ mod tests {
         let receipts3 = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -5090,7 +5090,7 @@ mod tests {
         let receipts4 = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -5186,7 +5186,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -5294,7 +5294,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             ctx.host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             ctx.context,
             OperationHash::default(),
             operation,
@@ -5594,7 +5594,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             ctx.host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context,
             OperationHash::default(),
             operation,
@@ -5842,7 +5842,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             ctx.host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             ctx.context,
             OperationHash::default(),
             operation,
@@ -5909,7 +5909,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &registry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -5986,7 +5986,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -6038,7 +6038,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             batch,
@@ -6091,7 +6091,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -6145,7 +6145,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
-            &mut TezosXJournal::new(),
+            &mut TezosXJournal::default(),
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -6193,7 +6193,7 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let receipts = validate_and_apply_operation(
             &mut host,
             &registry,
@@ -6264,7 +6264,7 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let receipts = validate_and_apply_operation(
             &mut host,
             &registry,
@@ -6365,7 +6365,7 @@ mod tests {
             },
         );
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let receipts = validate_and_apply_operation(
             &mut host,
             &RevertRegistry,

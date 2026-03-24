@@ -11,14 +11,14 @@
 //! headers produce a `HeaderError`.
 
 pub use tezosx_interfaces::{
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_TIMESTAMP,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use alloy_primitives::{hex::FromHex, Address, U256 as AlloyU256};
 use primitive_types::U256;
 use tezosx_interfaces::headers::{
-    parse_tez_to_wei, require_str, require_u32, require_u64,
+    parse_str, parse_tez_to_wei, require_str, require_u32, require_u64,
 };
 use tezosx_interfaces::TezosXRuntimeError;
 
@@ -36,6 +36,10 @@ pub struct EthereumHeaders {
     pub timestamp: U256,
     /// Block level.
     pub block_number: U256,
+    /// CRAC-ID from `X-Tezos-CRAC-ID` (present for incoming CRACs).
+    pub crac_id: Option<String>,
+    /// Source address from `X-Tezos-Source` (present for incoming CRACs).
+    pub source: Option<Address>,
 }
 
 /// Parse `X-Tezos-*` headers from `headers`.
@@ -46,12 +50,23 @@ pub fn parse_request_headers(
     headers: &http::HeaderMap,
 ) -> Result<EthereumHeaders, TezosXRuntimeError> {
     let amount_wei = require_tez_as_wei(headers, X_TEZOS_AMOUNT)?;
+    let crac_id = parse_str(headers, X_TEZOS_CRAC_ID)?;
+    let source = match parse_str(headers, X_TEZOS_SOURCE)? {
+        Some(s) => Some(Address::from_hex(&s).map_err(|e| {
+            TezosXRuntimeError::HeaderError(format!(
+                "Invalid {X_TEZOS_SOURCE}: expected hex EVM address: {e}"
+            ))
+        })?),
+        None => None,
+    };
     Ok(EthereumHeaders {
         sender: require_address(headers, X_TEZOS_SENDER)?,
         amount: amount_wei,
         gas_limit: require_u64(headers, X_TEZOS_GAS_LIMIT)?,
         timestamp: U256::from(require_u64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: U256::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
+        crac_id,
+        source,
     })
 }
 

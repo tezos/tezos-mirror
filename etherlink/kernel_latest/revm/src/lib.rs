@@ -890,7 +890,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -940,7 +940,7 @@ mod test {
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let alias = registry
             .generate_alias(
                 &mut host,
@@ -983,7 +983,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1023,7 +1023,7 @@ mod test {
         let caller = Address::from(&[1; 20]);
         let destination = Address::from(&[2; 20]);
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let alias = registry
             .generate_alias(
                 &mut host,
@@ -1062,7 +1062,7 @@ mod test {
         .abi_encode();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1159,7 +1159,7 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -1220,7 +1220,7 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result = run_transaction(
             &mut host,
             &registry,
@@ -1313,7 +1313,7 @@ mod test {
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals,
@@ -1401,7 +1401,7 @@ mod test {
             .abi_encode();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
             &registry,
@@ -1468,7 +1468,7 @@ mod test {
             .unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -1501,7 +1501,7 @@ mod test {
         };
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result_call = run_transaction(
             &mut host,
             &registry,
@@ -1545,7 +1545,7 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -1629,7 +1629,7 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals: _,
@@ -1692,7 +1692,7 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CreateAndRevert contract
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result_create = run_transaction(
             &mut host,
             &registry,
@@ -1732,7 +1732,7 @@ mod test {
 
         let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let ExecutionOutcome {
             result,
             withdrawals: _,
@@ -1814,7 +1814,7 @@ mod test {
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let registry = Registry::new();
         run_transaction(
             &mut host,
@@ -1880,7 +1880,7 @@ mod test {
         assert_eq!(destination_info.balance, U256::ZERO);
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let result = run_transaction(
             &mut host,
             &registry,
@@ -1930,7 +1930,7 @@ mod test {
         };
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             &mut host,
             &registry,
@@ -1954,7 +1954,7 @@ mod test {
 
         assert!(outcome.result.is_success());
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             &mut host,
             &registry,
@@ -2136,7 +2136,7 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
-            let mut journal = TezosXJournal::new();
+            let mut journal = TezosXJournal::default();
             let outcome = run_transaction(
                 host,
                 &registry,
@@ -2170,7 +2170,7 @@ mod test {
                     },
                 )
                 .unwrap();
-            let mut journal = TezosXJournal::new();
+            let mut journal = TezosXJournal::default();
             let registry = Registry::new();
             run_transaction(
                 host,
@@ -2216,7 +2216,7 @@ mod test {
                     },
                 )
                 .unwrap();
-            let mut journal = TezosXJournal::new();
+            let mut journal = TezosXJournal::default();
             let registry = Registry::new();
             run_transaction(
                 host,
@@ -2256,7 +2256,7 @@ mod test {
                 )
                 .unwrap();
             let registry = Registry::new();
-            let mut journal = TezosXJournal::new();
+            let mut journal = TezosXJournal::default();
             let result_create = run_transaction(
                 host,
                 &registry,
@@ -2939,7 +2939,7 @@ mod test {
         contract_account.set_info(&mut host, contract_info).unwrap();
 
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let execution_result = run_transaction(
             &mut host,
             &registry,
@@ -2985,7 +2985,7 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,
@@ -3067,7 +3067,7 @@ mod test {
 
         // Create the Ethereum alias - this should forward the pre-existing balance
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,
@@ -3118,7 +3118,7 @@ mod test {
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let alias_bytes = registry
             .generate_alias(
                 &mut host,

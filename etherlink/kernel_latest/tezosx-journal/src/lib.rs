@@ -8,7 +8,7 @@ mod layered_state;
 mod michelson_journal;
 mod tezosx_journal;
 
-pub use evm_journal::EvmJournal;
+pub use evm_journal::{CracTransactionInfo, EvmJournal};
 pub use layered_state::LayeredState;
 pub use michelson_journal::MichelsonJournal;
-pub use tezosx_journal::{HttpTrace, TezosXJournal};
+pub use tezosx_journal::{CracId, HttpTrace, TezosXJournal};

@@ -114,7 +114,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let response = registry.serve(&mut host, &mut journal, request).unwrap();
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
@@ -131,7 +131,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let response = registry.serve(&mut host, &mut journal, request).unwrap();
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();

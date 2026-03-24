@@ -552,6 +552,9 @@ pub trait CrossRuntimeCall {
         &mut self,
         http_request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, CustomPrecompileError>;
+
+    /// Get the CRAC-ID for the current transaction.
+    fn crac_id(&self) -> String;
 }
 
 impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, EtherlinkVMDB<'a, Host, R>>
@@ -603,6 +606,10 @@ where
                     "Cross-runtime HTTP call failed: {e:?}"
                 ))
             })
+    }
+
+    fn crac_id(&self) -> String {
+        self.journal.crac_id().to_string()
     }
 }
 

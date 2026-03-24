@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    apply::RuntimeExecutionInfo,
+    apply::{extract_cross_runtime_effects, RuntimeExecutionInfo},
     block_in_progress::BlockInProgress,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -704,7 +704,8 @@ impl ChainConfigTrait for EvmChainConfig {
                 &self.limits,
             ),
             TezosXTransaction::Tezos(operation) => {
-                let mut journal = TezosXJournal::new();
+                let crac_id = tezosx_journal::CracId::new(0, index);
+                let mut journal = TezosXJournal::new(crac_id);
                 apply_tezos_operation(
                     &self.michelson_chain_config.chain_id,
                     block_in_progress,
@@ -1016,8 +1017,14 @@ where
                 push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             }
 
+            // Extract cross-runtime side effects from the journal.
+            let cross_runtime_effects = extract_cross_runtime_effects(journal);
+
             Ok(crate::apply::ExecutionResult::Valid(
-                RuntimeExecutionInfo::Tezos(applied_operation),
+                RuntimeExecutionInfo::Tezos {
+                    op: applied_operation,
+                    cross_runtime_effects,
+                },
             ))
         }
         TezlinkContent::Deposit(deposit) => {
@@ -1056,7 +1063,10 @@ where
                 ),
             };
             Ok(crate::apply::ExecutionResult::Valid(
-                RuntimeExecutionInfo::Tezos(applied_operation),
+                RuntimeExecutionInfo::Tezos {
+                    op: applied_operation,
+                    cross_runtime_effects: Vec::new(),
+                },
             ))
         }
     }
@@ -1182,7 +1192,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
         transaction: TezosXTransaction,
-        _index: u32,
+        index: u32,
         sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
         skip_signature_check: bool,
@@ -1196,7 +1206,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
             }
             TezosXTransaction::Tezos(operation) => {
-                let mut journal = TezosXJournal::new();
+                let crac_id = tezosx_journal::CracId::new(0, index);
+                let mut journal = TezosXJournal::new(crac_id);
                 apply_tezos_operation(
                     &self.chain_id,
                     block_in_progress,
@@ -1333,7 +1344,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // During simulation, skip the fee check: the client sends fee=0
         // because it doesn't know the fees yet (that's what simulation computes).
         // The OCaml node-side prevalidation also skips fees during simulation.
-        let mut tezosx_journal = TezosXJournal::new();
+        let mut tezosx_journal = TezosXJournal::default();
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,

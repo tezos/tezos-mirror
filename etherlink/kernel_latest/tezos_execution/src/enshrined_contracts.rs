@@ -758,7 +758,7 @@ mod tests {
         calldata.extend_from_slice(&selector);
         calldata.extend_from_slice(&abi_params);
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &calldata);
@@ -800,7 +800,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000u64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount as i64);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -836,7 +836,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First transfer creates aliases (sender + source)
@@ -1067,7 +1067,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 0i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1092,7 +1092,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = -1i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1122,7 +1122,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 100i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1148,7 +1148,7 @@ mod tests {
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, 0);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1436,7 +1436,7 @@ mod tests {
         // 1_000_000 mutez = 1 TEZ
         let amount = 1_000_000i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1461,7 +1461,7 @@ mod tests {
         // 1 mutez = 0.000001 TEZ
         let amount = 1i64;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);

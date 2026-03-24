@@ -307,7 +307,8 @@ where
     // For Tezos transactions, call apply_tezos_operation directly with an
     // external journal so we can capture HTTP traces.  For Ethereum
     // transactions, go through the normal apply_transaction path.
-    let mut trace_journal = tezosx_journal::TezosXJournal::new();
+    let mut trace_journal =
+        tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(0, 0));
     let execution_result = match transaction {
         chains::TezosXTransaction::Tezos(operation) => chains::apply_tezos_operation(
             &evm_config.michelson_chain_config().chain_id,
@@ -363,7 +364,7 @@ where
     }
 
     let applied_operation = match execution_result {
-        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos(op)) => op,
+        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos { op, .. }) => op,
         ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
             log!(
                 host,

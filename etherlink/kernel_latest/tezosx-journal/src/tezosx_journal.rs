@@ -2,8 +2,38 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt;
+
 use crate::{EvmJournal, MichelsonJournal};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+
+/// Unique identifier for a cross-runtime call chain within a block.
+///
+/// Composed of the origin runtime and the transaction index within
+/// the block. Known at journal creation time.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CracId {
+    /// Runtime that originated the transaction (0 = Tezos, 1 = Ethereum).
+    pub origin_runtime: u8,
+    /// Transaction index within the block.
+    pub tx_index: u32,
+}
+
+impl CracId {
+    /// Create a CracId for a given runtime and transaction index.
+    pub fn new(origin_runtime: u8, tx_index: u32) -> Self {
+        Self {
+            origin_runtime,
+            tx_index,
+        }
+    }
+}
+
+impl fmt::Display for CracId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-{}", self.origin_runtime, self.tx_index)
+    }
+}
 
 /// A single HTTP request/response pair captured during cross-runtime execution.
 /// Nested calls are recorded in [inner_traces].
@@ -138,7 +168,7 @@ impl HttpTrace {
 /// HTTP traces are recorded with proper nesting: when a cross-runtime call
 /// triggers further cross-runtime calls, the inner calls appear in the
 /// parent trace's [inner_traces] field.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct TezosXJournal {
     pub evm: EvmJournal,
     pub michelson: MichelsonJournal,
@@ -146,11 +176,17 @@ pub struct TezosXJournal {
     finalized_http_traces: Vec<HttpTrace>,
     /// Stack of in-progress traces (pending response).
     pending_http_traces: Vec<HttpTrace>,
+    /// CRAC-ID for the current transaction context.
+    /// Known at creation time from the origin runtime and tx index.
+    crac_id: CracId,
 }
 
 impl TezosXJournal {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(crac_id: CracId) -> Self {
+        Self {
+            crac_id,
+            ..Default::default()
+        }
     }
 
     /// Record an HTTP request. The trace is pushed onto an internal stack;
@@ -183,15 +219,79 @@ impl TezosXJournal {
     pub fn into_http_traces(self) -> Vec<HttpTrace> {
         self.finalized_http_traces
     }
+
+    /// Get the CRAC-ID for this transaction context.
+    pub fn crac_id(&self) -> &CracId {
+        &self.crac_id
+    }
+
+    /// Verify that a received CRAC-ID (from `X-Tezos-CRAC-ID` header)
+    /// matches the expected one. Used for debug/consistency checks on
+    /// incoming CRACs.
+    pub fn verify_crac_id(&self, received: &str) -> Result<(), anyhow::Error> {
+        let expected = self.crac_id.to_string();
+        if received == expected {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "CRAC-ID mismatch: expected '{}', received '{}'",
+                expected,
+                received
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn test_crac_id() -> CracId {
+        CracId {
+            origin_runtime: 1,
+            tx_index: 42,
+        }
+    }
+
+    #[test]
+    fn test_crac_id_available_from_creation() {
+        let journal = TezosXJournal::new(test_crac_id());
+        assert_eq!(journal.crac_id().origin_runtime, 1);
+        assert_eq!(journal.crac_id().tx_index, 42);
+        assert_eq!(journal.crac_id().to_string(), "1-42");
+    }
+
+    #[test]
+    fn test_verify_crac_id_matching() {
+        let journal = TezosXJournal::new(test_crac_id());
+        assert!(journal.verify_crac_id("1-42").is_ok());
+    }
+
+    #[test]
+    fn test_verify_crac_id_mismatch() {
+        let journal = TezosXJournal::new(test_crac_id());
+        assert!(journal.verify_crac_id("0-99").is_err());
+    }
+
+    #[test]
+    fn test_crac_id_display() {
+        let id = CracId {
+            origin_runtime: 0,
+            tx_index: 7,
+        };
+        assert_eq!(id.to_string(), "0-7");
+    }
+
+    #[test]
+    fn test_crac_id_is_stable() {
+        let j1 = TezosXJournal::new(test_crac_id());
+        let j2 = TezosXJournal::new(test_crac_id());
+        assert_eq!(j1.crac_id(), j2.crac_id());
+    }
+
     #[test]
     fn test_record_request_and_response() {
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::new(test_crac_id());
 
         let request = http::Request::builder()
             .method("POST")
@@ -224,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_nested_traces() {
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::new(test_crac_id());
 
         // Outer call: EVM → Tezos
         let req1 = http::Request::builder()

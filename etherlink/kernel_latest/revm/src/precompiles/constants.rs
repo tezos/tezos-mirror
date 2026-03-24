@@ -132,10 +132,17 @@ pub const FA12_WRAPPER_SOL_ADDR: Address = Address(FixedBytes::new([
 /// This address is used when the actual caller doesn't have an Ethereum-format
 /// address (e.g., when initializing aliases for Tezos addresses). We use a specific
 /// non-zero address because the zero address is reserved for simulation.
-pub const TEZOSX_CALLER_ADDRESS: Address = Address::new([
+const TEZOSX_CALLER_ADDRESS_BYTES: [u8; 20] = [
     0x7e, 0x20, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-]);
+];
+
+pub const TEZOSX_CALLER_ADDRESS: Address = Address::new(TEZOSX_CALLER_ADDRESS_BYTES);
+
+/// Same address as [`TEZOSX_CALLER_ADDRESS`] but as `primitive_types::H160`,
+/// for use in contexts that don't depend on alloy types.
+pub const TEZOSX_CALLER_H160: primitive_types::H160 =
+    primitive_types::H160(TEZOSX_CALLER_ADDRESS_BYTES);
 
 #[cfg(test)]
 pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([

@@ -5,7 +5,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
+use crate::apply::{
+    CrossRuntimeEffect, EthereumExecutionInfo, EvmCracEffect, RuntimeExecutionInfo,
+    TransactionReceiptInfo,
+};
 use crate::block_storage;
 use crate::blueprint_storage::{
     read_current_tez_block_header, store_current_tez_block_header, TezBlockHeader,
@@ -25,6 +28,7 @@ use anyhow::Context;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
+use revm_etherlink::precompiles::constants::TEZOSX_CALLER_H160;
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
@@ -32,7 +36,7 @@ use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionHash, TransactionObject, TransactionReceipt,
-    TransactionStatus, TRANSACTION_HASH_SIZE,
+    TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::Logging;
@@ -422,7 +426,10 @@ impl BlockInProgress {
                 self.cumulative_receipts.push(receipt);
                 self.cumulative_tx_objects.push(tx_object);
             }
-            RuntimeExecutionInfo::Tezos(operation_and_receipt) => {
+            RuntimeExecutionInfo::Tezos {
+                op: operation_and_receipt,
+                cross_runtime_effects,
+            } => {
                 let OperationDataAndMetadata::OperationWithMetadata(batch) =
                     &operation_and_receipt.op_and_receipt;
                 let michelson_milligas_used: u64 = batch
@@ -441,6 +448,14 @@ impl BlockInProgress {
                 self.cumulative_tezos_operation_receipts
                     .list
                     .push(operation_and_receipt);
+
+                for effect in cross_runtime_effects {
+                    match effect {
+                        CrossRuntimeEffect::Evm(evm_effect) => {
+                            self.register_crac_evm_transaction(evm_effect)?;
+                        }
+                    }
+                }
             }
         };
         Ok(())
@@ -613,6 +628,85 @@ impl BlockInProgress {
                 TransactionStatus::Failure
             },
         }
+    }
+
+    /// Build and register a fake EVM transaction from accumulated CRAC
+    /// execution data. This transaction appears in the EVM block as if
+    /// it were a regular transaction, carrying all logs emitted during
+    /// cross-runtime calls from a foreign runtime.
+    fn register_crac_evm_transaction(
+        &mut self,
+        effect: EvmCracEffect,
+    ) -> Result<(), anyhow::Error> {
+        use sha3::{Digest, Keccak256};
+
+        // Compute deterministic tx hash from CRAC-ID.
+        let mut hasher = Keccak256::new();
+        hasher.update(b"CRAC-TX");
+        hasher.update(effect.crac_id.as_bytes());
+        let hash_bytes: [u8; 32] = hasher.finalize().into();
+
+        // The handler address is the constant TezosX caller, not the
+        // originator. `to` is the alias of the top-level originator.
+        let from = TEZOSX_CALLER_H160;
+        let to = Some(effect.source);
+        let index = self.index;
+        let block_number = self.number;
+        let gas_used = effect.gas_used;
+
+        // Build indexed logs from the accumulated CRAC logs.
+        let logs: Vec<IndexedLog> = effect
+            .logs
+            .iter()
+            .enumerate()
+            .map(|(i, log)| IndexedLog {
+                log: alloy_to_log(log),
+                index: i as u64 + self.logs_offset,
+            })
+            .collect();
+        self.logs_offset += logs.len() as u64;
+
+        let logs_bloom = TransactionReceipt::logs_to_bloom(&logs);
+        self.logs_bloom.accrue_bloom(&logs_bloom);
+
+        let receipt = TransactionReceipt {
+            hash: hash_bytes,
+            index,
+            block_number,
+            from,
+            to,
+            cumulative_gas_used: self.cumulative_gas,
+            effective_gas_price: U256::zero(),
+            gas_used,
+            contract_address: None,
+            logs_bloom,
+            logs,
+            type_: TransactionType::Legacy,
+            status: TransactionStatus::Success,
+        };
+
+        let tx_object = TransactionObject {
+            block_number,
+            from,
+            gas: gas_used,
+            gas_price: U256::zero(),
+            hash: hash_bytes,
+            input: Vec::new(),
+            nonce: 0,
+            to,
+            index,
+            value: effect.amount,
+            signature: None,
+        };
+
+        self.add_gas(gas_used)?;
+        self.cumulative_execution_gas += gas_used;
+        self.valid_txs.push(hash_bytes);
+        self.index += 1;
+        self.cumulative_receipts.push(receipt);
+        self.cumulative_tx_objects.push(tx_object);
+
+        Ok(())
     }
 
     #[cfg(test)]

@@ -493,7 +493,7 @@ impl Evaluation {
         info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
         simulation_caller.set_info_without_code(host, info)?;
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let sim_result = match revm_run_transaction(
             host,
             registry,
@@ -804,7 +804,7 @@ mod tests {
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
         let registry = RegistryImpl::default();
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let outcome = run_transaction(
             host,
             &registry,

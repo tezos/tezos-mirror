@@ -23,6 +23,7 @@ pub const X_TEZOS_GAS_LIMIT: &str = "X-Tezos-Gas-Limit";
 pub const X_TEZOS_GAS_CONSUMED: &str = "X-Tezos-Gas-Consumed";
 pub const X_TEZOS_TIMESTAMP: &str = "X-Tezos-Timestamp";
 pub const X_TEZOS_BLOCK_NUMBER: &str = "X-Tezos-Block-Number";
+pub const X_TEZOS_CRAC_ID: &str = "X-Tezos-CRAC-ID";
 
 /// Error message emitted when a user supplies an X-Tezos-* header that must
 /// only be injected by the trusted gateway.
