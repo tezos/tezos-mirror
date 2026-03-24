@@ -183,17 +183,6 @@ module Docker = struct
       ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
       ~ci_docker_hub
       ["./scripts/ci/docker_merge_manifests.sh"]
-
-  let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
-    job_docker_authenticated
-      ~__POS__
-      ?dependencies
-      ~stage:Stages.publish
-      ~name:"docker:promote_to_latest"
-      ~ci_docker_hub
-      ["./scripts/ci/docker_promote_to_latest.sh"]
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~tag:Gcp_not_interruptible
 end
 
 (** {2 Helpers for Debian/RPM packaging jobs} *)
