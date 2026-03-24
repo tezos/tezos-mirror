@@ -1006,6 +1006,24 @@ let () =
         trace
 
 let () =
+  register_test
+    ~title:
+      "Test update_operator: remove operator for non-operator has no effect"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, operator) = Context.init2 ~consensus_threshold_size:0 () in
+  let* op =
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Remove)]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%operator_update" events
+  in
+  let* is_operator = is_operator_view ~owner ~operator b in
+  Assert.equal_bool ~loc:__LOC__ false is_operator
+
+let () =
   register_test ~title:"Test adding operator on finite allowance" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, (owner, account) = Context.init2 ~consensus_threshold_size:0 () in
