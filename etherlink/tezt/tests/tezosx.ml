@@ -1121,22 +1121,37 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
     ~tags:["rpc"]
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
-  let tezos_address = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
-  let expected = "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2" in
-  let* rpc_result =
-    Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
+  let check_rpc_result tezos_address expected_evm_address_opt =
+    let* rpc_result =
+      Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
+    in
+    match (rpc_result, expected_evm_address_opt) with
+    | Ok evm_address, Some expected ->
+        Check.(
+          (evm_address = expected) string ~error_msg:"Expected %R but got %L") ;
+        unit
+    | Error _, None -> unit
+    | Error err, Some _ ->
+        Test.fail
+          "Could not get the EVM address corresponding to the Tezos address \
+           %s: %s"
+          tezos_address
+          err.Rpc.message
+    | Ok evm_address, None ->
+        Test.fail
+          "Expected an error for address %s but got the result %s"
+          tezos_address
+          evm_address
   in
-  match rpc_result with
-  | Ok evm_address ->
-      Check.(
-        (evm_address = expected) string ~error_msg:"Expected %R but got %L") ;
-      unit
-  | Error err ->
-      Test.fail
-        "Could not get the EVM address corresponding to the Tezos address %s: \
-         %s"
-        tezos_address
-        err.Rpc.message
+  let* () =
+    check_rpc_result
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Some "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2")
+  in
+  (* TODO https://linear.app/tezos/issue/L2-1100/kt1-dont-have-aliases-in-tezos-x
+     The RPC currently rejects KT1 addresses due to an encoding bug. Once
+     fixed, this should succeed and return the correct alias. *)
+  check_rpc_result "KT1Uik8kf8QBs4JoFCbeJBVaEwozebEjoEXQ" None
 
 let test_get_ethereum_tezos_address_rpc ~runtime () =
   Setup.register_sandbox_test
@@ -1355,6 +1370,12 @@ let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
     Runtime bytecode: PUSH1 04 | CALLDATALOAD | PUSH1 00 | SSTORE | STOP
     = 60 04 35 60 00 55 00 (7 bytes) *)
 let evm_storer_init_code = "600780600b6000396000f360043560005500"
+
+(** Init code for a minimal EVM contract that stores msg.sender (CALLER) in
+    slot 0 and stops.
+    Runtime bytecode: CALLER | PUSH1 00 | SSTORE | STOP
+    = 33 60 00 55 00 (5 bytes) *)
+let evm_caller_storer_init_code = "600580600b6000396000f33360005500"
 
 (** Init code for a minimal EVM contract that always REVERTs.
     Runtime bytecode: PUSH1 00 | PUSH1 00 | REVERT
@@ -3248,6 +3269,65 @@ let test_cross_runtime_evm_sender_is_alias =
   Check.((storage = expected) string ~error_msg:"Expected %R but got %L") ;
   unit
 
+(** Test cross-runtime Michelson to EVM: msg.sender is the Ethereum alias of
+    the Michelson source. *)
+let test_cross_runtime_michelson_sender_is_alias =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Cross-runtime Michelson to EVM: msg.sender is alias of Michelson source"
+    ~tags:["cross_runtime"; "sender"; "alias"]
+    ~with_runtimes:[Tezos]
+  @@ fun ({sequencer; _} as setup) _protocol ->
+  let source = Constant.bootstrap1 in
+  (* Step 1: Deploy an EVM contract that stores msg.sender (CALLER) in slot 0. *)
+  let deployer = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender:deployer
+      ~nonce:0
+      ~init_code:evm_caller_storer_init_code
+      ()
+  in
+  (* Step 2: Call the EVM contract from the Michelson source via the gateway. *)
+  let* () =
+    michelson_to_evm_transfer
+      ~source
+      ~evm_destination:contract_address
+      ~transfer_amount:Tez.zero
+      ~call:("store()", "")
+      setup
+  in
+  (* Step 3: Read msg.sender recorded by the EVM contract. *)
+  let*@ stored_sender =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+  in
+  (* Step 4: Resolve the alias via the RPC. *)
+  let* alias_result =
+    Rpc.Tezosx.tez_getTezosEthereumAddress source.public_key_hash sequencer
+  in
+  let rpc_address = Result.get_ok alias_result in
+  (* TODO https://linear.app/tezos/issue/L2-1100/kt1-dont-have-aliases-in-tezos-x
+     The values below are currently not the expected ones. The checks will be
+     modified as we fix the behavior of the node. In the end, we'll check
+     equality (instead of difference right now). *)
+  Check.(
+    (stored_sender
+   = "0x000000000000000000000000ccef676171871a48bbd6e2be75bbcc09d38830c5")
+      string
+      ~error_msg:"Expected stored msg.sender %R but got %L") ;
+  Check.(
+    (rpc_address = "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2")
+      string
+      ~error_msg:"Expected RPC alias %R but got %L") ;
+  Check.(
+    (stored_sender <> rpc_address)
+      string
+      ~error_msg:
+        "Expected stored msg.sender and RPC alias to differ, but both are %L") ;
+  unit
+
 (** Transfer tez between two accounts on the Michelson runtime and verify
     that the receiver balance is updated. *)
 let test_tez_transfer =
@@ -3328,4 +3408,5 @@ let () =
   test_script_coherency_enshrined () ;
   test_trace_call_evm ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias [Alpha] ;
+  test_cross_runtime_michelson_sender_is_alias [Alpha] ;
   test_tez_transfer [Alpha]
