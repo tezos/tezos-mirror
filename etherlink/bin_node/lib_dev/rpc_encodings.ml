@@ -1227,12 +1227,11 @@ module Tezosx = struct
   module Get_tezos_ethereum_address = struct
     open Ethereum_types
 
-    type input = Signature.V2.public_key_hash
+    type input = Tezos_types.Contract.t
 
     type output = address
 
-    let input_encoding =
-      Data_encoding.tup1 Signature.V2.Public_key_hash.encoding
+    let input_encoding = Data_encoding.tup1 Tezos_types.Contract.encoding
 
     let output_encoding = address_encoding
 
