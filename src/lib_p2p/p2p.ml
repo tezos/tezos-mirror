@@ -742,6 +742,10 @@ let set_peer_metadata net = net.set_peer_metadata
 
 let connect net = net.connect
 
+let wait_reader_closed conn = P2p_conn.wait_reader_closed conn
+
+let wait_writer_closed conn = P2p_conn.wait_writer_closed conn
+
 let recv net = net.recv
 
 let recv_any net = net.recv_any ()
