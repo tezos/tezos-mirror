@@ -33,3 +33,7 @@ let rpc_directory () =
       match r with
       | Ok stats -> Tezos_rpc.Answer.return stats
       | Error err -> Tezos_rpc.Answer.fail [err])
+  |> fun dir ->
+  Tezos_rpc.Directory.gen_register dir Stat_services.S.gc_full (fun () () () ->
+      Gc.full_major () ;
+      Tezos_rpc.Answer.return ())

@@ -27,9 +27,14 @@ module S : sig
 
   val memory :
     ([`GET], unit, unit, unit, unit, Memory.mem_stats) Tezos_rpc.Service.service
+
+  val gc_full :
+    ([`POST], unit, unit, unit, unit, unit) Tezos_rpc.Service.service
 end
 
 val gc : #Tezos_rpc.Context.simple -> Gc.stat Error_monad.tzresult Lwt.t
 
 val memory :
   #Tezos_rpc.Context.simple -> Memory.mem_stats Error_monad.tzresult Lwt.t
+
+val gc_full : #Tezos_rpc.Context.simple -> unit Error_monad.tzresult Lwt.t
