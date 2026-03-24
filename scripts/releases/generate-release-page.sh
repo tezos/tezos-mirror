@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 # Generates the Octez release page HTML and RSS feed from a local versions.json.
 # The caller is responsible for providing versions.json beforehand

@@ -12,4 +12,4 @@
   -open Tezt
   -open Tezt.Base
   -open Base_lib)
- (modules main test_version_manager))
+ (modules main test_version_manager test_generate_release_page))
