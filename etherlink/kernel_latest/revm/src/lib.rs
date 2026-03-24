@@ -52,7 +52,7 @@ type EVMInnerContext<'a, Host, R> = Context<
     &'a TxEnv,
     CfgEnv,
     EtherlinkVMDB<'a, Host, R>,
-    Journal<'a, EtherlinkVMDB<'a, Host, R>>,
+    Journal<'a, Host, R>,
 >;
 
 type EvmContext<'a, Host, R> = Evm<
@@ -430,6 +430,12 @@ where
 
         let result = evm_context.inspect_one_tx(&tx)?;
 
+        if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            return Err(EVMError::Custom(format!(
+                "Michelson journal checkpoint error: {err}"
+            )));
+        }
+
         if let Some(cp) = credit_checkpoint {
             if result.is_success() {
                 evm_context.ctx.journaled_state.checkpoint_commit();
@@ -488,6 +494,12 @@ where
         };
 
         let result = execute_transaction(&mut evm_context, &tx, transaction_hash)?;
+
+        if let Some(err) = evm_context.ctx.journaled_state.take_deferred_error() {
+            return Err(EVMError::Custom(format!(
+                "Michelson journal checkpoint error: {err}"
+            )));
+        }
 
         if let Some(cp) = credit_checkpoint {
             if result.is_success() {

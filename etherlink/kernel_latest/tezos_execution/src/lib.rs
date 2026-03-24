@@ -22,7 +22,7 @@ use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Logging};
-use tezos_evm_runtime::safe_storage::{safe_path, SafeStorage};
+use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -660,6 +660,10 @@ where
     .map(Into::into)
 }
 
+fn gw<E: ToString>(e: E) -> TransferError {
+    TransferError::GatewayError(e.to_string())
+}
+
 /// Execute a cross-runtime transfer with automatic rollback on failure.
 ///
 /// Snapshots the world state before executing the transfer.  On success
@@ -686,14 +690,10 @@ where
     let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
 
     let world_state = tc_ctx.context.path();
-    let tmp_path = safe_path(&world_state)
-        .map_err(|e| TransferError::GatewayError(format!("safe_path: {e:?}")))?;
-
-    // start: snapshot the world state
-    tc_ctx
-        .host
-        .store_copy(&world_state, &tmp_path)
-        .map_err(|e| TransferError::GatewayError(format!("start: {e:?}")))?;
+    let checkpoint_index = journal
+        .michelson
+        .checkpoint(tc_ctx.host, &world_state)
+        .map_err(gw)?;
 
     let mut internal_receipts = Vec::new();
     match transfer(
@@ -721,19 +721,27 @@ where
                 .is_none_or(InternalOperationSum::is_applied);
             if all_internal_succeeded {
                 // promote: discard the snapshot, keep changes
-                let _ = tc_ctx.host.store_delete(&tmp_path);
+                journal
+                    .michelson
+                    .checkpoint_commit(tc_ctx.host, checkpoint_index)
+                    .map_err(gw)?;
                 Ok(success.into())
             } else {
                 // revert: restore the snapshot
-                let _ = tc_ctx.host.store_move(&tmp_path, &world_state);
+                journal
+                    .michelson
+                    .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
+                    .map_err(gw)?;
                 Err(TransferError::FailedToExecuteInternalOperation(
                     "internal operation failed during cross-runtime call".into(),
                 ))
             }
         }
         Err(e) => {
-            // revert: restore the snapshot
-            let _ = tc_ctx.host.store_move(&tmp_path, &world_state);
+            journal
+                .michelson
+                .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
+                .map_err(gw)?;
             Err(e)
         }
     }

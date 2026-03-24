@@ -27,7 +27,12 @@ use tezos_smart_rollup_encoding::{
     outbox::OutboxMessageTransaction,
 };
 
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
+    database::EtherlinkVMDB,
     helpers::storage::u256_to_bigint,
     journal::Journal,
     precompiles::{
@@ -235,13 +240,14 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<'j, CTX, DB>(
+fn send_outbox_methods<'j, CTX, Host, R>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
@@ -421,14 +427,15 @@ where
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<'j, CTX, DB>(
+pub(crate) fn send_outbox_message_precompile<'j, CTX, Host, R>(
     calldata: &[u8],
     context: &mut CTX,
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    DB: DatabasePrecompileStateChanges,
-    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,

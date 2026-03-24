@@ -3563,6 +3563,8 @@ dependencies = [
  "revm",
  "rlp",
  "tezos-evm-logging-latest",
+ "tezos-smart-rollup-host",
+ "tezos-smart-rollup-mock",
  "tezos_crypto_rs",
 ]
 

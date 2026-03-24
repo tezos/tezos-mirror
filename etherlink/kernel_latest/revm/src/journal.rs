@@ -34,7 +34,9 @@ use evm_types::{
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::Logging;
+use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::{path::OwnedPath, runtime::RuntimeError};
 use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
 
 /// A journal of state changes internal to the EVM
@@ -42,35 +44,49 @@ use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
 /// On each additional call, the depth of the journaled state is increased (`depth`) and a new journal is added.
 ///
 /// The journal contains every state change that happens within that call, making it possible to revert changes made in a specific call.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Journal<'a, DB> {
+pub struct Journal<'a, Host: StorageV1 + Logging, R: Registry> {
     /// Database
-    pub database: DB,
+    pub database: EtherlinkVMDB<'a, Host, R>,
 
     /// TezosX journal combining EVM and Michelson journal state.
     pub journal: &'a mut TezosXJournal,
+
+    /// Deferred error from michelson journal checkpoint operations.
+    /// The `JournalTr` trait methods `checkpoint_commit` and `checkpoint_revert`
+    /// cannot return errors, so we store them here for later retrieval.
+    deferred_error: Option<RuntimeError>,
 }
 
-impl<'a, DB> Journal<'a, DB> {
-    pub fn new_with_inner(database: DB, journal: &'a mut TezosXJournal) -> Self {
-        Self { database, journal }
+impl<'a, Host: StorageV1 + Logging, R: Registry> Journal<'a, Host, R> {
+    pub fn new_with_inner(
+        database: EtherlinkVMDB<'a, Host, R>,
+        journal: &'a mut TezosXJournal,
+    ) -> Self {
+        Self {
+            database,
+            journal,
+            deferred_error: None,
+        }
+    }
+
+    /// Take any deferred error from michelson journal checkpoint operations.
+    pub fn take_deferred_error(&mut self) -> Option<RuntimeError> {
+        self.deferred_error.take()
     }
 }
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
-    for Journal<'a, DB>
-{
-    type Database = DB;
+impl<'a, Host: StorageV1 + Logging, R: Registry> JournalTr for Journal<'a, Host, R> {
+    type Database = EtherlinkVMDB<'a, Host, R>;
     type State = EvmState;
     type JournaledAccount<'b>
-        = JournaledAccount<'b, DB>
+        = JournaledAccount<'b, EtherlinkVMDB<'a, Host, R>>
     where
-        DB: 'b,
+        EtherlinkVMDB<'a, Host, R>: 'b,
         'a: 'b;
 
-    fn new(_database: DB) -> Journal<'a, DB> {
+    fn new(_database: EtherlinkVMDB<'a, Host, R>) -> Journal<'a, Host, R> {
         unimplemented!("Use Journal::new_with_inner instead")
     }
 
@@ -154,7 +170,10 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
         address: Address,
         target: Address,
         skip_cold_load: bool,
-    ) -> Result<StateLoad<SelfDestructResult>, JournalLoadError<DB::Error>> {
+    ) -> Result<
+        StateLoad<SelfDestructResult>,
+        JournalLoadError<<Self::Database as Database>::Error>,
+    > {
         self.journal.evm.inner.selfdestruct(
             &mut self.database,
             address,
@@ -203,7 +222,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
         from: Address,
         to: Address,
         balance: U256,
-    ) -> Result<Option<TransferError>, DB::Error> {
+    ) -> Result<Option<TransferError>, <Self::Database as Database>::Error> {
         self.journal
             .evm
             .inner
@@ -264,7 +283,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     fn load_account(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, DB::Error> {
+    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
         self.journal
             .evm
             .inner
@@ -275,7 +294,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     fn load_account_code(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&Account>, DB::Error> {
+    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
         self.journal
             .evm
             .inner
@@ -286,7 +305,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     fn load_account_delegated(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<AccountLoad>, DB::Error> {
+    ) -> Result<StateLoad<AccountLoad>, <Self::Database as Database>::Error> {
         self.journal
             .evm
             .inner
@@ -295,6 +314,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
 
     #[inline]
     fn checkpoint(&mut self) -> JournalCheckpoint {
+        self.journal.michelson.push_external_checkpoint();
         self.journal.evm.layered_state.checkpoint();
         self.journal.evm.inner.checkpoint()
     }
@@ -302,15 +322,24 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     #[inline]
     fn checkpoint_commit(&mut self) {
         self.journal.evm.layered_state.checkpoint_commit();
-        self.journal.evm.inner.checkpoint_commit()
+        self.journal.evm.inner.checkpoint_commit();
+        if let Err(e) = self.journal.michelson.commit_frame(self.database.host) {
+            self.deferred_error.get_or_insert(e);
+        }
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
-        // Following the doc of REVM it's safe to consider that `checkpoint` is always the latest created.
-        // https://github.com/bluealloy/revm/blob/a8916288952ca65ead1b0fd7aae20341e396b1c6/crates/context/src/journal/inner.rs#L465
         self.journal.evm.layered_state.checkpoint_revert();
-        self.journal.evm.inner.checkpoint_revert(checkpoint)
+        self.journal.evm.inner.checkpoint_revert(checkpoint);
+        let world_state = OwnedPath::from(&ETHERLINK_SAFE_STORAGE_ROOT_PATH);
+        if let Err(e) = self
+            .journal
+            .michelson
+            .revert_frame(self.database.host, &world_state)
+        {
+            self.deferred_error.get_or_insert(e);
+        }
     }
 
     #[inline]
@@ -353,8 +382,10 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     /// Clear current journal resetting it to initial state and return changes state.
     #[inline]
     fn finalize(&mut self) -> Self::State {
-        self.database
-            .commit(self.journal.evm.layered_state.finalize());
+        DatabaseCommitPrecompileStateChanges::commit(
+            &mut self.database,
+            self.journal.evm.layered_state.finalize(),
+        );
         self.journal.evm.inner.finalize()
     }
 
@@ -433,7 +464,7 @@ impl<'a, DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr
     }
 }
 
-impl<DB> JournalExt for Journal<'_, DB> {
+impl<Host: StorageV1 + Logging, R: Registry> JournalExt for Journal<'_, Host, R> {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
         &self.journal.evm.inner.journal
@@ -450,7 +481,7 @@ impl<DB> JournalExt for Journal<'_, DB> {
     }
 }
 
-impl<DB: DatabasePrecompileStateChanges> Journal<'_, DB> {
+impl<Host: StorageV1 + Logging, R: Registry> Journal<'_, Host, R> {
     pub fn get_and_increment_global_counter(
         &mut self,
     ) -> Result<U256, CustomPrecompileError> {
@@ -557,7 +588,7 @@ pub trait CrossRuntimeCall {
     fn crac_id(&self) -> String;
 }
 
-impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, EtherlinkVMDB<'a, Host, R>>
+impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
 where
     Host: StorageV1 + Logging,
 {

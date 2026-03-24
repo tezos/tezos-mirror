@@ -11,8 +11,13 @@ use revm::{
     primitives::Address,
 };
 
+use tezos_evm_logging::Logging;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezosx_interfaces::Registry;
+
 use crate::{
-    journal::{CrossRuntimeCall, Journal},
+    database::EtherlinkVMDB,
+    journal::Journal,
     precompiles::{
         change_sequencer_key::change_sequencer_key_precompile,
         constants::{
@@ -28,9 +33,7 @@ use crate::{
     },
     storage::version::EVMVersion,
 };
-use evm_types::{
-    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges, Error,
-};
+use evm_types::Error;
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkPrecompiles {
@@ -58,17 +61,15 @@ impl EtherlinkPrecompiles {
         CUSTOMS.contains(address) || self.builtins.contains(address)
     }
 
-    fn run_custom_precompile<'j, CTX, DB>(
+    fn run_custom_precompile<'j, CTX, Host, R>(
         &mut self,
         context: &mut CTX,
         inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, Error>
     where
-        DB: DatabasePrecompileStateChanges
-            + DatabaseCommitPrecompileStateChanges
-            + revm::Database,
-        CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
-        Journal<'j, DB>: CrossRuntimeCall,
+        Host: StorageV1 + Logging + 'j,
+        R: Registry + 'j,
+        CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -116,13 +117,11 @@ impl EtherlinkPrecompiles {
     }
 }
 
-impl<'j, CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
+impl<'j, CTX, Host, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    DB: DatabasePrecompileStateChanges
-        + DatabaseCommitPrecompileStateChanges
-        + revm::Database,
-    CTX: ContextTr<Db = DB, Journal = Journal<'j, DB>>,
-    Journal<'j, DB>: CrossRuntimeCall,
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     type Output = InterpreterResult;
 
