@@ -1042,9 +1042,9 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Tezosx.Get_tezos_ethereum_address.Method ->
             let f tezos_address =
-              tezos_address
-              |> Data_encoding.Binary.to_bytes_exn Tezos_types.Contract.encoding
-              |> Tezosx_mod.Ethereum_runtime.generate_alias |> rpc_ok
+              tezos_address |> Tezos_types.Contract.to_b58check
+              |> Bytes.of_string |> Tezosx_mod.Ethereum_runtime.generate_alias
+              |> rpc_ok
             in
             build_with_input ~f module_ parameters
         | Tezosx.Get_ethereum_tezos_address.Method ->
