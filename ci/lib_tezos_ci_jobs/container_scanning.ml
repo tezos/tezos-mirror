@@ -33,6 +33,7 @@ let job_container_scanning image : tezos_job =
     ~image:Images.trivy
     ~variables:
       [
+        ("TRIVY_NO_PROGRESS", "true");
         ("TRIVY_CACHE_DIR", ".trivycache/");
         ("REPORT", "gl-container-scanning-report.json");
         ("FULL_IMAGE_NAME", image_ref image);
