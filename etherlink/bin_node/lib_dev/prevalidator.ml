@@ -88,6 +88,7 @@ module Types = struct
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
     maximum_gas_per_transaction : Z.t;
+    michelson_to_evm_gas_multiplier : int64;
   }
 
   type session = {
@@ -125,12 +126,16 @@ module Types = struct
     let* (Qty maximum_gas_per_transaction) =
       Etherlink_durable_storage.maximum_gas_per_transaction (read state)
     in
+    let* michelson_to_evm_gas_multiplier =
+      Etherlink_durable_storage.michelson_to_evm_gas_multiplier (read state)
+    in
     return
       {
         base_fee_per_gas;
         minimum_base_fee_per_gas;
         da_fee_per_bytes;
         maximum_gas_per_transaction;
+        michelson_to_evm_gas_multiplier;
       }
 
   let session_of_state chain_family ctxt state =
@@ -162,6 +167,7 @@ module Types = struct
                 base_fee_per_gas = Z.zero;
                 da_fee_per_bytes;
                 maximum_gas_per_transaction = Z.zero;
+                michelson_to_evm_gas_multiplier = 10L;
               };
           }
 
@@ -677,15 +683,15 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid ~data_model ~simulator_mode _ctxt session
+  let is_tezlink_tx_valid ~data_model ~simulator_mode ctxt session
       raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
     let open Tezos_types.Tez in
     let read = Types.read session.state in
-    let* michelson_to_evm_gas_multiplier =
-      Etherlink_durable_storage.michelson_to_evm_gas_multiplier read
+    let michelson_to_evm_gas_multiplier =
+      ctxt.session.etherlink_infos.michelson_to_evm_gas_multiplier
     in
     let nanotez_per_evm_gas =
       Tezos_types.Tez.(
