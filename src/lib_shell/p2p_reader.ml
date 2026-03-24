@@ -66,6 +66,9 @@ type t = {
   active_chains : chain_db Chain_id.Table.t;
       (** All chains managed by this peer **)
   unregister : unit -> unit;
+  conn_lost : unit Lwt.t;
+      (** Resolves when the underlying TCP connection is lost (either the read
+          or the write side fails). *)
 }
 
 (* performs [f chain_db] if the chain is active for the remote peer
@@ -506,9 +509,15 @@ let handle_msg (state : t) msg =
       [@profiler.span_s {verbosity = Notice} ["Predecessor_header"]]
 
 let on_error state =
-  Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
-  state.unregister () ;
-  Lwt_result.return `Shutdown
+  if Lwt.is_sleeping state.conn_lost then
+    (* Protocol-level error unrelated to a disconnect: shut the worker down. *)
+    Lwt_result.return `Shutdown
+  else
+    (* TCP connection already dropped; Worker.shutdown is already scheduled
+       via Lwt.on_success on conn_lost. Return Continue to avoid racing with
+       the upcoming shutdown (which would cause Lwt.Resolution_loop.Canceled
+       when the terminated event is emitted). *)
+    Lwt_result.return `Continue
 
 type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
 [@@ocaml.unboxed]
@@ -594,6 +603,8 @@ let on_launch (_ : worker) gid
       peer_active_chains = Chain_id.Table.create 17;
       worker = Lwt.return_unit;
       unregister;
+      conn_lost =
+        Lwt.choose [P2p.wait_reader_closed conn; P2p.wait_writer_closed conn];
     }
   in
   Chain_id.Table.iter
@@ -622,7 +633,12 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch (self : self) gid parameters : (t, launch_error) result Lwt.t =
-    Lwt_result.return @@ on_launch self gid parameters
+    let state = on_launch self gid parameters in
+    let () =
+      Lwt.on_success state.conn_lost (fun () ->
+          Lwt.dont_wait (fun () -> Worker.shutdown self) (fun _exn -> ()))
+    in
+    Lwt_result.return state
 
   let on_request : type res err.
       self -> (res, err) req -> (res, err) result Lwt.t =
@@ -636,7 +652,11 @@ module Handlers = struct
 
   let on_no_request _ = Lwt.return_unit
 
-  let on_close _ = Lwt.return_unit
+  let on_close self =
+    let state = Worker.state self in
+    Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
+    state.unregister () ;
+    Lwt.return_unit
 
   let on_error : type res err.
       self -> _ -> (res, err) req -> err -> [> `Shutdown] tzresult Lwt.t =
