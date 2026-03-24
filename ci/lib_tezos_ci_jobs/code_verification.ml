@@ -35,7 +35,6 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 open Common.Docker
-open Common.Build
 open Changesets
 
 (** Variants of the code verification pipeline.
@@ -171,34 +170,6 @@ let jobs pipeline_type =
       child_pipeline_path
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
-
-  (* Octez static binaries *)
-  let job_static_x86_64_experimental =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-        (* Even though not many tests depend on static executables, some
-         of those that do are limiting factors in the total duration
-         of pipelines. So we start this job as early as possible,
-         without waiting for sanity_ci. *)
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez ())
-      ()
-  in
-  let job_static_arm64_experimental =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~dependencies:dependencies_needs_start (* See rationale above *)
-      ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
-      ()
-  in
-
-  (* Build jobs *)
-  let build = [job_static_x86_64_experimental; job_static_arm64_experimental] in
 
   (* Test jobs*)
   let test =
@@ -351,7 +322,7 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ build @ test @ manual
+  start_stage @ test @ manual
   @
   (* base image build jobs. *)
   match pipeline_type with

@@ -154,19 +154,12 @@ let job_tezt_static_binaries =
     ~description:
       "Run Tezt tests tagged as cli and not flaky, using static executables."
     ~cpu:Normal
-    ~needs_legacy:
-      [
-        (* The static job should actually be taken from Code_verification,
-           but it is only defined at toplevel in Master_branch.
-           Since we only need the name, this is fine.
-           We did the same in the docs/ci. *)
-        (Artifacts, Master_branch.job_static_x86_64);
-      ]
     ~needs:
       [
         (* No need for kernels for this job. *)
-        (Cacio.Artifacts, Build.job_build_extra_dev Amd64);
-        (Cacio.Artifacts, Build.job_build_exp Amd64);
+        (Artifacts, Build.job_build_static_linux_binaries Amd64 `test);
+        (Artifacts, Build.job_build_extra_dev Amd64);
+        (Artifacts, Build.job_build_exp Amd64);
       ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3
