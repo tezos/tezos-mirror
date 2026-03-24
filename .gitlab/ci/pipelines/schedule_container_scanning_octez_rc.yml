@@ -1,9 +1,6 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
-include:
-  template: Jobs/Container-Scanning.gitlab-ci.yml
-
 stages:
 - start
 - images
@@ -58,31 +55,35 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 container_scanning:
+  image: aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   stage: test
   tags:
   - gcp
   needs: []
   dependencies: []
   timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - gtcs scan
+  - . ./scripts/ci/container_scanning_generate_reports.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    GIT_STRATEGY: fetch
-    CS_IMAGE: tezos/tezos:octez-v22.0-rc3
-    SECURE_LOG_LEVEL: info
-    CS_DOCKERFILE_PATH: build.Dockerfile
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    REPORT: gl-container-scanning-report.json
+    FULL_IMAGE_NAME: tezos/tezos:octez-v22.0-rc3
   artifacts:
     paths:
     - gl-container-scanning-report.json
-    - gl-dependency-scanning-report.json
-    - '"**/gl-sbom-*.cdx.json"'
 
 container_scanning_slack_notification:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
