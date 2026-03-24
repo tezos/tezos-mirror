@@ -54,6 +54,44 @@ type chain_db = {
   active_connections : connection P2p_peer.Table.t;
 }
 
+(** Per-message-type throttle state, stored per peer connection. *)
+
+type throttle_entry = {
+  mutable count : int;
+      (** Number of messages received in the current window. *)
+  mutable window_start : Time.System.t option;
+      (** [None] until the first message has been handled. [Some ts] otherwise,
+          where [ts] is the last time the window has been reset. A window is
+          reset with the first message outside the previous window, if any. *)
+  params : (int * float * float) option;
+      (** [None] = no rate limiting.
+          [Some (n, window_s, cooldown_s)] = allow at most [n] messages per
+          [window_s] seconds; sleep [cooldown_s] seconds when exceeded. *)
+}
+
+type throttle_state = {
+  get_block_headers : throttle_entry;
+  block_header : throttle_entry;
+  get_current_branch : throttle_entry;
+  current_branch : throttle_entry;
+  get_current_head : throttle_entry;
+  current_head : throttle_entry;
+  deactivate : throttle_entry;
+  get_operations : throttle_entry;
+  operation : throttle_entry;
+  get_operations_for_blocks : throttle_entry;
+  operations_for_block : throttle_entry;
+  get_protocols : throttle_entry;
+  protocol : throttle_entry;
+  (* Unused *)
+  get_checkpoint : throttle_entry;
+  checkpoint : throttle_entry;
+  get_predecessor_header : throttle_entry;
+  predecessor_header : throttle_entry;
+  get_protocol_branch : throttle_entry;
+  protocol_branch : throttle_entry;
+}
+
 type t = {
   p2p : p2p;
   gid : P2p_peer.Id.t;  (** remote peer id *)
@@ -66,10 +104,148 @@ type t = {
   active_chains : chain_db Chain_id.Table.t;
       (** All chains managed by this peer **)
   unregister : unit -> unit;
+  throttle : throttle_state;
   conn_lost : unit Lwt.t;
       (** Resolves when the underlying TCP connection is lost (either the read
           or the write side fails). *)
 }
+
+let make_entry ~threshold ~window_s ~cooldown_s =
+  {
+    count = 0;
+    window_start = None;
+    params = Some (threshold, window_s, cooldown_s);
+  }
+
+let entry_of_msg (d : throttle_state) msg =
+  let open Message in
+  match msg with
+  | Get_block_headers _ -> d.get_block_headers
+  | Block_header _ -> d.block_header
+  | Get_current_branch _ -> d.get_current_branch
+  | Current_branch _ -> d.current_branch
+  | Get_current_head _ -> d.get_current_head
+  | Current_head _ -> d.current_head
+  | Deactivate _ -> d.deactivate
+  | Get_operations _ -> d.get_operations
+  | Operation _ -> d.operation
+  | Get_operations_for_blocks _ -> d.get_operations_for_blocks
+  | Operations_for_block _ -> d.operations_for_block
+  | Get_protocols _ -> d.get_protocols
+  | Protocol _ -> d.protocol
+  | Get_checkpoint _ -> d.get_checkpoint
+  | Checkpoint _ -> d.checkpoint
+  | Get_predecessor_header _ -> d.get_predecessor_header
+  | Predecessor_header _ -> d.predecessor_header
+  | Get_protocol_branch _ -> d.get_protocol_branch
+  | Protocol_branch _ -> d.protocol_branch
+
+(** [throttle state msg] checks the rate-limiting state for the message type of
+    [msg] within [state.throttle]. If the message count in the current window
+    exceeds the threshold, it sleeps for [cooldown_s] (or until the connection
+    is lost, whichever comes first) and returns [true] to signal the caller that
+    the message was throttled. Otherwise it increments the counter and returns
+    [false]. *)
+let throttle t msg =
+  let open Lwt_syntax in
+  let entry = entry_of_msg t.throttle msg in
+  match entry.params with
+  | None -> return false
+  | Some (n, window_s, cooldown_s) ->
+      let now = Time.System.now () in
+      let in_window =
+        match entry.window_start with
+        | None -> false
+        | Some ws ->
+            Ptime.Span.compare
+              (Ptime.diff now ws)
+              (Time.System.Span.of_seconds_exn window_s)
+            < 0
+      in
+      if not in_window then (
+        entry.window_start <- Some now ;
+        entry.count <- 1 ;
+        return false)
+      else (
+        entry.count <- entry.count + 1 ;
+        if entry.count > n then
+          let* () =
+            Lwt.choose
+              [
+                Lwt_unix.sleep cooldown_s;
+                (let* () = t.conn_lost in
+                 (* We also watch for connection loss: without this, a dead peer
+                 with a full message buffer would keep us busy sleeping and
+                 processing for a long time.
+
+                 The [Lwt.pause] after [conn_lost] gives the worker shutdown
+                 path (which reacts to the same signal) a chance to cancel us
+                 before we loop back and pick up the next buffered message. In
+                 the worst case we handle one extra message before being
+                 cancelled. *)
+                 Lwt.pause ());
+              ]
+          in
+          return true
+        else return false)
+
+(** No throttling; messages of this type are always processed immediately. *)
+let no_throttle () = {count = 0; window_start = None; params = None}
+
+(** Safety-net entry for message types no longer used by the protocol. Limits to
+    1 per 10 s so that unexpected occurrences do not cause a busy loop. *)
+let unused_entry () = make_entry ~threshold:1 ~window_s:10. ~cooldown_s:10.
+
+let make_throttle_state () =
+  {
+    (* get_block_headers: no throttle, it's naturally spamming (bootstrap)*)
+    get_block_headers = no_throttle ();
+    (* block_header: no throttle, it's naturally spamming (bootstrap)*)
+    block_header = no_throttle ();
+    (* get_current_branch: Only sent at connection establishment, or received
+       block with no predecessor. *)
+    get_current_branch = make_entry ~threshold:1 ~window_s:4. ~cooldown_s:4.;
+    (* current_branch: should only come as a response to get_current_branch,
+       i.e. once per connection establishment or missing predecessor. *)
+    current_branch = make_entry ~threshold:1 ~window_s:4. ~cooldown_s:4.;
+    (* get_current_head only sent on RPC call or new protocol has been fetched
+       and compiled. *)
+    get_current_head = make_entry ~threshold:1 ~window_s:4. ~cooldown_s:4.;
+    (* current_head: no throttle. Don't delay preattestation arriving just after
+       new head *)
+    current_head = no_throttle ();
+    (* deactivate is either peer deconnection or side-chain deactivation *)
+    deactivate = make_entry ~threshold:1 ~window_s:4. ~cooldown_s:4.;
+    (* get_operations: no throttle, it's naturally spamming*)
+    get_operations = no_throttle ();
+    (* operation: no throttle, it's naturally spamming*)
+    operation = no_throttle ();
+    (* get_operations_for_blocks: no throttle, it's naturally spamming*)
+    get_operations_for_blocks = no_throttle ();
+    (* operations_for_blocks: no throttle, it's naturally spamming*)
+    operations_for_block = no_throttle ();
+    (* get_protocols: the message can carry a batch of protocol hashes, but in
+       practice we only request one unknown protocol at a time. Serving more
+       than one such batch per 10 s from the same peer makes no sense. *)
+    get_protocols = make_entry ~threshold:1 ~window_s:10. ~cooldown_s:10.;
+    (* protocol: carries a single protocol in response to get_protocols.
+       We only fetch one unknown protocol at a time so more than one per
+       second from the same peer is unexpected. *)
+    protocol = make_entry ~threshold:1 ~window_s:1. ~cooldown_s:1.;
+    (* Unused *)
+    (* get_checkpoint: not used.*)
+    get_checkpoint = unused_entry ();
+    (* checkpoint: not used anymore.*)
+    checkpoint = unused_entry ();
+    (* get_predecessor_header: not used.*)
+    get_predecessor_header = unused_entry ();
+    (* predecessor_header: not used.*)
+    predecessor_header = unused_entry ();
+    (* get_protocol_branch: not used.*)
+    get_protocol_branch = unused_entry ();
+    (* protocol_branch: not used.*)
+    protocol_branch = unused_entry ();
+  }
 
 (* performs [f chain_db] if the chain is active for the remote peer
    and [chain_db] is the chain_db corresponding to this chain id, otherwise
@@ -178,6 +354,7 @@ let handle_msg (state : t) msg =
   let* () =
     P2p_reader_event.(emit read_message) (state.gid, P2p_message.Message msg)
   in
+  let* _throttled = throttle state msg in
   match msg with
   | Get_current_branch chain_id ->
       (Peer_metadata.incr meta @@ Received_request Branch ;
@@ -605,6 +782,7 @@ let on_launch (_ : worker) gid
       unregister;
       conn_lost =
         Lwt.choose [P2p.wait_reader_closed conn; P2p.wait_writer_closed conn];
+      throttle = make_throttle_state ();
     }
   in
   Chain_id.Table.iter
