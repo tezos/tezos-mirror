@@ -108,7 +108,7 @@ val to_attested_levels :
     The [slot_availabilities] map should contain metadata for all relevant levels
     (typically obtained via {!collect_slot_availabilities}).
 
-    Returns wether the slot is found attested at ANY of the checked
+    Returns whether the slot is found attested at ANY of the checked
     (level, lag_index) pairs. *)
 val is_slot_attested :
   endpoint:Endpoint.t ->
