@@ -133,10 +133,9 @@ val connect :
     accepting a connection from [fd]. [point] is the id of the connecting
     host.
 
-    Incoming connection from banned points, or when maximum number of
-    connection is exceeded are refused. The maximum number of connections
-    maybe be randomly increased by one. Socket [fd] is closed when the
-    connection is refused. *)
+    Incoming connection from banned points, or when maximum number of connection
+    is exceeded are refused. Socket [fd] is closed when the connection is
+    refused. *)
 val accept : ('msg, 'peer, 'conn) t -> P2p_fd.t -> P2p_point.Id.t -> unit
 
 (** [stat t] is a snapshot of current bandwidth usage for the entire connected
