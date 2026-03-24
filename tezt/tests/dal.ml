@@ -4638,10 +4638,22 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     in
     let to_attested_levels ~published_level =
       if published_level < migration_level then
-        let attested_level = published_level + old_lag in
-        let proto, dal_params = proto_and_dal_params attested_level in
-        let lag_index = 0 in
-        [(attested_level, lag_index, dal_params, proto)]
+        (* For pre-migration publications, each lag in the old protocol's
+           attestation_lags produces an attested level. The attested level may
+           fall before or after migration, so we select the right protocol and
+           parameters for each, and compute the lag_index in that protocol's
+           attestation_lags list. *)
+        let old_lags = dal_parameters.Dal.Parameters.attestation_lags in
+        List.filter_map
+          (fun lag ->
+            let attested_level = published_level + lag in
+            let proto, dal_params = proto_and_dal_params attested_level in
+            let lags = dal_params.Dal.Parameters.attestation_lags in
+            match List.find_index (fun l -> l = lag) lags with
+            | Some lag_index ->
+                Some (attested_level, lag_index, dal_params, proto)
+            | None -> None)
+          old_lags
       else
         Dal.to_attested_levels
           ~protocol:migrate_to
@@ -4669,25 +4681,28 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
           ~__LOC__
           ~error_msg:
             "Slot before migration - old_lag is expected to be attested")
-      else if published_level + old_lag = migration_level + 1 then (
-        log_step
-          "Checking that migration level %d is not considered as DAL attested \
-           (as it is not attested at all)"
-          (migration_level + 1) ;
-        (* TODO: we could check that the dal_attestation is empty in this case. *)
-        Check.is_false
-          is_attested
-          ~__LOC__
-          ~error_msg:"The migration level block is not supposed to be attested")
       else if published_level <= migration_level then (
+        (* Slots published in the window [migration_level - old_lag,
+           migration_level] have their attestation window crossing the
+           migration boundary. The protocol zeroes out DAL attestation
+           payloads for the first [attestation_lag] blocks of the new
+           protocol (see [record_dal_content] in [apply.ml]).
+           So a cross-migration slot is attested only if at
+           least one lag produces an attested level strictly before
+           [migration_level], where it is processed entirely by the
+           old protocol. *)
+        let expected_attested =
+          List.exists
+            (fun lag -> published_level + lag < migration_level)
+            dal_parameters.attestation_lags
+        in
         log_step
           "Checking that a slot published at level %d, just before migration \
-           is attested only if the attestation_level did not change between \
-           the 2 protocols."
-          published_level ;
-        let expected_attested =
-          new_lag = old_lag && Protocol.number migrate_to <= 025
-        in
+           is attested: %b (old_lag=%d, new_lag=%d)."
+          published_level
+          expected_attested
+          old_lag
+          new_lag ;
         Check.(
           (is_attested = expected_attested)
             bool
