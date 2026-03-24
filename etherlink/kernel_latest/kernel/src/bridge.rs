@@ -485,6 +485,7 @@ where
             Ok(ExecutionResult::Valid(RuntimeTransactionResult::Tezos {
                 op: applied_operation,
                 etherlink_withdrawals: vec![],
+                cross_runtime_effects: vec![],
             }))
         }
         DepositReceiver::Tezos(Contract::Originated(kt1)) => Err(

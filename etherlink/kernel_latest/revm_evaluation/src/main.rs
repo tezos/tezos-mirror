@@ -407,7 +407,7 @@ pub fn main() {
                             .collect(),
                     );
 
-                    let mut journal = TezosXJournal::new();
+                    let mut journal = TezosXJournal::default();
                     let execution_result = run_transaction(
                         &mut host,
                         &registry,

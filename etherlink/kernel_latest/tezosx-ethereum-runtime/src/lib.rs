@@ -160,6 +160,28 @@ where
     let hdrs = headers::parse_request_headers(request.headers())?;
     let call_data = Bytes::from(request.into_body());
 
+    // Verify CRAC-ID from incoming header (debug/consistency check).
+    if let Some(crac_id) = hdrs.crac_id {
+        journal
+            .verify_crac_id(&crac_id)
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    }
+    // Save transaction info for building the fake EVM transaction.
+    // set_crac_tx_info is only called once subsequent calls in the same CRAC execution will
+    // result in an error.
+    if !journal.evm.has_crac_data() {
+        journal
+            .evm
+            .set_crac_tx_info(tezosx_journal::CracTransactionInfo {
+                source: hdrs.source.unwrap_or_default(),
+                sender: hdrs.sender,
+                gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
+                amount: revm::primitives::U256::from_limbs(hdrs.amount.into_limbs()),
+                gas_used: 0,
+            })
+            .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+    }
+
     let context = CrossRuntimeContext {
         gas_limit: hdrs.gas_limit,
         timestamp: hdrs.timestamp,
@@ -170,7 +192,7 @@ where
     let block_constants = runtime.create_block_constants(host, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
 
-    run_transaction(
+    let outcome = run_transaction(
         host,
         registry,
         journal,
@@ -189,7 +211,17 @@ where
             credit: Some((hdrs.sender, hdrs.amount)),
         },
     )
-    .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))
+    .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
+
+    // Accumulate EVM logs and gas from this CRAC execution.
+    // Note: cross-runtime reverts for accumulated logs are not handled.
+    // See L2-1097.
+    journal.evm.accumulate_crac_execution(
+        outcome.result.logs().iter().cloned(),
+        outcome.result.gas_used(),
+    );
+
+    Ok(outcome)
 }
 
 impl RuntimeInterface for EthereumRuntime {
@@ -456,7 +488,7 @@ mod tests {
         // the transfer amount (the calling runtime already debited it).
         let five_tez_wei = revm::primitives::U256::from(5_000_000_000_000_000_000u128);
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "5", vec![]);
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
@@ -509,7 +541,7 @@ mod tests {
             .unwrap();
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &contract, "0", vec![]);
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
@@ -566,7 +598,7 @@ mod tests {
             .unwrap();
         CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &contract, "42", vec![]);
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
@@ -812,7 +844,7 @@ mod tests {
         let sender = Address::from_slice(&[0x11; 20]);
         let destination = Address::from_slice(&[0x22; 20]);
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "0", vec![]);
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
@@ -846,7 +878,7 @@ mod tests {
         // 0.5 TEZ = 500_000_000_000_000_000 wei
         let half_tez_wei = revm::primitives::U256::from(500_000_000_000_000_000u64);
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "0.5", vec![]);
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
@@ -935,7 +967,7 @@ mod tests {
             .body(vec![])
             .unwrap();
 
-        let mut journal = TezosXJournal::new();
+        let mut journal = TezosXJournal::default();
         let resp = runtime
             .serve(&registry, &mut host, &mut journal, request)
             .unwrap();

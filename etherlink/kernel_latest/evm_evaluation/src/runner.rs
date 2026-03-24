@@ -258,7 +258,7 @@ fn execute_transaction(
     let mut bytes = vec![0u8; 32];
     transaction_value.to_little_endian(&mut bytes);
     let registry = kernel::registry_impl::RegistryImpl::default();
-    let mut journal = TezosXJournal::new();
+    let mut journal = TezosXJournal::default();
     run_transaction(
         host,
         &registry,

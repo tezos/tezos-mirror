@@ -12,8 +12,8 @@ use tezos_protocol::contract::Contract;
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
     gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
-    X_TEZOS_TIMESTAMP,
+    X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
+    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use crate::{
@@ -50,14 +50,13 @@ sol! {
         ) external returns (bool success, bytes memory response);
     }
 
-    event TransferEvent(
-        string implicitAddress,
-        uint256 amount
-    );
-
-    event CallMichelsonEvent(
-        string destination,
-        string entrypoint,
+    /// Emitted on every outgoing CRAC (EVM -> other runtime).
+    /// `cracId` allows indexers to correlate operations across
+    /// derived blocks.
+    event CracSent(
+        string cracId,
+        string targetRuntime,
+        string targetAddress,
         uint256 amount
     );
 }
@@ -103,6 +102,7 @@ fn build_http_request(
 /// - `X-Tezos-Gas-Limit`: The gas limit forwarded to the call (decimal string).
 /// - `X-Tezos-Timestamp`: The current block timestamp in seconds (decimal string).
 /// - `X-Tezos-Block-Number`: The current block number (decimal string).
+#[allow(clippy::too_many_arguments)]
 fn inject_tezos_headers(
     headers: &mut HeaderMap,
     sender_alias: &[u8],
@@ -111,6 +111,7 @@ fn inject_tezos_headers(
     gas_limit: u64,
     timestamp: U256,
     block_number: U256,
+    crac_id: &str,
 ) -> Result<(), CustomPrecompileError> {
     let parse_value = |v: &str| -> Result<http::HeaderValue, CustomPrecompileError> {
         v.parse().map_err(|e| {
@@ -138,6 +139,7 @@ fn inject_tezos_headers(
         X_TEZOS_BLOCK_NUMBER,
         parse_value(&format!("{block_number}"))?,
     );
+    headers.insert(X_TEZOS_CRAC_ID, parse_value(crac_id)?);
     Ok(())
 }
 
@@ -194,6 +196,7 @@ where
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
+            let crac_id = context.journal().crac_id();
             let sender_alias = context
                 .journal_mut()
                 .tezosx_resolve_source_alias(inputs.caller)?;
@@ -209,6 +212,7 @@ where
                 gas_limit,
                 timestamp,
                 block_number,
+                &crac_id,
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request)?;
@@ -220,16 +224,18 @@ where
                 )));
             }
 
-            // Emit event
-            let log_data = TransferEvent {
-                implicitAddress: implicit_address,
-                amount,
-            };
-            let log = Log {
+            // Emit CracSent event
+            let crac_log = Log {
                 address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                data: log_data.into_log_data(),
+                data: CracSent {
+                    cracId: crac_id,
+                    targetRuntime: "tezos".to_string(),
+                    targetAddress: implicit_address,
+                    amount,
+                }
+                .into_log_data(),
             };
-            context.journal_mut().log(log);
+            context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::callMichelson(call) => {
             if !gas.record_cost(RUNTIME_GATEWAY_TRANSFER_BASE_COST) {
@@ -268,6 +274,7 @@ where
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
+            let crac_id = context.journal().crac_id();
             let sender_alias = context
                 .journal_mut()
                 .tezosx_resolve_source_alias(inputs.caller)?;
@@ -283,6 +290,7 @@ where
                 gas_limit,
                 timestamp,
                 block_number,
+                &crac_id,
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request)?;
@@ -294,17 +302,18 @@ where
                 )));
             }
 
-            // Emit event
-            let log_data = CallMichelsonEvent {
-                destination: destination.clone(),
-                entrypoint: entrypoint.clone(),
-                amount,
-            };
-            let log = Log {
+            // Emit CracSent event
+            let crac_log = Log {
                 address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                data: log_data.into_log_data(),
+                data: CracSent {
+                    cracId: crac_id,
+                    targetRuntime: "tezos".to_string(),
+                    targetAddress: destination,
+                    amount,
+                }
+                .into_log_data(),
             };
-            context.journal_mut().log(log);
+            context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::call(call) => {
             if !gas.record_cost(RUNTIME_GATEWAY_CALL_BASE_COST) {
@@ -334,6 +343,7 @@ where
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
+            let crac_id = context.journal().crac_id();
             let sender_alias = context
                 .journal_mut()
                 .tezosx_resolve_source_alias(inputs.caller)?;
@@ -359,7 +369,13 @@ where
                 gas_limit,
                 timestamp,
                 block_number,
+                &crac_id,
             )?;
+
+            // Extract URI info before the request is consumed by the call.
+            let uri = request.uri().clone();
+            let target_rt = uri.host().unwrap_or("unknown").to_string();
+            let target_addr = uri.path().trim_start_matches('/').to_string();
 
             // TODO: L2-918 Handle http code responses
             let response = context.journal_mut().tezosx_call_http(request)?;
@@ -414,6 +430,19 @@ where
                     })?;
                 account_load.data.set_balance(U256::ZERO);
             }
+
+            // Emit CracSent event after the call succeeds.
+            let crac_log = Log {
+                address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                data: CracSent {
+                    cracId: crac_id,
+                    targetRuntime: target_rt,
+                    targetAddress: target_addr,
+                    amount,
+                }
+                .into_log_data(),
+            };
+            context.journal_mut().log(crac_log);
 
             return Ok(InterpreterResult {
                 result: InstructionResult::Return,
@@ -587,6 +616,7 @@ mod tests {
             gas_limit,
             timestamp,
             block_number,
+            "test-crac-id",
         )
         .unwrap();
 
@@ -653,6 +683,15 @@ mod tests {
                 .unwrap(),
             "12345"
         );
+        assert_eq!(
+            request
+                .headers()
+                .get(X_TEZOS_CRAC_ID)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "test-crac-id"
+        );
     }
 
     #[test]
@@ -704,6 +743,7 @@ mod tests {
             100_000,
             U256::from(1_700_000_000u64),
             U256::from(1u64),
+            "test-crac-id",
         )
         .unwrap();
 
@@ -737,6 +777,7 @@ mod tests {
             100_000,
             U256::from(1_700_000_000u64),
             U256::from(1u64),
+            "test-crac-id",
         )
         .unwrap();
 
@@ -768,6 +809,7 @@ mod tests {
             0,
             U256::ZERO,
             U256::ZERO,
+            "test-crac-id",
         )
         .unwrap();
 
@@ -918,6 +960,7 @@ mod tests {
             50_000,
             U256::from(100u64),
             U256::from(42u64),
+            "test-crac-id",
         )
         .unwrap();
 

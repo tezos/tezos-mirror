@@ -53,7 +53,7 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::Registry;
-use tezosx_journal::TezosXJournal;
+use tezosx_journal::{CracId, TezosXJournal};
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
@@ -254,7 +254,31 @@ pub enum RuntimeTransactionResult {
     Tezos {
         op: AppliedOperation,
         etherlink_withdrawals: Vec<Withdrawal>,
+        cross_runtime_effects: Vec<CrossRuntimeEffect>,
     },
+}
+
+/// Extract cross-runtime side effects accumulated in the journal
+/// during a Michelson transaction that may have CRACed into EVM.
+pub fn extract_cross_runtime_effects(
+    journal: &mut TezosXJournal,
+) -> Vec<CrossRuntimeEffect> {
+    let mut effects = Vec::new();
+
+    if let Some((logs, tx_info)) = journal.evm.take_crac_data() {
+        let crac_id = journal.crac_id().to_string();
+        effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
+            crac_id,
+            logs,
+            source: H160(*tx_info.source.0),
+            sender: H160(*tx_info.sender.0),
+            gas_limit: U256::from_little_endian(&tx_info.gas_limit.to_le_bytes::<32>()),
+            amount: U256::from_little_endian(&tx_info.amount.to_le_bytes::<32>()),
+            gas_used: U256::from(tx_info.gas_used),
+        }));
+    }
+
+    effects
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -386,6 +410,7 @@ fn apply_ethereum_transaction_common<Host>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
+    crac_id: CracId,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
     Host: StorageV1 + Logging,
@@ -410,7 +435,7 @@ where
     let call_data = transaction.data.clone();
     log_transaction_type(host, to, &call_data);
     let value = transaction.value;
-    let mut journal = TezosXJournal::new();
+    let mut journal = TezosXJournal::new(crac_id);
     let execution_outcome = match revm_run_transaction(
         host,
         registry,
@@ -506,7 +531,7 @@ where
     }
     .abi_encode();
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let mut journal = TezosXJournal::new();
+    let mut journal = TezosXJournal::default();
     match revm_run_transaction(
         host,
         registry,
@@ -630,7 +655,7 @@ where
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let mut journal = TezosXJournal::new();
+    let mut journal = TezosXJournal::default();
     match revm_run_transaction(
         host,
         registry,
@@ -704,11 +729,41 @@ pub struct EthereumExecutionInfo {
     pub tx_object: TransactionObject,
 }
 
+/// Side effect from a cross-runtime call that needs to be registered
+/// in the target runtime's derived block.
+pub enum CrossRuntimeEffect {
+    /// EVM logs accumulated from CRAC executions that need to appear
+    /// as a fake transaction in the EVM block.
+    Evm(EvmCracEffect),
+}
+
+/// Data needed to construct a fake EVM transaction from incoming CRACs.
+#[allow(dead_code)]
+pub struct EvmCracEffect {
+    /// CRAC-ID shared by all CRACs in this transaction.
+    pub crac_id: String,
+    /// Logs accumulated from all `serve()` calls.
+    pub logs: Vec<revm::primitives::Log>,
+    /// EVM address (alias) of the top-level sender (from X-Tezos-Source).
+    pub source: H160,
+    /// EVM address (alias) of the immediate caller (from X-Tezos-Sender).
+    pub sender: H160,
+    /// Gas limit forwarded to the call.
+    pub gas_limit: U256,
+    /// Value attached to the call (in wei).
+    pub amount: U256,
+    /// Cumulative gas used across all CRAC executions.
+    pub gas_used: U256,
+}
+
 /// Enum distinguishing between Ethereum and Tezos execution info.
 #[allow(clippy::large_enum_variant)]
 pub enum RuntimeExecutionInfo {
     Ethereum(EthereumExecutionInfo),
-    Tezos(AppliedOperation),
+    Tezos {
+        op: AppliedOperation,
+        cross_runtime_effects: Vec<CrossRuntimeEffect>,
+    },
 }
 
 pub enum ExecutionResult<T> {
@@ -823,9 +878,13 @@ where
         RuntimeTransactionResult::Tezos {
             op,
             etherlink_withdrawals,
+            cross_runtime_effects,
         } => {
             push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
-            Ok(RuntimeExecutionInfo::Tezos(op))
+            Ok(RuntimeExecutionInfo::Tezos {
+                op,
+                cross_runtime_effects,
+            })
         }
     }
 }
@@ -851,6 +910,14 @@ where
         revm::primitives::B256::from_slice(&transaction.tx_hash),
         tracer_input,
     );
+    let origin_runtime = match &transaction.content {
+        TransactionContent::Ethereum(_)
+        | TransactionContent::EthereumDelayed(_)
+        | TransactionContent::Deposit(_)
+        | TransactionContent::FaDeposit(_) => 1, // Ethereum
+        TransactionContent::TezosDelayed(_) => 0, // Tezos
+    };
+    let crac_id = CracId::new(origin_runtime, index);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
@@ -862,6 +929,7 @@ where
             tracer_input,
             spec_id,
             limits,
+            crac_id,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -873,6 +941,7 @@ where
             tracer_input,
             spec_id,
             limits,
+            crac_id,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
@@ -921,7 +990,7 @@ where
             })?;
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
-            let mut tezosx_journal = TezosXJournal::new();
+            let mut tezosx_journal = TezosXJournal::new(crac_id);
             match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
@@ -967,10 +1036,15 @@ where
                         block_constants,
                         &mut tezosx_journal,
                     )?;
+                    // Extract cross-runtime side effects accumulated
+                    // during the Michelson execution (e.g. CRAC into EVM).
+                    let cross_runtime_effects =
+                        extract_cross_runtime_effects(&mut tezosx_journal);
                     Ok::<_, anyhow::Error>(ExecutionResult::Valid(
                         RuntimeTransactionResult::Tezos {
                             op: operation_and_receipt,
                             etherlink_withdrawals,
+                            cross_runtime_effects,
                         },
                     ))
                 }
