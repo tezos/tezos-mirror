@@ -1232,6 +1232,38 @@ let test_crac_access_list_preserved =
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_inner in
   unit
 
+(** TEZ CRAC target reverts.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter]
+ *                                 |-> REVERT
+ *
+ *)
+let test_crac_tez_target_reverts =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ CRAC target reverts"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate TEZ reverter" ;
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ reverter" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  Log.debug ~prefix "Call EVM main (expected failure)" ;
+  let* _ = EvmRunner.call_run ~expected_status:false evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1243,4 +1275,5 @@ let () =
   test_crac_tez_double_crossing [Alpha] ;
   test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
   test_crac_tez_5_crossing_chain [Alpha] ;
-  test_crac_access_list_preserved [Alpha]
+  test_crac_access_list_preserved [Alpha] ;
+  test_crac_tez_target_reverts [Alpha]
