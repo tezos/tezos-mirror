@@ -536,6 +536,8 @@ module CracRunnerWrapper = struct
    *  sub-module mirrors its namesake but with nonces, counters and
    *  sequencer setup already applied. *)
   module type S = sig
+    val sequencer : Evm_node.t
+
     module EvmRunner : sig
       val call_run :
         ?expected_status:bool ->
@@ -618,6 +620,8 @@ module CracRunnerWrapper = struct
       counter
     in
     let module Helper = struct
+      let sequencer = sequencer
+
       module EvmRunner = struct
         let call_run ?expected_status ?(value = Wei.zero) ?access_list
             (`Evm_runner runner) =
@@ -1264,6 +1268,51 @@ let test_crac_tez_target_reverts =
   in
   unit
 
+(** CRAC: when a Michelson transaction makes a single CRAC into EVM,
+ *  the EVM block must contain a fake transaction carrying the logs
+ *  emitted during the cross-runtime EVM execution.
+ *
+ *     TEZ[tez_runner]
+ *      |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]
+ *
+ *  After the Michelson transaction, we fetch the latest EVM block and
+ *  assert it contains at least one transaction (the CRAC envelope).
+ *)
+let test_crac_tez_to_evm_fake_tx_in_block =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ->EVM produces fake EVM transaction in block"
+    ~tags:["crac_tx"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-TX" in
+  Log.debug ~prefix "Deploy EVM runner" ;
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  Log.debug ~prefix "Originate TEZ runner calling the bridge" ;
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Call TEZ runner (triggers CRAC into EVM)" ;
+  let* () = TezRunner.call_run tez_runner in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:2 tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  Log.debug ~prefix "Fetch latest EVM block" ;
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_count =
+    match block.transactions with
+    | Block.Hash txs -> List.length txs
+    | Block.Full txs -> List.length txs
+    | Block.Empty -> 0
+  in
+  Log.info "EVM block %ld contains %d transaction(s)" block.number tx_count ;
+  Check.(
+    (tx_count >= 1)
+      int
+      ~error_msg:
+        "Expected at least 1 transaction in the EVM block (the CRAC envelope), \
+         but found %L") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1276,4 +1325,5 @@ let () =
   test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
   test_crac_tez_5_crossing_chain [Alpha] ;
   test_crac_access_list_preserved [Alpha] ;
-  test_crac_tez_target_reverts [Alpha]
+  test_crac_tez_target_reverts [Alpha] ;
+  test_crac_tez_to_evm_fake_tx_in_block [Alpha]
