@@ -233,7 +233,7 @@ let create_connection t p2p_conn id_point point_info peer_info
        Improve invariant stability using a better encapsulation. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5294
        Stop triggering the maintenance while performing a connection swap. *)
-    if t.config.max_connections < P2p_pool.active_connections t.pool then (
+    if t.config.max_connections <= P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
         (P2p_pool.active_connections t.pool, t.config.max_connections))
@@ -497,11 +497,10 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
     (* we have a common version, checking if there is an available slot *)
     let* () =
       if
-        (* randomly allow one additional incoming connection *)
-        t.config.max_connections + Random.int 2
-        > P2p_pool.active_connections t.pool
-      then return_unit
-      else P2p_rejection.(rejecting Too_many_connections)
+        (* Reject connection if [max_connections] is reached. *)
+        P2p_pool.active_connections t.pool >= t.config.max_connections
+      then P2p_rejection.(rejecting Too_many_connections)
+      else return_unit
     in
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
