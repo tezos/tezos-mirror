@@ -73,6 +73,17 @@ module Simple = struct
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
 
+  let l1_behind =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_daemon_l1_behind"
+      ~msg:
+        "L1 node is on the same chain but behind at level {l1_level} (last \
+         processed level is {l2_level}), waiting for it to catch up"
+      ~level:Notice
+      ("l1_level", Data_encoding.int32)
+      ("l2_level", Data_encoding.int32)
+
   let catch_up =
     declare_1
       ~section
@@ -269,6 +280,8 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
 let new_heads_side_process_finished =
   new_heads_iteration Simple.new_heads_side_process_finished
+
+let l1_behind ~l1_level ~l2_level = Simple.(emit l1_behind) (l1_level, l2_level)
 
 let catch_up levels = Simple.(emit catch_up) levels
 

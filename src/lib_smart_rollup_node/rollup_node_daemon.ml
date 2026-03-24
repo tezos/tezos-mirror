@@ -408,54 +408,73 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
         let l = Int32.pred origination_level in
         (`Level l, l)
   in
-  let missing_blocks = Int32.sub head.level old_level in
-  let*! () =
-    if missing_blocks > 1l then Daemon_event.catch_up missing_blocks
-    else Lwt.return_unit
+  (* When the L1 head is behind our last processed level, check if it is
+     on the same chain. If so, there is nothing to do — the L1 is just
+     catching up (e.g. it was recently bootstrapped). This avoids an
+     expensive O(distance) reorg computation that would produce an empty
+     new_chain anyway. *)
+  let* l1_same_chain_but_behind =
+    if head.level < old_level then
+      let* stored_hash = Node_context.hash_of_level_opt node_ctxt head.level in
+      match stored_hash with
+      | Some h when Block_hash.(h = head.hash) -> return_true
+      | _ -> return_false
+    else return_false
   in
-  let stripped_head = Layer1.head_of_header head in
-  let*! reorg =
-    Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
-  in
-  let*? reorg = report_missing_data reorg in
-  let*! () = Daemon_event.reorg reorg.old_chain in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
-     Rollback state information on reorganization, i.e. for
-     reorg.old_chain. *)
-  let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
-  let get_header Layer1.{hash; level} =
-    if Block_hash.equal hash head.hash then return head
-    else
-      let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
-      {Layer1.hash; level; header}
-  in
-  let new_chain_prefetching =
-    Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
-  in
-  let* () =
-    List.iter_es
-      (fun (block, to_prefetch) ->
-        let module Plugin = (val state.plugin) in
-        Octez_telemetry.Trace.with_tzresult "process_block" @@ fun _ ->
-        Plugin.Layer1_helpers.prefetch_tezos_blocks
-          node_ctxt.l1_ctxt
-          to_prefetch ;
-        let* header = get_header block in
-        let catching_up = block.level < head.level in
-        update_l2_chain state ~catching_up ~finalized header)
-      new_chain_prefetching
-  in
-  notify_synchronization node_ctxt head.level ;
-  let* () = Publisher.publish_commitments () in
-  let* () = Publisher.cement_commitments () in
-  let* () = Outbox_execution.publish_executable_messages node_ctxt in
-  let*! () = Daemon_event.new_heads_processed reorg.new_chain in
-  let* () = Batcher.produce_batches () in
-  let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
-  let*! () = Injector.inject ~header:head.header () in
-  let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
-  Reference.set node_ctxt.degraded false ;
-  return_unit
+  if l1_same_chain_but_behind then
+    let*! () =
+      Daemon_event.l1_behind ~l1_level:head.level ~l2_level:old_level
+    in
+    return_unit
+  else
+    let missing_blocks = Int32.sub head.level old_level in
+    let*! () =
+      if missing_blocks > 1l then Daemon_event.catch_up missing_blocks
+      else Lwt.return_unit
+    in
+    let stripped_head = Layer1.head_of_header head in
+    let*! reorg =
+      Node_context.get_tezos_reorg_for_new_head node_ctxt old_head stripped_head
+    in
+    let*? reorg = report_missing_data reorg in
+    let*! () = Daemon_event.reorg reorg.old_chain in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
+       Rollback state information on reorganization, i.e. for
+       reorg.old_chain. *)
+    let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
+    let get_header Layer1.{hash; level} =
+      if Block_hash.equal hash head.hash then return head
+      else
+        let+ header = Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt hash in
+        {Layer1.hash; level; header}
+    in
+    let new_chain_prefetching =
+      Layer1.make_prefetching_schedule node_ctxt.l1_ctxt reorg.new_chain
+    in
+    let* () =
+      List.iter_es
+        (fun (block, to_prefetch) ->
+          let module Plugin = (val state.plugin) in
+          Octez_telemetry.Trace.with_tzresult "process_block" @@ fun _ ->
+          Plugin.Layer1_helpers.prefetch_tezos_blocks
+            node_ctxt.l1_ctxt
+            to_prefetch ;
+          let* header = get_header block in
+          let catching_up = block.level < head.level in
+          update_l2_chain state ~catching_up ~finalized header)
+        new_chain_prefetching
+    in
+    notify_synchronization node_ctxt head.level ;
+    let* () = Publisher.publish_commitments () in
+    let* () = Publisher.cement_commitments () in
+    let* () = Outbox_execution.publish_executable_messages node_ctxt in
+    let*! () = Daemon_event.new_heads_processed reorg.new_chain in
+    let* () = Batcher.produce_batches () in
+    let* () = Dal_injection_queue.produce_dal_slots ~level:head.level in
+    let*! () = Injector.inject ~header:head.header () in
+    let*! () = Daemon_event.new_heads_side_process_finished reorg.new_chain in
+    Reference.set node_ctxt.degraded false ;
+    return_unit
 
 let daemonize state =
   if state.configuration.l1_monitor_finalized then
