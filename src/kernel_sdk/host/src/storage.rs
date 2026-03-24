@@ -13,4 +13,5 @@
 
 mod v1;
 
+pub use v1::CoreStorage;
 pub use v1::StorageV1;
