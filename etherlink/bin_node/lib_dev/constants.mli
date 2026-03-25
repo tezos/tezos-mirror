@@ -31,7 +31,6 @@ type kernel =
   | Farfadet
   | FarfadetR1
   | FarfadetR2
-  | FarfadetR2SU
   | Latest
 
 val kernel_from_string : string -> kernel option
