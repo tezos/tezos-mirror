@@ -1188,6 +1188,11 @@ where
         );
         log!(safe_host, Debug, "Receipts: {receipts:#?}");
         safe_host.revert()?;
+        // Clear the in-memory EVM journal: safe_host.revert() only rolls
+        // back Tezos durable storage but cannot affect the in-memory REVM
+        // JournalInner. Without this, commit_evm_journal_from_external()
+        // would persist EVM state changes from a backtracked operation.
+        journal.evm.clear();
     }
 
     Ok(receipts)
