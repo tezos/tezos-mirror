@@ -207,19 +207,10 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
             params.dal.cryptobox_parameters.slot_size,
             params.dal.cryptobox_parameters.page_size )
       in
-      let*! result =
-        Layer1_helpers.get_dal_attested_slots_messages
-          fetch_dal_params
-          node_ctxt.cctxt
-          head.hash
-      in
-      match result with
-      | Ok messages -> return messages
-      | Error err ->
-          let*! () =
-            Inbox_event.get_dal_attested_slots_messages_failed head.hash err
-          in
-          return []
+      Layer1_helpers.get_dal_attested_slots_messages
+        fetch_dal_params
+        node_ctxt.cctxt
+        head.hash
     in
     process_messages
       node_ctxt

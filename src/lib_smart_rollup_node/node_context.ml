@@ -834,7 +834,6 @@ let protocol_of_level_with_store (store : _ Store.t) level =
         {protocol; proto_level; first_level_of_protocol = level = Int32.succ l}
 
 let protocol_of_level node_ctxt level =
-  assert (level >= node_ctxt.genesis_info.level) ;
   protocol_of_level_with_store node_ctxt.store level
 
 let last_seen_protocol node_ctxt =

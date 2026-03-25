@@ -3508,6 +3508,109 @@ let test_refutation protocols ~kind =
         protocols)
     tests
 
+(* Test that a rollup node can publish commitments when DAL attestation
+   lags produce published levels before the rollup's genesis level.
+
+   A DAL slot is published, then a rollup is originated before the slot
+   is attested. When attestation happens (at published_level +
+   attestation_lag), DAL skip list cells are created referencing the
+   published_level, which is before the rollup's genesis. *)
+let test_dal_commitment_with_pre_genesis_attested_levels =
+  register_test
+    ~__FILE__
+    ~tags:["dal"; "commitment"]
+    ~uses:(fun _protocol ->
+      [Constant.octez_dal_node; Constant.octez_smart_rollup_node])
+    ~title:"sc_rollup_dal_commitment_pre_genesis_levels"
+  @@ fun protocol ->
+  let commitment_period = 10 in
+  let* node, client = Sc_rollup_helpers.setup_l1 ~commitment_period protocol in
+  (* Start a DAL node to publish slot data. *)
+  let dal_node = Dal_node.create ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:[0] dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* dal_parameters = Dal_common.Parameters.from_client client in
+  let attestation_lag = dal_parameters.attestation_lag in
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let* _commitment =
+    Dal_common.Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:0
+      (Dal_common.Helpers.make_slot ~slot_size (String.make slot_size 'x'))
+  in
+  (* Bake to include the DAL publish operation before originating. *)
+  let* () = Client.bake_for_and_wait client in
+  (* Originate the rollup before the slot is attested. The published_level is
+     now before the rollup's genesis. *)
+  let* sc_rollup =
+    Sc_rollup_helpers.originate_sc_rollup
+      ~kind:"wasm_2_0_0"
+      ~parameters_ty:"string"
+      client
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      Operator
+      node
+      ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
+      ~default_operator:Constant.bootstrap1.alias
+  in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
+  in
+  (* Bake through the attestation lag so the DAL slot is attested and finalized.
+    The rollup node will see DAL cells referencing a published_level before its
+    genesis. The attestation must happen exactly at published_level + attestation_lag.
+    We already baked 2 blocks since publish (one for the publish inclusion, one for
+    origination), so we bake attestation_lag - 2 more, then inject attestations. *)
+  let* () =
+    repeat (attestation_lag - 2) (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () =
+    Dal.inject_dal_attestations_and_bake
+      ~protocol
+      node
+      client
+      (Dal.Slots [0])
+      dal_parameters
+  in
+  (* Bake past the commitment period + finality, then bake extra blocks so the
+     publish operation is injected and included. *)
+  let target_level = init_level + commitment_period in
+  let* current_level = Node.get_level node in
+  let remaining = max 0 (target_level - current_level) in
+  let* () = bake_levels (remaining + block_finality_time + 1) client in
+  let* _ = wait_for_current_level node sc_rollup_node in
+  (* Bake a few more blocks for the publish operation to be injected
+     and included on L1, then sync the rollup node. *)
+  let* () = bake_levels 3 client in
+  let* _ = wait_for_current_level node sc_rollup_node in
+  (* Verify the commitment was published on L1. *)
+  let* published_commitment =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_local_last_published_commitment ()
+  in
+  Check.(
+    published_commitment.commitment_and_hash.commitment.inbox_level
+    >= target_level)
+    Check.int
+    ~error_msg:"Expected published commitment at level >= %R, got %L" ;
+  check_published_commitment_in_l1
+    ~force_new_level:false
+    sc_rollup
+    client
+    published_commitment
+
 let test_invalid_dal_parameters protocols =
   test_refutation_scenario
     ~uses:(fun _protocol ->
@@ -8291,6 +8394,7 @@ let register ~protocols =
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific features. *)
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
+  test_dal_commitment_with_pre_genesis_attested_levels protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols ~kind:"arith" ;
   test_timeout ~kind:"arith" protocols ;
