@@ -139,6 +139,7 @@ pub mod bls;
 pub mod context;
 pub mod gas;
 pub mod interpreter;
+#[cfg(test)]
 mod irrefutable_match;
 pub mod lexer;
 pub mod parser;
