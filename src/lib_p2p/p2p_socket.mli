@@ -213,6 +213,16 @@ val close :
   ('msg, 'meta) t ->
   unit Lwt.t
 
+(** [wait_reader_closed t] is a promise that resolves when the internal
+    reader worker of [t] terminates, i.e. when the TCP connection is
+    lost or the read side fails. *)
+val wait_reader_closed : ('msg, 'meta) t -> unit Lwt.t
+
+(** [wait_writer_closed t] is a promise that resolves when the internal
+    writer worker of [t] terminates, i.e. when the TCP connection is
+    lost or the write side fails. *)
+val wait_writer_closed : ('msg, 'meta) t -> unit Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig

@@ -331,6 +331,10 @@ let read t =
         P2p_metrics.Messages.user_message_received_error ;
       pipe_exn_handler e)
 
+let wait_reader_closed t = P2p_socket.wait_reader_closed t.conn
+
+let wait_writer_closed t = P2p_socket.wait_writer_closed t.conn
+
 let is_readable t =
   let open Lwt_result_syntax in
   Lwt.catch
