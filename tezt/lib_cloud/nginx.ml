@@ -45,10 +45,12 @@ let write_config services =
   with_open_out config_file (fun oc -> output_string oc contents)
 
 let generate_htpasswd ~username ~password =
-  let* output =
-    Process.spawn "openssl" ["passwd"; "-apr1"; password]
-    |> Process.check_and_read_stdout
+  let process, stdin =
+    Process.spawn_with_stdin "openssl" ["passwd"; "-apr1"; "-stdin"]
   in
+  let* () = Lwt_io.write_line stdin password in
+  let* () = Lwt_io.close stdin in
+  let* output = Process.check_and_read_stdout process in
   let hash = String.trim output in
   let contents = sf "%s:%s\n" username hash in
   with_open_out htpasswd_file (fun oc -> output_string oc contents) ;

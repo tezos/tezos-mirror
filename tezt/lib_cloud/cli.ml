@@ -119,7 +119,11 @@ let encoding =
            artifacts_dir;
            teztale_artifacts;
            auth_username;
-           auth_password;
+           (* [auth_password] is intentionally excluded from the encoding.
+              The config file may be committed or shared, which would
+              compromise the password. It can only be set via CLI flag
+              or environment variable. *)
+           auth_password = _;
          }
        ->
       ( ( ( localhost,
@@ -172,7 +176,7 @@ let encoding =
               teztale_artifacts,
               disk_type,
               disk_size_gb ),
-            (auth_username, auth_password) ) ) ))
+            auth_username ) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -223,7 +227,7 @@ let encoding =
                  teztale_artifacts,
                  disk_type,
                  disk_size_gb ),
-               (auth_username, auth_password) ) ) )
+               auth_username ) ) )
        ->
       {
         localhost;
@@ -277,7 +281,7 @@ let encoding =
         tc_jitter;
         teztale_artifacts;
         auth_username;
-        auth_password;
+        auth_password = None;
       })
     (merge_objs
        (merge_objs
@@ -341,7 +345,7 @@ let encoding =
                 (opt "teztale_artifacts" bool)
                 (opt "disk_type" string)
                 (opt "disk_size_gb" int31))
-             (obj2 (opt "auth_username" string) (opt "auth_password" string)))))
+             (obj1 (opt "auth_username" string)))))
 
 let section =
   Clap.section
