@@ -21,30 +21,25 @@ open Tezos_ci
 
 let rules_always = [job_rule ~when_:Always ()]
 
-(* Defines the jobs of the [schedule_docker_build_pipeline] pipeline.
+let job_docker_amd64_experimental : tezos_job =
+  job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
 
-    This pipeline runs scheduled on the [master] branch. The goal
-   of this pipeline is to publish fresh Docker images for 'master' using the latest Alpine packages. *)
+let job_docker_arm64_experimental : tezos_job =
+  job_docker_build
+    ~__POS__
+    ~rules:rules_always
+    ~arch:Arm64
+    ~storage:Ramfs
+    Experimental
+
+let job_docker_merge_manifests =
+  job_docker_merge_manifests
+    ~__POS__
+    ~ci_docker_hub:true
+    ~job_docker_amd64:job_docker_amd64_experimental
+    ~job_docker_arm64:job_docker_arm64_experimental
 
 let octez_distribution_docker_jobs =
-  let job_docker_amd64_experimental : tezos_job =
-    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
-  in
-  let job_docker_arm64_experimental : tezos_job =
-    job_docker_build
-      ~__POS__
-      ~rules:rules_always
-      ~arch:Arm64
-      ~storage:Ramfs
-      Experimental
-  in
-  let job_docker_merge_manifests =
-    job_docker_merge_manifests
-      ~__POS__
-      ~ci_docker_hub:true
-      ~job_docker_amd64:job_docker_amd64_experimental
-      ~job_docker_arm64:job_docker_arm64_experimental
-  in
   [
     (* Stage: build *)
     job_docker_amd64_experimental;
@@ -52,6 +47,11 @@ let octez_distribution_docker_jobs =
     (* Stage: prepare_release *)
     job_docker_merge_manifests;
   ]
+
+(* Defines the jobs of the [schedule_docker_build_pipeline] pipeline.
+
+    This pipeline runs scheduled on the [master] branch. The goal
+   of this pipeline is to publish fresh Docker images for 'master' using the latest Alpine packages. *)
 
 let jobs =
   (* Like in the {!Schedule_extended_test} variant of
