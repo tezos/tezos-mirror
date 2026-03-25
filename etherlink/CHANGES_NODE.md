@@ -1,24 +1,22 @@
 # Changelog
 
-## Unreleased
+## Version 0.55 (2026-03-26)
 
-### Breaking changes
+This is a bugfix release addressing compatibility issues between the latest
+Etherlink upgrade (6.2) and the node. Operators are strongly encouraged to
+upgrade.
 
-### Configuration changes
+This release will apply one migrations to the node’s store (version 24),
+meaning it is not possible downgrade to a previous version.
 
 ### RPCs changes
 
-### Monitoring changes
-
-### Command-line interface changes
+- `eth_estimateGas` correctly takes into account the authorization lists when
+  computing the gas used to pay DA fees. (!21339)
 
 ### Execution changes
 
-- Supports executing `farfadet-r2` natively. (!20604)
-
-### Storage changes
-
-### Documentation changes
+- Supports executing `farfadet-r2` natively. (!21338 !21350)
 
 ### Experimental features changes
 
@@ -26,6 +24,9 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Fixes instant confirmation for networks with Etherlink 6.2 deployed (notably
+  Etherlink Mainnet). (!21338)
 
 ## Version 0.54 (2026-03-06)
 
