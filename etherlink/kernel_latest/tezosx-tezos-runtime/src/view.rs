@@ -301,9 +301,12 @@ where
         })?;
         let result = Rc::try_unwrap(result_rc).unwrap_or_else(|rc| (*rc).clone());
 
-        Ok(result
+        result
             .into_micheline_optimized_legacy(&parser.arena)
-            .encode())
+            .encode()
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("failed to encode view result: {e}"))
+            })
     })();
 
     // Always report consumed gas, regardless of MIR success/failure:

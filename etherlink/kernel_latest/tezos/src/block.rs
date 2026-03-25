@@ -211,8 +211,8 @@ mod tests {
 
         // CRAC event payload
         let crac_id_str = "1-0";
-        let ty = Micheline::App(Prim::string, &[], NO_ANNS).encode();
-        let payload = Micheline::from(crac_id_str.to_string()).encode();
+        let ty = Micheline::App(Prim::string, &[], NO_ANNS).encode().unwrap();
+        let payload = Micheline::from(crac_id_str.to_string()).encode().unwrap();
 
         let transfer_internal =
             InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -369,8 +369,8 @@ mod tests {
                 .unwrap();
 
         // -- Micheline expressions ----------------------------------------
-        let storage_expr = Micheline::App(Prim::pair, &[], NO_ANNS).encode();
-        let param_value = Micheline::Int(42u64.into()).encode();
+        let storage_expr = Micheline::App(Prim::pair, &[], NO_ANNS).encode().unwrap();
+        let param_value = Micheline::Int(42u64.into()).encode().unwrap();
 
         // -- lazy storage diff: two big maps (copy + remove) ---------------
         let lazy_diff = LazyStorageDiffList {
@@ -423,8 +423,8 @@ mod tests {
 
         // -- CRAC event payload -------------------------------------------
         let crac_id_str = "42-3";
-        let ty = Micheline::App(Prim::string, &[], NO_ANNS).encode();
-        let payload = Micheline::from(crac_id_str.to_string()).encode();
+        let ty = Micheline::App(Prim::string, &[], NO_ANNS).encode().unwrap();
+        let payload = Micheline::from(crac_id_str.to_string()).encode().unwrap();
 
         // -- internal operations ------------------------------------------
         let transfer_internal =
@@ -617,7 +617,7 @@ mod tests {
     fn transfer_success_elaborate_round_trip() {
         let ts = TransferSuccess {
             storage: Some(MichelineExpr(
-                Micheline::App(Prim::pair, &[], NO_ANNS).encode(),
+                Micheline::App(Prim::pair, &[], NO_ANNS).encode().unwrap(),
             )),
             balance_updates: vec![
                 BalanceUpdate {

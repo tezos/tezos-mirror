@@ -458,7 +458,17 @@ fn handle_query_entrypoints_to<Host, R>(
         };
     let entrypoints =
         tezos_execution::get_contract_entrypoint(&*host, &context, &address);
-    let result = encode_entrypoints_result(entrypoints);
+    let result = match encode_entrypoints_result(entrypoints) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            log!(
+                Error,
+                "Tezos X entrypoints: failed to encode result: {:?}",
+                err
+            );
+            return;
+        }
+    };
     if let Err(err) = host.store_write_all(result_path, &result) {
         log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
@@ -485,27 +495,44 @@ fn handle_query_entrypoints_to<Host, R>(
 /// enforced structurally.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, tezos_data_encoding::enc::BinError> {
     let parser = Parser::new();
+    // Pre-encode all entries up front so encoding errors can be surfaced
+    // to the caller (the RLP stream API does not let us return errors
+    // from inside the encode closure).
+    let mut encoded_entries: Option<Vec<(Vec<u8>, Vec<u8>)>> = entrypoints_opt
+        .map(|entrypoints| {
+            entrypoints
+                .into_iter()
+                .map(|(name, ty)| {
+                    let name_bytes = name.to_string().into_bytes();
+                    // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
+                    // producing multi-arg pairs (equivalent to L1 normalize_types=true).
+                    let type_bytes =
+                        ty.into_micheline_optimized_legacy(&parser.arena).encode()?;
+                    Ok((name_bytes, type_bytes))
+                })
+                .collect::<Result<Vec<_>, tezos_data_encoding::enc::BinError>>()
+        })
+        .transpose()?;
+    // Sort entries by name before encoding: see the "Determinism
+    // warning" on the enclosing function. HashMap iteration order is
+    // not stable across runs (and differs between native and WASM),
+    // so the resulting bytes must be made canonical here.
+    if let Some(entries) = encoded_entries.as_mut() {
+        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+    }
     let mut stream = rlp::RlpStream::new();
-    append_option_canonical(&mut stream, &entrypoints_opt, |s, entrypoints| {
-        // Sort entries by name before encoding: see the "Determinism
-        // warning" on the enclosing function.
-        let mut sorted: Vec<(&Entrypoint, &Type)> = entrypoints.iter().collect();
-        sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
-        s.begin_list(sorted.len());
-        for (name, ty) in sorted {
-            let name_bytes = name.to_string().into_bytes();
-            // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
-            // producing multi-arg pairs (equivalent to L1 normalize_types=true).
-            let type_bytes = ty.into_micheline_optimized_legacy(&parser.arena).encode();
+    append_option_canonical(&mut stream, &encoded_entries, |s, entries| {
+        s.begin_list(entries.len());
+        for (name_bytes, type_bytes) in entries {
             s.begin_list(2);
-            s.append(&name_bytes);
-            s.append(&type_bytes);
+            s.append(name_bytes);
+            s.append(type_bytes);
         }
         s
     });
-    stream.out().to_vec()
+    Ok(stream.out().to_vec())
 }
 
 #[cfg(test)]
@@ -565,23 +592,23 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        let encoded = encode_entrypoints_result(Some(map));
+        let encoded = encode_entrypoints_result(Some(map)).expect("encode ok");
         let decoded = decode_result(&encoded).expect("roundtrip should be Some");
         assert_eq!(decoded, expected);
     }
 
     #[test]
     fn test_encode_none() {
-        let result = encode_entrypoints_result(None);
+        let result = encode_entrypoints_result(None).expect("encode ok");
         // RLP empty list: 0xc0
         assert_eq!(result, vec![0xc0]);
     }
 
     #[test]
     fn test_encode_empty_map() {
-        let result = encode_entrypoints_result(Some(HashMap::new()));
+        let result = encode_entrypoints_result(Some(HashMap::new())).expect("encode ok");
         // Must be distinct from None
-        assert_ne!(result, encode_entrypoints_result(None));
+        assert_ne!(result, encode_entrypoints_result(None).expect("encode ok"));
         assert_roundtrip(HashMap::new());
     }
 

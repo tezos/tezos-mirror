@@ -96,8 +96,12 @@ mod tests {
 
     #[test]
     pub fn big_map_alloc_compatibility() {
-        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
-        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat)
+            .encode()
+            .unwrap();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit)
+            .encode()
+            .unwrap();
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
             id: 0u64.into(),
             storage_diff: StorageDiff::Alloc(Alloc {
@@ -165,8 +169,12 @@ mod tests {
 
     #[test]
     pub fn big_map_update_compatibility() {
-        let key = mir::ast::Micheline::Int(1u64.into()).encode();
-        let value = Some(mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT).encode());
+        let key = mir::ast::Micheline::Int(1u64.into()).encode().unwrap();
+        let value = Some(
+            mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT)
+                .encode()
+                .unwrap(),
+        );
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
             id: 0u64.into(),
             storage_diff: StorageDiff::Update(vec![Update {

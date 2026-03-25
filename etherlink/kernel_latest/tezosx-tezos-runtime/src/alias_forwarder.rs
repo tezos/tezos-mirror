@@ -50,7 +50,9 @@ pub fn forwarder_code() -> Result<Vec<u8>, hex::FromHexError> {
 }
 
 /// Micheline-encode an EVM address string as the contract's initial storage.
-pub fn forwarder_storage(native_evm_address: &str) -> Vec<u8> {
+pub fn forwarder_storage(
+    native_evm_address: &str,
+) -> Result<Vec<u8>, tezos_data_encoding::enc::BinError> {
     Micheline::from(native_evm_address).encode()
 }
 
@@ -68,7 +70,7 @@ mod tests {
 
     #[test]
     fn forwarder_storage_encodes_string() {
-        let storage = forwarder_storage("0xabcdef");
+        let storage = forwarder_storage("0xabcdef").unwrap();
         // Micheline string tag = 0x01, then 4-byte length, then string bytes
         assert_eq!(storage[0], 0x01);
         let len = u32::from_be_bytes([storage[1], storage[2], storage[3], storage[4]]);
@@ -78,7 +80,7 @@ mod tests {
 
     #[test]
     fn forwarder_storage_empty_address() {
-        let storage = forwarder_storage("");
+        let storage = forwarder_storage("").unwrap();
         assert_eq!(storage, vec![0x01, 0x00, 0x00, 0x00, 0x00]);
     }
 }

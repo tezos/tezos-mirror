@@ -57,6 +57,9 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+    /// Error when encoding serialized data
+    #[error("encoding error: {0}")]
+    EncodeError(String),
     /// Error when decoding serialized data
     #[error(transparent)]
     DecodeError(#[from] DecodeError),
@@ -1502,7 +1505,9 @@ fn interpret_one<'a>(
             let mich = v.into_micheline_optimized_legacy(&arena);
             ctx.gas()
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
-            let encoded = mich.encode_for_pack();
+            let encoded = mich
+                .encode_for_pack()
+                .map_err(|e| InterpretError::EncodeError(e.to_string()))?;
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {

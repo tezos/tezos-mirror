@@ -371,7 +371,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
         let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
         let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
-        Some((view, mich_storage_ty, mich_storage.encode(), view_balance))
+        Some((view, mich_storage_ty, mich_storage.encode().ok()?, view_balance))
     }
 
     fn set_view_context(

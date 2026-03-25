@@ -1297,8 +1297,10 @@ mod tests {
             EventContent, EventSuccess, InternalContentWithMetadata,
         };
 
-        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
-        let payload = Micheline::from(crac_id.to_string()).encode();
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS)
+            .encode()
+            .unwrap();
+        let payload = Micheline::from(crac_id.to_string()).encode().unwrap();
 
         InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {

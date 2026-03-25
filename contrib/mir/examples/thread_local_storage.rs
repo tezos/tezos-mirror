@@ -51,6 +51,7 @@ fn run_contract(parameter: Micheline) {
             new_storage
                 .into_micheline_optimized_legacy(&Arena::new())
                 .encode()
+                .unwrap()
         });
     });
 }

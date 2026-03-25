@@ -1310,7 +1310,8 @@ mod tests {
             Micheline::from(10_i128),
             Micheline::from(source_bytes),
         )
-        .encode();
+        .encode()
+        .unwrap();
 
         let add_amount_annots: Annotations =
             Annotations::from([Annotation::Field(Cow::Borrowed("addAmount"))]);
@@ -1325,7 +1326,8 @@ mod tests {
             ]),
             NO_ANNS,
         )
-        .encode();
+        .encode()
+        .unwrap();
 
         let operation = InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {

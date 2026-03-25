@@ -119,7 +119,8 @@
 //! // same arena everywhere.
 //! let packed_new_storage = new_storage
 //!     .into_micheline_optimized_legacy(&Arena::new())
-//!     .encode();
+//!     .encode()
+//!     .unwrap();
 //! assert_eq!(
 //!     packed_new_storage,
 //!     vec![0x00, 0x82, 0x81, 0x8d, 0xe6, 0xdf, 0x96, 0x8c, 0xad, 0xa5, 0xc5, 0xb4, 0xac, 0x02]
