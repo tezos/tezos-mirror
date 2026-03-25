@@ -40,6 +40,8 @@ let monitoring_child_pipeline =
             ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
        ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_jobs Octez_monitoring))
 
+let docker_version = "24.0.7"
+
 let job_docker =
   Cacio.parameterize @@ fun mode ->
   Cacio.parameterize @@ fun trigger ->
@@ -64,6 +66,44 @@ let job_docker_merge =
     ~ci_docker_hub:(match mode with `test -> false | `real -> true)
     ~job_docker_amd64:(job_docker mode trigger Amd64)
     ~job_docker_arm64:(job_docker mode trigger Arm64)
+
+(* This job normally runs in the {!Octez_latest_release} pipeline
+   that is triggered manually after a release is made.
+   However, to make release testing easier, we include it in other test release pipelines.
+   Thus, release testers are not required to trigger two separate pipelines
+   (indeed, the second [latest_release_test] pipeline is rarely tested).
+   This version of the job is only for testing (mode [`test]);
+   the [`real] version is in [octez_latest_release.ml]. *)
+let job_docker_promote_to_latest =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "docker:promote_to_latest"
+    ~__POS__
+    ~description:"Add the latest tag to the new Docker images."
+    ~image:Images_external.docker
+    ~stage:Publish
+    ~needs_legacy:
+      (match mode with
+      | `test_wait ->
+          (* In pipelines other than latest release pipelines,
+             we want to wait for the Docker image to exist. *)
+          [(Job, job_docker_merge `test `auto)]
+      | `test | `real ->
+          (* In latest release pipelines, the Docker image already exists,
+             as it was created by another pipeline (the tag pipeline). *)
+          [])
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~variables:
+      [
+        ("DOCKER_VERSION", docker_version);
+        ( "CI_DOCKER_HUB",
+          match mode with `test | `test_wait -> "false" | `real -> "true" );
+      ]
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "./scripts/ci/docker_promote_to_latest.sh";
+    ]
 
 let job_build_homebrew_release =
   add_artifacts
@@ -230,6 +270,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
+      (Auto, job_docker_promote_to_latest `test_wait);
     ] ;
   (* Minor *)
   Cacio.register_jobs
@@ -246,6 +287,7 @@ let () =
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
+      (Auto, job_docker_promote_to_latest `test_wait);
     ] ;
   (* Beta *)
   Cacio.register_jobs
@@ -279,6 +321,13 @@ let () =
   Cacio.register_jobs
     Test_publish_release_page
     [(Manual, job_release_page `test `wait_for_nothing)] ;
+  (* Octez Latest Release *)
+  Cacio.register_jobs
+    Octez_latest_release
+    [(Auto, job_docker_promote_to_latest `real)] ;
+  Cacio.register_jobs
+    Octez_latest_release_test
+    [(Auto, job_docker_promote_to_latest `test)] ;
   ()
 
 (** Create an Octez release tag pipeline of type {!pipeline_type},
@@ -293,12 +342,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
-  in
-  let job_promote_to_latest_test =
-    job_docker_promote_to_latest
-      ~ci_docker_hub:false
-      ~dependencies:(Dependent [Job (job_docker_merge mode `auto)])
-      ()
   in
   let job_trigger_monitoring =
     trigger_job
@@ -318,18 +361,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
   ]
   @ [job_trigger_monitoring] @ jobs_debian_repository
   @ Cacio.get_jobs pipeline_type
-  @
-  match pipeline_type with
-  | Major_release_tag_test | Minor_release_tag_test ->
-      [
-        (* This job normally runs in the {!Octez_latest_release} pipeline
-           that is triggered manually after a release is made. However, to
-           make release testing easier, we include it here directly. Thus,
-           release testers are not required to trigger two separate pipelines
-           (indeed, the second `latest_release_test` pipeline is rarely tested). *)
-        job_promote_to_latest_test;
-      ]
-  | _ -> []
 
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->

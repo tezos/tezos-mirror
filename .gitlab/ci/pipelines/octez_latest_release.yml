@@ -31,14 +31,16 @@ docker:promote_to_latest:
   stage: publish
   tags:
   - gcp_not_interruptible
+  needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - ./scripts/ci/docker_promote_to_latest.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

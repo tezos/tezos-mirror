@@ -212,7 +212,9 @@ let () =
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
     "octez_latest_release"
-    ~jobs:(Octez_latest_release.jobs ())
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+      :: Cacio.get_jobs Octez_latest_release)
     If.(on_tezos_namespace && push && on_branch "latest-release")
     ~description:
       ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
@@ -227,7 +229,9 @@ let () =
   register
     "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
-    ~jobs:(Octez_latest_release.jobs ~test:true ())
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+      :: Cacio.get_jobs Octez_latest_release_test)
     ~description:
       "Dry-run pipeline for 'octez_latest_release' pipelines.\n\n\
        This pipeline is used to dry run the 'octez_latest_release' pipeline, \
