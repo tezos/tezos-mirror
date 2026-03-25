@@ -161,21 +161,6 @@ module Docker = struct
       ~name
       ~variables
       ["./scripts/ci/docker_release.sh"]
-
-  let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
-      ~job_docker_arm64 : tezos_job =
-    job_docker_authenticated
-      ~__POS__
-      ~stage:Stages.publish
-      ~name:"docker:merge_manifests"
-      ~tag:Gcp_not_interruptible
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-        (* This job merges the images produced in the jobs
-         [docker:{amd64,arm64}] into a single multi-architecture image, and
-         so must be run after these jobs. *)
-      ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
-      ~ci_docker_hub
-      ["./scripts/ci/docker_merge_manifests.sh"]
 end
 
 (** {2 Helpers for Debian/RPM packaging jobs} *)
