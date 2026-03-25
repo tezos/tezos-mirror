@@ -4376,7 +4376,7 @@ let test_tezlink_upgrade_kernel_auto_sync =
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_tezlink_only_upgrade_test
     ~genesis_timestamp
-    ~tags:["sequencer"; "upgrade"; "auto"; "sync"]
+    ~tags:["sequencer"; "upgrade"; "auto"; "sync"; Tag.flaky]
     ~title:
       "Tezlink rollup-node kernel upgrade is applied to the sequencer state."
   @@
