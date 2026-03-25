@@ -235,5 +235,6 @@ let da_fee_per_byte_mutez read =
       Durable_storage_path.da_fee_per_byte
       Ethereum_types.decode_number_le
   in
+  let*? da_fee_per_byte = Tezos_types.Tez.(of_wei (Wei da_fee_per_byte_wei)) in
   (* DA fee expressed in wei: converting to mutez. *)
-  return @@ Tezos_types.Tez.wei_to_mutez da_fee_per_byte_wei
+  return da_fee_per_byte

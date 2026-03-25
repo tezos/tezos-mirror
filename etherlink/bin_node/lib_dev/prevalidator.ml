@@ -853,12 +853,14 @@ let prevalidate_raw_transaction raw_transaction =
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
 
-let get_da_fee_per_byte_nanotez () =
+let get_da_fee_per_byte () =
   let open Lwt_result_syntax in
   let* w = get_worker () in
   let state = Worker.state w in
-  let da_fee_wei = state.session.etherlink_infos.da_fee_per_bytes in
-  return (Tezos_types.Tez.wei_to_nanotez da_fee_wei)
+  let da_fee_wei =
+    Tezos_types.Tez.Wei state.session.etherlink_infos.da_fee_per_bytes
+  in
+  return (Tezos_types.Tez.nanotez_of_wei da_fee_wei)
 
 let prevalidate_raw_transaction_tezlink ~simulator_mode raw_transaction =
   worker_wait_for_request

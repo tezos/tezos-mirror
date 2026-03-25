@@ -55,15 +55,17 @@ end
 module Tez : sig
   include module type of Tezlink_imports.Imported_context.Tez
 
+  type nanotez = Nanotez of Q.t
+
+  type wei = Wei of Z.t
+
   val of_string_exn : string -> t
 
   val to_mutez_z : t -> Z.t
 
-  val wei_to_mutez : Z.t -> int64
+  val of_wei : wei -> t tzresult
 
-  val wei_to_nanotez : Z.t -> Q.t
-
-  val mutez_to_wei : int64 -> Z.t
+  val nanotez_of_wei : wei -> nanotez
 end
 
 module Operation : sig

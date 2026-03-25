@@ -9,7 +9,7 @@
 val register_tezlink_services :
   l2_chain_id:L2_types.chain_id ->
   add_operation:(bytes -> Ethereum_types.hash tzresult Lwt.t) ->
-  get_da_fee_per_byte_nanotez:(unit -> Q.t tzresult Lwt.t) ->
+  get_da_fee_per_byte:(unit -> Tezos_types.Tez.nanotez tzresult Lwt.t) ->
   (module Tezlink_backend_sig.S) ->
   unit Tezos_rpc.Directory.t
 
