@@ -367,27 +367,36 @@ let start global_state =
       (module Handlers))
 
 let push_request (worker : worker) {automaton_state; request} =
-  match request with
-  | Forge_and_sign_block block_to_bake ->
-      Worker.Queue.push_request
-        worker
-        Request.{automaton_state; content = Forge_and_sign_block block_to_bake}
-  | Forge_and_sign_preattestations {unsigned_preattestations} ->
-      Worker.Queue.push_request
-        worker
-        Request.
-          {
-            automaton_state;
-            content = Forge_and_sign_preattestations {unsigned_preattestations};
-          }
-  | Forge_and_sign_attestations {unsigned_attestations} ->
-      Worker.Queue.push_request
-        worker
-        Request.
-          {
-            automaton_state;
-            content = Forge_and_sign_attestations {unsigned_attestations};
-          }
+  let open Lwt_result_syntax in
+  let*! accepted =
+    match request with
+    | Forge_and_sign_block block_to_bake ->
+        Worker.Queue.push_request
+          worker
+          Request.
+            {automaton_state; content = Forge_and_sign_block block_to_bake}
+    | Forge_and_sign_preattestations {unsigned_preattestations} ->
+        Worker.Queue.push_request
+          worker
+          Request.
+            {
+              automaton_state;
+              content =
+                Forge_and_sign_preattestations {unsigned_preattestations};
+            }
+    | Forge_and_sign_attestations {unsigned_attestations} ->
+        Worker.Queue.push_request
+          worker
+          Request.
+            {
+              automaton_state;
+              content = Forge_and_sign_attestations {unsigned_attestations};
+            }
+  in
+  if accepted then return_unit
+  else
+    let*! () = Events.(emit forge_worker_unavailable) () in
+    tzfail Baking_errors.Forge_worker_unavailable
 
 module Internal_for_tests = struct
   module Delegate_signing_queue = Delegate_signing_queue

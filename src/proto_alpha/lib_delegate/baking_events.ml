@@ -1467,6 +1467,14 @@ module Forge_worker = struct
       ~msg:"error while authorizing consensus votes: {errors}"
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
+
+  let forge_worker_unavailable =
+    declare_0
+      ~section
+      ~name:"forge_worker_unavailable"
+      ~level:Error
+      ~msg:"forge worker unavailable (queue closed or crashed)"
+      ()
 end
 
 module Client_daemon = struct
