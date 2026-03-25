@@ -707,7 +707,8 @@ let register_dynamic_block_services ~l2_chain_id
   Lwt.return dir
 
 let register_chain_services ~l2_chain_id ~get_da_fee_per_byte
-    (module Backend : Tezlink_backend_sig.S) base_dir =
+    ~get_michelson_base_fee_per_gas (module Backend : Tezlink_backend_sig.S)
+    base_dir =
   let dir =
     Tezos_rpc.Directory.empty
     |> register_with_conversion
@@ -821,10 +822,13 @@ let register_chain_services ~l2_chain_id ~get_da_fee_per_byte
            let* (Tezos_types.Tez.Nanotez nanotez_per_byte) =
              get_da_fee_per_byte ()
            in
+           let* (Tezos_types.Tez.Nanotez nanotez_per_gas) =
+             get_michelson_base_fee_per_gas ()
+           in
            let config =
-             Mempool.with_minimal_nanotez_per_byte
-               nanotez_per_byte
-               Mempool.default_config
+             Mempool.default_config
+             |> Mempool.with_minimal_nanotez_per_byte nanotez_per_byte
+             |> Mempool.with_minimal_nanotez_per_gas_unit nanotez_per_gas
            in
            let include_default_fields =
              if query#include_default then `Always else `Never
@@ -876,7 +880,8 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte backend =
+let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte
+    ~get_michelson_base_fee_per_gas backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   let base_dir =
     Tezos_rpc.Directory.register_dynamic_directory
@@ -886,7 +891,11 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte backend =
         register_dynamic_block_services ~l2_chain_id backend chain block)
   in
   base_dir
-  |> register_chain_services ~l2_chain_id ~get_da_fee_per_byte backend
+  |> register_chain_services
+       ~l2_chain_id
+       ~get_da_fee_per_byte
+       ~get_michelson_base_fee_per_gas
+       backend
   |> register_with_conversion
        ~service:Tezos_services.bootstrapped
        ~impl:(fun () () () -> Backend.bootstrapped ())
@@ -914,9 +923,14 @@ let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
 let register_tezlink_services ~l2_chain_id ~add_operation ~get_da_fee_per_byte
-    backend =
+    ~get_michelson_base_fee_per_gas backend =
   let directory =
-    build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte backend
+    build_dir
+      ~l2_chain_id
+      ~add_operation
+      ~get_da_fee_per_byte
+      ~get_michelson_base_fee_per_gas
+      backend
   in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service

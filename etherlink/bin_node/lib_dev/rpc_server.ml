@@ -218,6 +218,8 @@ let start_public_server (type f) ~(mode : f Mode.t)
              (Tezlink_services_impl.make ro_ctxt)
              ~add_operation:add_operation_with_tick
              ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte
+             ~get_michelson_base_fee_per_gas:
+               Prevalidator.get_michelson_base_fee_per_gas
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
         let*! runtimes = Evm_ro_context.list_runtimes ro_ctxt in
         match runtimes with

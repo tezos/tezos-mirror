@@ -12,5 +12,7 @@ let add_rpc_directory ro_ctxt ~l2_chain_id ~add_operation dir = function
            ~l2_chain_id
            (Tezos_backend.make ro_ctxt)
            ~add_operation
-           ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte)
+           ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte
+           ~get_michelson_base_fee_per_gas:
+             Prevalidator.get_michelson_base_fee_per_gas)
         dir
