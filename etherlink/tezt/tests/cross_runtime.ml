@@ -1313,6 +1313,43 @@ let test_crac_tez_to_evm_fake_tx_in_block =
          but found %L") ;
   unit
 
+(** EVM journal is preserved across CrossRuntime boundaries: TEZ revert must
+ *  roll back inner EVM storage changes made via a TEZ->EVM CRAC.
+ *
+ *    EVM[evm_outer] ~CRAC~> TEZ[tez_runner]
+ *                             |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
+ *                             |-> REVERT
+ *
+ *  evm_inner gets called from within the TEZ execution (TEZ->EVM inner CRAC).
+ *  When tez_runner reverts, both the TEZ state and evm_inner's EVM storage
+ *  must be rolled back to zero.
+ *)
+let test_crac_tez_revert_rolls_back_inner_evm_storage =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ revert rolls back inner EVM storage"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy inner EVM contract" ;
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to inner EVM" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  Log.debug ~prefix "Originate TEZ runner (calls bridge, then reverts)" ;
+  let* tez_runner =
+    TezMultiRunCaller.originate ~revert:true ~callees:[tez_bridge] ()
+  in
+  Log.debug ~prefix "Deploy EVM outer bridge to TEZ runner" ;
+  let* evm_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  Log.debug ~prefix "Call EVM outer (expected failure)" ;
+  let* _ = EvmRunner.call_run ~expected_status:false evm_outer in
+  Log.debug ~prefix "Verify inner EVM storage was rolled back" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_inner in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_outer
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1326,4 +1363,5 @@ let () =
   test_crac_tez_5_crossing_chain [Alpha] ;
   test_crac_access_list_preserved [Alpha] ;
   test_crac_tez_target_reverts [Alpha] ;
-  test_crac_tez_to_evm_fake_tx_in_block [Alpha]
+  test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
+  test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha]
