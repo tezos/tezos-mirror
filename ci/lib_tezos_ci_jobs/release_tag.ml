@@ -69,14 +69,7 @@ let job_docker =
         ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
         ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("IMAGE_ARCH_PREFIX", Runner.Arch.show_uniform arch ^ "_");
-        ( "EXECUTABLE_FILES",
-          match mode with
-          | `test ->
-              (* TODO: why this special case?
-                 Don't we want the test pipeline to mimic the real pipeline? *)
-              "script-inputs/released-executables \
-               script-inputs/experimental-executables"
-          | `real -> "script-inputs/released-executables" );
+        ("EXECUTABLE_FILES", "script-inputs/released-executables");
       ]
     ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
 
