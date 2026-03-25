@@ -191,12 +191,13 @@ docker:merge_manifests:
   - oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - ./scripts/ci/docker_merge_manifests.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
