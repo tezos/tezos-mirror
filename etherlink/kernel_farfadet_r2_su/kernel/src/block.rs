@@ -87,7 +87,7 @@ pub enum ComputationResult {
 }
 
 // A block in progress can either come directly from the storage (when the previous run did not have enough ticks to apply the full block) or from a blueprint
-enum BlockInProgressProvenance {
+pub enum BlockInProgressProvenance {
     Storage,
     Blueprint,
 }
@@ -128,7 +128,7 @@ fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compute<Host: Runtime>(
+pub fn compute<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut EthBlockInProgress,
@@ -404,7 +404,7 @@ fn clean_delayed_transactions(
     Ok(())
 }
 
-fn promote_block<Host: Runtime>(
+pub fn promote_block<Host: Runtime>(
     safe_host: &mut SafeStorage<&mut Host>,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress_provenance: &BlockInProgressProvenance,
