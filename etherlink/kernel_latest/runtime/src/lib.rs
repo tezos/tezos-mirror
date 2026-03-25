@@ -3,5 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 pub mod extensions;
+pub mod keyspace;
 pub mod runtime;
 pub mod safe_storage;
