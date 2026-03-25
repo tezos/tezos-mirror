@@ -125,7 +125,12 @@ impl FeeUpdates {
         block_fees: &BlockFees,
         execution_gas_used: U256,
     ) -> Self {
-        let da_fee = da_fee(block_fees.da_fee_per_byte(), &tx.data, &tx.access_list);
+        let da_fee = da_fee(
+            block_fees.da_fee_per_byte(),
+            &tx.data,
+            &tx.access_list,
+            tx.authorization_list.as_deref().unwrap_or_default().len(),
+        );
 
         Self::of_gas_and_da_fee(block_fees, execution_gas_used, da_fee)
     }
@@ -179,18 +184,6 @@ impl FeeUpdates {
             "Applying {self:?} for {caller}"
         );
 
-        let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
-
-        if let Err(e) =
-            caller_account.sub_balance(host, u256_to_alloy(&self.charge_user_amount))
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to charge {caller} additional fees of {}: {}",
-                self.charge_user_amount,
-                e
-            ));
-        }
-
         let sequencer = match sequencer_pool_address {
             None => {
                 let burned_fee = self
@@ -228,7 +221,7 @@ pub fn simulation_add_gas_for_fees(
     block_fees: &BlockFees,
     tx_data: &[u8],
 ) -> Result<SimulationOutcome, Error> {
-    // Simulation does not have an access list
+    // Simulation does not have an access list or authorization list
     let gas_for_fees = gas_for_fees(
         block_fees.da_fee_per_byte(),
         // We select minimum base fee per gas, to ensure that the user has sufficient gas
@@ -236,6 +229,7 @@ pub fn simulation_add_gas_for_fees(
         block_fees.minimum_base_fee_per_gas(),
         tx_data,
         &[],
+        0,
     )?;
 
     outcome.gas_used = outcome.gas_used.saturating_add(gas_for_fees);
@@ -264,6 +258,7 @@ pub fn tx_execution_gas_limit(
         fees.minimum_base_fee_per_gas(),
         &tx.data,
         &tx.access_list,
+        tx.authorization_list.as_deref().unwrap_or_default().len(),
     )?;
 
     tx.gas_limit_with_fees()
@@ -277,27 +272,46 @@ pub(crate) fn gas_for_fees(
     gas_price: U256,
     tx_data: &[u8],
     tx_access_list: &[AccessListItem],
+    authorization_list_len: usize,
 ) -> Result<u64, Error> {
-    let fees = da_fee(da_fee_per_byte, tx_data, tx_access_list);
+    let fees = da_fee(
+        da_fee_per_byte,
+        tx_data,
+        tx_access_list,
+        authorization_list_len,
+    );
 
     let gas_for_fees = cdiv(fees, gas_price);
     gas_as_u64(gas_for_fees)
 }
+
+// Size of a single EIP-7702 authorization entry:
+// chain_id (U256=32) + address (H160=20) + nonce (u64=8)
+// + y_parity (u8=1) + r (U256=32) + s (U256=32) = 125 bytes
+const AUTHORIZATION_ENTRY_SIZE: usize = size_of::<U256>()
+    + size_of::<H160>()
+    + size_of::<u64>()
+    + size_of::<u8>()
+    + 2 * size_of::<U256>();
 
 /// Data availability fee for a transaction with given data size.
 pub(crate) fn da_fee(
     da_fee_per_byte: U256,
     tx_data: &[u8],
     access_list: &[AccessListItem],
+    authorization_list_len: usize,
 ) -> U256 {
     let access_data_size: usize = access_list
         .iter()
         .map(|ali| size_of::<H160>() + size_of::<H256>() * ali.storage_keys.len())
         .sum();
 
+    let authorization_data_size = authorization_list_len * AUTHORIZATION_ENTRY_SIZE;
+
     U256::from(tx_data.len())
         .saturating_add(ASSUMED_TX_ENCODED_SIZE.into())
         .saturating_add(access_data_size.into())
+        .saturating_add(authorization_data_size.into())
         .saturating_mul(da_fee_per_byte)
 }
 
@@ -391,6 +405,7 @@ mod tests {
         };
 
         // Act
+        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
         let result = fee_updates.apply(&mut host, address, None);
 
         // Assert
@@ -430,6 +445,7 @@ mod tests {
         };
 
         // Act
+        mock_charge_inclusion_fees(&mut host, address, fee_updates.charge_user_amount);
         let result = fee_updates.apply(&mut host, address, Some(sequencer_address));
 
         // Assert
@@ -448,29 +464,18 @@ mod tests {
     }
 
     #[test]
-    fn apply_fails_user_charge_too_large() {
-        // Arrange
+    #[should_panic]
+    fn charge_inclusion_fees_fails_if_too_large() {
+        // The inclusion fee deduction (now in apply.rs) should fail
+        // when the charge exceeds the caller's balance.
         let mut host = MockKernelHost::default();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
         set_balance(&mut host, address, balance);
 
-        let fee_updates = FeeUpdates {
-            overall_gas_used: U256::zero(),
-            overall_gas_price: U256::zero(),
-            burn_amount: U256::zero(),
-            charge_user_amount: balance * 2,
-            compensate_sequencer_amount: U256::zero(),
-        };
-
-        // Act
-        let result = fee_updates.apply(&mut host, address, None);
-
-        // Assert
-        assert!(result.is_err());
-        let new_balance = get_balance(&mut host, address);
-        assert_eq!(balance, new_balance);
+        // This panics because sub_balance fails and the helper unwraps
+        mock_charge_inclusion_fees(&mut host, address, balance * 2);
     }
 
     #[test]
@@ -485,7 +490,7 @@ mod tests {
         let data = &[1, 2, 3];
 
         // Act
-        let fee = da_fee(super::DA_FEE_PER_BYTE.into(), data, al);
+        let fee = da_fee(super::DA_FEE_PER_BYTE.into(), data, al, 0);
 
         // Assert
         let expected_bytes = data.len() + 2 * (20 /* address */ + 2 * 32/* keys */);
@@ -512,6 +517,19 @@ mod tests {
         assert!(info.balance.is_zero());
         info.balance = info.balance.saturating_add(u256_to_alloy(&balance));
         account.set_info(host, info).unwrap();
+    }
+
+    /// Mock the inclusion fee deduction that now happens in apply.rs
+    /// before FeeUpdates::apply is called.
+    fn mock_charge_inclusion_fees(
+        host: &mut MockKernelHost,
+        address: H160,
+        charge_amount: U256,
+    ) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
+        account
+            .sub_balance(host, u256_to_alloy(&charge_amount))
+            .unwrap();
     }
 
     fn mock_execution_outcome(gas_used: u64) -> SimulationOutcome {

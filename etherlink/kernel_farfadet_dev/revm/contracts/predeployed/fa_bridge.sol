@@ -69,6 +69,18 @@ contract FABridge is ReentrancySafe {
         _;
     }
 
+    function isWallet(address addr) internal view returns (bool) {
+        bytes memory code = addr.code;
+
+        // Plain EOA
+        if (code.length == 0) return true;
+
+        // EIP-7702 delegation designator: exactly 23 bytes starting with 0xef0100
+        if (code.length == 23 && code[0] == 0xef && code[1] == 0x01 && code[2] == 0x00) return true;
+
+        return false;
+    }
+
     /// @notice Queue a deposit into the ticket table with proxy information.
     /// @dev
     ///  - Can only be called through the feed deposit address
@@ -226,6 +238,15 @@ contract FABridge is ReentrancySafe {
         // Revert if amount is zero
         require(amount > 0, "Empty withdrawals are not allowed");
 
+        bool ownerIsWallet = isWallet(ticketOwner);
+
+        if (ownerIsWallet) {
+            require(
+                msg.sender == ticketOwner,
+                "FABridge: caller is not the ticket owner"
+            );
+        }
+
         // Compute ticket hash
         uint256 ticketHash = uint256(
             keccak256(abi.encodePacked(ticketer, content))
@@ -244,6 +265,28 @@ contract FABridge is ReentrancySafe {
             ticketSuccess,
             "Failed to decrement ticket balance: ticket_balance_remove call was unsuccessful"
         );
+
+        if (!ownerIsWallet) {
+            // Encode proxy data
+            bytes memory proxyData = abi.encodeCall(
+                IProxy.withdraw,
+                (msg.sender, amount, ticketHash)
+            );
+
+            // Send proxy data to the system forwarder
+            bytes memory systemInput = abi.encodeCall(
+                InternalForwarder.forward,
+                (ticketOwner, proxyData)
+            );
+            (bool forwarderSuccess, bytes memory proxyReturn) = Constants
+                .system
+                .call(systemInput);
+            require(forwarderSuccess, "System forwarder failed");
+
+            // Decode proxy execution return
+            (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
+            require(proxySuccess, "Proxy withdraw failed");
+        }
 
         // Call outboxSender.push_fa_withdrawal_to_outbox
         bytes memory outboxData = abi.encodeCall(
@@ -272,26 +315,6 @@ contract FABridge is ReentrancySafe {
             amount,
             counter
         );
-
-        // Encode proxy data
-        bytes memory proxyData = abi.encodeCall(
-            IProxy.withdraw,
-            (msg.sender, amount, ticketHash)
-        );
-
-        // Send proxy data to the system forwarder
-        bytes memory systemInput = abi.encodeCall(
-            InternalForwarder.forward,
-            (ticketOwner, proxyData)
-        );
-        (bool forwarderSuccess, bytes memory proxyReturn) = Constants
-            .system
-            .call(systemInput);
-        require(forwarderSuccess, "System forwarder failed");
-
-        // Decode proxy execution return
-        (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
-        require(proxySuccess, "Proxy withdraw failed");
     }
 
     /// @notice Performs a fast withdrawal of FA tickets to L1.
@@ -314,6 +337,15 @@ contract FABridge is ReentrancySafe {
         // Revert if amount is zero
         require(amount > 0, "Empty withdrawals are not allowed");
 
+        bool ownerIsWallet = isWallet(ticketOwner);
+
+        if (ownerIsWallet) {
+            require(
+                msg.sender == ticketOwner,
+                "FABridge: caller is not the ticket owner"
+            );
+        }
+
         // Compute ticket hash
         uint256 ticketHash = uint256(
             keccak256(abi.encodePacked(ticketer, content))
@@ -332,6 +364,28 @@ contract FABridge is ReentrancySafe {
             ticketSuccess,
             "Failed to decrement ticket balance: ticket_balance_remove call was unsuccessful"
         );
+
+        if (!ownerIsWallet) {
+            // Encode proxy data
+            bytes memory proxyData = abi.encodeCall(
+                IProxy.withdraw,
+                (msg.sender, amount, ticketHash)
+            );
+
+            // Send proxy data to the system forwarder
+            bytes memory systemInput = abi.encodeCall(
+                InternalForwarder.forward,
+                (ticketOwner, proxyData)
+            );
+            (bool forwarderSuccess, bytes memory proxyReturn) = Constants
+                .system
+                .call(systemInput);
+            require(forwarderSuccess, "System forwarder failed");
+
+            // Decode proxy execution return
+            (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
+            require(proxySuccess, "Proxy withdraw failed");
+        }
 
         // Call outboxSender.push_fast_fa_withdrawal_to_outbox
         bytes memory outboxData = abi.encodeCall(
@@ -370,25 +424,5 @@ contract FABridge is ReentrancySafe {
             block.timestamp,
             payload
         );
-
-        // Encode proxy data
-        bytes memory proxyData = abi.encodeCall(
-            IProxy.withdraw,
-            (msg.sender, amount, ticketHash)
-        );
-
-        // Send proxy data to the system forwarder
-        bytes memory systemInput = abi.encodeCall(
-            InternalForwarder.forward,
-            (ticketOwner, proxyData)
-        );
-        (bool forwarderSuccess, bytes memory proxyReturn) = Constants
-            .system
-            .call(systemInput);
-        require(forwarderSuccess, "System forwarder failed");
-
-        // Decode proxy execution return
-        (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
-        require(proxySuccess, "Proxy withdraw failed");
     }
 }
