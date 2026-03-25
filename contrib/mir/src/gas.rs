@@ -97,7 +97,6 @@ trait Log2i {
 
 impl Log2i for usize {
     fn log2i(self) -> Result<u32, OutOfGas> {
-        debug_assert!(self != 0, "log2i(0) is undefined");
         if self == 0 {
             Err(OutOfGas)
         } else {
@@ -108,7 +107,6 @@ impl Log2i for usize {
 
 impl Log2i for u64 {
     fn log2i(self) -> Result<u32, OutOfGas> {
-        debug_assert!(self != 0, "log2i(0) is undefined");
         if self == 0 {
             Err(OutOfGas)
         } else {
@@ -1037,31 +1035,13 @@ mod test {
         assert_eq!(300_000u64.log2i(), Ok(19));
     }
 
-    // In debug builds, log2i(0) triggers a debug_assert panic.
     #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "log2i(0) is undefined")]
-    fn log2i_zero_usize_debug() {
-        let _ = 0usize.log2i();
-    }
-
-    #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "log2i(0) is undefined")]
-    fn log2i_zero_u64_debug() {
-        let _ = 0u64.log2i();
-    }
-
-    // In release builds, log2i(0) returns OutOfGas.
-    #[test]
-    #[cfg(not(debug_assertions))]
-    fn log2i_zero_usize_release() {
+    fn log2i_zero_usize() {
         assert_eq!(0usize.log2i(), Err(OutOfGas));
     }
 
     #[test]
-    #[cfg(not(debug_assertions))]
-    fn log2i_zero_u64_release() {
+    fn log2i_zero_u64() {
         assert_eq!(0u64.log2i(), Err(OutOfGas));
     }
 }
