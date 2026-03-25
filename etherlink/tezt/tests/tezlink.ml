@@ -3887,6 +3887,99 @@ let test_michelson_execution_gas_fee =
   in
   unit
 
+(** Test that gas exhaustion is handled correctly.
+
+    Originates [loop.tz] which loops [n] times, then calls it with
+    [n = 150_000] and [gas_limit = 10_000] gas units.  Each iteration
+    costs roughly 0.1 gas unit, so 150k iterations need ~15k gas but
+    only 10k are available.  The operation is included in the block
+    but fails with gas exhaustion, and the fee is fully consumed. *)
+let test_michelson_gas_exhaustion =
+  register_tezlink_test
+    ~title:"Michelson gas exhaustion"
+    ~tags:["gas"; "exhaustion"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let script_path =
+    Michelson_script.(find ["mini_scenarios"; "loop"] protocol |> path)
+  in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"loop"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* balance_before =
+    Client.get_balance_for
+      ~endpoint
+      ~account:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let fee = 10_000 in
+  (* [~force:true] bypasses client-side simulation which would reject the
+     operation before injection.  The node prevalidator accepts it (gas_limit
+     and fee are valid) and the failure only happens during block execution. *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~force:true
+      ~amount:Tez.zero
+      ~fee:(Tez.of_mutez_int fee)
+      ~gas_limit:10_000
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:contract
+      ~arg:"150000"
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Verify the operation was included but failed. *)
+  let* operations =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_operations ()
+  in
+  let op_result =
+    JSON.(
+      operations |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result")
+  in
+  let status = JSON.(op_result |-> "status" |> as_string) in
+  Check.(
+    (status = "failed")
+      string
+      ~error_msg:"Expected operation to fail (gas exhaustion), got status %L") ;
+  (* Verify the error is specifically gas exhaustion. *)
+  let error_message =
+    JSON.(op_result |-> "errors" |=> 0 |-> "error_message" |> as_string)
+  in
+  Check.(
+    (error_message =~ rex "Gas_exhaustion")
+      ~error_msg:"Expected Gas_exhaustion error, got %L") ;
+  let* balance_after =
+    Client.get_balance_for
+      ~endpoint
+      ~account:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let consumed = Tez.to_mutez balance_before - Tez.to_mutez balance_after in
+  Check.(
+    (consumed = fee)
+      int
+      ~error_msg:"Expected %R mutez consumed (fee only), got %L") ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4616,6 +4709,7 @@ let () =
   test_tezlink_forge_operations [Alpha] ;
   test_michelson_gas_backlog [Alpha] ;
   test_michelson_execution_gas_fee [Alpha] ;
+  test_michelson_gas_exhaustion [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
