@@ -102,7 +102,10 @@ fn unify_interpreter_error<'a>(
         }
         (MutezOverflow(_, _), InterpretError::MutezOverflow) => true,
         (Overflow, InterpretError::Overflow) => true,
-        (GeneralOverflow(_, _), _) => todo!("General overflow is unsupported on interpreter"),
+        // The MIR interpreter currently doesn't distinguish a "general overflow"
+        // error from other failures. Treat this expectation as unmet rather
+        // than panicking via todo!().
+        (GeneralOverflow(_, _), _) => false,
         // Mirror the kernel's `classify_interpret_error` (view.rs): every
         // flavour of resource exhaustion answers an `OutOfGas` expectation
         // — direct budget exhaustion, the nested-`TcError` forms, a
