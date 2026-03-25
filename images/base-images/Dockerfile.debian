@@ -15,6 +15,8 @@ RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.c
     echo "Acquire::http::Proxy::ports.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
     echo "Acquire::http::Proxy::security.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+
 COPY scripts/kiss-fetch.sh /usr/local/bin/
 # install datadog and gcloud static binary
 COPY images/scripts/install_datadog_static.sh \
