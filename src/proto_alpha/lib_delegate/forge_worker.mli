@@ -48,8 +48,9 @@ type worker
     to be treated. Each [forge_request] is associated to a specific
     delegate. The request will be treated whenever the delegate's
     associated queue is available. If, the delegate's queue did not
-    previously exist, it will be created. *)
-val push_request : worker -> forge_request -> bool Lwt.t
+    previously exist, it will be created. Returns an error if the
+    worker queue is closed or unavailable. *)
+val push_request : worker -> forge_request -> unit tzresult Lwt.t
 
 (** [get_event_stream worker] returns the worker's stream of events
     onto which tasks completion results are pushed. *)
