@@ -31,7 +31,7 @@ use tezos_tezlink::operation::{
     ManagerOperationContentConv, Operation, OriginationContent, Script,
 };
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, ApplyOperationError, ContentResult,
+    produce_skipped_receipt, ApplyOperationError, BacktrackedResult, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
     OriginationSuccess, TransferTarget,
 };
@@ -284,6 +284,7 @@ where
                         result: ContentResult::Skipped,
                     })
                 } else {
+                    let receipts_before = all_internal_receipts.len();
                     let receipt = transfer(
                         tc_ctx,
                         operation_ctx,
@@ -303,7 +304,21 @@ where
                         sender: sender_account.contract(),
                         nonce,
                         result: match receipt {
-                            Ok(success) => ContentResult::Applied(success.into()),
+                            Ok(success) => {
+                                let sub_ops_succeeded = all_internal_receipts
+                                    .get(receipts_before..)
+                                    .and_then(|s| s.last())
+                                    .is_none_or(InternalOperationSum::is_applied);
+                                if sub_ops_succeeded {
+                                    ContentResult::Applied(success.into())
+                                } else {
+                                    failed = Some(index);
+                                    ContentResult::BackTracked(BacktrackedResult {
+                                        errors: None,
+                                        result: success.into(),
+                                    })
+                                }
+                            }
                             Err(err) => {
                                 failed = Some(index);
                                 log!(
