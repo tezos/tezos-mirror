@@ -169,14 +169,15 @@ pub enum Noun {
     MacroPrim(Macro),
 }
 
-pub(crate) fn try_ann_from_str(value: &str) -> Option<Annotation> {
+pub(crate) fn ann_from_str(value: &str) -> Result<Annotation, LexerError> {
     match value {
-        s @ ("@%" | "@%%" | "%@") => Some(Annotation::Special(Cow::Borrowed(s))),
+        s @ ("@%" | "@%%" | "%@") => Ok(Annotation::Special(Cow::Borrowed(s))),
+        "" => Err(LexerError::InvalidAnnotation),
         s => match s.as_bytes()[0] {
-            b'@' => Some(Annotation::Variable(Cow::Borrowed(&s[1..]))),
-            b'%' => Some(Annotation::Field(Cow::Borrowed(&s[1..]))),
-            b':' => Some(Annotation::Type(Cow::Borrowed(&s[1..]))),
-            _ => None,
+            b'@' => Ok(Annotation::Variable(Cow::Borrowed(&s[1..]))),
+            b'%' => Ok(Annotation::Field(Cow::Borrowed(&s[1..]))),
+            b':' => Ok(Annotation::Type(Cow::Borrowed(&s[1..]))),
+            _ => Err(LexerError::InvalidAnnotation),
         },
     }
 }
@@ -325,8 +326,9 @@ fn lex_bytes(lex: &mut Lexer) -> Result<Vec<u8>, LexerError> {
     Ok(hex::decode(&lex.slice()[2..])?)
 }
 
-fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Annotation<'a> {
-    try_ann_from_str(lex.slice()).expect("regex from annotation ensures it's valid")
+fn lex_annotation<'a>(lex: &mut Lexer<'a>) -> Result<Annotation<'a>, LexerError> {
+    let lex_slice = lex.slice();
+    ann_from_str(lex_slice)
 }
 
 #[cfg(test)]
