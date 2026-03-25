@@ -130,6 +130,11 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Fixed inbox divergence when DAL attestation lags produce published levels
+  before the rollup's genesis level. Errors fetching DAL attested slots messages
+  are now propagated instead of silently returning an empty list. (MR
+  :gl:`!21293`)
+
 - Delayed the start of a refutation game by one commitment period (approximately
   15 minutes) to prevent some edge cases in dispute resolution. (MR
   :gl:`!20674`)
