@@ -92,6 +92,10 @@ type error +=
   | Invalid_chain_store_export of Chain_id.t * string
   | Cannot_export_snapshot_format
   | Cannot_checkout_imported_context of Context_hash.t
+  | Cannot_encode_floating_block of {
+      hash : Block_hash.t;
+      error : Data_encoding.Binary.write_error;
+    }
 
 let () =
   let open Data_encoding in
@@ -606,7 +610,27 @@ let () =
         h)
     (obj1 (req "context_hash" Context_hash.encoding))
     (function Cannot_checkout_imported_context h -> Some h | _ -> None)
-    (fun h -> Cannot_checkout_imported_context h)
+    (fun h -> Cannot_checkout_imported_context h) ;
+  register_error_kind
+    `Permanent
+    ~id:"Snapshot.cannot_encode_floating_block"
+    ~title:"Cannot encode floating block"
+    ~description:"Failed to encode a floating block during snapshot export."
+    ~pp:(fun ppf (hash, error) ->
+      Format.fprintf
+        ppf
+        "Failed to encode floating block %a during snapshot export: %a."
+        Block_hash.pp
+        hash
+        Data_encoding.Binary.pp_write_error
+        error)
+    (obj2
+       (req "block_hash" Block_hash.encoding)
+       (req "error" Data_encoding.Binary.write_error_encoding))
+    (function
+      | Cannot_encode_floating_block {hash; error} -> Some (hash, error)
+      | _ -> None)
+    (fun (hash, error) -> Cannot_encode_floating_block {hash; error})
 
 (* This module handles snapshot's versioning system. *)
 module Version = struct
@@ -909,7 +933,7 @@ module type EXPORTER = sig
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     export_block:Store.Block.t ->
     resulting_context_hash:Context_hash.t ->
-    unit Lwt.t
+    unit tzresult Lwt.t
 
   val export_context :
     t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
@@ -988,7 +1012,7 @@ module Raw_exporter : EXPORTER = struct
   let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~export_block ~resulting_context_hash =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let block_data =
       {
         block_header = Store.Block.header export_block;
@@ -1006,15 +1030,18 @@ module Raw_exporter : EXPORTER = struct
     let file =
       Naming.(snapshot_block_data_file t.snapshot_tmp_dir |> file_path)
     in
-    let* fd =
+    let*! fd =
       Lwt_unix.openfile
         file
         Unix.[O_CREAT; O_TRUNC; O_WRONLY]
         snapshot_rw_file_perm
     in
-    Lwt.finalize
-      (fun () -> Lwt_utils_unix.write_bytes fd bytes)
-      (fun () -> Lwt_unix.close fd)
+    let*! () =
+      Lwt.finalize
+        (fun () -> Lwt_utils_unix.write_bytes fd bytes)
+        (fun () -> Lwt_unix.close fd)
+    in
+    return_unit
 
   let export_context t context_index context_hash =
     let open Lwt_result_syntax in
@@ -1249,6 +1276,7 @@ module Tar_exporter : EXPORTER = struct
   let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~export_block ~resulting_context_hash =
+    let open Lwt_result_syntax in
     let block_data =
       {
         block_header = Store.Block.header export_block;
@@ -1263,10 +1291,13 @@ module Tar_exporter : EXPORTER = struct
     let bytes =
       Data_encoding.Binary.to_bytes_exn block_data_encoding block_data
     in
-    Octez_tar_helpers.add_raw_and_finalize
-      t.tar
-      ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
-      ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
+    let*! () =
+      Octez_tar_helpers.add_raw_and_finalize
+        t.tar
+        ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
+        ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
+    in
+    return_unit
 
   let export_context t context_index context_hash =
     let open Lwt_result_syntax in
@@ -1444,6 +1475,13 @@ module Tar_exporter : EXPORTER = struct
 
   let cleaner ?to_clean t =
     let open Lwt_syntax in
+    (* Best-effort: close the tar archive, ignoring errors since we are
+       already in a cleanup path. *)
+    let* () =
+      Lwt.catch
+        (fun () -> Octez_tar_helpers.close_out t.tar)
+        (fun _exn -> Lwt.return_unit)
+    in
     let* () = Event.(emit cleaning_after_failure ()) in
     let paths =
       match to_clean with
@@ -1568,8 +1606,18 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return_unit
 
   let write_floating_block fd (block : Block_repr.t) =
-    let bytes = Data_encoding.Binary.to_bytes_exn Block_repr.encoding block in
-    Lwt_utils_unix.write_bytes ~pos:0 ~len:(Bytes.length bytes) fd bytes
+    let open Lwt_result_syntax in
+    let* bytes =
+      match Data_encoding.Binary.to_bytes Block_repr.encoding block with
+      | Ok bytes -> return bytes
+      | Error error ->
+          tzfail
+            (Cannot_encode_floating_block {hash = Block_repr.hash block; error})
+    in
+    let*! () =
+      Lwt_utils_unix.write_bytes ~pos:0 ~len:(Bytes.length bytes) fd bytes
+    in
+    return_unit
 
   let export_floating_blocks ~floating_ro_fd ~floating_rw_fd ~export_block =
     let open Lwt_result_syntax in
@@ -1596,11 +1644,14 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (Inconsistent_floating_store
            (export_block_descr, (Block_repr.hash first_block, first_block_level)))
     else
+      (* [Done] is raised by [f] when the limit level is reached to
+         stop iteration, caught by the outer [Lwt.catch]. *)
       let exception Done in
       let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
       let f block =
-        (* FIXME: we also write potential branches, it will eventually
-           be GCed *)
+        (* Blocks from alternative branches at or above the export
+           block level are skipped. Blocks below that level are
+           included even if from alternative branches. *)
         if Compare.Int32.(Block_repr.level block >= limit_level) then
           if Block_hash.equal limit_hash (Block_repr.hash block) then raise Done
           else return_unit
@@ -1968,13 +2019,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                     chain_store
                     extra_cycle.start_level
                 in
-                (* TODO explain this... *)
+                (* When cycles are short (e.g. in sandboxed mode), the extra
+                   cycle's start level may exceed the export block level,
+                   meaning more blocks live in the floating store than in
+                   cemented. In that case, fall back to the caboose as the
+                   starting point for floating block retrieval. *)
                 if
                   Compare.Int32.(
                     Store.Block.level first_block_in_cycle > export_block_level)
                 then
-                  (* When the cycles are short, we may keep more blocks in the
-                     floating store than in cemented *)
                   let*! _, caboose_level = Store.Chain.caboose chain_store in
                   Store.Block.read_block_by_level chain_store caboose_level
                 else return first_block_in_cycle
@@ -1999,27 +2052,32 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
 
   let export_floating_block_stream snapshot_exporter floating_block_stream
       progress_display_mode =
-    let open Lwt_syntax in
-    let* () = Event.(emit exporting_floating_blocks) () in
+    let open Lwt_result_syntax in
+    let*! () = Event.(emit exporting_floating_blocks) () in
     let f fd =
-      let* is_empty = Lwt_stream.is_empty floating_block_stream in
-      if is_empty then Lwt.return_unit
+      let*! is_empty = Lwt_stream.is_empty floating_block_stream in
+      if is_empty then return_unit
       else
         Animation.display_progress
           ~every:10
           ~pp_print_step:(fun fmt i ->
             Format.fprintf fmt "Copying floating blocks: %d blocks copied" i)
           (fun notify ->
-            Lwt_stream.iter_s
-              (fun b ->
-                let* () = write_floating_block fd b in
-                notify ())
-              floating_block_stream)
+            let rec loop () =
+              let*! next = Lwt_stream.get floating_block_stream in
+              match next with
+              | None -> return_unit
+              | Some b ->
+                  let* () = write_floating_block fd b in
+                  let*! () = notify () in
+                  loop ()
+            in
+            loop ())
           ~progress_display_mode
     in
     let* () = Exporter.write_floating_blocks snapshot_exporter ~f in
-    let* () = Event.(emit floating_blocks_exported) () in
-    return_ok_unit
+    let*! () = Event.(emit floating_blocks_exported) () in
+    return_unit
 
   let export_context snapshot_exporter ~data_dir context_hash =
     let open Lwt_result_syntax in
@@ -2369,7 +2427,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let predecessor_ops_metadata_hash =
             Store.Block.all_operations_metadata_hash pred_block
           in
-          let*! () =
+          let* () =
             Exporter.write_block_data
               snapshot_exporter
               ~predecessor_header:(Store.Block.header pred_block)
@@ -3582,7 +3640,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
     let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-    let chain_id = Chain_id.of_block_hash genesis.block in
     let dst_chain_dir = Naming.chain_dir dst_store_dir chain_id in
     let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_dir in
     (* Create directories *)
@@ -3590,7 +3647,6 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       List.iter_s
         (Lwt_utils_unix.create_dir ~perm:snapshot_dir_perm)
         [
-          Naming.dir_path dst_store_dir;
           Naming.dir_path dst_protocol_dir;
           Naming.dir_path dst_chain_dir;
           Naming.dir_path dst_cemented_dir;
