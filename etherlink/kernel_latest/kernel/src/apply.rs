@@ -59,7 +59,7 @@ use tezosx_tezos_runtime::context::TezosRuntimeContext;
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
-use crate::fees::{tx_execution_gas_limit, FeeUpdates};
+use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
 
 pub struct TransactionReceiptInfo {
@@ -430,6 +430,42 @@ where
             return Ok(ExecutionResult::Invalid);
         }
     };
+
+    if !is_delayed {
+        // Deduct the DA fee before EVM execution, so that the caller cannot
+        // transfer it out during execution (which would make the post-execution
+        // fee settlement fail and revert the entire block).
+        //
+        // Safety: `is_valid_ethereum_transaction_common` (above) already
+        // verified that `balance >= gas_limit_with_fees * base_fee_per_gas`.
+        // Since `gas_for_fees = ceil(da_fee / minimum_base_fee_per_gas)` and
+        // `base_fee_per_gas >= minimum_base_fee_per_gas`, we have:
+        //   balance >= gas_limit_with_fees * base_fee_per_gas
+        //           >= gas_for_fees * base_fee_per_gas
+        //           >= gas_for_fees * minimum_base_fee_per_gas
+        //           >= da_fee
+        // Nothing modifies the caller's balance between the validation check
+        // and this point, so `sub_balance` cannot fail.
+        let cost = fees::da_fee(
+            block_constants.block_fees.da_fee_per_byte(),
+            &transaction.data,
+            &transaction.access_list,
+            transaction
+                .authorization_list
+                .as_ref()
+                .map_or(0, |al| al.len()),
+        );
+
+        let mut caller_account = StorageAccount::from_address(&h160_to_alloy(&caller))?;
+
+        if let Err(e) = caller_account.sub_balance(host, u256_to_alloy(&cost)) {
+            return Err(anyhow::anyhow!(
+                "Failed to charge {caller} additional fees of {}: {}",
+                cost,
+                e
+            ));
+        }
+    }
 
     let to = transaction.to;
     let call_data = transaction.data.clone();
@@ -1172,6 +1208,7 @@ mod tests {
             block_constants.block_fees.minimum_base_fee_per_gas(),
             vec![].as_slice(),
             vec![].as_slice(),
+            0,
         )
         .expect("should have been able to calculate fees")
     }

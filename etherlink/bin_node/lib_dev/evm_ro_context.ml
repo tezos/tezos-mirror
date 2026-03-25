@@ -442,10 +442,14 @@ let promote_native_execution ctxt =
   | _ -> ctxt
 
 let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
+  let authorization_list_len =
+    List.length (Transaction_object.authorization_list object_)
+  in
   let da_fees =
     Fees.gas_used_for_da_fees
       ~da_fee_per_byte
       ~base_fee_per_gas
+      ~authorization_list_len
       Ethereum_types.(Transaction_object.input object_ |> hex_to_real_bytes)
   in
   let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in

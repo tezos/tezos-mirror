@@ -589,6 +589,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?history_mode
     ?patch_config ?websockets ?(kernel = Kernel.Latest) ?evm_version
+    ?sequencer_pool_address
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -624,6 +625,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?evm_version
       ?with_runtimes
       ?kernel_compat:(Kernel.name_of kernel)
+      ?sequencer_pool_address
       ?sequencer:
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)

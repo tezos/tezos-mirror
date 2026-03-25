@@ -1559,6 +1559,80 @@ let test_delayed_deposit_is_included =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+let test_empty_deposit_info_does_not_block_valid_deposits =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~da_fee:arb_da_fee_for_delayed_inbox
+      (* TODO: Remove once the Mainnet kernel has been updated *)
+    ~kernels:[Latest]
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"; "empty"]
+    ~title:"Empty deposit info does not block valid deposits"
+    ~use_dal:ci_enabled_dal_registration
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let amount = Tez.of_int 16 in
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+  let* receiver_balance_prev =
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
+  in
+  (* First, send a deposit with empty deposit info (without baking). *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"deposit"
+      ~arg:(sf "Pair %S 0x" sc_rollup_address)
+      ~amount
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.bridge
+      ~burn_cap:Tez.one
+      client
+  in
+  (* Then, send a valid deposit. Both will be included in the same L1 block
+     since we have not baked yet. *)
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor:
+        (* Use a different depositor to avoid counter collision. *)
+        Constant.bootstrap4
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Wait for the valid deposit to be picked up and included. *)
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* receiver_balance_next =
+    Eth_cli.balance ~account:receiver.address ~endpoint ()
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:
+      "Expected a bigger balance after the valid deposit, the empty deposit \
+       info should not have blocked it" ;
+  unit
+
 let encode_data json codec =
   let* hex_string = Codec.encode ~name:codec json in
   let hex = `Hex (Durable_storage_path.no_0x hex_string) in
@@ -10509,7 +10583,8 @@ let test_da_fees_after_execution =
       sequencer
   in
 
-  let* res =
+  let wait_for = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+  let res =
     Lwt.catch
       (fun () ->
         Eth_cli.transaction_send
@@ -10521,8 +10596,138 @@ let test_da_fees_after_execution =
       (fun _exn -> Lwt.return "")
   in
 
+  let* _ = wait_for in
+  let*@ _ = produce_block sequencer in
+
+  let* res in
+
   Check.((res = "") string) ~error_msg:"The transaction should have failed" ;
 
+  unit
+
+(* Regression test for the DA fee reservation vulnerability (F62).
+   The attacker delegates their EOA to a drain contract via EIP-7702,
+   then sends a tx (value=0) calling drain() on their own address,
+   transferring their entire balance to a receiver during execution.
+   Without the fix, the DA fee reserve stays in the balance during
+   execution, the drain succeeds completely, and the post-execution
+   fee settlement fails — reverting the entire block at zero cost.
+   With the fix, the DA fee is deducted before execution, so the
+   drain can only take what remains after the DA fee. *)
+let test_da_fee_drain_via_eip7702 =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "da_fees"; "eip7702"]
+    ~da_fee:(Wei.of_string "4_000_000_000_000")
+    ~title:"DA fee reservation cannot be drained via EIP-7702"
+    ~kernels:[Kernel.Latest]
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let attacker =
+    Eth_account.
+      {
+        address = "0xA257edC8ad1D8f8f463aC0D947cc381000b3c863";
+        private_key =
+          "0xb80e5dd2ba9281e482589973600609bb0f10f6a075e6c733e4472d4dd2df238a";
+      }
+  in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+  (* Step 1: Fund the attacker with 1 ETH. *)
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:whale.private_key
+         ~to_public_key:attacker.address
+         ~value:(Wei.of_eth_int 1)
+         ~endpoint)
+      sequencer
+  in
+  (* Deploy the drain contract. *)
+  let* drain = Solidity_contracts.drain_balance evm_version in
+  let* () = Eth_cli.add_abi ~label:drain.label ~abi:drain.abi () in
+  let* drain_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:drain.abi
+         ~bin:drain.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  (* Step 2: The whale sends an EIP-7702 tx that sets the attacker's
+     delegation to the drain contract. The attacker signs the auth
+     but the whale pays for the tx. *)
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:drain_contract
+      ~private_key:attacker.private_key
+      ~endpoint
+      ()
+  in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let* raw_setup =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int whale_nonce)
+      ~gas_price
+        (* EIP-7702 txs carry an authorization list which adds overhead beyond
+         what eth_estimateGas accounts for: PER_AUTH_BASE_COST (25_000 gas per
+         entry) plus DA fee gas for the auth list bytes (~125 bytes/entry).
+         The exact cost observed is 1_146_000 gas. *)
+      ~gas:1_146_000
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~legacy:false
+      ~address:attacker.address
+      ~arguments:[]
+      ()
+  in
+  let*@ _setup_hash = Rpc.send_raw_transaction ~raw_tx:raw_setup sequencer in
+  let*@ _ = produce_block sequencer in
+  (* Step 3: The attacker sends a tx to themselves with value=0.
+     Because their address now has the drain contract's code, this
+     calls drain(receiver), transferring the balance out during
+     execution. The attacker's nonce is 1 (bumped by the auth). *)
+  let*@ attacker_nonce =
+    Rpc.get_transaction_count ~address:attacker.address sequencer
+  in
+  let* raw_attack =
+    Cast.craft_tx
+      ~source_private_key:attacker.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int attacker_nonce)
+      ~gas_price
+      ~gas:1_000_000
+      ~value:Wei.zero
+      ~legacy:true
+      ~address:attacker.address
+      ~signature:"drain(address)"
+      ~arguments:[receiver]
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx:raw_attack sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@! Transaction.{status; _} =
+    Rpc.get_transaction_receipt ~tx_hash sequencer
+  in
+  (* The transaction must be included (no block revert). *)
+  Log.info "Transaction included, status = %b" status ;
+  (* The receiver should have received less than 1 ETH: the DA fee
+     was deducted from the attacker before execution. *)
+  let*@ receiver_balance = Rpc.get_balance ~address:receiver sequencer in
+  Check.((receiver_balance < Wei.of_eth_int 1) Wei.typ)
+    ~error_msg:
+      "Receiver should have less than 1 ETH (DA fee was deducted), got %L" ;
+  Log.info
+    "Receiver balance: %s (less than 1 ETH as expected)"
+    (Wei.to_string receiver_balance) ;
   unit
 
 let test_configuration_service =
@@ -15042,6 +15247,588 @@ let test_next_block_info_ic_reset () =
   let* () = Evm_node.wait_for_blueprint_applied observer 2 in
   unit
 
+let test_fa_withdrawal_eoa_without_code =
+  register_all
+    ~__FILE__
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~tags:["evm"; "sequencer"; "fa_withdrawal"; "eoa"]
+    ~title:"FA withdrawal from an EOA without code succeeds"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = sender.address in
+
+  (* Deposit FA tokens to the EOA without proxy *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+  let* ticket_balance_before =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_before) int)
+    ~error_msg:"After deposit we expect %L ticket balance, got %R" ;
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+
+  let ticketer_hex = ticketer |> Hex.of_bytes |> Hex.show in
+  let content_hex = content |> Hex.of_bytes |> Hex.show in
+
+  (* The EOA withdraws half its tickets via withdraw *)
+  let* _tx =
+    call_fa_withdraw
+      ~sender
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~ticket_owner:receiver
+      ~routing_info
+      ~amount:(amount / 2)
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ()
+  in
+
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
+
+  let* ticket_balance_mid =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((amount / 2 = ticket_balance_mid) int)
+    ~error_msg:"After first withdrawal we expect %L ticket balance, got %R" ;
+
+  (* The EOA withdraws the rest via fa_fast_withdraw *)
+  let* _tx =
+    call_fa_fast_withdraw
+      ~sender
+      ~sequencer
+      ~ticket_owner:receiver
+      ~receiver:Constant.bootstrap4.public_key_hash
+      ~amount:(amount / 2)
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ~fast_withdrawal_contract_address:Constant.bootstrap3.public_key_hash
+      ()
+  in
+
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
+
+  let* ticket_balance_after =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver
+      (Either.Right sequencer)
+  in
+  Check.((0 = ticket_balance_after) int)
+    ~error_msg:"After both withdrawals we expect %L ticket balance, got %R" ;
+  unit
+
+let test_fa_withdrawal_eoa_unauthorized_caller_fails =
+  register_all
+    ~__FILE__
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~tags:["evm"; "sequencer"; "fa_withdrawal"; "eoa"; "unauthorized"]
+    ~title:"FA withdrawal from another EOA fails"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let owner = Eth_account.bootstrap_accounts.(0) in
+  let attacker = Eth_account.bootstrap_accounts.(1) in
+
+  (* Deposit FA tokens to the owner EOA *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:owner.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+  let* ticket_balance_before =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:owner.address
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_before) int)
+    ~error_msg:"After deposit we expect %L ticket balance, got %R" ;
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+
+  let ticketer_hex = ticketer |> Hex.of_bytes |> Hex.show in
+  let content_hex = content |> Hex.of_bytes |> Hex.show in
+
+  (* A different EOA tries to withdraw the owner's tickets via withdraw *)
+  let* () =
+    expect_failure
+      "Unauthorized caller should not be able to withdraw another EOA's tickets"
+    @@ fun () ->
+    call_fa_withdraw
+      ~sender:attacker
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~ticket_owner:owner.address
+      ~routing_info
+      ~amount
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ()
+  in
+
+  (* A different EOA tries via fa_fast_withdraw *)
+  let* () =
+    expect_failure
+      "Unauthorized caller should not be able to fast-withdraw another EOA's \
+       tickets"
+    @@ fun () ->
+    call_fa_fast_withdraw
+      ~sender:attacker
+      ~sequencer
+      ~ticket_owner:owner.address
+      ~receiver:Constant.bootstrap4.public_key_hash
+      ~amount
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ~fast_withdrawal_contract_address:Constant.bootstrap3.public_key_hash
+      ()
+  in
+
+  (* Verify the owner's tickets are still there *)
+  let* ticket_balance_after =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:owner.address
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_after) int)
+    ~error_msg:"After failed withdrawals we expect %L ticket balance, got %R" ;
+  unit
+
+let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
+  register_all
+    ~__FILE__
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~tags:
+      ["evm"; "sequencer"; "fa_withdrawal"; "eoa"; "eip7702"; "unauthorized"]
+    ~title:"FA withdrawal from an EIP-7702 EOA by another EOA fails"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec]
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      _protocol
+    ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let owner = Eth_account.bootstrap_accounts.(1) in
+  let attacker = Eth_account.bootstrap_accounts.(2) in
+  let endpoint = Evm_node.endpoint sequencer in
+
+  (* Deploy an EIP-7702 delegation contract and set it on the owner *)
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:owner.private_key
+      ~endpoint
+      ()
+  in
+  let*@ estimated_gas =
+    Rpc.estimate_gas
+      [("from", `String whale.address); ("to", `String owner.address)]
+      sequencer
+  in
+  (* eth_estimateGas does not account for EIP-7702 authorization list
+     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
+     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
+  let gas = Int64.to_int estimated_gas + 147_234 in
+  let* raw_set_eoa =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int whale_nonce)
+      ~gas
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:owner.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ _set_eoa_hash =
+    Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer
+  in
+  let* _ = produce_block sequencer in
+
+  (* Verify the owner EOA now has code (EIP-7702 delegation) *)
+  let*@ code = Rpc.get_code ~address:owner.address sequencer in
+  Check.((code <> "0x") string)
+    ~error_msg:"Expected the owner EOA to have code after EIP-7702 delegation" ;
+
+  (* Deposit FA tokens to the EIP-7702 owner *)
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:owner.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+  let* ticket_balance_before =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:owner.address
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_before) int)
+    ~error_msg:"After deposit we expect %L ticket balance, got %R" ;
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+
+  let ticketer_hex = ticketer |> Hex.of_bytes |> Hex.show in
+  let content_hex = content |> Hex.of_bytes |> Hex.show in
+
+  (* A plain EOA tries to withdraw the EIP-7702 owner's tickets via withdraw.
+     The owner has code (delegation designator), but isWallet recognizes it,
+     so the guard requires msg.sender == ticketOwner. *)
+  let* () =
+    expect_failure
+      "Plain EOA should not be able to withdraw an EIP-7702 EOA's tickets"
+    @@ fun () ->
+    call_fa_withdraw
+      ~sender:attacker
+      ~endpoint
+      ~evm_node:sequencer
+      ~ticket_owner:owner.address
+      ~routing_info
+      ~amount
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ()
+  in
+
+  (* The plain EOA attacker tries via fa_fast_withdraw *)
+  let* () =
+    expect_failure
+      "Plain EOA should not be able to fast-withdraw an EIP-7702 EOA's tickets"
+    @@ fun () ->
+    call_fa_fast_withdraw
+      ~sender:attacker
+      ~sequencer
+      ~ticket_owner:owner.address
+      ~receiver:Constant.bootstrap4.public_key_hash
+      ~amount
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ~fast_withdrawal_contract_address:Constant.bootstrap3.public_key_hash
+      ()
+  in
+
+  (* Verify the owner's tickets are still there *)
+  let* ticket_balance_after =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:owner.address
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_after) int)
+    ~error_msg:"After failed withdrawals we expect %L ticket balance, got %R" ;
+  unit
+
+let test_fa_withdrawal_eip7702_eoa =
+  register_all
+    ~__FILE__
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~tags:["evm"; "sequencer"; "fa_withdrawal"; "eoa"; "eip7702"]
+    ~title:"FA withdrawal from an EIP-7702 EOA succeeds"
+    ~enable_fa_bridge:true
+    ~kernels:[Kernel.Latest]
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec]
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      _protocol
+    ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let eoa = Eth_account.bootstrap_accounts.(1) in
+  let endpoint = Evm_node.endpoint sequencer in
+
+  (* Deploy an EIP-7702 delegation contract *)
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+
+  (* Set up EIP-7702 delegation for the EOA *)
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:eoa.private_key
+      ~endpoint
+      ()
+  in
+  let*@ estimated_gas =
+    Rpc.estimate_gas
+      [("from", `String whale.address); ("to", `String eoa.address)]
+      sequencer
+  in
+  (* eth_estimateGas does not account for EIP-7702 authorization list
+     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
+     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
+  let gas = Int64.to_int estimated_gas + 147_234 in
+  let* raw_set_eoa =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int whale_nonce)
+      ~gas
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:eoa.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ _set_eoa_hash =
+    Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer
+  in
+  let* _ = produce_block sequencer in
+
+  (* Verify the EOA now has code *)
+  let*@ code = Rpc.get_code ~address:eoa.address sequencer in
+  Check.((code <> "0x") string)
+    ~error_msg:"Expected the EOA to have code after EIP-7702 delegation" ;
+
+  (* Deposit FA tokens to the EOA without proxy *)
+  let amount = 42 in
+  let depositor = Constant.bootstrap5 in
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:eoa.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+  let* ticket_balance_before =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:eoa.address
+      (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_before) int)
+    ~error_msg:"After deposit we expect %L ticket balance, got %R" ;
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+
+  let ticketer_hex = ticketer |> Hex.of_bytes |> Hex.show in
+  let content_hex = content |> Hex.of_bytes |> Hex.show in
+
+  (* The EIP-7702 EOA withdraws half its tickets via withdraw.
+     Even though ticketOwner.code.length > 0, the guard allows it
+     because msg.sender == ticketOwner. *)
+  let* _tx =
+    call_fa_withdraw
+      ~sender:eoa
+      ~endpoint
+      ~evm_node:sequencer
+      ~ticket_owner:eoa.address
+      ~routing_info
+      ~amount:(amount / 2)
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ()
+  in
+
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
+
+  let* ticket_balance_mid =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:eoa.address
+      (Either.Right sequencer)
+  in
+  Check.((amount / 2 = ticket_balance_mid) int)
+    ~error_msg:"After first withdrawal we expect %L ticket balance, got %R" ;
+
+  (* The EIP-7702 EOA withdraws the rest via fa_fast_withdraw *)
+  let* _tx =
+    call_fa_fast_withdraw
+      ~sender:eoa
+      ~sequencer
+      ~ticket_owner:eoa.address
+      ~receiver:Constant.bootstrap4.public_key_hash
+      ~amount:(amount / 2)
+      ~ticketer:ticketer_hex
+      ~content:content_hex
+      ~fast_withdrawal_contract_address:Constant.bootstrap3.public_key_hash
+      ()
+  in
+
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
+
+  let* ticket_balance_after =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:eoa.address
+      (Either.Right sequencer)
+  in
+  Check.((0 = ticket_balance_after) int)
+    ~error_msg:"After both withdrawals we expect %L ticket balance, got %R" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -15065,6 +15852,7 @@ let () =
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
+  test_empty_deposit_info_does_not_block_valid_deposits protocols ;
   test_delayed_fa_deposit_is_included protocols ;
   test_delayed_fa_deposit_is_ignored_if_feature_disabled protocols ;
   test_fa_reentrant_deposit_reverts protocols ;
@@ -15172,6 +15960,7 @@ let () =
   test_batch_eth_send_raw_transaction_sync_rpc () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
+  test_da_fee_drain_via_eip7702 protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
   test_clean_bps protocols ;
@@ -15223,6 +16012,10 @@ let () =
   test_eip7702 [Alpha] ;
   test_deposits_on_eip7702_accounts [Alpha] ;
   test_eip7702_auto_sign [Alpha] ;
+  test_fa_withdrawal_eoa_without_code [Alpha] ;
+  test_fa_withdrawal_eoa_unauthorized_caller_fails [Alpha] ;
+  test_fa_withdrawal_eip7702_unauthorized_caller_fails [Alpha] ;
+  test_fa_withdrawal_eip7702_eoa [Alpha] ;
   test_validate_encoding_compatibility_accounts [Alpha] ;
   test_eip2537 [Alpha] ;
   test_eip3607_disabled_for_simulation [Alpha] ;

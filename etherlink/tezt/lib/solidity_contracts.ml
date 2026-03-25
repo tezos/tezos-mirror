@@ -485,6 +485,12 @@ let transfer_crac =
     ~label:"crac_caller"
     ~contract:"CracCaller"
 
+let drain_balance =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/drain_balance.sol")
+    ~label:"drain_balance"
+    ~contract:"DrainBalance"
+
 let multi_run_caller =
   compile_contract
     ~source:(solidity_contracts_path ^ "/multi_run_caller.sol")

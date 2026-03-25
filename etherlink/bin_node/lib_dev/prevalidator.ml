@@ -299,6 +299,9 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
   (* Computing the execution gas limit validates that the gas limit is
      sufficient to cover the inclusion fees. *)
   let access_list = Transaction_object.access_list transaction in
+  let authorization_list_len =
+    List.length (Transaction_object.authorization_list transaction)
+  in
   let (Qty gas_limit) = Transaction_object.gas transaction in
   let data =
     Transaction_object.input transaction |> Ethereum_types.encode_hex
@@ -309,6 +312,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
     Fees.execution_gas_limit
       ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
       ~access_list
+      ~authorization_list_len
       ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
       ~gas_limit
       data
@@ -515,10 +519,14 @@ let validate_minimum_gas_requirement ~session
   let data =
     Transaction_object.input transaction |> Ethereum_types.encode_hex
   in
+  let authorization_list_len =
+    List.length (Transaction_object.authorization_list transaction)
+  in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
       ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
       ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~authorization_list_len
       data
   in
   let (Qty gas_limit) = Transaction_object.gas transaction in
