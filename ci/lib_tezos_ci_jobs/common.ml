@@ -16,9 +16,7 @@
     - jobs shared between pipelines *)
 
 open Gitlab_ci.Types
-open Gitlab_ci.Util
 open Tezos_ci
-open Tezos_ci.Cache
 
 (** {2 Shared Helpers} *)
 
@@ -62,72 +60,6 @@ module Helpers = struct
     @ toggle init_python_venv ". $HOME/.venv/bin/activate"
     @ toggle install_js_deps ". ./scripts/install_build_deps.js.sh"
     @ before_script
-end
-
-(** {2 Shared build jobs} *)
-
-module Build = struct
-  let job_build_dynamic_binaries ?(extra = false) ?rules ~__POS__ ~arch ?retry
-      ?cpu ?storage ?dependencies ~name executable_files =
-    let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-    let build_extra =
-      match arch with
-      | Amd64 ->
-          [
-            "src/bin_tps_evaluation/main_tps_evaluation.exe";
-            "src/bin_octogram/octogram_main.exe";
-            "tezt/tests/main.exe";
-            "contrib/octez_injector_server/octez_injector_server.exe";
-          ]
-      | Arm64 ->
-          [
-            "src/bin_tps_evaluation/main_tps_evaluation.exe";
-            "src/bin_octogram/octogram_main.exe tezt/tests/main.exe";
-          ]
-    in
-    let variables =
-      [("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
-      @ if extra then [("BUILD_EXTRA", String.concat " " build_extra)] else []
-    in
-    let artifacts =
-      artifacts
-        ~name:"build-$ARCH-$CI_COMMIT_REF_SLUG"
-        ~when_:On_success
-        ~expire_in:(Duration (Days 1))
-        (* TODO: [paths] can be refined based on [release] *)
-        [
-          "octez-*";
-          "octez-teztale-*";
-          "src/proto_*/parameters/*.json";
-          "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
-          "_build/default/tezt/tests/main.exe";
-          "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
-          "etherlink-governance-observer";
-          "fa-bridge-watchtower";
-        ]
-    in
-    job
-      ?rules
-      ?dependencies
-      ~__POS__
-      ~stage:Stages.build
-      ~arch
-      ?retry
-      ?cpu
-      ?storage
-      ~name
-      ~image:Images.CI.build
-      ~before_script:
-        (Helpers.before_script
-           ~take_ownership:true
-           ~source_version:true
-           ~eval_opam:true
-           [])
-      ~variables
-      ~artifacts
-      ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache
-    |> enable_sccache ~policy:Pull_push
 end
 
 (** {2 Shared Docker jobs} *)
