@@ -68,14 +68,19 @@ let get_checksum_file ?arch ~component ~version ~asset () =
   let file = "sha256sums.txt" in
   Storage.get_file ~path ~target file
 
-(* [get_versions ~component] returns the list of [versions] of [component]
-   listed in versions.json stored in s3 [component.path]. *)
-let get_versions ~component =
+(* [get_versions ~component ~file] returns the list of [versions] of [component].
+   If [file] is [Some path], reads from that local path instead of downloading
+   from S3. *)
+let get_versions ~component ~file =
   let open JSON in
-  try
-    Storage.get_file ~path:component.path "versions.json" ;
-    parse_file (Filename.concat Storage.temp_dir "versions.json")
-    |> as_list |> List.map of_json
+  let path =
+    match file with
+    | Some f -> f
+    | None ->
+        Storage.get_file ~path:component.path "versions.json" ;
+        Filename.concat Storage.temp_dir "versions.json"
+  in
+  try parse_file path |> as_list |> List.map of_json
   with Error error ->
     failwith
       ("Failed to read versions.json in " ^ component.path ^ ": "
@@ -407,6 +412,16 @@ let () =
         ~placeholder:"ASSET_TYPE"
         ())
   in
+  let file =
+    Clap.optional_string
+      ~long:"file"
+      ~short:'f'
+      ~description:
+        "Path to a local versions.json file. If provided, skips the S3 \
+         download."
+      ~placeholder:"FILE"
+      ()
+  in
   Clap.close () ;
   let component =
     {
@@ -445,7 +460,7 @@ let () =
       url;
     }
   in
-  let all_versions = get_versions ~component in
+  let all_versions = get_versions ~component ~file in
   let versions =
     match filter_active with
     | Some Active -> List.filter (fun v -> v.active) all_versions
