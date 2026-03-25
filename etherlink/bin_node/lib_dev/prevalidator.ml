@@ -881,6 +881,16 @@ let get_da_fee_per_byte () =
   in
   return (Tezos_types.Tez.nanotez_of_wei da_fee_wei)
 
+let get_michelson_base_fee_per_gas () =
+  let open Lwt_result_syntax in
+  let open Tezos_types.Tez in
+  let* w = get_worker () in
+  let state = Worker.state w in
+  let base_fee = Wei state.session.tezosx_infos.base_fee_per_gas in
+  let multiplier = state.session.tezosx_infos.michelson_to_evm_gas_multiplier in
+  let (Nanotez nanotez_per_evm_gas) = nanotez_of_wei base_fee in
+  return (Nanotez Q.(nanotez_per_evm_gas * of_int64 multiplier))
+
 let prevalidate_raw_transaction_tezlink ~simulator_mode raw_transaction =
   worker_wait_for_request
     (Request.Prevalidate_raw_transaction_tezlink
