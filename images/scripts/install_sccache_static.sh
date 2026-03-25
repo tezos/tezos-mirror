@@ -50,7 +50,7 @@ echo "Downloading $ARCHIVE_NAME..."
 echo "From $URL"
 
 if command -v kiss-fetch.sh > /dev/null 2>&1; then
-  kiss-fetch.sh "$URL" -o "$TMP_FILE"
+  kiss-fetch.sh -o "$TMP_FILE" "$URL"
 else
   echo "Warning: Kiss-fetch.sh missing"
   curl -L -Ss --fail "$URL" -o "$TMP_FILE"
