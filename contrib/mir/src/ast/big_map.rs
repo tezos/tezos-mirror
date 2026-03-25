@@ -251,6 +251,9 @@ pub enum LazyStorageError {
     /// Error when using bin_write to interact with the storage
     #[error("Error bin_writing value to store: {0}")]
     BinWriteError(String),
+    /// The requested big_map id was not found in the lazy storage.
+    #[error("big map with ID {0} not found in the lazy storage")]
+    BigMapNotFound(BigMapId),
 }
 
 /// All the operations for working with the lazy storage.
@@ -439,13 +442,13 @@ impl<'a> InMemoryLazyStorage<'a> {
     fn access_big_map(&self, id: &BigMapId) -> Result<&MapInfo<'a>, LazyStorageError> {
         self.big_maps
             .get(id)
-            .ok_or_else(|| panic!("Non-existent big map by id {id}"))
+            .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
     }
 
     fn access_big_map_mut(&mut self, id: &BigMapId) -> Result<&mut MapInfo<'a>, LazyStorageError> {
         self.big_maps
             .get_mut(id)
-            .ok_or_else(|| panic!("Non-existent big map by id {id}"))
+            .ok_or_else(|| LazyStorageError::BigMapNotFound(id.clone()))
     }
 }
 

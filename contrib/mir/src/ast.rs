@@ -401,9 +401,11 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Address(x) => V::Bytes(x.to_bytes_vec()),
             TV::ChainId(x) => V::Bytes(x.into()),
             TV::Bytes(x) => V::Bytes(x),
+            // to_bytes() cannot fail for a well-formed key.
             TV::Key(k) => V::Bytes(k.to_bytes().unwrap()),
             TV::Signature(s) => V::Bytes(s.into()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
+            // to_bytes() cannot fail for a well-formed key hash.
             TV::KeyHash(s) => V::Bytes(s.to_bytes().unwrap()),
             TV::Timestamp(s) => V::Int(s),
             TV::Contract(x) => go(TV::Address(x)),
