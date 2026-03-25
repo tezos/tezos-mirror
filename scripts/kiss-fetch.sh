@@ -43,6 +43,7 @@ if curl $CURL_RETRY --output /dev/null --silent --head --fail "$KISSCACHE"; then
     KISSFAIL=1
   fi
 else
+  echo "Warning: Kisscache server not reachable"
   KISSFAIL=1
 fi
 
