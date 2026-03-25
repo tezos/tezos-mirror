@@ -58,7 +58,7 @@ let job_docker =
     ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
     (match mode with `test -> Test | `real -> Release)
 
-let job_docker_merge =
+let job_docker_merge_manifests =
   Cacio.parameterize @@ fun mode ->
   Cacio.parameterize @@ fun trigger ->
   CI.job
@@ -106,7 +106,7 @@ let job_docker_promote_to_latest =
       | `test_wait ->
           (* In pipelines other than latest release pipelines,
              we want to wait for the Docker image to exist. *)
-          [(Job, job_docker_merge `test `auto)]
+          [(Job, job_docker_merge_manifests `test `auto)]
       | `test | `real ->
           (* In latest release pipelines, the Docker image already exists,
              as it was created by another pipeline (the tag pipeline). *)
@@ -144,7 +144,7 @@ let job_gitlab_release =
       [
         (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
         (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
-        (Job, job_docker_merge mode `auto);
+        (Job, job_docker_merge_manifests mode `auto);
       ]
     ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ~id_tokens:Tezos_ci.id_tokens
@@ -275,7 +275,7 @@ let () =
   Cacio.register_jobs
     Major_release_tag
     [
-      (Auto, job_docker_merge `real `auto);
+      (Auto, job_docker_merge_manifests `real `auto);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
@@ -284,7 +284,7 @@ let () =
   Cacio.register_jobs
     Major_release_tag_test
     [
-      (Auto, job_docker_merge `test `auto);
+      (Auto, job_docker_merge_manifests `test `auto);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -294,7 +294,7 @@ let () =
   Cacio.register_jobs
     Minor_release_tag
     [
-      (Auto, job_docker_merge `real `auto);
+      (Auto, job_docker_merge_manifests `real `auto);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
@@ -303,7 +303,7 @@ let () =
   Cacio.register_jobs
     Minor_release_tag_test
     [
-      (Auto, job_docker_merge `test `auto);
+      (Auto, job_docker_merge_manifests `test `auto);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -313,7 +313,7 @@ let () =
   Cacio.register_jobs
     Beta_release_tag
     [
-      (Auto, job_docker_merge `real `auto);
+      (Auto, job_docker_merge_manifests `real `auto);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
@@ -321,7 +321,7 @@ let () =
   Cacio.register_jobs
     Beta_release_tag_test
     [
-      (Auto, job_docker_merge `test `auto);
+      (Auto, job_docker_merge_manifests `test `auto);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
     ] ;
@@ -329,20 +329,20 @@ let () =
   Cacio.register_jobs
     Non_release_tag
     [
-      (Auto, job_docker_merge `real `auto);
+      (Auto, job_docker_merge_manifests `real `auto);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   Cacio.register_jobs
     Non_release_tag_test
     [
-      (Auto, job_docker_merge `test `auto);
+      (Auto, job_docker_merge_manifests `test `auto);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
     Scheduled_test_release
     [
-      (Auto, job_docker_merge `test `auto);
+      (Auto, job_docker_merge_manifests `test `auto);
       (Auto, job_gitlab_publish `scheduled_test);
     ] ;
   (* Release page *)
@@ -403,7 +403,7 @@ let job_docker_promote_to_version =
     ~image:Images_external.docker
     ~stage:Publish
     ~allow_failure:No
-    ~needs:[(Job, job_docker_merge mode `manual)]
+    ~needs:[(Job, job_docker_merge_manifests mode `manual)]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
@@ -458,7 +458,7 @@ let () =
       (Auto, job_update_gitlab_release);
       (* [`manual] because the docker build jobs should be manual.
          This will go away after the docker build jobs are migrated to Cacio. *)
-      (Auto, job_docker_merge `real `manual);
+      (Auto, job_docker_merge_manifests `real `manual);
       (Manual, job_docker_promote_to_version `real);
     ] ;
   Cacio.register_jobs
@@ -466,7 +466,7 @@ let () =
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
-      (Auto, job_docker_merge `test `manual);
+      (Auto, job_docker_merge_manifests `test `manual);
       (Manual, job_docker_promote_to_version `test);
     ] ;
   ()
