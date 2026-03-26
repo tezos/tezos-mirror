@@ -70,11 +70,23 @@ let world_state read chain_id =
     Bytes.to_string
 
 let storage_version read =
-  inspect_durable_and_decode_default
-    ~default:0
-    read
-    Durable_storage_path.storage_version
-    (fun bytes -> Helpers.decode_z_le bytes |> Z.to_int)
+  let open Lwt_result_syntax in
+  let decode bytes = Helpers.decode_z_le bytes |> Z.to_int in
+  (* Try new /base/ path first, fall back to legacy /evm/ path. *)
+  let* v =
+    inspect_durable_and_decode_opt
+      read
+      Durable_storage_path.storage_version_base
+      decode
+  in
+  match v with
+  | Some v -> return v
+  | None ->
+      inspect_durable_and_decode_default
+        ~default:0
+        read
+        Durable_storage_path.storage_version_legacy
+        decode
 
 let sequencer =
   let read_storage_version = storage_version in

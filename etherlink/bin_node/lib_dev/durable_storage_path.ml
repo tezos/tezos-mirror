@@ -22,6 +22,12 @@ end
 
 let tezlink_root = Tezlink.root
 
+module BASE = struct
+  let root = "/base"
+
+  let make s = root ^ s
+end
+
 module EVM = struct
   let root = "/evm"
 
@@ -92,7 +98,9 @@ let kernel_version = EVM.make "/kernel_version"
 
 let kernel_verbosity = EVM.make "/logging_verbosity"
 
-let storage_version = EVM.make "/storage_version"
+let storage_version_base = BASE.make "/storage_version"
+
+let storage_version_legacy = EVM.make "/storage_version"
 
 let kernel_root_hash = EVM.make "/kernel_root_hash"
 

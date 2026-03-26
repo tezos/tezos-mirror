@@ -26,6 +26,10 @@ val root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
 
+module BASE : sig
+  val make : string -> path
+end
+
 val evm_node_flag : path
 
 val chain_id : path
@@ -44,7 +48,9 @@ val kernel_version : path
 
 val kernel_verbosity : path
 
-val storage_version : path
+val storage_version_base : path
+
+val storage_version_legacy : path
 
 val kernel_root_hash : path
 
