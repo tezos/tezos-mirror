@@ -74,7 +74,7 @@ publish:release-page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - ./scripts/releases/publish_release_page.sh
+  - ./scripts/releases/publish-release-page.sh
   - cp /tmp/release_page*/index.md ./index.md
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

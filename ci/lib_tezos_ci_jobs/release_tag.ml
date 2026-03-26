@@ -229,7 +229,7 @@ let job_release_page =
           ])
     [
       "eval $(opam env)";
-      "./scripts/releases/publish_release_page.sh";
+      "./scripts/releases/publish-release-page.sh";
       "cp /tmp/release_page*/index.md ./index.md";
     ]
 
