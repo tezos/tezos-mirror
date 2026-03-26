@@ -364,19 +364,27 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
 
 let job_docker_promote_to_version =
   Cacio.parameterize @@ fun mode ->
-  job_docker_authenticated
+  CI.job
+    "oc.docker:promote_revision_to_version"
     ~__POS__
-    ~dependencies:(Dependent [Job (job_docker_merge mode `manual)])
-    ~stage:Stages.publish
-    ~name:"oc.docker:promote_revision_to_version"
     ~description:
       "Promote the Docker image from the packaging revision tag to the \
        canonical version tag (e.g., octez-v1.2 from octez-v1.2-1)"
-    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-    ~ci_docker_hub:(match mode with `test -> false | `real -> true)
-    ["./scripts/ci/docker_promote_to_version.sh"]
-    ~retry:no_retry
-    ~tag:Gcp_not_interruptible
+    ~image:Images_external.docker
+    ~stage:Publish
+    ~allow_failure:No
+    ~needs_legacy:[(Job, job_docker_merge `test `manual)]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~variables:
+      [
+        ("DOCKER_VERSION", docker_version);
+        ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
+      ]
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "./scripts/ci/docker_promote_to_version.sh";
+    ]
 
 let job_create_gitlab_package =
   CI.job
@@ -415,10 +423,18 @@ let job_update_gitlab_release =
 let () =
   Cacio.register_jobs
     Packaging_revision
-    [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
+    [
+      (Manual, job_create_gitlab_package);
+      (Auto, job_update_gitlab_release);
+      (Manual, job_docker_promote_to_version `real);
+    ] ;
   Cacio.register_jobs
     Packaging_revision_test
-    [(Manual, job_create_gitlab_package); (Auto, job_update_gitlab_release)] ;
+    [
+      (Manual, job_create_gitlab_package);
+      (Auto, job_update_gitlab_release);
+      (Manual, job_docker_promote_to_version `test);
+    ] ;
   ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
@@ -438,7 +454,6 @@ let octez_packaging_revision_jobs ?(test = false) () =
     job_docker mode `manual Amd64;
     job_docker mode `manual Arm64;
     job_docker_merge mode `manual;
-    job_docker_promote_to_version mode;
   ]
   @ jobs_debian_repository
   @
