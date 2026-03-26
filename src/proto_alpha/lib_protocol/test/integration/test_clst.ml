@@ -3253,3 +3253,61 @@ let () =
     Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before > 0)
   in
   return_unit
+
+let () =
+  register_test ~title:"Deposit and redeem do not change the exchange rate"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  (* Bake until rewards shift the rate away from 1:1 *)
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Rate must be different from 1:1 for this test to be meaningful *)
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare rate_before Q.one > 0) in
+  (* Fund a new account, deposit and immediately redeem in the next block *)
+  let* account, b =
+    create_funded_account ~funder:delegate ~amount_mutez:100_000_000L b
+  in
+  let deposit_amount = Tez.of_mutez_exn 50_000_000L in
+  let* deposit_tx =
+    Op.clst_deposit ~force_reveal:true (B b) account deposit_amount
+  in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:deposit_tx b
+  in
+  (* Record rate after deposit *)
+  let* rate_after_deposit =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Record the CLST balance obtained *)
+  let* balance =
+    Plugin.Contract_services.stez_balance Block.rpc_ctxt b account
+  in
+  let balance_mutez = Option.value ~default:0L (Script_int.to_int64 balance) in
+  let* () = Assert.is_true ~loc:__LOC__ Compare.Int64.(balance_mutez > 0L) in
+  let* redeem_tx = Op.clst_redeem ~fee:Tez.zero (B b) account balance_mutez in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:redeem_tx b
+  in
+  let* rate_after_redeem =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Deposit and redeem preserve the exchange rate. Between blocks,
+     rewards accrue and shift the rate slightly. We verify the rate
+     difference is negligible (< 1/1_000_000). *)
+  let diff = Q.abs (Q.sub rate_after_redeem rate_after_deposit) in
+  let epsilon = Q.(1 // 1_000_000) in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare diff epsilon < 0) in
+  return_unit
