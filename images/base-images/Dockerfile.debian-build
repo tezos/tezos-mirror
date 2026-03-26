@@ -70,7 +70,6 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
-ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 ENV OPAMFETCH="/tmp/kiss-fetch.sh"
 
 #hadolint ignore=SC2154, SC1091
