@@ -615,10 +615,214 @@ let test_multi_node_connection_recovery =
   Log.info "✓ Multi-node connection recovery test completed successfully" ;
   unit
 
+let test_multi_node_dal_worker_connection_recovery =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker multi-node DAL worker connection recovery"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "dal"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+    ~uses:(fun _protocol ->
+      [Constant.octez_agnostic_baker; Constant.octez_dal_node])
+  @@ fun protocol ->
+  Log.info "Setting up three nodes connected via P2P" ;
+  (* Setup: 3 nodes sharing the same chain via P2P *)
+  (* node1 and node2 are for the baker, node3 is dedicated for the DAL node *)
+  (* Use Archive mode to ensure DAL node has enough history *)
+  let* node1 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+  let* node2 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+  let* node3 =
+    Node.init [Synchronisation_threshold 0; Private_mode; History_mode Archive]
+  in
+
+  let* client1 = Client.init ~endpoint:(Node node1) () in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+  let* client3 = Client.init ~endpoint:(Node node3) () in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client1 ~peer:node3 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.trust_address client2 ~peer:node3 in
+  let* () = Client.Admin.trust_address client3 ~peer:node1 in
+  let* () = Client.Admin.trust_address client3 ~peer:node2 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  let* () = Client.Admin.connect_address client1 ~peer:node3 in
+
+  (* Activate protocol with DAL enabled *)
+  let dal_parameters =
+    [
+      (["dal_parametric"; "feature_enable"], `Bool true);
+      (["dal_parametric"; "number_of_slots"], `Int 8);
+      (["dal_parametric"; "attestation_lag"], `Int 4);
+      ( ["dal_parametric"; "attestation_lags"],
+        `A [`Float 2.; `Float 3.; `Float 4.] );
+      (["dal_parametric"; "attestation_threshold"], `Int 50);
+    ]
+  in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      dal_parameters
+  in
+  let* () =
+    Client.activate_protocol ~protocol ~parameter_file client1 ~timestamp:Now
+  in
+
+  (* Wait for all nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  let* _ = Node.wait_for_level node3 1 in
+  Log.info "✓ Three nodes set up, connected via P2P, and synced" ;
+
+  (* Start DAL node with attester profiles for delegates, connected to node3 *)
+  Log.info "Starting DAL node connected to node3" ;
+  let dal_node = Dal_node.create ~node:node3 () in
+  let* () =
+    Dal_node.init_config
+      ~attester_profiles:
+        [
+          Account.Bootstrap.keys.(0).public_key_hash;
+          Account.Bootstrap.keys.(1).public_key_hash;
+        ]
+      dal_node
+  in
+  let* () = Dal_node.run ~wait_ready:true dal_node in
+  Log.info "✓ DAL node running" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use two bootstrap accounts as delegates to have actual DAL committee membership *)
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[Account.Bootstrap.keys.(0).public_key_hash]
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~dal_node_rpc_endpoint:(Dal_node.as_rpc_endpoint dal_node)
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s and DAL node endpoint %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2))
+    (Endpoint.as_string (Dal_node.as_rpc_endpoint dal_node)) ;
+  let* () = Agnostic_baker.run ~event_level:`Info baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  (* Wait for DAL workers to start for both automatons *)
+  Log.info "Waiting for DAL workers to start for both automatons" ;
+  let node1_endpoint = Endpoint.as_string (Node.as_rpc_endpoint node1) in
+  let node2_endpoint = Endpoint.as_string (Node.as_rpc_endpoint node2) in
+  let wait_for_dal_worker_started expected_automaton =
+    Agnostic_baker.wait_for baker "dal_worker_started.v0" (fun json ->
+        let automaton_name = JSON.(json |-> "automaton_name" |> as_string) in
+        if automaton_name = expected_automaton then Some () else None)
+  in
+  let* () = wait_for_dal_worker_started node1_endpoint
+  and* () = wait_for_dal_worker_started node2_endpoint in
+  Log.info
+    "✓ DAL workers started for both automatons: %s and %s"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Phase 1: Both nodes active - wait for 2 no_attestable_dal_slots_for_levels events *)
+  Log.info
+    "Phase 1: Both nodes active - waiting for DAL worker query events from \
+     both automatons" ;
+  let wait_for_dal_event_from expected_automaton =
+    Agnostic_baker.wait_for
+      baker
+      "no_attestable_dal_slots_for_levels.v0"
+      (fun json ->
+        let automaton_name = JSON.(json |-> "automaton_name" |> as_string) in
+        if automaton_name = expected_automaton then Some () else None)
+  in
+  (* Wait for one event from each automaton *)
+  let* () = wait_for_dal_event_from node1_endpoint
+  and* () = wait_for_dal_event_from node2_endpoint in
+  Log.info
+    "✓ Received no_attestable_dal_slots_for_levels events from both \
+     automatons: %s and %s"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Phase 2: Terminate node1 - should only see 1 event from node2's automaton *)
+  Log.info
+    "Phase 2: Terminating node1 - expecting only 1 DAL worker query event from \
+     node2's automaton" ;
+  let* () = Node.terminate node1 in
+  (* Wait for just one DAL event from the remaining automaton *)
+  let* () = wait_for_dal_event_from node2_endpoint
+  and* () =
+    Lwt.pick
+      [
+        (let* () = wait_for_dal_event_from node1_endpoint in
+         Test.fail "We shouldn't see events from 1st automaton as it's down");
+        Lwt_unix.sleep 10.;
+      ]
+  in
+  Log.info
+    "✓ Received 1 no_attestable_dal_slots_for_levels event from automaton: %s"
+    node2_endpoint ;
+
+  (* Phase 3: Restart node1 - should see 2 events again *)
+  Log.info
+    "Phase 3: Restarting node1 - expecting 2 DAL attestation events from both \
+     automatons" ;
+  let* () = Node.run node1 [] and* () = Node.wait_for_ready node1 in
+
+  (* Re-establish P2P trust (needed after restart in Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client1 ~peer:node3 in
+  let* () = Client.Admin.connect_address client2 ~peer:node1 in
+  Log.info "Node1 restarted and P2P connected" ;
+
+  (* Wait for node1 to sync *)
+  let* node2_level = Node.get_level node2 in
+  let* _ = Node.wait_for_level node1 node2_level in
+  Log.info "Node1 synced to level %d" node2_level ;
+
+  (* Multi node baker takes 20 seconds before retrying the connection *)
+  let wait_for_dal_worker_started =
+    wait_for_dal_worker_started node1_endpoint
+  in
+
+  Log.info "Waiting 20 seconds for multi-node baker reconnection..." ;
+  let* () = Lwt_unix.sleep 20. in
+
+  (* Wait for DAL worker to restart for node1 automaton *)
+  Log.info "Waiting for DAL worker to restart for node1 automaton" ;
+  let* () = wait_for_dal_worker_started in
+  Log.info "✓ DAL worker restarted for automaton: %s" node1_endpoint ;
+
+  (* Verify both automatons emit DAL events again *)
+  let* () = wait_for_dal_event_from node1_endpoint
+  and* () = wait_for_dal_event_from node2_endpoint in
+  Log.info
+    "✓ Received no_attestable_dal_slots_for_levels events from both \
+     automatons: %s and %s (both operational again)"
+    node1_endpoint
+    node2_endpoint ;
+
+  (* Test completed successfully *)
+  Log.info
+    "✓ Multi-node DAL worker connection recovery test completed: verified \
+     per-automaton DAL worker architecture" ;
+  unit
+
 let register ~protocols =
   test_keep_alive protocols ;
   test_cli protocols ;
-  test_multi_node_connection_recovery protocols
+  test_multi_node_connection_recovery protocols ;
+  test_multi_node_dal_worker_connection_recovery protocols
 
 let register_migration ~migrate_from ~migrate_to =
   migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
