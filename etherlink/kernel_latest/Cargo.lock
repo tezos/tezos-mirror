@@ -3572,6 +3572,7 @@ dependencies = [
 name = "tezosx-tezos-runtime"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "http",
  "mir",
  "num-bigint",

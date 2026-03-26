@@ -6495,4 +6495,130 @@ mod tests {
             receipts[0].receipt
         );
     }
+
+    // --- Tezos alias forwarder tests ---
+
+    /// Test that sending funds to a Tezos alias KT1 triggers the forwarding
+    /// Michelson contract, which calls the TezosXGateway enshrined contract,
+    /// which routes funds cross-runtime via registry.serve().
+    #[test]
+    fn tezos_alias_forwarder_forwards_on_transfer() {
+        let mut host = MockKernelHost::default();
+
+        let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+
+        // Deploy the forwarder contract in the TezlinkContext path
+        // (which is where validate_and_apply_operation reads from)
+        let forwarder_script = r#"
+            parameter unit ;
+            storage string ;
+            code { CDR ;
+                   DUP ;
+                   PUSH address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
+                   CONTRACT string ;
+                   IF_NONE { PUSH string "gateway" ; FAILWITH } {} ;
+                   BALANCE ;
+                   DIG 2 ;
+                   TRANSFER_TOKENS ;
+                   NIL operation ;
+                   SWAP ;
+                   CONS ;
+                   PAIR }
+        "#;
+
+        // Use an arbitrary KT1 for the alias
+        let alias_kt1 =
+            ContractKt1Hash::from_base58_check("KT1QbKzQAyJtzprfvUJZv8VGqwQNch2o89di")
+                .unwrap();
+
+        let storage_micheline = Micheline::String(evm_address.to_string());
+        let _alias_account = init_contract(
+            &mut host,
+            &alias_kt1,
+            forwarder_script,
+            &storage_micheline,
+            &0_u64.into(),
+        );
+
+        let alias_contract = Contract::Originated(alias_kt1.clone());
+
+        // Set up a source account with funds
+        let src = bootstrap1();
+        let _src_account = init_account(&mut host, &src.pkh, 1_000_000);
+        reveal_account(&mut host, &src);
+
+        // Transfer 50 mutez to the alias KT1
+        let transfer_amount = 50_u64;
+        let operation = make_transfer_operation(
+            15,      // fee
+            1,       // counter
+            500_000, // gas_limit (needs enough for Michelson + gateway)
+            500,     // storage_limit
+            src.clone(),
+            transfer_amount.into(),
+            alias_contract,
+            Parameters::default(), // unit parameter
+        );
+
+        // Use MockRegistry that tracks serve calls
+        let registry = crate::test_utils::MockRegistry::new(vec![0xAA; 20]);
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &registry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        // Verify the operation succeeded
+        assert_eq!(receipt.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipt[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            ),
+            "Expected Applied Transfer result, got {:?}",
+            receipt[0].receipt
+        );
+
+        // Verify serve was called — this means the forwarder called the gateway
+        // which routed the transfer cross-runtime
+        let serve_calls = registry.serve_calls.borrow();
+        assert!(
+            !serve_calls.is_empty(),
+            "serve() should have been called by the gateway (forwarding contract -> gateway -> serve)"
+        );
+
+        // Verify the serve call targeted the ethereum runtime
+        let request = &serve_calls[0];
+        assert_eq!(
+            request.uri().host(),
+            Some("ethereum"),
+            "Cross-runtime call should target the ethereum runtime"
+        );
+
+        // Verify the gateway balance is 0 (funds were forwarded, not locked)
+        let tezlink_ctx = context::TezlinkContext::init_context();
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .unwrap();
+        let gateway_account = tezlink_ctx
+            .originated_from_kt1(&gateway_kt1)
+            .expect("Gateway account should exist");
+        assert_eq!(
+            gateway_account.balance(&host).unwrap(),
+            0_u64.into(),
+            "Gateway balance should be 0 after forwarding"
+        );
+    }
 }

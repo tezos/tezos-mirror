@@ -3317,6 +3317,106 @@ let test_cross_runtime_michelson_sender_is_alias =
       ~error_msg:"Expected stored msg.sender %R but got %L") ;
   unit
 
+(** Test that the alias forwarder contract correctly forwards funds
+    from a Tezos KT1 to an EVM address via the TezosXGateway.
+    This originates the forwarder contract, sends tez to it,
+    and verifies the destination EVM address receives the funds. *)
+let test_alias_forwarder_forwards_to_evm =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Alias forwarder contract forwards tez to EVM address"
+    ~tags:["alias"; "forwarder"; "cross_runtime"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let evm_receiver = Eth_account.bootstrap_accounts.(0) in
+  (* Step 1: Originate the alias forwarder contract. *)
+  let evm_destination = evm_receiver.address in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "alias_forwarder"]
+      ~init_storage_data:(sf {|"%s"|} evm_destination)
+      protocol
+  in
+  (* Step 2: Record the EVM receiver balance before the transfer. *)
+  let*@ evm_balance_before =
+    Rpc.get_balance ~address:evm_destination sequencer
+  in
+  (* Step 3: Send tez to the alias forwarder KT1.
+     The forwarder contract should forward its BALANCE to the
+     TezosXGateway enshrined contract, which routes funds to the EVM address. *)
+  let transfer_amount = Tez.of_int 100 in
+  let transfer_amount_mutez = Tez.to_mutez transfer_amount in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~dest:kt1_address
+      ~arg_data:"Unit"
+      ~amount:transfer_amount_mutez
+      ()
+  in
+  (* Step 4: Sync the rollup node. *)
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* Step 5: Verify the EVM receiver balance increased. *)
+  let*@ evm_balance_after =
+    Rpc.get_balance ~address:evm_destination sequencer
+  in
+  let expected_increase = Wei.of_tez transfer_amount in
+  Check.(
+    (evm_balance_after = Wei.(evm_balance_before + expected_increase))
+      Wei.typ
+      ~error_msg:"Expected EVM balance %R but got %L") ;
+  unit
+
+(** Test that an EVM-to-Tezos cross-runtime call creates a Tezos alias
+    for the EVM sender and that the cross-runtime transfer succeeds. *)
+let test_alias_forwarder_created_by_evm_cross_runtime_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "EVM cross-runtime call creates alias forwarder that forwards tez back"
+    ~tags:["alias"; "forwarder"; "cross_runtime"; "evm_to_tezos"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun {sequencer; _} _protocol ->
+  let evm_sender = Eth_account.bootstrap_accounts.(0) in
+  let tezos_receiver = Constant.bootstrap1.public_key_hash in
+  let* _receipt =
+    check_evm_to_michelson_transfer
+      ~sequencer
+      ~sender:evm_sender
+      ~nonce:0
+      ~tezos_destination:tezos_receiver
+      ~transfer_amount:(Tez.of_int 1)
+      ()
+  in
+  let* alias_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sequencer
+  in
+  let alias_kt1 = Result.get_ok alias_result in
+  Log.info "EVM sender %s has Tezos alias %s" evm_sender.address alias_kt1 ;
+  if alias_kt1 = "" then Test.fail "Alias should not be empty" ;
+  unit
+
 (** Transfer tez between two accounts on the Michelson runtime and verify
     that the receiver balance is updated. *)
 let test_tez_transfer =
@@ -3398,4 +3498,6 @@ let () =
   test_trace_call_evm ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias [Alpha] ;
   test_cross_runtime_michelson_sender_is_alias [Alpha] ;
+  test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
+  test_alias_forwarder_forwards_to_evm [Alpha] ;
   test_tez_transfer [Alpha]
