@@ -22,7 +22,6 @@ fi
 dune build ci/bin_release_page/src/
 
 VM="_build/default/ci/bin_release_page/src/version_manager.exe"
-RELEASE_PAGE="_build/default/ci/bin_release_page/src/release_page.exe"
 S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
 # Download versions.json from remote storage
@@ -115,29 +114,12 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-# Generate RSS feed
-echo "Generating RSS feed..."
-$VM \
-  generate-rss \
-  --path "${S3_PATH}" \
-  --base-url "${URL:-https://${S3_BUCKET}}"
-
 # Upload versions.json back to remote storage
 echo "Uploading versions.json..."
 $VM upload --path "${S3_PATH}"
 
-# Generate older releases page (inactive versions only)
-echo "Building older releases page..."
-$RELEASE_PAGE --component 'octez' \
-  --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
-  "${BUCKET_PATH:-}" --filter-active inactive changelog binaries packages
-mv index.html older_releases.html
-
-# Generate main release page (active versions only)
-echo "Generating main release page..."
-$RELEASE_PAGE --component 'octez' \
-  --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
-  "${BUCKET_PATH:-}" --filter-active active changelog binaries packages
+# Generate the release page HTML and RSS feed
+./scripts/releases/generate-release-page.sh
 
 # Upload HTML, CSS and RSS feed to S3
 echo "Syncing html files to remote s3 bucket..."
