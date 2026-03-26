@@ -193,17 +193,16 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
         (if res = `Valid then
            let store = Node_context.get_store ctxt in
            let traps_store = Store.traps store in
-           (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                The [proto_parameters] are those for the last known finalized
-                level, which may differ from those of the slot level. This
-                will be an issue when the value of the [traps_fraction]
-                changes. (We cannot use {!Node_context.get_proto_parameters},
-                as it is not monad-free; we'll need to use mapping from levels
-                to parameters.) *)
+           let traps_fraction =
+             Node_context.get_traps_fraction
+               ctxt
+               ~published_level:message_id.level
+               ~default:proto_parameters.traps_fraction
+           in
            Option.iter
              (Slot_manager.maybe_register_trap
                 traps_store
-                ~traps_fraction:proto_parameters.traps_fraction
+                ~traps_fraction
                 message_id)
              message) ;
         res
@@ -462,16 +461,15 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               List.iter
                 (fun {index; id; message} ->
                   (* We register traps only if the message is valid. *)
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                      The [proto_parameters] are those for the last known finalized
-                      level, which may differ from those of the slot level. This
-                      will be an issue when the value of the [traps_fraction]
-                      changes. (We cannot use {!Node_context.get_proto_parameters},
-                      as it is not monad-free; we'll need to use mapping from levels
-                      to parameters.) *)
+                  let traps_fraction =
+                    Node_context.get_traps_fraction
+                      ctxt
+                      ~published_level:id.level
+                      ~default:proto_parameters.traps_fraction
+                  in
                   Slot_manager.maybe_register_trap
                     traps_store
-                    ~traps_fraction:proto_parameters.traps_fraction
+                    ~traps_fraction
                     id
                     message ;
                   result.(index) <- `Valid)
