@@ -24,7 +24,7 @@ TARGET="/usr/local/bin/release-cli"
 # Installation
 # ----------------------------------------------------------------------
 if command -v kiss-fetch.sh > /dev/null 2>&1; then
-  kiss-fetch.sh "$DOWNLOAD_URL" -o "$TARGET"
+  kiss-fetch.sh -o "$TARGET" "$DOWNLOAD_URL"
 else
   echo "Warning: Kiss-fetch.sh missing"
   curl -L -Ss --fail "$DOWNLOAD_URL" -o "$TARGET"
