@@ -14,8 +14,6 @@ type path = string
 
 let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
-let evm_node_flag = "/__evm_node"
-
 module Tezlink = struct
   let root = "/tezlink"
 end
@@ -34,6 +32,15 @@ module EVM = struct
   let make s = root ^ s
 end
 
+let evm_node_flag_legacy = "/__evm_node"
+
+let evm_node_flag_base = BASE.make evm_node_flag_legacy
+
+let evm_node_flag ~storage_version =
+  if Storage_version.ipc_paths_moved_to_base ~storage_version then
+    evm_node_flag_base
+  else evm_node_flag_legacy
+
 module World_state = struct
   let root = "/world_state"
 
@@ -47,7 +54,7 @@ module Single_tx = struct
 end
 
 module Tezosx_simulation = struct
-  let path = "/__simulation"
+  let path = BASE.make "/__simulation"
 
   let input = path ^ "/input"
 
@@ -55,12 +62,17 @@ module Tezosx_simulation = struct
 end
 
 module Tezosx_entrypoints = struct
-  let path = "/tezosx_entrypoints"
+  let path = BASE.make "/tezosx_entrypoints"
 
   let input = path ^ "/input"
 
   let result = path ^ "/result"
 end
+
+let delayed_input ~storage_version =
+  if Storage_version.ipc_paths_moved_to_base ~storage_version then
+    BASE.make "/__delayed_input"
+  else "/__delayed_input"
 
 module Assemble_block = struct
   let path = World_state.make "/assemble_block"

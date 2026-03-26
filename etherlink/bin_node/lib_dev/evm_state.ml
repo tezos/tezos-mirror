@@ -167,8 +167,11 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
 let modify ?edit_readonly ~key ~value evm_state =
   Pvm.Kernel.set_durable_value ?edit_readonly evm_state key value
 
-let flag_local_exec evm_state =
-  modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
+let flag_local_exec evm_state ~storage_version =
+  modify
+    evm_state
+    ~key:Durable_storage_path.(evm_node_flag ~storage_version)
+    ~value:""
 
 let init_reboot_counter evm_state =
   let initial_reboot_counter =
@@ -193,7 +196,6 @@ let init ~kernel =
   (* The WASM Runtime completely ignores the reboot counter, but some versions
      of the Etherlink kernel will need it to exist. *)
   let*! evm_state = init_reboot_counter evm_state in
-  let*! evm_state = flag_local_exec evm_state in
   return evm_state
 
 let inspect evm_state key =

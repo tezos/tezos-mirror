@@ -30,7 +30,7 @@ module BASE : sig
   val make : string -> path
 end
 
-val evm_node_flag : path
+val evm_node_flag : storage_version:int -> path
 
 val chain_id : path
 
@@ -88,6 +88,8 @@ module Tezosx_entrypoints : sig
 
   val result : path
 end
+
+val delayed_input : storage_version:int -> path
 
 (** Kernel communication canal for block assembling (instant confirmations) *)
 module Assemble_block : sig
