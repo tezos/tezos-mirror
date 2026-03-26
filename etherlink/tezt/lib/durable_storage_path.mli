@@ -116,7 +116,7 @@ val delayed_inbox_timeout : path
 val delayed_inbox_min_levels : path
 
 (** [reveal_config] is the path to the storage configuration. *)
-val reveal_config : path
+val reveal_config : Kernel.t -> path
 
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
 val enable_fa_bridge : path
@@ -129,7 +129,11 @@ val enable_fast_withdrawal : path
 
 (** [storage_version] is the path to the version of the storage used
     by the kernel to detect if a storage migration is required. *)
-val storage_version : path
+val storage_version : Kernel.t -> path
+
+(** [evm_node_flag kernel] is the path to the flag telling the kernel
+    it runs inside an EVM node rather than a rollup node. *)
+val evm_node_flag : Kernel.t -> path
 
 module Ticket_table : sig
   (** [balance ~ticket_hash ~account] returns the path where the balance of

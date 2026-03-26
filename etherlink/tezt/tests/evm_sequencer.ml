@@ -9022,6 +9022,21 @@ let test_fast_withdrawal_feature_flag =
          Durable_storage_path.enable_fast_withdrawal) ;
   unit
 
+let test_evm_node_flag =
+  register_all
+    ~__FILE__
+    ~tags:["evm_node"; "flag"]
+    ~title:"EVM node flag is set in durable storage"
+    ~use_dal:Register_without_feature
+    ~use_multichain:Register_without_feature
+  @@ fun {sequencer; kernel; _} _protocol ->
+  let key = Durable_storage_path.evm_node_flag kernel in
+  let*@ flag = Rpc.state_value sequencer key in
+  Check.is_true
+    (Option.is_some flag)
+    ~error_msg:(sf "Expected evm_node flag to be set at %s" key) ;
+  unit
+
 let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
     ~produce_block ~receiver ~fast_withdrawal_contract_address () =
   let* () =
@@ -13694,8 +13709,8 @@ let test_durable_storage_consistency =
     ~tags:["durable_storage"; "consistency"]
     ~time_between_blocks:Nothing
     ~title:"Everyone agrees on L1 level"
-  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
-  let key = Durable_storage_path.storage_version in
+  @@ fun {sequencer; observer; sc_rollup_node; kernel; _} _protocol ->
+  let key = Durable_storage_path.storage_version kernel in
   let* val_from_rollup_node_opt =
     Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
@@ -16275,6 +16290,7 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
+  test_evm_node_flag [Alpha] ;
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;
   test_fast_withdrawal_feature_flag protocols ;

@@ -33,6 +33,8 @@ let no_0x s =
 
 let normalize s = String.lowercase_ascii @@ no_0x s
 
+let base rst = sf "/base%s" rst
+
 let evm rst = sf "/evm%s" rst
 
 let world_state rst = evm (sf "/world_state%s" rst)
@@ -95,7 +97,9 @@ let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 
 let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
 
-let reveal_config = "/__tmp/reveal_config"
+let reveal_config = function
+  | Kernel.Latest -> base "/__tmp/reveal_config"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> "/__tmp/reveal_config"
 
 let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
 
@@ -104,7 +108,13 @@ let enable_multichain = evm "/feature_flags/enable_multichain"
 let enable_fast_withdrawal =
   evm "/world_state/feature_flags/enable_fast_withdrawal"
 
-let storage_version = evm "/storage_version"
+let storage_version = function
+  | Kernel.Latest -> base "/storage_version"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/storage_version"
+
+let evm_node_flag = function
+  | Kernel.Latest -> base "/__evm_node"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> "/__evm_node"
 
 module Ticket_table = struct
   let ticket_table =

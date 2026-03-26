@@ -5488,13 +5488,14 @@ let test_reveal_storage =
 
      The only way for this new rollup to see initialized balances is for the
      duplication process to work. *)
+  let new_kernel = Kernel.Latest in
   let additional_config =
     Sc_rollup_helpers.Installer_kernel_config.
       [
         Reveal
           {
             hash = configuration_root_hash;
-            to_ = Durable_storage_path.reveal_config;
+            to_ = Durable_storage_path.reveal_config new_kernel;
           };
       ]
   in
@@ -5507,6 +5508,7 @@ let test_reveal_storage =
       ~additional_config
       ~force_install_kernel:false
       ~eth_bootstrap_accounts:[]
+      ~kernel:new_kernel
       protocol
   in
 
