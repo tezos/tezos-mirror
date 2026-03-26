@@ -54,6 +54,6 @@ let read_riscv_kernel (kernel : kernel) : string Lwt.t =
 let read_riscv_proof_first_step (kernel : kernel) : string =
   read_file (proof_path kernel)
 
-(** Get a boot sector for a the echo kernel *)
+(** Get the boot sector for the echo kernel *)
 let read_riscv_echo_kernel () : string Lwt.t =
   read_riscv_kernel_internal (riscv_kernel_path "riscv-echo")

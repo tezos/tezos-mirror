@@ -45,6 +45,9 @@ let tests =
         ( "Echo: Deserialise invalid bytes fails",
           `Quick,
           Test_outbox.test_deserialise_invalid_bytes );
+        ( "Echo: Proofs for input steps are produced and verified correctly",
+          `Quick,
+          Test_backend.test_input_request_proof );
       ] );
     ( "Storage",
       [
