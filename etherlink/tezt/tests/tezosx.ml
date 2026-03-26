@@ -1159,7 +1159,7 @@ let test_get_ethereum_tezos_address_rpc ~runtime () =
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
   let ethereum_address = "0xccef676171871a48bbd6e2be75bbcc09d38830c5" in
-  let expected = "KT1TzJBdRSNJGME2Qas4s1z4mzvRYuHgoFJk" in
+  let expected = "KT1TLraR9PboPAvxLKYQs9eU4n75rGFJTbWk" in
   let* rpc_result =
     Rpc.Tezosx.tez_getEthereumTezosAddress ethereum_address sandbox
   in
@@ -3388,7 +3388,15 @@ let test_alias_forwarder_forwards_to_evm =
   unit
 
 (** Test that an EVM-to-Tezos cross-runtime call creates a Tezos alias
-    for the EVM sender and that the cross-runtime transfer succeeds. *)
+    for the EVM sender (via generate_alias with raw address bytes), and
+    that sending tez to this alias KT1 forwards funds back to the EVM
+    address.
+
+    This exercises the full alias lifecycle:
+    1. EVM account calls the RuntimeGateway to reach a Tezos address
+       — journal.rs passes raw 20-byte address to generate_alias
+    2. The alias KT1 is created with the forwarding Michelson contract
+    3. Sending tez to the alias forwards it back to the EVM account *)
 let test_alias_forwarder_created_by_evm_cross_runtime_call =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -3397,9 +3405,15 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
     ~tags:["alias"; "forwarder"; "cross_runtime"; "evm_to_tezos"]
     ~with_runtimes:[Tezos]
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
-  @@ fun {sequencer; _} _protocol ->
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
   let evm_sender = Eth_account.bootstrap_accounts.(0) in
   let tezos_receiver = Constant.bootstrap1.public_key_hash in
+  (* Step 1: Make a cross-runtime transfer from EVM to Tezos.
+     This triggers alias creation for the EVM sender on the Tezos side
+     via journal.rs which passes the address as a string. *)
   let* _receipt =
     check_evm_to_michelson_transfer
       ~sequencer
@@ -3409,12 +3423,48 @@ let test_alias_forwarder_created_by_evm_cross_runtime_call =
       ~transfer_amount:(Tez.of_int 1)
       ()
   in
+  (* Step 2: Look up the Tezos alias (KT1) for the EVM sender. *)
   let* alias_result =
     Rpc.Tezosx.tez_getEthereumTezosAddress evm_sender.address sequencer
   in
   let alias_kt1 = Result.get_ok alias_result in
   Log.info "EVM sender %s has Tezos alias %s" evm_sender.address alias_kt1 ;
-  if alias_kt1 = "" then Test.fail "Alias should not be empty" ;
+  (* Step 3: Record the EVM sender balance before forwarding. *)
+  let*@ evm_balance_before =
+    Rpc.get_balance ~address:evm_sender.address sequencer
+  in
+  (* Step 4: Send tez to the alias KT1. The forwarder contract should
+     forward BALANCE to the EVM address via the TezosXGateway. *)
+  let forward_amount = Tez.of_int 100 in
+  let forward_amount_mutez = Tez.to_mutez forward_amount in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source:Constant.bootstrap5
+      ~counter:1
+      ~dest:alias_kt1
+      ~arg_data:"Unit"
+      ~amount:forward_amount_mutez
+      ()
+  in
+  (* Step 5: Sync and verify the EVM sender balance increased. *)
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let*@ evm_balance_after =
+    Rpc.get_balance ~address:evm_sender.address sequencer
+  in
+  let expected_increase = Wei.of_tez forward_amount in
+  Check.(
+    (evm_balance_after = Wei.(evm_balance_before + expected_increase))
+      Wei.typ
+      ~error_msg:
+        "Expected EVM balance to increase by forwarded amount: expected %R but \
+         got %L") ;
   unit
 
 (** Transfer tez between two accounts on the Michelson runtime and verify
@@ -3498,6 +3548,6 @@ let () =
   test_trace_call_evm ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias [Alpha] ;
   test_cross_runtime_michelson_sender_is_alias [Alpha] ;
-  test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
   test_alias_forwarder_forwards_to_evm [Alpha] ;
+  test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
   test_tez_transfer [Alpha]

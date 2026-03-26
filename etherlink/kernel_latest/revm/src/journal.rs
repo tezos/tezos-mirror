@@ -585,7 +585,7 @@ pub trait CrossRuntimeCall {
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
-    ) -> Result<Vec<u8>, CustomPrecompileError>;
+    ) -> Result<String, CustomPrecompileError>;
 
     fn tezosx_call_http(
         &mut self,
@@ -603,7 +603,7 @@ where
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
-    ) -> Result<Vec<u8>, CustomPrecompileError> {
+    ) -> Result<String, CustomPrecompileError> {
         let context = CrossRuntimeContext {
             gas_limit: self.database.block.gas_limit,
             timestamp: self.database.block.timestamp,
@@ -612,13 +612,14 @@ where
         match get_alias(self.database.host, &source, RuntimeId::Tezos)? {
             Some(alias) => Ok(alias),
             None => {
-                let alias = self
+                let source_hex = source.to_string().to_lowercase();
+                let alias_str = self
                     .database
                     .registry
                     .generate_alias(
                         self.database.host,
                         self.journal,
-                        &source.0 .0,
+                        &source_hex,
                         RuntimeId::Tezos,
                         context,
                     )
@@ -627,8 +628,8 @@ where
                             "Failed to generate alias for source address: {e:?}"
                         ))
                     })?;
-                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias)?;
-                Ok(alias)
+                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias_str)?;
+                Ok(alias_str)
             }
         }
     }

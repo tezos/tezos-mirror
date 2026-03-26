@@ -28,7 +28,7 @@ val feature_flag : runtime -> string
 module Ethereum_runtime : sig
   type address = Ethereum_types.address
 
-  val generate_alias : bytes -> Ethereum_types.address
+  val generate_alias : string -> Ethereum_types.address
 end
 
 module Tezos_runtime : sig
@@ -44,7 +44,7 @@ module Tezos_runtime : sig
 
   val encode_account_info : account_info -> bytes
 
-  val generate_alias : bytes -> Tezos_types.Contract.t
+  val generate_alias : string -> Tezos_types.Contract.t
 end
 
 module Foreign_address : sig

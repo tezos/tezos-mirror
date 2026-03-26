@@ -657,10 +657,10 @@ mod test {
                 &self,
                 host: &mut Host,
                 journal: &mut TezosXJournal,
-                native_address: &[u8],
+                native_address: &str,
                 runtime_id: RuntimeId,
                 context: CrossRuntimeContext,
-            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            ) -> Result<String, TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
@@ -744,20 +744,17 @@ mod test {
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
-                native_address: &[u8],
+                native_address: &str,
                 _context: CrossRuntimeContext,
-            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            ) -> Result<String, TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
-                // Simple mock: prefix with "tz1_" marker and return a hash-like alias
-                let mut alias = vec![0u8; 22]; // tz1 address size
-                alias[0] = 0x00; // tz1 tag
-                alias[1] = 0x00;
-                // Copy as much of native_address as fits
-                let copy_len = native_address.len().min(20);
-                alias[2..2 + copy_len].copy_from_slice(&native_address[..copy_len]);
-                Ok(alias)
+                // Deterministic mock: compute a KT1 from native_address bytes
+                use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
+                let kt1 =
+                    ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
+                Ok(kt1.to_base58_check())
             }
 
             fn serve<Host>(
@@ -778,8 +775,6 @@ mod test {
                     .ok_or_else(|| {
                         TezosXRuntimeError::Custom("Missing address in URL".to_string())
                     })?;
-                let to = self.address_from_string(address_str)?;
-
                 // Parse the amount from the X-Tezos-Amount header (TEZ decimal → mutez)
                 let amount = request
                     .headers()
@@ -788,8 +783,8 @@ mod test {
                     .and_then(|s| tezosx_interfaces::headers::parse_tez_to_mutez(s).ok())
                     .unwrap_or(0);
 
-                // Store the balance for the destination address
-                let address_hex = hex::encode(&to);
+                // Store the balance keyed by the address string from the URL
+                let address_hex = hex::encode(address_str.as_bytes());
                 let path = OwnedPath::try_from(format!("/{address_hex}"))
                     .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
                 let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
@@ -812,6 +807,7 @@ mod test {
 
                 Ok(http::Response::builder()
                     .status(http::StatusCode::OK)
+                    .header(tezosx_interfaces::X_TEZOS_GAS_CONSUMED, "0")
                     .body(Vec::new())
                     .unwrap())
             }
@@ -824,8 +820,16 @@ mod test {
                 &self,
                 address_str: &str,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
-                // Simple mock: just return the string as bytes
-                Ok(address_str.as_bytes().to_vec())
+                // Parse a b58check Tezos address (KT1/tz1) to binary Contract bytes
+                use tezos_data_encoding::enc::BinWriter;
+                let contract =
+                    tezos_protocol::contract::Contract::from_b58check(address_str)
+                        .map_err(|e| {
+                            TezosXRuntimeError::ConversionError(format!("{e}"))
+                        })?;
+                contract
+                    .to_bytes()
+                    .map_err(|e| TezosXRuntimeError::ConversionError(format!("{e}")))
             }
 
             fn string_from_address(
@@ -957,7 +961,7 @@ mod test {
             .generate_alias(
                 &mut host,
                 &mut journal,
-                &destination.0 .0,
+                &destination.to_string(),
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
             )
@@ -1040,7 +1044,7 @@ mod test {
             .generate_alias(
                 &mut host,
                 &mut journal,
-                &destination.0 .0,
+                &destination.to_string(),
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
             )
@@ -1066,7 +1070,7 @@ mod test {
             .unwrap();
 
         // Create a mock implicit address string for the test (hex-encoded for URL safety)
-        let implicit_address = hex::encode(&alias);
+        let implicit_address = alias.strip_prefix("0x").unwrap_or(&alias).to_string();
 
         let calldata = RuntimeGatewayCalls::transfer(transferCall {
             implicitAddress: implicit_address.clone(),
@@ -2993,7 +2997,7 @@ mod test {
         init_precompile_bytecodes(&mut host, true).unwrap();
 
         // Native Tezos address
-        let native_address = b"tz1TestForwarder123";
+        let native_address = "tz1TestForwarder123";
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
@@ -3007,7 +3011,8 @@ mod test {
                 test_alias_creation_context(),
             )
             .expect("Failed to generate alias");
-        let alias = Address::from_slice(&alias_bytes);
+        let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
+        let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 
         // Verify the alias has code (delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();
@@ -3020,7 +3025,7 @@ mod test {
 
         // Verify the alias address is computed deterministically from the native address
         let expected_alias = {
-            let hash = bytes_hash(native_address);
+            let hash = bytes_hash(native_address.as_bytes());
             Address::from_slice(&hash.0[0..20])
         };
         assert_eq!(
@@ -3052,12 +3057,12 @@ mod test {
         init_precompile_bytecodes(&mut host, true).unwrap();
 
         // Native Tezos address that should receive the funds
-        let native_address = b"tz1PreexistingBal";
+        let native_address = "tz1PreexistingBal";
 
         // First, we need to compute the alias address to set pre-existing balance
         // We use the same algorithm as generate_alias: keccak256(native_address)[0..20]
         let alias = {
-            let hash = bytes_hash(native_address);
+            let hash = bytes_hash(native_address.as_bytes());
             Address::from_slice(&hash.0[0..20])
         };
 
@@ -3091,14 +3096,15 @@ mod test {
             .expect("Failed to generate alias");
 
         // Verify the alias was created at the expected address
+        // (case-insensitive: generate_alias returns lowercase, Address::to_string uses EIP-55 checksum)
         assert_eq!(
-            alias_bytes,
-            alias.0.to_vec(),
+            alias_bytes.to_lowercase(),
+            alias.to_string().to_lowercase(),
             "Alias should be at the computed address"
         );
 
         // Check that the pre-existing balance was forwarded to the Tezos address
-        let native_addr_str = String::from_utf8(native_address.to_vec()).unwrap();
+        let native_addr_str = native_address.to_string();
         let tezos_balance = registry
             .get_balance(
                 &mut host,
@@ -3126,7 +3132,7 @@ mod test {
         init_precompile_bytecodes(&mut host, true).unwrap();
 
         // Native Tezos address that should receive the funds
-        let native_address = b"tz1TestForwarder123";
+        let native_address = "tz1TestForwarder123";
 
         // Create the Ethereum alias for this native address
         let registry = Registry::new();
@@ -3140,7 +3146,8 @@ mod test {
                 test_alias_creation_context(),
             )
             .expect("Failed to generate alias");
-        let alias = Address::from_slice(&alias_bytes);
+        let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
+        let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 
         // Verify the alias has code (EIP-7702 delegation bytecode)
         let alias_account = StorageAccount::from_address(&alias).unwrap();
@@ -3194,7 +3201,7 @@ mod test {
         match execution_result.result {
             ExecutionResult::Success { .. } => {
                 // Check the mock Tezos balance - funds should have been forwarded
-                let native_addr_str = String::from_utf8(native_address.to_vec()).unwrap();
+                let native_addr_str = native_address.to_string();
                 let tezos_balance = registry
                     .get_balance(
                         &mut host,

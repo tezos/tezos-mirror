@@ -230,15 +230,15 @@ impl RuntimeInterface for EthereumRuntime {
         registry: &impl Registry,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &[u8],
+        native_address: &str,
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    ) -> Result<String, TezosXRuntimeError>
     where
         Host: StorageV1 + tezos_evm_logging::Logging,
     {
         // Step 1: Compute the alias address deterministically from the native address
         let mut hasher = Keccak256::new();
-        hasher.update(native_address);
+        hasher.update(native_address.as_bytes());
         let hash = hasher.finalize();
         let alias = Address::from_slice(&hash[0..20]);
 
@@ -283,16 +283,10 @@ impl RuntimeInterface for EthereumRuntime {
 
         // Step 3: Call init_tezosx_alias on the alias address to set up storage
         // The native address is passed as a string (e.g., "tz1...")
-        let native_address_str =
-            String::from_utf8(native_address.to_vec()).map_err(|e| {
-                TezosXRuntimeError::Custom(format!(
-                    "Invalid native address encoding: {e}"
-                ))
-            })?;
 
         // Encode the init_tezosx_alias call
         let call_data = init_tezosx_aliasCall {
-            nativeAddress: native_address_str,
+            nativeAddress: native_address.to_string(),
         }
         .abi_encode();
 
@@ -335,7 +329,7 @@ impl RuntimeInterface for EthereumRuntime {
 
         // Check that the call succeeded
         match outcome.result {
-            ExecutionResult::Success { .. } => Ok(alias.0.to_vec()),
+            ExecutionResult::Success { .. } => Ok(alias.to_string()),
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
@@ -418,10 +412,10 @@ mod tests {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &[u8],
+            _native_address: &str,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        ) -> Result<String, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {

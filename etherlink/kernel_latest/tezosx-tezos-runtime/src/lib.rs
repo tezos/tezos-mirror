@@ -198,24 +198,13 @@ impl RuntimeInterface for TezosRuntime {
         _registry: &impl Registry,
         host: &mut Host,
         _journal: &mut TezosXJournal,
-        native_address: &[u8],
+        native_address: &str,
         _context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    ) -> Result<String, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address));
-
-        // TODO: Change everywhere to have a String type for addresses instead of raw bytes, to avoid this UTF-8 parsing logic.
-        // native_address may arrive as a UTF-8 string (e.g. "0x2E2A..."
-        // from enshrined_contracts) or as raw address bytes (e.g. the
-        // 20-byte EVM address from journal.rs). When raw, hex-encode
-        // with a "0x" prefix so the forwarder storage holds a valid
-        // address string the TezosXGateway can route to.
-        let native_address_str = match std::str::from_utf8(native_address) {
-            Ok(s) => s.to_string(),
-            Err(_) => format!("0x{}", hex::encode(native_address)),
-        };
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
 
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let account = context.originated_from_kt1(&kt1)?;
@@ -225,7 +214,7 @@ impl RuntimeInterface for TezosRuntime {
                 "Failed to decode forwarder code from hex: {e}"
             ))
         })?;
-        let storage = alias_forwarder::forwarder_storage(&native_address_str);
+        let storage = alias_forwarder::forwarder_storage(native_address);
 
         account.init(host, &code, &storage).map_err(|e| {
             TezosXRuntimeError::Custom(format!(
@@ -237,12 +226,7 @@ impl RuntimeInterface for TezosRuntime {
             TezosXRuntimeError::Custom(format!("Failed to set alias balance: {e}"))
         })?;
 
-        let contract = Contract::Originated(kt1);
-        contract.to_bytes().map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Failed to encode address to bytes: {e}"
-            ))
-        })
+        Ok(kt1.to_base58_check())
     }
 
     /// Execute a cross-runtime call where the sender's balance was already
@@ -433,10 +417,10 @@ mod tests {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &[u8],
+            _native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        ) -> Result<String, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
@@ -477,23 +461,26 @@ mod tests {
     }
 
     #[test]
-    fn generate_alias_returns_valid_kt1_bytes() {
+    fn generate_alias_returns_valid_kt1_string() {
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
 
-        let result = runtime.generate_alias(
-            &StubRegistry,
-            &mut host,
-            &mut journal,
-            b"0x1234567890abcdef1234567890abcdef12345678",
-            test_context(),
-        );
+        let alias = runtime
+            .generate_alias(
+                &StubRegistry,
+                &mut host,
+                &mut journal,
+                "0x1234567890abcdef1234567890abcdef12345678",
+                test_context(),
+            )
+            .expect("generate_alias should succeed");
 
-        let alias_bytes = result.expect("generate_alias should succeed");
-        // KT1 contract encoding: 1 byte tag (0x01) + 20 bytes hash + 1 byte padding
-        assert_eq!(alias_bytes.len(), 22);
-        assert_eq!(alias_bytes[0], 0x01); // originated contract tag
+        // The alias should be a valid KT1 base58check string
+        assert!(
+            alias.starts_with("KT1"),
+            "Alias should be a KT1 address: {alias}"
+        );
     }
 
     #[test]
@@ -501,7 +488,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
-        let evm_address = b"0x1234567890abcdef1234567890abcdef12345678";
+        let evm_address = "0x1234567890abcdef1234567890abcdef12345678";
 
         runtime
             .generate_alias(
@@ -513,8 +500,7 @@ mod tests {
             )
             .expect("generate_alias should succeed");
 
-        // Verify the contract was deployed by reading it back
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address));
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
             TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
@@ -537,7 +523,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
-        let evm_address = b"0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        let evm_address = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
         runtime
             .generate_alias(
@@ -549,15 +535,13 @@ mod tests {
             )
             .expect("generate_alias should succeed");
 
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address));
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
             TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
-        let expected = alias_forwarder::forwarder_storage(
-            "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-        );
+        let expected = alias_forwarder::forwarder_storage(evm_address);
         assert_eq!(storage, expected);
     }
 
@@ -566,7 +550,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
-        let evm_address = b"0xabcdef";
+        let evm_address = "0xabcdef";
 
         runtime
             .generate_alias(
@@ -578,7 +562,7 @@ mod tests {
             )
             .expect("generate_alias should succeed");
 
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address));
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let balance = TezosRuntime::get_originated_account_balance(&host, &kt1)
             .expect("should read balance");
         assert_eq!(balance, U256::zero());
@@ -590,7 +574,7 @@ mod tests {
         let mut host2 = MockKernelHost::default();
         let mut journal = TezosXJournal::default();
         let runtime = test_runtime();
-        let evm_address = b"0x1111111111111111111111111111111111111111";
+        let evm_address = "0x1111111111111111111111111111111111111111";
 
         let alias1 = runtime
             .generate_alias(
@@ -625,7 +609,7 @@ mod tests {
                 &StubRegistry,
                 &mut host,
                 &mut journal,
-                b"0x1111111111111111111111111111111111111111",
+                "0x1111111111111111111111111111111111111111",
                 test_context(),
             )
             .unwrap();
@@ -634,47 +618,11 @@ mod tests {
                 &StubRegistry,
                 &mut host,
                 &mut journal,
-                b"0x2222222222222222222222222222222222222222",
+                "0x2222222222222222222222222222222222222222",
                 test_context(),
             )
             .unwrap();
 
         assert_ne!(alias1, alias2);
-    }
-
-    #[test]
-    fn generate_alias_accepts_raw_evm_address_bytes() {
-        let mut host = MockKernelHost::default();
-        let mut journal = TezosXJournal::default();
-        let runtime = test_runtime();
-
-        // Raw 20-byte EVM address (not valid UTF-8), as passed by journal.rs
-        let raw_address: [u8; 20] = [
-            0x2E, 0x2A, 0xC8, 0x69, 0x9A, 0xD0, 0x2E, 0x71, 0x09, 0x51, 0xEA, 0x0F, 0x56,
-            0xB8, 0x92, 0xED, 0x36, 0x91, 0x6C, 0xD5,
-        ];
-
-        let result = runtime.generate_alias(
-            &StubRegistry,
-            &mut host,
-            &mut journal,
-            &raw_address,
-            test_context(),
-        );
-
-        let alias_bytes = result.expect("generate_alias should succeed with raw bytes");
-        assert_eq!(alias_bytes.len(), 22);
-        assert_eq!(alias_bytes[0], 0x01);
-
-        // Verify the storage contains the hex-encoded address
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(&raw_address));
-        let context =
-            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
-        let account = context.originated_from_kt1(&kt1).unwrap();
-        let storage = account.storage(&host).unwrap();
-        let expected = alias_forwarder::forwarder_storage(
-            "0x2e2ac8699ad02e710951ea0f56b892ed36916cd5",
-        );
-        assert_eq!(storage, expected);
     }
 }

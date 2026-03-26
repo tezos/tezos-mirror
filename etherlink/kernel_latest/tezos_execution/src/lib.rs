@@ -1419,13 +1419,13 @@ pub(crate) mod test_utils {
     /// Mock Registry for testing gateway operations.
     /// Tracks all calls to serve and generate_alias for verification.
     pub struct MockRegistry {
-        pub generate_alias_calls: RefCell<Vec<(Vec<u8>, RuntimeId)>>,
+        pub generate_alias_calls: RefCell<Vec<(String, RuntimeId)>>,
         pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
-        generated_alias: Vec<u8>,
+        generated_alias: String,
     }
 
     impl MockRegistry {
-        pub fn new(generated_alias: Vec<u8>) -> Self {
+        pub fn new(generated_alias: String) -> Self {
             Self {
                 generate_alias_calls: RefCell::new(Vec::new()),
                 serve_calls: RefCell::new(Vec::new()),
@@ -1439,16 +1439,16 @@ pub(crate) mod test_utils {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            native_address: &[u8],
+            native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        ) -> Result<String, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
             self.generate_alias_calls
                 .borrow_mut()
-                .push((native_address.to_vec(), runtime_id));
+                .push((native_address.to_string(), runtime_id));
             Ok(self.generated_alias.clone())
         }
 
@@ -1479,14 +1479,14 @@ pub(crate) mod test_utils {
     /// responses.
     pub struct MockRegistryWithStatus {
         pub serve_calls: RefCell<Vec<http::Request<Vec<u8>>>>,
-        generated_alias: Vec<u8>,
+        generated_alias: String,
         status_code: u16,
         response_body: Vec<u8>,
     }
 
     impl MockRegistryWithStatus {
         pub fn new(
-            generated_alias: Vec<u8>,
+            generated_alias: String,
             status_code: u16,
             response_body: Vec<u8>,
         ) -> Self {
@@ -1504,10 +1504,10 @@ pub(crate) mod test_utils {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &[u8],
+            _native_address: &str,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        ) -> Result<String, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
@@ -1608,10 +1608,10 @@ mod tests {
             &self,
             _host: &mut Host,
             _journal: &mut TezosXJournal,
-            _native_address: &[u8],
+            _native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError>
+        ) -> Result<String, TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
@@ -6028,7 +6028,7 @@ mod tests {
             },
         );
 
-        let registry = crate::test_utils::MockRegistry::new(vec![0x12; 20]);
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let receipt = validate_and_apply_operation(
             &mut host,
             &registry,
@@ -6315,7 +6315,7 @@ mod tests {
             },
         );
 
-        let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::default();
         let receipts = validate_and_apply_operation(
             &mut host,
@@ -6386,7 +6386,7 @@ mod tests {
             },
         );
 
-        let registry = crate::test_utils::MockRegistry::new(vec![0x11; 20]);
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::default();
         let receipts = validate_and_apply_operation(
             &mut host,
@@ -6429,14 +6429,14 @@ mod tests {
                 &self,
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
-                _native_address: &[u8],
+                _native_address: &str,
                 _runtime_id: RuntimeId,
                 _context: CrossRuntimeContext,
-            ) -> Result<Vec<u8>, TezosXRuntimeError>
+            ) -> Result<String, TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
-                Ok(vec![0x11; 20])
+                Ok("KT1_mock_revert".to_string())
             }
 
             fn address_from_string(
@@ -6581,7 +6581,7 @@ mod tests {
         );
 
         // Use MockRegistry that tracks serve calls
-        let registry = crate::test_utils::MockRegistry::new(vec![0xAA; 20]);
+        let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let receipt = validate_and_apply_operation(
             &mut host,
             &registry,
