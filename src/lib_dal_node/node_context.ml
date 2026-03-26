@@ -199,6 +199,11 @@ let get_proto_parameters ~level ctxt =
   let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return parameters
 
+let get_traps_fraction ctxt ~published_level ~default =
+  match get_proto_parameters ~level:(`Level published_level) ctxt with
+  | Ok params -> params.traps_fraction
+  | Error _ -> default
+
 let storage_period ctxt proto_parameters =
   match ctxt.config.history_mode with
   | Full -> `Always
