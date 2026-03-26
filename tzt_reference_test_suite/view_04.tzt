@@ -1,0 +1,20 @@
+code { VIEW "get_amount" mutez };
+
+input
+  {
+    Stack_elt unit Unit ;
+    Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+  };
+
+output { Stack_elt (option mutez) (Some 0) };
+
+self "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ;
+amount 100 ;
+
+views
+  {
+    Views "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+      { View "get_amount" unit mutez { DROP ; AMOUNT } }
+  };
+
+storages { Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit };

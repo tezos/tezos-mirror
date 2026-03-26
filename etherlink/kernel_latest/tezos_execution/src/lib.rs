@@ -5222,6 +5222,101 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_view_balance() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let src = bootstrap1();
+        let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
+        let view_addr = orignation_nonce.generate_kt1();
+        let caller_addr = orignation_nonce.generate_kt1();
+
+        let arena = Arena::new();
+
+        init_account(&mut host, &src.pkh, 1000);
+        reveal_account(&mut host, &src);
+
+        // Contract with a view that returns its BALANCE
+        let view_balance = 500;
+        init_contract(
+            &mut host,
+            &view_addr,
+            r#"
+                parameter unit ;
+                storage unit ;
+                code { CDR ; NIL operation ; PAIR } ;
+                view "get_balance" unit mutez { DROP ; BALANCE }
+            "#,
+            &Micheline::from(()),
+            &view_balance.into(),
+        );
+
+        let mich_addr = TypedValue::Address(Address {
+            hash: mir::ast::AddressHash::Kt1(view_addr),
+            entrypoint: Entrypoint::default(),
+        })
+        .into_micheline_optimized_legacy(&arena);
+
+        // Caller invokes the view and asserts the result equals 500
+        init_contract(
+            &mut host,
+            &caller_addr,
+            r#"
+                parameter unit ;
+                storage address ;
+                code { CDR ;
+                    DUP ;
+                    UNIT ;
+                    VIEW "get_balance" mutez ;
+                    IF_NONE { PUSH string "View failed" ; FAILWITH }
+                            { PUSH mutez 500 ; ASSERT_CMPEQ ; NIL operation ; PAIR } }
+            "#,
+            &mich_addr,
+            &0.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21000,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(caller_addr),
+            Parameters::default(),
+        );
+
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context,
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Successful Transfer operation result, got {:?}",
+            receipts[0].receipt
+        );
+    }
+
     const SCRIPTS_FOLDER: &str = "../../../michelson_test_scripts/big_maps/";
 
     fn read_script(file: &str) -> String {

@@ -250,16 +250,18 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         Box::new(self.tc_ctx)
     }
 
-    fn lookup_view_and_storage(
+    fn lookup_view_storage_balance(
         &self,
-        contract: ContractKt1Hash,
+        contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
     ) -> Option<(
         mir::typechecker::MichelineView<Micheline<'a>>,
-        (Micheline<'a>, Vec<u8>),
+        Micheline<'a>,
+        Vec<u8>,
+        i64,
     )> {
-        let account = self.tc_ctx.context.originated_from_kt1(&contract).ok()?;
+        let account = self.tc_ctx.context.originated_from_kt1(contract).ok()?;
         let serialized_script = account.code(self.tc_ctx.host).ok()?;
         match serialized_script {
             Code::Code(serialized_script) => {
@@ -279,13 +281,28 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
                     code: view.code.clone(),
                 };
                 let storage = account.storage(self.tc_ctx.host).ok()?;
-                Some((owned_view, (storage_ty.clone(), storage)))
+                let balance = account.balance(self.tc_ctx.host).ok()?;
+                let balance = balance.0.try_into().ok()?;
+                Some((owned_view, storage_ty.clone(), storage, balance))
             }
             Code::Enshrined(_) => {
                 // Current enshrined contracts have no views
                 None
             }
         }
+    }
+
+    fn set_view_context(
+        &mut self,
+        self_address: AddressHash,
+        sender: AddressHash,
+        amount: i64,
+        balance: i64,
+    ) {
+        self.exec_ctx.self_address = self_address;
+        self.exec_ctx.sender = sender;
+        self.exec_ctx.amount = amount;
+        self.exec_ctx.balance = balance;
     }
 }
 
@@ -1210,13 +1227,23 @@ pub(crate) mod mock {
             unimplemented!("MockCtx does not support lazy_storage")
         }
 
-        fn lookup_view_and_storage(
+        fn lookup_view_storage_balance(
             &self,
-            _contract: ContractKt1Hash,
+            _contract: &ContractKt1Hash,
             _name: &str,
             _arena: &'a Arena<Micheline<'a>>,
-        ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
+        ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)> {
             None
+        }
+
+        fn set_view_context(
+            &mut self,
+            _self_address: AddressHash,
+            _sender: AddressHash,
+            _amount: i64,
+            _balance: i64,
+        ) {
+            // MockCtx does not support views
         }
     }
 }

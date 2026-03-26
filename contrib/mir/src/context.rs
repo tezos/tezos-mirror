@@ -95,12 +95,30 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>>;
 
-    fn lookup_view_and_storage(
+    /// Looks up a view definition together with the contract's storage and balance.
+    ///
+    /// Returns the view named `name` from `contract`, along with:
+    /// - the Micheline storage type,
+    /// - the packed (serialized) storage,
+    /// - the contract balance in mutez.
+    ///
+    /// Returns [`None`] if the contract or the view does not exist.
+    fn lookup_view_storage_balance(
         &self,
-        contract: ContractKt1Hash,
+        contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
+    ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>;
+
+    /// Override the execution context for a view call.
+    /// Sets `self_address`, `sender`, `amount`, and `balance`.
+    fn set_view_context(
+        &mut self,
+        self_address: AddressHash,
+        sender: AddressHash,
+        amount: i64,
+        balance: i64,
+    );
 }
 
 /// Standalone implementation of the MIR execution context, used for tests,
@@ -174,6 +192,10 @@ pub struct Ctx<'a> {
     origination_counter: u32,
     /// Operation counter used as a nonce for operations. Defaults to `0`.
     operation_counter: u128,
+    /// A map of contract KT1 addresses to their balances (in mutez).
+    /// Used by [`lookup_view_storage_balance`](CtxTrait::lookup_view_storage_balance) to
+    /// return the target contract's balance during view execution. Defaults to empty.
+    pub balances: HashMap<ContractKt1Hash, i64>,
 }
 
 impl<'a> Ctx<'a> {
@@ -237,6 +259,7 @@ impl Default for Ctx<'_> {
             )
             .unwrap(),
             origination_counter: 0,
+            balances: HashMap::new(),
         }
     }
 }
@@ -327,13 +350,13 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         Box::new(&mut self.big_map_storage)
     }
 
-    fn lookup_view_and_storage(
+    fn lookup_view_storage_balance(
         &self,
-        contract: ContractKt1Hash,
+        contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
-        let addr = AddressHash::Kt1(contract);
+    ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)> {
+        let addr = AddressHash::Kt1(contract.clone());
         let contract_view = self.views.get(&addr)?.get(view_name)?;
         let view = MichelineView {
             input_type: contract_view
@@ -347,6 +370,20 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         let (storage_ty, storage) = self.storage.get(&addr)?;
         let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
         let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
-        Some((view, (mich_storage_ty, mich_storage.encode())))
+        let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
+        Some((view, mich_storage_ty, mich_storage.encode(), view_balance))
+    }
+
+    fn set_view_context(
+        &mut self,
+        self_address: AddressHash,
+        sender: AddressHash,
+        amount: i64,
+        balance: i64,
+    ) {
+        self.self_address = self_address;
+        self.sender = sender;
+        self.amount = amount;
+        self.balance = balance;
     }
 }
