@@ -51,9 +51,13 @@ pub struct SingleTxExecutionInput {
     pub block_number: U256,
 }
 
+const TEZOSX_ETHEREUM_RUNTIME_ID: u8 = 1;
+
 impl Encodable for SingleTxExecutionInput {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(3);
+        stream.begin_list(2);
+        stream.append(&TEZOSX_ETHEREUM_RUNTIME_ID);
         stream.append(&self.tx);
         append_timestamp(stream, self.timestamp);
         stream.append(&self.block_number);
@@ -66,7 +70,18 @@ impl Decodable for SingleTxExecutionInput {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
         let mut it = decoder.iter();
-        let tx = decode_field(&next(&mut it)?, "Transaction")?;
+        let tezosx_tx = next(&mut it)?;
+        if tezosx_tx.item_count()? != 2 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+        let mut tezosx_it = tezosx_tx.iter();
+        let runtime_id: u8 = decode_field(&next(&mut tezosx_it)?, "runtime_id")?;
+        if runtime_id != TEZOSX_ETHEREUM_RUNTIME_ID {
+            return Err(rlp::DecoderError::Custom(
+                "Only Ethereum runtime is supported",
+            ));
+        }
+        let tx = decode_field(&next(&mut tezosx_it)?, "Transaction")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
         let block_number = decode_field_u256_le(&next(&mut it)?, "Block number")?;
         Ok(SingleTxExecutionInput {
