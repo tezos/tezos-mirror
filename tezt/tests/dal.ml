@@ -14883,6 +14883,7 @@ let test_dal_node_snapshot_over_migration ~operators ~migration_level
 let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
   let operators = [0; 3] in
   test_l1_migration_scenario
+    ~tags:[Tag.slow]
     ~description:"snapshot over migration"
     ~migrate_from
     ~migrate_to
