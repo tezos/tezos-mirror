@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
 REGION="${REGION:-eu-west-1}"
 
@@ -19,9 +19,11 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
-dune build ci/bin_release_page/version_manager.exe
-VM=_build/default/ci/bin_release_page/version_manager.exe
-S3_PATH="${S3_BUCKET}${BUCKET_PATH}"
+dune build ci/bin_release_page/src/
+
+VM="_build/default/ci/bin_release_page/src/version_manager.exe"
+RELEASE_PAGE="_build/default/ci/bin_release_page/src/release_page.exe"
+S3_PATH="${S3_BUCKET}${BUCKET_PATH:-}"
 
 # Download versions.json from remote storage
 echo "Downloading versions.json..."
@@ -81,16 +83,16 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."
-    aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
-    aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+    aws s3 sync "./octez-binaries/x86_64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
+    aws s3 sync "./octez-binaries/arm64/" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Create and push archives
-    tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
+    tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/x86_64/|octez/|' octez-binaries/x86_64/*
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/" --region "${REGION}"
     sha256sum "${gitlab_release}.tar.gz" >> "./x86_64_sha256sums.txt"
-    tar -czf "${gitlab_release}.tar.gz" --transform 's|^\octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
+    tar -czf "${gitlab_release}.tar.gz" --transform 's|^octez-binaries/arm64/|octez/|' octez-binaries/arm64/*
     sha256sum "${gitlab_release}.tar.gz" >> "./arm64_sha256sums.txt"
-    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
+    aws s3 cp "./${gitlab_release}.tar.gz" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/" --region "${REGION}"
 
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
@@ -98,7 +100,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
     done
-    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
+    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/x86_64/sha256sums.txt"
 
     # Push checksums for arm64 binaries
     echo "Generating checksums for arm64 binaries"
@@ -106,14 +108,14 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
     done
-    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH}/${gitlab_release}/binaries/arm64/sha256sums.txt"
+    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}${BUCKET_PATH:-}/${gitlab_release}/binaries/arm64/sha256sums.txt"
 
   fi
 else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-# Generate RSS feed for all releases
+# Generate RSS feed
 echo "Generating RSS feed..."
 $VM \
   generate-rss \
@@ -124,31 +126,30 @@ $VM \
 echo "Uploading versions.json..."
 $VM upload --path "${S3_PATH}"
 
-echo "Building older releases page (inactive versions only)"
-dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+# Generate older releases page (inactive versions only)
+echo "Building older releases page..."
+$RELEASE_PAGE --component 'octez' \
   --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" --filter-active inactive changelog binaries packages
-
-# Rename the second page to older_releases.html
 mv index.html older_releases.html
 
-# Generate the main page again (active versions) to create index.html
-echo "Generating main release page for index.html"
-dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+# Generate main release page (active versions only)
+echo "Generating main release page..."
+$RELEASE_PAGE --component 'octez' \
   --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" --filter-active active changelog binaries packages
 
-echo "Syncing html files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
-  aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
-  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
-  aws s3 cp "./feed.xml" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+# Upload HTML, CSS and RSS feed to S3
+echo "Syncing html files to remote s3 bucket..."
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
+  aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
+  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
+  aws s3 cp "./feed.xml" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
   exit 1
 fi
 
-# Create an invalidation so that the web page actually updates.
-
+# Create a CloudFront invalidation so that the web page actually updates.
 aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
