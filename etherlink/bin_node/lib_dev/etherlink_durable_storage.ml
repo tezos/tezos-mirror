@@ -454,7 +454,8 @@ let base_fee_per_gas read =
          have one."
 
 let michelson_to_evm_gas_multiplier read =
-  inspect_durable_and_decode
+  inspect_durable_and_decode_default
+    ~default:10L
     read
     Durable_storage_path.michelson_to_evm_gas_multiplier
     Data_encoding.(Binary.of_bytes_exn Little_endian.int64)
