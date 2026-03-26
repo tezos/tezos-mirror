@@ -185,6 +185,58 @@ let new_head =
     ~msg:"agnostic daemon received a new head"
     ()
 
+let node_connection_lost =
+  declare_1
+    ~section
+    ~name:"agnostic_daemon_node_connection_lost"
+    ~level:Warning
+    ~msg:"connection lost to node {uri}, will retry in 5 seconds"
+    ("uri", Data_encoding.string)
+
+let node_connection_restored =
+  declare_1
+    ~section
+    ~name:"agnostic_daemon_node_connection_restored"
+    ~level:Notice
+    ~msg:"connection restored to node {uri}"
+    ("uri", Data_encoding.string)
+
+let node_connection_retry_failed =
+  declare_2
+    ~section
+    ~name:"agnostic_daemon_node_connection_retry_failed"
+    ~level:Warning
+    ~msg:"failed to reconnect to node {uri}: {error}, retrying in 5 seconds"
+    ("uri", Data_encoding.string)
+    ~pp2:pp_print_top_error_of_trace
+    ("error", trace_encoding)
+
+let monitoring_head_from_node =
+  declare_3
+    ~section
+    ~name:"agnostic_daemon_monitoring_head_from_node"
+    ~level:Debug
+    ~msg:"monitoring head at level {level} from node {uri} (block {block})"
+    ~pp1:Format.pp_print_int
+    ("level", Data_encoding.int31)
+    ("uri", Data_encoding.string)
+    ~pp3:Block_hash.pp_short
+    ("block", Block_hash.encoding)
+
+let skipping_lower_or_equal_level =
+  declare_3
+    ~section
+    ~name:"agnostic_daemon_skipping_lower_or_equal_level"
+    ~level:Debug
+    ~msg:
+      "skipping monitoring for head at level {level} from node {uri} (block \
+       {block}): level is not greater than last seen level"
+    ~pp1:Format.pp_print_int
+    ("level", Data_encoding.int31)
+    ("uri", Data_encoding.string)
+    ~pp3:Block_hash.pp_short
+    ("block", Block_hash.encoding)
+
 module Per_block_votes = struct
   include Internal_event.Simple
 

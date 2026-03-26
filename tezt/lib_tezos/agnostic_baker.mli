@@ -145,7 +145,10 @@ val extra_levels_for_old_baker : int
 
     If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
     order to determine the DAL content of the attestations it sends to the L1
-    node.  *)
+    node.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -158,6 +161,7 @@ val create :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
@@ -184,7 +188,10 @@ val create :
 
     If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
     order to determine the DAL content of the attestations it sends to the L1
-    node. *)
+    node.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val create_from_uris :
   ?runner:Runner.t ->
   ?path:string ->
@@ -197,6 +204,7 @@ val create_from_uris :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->
@@ -246,7 +254,10 @@ val create_from_uris :
     "every known account".
 
     If [remote_mode] is specified, the agnostic baker will run in
-    RPC-only mode. *)
+    RPC-only mode.
+
+    If [extra_nodes] is specified, the baker will connect to multiple nodes for
+    improved fault resilience (EXPERIMENTAL). *)
 val init :
   ?env:string String_map.t ->
   ?runner:Runner.t ->
@@ -262,6 +273,7 @@ val init :
   ?force_apply_from_round:int ->
   ?remote_mode:bool ->
   ?operations_pool:string ->
+  ?extra_nodes:Endpoint.t list ->
   ?dal_node_rpc_endpoint:Endpoint.t ->
   ?dal_node_timeout_percentage:int ->
   ?state_recorder:bool ->

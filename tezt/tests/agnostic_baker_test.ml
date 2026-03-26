@@ -459,9 +459,166 @@ let test_cli =
   and* () = Agnostic_baker.raw ~arguments baker in
   unit
 
+let test_multi_node_connection_recovery =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Agnostic baker multi-node connection recovery"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P" ;
+  (* Setup: 2 nodes sharing the same chain via P2P *)
+  let* node1 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node1_uri =
+    Node.as_rpc_endpoint node1 |> Endpoint.to_uri |> Uri.to_string
+  in
+  let* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let node2_uri =
+    Node.as_rpc_endpoint node2 |> Endpoint.to_uri |> Uri.to_string
+  in
+
+  let* client1 = Client.init ~endpoint:(Node node1) () in
+  let* client2 = Client.init ~endpoint:(Node node2) () in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Activate protocol on node1 (will propagate to node2) *)
+  let* () = Client.activate_protocol ~protocol client1 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  (* Use activator (no voting power) to avoid conflict with manual baking *)
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[Constant.activator.public_key_hash]
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      ~keep_alive:true
+      ~remote_mode:true
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info
+    "Starting baker with --extra-node %s"
+    (Endpoint.as_string (Node.as_rpc_endpoint node2)) ;
+  let* () = Agnostic_baker.run ~event_level:`Debug baker in
+  let* () = Agnostic_baker.wait_for_ready baker in
+  Log.info "✓ Baker is ready and monitoring both nodes" ;
+
+  (* Helper: wait for daemon events *)
+  let wait_for_node_connection_lost uri =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_node_connection_lost.v0"
+      (fun json ->
+        let uri' = JSON.as_string json in
+        if uri = uri' then Some () else None)
+  in
+
+  let wait_for_node_connection_restored () =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_node_connection_restored.v0"
+      (fun json ->
+        let uri = JSON.as_string json in
+        Log.info "Detected node_connection_restored event for: %s" uri ;
+        Some uri)
+  in
+
+  let wait_for_monitoring_head_from_node level uri =
+    Agnostic_baker.wait_for
+      baker
+      "agnostic_daemon_monitoring_head_from_node.v0"
+      (fun json ->
+        let level' = JSON.(json |-> "level" |> as_int) in
+        let uri' = JSON.(json |-> "uri" |> as_string) in
+        if level = level' && uri = uri' then Some () else None)
+  in
+
+  (* Bake a few initial blocks to ensure the baker is operational *)
+  Log.info "Baking initial blocks to verify daemon is monitoring" ;
+  let wait_monitor1 = wait_for_monitoring_head_from_node 2 node1_uri in
+  let wait_monitor2 = wait_for_monitoring_head_from_node 2 node2_uri in
+
+  let* () = Client.bake_for_and_wait ~keys:[] client1
+  and* () = wait_monitor1
+  and* () = wait_monitor2 in
+
+  Log.info "✓ Daemon saw head at level 2 from %s" node1_uri ;
+  Log.info "✓ Daemon saw head at level 2 from %s" node2_uri ;
+
+  (* Test 1: Terminate node2 - should trigger node_connection_lost event *)
+  Log.info "Terminating node2 to test connection loss detection" ;
+  (* Set up the event watcher BEFORE terminating the node *)
+  let wait_connection_lost = wait_for_node_connection_lost node2_uri in
+  let* () = Node.terminate node2 and* () = wait_connection_lost in
+
+  Log.info "✓ node_connection_lost event received for: %s" node2_uri ;
+
+  (* Verify baker continues working with node1 only *)
+  Log.info "Baking a block to verify baker still works with node1" ;
+  let* current_level = Node.get_level node1 in
+  let wait_monitor =
+    wait_for_monitoring_head_from_node (current_level + 1) node1_uri
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client1 and* _ = wait_monitor in
+  Log.info
+    "✓ Baker continues operating with node1 (monitoring from %s)"
+    node1_uri ;
+
+  (* Test 2: Restart node2 - should trigger node_connection_restored event *)
+  Log.info "Restarting node2 to test connection restoration" ;
+  (* Set up the event watcher BEFORE restarting the node *)
+  let wait_connection_restored = wait_for_node_connection_restored () in
+  let* () = Node.run node2 []
+  and* _ = wait_connection_restored
+  and* () = Node.wait_for_ready node2 in
+
+  (* Re-establish P2P trust (needed after restart in Private_mode) *)
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+  Log.info "Node2 restarted and P2P connected" ;
+
+  (* Wait for node2 to sync *)
+  let* node1_level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node2 node1_level in
+  Log.info "Node2 synced to level %d" node1_level ;
+
+  (* Verify both nodes are working again by baking more blocks *)
+  Log.info "Baking blocks to verify both nodes are operational" ;
+  let expected_level = node1_level + 1 in
+  let wait_monitor1 =
+    wait_for_monitoring_head_from_node expected_level node1_uri
+  in
+  let wait_monitor2 =
+    wait_for_monitoring_head_from_node expected_level node2_uri
+  in
+
+  let* () = wait_monitor1
+  and* () = wait_monitor2
+  and* () = Client.bake_for_and_wait ~keys:[] client1 in
+  Log.info "✓ Daemon saw head at level %d from %s" expected_level node1_uri ;
+  Log.info "✓ Daemon saw head at level %d from %s" expected_level node2_uri ;
+
+  (* Test completed successfully *)
+  Log.info "✓ Multi-node connection recovery test completed successfully" ;
+  unit
+
 let register ~protocols =
   test_keep_alive protocols ;
-  test_cli protocols
+  test_cli protocols ;
+  test_multi_node_connection_recovery protocols
 
 let register_migration ~migrate_from ~migrate_to =
   migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
