@@ -71,6 +71,7 @@ let job_docker_build =
     ~stage:Build
     ~image:Images_external.docker
     ~arch
+    ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(if arch = Arm64 then Some Ramfs else None)
     ~variables:
       [
