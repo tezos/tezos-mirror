@@ -366,23 +366,20 @@ impl<'a, Host: StorageV1 + Logging, R: Registry> JournalTr for Journal<'a, Host,
 
     #[inline]
     fn take_logs(&mut self) -> Vec<Log> {
-        self.journal.evm.inner.take_logs()
+        // Clone instead of drain: inner CRAC EVM executions share the
+        // JournalInner with the outer EVM transaction. Draining would
+        // invalidate checkpoint.log_i indices held by outer CALL frames.
+        // The logs are properly drained by finalize() at the top level.
+        self.journal.evm.inner.logs.clone()
     }
 
     #[inline]
     fn commit_tx(&mut self) {
-        let inner = &mut self.journal.evm.inner;
-        inner.transient_storage.clear();
-        inner.depth = 0;
-        inner.warm_addresses.clear_coinbase_and_access_list();
-        inner.transaction_id += 1;
-        inner.logs.clear();
-        inner.selfdestructed_addresses.clear();
-        // NOTE: inner.journal is intentionally NOT cleared here.
-        // Journal entries must be preserved so that outer EVM checkpoints
-        // (created before inner CrossRuntime transactions) can still revert
-        // all inner changes. For UserInput transactions, finalize() clears
-        // the journal after committing state to the database.
+        // Noop: CRAC sub-calls reuse the outer EVM transaction JournalInner.
+        // All the transaction state (logs, journal entries, depth, transient
+        // storage, warm addresses, selfdestructed addresses, transaction_id)
+        // belongs to the outer frame and must not be reset.
+        // Full cleanup happens in finalize() for top-level UserInput transactions.
     }
 
     #[inline]
