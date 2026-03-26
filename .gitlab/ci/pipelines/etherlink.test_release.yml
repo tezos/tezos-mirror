@@ -244,7 +244,7 @@ etherlink.docker:amd64:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
