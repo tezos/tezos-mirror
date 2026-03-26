@@ -107,7 +107,7 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 # hadolint ignore=DL3018,DL3019
 RUN apk update \
  && apk add --no-cache git file websocat gcc clang lld \
- && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng npm
+ && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng npm pandoc
 # Install desync from edge repo as its not yet available in alpine 3.20
 # hadolint ignore=DL3018,DL3019
 RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
