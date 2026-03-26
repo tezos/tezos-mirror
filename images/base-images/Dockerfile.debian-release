@@ -11,6 +11,8 @@ COPY images/scripts/install-release-cli.sh /tmp
 COPY images/scripts/install_datadog_static.sh \
      images/scripts/install-gcloud-apt.sh /tmp/
 
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+
 # hadolint ignore=DL3008
 RUN apt-get install -y --update --no-install-recommends \
     bash \
