@@ -51,10 +51,10 @@ use tezos_tracing::trace_kernel;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
-    RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
+    RefPath::assert_from(b"/base/instant_confirmation/input_tx");
 
 const ASSEMBLE_BLOCK_INPUT: RefPath =
-    RefPath::assert_from(b"/evm/world_state/assemble_block/input");
+    RefPath::assert_from(b"/base/instant_confirmation/assemble_block/input");
 
 pub struct SingleTxExecutionInput {
     pub tx: TezosXTransaction,

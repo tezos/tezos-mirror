@@ -305,10 +305,13 @@ pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
 }
 
 // If the flag is set, the kernel consider that this is local evm node execution.
-const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
+const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/base/__evm_node");
+// TODO: L2-1158 — remove legacy fallback once all kernels are past V51
+const LEGACY_EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
 pub fn evm_node_flag(host: &impl StorageV1) -> bool {
     Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
+        || Ok(Some(ValueType::Value)) == host.store_has(&LEGACY_EVM_NODE_FLAG)
 }
 
 impl<R, Host: BorrowMut<R> + Borrow<R>> WithGas for KernelHost<R, Host> {

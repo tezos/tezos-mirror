@@ -78,9 +78,6 @@ pub fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), Runtime
     }
 }
 
-const TMP_NEXT_BLUEPRINT_PATH: RefPath =
-    RefPath::assert_from(b"/__tmp_next_blueprint_path");
-
 mod legacy {
     // This module contains copies of old implementations of some
     // functions. The legacy semantics of these functions is needed in
@@ -98,6 +95,9 @@ mod legacy {
     use tezos_smart_rollup_storage::storage::Storage;
     use tezos_storage::read_h256_be;
     use thiserror::Error;
+
+    pub const TMP_NEXT_BLUEPRINT_PATH: RefPath =
+        RefPath::assert_from(b"/__tmp_next_blueprint_path");
 
     pub fn read_next_blueprint_number(
         host: &impl StorageV1,
@@ -439,11 +439,11 @@ where
             let next_blueprint_number = legacy::read_next_blueprint_number(host)?;
             let blueprint_path = blueprint_path(next_blueprint_number)?;
             allow_path_not_found(
-                host.store_move(&blueprint_path, &TMP_NEXT_BLUEPRINT_PATH),
+                host.store_move(&blueprint_path, &legacy::TMP_NEXT_BLUEPRINT_PATH),
             )?;
             clear_all_blueprints(host)?;
             allow_path_not_found(
-                host.store_move(&TMP_NEXT_BLUEPRINT_PATH, &blueprint_path),
+                host.store_move(&legacy::TMP_NEXT_BLUEPRINT_PATH, &blueprint_path),
             )?;
             Ok(MigrationStatus::Done)
         }
@@ -803,6 +803,33 @@ where
                 &legacy_sequencer_key,
                 &RefPath::assert_from(b"/evm/world_state/sequencer"),
             ))?;
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V51 => {
+            // Phase 1 of the durable storage reorganization: move IPC
+            // paths from root-level locations to /base/ prefix.
+            // Note: tezosx paths (__simulation, tezosx_entrypoints) are
+            // not in production and do not need migration.
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__evm_node"),
+                &RefPath::assert_from(b"/base/__evm_node"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__delayed_input"),
+                &RefPath::assert_from(b"/base/__delayed_input"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__backup_kernel"),
+                &RefPath::assert_from(b"/base/__backup_kernel"),
+            ))?;
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/__tmp"),
+                &RefPath::assert_from(b"/base/__tmp"),
+            ))?;
+
+            // Clean up dead migration artifact from V23.
+            allow_path_not_found(host.store_delete(&legacy::TMP_NEXT_BLUEPRINT_PATH))?;
 
             Ok(MigrationStatus::Done)
         }
