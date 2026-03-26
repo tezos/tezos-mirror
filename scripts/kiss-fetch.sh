@@ -32,18 +32,21 @@ KISSFAIL=0
 CURL_RETRY="--ipv4 --max-time 20 --retry 2 --retry-delay 5 --retry-max-time 60"
 # shellcheck disable=SC2086
 if curl $CURL_RETRY --output /dev/null --silent --head --fail "$KISSCACHE"; then
+  echo "Kisscache server reached" | tee -a /tmp/kiss.log >&2
   # Use curl to fetch the mangled URL
   curl $CURL_RETRY -L $arguments $mangled_url
 
   # shellcheck disable=SC2181
   if [ $? = 0 ]; then
-    echo "Kisscache hit: curl -L $arguments $mangled_url" >> /tmp/kiss.log
+    echo "Kisscache hit: $original_url" | tee -a /tmp/kiss.log >&2
+    echo "Debug details: curl -L $arguments $mangled_url" >> /tmp/kiss.log
   else
-    echo "Kisscache error: curl -L $arguments $mangled_url" >> /tmp/kiss.log
+    echo "Kisscache error: $original_url" | tee -a /tmp/kiss.log >&2
+    echo "Debug details: curl -L $arguments $mangled_url" >> /tmp/kiss.log
     KISSFAIL=1
   fi
 else
-  echo "Warning: Kisscache server not reachable"
+  echo "Warning: Kisscache not reachable" | tee -a /tmp/kiss.log >&2
   KISSFAIL=1
 fi
 
@@ -54,9 +57,9 @@ if [ $KISSFAIL = 1 ]; then
 
   # shellcheck disable=SC2181
   if [ $? = 0 ]; then
-    echo "Direct download succeded $original_url" >> /tmp/kiss.log
+    echo "Direct download succeeded: $original_url" | tee -a /tmp/kiss.log >&2
   else
-    echo "Direct download failed $original_url" >> /tmp/kiss.log
+    echo "Direct download failed: $original_url" | tee -a /tmp/kiss.log >&2
     tail -n 10 /tmp/kiss.log 1>&2
     exit 1
   fi
