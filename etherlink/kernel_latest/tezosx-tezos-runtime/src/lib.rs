@@ -12,7 +12,7 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 use tezos_evm_logging::Logging;
 use tezos_execution::{
-    account_storage::TezlinkAccount,
+    account_storage::{TezlinkAccount, TezosOriginatedAccount},
     context::Context,
     cross_runtime_transfer,
     mir_ctx::{OperationCtx, TcCtx},
@@ -44,6 +44,7 @@ use crate::{
 pub struct TezosRuntime(pub ChainId);
 
 pub mod account;
+pub mod alias_forwarder;
 pub mod context;
 pub mod headers;
 pub mod url;
@@ -195,7 +196,7 @@ impl RuntimeInterface for TezosRuntime {
     fn generate_alias<Host>(
         &self,
         _registry: &impl Registry,
-        _host: &mut Host,
+        host: &mut Host,
         _journal: &mut TezosXJournal,
         native_address: &[u8],
         _context: CrossRuntimeContext,
@@ -203,10 +204,40 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + Logging,
     {
-        // TODO: Add code in this contract.
-        let contract = Contract::Originated(ContractKt1Hash::from(blake2b::digest_160(
-            native_address,
-        )));
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address));
+
+        // TODO: Change everywhere to have a String type for addresses instead of raw bytes, to avoid this UTF-8 parsing logic.
+        // native_address may arrive as a UTF-8 string (e.g. "0x2E2A..."
+        // from enshrined_contracts) or as raw address bytes (e.g. the
+        // 20-byte EVM address from journal.rs). When raw, hex-encode
+        // with a "0x" prefix so the forwarder storage holds a valid
+        // address string the TezosXGateway can route to.
+        let native_address_str = match std::str::from_utf8(native_address) {
+            Ok(s) => s.to_string(),
+            Err(_) => format!("0x{}", hex::encode(native_address)),
+        };
+
+        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let account = context.originated_from_kt1(&kt1)?;
+
+        let code = alias_forwarder::forwarder_code().map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to decode forwarder code from hex: {e}"
+            ))
+        })?;
+        let storage = alias_forwarder::forwarder_storage(&native_address_str);
+
+        account.init(host, &code, &storage).map_err(|e| {
+            TezosXRuntimeError::Custom(format!(
+                "Failed to initialize alias forwarder contract: {e}"
+            ))
+        })?;
+
+        account.set_balance(host, &0u64.into()).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to set alias balance: {e}"))
+        })?;
+
+        let contract = Contract::Originated(kt1);
         contract.to_bytes().map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(
                 "Failed to encode address to bytes: {e}"

@@ -11,6 +11,7 @@ license = "MIT"
 [dependencies]
 # We use it from RlpHelpers we should probably have a separate crate
 tezos_ethereum.workspace = true
+hex.workspace = true
 http.workspace = true
 rlp.workspace = true
 primitive-types.workspace = true
