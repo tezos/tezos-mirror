@@ -127,7 +127,7 @@ if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH:-}/
   aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
   aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}" &&
   aws s3 cp "./feed.xml" "s3://${S3_BUCKET}${BUCKET_PATH:-}/" --region "${REGION}"; then
-  echo "Deployment successful!"
+  echo "Deployment successful! Release page available at: ${URL:-https://${S3_BUCKET}}${BUCKET_PATH:-}"
 else
   echo "Deployment failed. Please check the configuration and try again."
   exit 1
