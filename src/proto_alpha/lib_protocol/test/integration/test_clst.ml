@@ -3227,3 +3227,29 @@ let () =
   let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
   let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
   return_unit
+
+let () =
+  register_test ~title:"Exchange rate increases with rewards" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () =
+    Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before > 0)
+  in
+  return_unit
