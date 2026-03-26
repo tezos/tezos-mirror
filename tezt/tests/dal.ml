@@ -14205,7 +14205,7 @@ let register ~protocols =
     test_dal_node_import_l1_snapshot
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["snapshot"]
+    ~tags:["snapshot"; Tag.slow]
     ~operator_profiles:[0; 3]
     ~l1_history_mode:(Custom Node.Archive)
     ~history_mode:Full
