@@ -957,7 +957,11 @@ let send_raw_tezlink_operation (type f) (config : Configuration.t)
   in
   let f raw_tx =
     let txn = Ethereum_types.hex_to_bytes raw_tx in
-    let* is_valid = Prevalidator.prevalidate_raw_transaction_tezlink txn in
+    let* is_valid =
+      Prevalidator.prevalidate_raw_transaction_tezlink
+        ~simulator_mode:Preapplication
+        txn
+    in
     match is_valid with
     | Error err ->
         let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_tx in

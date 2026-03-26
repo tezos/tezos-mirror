@@ -280,16 +280,19 @@ let make (ctxt : Evm_ro_context.t) =
       let* number = shell_block_param_to_block_number block in
       Evm_ro_context.tezlink_nth_block_hash ctxt (Z.of_int32 number)
 
-    let simulate_operation ~chain_id ~skip_signature op hash block =
+    let simulate_operation ~chain_id ~simulator_mode op hash block =
       let open Lwt_result_syntax in
-      let read = read ~block in
-      let* block = shell_block_param_to_eth_block_param block in
+      let* () =
+        match block with
+        | `Head 0l -> return_unit
+        | _ ->
+            failwith "operation simulation is only possible on the head block"
+      in
+      let block = Ethereum_types.Block_parameter.(Block_parameter Latest) in
       Simulator.Tezlink.simulate_operation
         ctxt
-        ~read
-        ~data_model
         ~chain_id
-        ~skip_signature
+        ~simulator_mode
         op
         hash
         block

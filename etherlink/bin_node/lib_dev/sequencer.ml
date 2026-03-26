@@ -58,7 +58,11 @@ let validate_and_add_etherlink_tx raw_tx =
    Validate Tezlink operations before adding them to the queue. *)
 let validate_and_add_tezlink_operation raw_tx =
   let open Lwt_result_syntax in
-  let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_tx in
+  let* res =
+    Prevalidator.prevalidate_raw_transaction_tezlink
+      ~simulator_mode:Preapplication
+      raw_tx
+  in
   match res with
   | Ok Prevalidator.{next_nonce; transaction_object} ->
       let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in

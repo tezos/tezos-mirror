@@ -746,12 +746,18 @@ let deposit ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     client
   |> Process.check ?expect_failure
 
-let check_operations ~client ~block ~expected =
-  let* block = Client.RPC.call ~hooks client @@ RPC.get_chain_block ~block () in
+let check_operations ~__LOC__ ~client ?endpoint ~block ~expected () =
+  let* block =
+    Client.RPC.call ~hooks ?endpoint client @@ RPC.get_chain_block ~block ()
+  in
   let operations = JSON.(block |-> "operations" |> as_list) in
   let managers = JSON.(List.nth operations 3 |> as_list) in
   let hashes = List.map (fun o -> JSON.(o |-> "hash" |> as_string)) managers in
-  Check.((hashes = expected) (list string) ~error_msg:"Expected %R Actual %L") ;
+  Check.(
+    (hashes = expected)
+      (list string)
+      ~__LOC__
+      ~error_msg:"Expected %R Actual %L") ;
   unit
 
 let produce_block_and_wait_for ?timestamp ~sequencer n =

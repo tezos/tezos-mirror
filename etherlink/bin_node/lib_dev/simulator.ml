@@ -331,10 +331,15 @@ module Tezlink = struct
   open Tezlink_imports
   open Imported_protocol
 
-  let call_simulation ctxt ~input ~skip_signature block =
+  let call_simulation ctxt ~input ~simulator_mode block =
     let open Lwt_result_syntax in
     let* simulation_state = Evm_ro_context.get_state ctxt ~block () in
-    let skip_signature_tag = if skip_signature then "\000" else "\001" in
+    let skip_signature_tag =
+      match simulator_mode with
+      | Tezlink_backend_sig.Simulation -> "\000"
+      | Preapplication -> "\001"
+      (* Fail on invalid signature *)
+    in
     let*? messages = String.chunk_bytes 4096 (Bytes.of_string input) in
     let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
     let insight_requests =
@@ -356,7 +361,7 @@ module Tezlink = struct
           log_kernel_debug_file = Some "simulate_call";
         }
 
-  let simulate_operation ctxt ~chain_id ~skip_signature ~read ~data_model
+  let simulate_operation ctxt ~chain_id ~simulator_mode
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -367,22 +372,18 @@ module Tezlink = struct
     (* First, prevalidate the operation because there is no point
        in simulating it if it's invalid (invalid operations don't
        produce any receipt). *)
-    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
-      Tezlink_prevalidation.parse_and_validate_for_queue
-        ~check_signature:(not skip_signature)
-        ~check_da_fees:false
-        ~read
-        ~data_model
-        input
+    let* (prevalidation_res :
+           (_ Prevalidator.prevalidation_result, string) result) =
+      Prevalidator.prevalidate_raw_transaction_tezlink ~simulator_mode input
     in
     let* () =
       match prevalidation_res with
-      | Ok _op -> return_unit
+      | Ok _res -> return_unit
       | Error message -> Error_monad.failwith "Prevalidation error: %s" message
     in
 
     (* Now, the actual simulation. *)
-    let* bytes = call_simulation ctxt ~input ~skip_signature block in
+    let* bytes = call_simulation ctxt ~input ~simulator_mode block in
     let*? operations =
       Tezos_services.Current_block_services.deserialize_operations
         ~chain_id
@@ -406,7 +407,7 @@ module TezosX = struct
   open Tezlink_imports
   open Imported_protocol
 
-  let simulate_operation ctxt ~chain_id ~skip_signature ~read ~data_model
+  let simulate_operation ctxt ~chain_id ~simulator_mode
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -415,17 +416,13 @@ module TezosX = struct
          Result_syntax.tzfail (Operation_serialization_error e)
     in
     (* Prevalidate the operation: invalid operations don't produce receipts. *)
-    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
-      Tezlink_prevalidation.parse_and_validate_for_queue
-        ~check_signature:(not skip_signature)
-        ~check_da_fees:false
-        ~read
-        ~data_model
-        input
+    let* (prevalidation_res :
+           (_ Prevalidator.prevalidation_result, string) result) =
+      Prevalidator.prevalidate_raw_transaction_tezlink ~simulator_mode input
     in
     let* () =
       match prevalidation_res with
-      | Ok _op -> return_unit
+      | Ok _res -> return_unit
       | Error message -> Error_monad.failwith "Prevalidation error: %s" message
     in
     (* Actual simulation via the kernel entrypoint.
@@ -434,7 +431,10 @@ module TezosX = struct
        operation. The result is RLP-encoded as a value containing the serialized
        operation receipt. *)
     let skip_sig_bytes =
-      if skip_signature then Bytes.make 1 '\001' else Bytes.make 1 '\000'
+      Rlp.encode_bool
+        (match simulator_mode with
+        | Tezlink_backend_sig.Simulation -> true
+        | Preapplication -> false)
     in
     let tx_bytes =
       Bytes.of_string (Sequencer_blueprint.tag_transaction (Michelson input))

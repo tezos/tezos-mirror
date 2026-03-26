@@ -140,7 +140,11 @@ let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
   let open Lwt_result_syntax in
   let raw_str = Bytes.to_string raw_op in
   let raw_hex = Ethereum_types.hex_of_bytes raw_op in
-  let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_str in
+  let* res =
+    Prevalidator.prevalidate_raw_transaction_tezlink
+      ~simulator_mode:Preapplication
+      raw_str
+  in
   match res with
   | Error err ->
       let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_hex in
@@ -213,8 +217,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
              ~l2_chain_id
              (Tezlink_services_impl.make ro_ctxt)
              ~add_operation:add_operation_with_tick
-             ~get_da_fee_per_byte_nanotez:
-               Prevalidator.get_da_fee_per_byte_nanotez
+             ~get_da_fee_per_byte:Prevalidator.get_da_fee_per_byte
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
         let*! runtimes = Evm_ro_context.list_runtimes ro_ctxt in
         match runtimes with

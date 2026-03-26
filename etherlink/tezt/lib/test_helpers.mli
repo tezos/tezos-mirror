@@ -353,10 +353,17 @@ val deposit :
   Client.t ->
   unit Lwt.t
 
-(** [check_operations ~client ~block ~expected] fetches the list of hashes of
-    the manager operations of [block] and check it's equal to [expected]. *)
+(** [check_operations ~__LOC__ ~client ?endpoint ~block ~expected ()]
+    fetches the list of hashes of the manager operations of [block]
+    and check it's equal to [expected]. *)
 val check_operations :
-  client:Client.t -> block:string -> expected:string list -> unit Lwt.t
+  __LOC__:string ->
+  client:Client.t ->
+  ?endpoint:Client.endpoint ->
+  block:string ->
+  expected:string list ->
+  unit ->
+  unit Lwt.t
 
 (** [produce_block_and_wait_for ?timestamp ~sequencer n]
     Produces a block at [timestamp] and wait for

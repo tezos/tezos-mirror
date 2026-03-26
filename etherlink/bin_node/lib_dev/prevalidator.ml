@@ -83,18 +83,19 @@ end
 type mode = Minimal | Full
 
 module Types = struct
-  type etherlink_infos = {
+  type tezosx_infos = {
     minimum_base_fee_per_gas : Z.t;
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
     maximum_gas_per_transaction : Z.t;
+    michelson_to_evm_gas_multiplier : int64;
   }
 
   type session = {
     state : Evm_state.t;
     ctxt : Evm_ro_context.t;
     storage_version : int;
-    etherlink_infos : etherlink_infos;
+    tezosx_infos : tezosx_infos;
   }
 
   let read state = Evm_ro_context.read_state state
@@ -106,7 +107,7 @@ module Types = struct
     in
     return da_fee_per_bytes
 
-  let etherlink_infos_of_state state =
+  let tezosx_infos_of_state state =
     let open Lwt_result_syntax in
     let* (Qty base_fee_per_gas) =
       Lwt.catch
@@ -125,12 +126,16 @@ module Types = struct
     let* (Qty maximum_gas_per_transaction) =
       Etherlink_durable_storage.maximum_gas_per_transaction (read state)
     in
+    let* michelson_to_evm_gas_multiplier =
+      Etherlink_durable_storage.michelson_to_evm_gas_multiplier (read state)
+    in
     return
       {
         base_fee_per_gas;
         minimum_base_fee_per_gas;
         da_fee_per_bytes;
         maximum_gas_per_transaction;
+        michelson_to_evm_gas_multiplier;
       }
 
   let session_of_state chain_family ctxt state =
@@ -138,8 +143,8 @@ module Types = struct
     let* storage_version = Durable_storage.storage_version (read state) in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
-        let* etherlink_infos = etherlink_infos_of_state state in
-        return {state; ctxt; storage_version; etherlink_infos}
+        let* tezosx_infos = tezosx_infos_of_state state in
+        return {state; ctxt; storage_version; tezosx_infos}
     | L2_types.Ex_chain_family Michelson ->
         let*! da_fee_result = da_fee_per_bytes_of_state state in
         let* da_fee_per_bytes =
@@ -156,12 +161,13 @@ module Types = struct
             storage_version;
             (* Michelson chains do not use EVM gas semantics, only
                da_fee_per_bytes is meaningful here. *)
-            etherlink_infos =
+            tezosx_infos =
               {
                 minimum_base_fee_per_gas = Z.zero;
                 base_fee_per_gas = Z.zero;
                 da_fee_per_bytes;
                 maximum_gas_per_transaction = Z.zero;
+                michelson_to_evm_gas_multiplier = 10L;
               };
           }
 
@@ -209,6 +215,7 @@ module Request = struct
     | Refresh_state : (unit, tztrace) t
     | Prevalidate_raw_transaction_tezlink : {
         raw_transaction : string;
+        simulator_mode : Tezlink_backend_sig.simulator_mode;
       }
         -> ( (Tezos_types.Operation.t prevalidation_result, string) result,
              tztrace )
@@ -252,14 +259,17 @@ module Request = struct
         case
           ~title:"Prevalidate_raw_transaction_tezlink"
           Json_only
-          (obj2
+          (obj3
              (req "request" (constant "prevalidate_raw_transaction_tezlink"))
-             (req "raw_transaction" (string' Hex)))
+             (req "raw_transaction" (string' Hex))
+             (req "simulator_mode" Tezlink_backend_sig.simulator_mode_encoding))
           (function
-            | View (Prevalidate_raw_transaction_tezlink {raw_transaction}) ->
-                Some ((), raw_transaction)
+            | View
+                (Prevalidate_raw_transaction_tezlink
+                   {raw_transaction; simulator_mode}) ->
+                Some ((), raw_transaction, simulator_mode)
             | _ -> None)
-          (fun ((), _) ->
+          (fun ((), _, _) ->
             (* Only used for logging *)
             assert false);
       ]
@@ -310,10 +320,10 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
       ~access_list
       ~authorization_list_len
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~gas_limit
       data
   in
@@ -323,8 +333,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
   then
     if
       Compare.Z.(
-        execution_gas_limit
-        <= session.etherlink_infos.maximum_gas_per_transaction)
+        execution_gas_limit <= session.tezosx_infos.maximum_gas_per_transaction)
     then return (Ok ())
     else
       return
@@ -333,7 +342,7 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
               "Gas limit for execution is too high. Maximum limit is %a, \
                transaction has %a"
               Z.pp_print
-              session.etherlink_infos.maximum_gas_per_transaction
+              session.tezosx_infos.maximum_gas_per_transaction
               Z.pp_print
               execution_gas_limit))
   else return (Ok ())
@@ -524,8 +533,8 @@ let validate_minimum_gas_requirement ~session
   in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
-      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
-      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
+      ~da_fee_per_byte:(Qty session.tezosx_infos.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.tezosx_infos.minimum_base_fee_per_gas
       ~authorization_list_len
       data
   in
@@ -578,7 +587,7 @@ let validate_balance_and_gas_with_backend ~caller session transaction =
   in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:(Qty session.etherlink_infos.base_fee_per_gas)
+      ~base_fee_per_gas:(Qty session.tezosx_infos.base_fee_per_gas)
       ~transaction
       ~from_balance
   in
@@ -673,13 +682,28 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid ~data_model _ctxt session raw_transaction :
+  let is_tezlink_tx_valid ~data_model ~simulator_mode ctxt session
+      raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
+    let open Tezos_types.Tez in
     let read = Types.read session.state in
+    let michelson_to_evm_gas_multiplier =
+      ctxt.session.tezosx_infos.michelson_to_evm_gas_multiplier
+    in
+    let nanotez_per_evm_gas =
+      Tezos_types.Tez.(
+        nanotez_of_wei (Wei session.tezosx_infos.base_fee_per_gas))
+    in
+    let nanotez_per_michelson_gas =
+      let (Nanotez per_evm_gas) = nanotez_per_evm_gas in
+      Nanotez Q.(per_evm_gas * of_int64 michelson_to_evm_gas_multiplier)
+    in
     let** op =
       Tezlink_prevalidation.parse_and_validate_for_queue
+        ~simulator_mode
+        ~nanotez_per_michelson_gas
         ~read
         ~data_model
         raw_transaction
@@ -695,13 +719,18 @@ module Handlers = struct
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
-    | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
+    | Prevalidate_raw_transaction_tezlink {raw_transaction; simulator_mode} ->
         let data_model =
           match ctxt.chain_family with
           | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
           | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
         in
-        is_tezlink_tx_valid ctxt session raw_transaction ~data_model
+        is_tezlink_tx_valid
+          ctxt
+          session
+          raw_transaction
+          ~data_model
+          ~simulator_mode
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -842,16 +871,19 @@ let prevalidate_raw_transaction raw_transaction =
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
 
-let get_da_fee_per_byte_nanotez () =
+let get_da_fee_per_byte () =
   let open Lwt_result_syntax in
   let* w = get_worker () in
   let state = Worker.state w in
-  let da_fee_wei = state.session.etherlink_infos.da_fee_per_bytes in
-  return (Tezos_types.Tez.wei_to_nanotez da_fee_wei)
+  let da_fee_wei =
+    Tezos_types.Tez.Wei state.session.tezosx_infos.da_fee_per_bytes
+  in
+  return (Tezos_types.Tez.nanotez_of_wei da_fee_wei)
 
-let prevalidate_raw_transaction_tezlink raw_transaction =
+let prevalidate_raw_transaction_tezlink ~simulator_mode raw_transaction =
   worker_wait_for_request
-    (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
+    (Request.Prevalidate_raw_transaction_tezlink
+       {raw_transaction; simulator_mode})
 
 let validate_balance_gas_nonce_with_validation_state validation_state
     (transaction : Transaction_object.t) :

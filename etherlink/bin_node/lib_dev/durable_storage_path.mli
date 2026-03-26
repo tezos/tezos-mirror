@@ -38,6 +38,8 @@ val backlog : path
 
 val da_fee_per_byte : path
 
+val michelson_to_evm_gas_multiplier : path
+
 val kernel_version : path
 
 val kernel_verbosity : path

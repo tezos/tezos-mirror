@@ -85,6 +85,9 @@ let backlog = World_state.make "/fees/backlog"
 
 let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 
+let michelson_to_evm_gas_multiplier =
+  World_state.make "/fees/michelson_to_evm_gas_multiplier"
+
 let kernel_version = EVM.make "/kernel_version"
 
 let kernel_verbosity = EVM.make "/logging_verbosity"

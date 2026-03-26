@@ -502,12 +502,24 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez =
-  let da_fees_mutez = Int64.(mul (of_int op_raw_size) da_fee_per_byte_mutez) in
-  Tez.of_mutez_exn da_fees_mutez
+let compute_minimal_fees ~(op_raw_size : int) ~(op_gas_limit : Z.t)
+    ~(da_fee_per_byte : Tezos_types.Tez.t)
+    ~(nanotez_per_michelson_gas : Tezos_types.Tez.nanotez) =
+  let open Tezos_types.Tez in
+  let open Result_syntax in
+  let open Imported_env in
+  let* da_fees =
+    wrap_tzresult @@ (da_fee_per_byte *? Int64.of_int op_raw_size)
+  in
+  let execution_fees =
+    let (Nanotez per_michelson_gas) = nanotez_per_michelson_gas in
+    Nanotez Q.(mul per_michelson_gas (of_bigint op_gas_limit))
+  in
+  let* execution_fees = of_nanotez_ceil execution_fees in
+  Imported_env.wrap_tzresult @@ Tezos_types.Tez.(da_fees +? execution_fees)
 
-let parse_and_validate_for_queue ?(check_signature = true)
-    ?(check_da_fees = true) ~read ~data_model raw =
+let parse_and_validate_for_queue ~simulator_mode ~nanotez_per_michelson_gas
+    ~read ~data_model raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let op_raw_size = Bytes.length raw in
@@ -524,6 +536,14 @@ let parse_and_validate_for_queue ?(check_signature = true)
     | Single only_operation -> (Contents only_operation, [])
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
+  in
+  (* During operation simulation, fees are not yet estimated and the
+     operation is not properly signed yet. For this reason, the
+     simulator bypasses the corresponding checks during validation. *)
+  let check_signature, check_minimal_fees =
+    match simulator_mode with
+    | Tezlink_backend_sig.Simulation -> (false, false)
+    | Preapplication -> (true, true)
   in
   let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
@@ -550,13 +570,17 @@ let parse_and_validate_for_queue ?(check_signature = true)
     }
   in
   let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
-  let* da_fee_per_byte_mutez =
-    Tezlink_durable_storage.da_fee_per_byte_mutez read
+  let* da_fee_per_byte = Tezlink_durable_storage.da_fee_per_byte_mutez read in
+  let*? minimal_fees =
+    compute_minimal_fees
+      ~op_raw_size
+      ~op_gas_limit:ctxt.gas_limit_sum
+      ~da_fee_per_byte
+      ~nanotez_per_michelson_gas
   in
-  let da_fees = compute_da_fees ~op_raw_size ~da_fee_per_byte_mutez in
-  if check_da_fees && ctxt.fee_sum < da_fees then
+  if check_minimal_fees && ctxt.fee_sum < minimal_fees then
     tzfail
-    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string da_fees)
+    @@ Insufficient_fees (Tez.to_string ctxt.fee_sum, Tez.to_string minimal_fees)
   else
     let** () =
       validate_signature

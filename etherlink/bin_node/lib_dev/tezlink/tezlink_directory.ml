@@ -445,7 +445,7 @@ let build_block_static_directory ~l2_chain_id
          let* result =
            Backend.simulate_operation
              ~chain_id
-             ~skip_signature:true
+             ~simulator_mode:Simulation
              operation
              hash
              block
@@ -460,7 +460,7 @@ let build_block_static_directory ~l2_chain_id
          let* result =
            Backend.simulate_operation
              ~chain_id
-             ~skip_signature:true
+             ~simulator_mode:Simulation
              operation
              (Tezlink_imports.Imported_context.Operation.hash_packed operation)
              block
@@ -486,7 +486,7 @@ let build_block_static_directory ~l2_chain_id
                let* result =
                  Backend.simulate_operation
                    ~chain_id
-                   ~skip_signature:false
+                   ~simulator_mode:Preapplication
                    operation
                    hash
                    block
@@ -706,7 +706,7 @@ let register_dynamic_block_services ~l2_chain_id
   in
   Lwt.return dir
 
-let register_chain_services ~l2_chain_id ~get_da_fee_per_byte_nanotez
+let register_chain_services ~l2_chain_id ~get_da_fee_per_byte
     (module Backend : Tezlink_backend_sig.S) base_dir =
   let dir =
     Tezos_rpc.Directory.empty
@@ -818,7 +818,9 @@ let register_chain_services ~l2_chain_id ~get_da_fee_per_byte_nanotez
          ~impl:(fun chain query () ->
            let open Lwt_result_syntax in
            let*? _chain = check_chain chain in
-           let* nanotez_per_byte = get_da_fee_per_byte_nanotez () in
+           let* (Tezos_types.Tez.Nanotez nanotez_per_byte) =
+             get_da_fee_per_byte ()
+           in
            let config =
              Mempool.with_minimal_nanotez_per_byte
                nanotez_per_byte
@@ -874,7 +876,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
       Tezos_rpc.Answer.return_stream {next; shutdown})
 
 (** Builds the root directory. *)
-let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend =
+let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
   let base_dir =
     Tezos_rpc.Directory.register_dynamic_directory
@@ -884,7 +886,7 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend =
         register_dynamic_block_services ~l2_chain_id backend chain block)
   in
   base_dir
-  |> register_chain_services ~l2_chain_id ~get_da_fee_per_byte_nanotez backend
+  |> register_chain_services ~l2_chain_id ~get_da_fee_per_byte backend
   |> register_with_conversion
        ~service:Tezos_services.bootstrapped
        ~impl:(fun () () () -> Backend.bootstrapped ())
@@ -911,10 +913,10 @@ let build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend =
 let tezlink_root = Tezos_rpc.Path.(open_root / "tezlink")
 
 (* module entrypoint *)
-let register_tezlink_services ~l2_chain_id ~add_operation
-    ~get_da_fee_per_byte_nanotez backend =
+let register_tezlink_services ~l2_chain_id ~add_operation ~get_da_fee_per_byte
+    backend =
   let directory =
-    build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte_nanotez backend
+    build_dir ~l2_chain_id ~add_operation ~get_da_fee_per_byte backend
   in
   let directory =
     Tezos_rpc.Directory.register_describe_directory_service

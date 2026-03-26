@@ -73,6 +73,16 @@ end
 module Tez = struct
   include Tezlink_imports.Imported_context.Tez
 
+  type error += Conversion_error of string
+
+  (* Tez.t is an abstract type, Tez.mutez and Tez.wei are exposed
+     wrappers arount Q.t and Z.t, to be cautious about unit
+     conversions. *)
+
+  type nanotez = Nanotez of Q.t
+
+  type wei = Wei of Z.t
+
   let of_string_exn str =
     match of_string str with
     | None ->
@@ -81,11 +91,39 @@ module Tez = struct
 
   let to_mutez_z t = t |> to_mutez |> Z.of_int64
 
-  let wei_to_mutez wei = Z.(to_int64 (wei / pow (of_int 10) 12))
+  let of_mutez_z mutez =
+    let open Result_syntax in
+    if Z.Compare.(mutez < Z.zero) then
+      tzfail (Conversion_error "Negative values cannot be converted to Tez.t")
+    else if not (Z.fits_int64 mutez) then
+      tzfail
+        (Conversion_error
+           "Only values fitting on int64 can be converted to Tez.t")
+    else return (of_mutez_exn (Z.to_int64 mutez))
 
-  let wei_to_nanotez wei = Q.make wei (Z.pow (Z.of_int 10) 9)
+  let of_mutez_q_floor mutez = of_mutez_z (Q.to_bigint mutez)
 
-  let mutez_to_wei mutez = Z.(of_int64 mutez * pow (of_int 10) 12)
+  let of_mutez_q_ceil mutez =
+    let open Result_syntax in
+    (* Same as [of_mutez_q_floor] but rounds up instead of down. *)
+    match of_mutez_q_floor mutez with
+    | Error _ as err -> err
+    | Ok floor ->
+        if Q.(mutez = of_bigint (to_mutez_z floor)) then
+          (* The division was exact, there is no rounding so floor and ceil are the same thing. *)
+          return floor
+        else
+          (* The division is not exact, we need to take the successor. *)
+          Tezlink_imports.Imported_env.wrap_tzresult @@ (floor +? one_mutez)
+
+  let of_wei (Wei wei) = of_mutez_z Z.(wei / pow (of_int 10) 12)
+
+  let nanotez_of_wei (Wei wei) = Nanotez (Q.make wei (Z.pow (Z.of_int 10) 9))
+
+  let to_wei (t : t) = Wei Z.(to_mutez_z t * pow (of_int 10) 12)
+
+  let of_nanotez_ceil (Nanotez nanotez) =
+    of_mutez_q_ceil Q.(nanotez / of_int 1000)
 end
 
 module Operation = struct
