@@ -197,7 +197,7 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
              Node_context.get_traps_fraction
                ctxt
                ~published_level:message_id.level
-               ~default:proto_parameters.traps_fraction
+               ~default:Q.one
            in
            Option.iter
              (Slot_manager.maybe_register_trap
@@ -465,7 +465,7 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                     Node_context.get_traps_fraction
                       ctxt
                       ~published_level:id.level
-                      ~default:proto_parameters.traps_fraction
+                      ~default:Q.one
                   in
                   Slot_manager.maybe_register_trap
                     traps_store

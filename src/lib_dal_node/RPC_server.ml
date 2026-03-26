@@ -386,7 +386,7 @@ module Profile_handlers = struct
                 else
                   Attestable_slots.is_attestable_slot_with_traps
                     shards_store
-                    last_known_parameters.traps_fraction
+                    published_level_parameters.traps_fraction
                     pkh
                     shard_indices
                     slot_id)
