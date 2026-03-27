@@ -24,6 +24,23 @@ let wrap_error = function
   | Error e ->
       Result_syntax.tzfail (Invalid_argument (convert_invalid_argument e))
 
+module Proof = struct
+  type t = Api.proof
+
+  let start_state proof =
+    Api.octez_riscv_durable_in_memory_proof_start_state proof
+
+  let stop_state proof =
+    Api.octez_riscv_durable_in_memory_proof_stop_state proof
+
+  let serialise proof = Api.octez_riscv_durable_in_memory_serialise_proof proof
+
+  let deserialise bytes =
+    match Api.octez_riscv_durable_in_memory_deserialise_proof bytes with
+    | Ok proof -> Ok proof
+    | Error msg -> Result_syntax.tzfail (Proof_deserialisation_error msg)
+end
+
 module Normal = struct
   module Registry = struct
     type t = Api.registry
@@ -94,4 +111,80 @@ module Normal = struct
       Api.octez_riscv_durable_in_memory_database_hash registry db_index
       |> wrap_error
   end
+end
+
+module Prove = struct
+  module Registry = struct
+    type t = Api.registry_prove
+
+    let hash t = Ok (Api.octez_riscv_durable_in_memory_prove_registry_hash t)
+
+    let size t = Ok (Api.octez_riscv_durable_in_memory_prove_registry_size t)
+
+    let resize t n =
+      Api.octez_riscv_durable_in_memory_prove_registry_resize t n |> wrap_error
+
+    let copy_database t ~src ~dst =
+      Api.octez_riscv_durable_in_memory_prove_registry_copy t src dst
+      |> wrap_error
+
+    let move_database t ~src ~dst =
+      Api.octez_riscv_durable_in_memory_prove_registry_move t src dst
+      |> wrap_error
+
+    let clear t db_index =
+      Api.octez_riscv_durable_in_memory_prove_registry_clear t db_index
+      |> wrap_error
+  end
+
+  module Database = struct
+    let exists t ~db_index ~key =
+      Api.octez_riscv_durable_in_memory_prove_database_exists t db_index key
+      |> wrap_error
+
+    let set t ~db_index ~key ~value =
+      Api.octez_riscv_durable_in_memory_prove_database_set t db_index key value
+      |> wrap_error
+
+    let write t ~db_index ~key ~offset ~value =
+      Api.octez_riscv_durable_in_memory_prove_database_write
+        t
+        db_index
+        key
+        offset
+        value
+      |> wrap_error
+
+    let read t ~db_index ~key ~offset ~len =
+      Api.octez_riscv_durable_in_memory_prove_database_read
+        t
+        db_index
+        key
+        offset
+        len
+      |> wrap_error
+
+    let value_length t ~db_index ~key =
+      Api.octez_riscv_durable_in_memory_prove_database_value_length
+        t
+        db_index
+        key
+      |> wrap_error
+
+    let delete t ~db_index ~key =
+      Api.octez_riscv_durable_in_memory_prove_database_delete t db_index key
+      |> wrap_error
+
+    let hash t ~db_index =
+      Api.octez_riscv_durable_in_memory_prove_database_hash t db_index
+      |> wrap_error
+  end
+
+  module Proof = Proof
+
+  let start_proof registry =
+    Api.octez_riscv_durable_in_memory_start_proof registry
+
+  let produce_proof registry_prove =
+    Api.octez_riscv_durable_in_memory_produce_proof registry_prove
 end

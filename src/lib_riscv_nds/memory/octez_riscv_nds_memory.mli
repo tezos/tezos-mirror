@@ -14,6 +14,11 @@
 
 open Intf
 
+(** Proof objects for the in-memory durable storage.
+
+    {b Note}: Currently a stub (TZX-113). *)
+module Proof : PROOF
+
 (** Normal mode: registry and database operations. *)
 module Normal : sig
   module Registry : sig
@@ -28,3 +33,12 @@ module Normal : sig
       {!Octez_riscv_nds_common.DATABASE} for the full specification. *)
   module Database : DATABASE with type registry := Registry.t
 end
+
+(** Prove mode: registry, database, and proof lifecycle.
+
+    {b Note}: Currently a stub (TZX-113). All operations will raise a
+    runtime error if called. *)
+module Prove :
+  PROVE
+    with type normal_registry := Normal.Registry.t
+     and type Proof.t = Proof.t
