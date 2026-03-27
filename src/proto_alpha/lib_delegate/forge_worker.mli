@@ -52,10 +52,6 @@ type worker
     worker queue is closed or unavailable. *)
 val push_request : worker -> forge_request -> unit tzresult Lwt.t
 
-(** [get_event_stream worker] returns the worker's stream of events
-    onto which tasks completion results are pushed. *)
-val get_event_stream : worker -> forge_event Lwt_stream.t
-
 (** [cancel_all_pending_tasks worker] cancels all the worker's
     delegate queues pending tasks. *)
 val cancel_all_pending_tasks : worker -> unit
@@ -85,8 +81,6 @@ module Internal_for_tests : sig
       delegate_signing_queues :
         Delegate_signing_queue.t Baking_state_types.Key_id.Table.t;
       baking_state : global_state;
-      push_event : Baking_state.forge_event option -> unit;
-      event_stream : Baking_state.forge_event Lwt_stream.t;
       forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
     }
   end

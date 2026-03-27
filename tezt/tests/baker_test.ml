@@ -2012,6 +2012,265 @@ let test_abaab_with_small_baker =
   in
   check_bootstrap2_present (activation_level + 1) 10
 
+let multi_node_inconsistent_chain_id =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node inconsistent chain id"
+    ~tags:[team; "baker"; "extra_nodes"; "sanity_check"]
+    ~supports:Protocol.(From_protocol 026)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Start node1 with sandbox protocol" ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0]
+      ()
+  in
+  Log.info
+    "Start node2 on a different chain (ghostnet genesis, not connected to \
+     node1)" ;
+  let node2 = Node.create [Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.config_init node2 [] in
+  let* () =
+    Node.Config_file.update
+      node2
+      (Node.Config_file.set_ghostnet_sandbox_network ())
+  in
+  let* () = Node.run node2 [] in
+  let* () = Node.wait_for_ready node2 in
+  Log.info
+    "Start baker with node1 as primary and node2 (different chain) as extra" ;
+  let* baker =
+    Agnostic_baker.init
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      node1
+      client1
+  in
+  Log.info "Baker should terminate due to chain_id mismatch" ;
+  let timeout = 10. in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "Baker did not shut down within %f seconds despite chain_id mismatch"
+        timeout)
+    (fun () -> Agnostic_baker.wait_for_termination baker)
+
+let multi_node_staggered_crash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node staggered crash"
+    ~tags:[team; "baker"; "extra_nodes"]
+    ~supports:Protocol.(From_protocol 026)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "Start agnostic baker with node1 as primary and node2 as extra" ;
+  let node1_endpoint = Node.as_rpc_endpoint node1 in
+  let node2_endpoint = Node.as_rpc_endpoint node2 in
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[node2_endpoint]
+      node1
+      client1
+  in
+  let node1_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let node2_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Agnostic_baker.run baker
+  and* () = Agnostic_baker.wait_for_ready baker
+  and* () = node1_start_waiter
+  and* () = node2_start_waiter in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node1 5 in
+  Log.info "Kill node1 and wait for the related automaton to crash" ;
+  let crash_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_crash
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let* () = Node.kill node1 and* () = crash_waiter in
+  let restart_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~timeout:60.
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let crash_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_crash
+      ~endpoint:node1_endpoint
+      baker
+  in
+  Log.info "Wait for supervisor to retry connecting to node1" ;
+  let* () = restart_waiter in
+  Log.info "Wait for node1 automaton to crash again (node1 still offline)" ;
+  let* () = crash_waiter in
+  (* Now kill node2: both automatons are down, the baker must shut down. *)
+  Log.info "Kill node2 while node1 automaton is in its second restart delay" ;
+  let supervisor_shutdown_waiter =
+    Agnostic_baker.wait_for_supervisor_all_automatons_down baker
+  in
+  let termination_waiter = Agnostic_baker.wait_for_termination baker in
+  Log.info "Wait for baker to shut down" ;
+  let* () = Node.kill node2
+  and* () =
+    let timeout = 30. in
+    with_timeout
+      ~timeout
+      ~on_timeout:(fun () ->
+        Test.fail
+          "The baker failed to shutdown after being disconnected from all \
+           nodes for over %f seconds."
+          timeout)
+      (fun () ->
+        let* () = supervisor_shutdown_waiter in
+        termination_waiter)
+  in
+  unit
+
+let multi_node_crash_resilience =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Multi node crash resilience"
+    ~tags:[team; "baker"; "extra_nodes"]
+    ~supports:Protocol.(From_protocol 026)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  (* Connect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "Start agnostic baker with node1 as primary and node2 as extra" ;
+  let node1_endpoint = Node.as_rpc_endpoint node1 in
+  let node2_endpoint = Node.as_rpc_endpoint node2 in
+  let baker =
+    Agnostic_baker.create
+      ~delegates:[]
+      ~remote_mode:true
+      ~extra_nodes:[node2_endpoint]
+      node1
+      client1
+  in
+  let node1_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let node2_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Agnostic_baker.run baker
+  and* () = Agnostic_baker.wait_for_ready baker
+  and* () = node1_start_waiter
+  and* () = node2_start_waiter in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node1 5 in
+  (* Kill node1: baker should fall back to node2 *)
+  Log.info "Kill node1" ;
+  let* () = Node.kill node1 in
+  Log.info "Wait for node2 to progress for 5 levels while node1 is down" ;
+  let* level = Node.get_level node2 in
+  let* _ = Node.wait_for_level node2 (level + 5) in
+  (* Restart node1 and reconnect: baker should resume using node1 too *)
+  Log.info "Restart node1 and wait for baker to reconnect its automaton" ;
+  let* () = Node.run node1 [Synchronisation_threshold 0; Connections 1] in
+  let* () = Node.wait_for_ready node1 in
+  let node1_automaton_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node1_endpoint
+      baker
+  in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  (* The supervisor restarts crashed automatons *)
+  let* () = node1_automaton_start_waiter in
+  Log.info "Kill node2: baker should fall back to node1" ;
+  let* () = Node.kill node2 in
+  Log.info "Wait for node1 to progress for 5 levels while node2 is down" ;
+  let* level = Node.get_level node1 in
+  let* _ = Node.wait_for_level node1 (level + 5) in
+  (* Restart node2 and reconnect *)
+  Log.info "Restart node2 and wait for baker to reconnect its automaton" ;
+  let* () = Node.run node2 [Synchronisation_threshold 0; Connections 1] in
+  let* () = Node.wait_for_ready node2 in
+  let node2_automaton_start_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_start
+      ~endpoint:node2_endpoint
+      baker
+  in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* () = node2_automaton_start_waiter in
+  (* Kill both nodes: baker must shut down *)
+  Log.info "Kill both nodes and wait for baker to shut down" ;
+  let supervisor_shutdown_waiter =
+    Agnostic_baker.wait_for_supervisor_all_automatons_down baker
+  in
+  let termination_waiter = Agnostic_baker.wait_for_termination baker in
+  let* () = Node.kill node1 in
+  let* () = Node.kill node2 in
+  let timeout =
+    (* The supervisor waits delay_between_restarts=20s before giving up *) 30.
+  in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "The baker failed to shutdown after being disconnected from all nodes \
+         for over %f seconds."
+        timeout)
+    (fun () ->
+      let* () = supervisor_shutdown_waiter in
+      termination_waiter)
+
 let register_with_abaab ~abaab ~protocols =
   baker_check_consensus_branch ~abaab protocols ;
   force_apply_from_round ~abaab protocols ;
@@ -2038,4 +2297,7 @@ let register ~protocols =
   test_abaab_with_small_baker protocols ;
   register_with_abaab ~abaab:false ~protocols ;
   register_with_abaab ~abaab:true ~protocols ;
-  baker_shutdown_on_node_shutdown protocols
+  baker_shutdown_on_node_shutdown protocols ;
+  multi_node_inconsistent_chain_id protocols ;
+  multi_node_staggered_crash protocols ;
+  multi_node_crash_resilience protocols
