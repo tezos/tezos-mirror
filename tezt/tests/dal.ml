@@ -14900,6 +14900,59 @@ let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
         dal_node)
     ()
 
+(* Test that a DAL node that is stopped before a migration and restarted
+   after it correctly catches up through the migration boundary. *)
+let test_restart_dal_node_across_migration ~migrate_from ~migrate_to =
+  let slot_index = 0 in
+  let scenario ~migration_level dal_parameters client _node dal_node =
+    let lag = dal_parameters.Dal.Parameters.attestation_lag in
+    let slot_size = dal_parameters.cryptobox.slot_size in
+    let* _commitment =
+      Helpers.publish_and_store_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+      @@ Helpers.make_slot ~slot_size "slot before migration"
+    in
+    let* () = bake_for client in
+    let* published_level = Client.level client in
+    Log.info "Published slot at level %d" published_level ;
+    let* () = bake_for ~count:2 client in
+    Log.info "Stopping DAL node" ;
+    let* () = Dal_node.terminate dal_node in
+    let* current_level = Client.level client in
+    let target_level = migration_level + lag + 3 in
+    let* () =
+      repeat (target_level - current_level) (fun () -> bake_for client)
+    in
+    Log.info "Baked through migration to level %d" target_level ;
+    Log.info "Restarting DAL node" ;
+    let* () = Dal_node.run dal_node ~wait_ready:true in
+    let* () = bake_until_processed ~level:target_level client [dal_node] in
+    Log.info "DAL node caught up" ;
+    (* Querying a post-migration level exercises the full catch-up path:
+       plugin resolution, parameter fetching, committee lookup, and store. *)
+    let* _ =
+      Dal_RPC.(
+        call dal_node
+        @@ get_attestable_slots
+             ~attester:Constant.bootstrap1
+             ~attested_level:(migration_level + lag))
+    in
+    Log.info "Post-migration attestable_slots RPC succeeded" ;
+    unit
+  in
+  test_l1_migration_scenario
+    ~migrate_from
+    ~migrate_to
+    ~migration_level:10
+    ~scenario
+    ~tags:["restart"; "dal"; "migration"]
+    ~description:"restart DAL node across migration"
+    ~operator_profiles:[slot_index]
+    ()
+
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
   if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
@@ -14908,6 +14961,7 @@ let register_migration ~migrate_from ~migrate_to =
       ~migrate_from
       ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
+  test_restart_dal_node_across_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
   test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;
   test_accusation_migration_with_attestation_lag_decrease
