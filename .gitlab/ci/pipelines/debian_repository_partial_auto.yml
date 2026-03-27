@@ -69,7 +69,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-3bb7eddc
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-d79172a8
   parallel:
     matrix:
     - RELEASE:
@@ -185,7 +185,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d79172a8
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -217,7 +217,7 @@ apt_repo_debian:
   retry: 0
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-d79172a8
   stage: publishing_tests
   tags:
   - gcp
@@ -242,7 +242,7 @@ oc.lintian_debian:
   variables: {}
 
 oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-d79172a8
   stage: publishing_tests
   tags:
   - gcp
@@ -286,7 +286,7 @@ oc.install_bin_debian_bookworm_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-3bb7eddc
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-d79172a8
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -315,7 +315,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-3bb7eddc
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-d79172a8
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
