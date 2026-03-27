@@ -263,9 +263,23 @@ module Etherlink = struct
           let authorization_list_gas =
             (call.authorization_list |> List.length) * 25000
           in
+          (* Add access list gas. ACCESS_LIST_STORAGE_KEY_COST	1900
+            ACCESS_LIST_ADDRESS_COST	2400 *)
+          let access_list_accounts, access_list_storages =
+            List.fold_left
+              (fun (accounts, storages)
+                   ({address = _; storage_keys} : Transaction_object.access)
+                 -> (accounts + 1, storages + List.length storage_keys))
+              (0, 0)
+              call.access_list
+          in
+          let access_list_accounts_cost = access_list_accounts * 2_400 in
+          let access_list_storages_costs = access_list_storages * 1_900 in
           let (Qty gas) = gas in
-          return @@ quantity_of_z
-          @@ Z.add gas (Z.add da_fees (Z.of_int authorization_list_gas))
+          return @@ quantity_of_z @@ Z.add da_fees
+          @@ Z.add (Z.of_int authorization_list_gas)
+          @@ Z.add (Z.of_int access_list_accounts_cost)
+          @@ Z.add (Z.of_int access_list_storages_costs) gas
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
