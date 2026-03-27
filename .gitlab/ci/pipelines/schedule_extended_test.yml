@@ -205,7 +205,7 @@ build_octez_source:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: test
   tags:
   - gcp
@@ -246,7 +246,7 @@ check_riscv_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: test
   tags:
   - gcp
@@ -286,7 +286,7 @@ audit_riscv_deps:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: test
   tags:
   - gcp
@@ -326,7 +326,7 @@ test_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -691,7 +691,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: sanity
   tags:
   - gcp
@@ -1330,7 +1330,7 @@ ocaml-check:
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-d79172a8
   stage: test
   tags:
   - gcp
@@ -1391,7 +1391,7 @@ oc.install_opam_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-d79172a8
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1412,7 +1412,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-3bb7eddc
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-d79172a8
   stage: test
   tags:
   - gcp_very_high_cpu
