@@ -717,14 +717,15 @@ module Handlers = struct
     let session = ctxt.session in
     match request with
     | Prevalidate_raw_transaction {raw_transaction} ->
-        is_tx_valid ctxt session raw_transaction
-    | Refresh_state -> refresh_state ctxt session
+        protect @@ fun () -> is_tx_valid ctxt session raw_transaction
+    | Refresh_state -> protect @@ fun () -> refresh_state ctxt session
     | Prevalidate_raw_transaction_tezlink {raw_transaction; simulator_mode} ->
         let data_model =
           match ctxt.chain_family with
           | Ex_chain_family Michelson -> Tezlink_durable_storage.Path
           | Ex_chain_family EVM -> Tezlink_durable_storage.Rlp
         in
+        protect @@ fun () ->
         is_tezlink_tx_valid
           ctxt
           session
