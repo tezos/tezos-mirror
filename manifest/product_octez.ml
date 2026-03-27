@@ -3773,6 +3773,13 @@ let octez_riscv_api =
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/api/octez_riscv_api.*"]]
 
+let octez_riscv_nds_common =
+  public_lib
+    "octez-riscv-nds.common"
+    ~path:"src/lib_riscv_nds/common"
+    ~synopsis:"RISC-V new durable storage"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+
 let octez_riscv_durable_storage_in_memory_api =
   public_lib
     "octez-riscv-nds-memory-api"
@@ -3797,10 +3804,11 @@ let _octez_riscv_nds_memory =
   public_lib
     "octez-riscv-nds.memory"
     ~path:"src/lib_riscv_nds/memory"
-    ~synopsis:"RISC-V new durable storage - in-memory implementation"
+    ~synopsis:"RISC-V new durable storage"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_riscv_nds_common |> open_;
         octez_riscv_durable_storage_in_memory_api;
       ]
 
