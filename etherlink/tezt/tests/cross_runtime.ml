@@ -1243,10 +1243,8 @@ let test_crac_access_list_preserved =
  *                                 |-> REVERT
  *
  *)
-let test_crac_tez_target_reverts =
-  register_crac_runner_test
-    ~title:"CRAC: TEZ CRAC target reverts"
-    ~tags:["revert"]
+let test_crac_evm_to_tez_reverts =
+  register_crac_runner_test ~title:"CRAC: EVM to TEZ reverts" ~tags:["revert"]
   @@ fun (module Wrapper) ->
   let open Wrapper in
   let prefix = "CRAC" in
@@ -1266,6 +1264,34 @@ let test_crac_tez_target_reverts =
   let* () =
     EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
   in
+  unit
+
+(** EVM CRAC target reverts.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_reverter]
+ *                                 |-> REVERT
+ *
+ *)
+let test_crac_tez_to_evm_reverts =
+  register_crac_runner_test ~title:"CRAC: TEZ to EVM reverts" ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM reverter" ;
+  let* evm_reverter = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM reverter" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_reverter in
+  Log.debug ~prefix "Originate TEZ main caller" ;
+  let* tez_main = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "Call TEZ main (BackTracked due to EVM revert)" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters are all zero (state reverted)" ;
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge
+  in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
   unit
 
 (** CRAC: when a Michelson transaction makes a single CRAC into EVM,
@@ -1362,6 +1388,7 @@ let () =
   test_crac_tez_shared_leaf_via_direct_and_chain [Alpha] ;
   test_crac_tez_5_crossing_chain [Alpha] ;
   test_crac_access_list_preserved [Alpha] ;
-  test_crac_tez_target_reverts [Alpha] ;
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
-  test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha]
+  test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
+  test_crac_evm_to_tez_reverts [Alpha] ;
+  test_crac_tez_to_evm_reverts [Alpha]
