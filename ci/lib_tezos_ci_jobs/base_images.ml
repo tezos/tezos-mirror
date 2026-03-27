@@ -174,6 +174,11 @@ module Distribution = struct
     | Fedora | Rockylinux -> Files.rpm_base
 end
 
+(* Set to [true] to include RPM-based distribution images (Fedora, Rockylinux)
+   in the pipeline. Set to [false] to deprecate them.
+   See https://gitlab.com/tezos/tezos/-/work_items/8205 *)
+let enable_rpm_images = false
+
 (* [start_job] used to add dependency to [trigger] in [before_merging] pipelines.
 
    [changeset] should be set to [true] for [before_merging]/[merge_train] parent pipelines only.
@@ -498,8 +503,6 @@ let jobs ?start_job ?(changeset = false) () =
   [
     job_debian_based_images;
     job_ubuntu_based_images;
-    job_fedora_based_images;
-    job_rockylinux_based_images;
     job_rust_based_images;
     job_rust_based_images_merge;
     job_debian_homebrew_base_images;
@@ -510,6 +513,10 @@ let jobs ?start_job ?(changeset = false) () =
     job_ubuntu_systemd_base_images;
     job_ci_release_based_images;
   ]
+  @
+  if enable_rpm_images then
+    [job_fedora_based_images; job_rockylinux_based_images]
+  else []
 
 let child_pipeline =
   Pipeline.register_child
