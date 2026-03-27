@@ -117,6 +117,12 @@ let register () =
   Cacio.register_test_release_jobs
     [(Manual, job_release_page `test `build_dependencies)] ;
   Cacio.register_jobs
+    Non_release_tag
+    [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
+  Cacio.register_jobs
+    Non_release_tag_test
+    [(Auto, job_build `release Amd64); (Auto, job_build `release Arm64)] ;
+  Cacio.register_jobs
     Publish_release_page
     [
       ( Manual,
