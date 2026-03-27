@@ -15,25 +15,18 @@ distribution/release/architecture by calling `make` on the root of the Octez
 project and then copied in the `scripts/packaging/binaries` directory to be
 used by the Debian packaging tools.
 
-The CI runs two scripts to build the dependencies images and the packages
-themselves.
-
-The first, `scripts/ci/build-debian-packages-dependencies.sh`
-gets as input a distribution/release/architecture triplet and creates a Docker
-image with all the needed dependencies specific to this triplet. Opam dependencies
-are installed from the lockfile in `opam/virtual/octez-deps.opam.locked`.
-
-The second, `scripts/ci/build-debian-packages.sh` is executed by
-the CI in the Docker images created by the script above and compiles the
-binaries and creates the Debian packages.
+The CI runs `scripts/ci/build-debian-packages.sh` inside a pre-built
+`distro-build` Docker image to compile the binaries and create the Debian
+packages.
 
 #### Build dependencies
 
-For the list of build dependencies needed to build post-19.1 packages, please
-refer to the list in the Docker file `images/packages/debian-deps-build.Dockerfile`. This file
-is used to build the dependencies Docker images. In particular, if you never
-built Debian packages before you will probably have to run `sudo apt install
-debhelper` .
+Build jobs use the pre-built `distro-build` Docker images defined in
+`images/base-images/Dockerfile.debian-build` and published to the container
+registry.
+
+If you have never built Debian packages before you will
+probably have to run `sudo apt install debhelper`.
 
 ## Build post-19.1 packages locally
 
