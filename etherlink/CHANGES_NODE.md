@@ -8,10 +8,6 @@
 
 ### RPCs changes
 
-- `eth_estimateGas` RPC doesn't drop the authorization lists
-  and access lists fields so that they are used to compute the
-  gas used to pay DA fees. (!21388)
-
 ### Monitoring changes
 
 ### Command-line interface changes
@@ -28,6 +24,22 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.56 (2026-03-27)
+
+This is a bugfix release addressing two issues affecting the EVM node, notably
+under-approximations in `eth_estimateGas` for transactions including
+authorization or access lists. Operators are strongly encouraged to upgrade.
+
+This release will not apply any migration to the node’s store (version 23),
+meaning it is possible to downgrade to previous version).
+
+### RPCs changes
+
+- `eth_estimateGas` RPC takes into account the authorization 
+  lists and access lists fields in the gas estimation. (!21388)
+- Fix `eth_sendRawTransaction` leaving the node in a degraded state if
+  ill-formed type-4 transactions are submitted. (!21387)
 
 ## Version 0.55 (2026-03-26)
 
