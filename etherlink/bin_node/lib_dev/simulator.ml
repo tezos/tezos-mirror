@@ -157,7 +157,7 @@ module Etherlink = struct
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances.
   *)
-  let da_fees_gas_limit_overhead simulation_state tx_data :
+  let da_fees_gas_limit_overhead (call : Ethereum_types.call) simulation_state :
       (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
     let read = Evm_ro_context.read_state simulation_state in
@@ -178,10 +178,19 @@ module Etherlink = struct
             (Ethereum_types.quantity_of_z Fees.default_minimum_base_fee_per_gas)
       | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
     in
+    let tx_data =
+      match call.data with
+      | Some (Hash (Hex data)) -> `Hex data |> Hex.to_bytes_exn
+      | None -> Bytes.empty
+    in
+    let access_list = call.access_list in
+    let authorization_list_len = List.length call.authorization_list in
     let da_fee =
       Fees.da_fees_gas_limit_overhead
         ~da_fee_per_byte
         ~minimum_base_fee_per_gas
+        ~access_list
+        ~authorization_list_len
         tx_data
     in
     return da_fee
@@ -249,12 +258,7 @@ module Etherlink = struct
         else
           (* If enabled, previous simulation did not take into account
              da fees, we need to add extra units here. *)
-          let tx_data =
-            match call.data with
-            | Some (Hash (Hex data)) -> `Hex data |> Hex.to_bytes_exn
-            | None -> Bytes.empty
-          in
-          let* da_fees = da_fees_gas_limit_overhead simulation_state tx_data in
+          let* da_fees = da_fees_gas_limit_overhead call simulation_state in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->

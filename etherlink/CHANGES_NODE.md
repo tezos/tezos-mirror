@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- `eth_estimateGas` RPC doesn't drop the authorization lists
+  and access lists fields so that they are used to compute the
+  gas used to pay DA fees. (!21388)
+
 ### Monitoring changes
 
 ### Command-line interface changes
