@@ -105,6 +105,8 @@ let get_total_supply {infos; rpc_node; accounts; _} contract =
             Some
               ((Efunc_core.Evm.encode ~name:"totalSupply" [] [] :> string)
               |> Ethereum_types.hash_of_string);
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
@@ -137,6 +139,8 @@ let get_balance {infos; rpc_node; _} contract sender =
                   [`address (Account.address sender)]
                  :> string)
               |> Ethereum_types.hash_of_string);
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )

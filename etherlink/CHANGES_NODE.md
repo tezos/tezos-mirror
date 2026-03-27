@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- `eth_estimateGas` RPC doesn't drop the authorization lists
+  and access lists fields so that they are used to compute the
+  gas used to pay DA fees. (!21388)
+
 ### Monitoring changes
 
 ### Command-line interface changes
@@ -37,7 +41,8 @@ meaning it is not possible downgrade to a previous version.
 ### RPCs changes
 
 - `eth_estimateGas` correctly takes into account the authorization lists when
-  computing the gas used to pay DA fees. (!21339)
+  computing the gas used to pay DA fees. Also add the gas consumed by access
+  lists and authorization lists to the simulator. (!21339)
 
 ### Execution changes
 

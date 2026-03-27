@@ -238,6 +238,21 @@ type transaction_log = {
   removed : bool option;
 }
 
+type access = {address : address; storage_keys : hex list}
+
+val access_encoding : access Data_encoding.t
+
+type authorization_item = {
+  chain_id : quantity;
+  address : address;
+  nonce : quantity;
+  y_parity : quantity;
+  r : quantity;
+  s : quantity;
+}
+
+val authorization_item_encoding : authorization_item Data_encoding.t
+
 type call = {
   from : address option;
   to_ : address option;
@@ -245,6 +260,8 @@ type call = {
   gasPrice : quantity option;
   value : quantity option;
   data : hash option;
+  access_list : access list;
+  authorization_list : authorization_item list;
 }
 
 val call_encoding : call Data_encoding.t

@@ -8,18 +8,14 @@
 
 open Ethereum_types
 
-type access = {address : address; storage_keys : hex list}
+type access = Ethereum_types.access = {
+  address : address;
+  storage_keys : hex list;
+}
 
-let access_encoding =
-  let open Data_encoding in
-  conv
-    (fun {address; storage_keys} -> (address, storage_keys))
-    (fun (address, storage_keys) -> {address; storage_keys})
-    (obj2
-       (req "address" address_encoding)
-       (req "storageKeys" (list hex_encoding)))
+let access_encoding = Ethereum_types.access_encoding
 
-type authorization_item = {
+type authorization_item = Ethereum_types.authorization_item = {
   chain_id : quantity;
   address : address;
   nonce : quantity;
@@ -28,20 +24,7 @@ type authorization_item = {
   s : quantity;
 }
 
-let authorization_item_encoding =
-  let open Data_encoding in
-  conv
-    (fun {chain_id; address; nonce; y_parity; r; s} ->
-      (chain_id, address, nonce, y_parity, r, s))
-    (fun (chain_id, address, nonce, y_parity, r, s) ->
-      {chain_id; address; nonce; y_parity; r; s})
-    (obj6
-       (req "chainId" quantity_encoding)
-       (req "address" address_encoding)
-       (req "nonce" quantity_encoding)
-       (req "yParity" quantity_encoding)
-       (req "r" quantity_encoding)
-       (req "s" quantity_encoding))
+let authorization_item_encoding = Ethereum_types.authorization_item_encoding
 
 module EIP_2930 = struct
   type t = {

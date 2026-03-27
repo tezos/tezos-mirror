@@ -56,6 +56,8 @@ let get_gas_limit ?data ?from ?to_ ?(value = Z.one) ~rpc_endpoint
           gasPrice = Some (Qty base_fee_per_gas);
           value = Some (Qty value);
           data;
+          access_list = [];
+          authorization_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )

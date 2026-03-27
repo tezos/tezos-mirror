@@ -45,6 +45,8 @@ let get_symbol ws_client token_addr =
                gas = None;
                gasPrice = None;
                value = None;
+               access_list = [];
+               authorization_list = [];
              },
              Block_parameter Latest,
              Ethereum_types.AddressMap.empty ) ))
@@ -70,6 +72,8 @@ let get_decimals ws_client token_addr =
                gas = None;
                gasPrice = None;
                value = None;
+               access_list = [];
+               authorization_list = [];
              },
              Block_parameter Latest,
              Ethereum_types.AddressMap.empty ) ))

@@ -10671,17 +10671,37 @@ let test_da_fee_drain_via_eip7702 =
   let*@ whale_nonce =
     Rpc.get_transaction_count ~address:whale.address sequencer
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String drain_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
+  let*@ estimated_gas =
+    Rpc.estimate_gas
+      [
+        ("from", `String whale.address);
+        ("to", `String attacker.address);
+        auth_list_json;
+      ]
+      sequencer
+  in
   let* raw_setup =
     Cast.craft_tx
       ~source_private_key:whale.private_key
       ~chain_id:1337
       ~nonce:(Int64.to_int whale_nonce)
       ~gas_price
-        (* EIP-7702 txs carry an authorization list which adds overhead beyond
-         what eth_estimateGas accounts for: PER_AUTH_BASE_COST (25_000 gas per
-         entry) plus DA fee gas for the auth list bytes (~125 bytes/entry).
-         The exact cost observed is 1_146_000 gas. *)
-      ~gas:1_146_000
+      ~gas:(Int64.to_int estimated_gas)
       ~value:Wei.zero
       ~authorization:signed_auth
       ~legacy:false
@@ -12208,6 +12228,172 @@ let test_estimate_gas_with_block_param =
              block numbers but got even = %L and odd = %R") ;
       unit
   | _ -> Test.fail "Test contract deployment failed"
+
+let test_estimate_gas_accounts_for_access_list =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "eth_estimategas"; "estimate_gas"; "access_list"; "eip2930"]
+    ~title:"eth_estimateGas with access list gives enough gas"
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* eip2930 = Solidity_contracts.eip2930_storage_access evm_version in
+  let* () = Eth_cli.add_abi ~label:eip2930.label ~abi:eip2930.abi () in
+  let* contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip2930.abi
+         ~bin:eip2930.bin)
+      sequencer
+  in
+  let storage_slot =
+    "0x0000000000000000000000000000000000000000000000000000000000000000"
+  in
+  let* data = Cast.calldata ~args:["42"] "setValue(uint256)" in
+  let data = String.trim data in
+  let call_params =
+    [
+      ("from", `String sender.address);
+      ("to", `String contract);
+      ("input", `String data);
+      ( "accessList",
+        `A
+          [
+            `O
+              [
+                ("address", `String contract);
+                ("storageKeys", `A [`String storage_slot]);
+              ];
+          ] );
+    ]
+  in
+  let*@ estimated_gas = Rpc.estimate_gas call_params sequencer in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let* raw_tx =
+    Cast.craft_tx
+      ~signature:"setValue(uint256)"
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas:(Int64.to_int estimated_gas)
+      ~gas_price
+      ~value:Wei.zero
+      ~access_list:[(contract, [storage_slot])]
+      ~address:contract
+      ~arguments:["42"]
+      ~legacy:false
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{status; _} =
+    Rpc.get_transaction_receipt ~tx_hash sequencer
+  in
+  Check.((status = true) bool)
+    ~error_msg:
+      "Transaction with access list should succeed with gas estimated by \
+       eth_estimateGas" ;
+  unit
+
+let test_estimate_gas_accounts_for_authorization_list =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:
+      [
+        "evm"; "eth_estimategas"; "estimate_gas"; "authorization_list"; "eip7702";
+      ]
+    ~title:"eth_estimateGas with authorization list gives enough gas"
+    ~da_fee:(Wei.of_string "1_000_000_000_000")
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let sponsored = Eth_account.bootstrap_accounts.(1) in
+  let endpoint = Evm_node.endpoint sequencer in
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:sponsored.private_key
+      ~endpoint
+      ()
+  in
+  let base_call =
+    [("from", `String whale.address); ("to", `String sponsored.address)]
+  in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
+  (* Estimate gas without and with authorization list *)
+  let*@ gas_without_auth = Rpc.estimate_gas base_call sequencer in
+  let*@ gas_with_auth =
+    Rpc.estimate_gas (auth_list_json :: base_call) sequencer
+  in
+  (* The fix makes eth_estimateGas account for DA fee overhead of the
+     authorization list. The estimate with auth list should be higher. *)
+  Check.(
+    (gas_with_auth > gas_without_auth)
+      int64
+      ~error_msg:
+        "eth_estimateGas should return higher gas with authorization list (%L) \
+         than without (%R)") ;
+  let gas = Int64.to_int gas_with_auth in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(Int64.to_int whale_nonce)
+      ~gas
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:sponsored.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ _tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let* _ = produce_block sequencer in
+  (* The bare call reverts (no fallback in the delegation contract) but
+     the authorization is processed regardless. Verify the delegation
+     code was set on the sponsored address. *)
+  let*@ code = Rpc.get_code ~address:sponsored.address sequencer in
+  Check.((code <> "0x") string)
+    ~error_msg:
+      "Expected the sponsored EOA to have delegation code after EIP-7702 tx" ;
+  unit
 
 let test_transaction_object expected_type_ name make_transaction =
   register_all
@@ -15521,15 +15707,31 @@ let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
       ~endpoint
       ()
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
   let*@ estimated_gas =
     Rpc.estimate_gas
-      [("from", `String whale.address); ("to", `String owner.address)]
+      [
+        ("from", `String whale.address);
+        ("to", `String owner.address);
+        auth_list_json;
+      ]
       sequencer
   in
-  (* eth_estimateGas does not account for EIP-7702 authorization list
-     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
-     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
-  let gas = Int64.to_int estimated_gas + 147_234 in
+  let gas = Int64.to_int estimated_gas in
   let* raw_set_eoa =
     Cast.craft_tx
       ~source_private_key:whale.private_key
@@ -15698,15 +15900,31 @@ let test_fa_withdrawal_eip7702_eoa =
       ~endpoint
       ()
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
   let*@ estimated_gas =
     Rpc.estimate_gas
-      [("from", `String whale.address); ("to", `String eoa.address)]
+      [
+        ("from", `String whale.address);
+        ("to", `String eoa.address);
+        auth_list_json;
+      ]
       sequencer
   in
-  (* eth_estimateGas does not account for EIP-7702 authorization list
-     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
-     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
-  let gas = Int64.to_int estimated_gas + 147_234 in
+  let gas = Int64.to_int estimated_gas in
   let* raw_set_eoa =
     Cast.craft_tx
       ~source_private_key:whale.private_key
@@ -15985,6 +16203,8 @@ let () =
   test_init_config_network "mainnet" ;
   test_init_config_network "testnet" ;
   test_estimate_gas_with_block_param protocols ;
+  test_estimate_gas_accounts_for_access_list [Alpha] ;
+  test_estimate_gas_accounts_for_authorization_list [Alpha] ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
   test_rpc_getLogs_with_earliest_fail protocols ;
   test_eip2930_transaction_object [Alpha] ;
