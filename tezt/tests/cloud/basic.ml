@@ -260,110 +260,114 @@ let nginx () =
         ]
       ()
   in
-  (* Test 1: Without auth -> 401 *)
-  let* () =
-    check_http_status
-      ~url:(sf "http://localhost:%d/" proxy_port)
-      ~expected:"401"
-  in
-  Log.info "Without auth: got 401 as expected" ;
-  (* Test 2: With auth -> 200 *)
-  let* output =
-    Curl.get_raw
-      ~args:
-        [
-          "-o";
-          "/dev/null";
-          "-w";
-          "%{http_code}";
-          "-u";
-          sf "%s:%s" username password;
-        ]
-      (sf "http://localhost:%d/" proxy_port)
-    |> Runnable.run
-  in
-  let status = String.trim output in
-  if status <> "200" then Test.fail "With auth: expected 200, got %s" status ;
-  Log.info "With auth: got 200 as expected" ;
-  (* Test 3: Add a second service dynamically *)
-  let proxy_port_2 = 28081 in
-  let* () =
-    Nginx.add_service
-      nginx
-      {
-        listen_port = proxy_port_2;
-        proxy_target = sf "http://127.0.0.1:%d" dummy_port;
-      }
-  in
-  (* Verify the new port also requires auth *)
-  let* () =
-    check_http_status
-      ~url:(sf "http://localhost:%d/" proxy_port_2)
-      ~expected:"401"
-  in
-  Log.info "Dynamic service: got 401 without auth" ;
-  (* Verify original port still works *)
-  let* output =
-    Curl.get_raw
-      ~args:
-        [
-          "-o";
-          "/dev/null";
-          "-w";
-          "%{http_code}";
-          "-u";
-          sf "%s:%s" username password;
-        ]
-      (sf "http://localhost:%d/" proxy_port)
-    |> Runnable.run
-  in
-  let status = String.trim output in
-  if status <> "200" then
-    Test.fail "Original port after add_service: expected 200, got %s" status ;
-  Log.info "Original port still works after add_service" ;
-  (* Test 4: Config generation — add a third service, then verify
-     /tmp/nginx/default.conf contains 3 server{} blocks with correct
-     ports and proxy targets. *)
-  let proxy_port_3 = 28082 in
-  let* () =
-    Nginx.add_service
-      nginx
-      {
-        listen_port = proxy_port_3;
-        proxy_target = sf "http://127.0.0.1:%d" dummy_port;
-      }
-  in
-  let config_path = Path.tmp_dir // "nginx" // "default.conf" in
-  let config = read_file config_path in
-  let expected_ports = [proxy_port; proxy_port_2; proxy_port_3] in
-  let expected_target = sf "http://127.0.0.1:%d" dummy_port in
-  List.iter
-    (fun port ->
-      let listen = sf "listen 0.0.0.0:%d" port in
-      if not (string_mem ~sub:listen config) then
-        Test.fail "Config missing server block for port %d" port ;
-      if not (string_mem ~sub:(sf "proxy_pass %s" expected_target) config) then
-        Test.fail "Config missing proxy_pass for target %s" expected_target)
-    expected_ports ;
-  (* Count server{} blocks *)
-  let server_count =
-    let sub = "server {" in
-    let sublen = String.length sub in
-    let rec count i acc =
-      if i > String.length config - sublen then acc
-      else if String.sub config i sublen = sub then count (i + 1) (acc + 1)
-      else count (i + 1) acc
-    in
-    count 0 0
-  in
-  if server_count <> 3 then
-    Test.fail "Expected 3 server blocks, found %d" server_count ;
-  Log.info "Config generation: 3 server blocks with correct ports and targets" ;
-  (* Cleanup *)
-  let* () = Nginx.shutdown nginx in
-  let* () = cleanup_dummy () in
-  Log.report "Nginx auth tests passed" ;
-  unit
+  Lwt.finalize
+    (fun () ->
+      (* Test 1: Without auth -> 401 *)
+      let* () =
+        check_http_status
+          ~url:(sf "http://localhost:%d/" proxy_port)
+          ~expected:"401"
+      in
+      Log.info "Without auth: got 401 as expected" ;
+      (* Test 2: With auth -> 200 *)
+      let* output =
+        Curl.get_raw
+          ~args:
+            [
+              "-o";
+              "/dev/null";
+              "-w";
+              "%{http_code}";
+              "-u";
+              sf "%s:%s" username password;
+            ]
+          (sf "http://localhost:%d/" proxy_port)
+        |> Runnable.run
+      in
+      let status = String.trim output in
+      if status <> "200" then Test.fail "With auth: expected 200, got %s" status ;
+      Log.info "With auth: got 200 as expected" ;
+      (* Test 3: Add a second service dynamically *)
+      let proxy_port_2 = 28081 in
+      let* () =
+        Nginx.add_service
+          nginx
+          {
+            listen_port = proxy_port_2;
+            proxy_target = sf "http://127.0.0.1:%d" dummy_port;
+          }
+      in
+      (* Verify the new port also requires auth *)
+      let* () =
+        check_http_status
+          ~url:(sf "http://localhost:%d/" proxy_port_2)
+          ~expected:"401"
+      in
+      Log.info "Dynamic service: got 401 without auth" ;
+      (* Verify original port still works *)
+      let* output =
+        Curl.get_raw
+          ~args:
+            [
+              "-o";
+              "/dev/null";
+              "-w";
+              "%{http_code}";
+              "-u";
+              sf "%s:%s" username password;
+            ]
+          (sf "http://localhost:%d/" proxy_port)
+        |> Runnable.run
+      in
+      let status = String.trim output in
+      if status <> "200" then
+        Test.fail "Original port after add_service: expected 200, got %s" status ;
+      Log.info "Original port still works after add_service" ;
+      (* Test 4: Config generation — add a third service, then verify
+         /tmp/nginx/default.conf contains 3 server{} blocks with correct
+         ports and proxy targets. *)
+      let proxy_port_3 = 28082 in
+      let* () =
+        Nginx.add_service
+          nginx
+          {
+            listen_port = proxy_port_3;
+            proxy_target = sf "http://127.0.0.1:%d" dummy_port;
+          }
+      in
+      let config_path = Path.tmp_dir // "nginx" // "default.conf" in
+      let config = read_file config_path in
+      let expected_ports = [proxy_port; proxy_port_2; proxy_port_3] in
+      let expected_target = sf "http://127.0.0.1:%d" dummy_port in
+      List.iter
+        (fun port ->
+          let listen = sf "listen 0.0.0.0:%d" port in
+          if not (string_mem ~sub:listen config) then
+            Test.fail "Config missing server block for port %d" port ;
+          if not (string_mem ~sub:(sf "proxy_pass %s" expected_target) config)
+          then
+            Test.fail "Config missing proxy_pass for target %s" expected_target)
+        expected_ports ;
+      (* Count server{} blocks *)
+      let server_count =
+        let sub = "server {" in
+        let sublen = String.length sub in
+        let rec count i acc =
+          if i > String.length config - sublen then acc
+          else if String.sub config i sublen = sub then count (i + 1) (acc + 1)
+          else count (i + 1) acc
+        in
+        count 0 0
+      in
+      if server_count <> 3 then
+        Test.fail "Expected 3 server blocks, found %d" server_count ;
+      Log.info
+        "Config generation: 3 server blocks with correct ports and targets" ;
+      Log.report "Nginx auth tests passed" ;
+      unit)
+    (fun () ->
+      let* () = Nginx.shutdown nginx in
+      cleanup_dummy ())
 
 let register () =
   simple () ;
