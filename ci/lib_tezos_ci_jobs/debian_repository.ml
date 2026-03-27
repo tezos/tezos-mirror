@@ -49,10 +49,13 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
+(* Points to [(debian|ubuntu)-build] static images. *)
 let build_dependency_image =
   Image.mk_external
     ~image_path:
-      "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      (sf
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-%s"
+         Tezos_ci.Images.Base_images.debian_version)
 
 let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~matrix ~distribution ~script ~dependencies () =
@@ -62,11 +65,9 @@ let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~image:build_dependency_image
     ~stage:Stages.build
     ~variables:
-      (Common.Packaging.make_variables
-         (("DISTRIBUTION", distribution)
-         ::
-         (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-         ))
+      (("DISTRIBUTION", distribution)
+      :: (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+      )
     ~parallel:(Matrix matrix)
     ~dependencies
     ~tag:Dynamic
@@ -204,8 +205,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~image:build_dependency_image
       ~stage:Stages.build
       ~variables:
-        (Common.Packaging.make_variables
-           [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
+        [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
       ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~tag:Dynamic
       ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
