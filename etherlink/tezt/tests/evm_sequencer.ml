@@ -10671,17 +10671,37 @@ let test_da_fee_drain_via_eip7702 =
   let*@ whale_nonce =
     Rpc.get_transaction_count ~address:whale.address sequencer
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String drain_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
+  let*@ estimated_gas =
+    Rpc.estimate_gas
+      [
+        ("from", `String whale.address);
+        ("to", `String attacker.address);
+        auth_list_json;
+      ]
+      sequencer
+  in
   let* raw_setup =
     Cast.craft_tx
       ~source_private_key:whale.private_key
       ~chain_id:1337
       ~nonce:(Int64.to_int whale_nonce)
       ~gas_price
-        (* EIP-7702 txs carry an authorization list which adds overhead beyond
-         what eth_estimateGas accounts for: PER_AUTH_BASE_COST (25_000 gas per
-         entry) plus DA fee gas for the auth list bytes (~125 bytes/entry).
-         The exact cost observed is 1_146_000 gas. *)
-      ~gas:1_146_000
+      ~gas:(Int64.to_int estimated_gas)
       ~value:Wei.zero
       ~authorization:signed_auth
       ~legacy:false
@@ -15687,15 +15707,31 @@ let test_fa_withdrawal_eip7702_unauthorized_caller_fails =
       ~endpoint
       ()
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
   let*@ estimated_gas =
     Rpc.estimate_gas
-      [("from", `String whale.address); ("to", `String owner.address)]
+      [
+        ("from", `String whale.address);
+        ("to", `String owner.address);
+        auth_list_json;
+      ]
       sequencer
   in
-  (* eth_estimateGas does not account for EIP-7702 authorization list
-     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
-     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
-  let gas = Int64.to_int estimated_gas + 147_234 in
+  let gas = Int64.to_int estimated_gas in
   let* raw_set_eoa =
     Cast.craft_tx
       ~source_private_key:whale.private_key
@@ -15864,15 +15900,31 @@ let test_fa_withdrawal_eip7702_eoa =
       ~endpoint
       ()
   in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
   let*@ estimated_gas =
     Rpc.estimate_gas
-      [("from", `String whale.address); ("to", `String eoa.address)]
+      [
+        ("from", `String whale.address);
+        ("to", `String eoa.address);
+        auth_list_json;
+      ]
       sequencer
   in
-  (* eth_estimateGas does not account for EIP-7702 authorization list
-     overhead: it misses both PER_AUTH_BASE_COST (25000 gas per auth entry)
-     and the DA fee gas for auth list bytes (~125 bytes per entry). *)
-  let gas = Int64.to_int estimated_gas + 147_234 in
+  let gas = Int64.to_int estimated_gas in
   let* raw_set_eoa =
     Cast.craft_tx
       ~source_private_key:whale.private_key

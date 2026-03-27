@@ -117,6 +117,8 @@ let ray_trace_scanline {infos; contract; spp; rpc_node; height; _} sender
           gasPrice = Some (Qty (Z.mul infos.base_fee_per_gas (Z.of_int 1000)));
           value = Some (Qty Z.zero);
           data = Some data;
+          authorization_list = [];
+          access_list = [];
         },
         Block_parameter Latest,
         Ethereum_types.AddressMap.empty )
