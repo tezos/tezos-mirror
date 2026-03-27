@@ -12349,11 +12349,7 @@ let test_estimate_gas_accounts_for_authorization_list =
       ~error_msg:
         "eth_estimateGas should return higher gas with authorization list (%L) \
          than without (%R)") ;
-  (* The simulation does not process auth entries: it misses
-     PER_AUTH_BASE_COST and code execution at the delegated address.
-     Use the estimate (which now includes DA fees) plus a margin for
-     the execution gap. *)
-  let gas = Int64.to_int gas_with_auth + 200_000 in
+  let gas = Int64.to_int gas_with_auth in
   let* raw_tx =
     Cast.craft_tx
       ~source_private_key:whale.private_key

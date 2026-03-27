@@ -259,8 +259,13 @@ module Etherlink = struct
           (* If enabled, previous simulation did not take into account
              da fees, we need to add extra units here. *)
           let* da_fees = da_fees_gas_limit_overhead call simulation_state in
+          (* Add authorization list gas. 25000 = PER_EMPTY_ACCOUNT_COST *)
+          let authorization_list_gas =
+            (call.authorization_list |> List.length) * 25000
+          in
           let (Qty gas) = gas in
-          return @@ quantity_of_z @@ Z.add gas da_fees
+          return @@ quantity_of_z
+          @@ Z.add gas (Z.add da_fees (Z.of_int authorization_list_gas))
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
