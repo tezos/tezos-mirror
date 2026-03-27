@@ -60,6 +60,8 @@ type config = {
   tc_jitter : (float * float) option;
   artifacts_dir : string option;
   teztale_artifacts : bool option;
+  auth_username : string option;
+  auth_password : string option;
 }
 
 let encoding =
@@ -116,6 +118,12 @@ let encoding =
            tc_jitter;
            artifacts_dir;
            teztale_artifacts;
+           auth_username;
+           (* [auth_password] is intentionally excluded from the encoding.
+              The config file may be committed or shared, which would
+              compromise the password. It can only be set via CLI flag
+              or environment variable. *)
+           auth_password = _;
          }
        ->
       ( ( ( localhost,
@@ -158,16 +166,17 @@ let encoding =
               binaries_path,
               log_rotation,
               slack_channel_id ) ),
-          ( slack_bot_token,
-            retrieve_daily_logs,
-            retrieve_ppx_profiling_traces,
-            scenario_specific,
-            tc_delay,
-            tc_jitter,
-            artifacts_dir,
-            teztale_artifacts,
-            disk_type,
-            disk_size_gb ) ) ))
+          ( ( slack_bot_token,
+              retrieve_daily_logs,
+              retrieve_ppx_profiling_traces,
+              scenario_specific,
+              tc_delay,
+              tc_jitter,
+              artifacts_dir,
+              teztale_artifacts,
+              disk_type,
+              disk_size_gb ),
+            auth_username ) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -208,16 +217,17 @@ let encoding =
                  binaries_path,
                  log_rotation,
                  slack_channel_id ) ),
-             ( slack_bot_token,
-               retrieve_daily_logs,
-               retrieve_ppx_profiling_traces,
-               scenario_specific,
-               tc_delay,
-               tc_jitter,
-               artifacts_dir,
-               teztale_artifacts,
-               disk_type,
-               disk_size_gb ) ) )
+             ( ( slack_bot_token,
+                 retrieve_daily_logs,
+                 retrieve_ppx_profiling_traces,
+                 scenario_specific,
+                 tc_delay,
+                 tc_jitter,
+                 artifacts_dir,
+                 teztale_artifacts,
+                 disk_type,
+                 disk_size_gb ),
+               auth_username ) ) )
        ->
       {
         localhost;
@@ -270,6 +280,8 @@ let encoding =
         tc_delay;
         tc_jitter;
         teztale_artifacts;
+        auth_username;
+        auth_password = None;
       })
     (merge_objs
        (merge_objs
@@ -319,17 +331,21 @@ let encoding =
                 (opt "binaries_path" string)
                 (opt "log_rotation" int31)
                 (opt "slack_channel_id" string)))
-          (obj10
-             (opt "slack_bot_token" string)
-             (opt "daily_logs_artifacts" bool)
-             (opt "retrieve_ppx_profiling_traces" bool)
-             (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding))
-             (opt "tc_delay" (tup2 float float))
-             (opt "tc_jitter" (tup2 float float))
-             (opt "artifacts_dir" string)
-             (opt "teztale_artifacts" bool)
-             (opt "disk_type" string)
-             (opt "disk_size_gb" int31))))
+          (merge_objs
+             (obj10
+                (opt "slack_bot_token" string)
+                (opt "daily_logs_artifacts" bool)
+                (opt "retrieve_ppx_profiling_traces" bool)
+                (opt
+                   "scenario_specific"
+                   (tup2 string Data_encoding.Json.encoding))
+                (opt "tc_delay" (tup2 float float))
+                (opt "tc_jitter" (tup2 float float))
+                (opt "artifacts_dir" string)
+                (opt "teztale_artifacts" bool)
+                (opt "disk_type" string)
+                (opt "disk_size_gb" int31))
+             (obj1 (opt "auth_username" string)))))
 
 let section =
   Clap.section
@@ -908,6 +924,32 @@ let tc_jitter : (float * float) option =
        float_float
        ()
 
+let auth_username =
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"auth-username"
+      ~description:
+        "Username for basic auth on monitoring services. Requires \
+         --auth-password. Can also be set via TEZT_CLOUD_AUTH_USERNAME \
+         environment variable."
+      ()
+  in
+  Option.fold ~none:config.auth_username ~some from_cli
+
+let auth_password =
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"auth-password"
+      ~description:
+        "Password for basic auth on monitoring services. Requires \
+         --auth-username. Can also be set via TEZT_CLOUD_AUTH_PASSWORD \
+         environment variable."
+      ()
+  in
+  Option.fold ~none:config.auth_password ~some from_cli
+
 let section =
   Clap.section
     ~description:"Define report and alert managing options"
@@ -994,5 +1036,7 @@ let to_json_config ?scenario_config () =
     tc_jitter;
     artifacts_dir;
     teztale_artifacts = Some teztale_artifacts;
+    auth_username;
+    auth_password;
   }
   |> Data_encoding.Json.construct encoding

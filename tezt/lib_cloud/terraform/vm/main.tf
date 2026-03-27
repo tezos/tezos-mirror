@@ -80,6 +80,12 @@ variable "prometheus_port" {
   default     = 9090
 }
 
+variable "auth_enabled" {
+  type        = bool
+  description = "When true, monitoring ports are closed at the firewall level. Services are accessed through nginx with basic auth on the orchestrator."
+  default     = false
+}
+
 
 # Those values should not be modified
 locals {
@@ -117,7 +123,7 @@ provider "google" {
 # A service account must be associated with a VM
 resource "google_service_account" "default" {
   account_id   = "${terraform.workspace}-id"
-  display_name = "${terraform.workspace}"
+  display_name = terraform.workspace
 }
 
 # We want the service account to be able to fetch docker image from
@@ -276,20 +282,13 @@ resource "google_compute_firewall" "default" {
     ports    = ["${var.base_port}-${var.base_port + var.ports_per_vm}"]
   }
 
-  # Enable access to the netdata dashboard if monitoring is enabled
-  allow {
-    protocol = "tcp"
-    ports    = ["19999"]
-  }
-
-  # Enable access to Opentelemetry/Jaeger if enabled
+  # Data ingestion ports: always open (agents send data to orchestrator)
   # 4317 used by Otel collector to receive observability data via gRPC
   # 55681 used by Otel collector to receive observability data via JSON
-  # 14250 used by Jaeger to accept data over  gRPC.
-  # 16686 Provides access to the Jaeger web UI for tracing visualization.
+  # 14250 used by Jaeger to accept data over gRPC.
   allow {
     protocol = "tcp"
-    ports    = ["4317", "14250", "16686","55681"]
+    ports    = ["4317", "14250", "55681"]
   }
 
   # Rule to enable static page web access
@@ -298,16 +297,20 @@ resource "google_compute_firewall" "default" {
     ports    = ["80", "443", "8080"]
   }
 
-  # Rule to enable prometheus access
-  allow {
-    protocol = "tcp"
-    ports    = ["${var.prometheus_port}"]
-  }
-
-  # Rule to enable grafana access
-  allow {
-    protocol = "tcp"
-    ports    = ["3000"]
+  # Monitoring UI ports: only open when auth is disabled (default).
+  # When auth is enabled, these services are accessed through nginx
+  # with basic auth on the orchestrator, so direct access is blocked.
+  # 3000 used by Grafana dashboard
+  # prometheus_port (default 9090) used by Prometheus web UI
+  # 9093 used by AlertManager web UI
+  # 16686 used by Jaeger web UI for tracing visualization
+  # 19999 used by Netdata monitoring dashboard
+  dynamic "allow" {
+    for_each = var.auth_enabled ? [] : [true]
+    content {
+      protocol = "tcp"
+      ports    = ["3000", "${var.prometheus_port}", "9093", "16686", "19999"]
+    }
   }
 
   # Anybody can contact the machine on the open ports.

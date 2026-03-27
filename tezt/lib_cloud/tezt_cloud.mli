@@ -324,6 +324,8 @@ end
    registered jobs. *)
 val register : tags:string list -> unit
 
+module Nginx : module type of Nginx
+
 module Gcloud : sig
   module DNS : sig
     (** [add_subdomain ~zone ~name ~value] adds a dns entry for the domain name
