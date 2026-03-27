@@ -1376,6 +1376,38 @@ let test_crac_tez_revert_rolls_back_inner_evm_storage =
   in
   unit
 
+(** TEZ caller reverts after a successful cross-runtime call to EVM.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_leaf]
+ *     |-> REVERT
+ *
+ *)
+let test_crac_tez_revert_propagates_to_evm =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ revert propagates to EVM"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy EVM leaf" ;
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM leaf" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  Log.debug ~prefix "Originate TEZ main with revert" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~callees:[tez_bridge] ~revert:true ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run tez_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_leaf in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_main in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:0 tez_bridge
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1391,4 +1423,5 @@ let () =
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
   test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
   test_crac_evm_to_tez_reverts [Alpha] ;
-  test_crac_tez_to_evm_reverts [Alpha]
+  test_crac_tez_to_evm_reverts [Alpha] ;
+  test_crac_tez_revert_propagates_to_evm [Alpha]

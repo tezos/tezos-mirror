@@ -58,6 +58,15 @@ impl EvmJournal {
 }
 
 impl EvmJournal {
+    /// Discard all accumulated EVM state.
+    pub fn clear(&mut self) {
+        let _ = self.inner.finalize();
+        let _ = self.layered_state.finalize();
+        self.crac_logs.clear();
+        self.crac_tx_info = None;
+        self.access_list = None;
+    }
+
     pub fn set_access_list(
         &mut self,
         input_list: AccessList,
