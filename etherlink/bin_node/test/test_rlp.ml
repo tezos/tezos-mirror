@@ -141,6 +141,42 @@ let test_canonical_invalid_vectors () =
   let valid_tests = read_test_vector "invalidRLPTest.json" in
   List.iter (fun (testname, rlp, bytes) -> check testname rlp bytes) valid_tests
 
+let test_truncated_input () =
+  (* A list header claiming more bytes than available must return an error,
+     not raise an exception. Regression test for a crash caused by
+     decode_int reading past the end of the buffer. *)
+  let truncated_cases =
+    [
+      (* f8 5e = list of 94 bytes, but only 1 byte follows *)
+      ("truncated list length", Bytes.of_string "\xf8\x5e\x01");
+      (* b8 38 = string of 56 bytes, but nothing follows *)
+      ("truncated string length", Bytes.of_string "\xb8\x38");
+      (* f9 02 8f = list of 655 bytes, but only 3 bytes follow *)
+      ("truncated long list", Bytes.of_string "\xf9\x02\x8f\xc0\xc0\xc0");
+      (* Single byte claiming long length *)
+      ("truncated length field", Bytes.of_string "\xf9\x01");
+    ]
+  in
+  List.iter
+    (fun (name, input) ->
+      let result =
+        try decode input |> Option.of_result
+        with exn ->
+          Test.fail
+            "Test '%s': decode raised %s instead of returning an error"
+            name
+            (Printexc.to_string exn)
+      in
+      if result <> None then
+        Test.fail
+          "Test '%s': truncated input should fail to decode, but got %a"
+          name
+          (Format.pp_print_option
+             ~none:(fun ppf () -> Format.fprintf ppf "None")
+             pp)
+          result)
+    truncated_cases
+
 let tests =
   [
     ( "RLP",
@@ -150,6 +186,7 @@ let tests =
         ( "test canonical invalid vectors",
           `Quick,
           test_canonical_invalid_vectors );
+        ("test truncated input", `Quick, test_truncated_input);
       ] );
   ]
 
