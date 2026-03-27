@@ -42,3 +42,9 @@ module Prove :
   PROVE
     with type normal_registry := Normal.Registry.t
      and type Proof.t = Proof.t
+
+(** Verify mode: registry, database, and verify entry point.
+
+    {b Note}: Currently a stub (TZX-114). All operations will raise a
+    runtime error if called. *)
+module Verify : VERIFY with type proof := Proof.t
