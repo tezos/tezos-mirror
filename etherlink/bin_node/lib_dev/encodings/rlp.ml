@@ -112,7 +112,8 @@ let decode_int bytes offset len =
   in
   (* Checks the length is not negative and the encoded integer does not starts
      with leading zeros *)
-  if len < 0 then tzfail (Rlp_decoding_error "decode_int")
+  if len < 0 || offset + len > Bytes.length bytes then
+    tzfail (Rlp_decoding_error "decode_int")
   else if len > 0 && Bytes.get_uint8 bytes offset = 0 then
     tzfail (Rlp_decoding_error "decode_int")
   else return (decode 0 0)
@@ -127,7 +128,8 @@ let decode_z bytes offset len =
   in
   (* Checks the length is not negative and the encoded integer does not starts
      with leading zeros *)
-  if len < 0 then tzfail (Rlp_decoding_error "decode_z")
+  if len < 0 || offset + len > Bytes.length bytes then
+    tzfail (Rlp_decoding_error "decode_z")
   else if len > 0 && Bytes.get_uint8 bytes offset = 0 then
     tzfail (Rlp_decoding_error "decode_z")
   else return (decode Z.zero 0)
