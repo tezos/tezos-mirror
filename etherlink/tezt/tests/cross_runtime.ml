@@ -1408,6 +1408,51 @@ let test_crac_tez_revert_propagates_to_evm =
   in
   unit
 
+(** EVM journal state preserved across CRAC sub-calls.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_ok] ~CRAC~> TEZ[tez_bridge] ~CRAC~> EVM[evm_leaf]
+ *     |-> (Catch) EVM[evm_reverter] (pure EVM revert)
+ *
+ *  The first double-CRAC modifies journal state (logs, checkpoints),
+ *  making the outer checkpoint log_i > 0. The caught EVM revert
+ *  triggers REVM's logs[checkpoint.log_i..] slice operation which
+ *  panics if the prior CRAC drained or reset journal state.
+ *)
+let test_crac_evm_journal_state_preserved =
+  register_crac_runner_test
+    ~title:"CRAC: EVM journal state preserved"
+    ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  let* evm_leaf = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_leaf in
+  let* evm_bridge_ok = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  let* evm_reverter = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_ok, false); (evm_reverter, true)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* _ = EvmRunner.call_run evm_main in
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:1
+      ~expected_counter:3
+      evm_main
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_ok
+  in
+  let* () =
+    TezCrossRuntimeRunnerEvm.check_storage ~expected_counter:2 tez_bridge
+  in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_leaf in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1424,4 +1469,5 @@ let () =
   test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
   test_crac_evm_to_tez_reverts [Alpha] ;
   test_crac_tez_to_evm_reverts [Alpha] ;
-  test_crac_tez_revert_propagates_to_evm [Alpha]
+  test_crac_tez_revert_propagates_to_evm [Alpha] ;
+  test_crac_evm_journal_state_preserved [Alpha]
