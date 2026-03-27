@@ -64,6 +64,17 @@ val refresh_state : unit -> unit tzresult Lwt.t
 
 val get_da_fee_per_byte : unit -> Tezos_types.Tez.nanotez tzresult Lwt.t
 
+(** Returns the current base fee per Michelson gas unit in nanotez.
+
+    Reads [base_fee_per_gas] and [michelson_to_evm_gas_multiplier] from
+    the cached session and computes:
+    [nanotez_per_michelson_gas = wei_to_nanotez(base_fee) * multiplier]
+
+    For Michelson-only chains (Tezlink): returns 0 because
+    [session_of_state] hardcodes [base_fee_per_gas = Z.zero]. *)
+val get_michelson_base_fee_per_gas :
+  unit -> Tezos_types.Tez.nanotez tzresult Lwt.t
+
 (** [prevalidate_raw_transaction_tezlink raw_txn] sends a prevalidation request
     to the worker, and waits for the result.
 

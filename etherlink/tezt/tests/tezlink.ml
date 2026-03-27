@@ -3847,21 +3847,16 @@ let test_michelson_gas_backlog =
     | Ok block -> block.Block.baseFeePerGas
     | Error _ -> Stdlib.failwith "Couldn't retrieve latest block"
   in
-  (* With multiplier = 1,000,000 and gas_limit = 1,040,000 milligas,
-     execution gas fee = 1,040,000 * 1,000,000 * 10^9 / 10^12 = 1,040,000,000 mutez.
-     We provide a fee above this threshold to pass kernel fee validation.
-     The auto-estimated fee is rejected by the kernel. *)
-  let gas_limit = 1_040_000 in
-  let fee = Tez.of_mutez_int 1_100_000_000 in
-  let fee_cap = fee in
+  (* Fee and gas_limit are auto-estimated by the client.
+     fee_cap must be high enough to cover the large execution gas fees
+     induced by multiplier = 1,000,000. *)
+  let fee_cap = Tez.of_mutez_int 1_100_000_000 in
   let* () =
     Client.transfer
       ~amount:Tez.one
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
-      ~fee
       ~fee_cap
-      ~gas_limit
       client_tezlink
   in
   (* Produce block containing the transfer, then another whose
@@ -4019,6 +4014,54 @@ let test_michelson_gas_exhaustion =
     (consumed = fee)
       int
       ~error_msg:"Expected %R mutez consumed (fee only), got %L") ;
+  unit
+
+(* Tests that the [/mempool/filter] RPC returns the expected
+    [minimal_nanotez_per_gas_unit] and [minimal_nanotez_per_byte] computed
+    from the kernel's [base_fee_per_gas] and [michelson_to_evm_gas_multiplier]
+    instead of the protocol defaults.
+
+    With [base_fee_per_gas = 10^9 Wei] (default) and
+    [michelson_to_evm_gas_multiplier = 25]:
+      [nanotez_per_gas = wei_to_nanotez(10^9) * 25 = 1 * 25 = 25]
+
+    With [da_fee = 5 * 10^15 Wei] (5000 mutez/byte), we expect
+      [nanotez_per_byte = wei_to_nanotez(5 * 10^15) = 5_000_000] *)
+let test_mempool_filter_fields =
+  register_tezosx_test
+    ~title:"mempool/filter RPC returns Michelson base_fee and DA fee"
+    ~tags:["rpc"; "mempool"; "filter"; "fee"]
+    ~da_fee:(Wei.of_string "5000000000000000")
+    ~michelson_to_evm_gas_multiplier:25L
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* json =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_mempool_filter ~include_default:true ()
+  in
+  (* Michelson nanotez_per_gas = wei_to_nanotez(base_fee) * multiplier
+     = (10^9 / 10^9) * 25 = 25, encoded as ["25", "1"]. *)
+  let michelson_nanotez_per_gas =
+    JSON.(json |-> "minimal_nanotez_per_gas_unit" |> as_list)
+  in
+  Check.(
+    (List.map JSON.as_string michelson_nanotez_per_gas = ["25"; "1"])
+      (list string)
+      ~error_msg:"Expected minimal_nanotez_per_gas_unit = %R but got %L") ;
+  (* nanotez_per_byte = wei_to_nanotez(da_fee)
+     = 5 * 10^15 / 10^9 = 5_000_000, encoded as ["5000000", "1"]. *)
+  let nanotez_per_byte =
+    JSON.(json |-> "minimal_nanotez_per_byte" |> as_list)
+  in
+  Check.(
+    (List.map JSON.as_string nanotez_per_byte = ["5000000"; "1"])
+      (list string)
+      ~error_msg:"Expected minimal_nanotez_per_byte = %R but got %L") ;
   unit
 
 let test_tezlink_gas_vs_l1 =
@@ -4751,6 +4794,7 @@ let () =
   test_michelson_gas_backlog [Alpha] ;
   test_michelson_execution_gas_fee [Alpha] ;
   test_michelson_gas_exhaustion [Alpha] ;
+  test_mempool_filter_fields [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;

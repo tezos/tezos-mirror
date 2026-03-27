@@ -12,19 +12,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000317
+    Fee to the baker: ꜩ0.000122
     Expected counter: 1
     Gas limit: 2169
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000317
-      payload fees(the block proposer) ....... +ꜩ0.000317
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000122
+      payload fees(the block proposer) ....... +ꜩ0.000122
     Transaction:
       Amount: ꜩ1
       From: [PUBLIC_KEY_HASH]
       To: [PUBLIC_KEY_HASH]
       This transaction was successfully applied
-      Consumed gas: 2168.681
+      Consumed gas: 2168.648
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [PUBLIC_KEY_HASH] ... +ꜩ1
@@ -40,7 +40,7 @@ This sequence of operations was run:
     "next_protocol": "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu" }
 >>>>2: http://[HOST]:[PORT]/tezlink/chains/main/mempool/filter?include_default=yes
 <<<<2: 200 OK
-  { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
+  { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "10", "1" ],
     "minimal_nanotez_per_byte": [ "0", "1" ], "replace_by_fee_factor": [ "21", "20" ] }
 >>>>3: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter
 <<<<3: 200 OK
@@ -170,21 +170,21 @@ This sequence of operations was run:
       "branch": "[BLOCK_HASH]",
       "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "317", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "fee": "122", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
             "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]" } ],
       "signature":
         "[SIGNATURE]" } ]
 <<<<13: 200 OK
   [ { "contents":
         [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
-            "fee": "317", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
+            "fee": "122", "counter": "1", "gas_limit": "2169", "storage_limit": "0",
             "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]",
             "metadata":
               { "balance_updates":
                   [ { "kind": "contract", "contract": "[PUBLIC_KEY_HASH]",
-                      "change": "-317", "origin": "block" },
+                      "change": "-122", "origin": "block" },
                     { "kind": "accumulator", "category": "block fees", 
-                      "change": "317", "origin": "block" } ],
+                      "change": "122", "origin": "block" } ],
                 "operation_result":
                   { "status": "applied",
                     "balance_updates":
@@ -194,7 +194,7 @@ This sequence of operations was run:
                         { "kind": "contract",
                           "contract": "[PUBLIC_KEY_HASH]",
                           "change": "1000000", "origin": "block" } ],
-                    "consumed_milligas": "2168681" } } } ],
+                    "consumed_milligas": "2168648" } } } ],
       "signature":
         "[SIGNATURE]" } ]
 >>>>14: http://[HOST]:[PORT]/tezlink/injection/operation?chain=main
