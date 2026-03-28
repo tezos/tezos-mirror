@@ -195,3 +195,96 @@ module Prove = struct
   let produce_proof registry_prove =
     Api.octez_riscv_durable_on_disk_produce_proof registry_prove
 end
+
+let convert_verification = function Api.Not_found -> Not_found
+
+let convert_verification_argument = function
+  | Api.Invalid_argument e ->
+      Verification_invalid_argument (convert_invalid_argument e)
+  | Api.Verification e -> Verification (convert_verification e)
+
+let wrap_verification_error = function
+  | Ok x -> Ok x
+  | Error e ->
+      Result_syntax.tzfail (Verification_error (convert_verification e))
+
+let wrap_verification_argument_error = function
+  | Ok x -> Ok x
+  | Error e ->
+      Result_syntax.tzfail
+        (Verification_argument_error (convert_verification_argument e))
+
+module Verify = struct
+  module Registry = struct
+    type t = Api.registry_verify
+
+    let hash t =
+      Api.octez_riscv_durable_on_disk_verify_registry_hash t
+      |> wrap_verification_error
+
+    let size t =
+      Api.octez_riscv_durable_on_disk_verify_registry_size t
+      |> wrap_verification_error
+
+    let resize t n =
+      Api.octez_riscv_durable_on_disk_verify_registry_resize t n
+      |> wrap_verification_argument_error
+
+    let copy_database t ~src ~dst =
+      Api.octez_riscv_durable_on_disk_verify_registry_copy t src dst
+      |> wrap_verification_argument_error
+
+    let move_database t ~src ~dst =
+      Api.octez_riscv_durable_on_disk_verify_registry_move t src dst
+      |> wrap_verification_argument_error
+
+    let clear t db_index =
+      Api.octez_riscv_durable_on_disk_verify_registry_clear t db_index
+      |> wrap_verification_argument_error
+  end
+
+  module Database = struct
+    let exists t ~db_index ~key =
+      Api.octez_riscv_durable_on_disk_verify_database_exists t db_index key
+      |> wrap_verification_argument_error
+
+    let set t ~db_index ~key ~value =
+      Api.octez_riscv_durable_on_disk_verify_database_set t db_index key value
+      |> wrap_verification_argument_error
+
+    let write t ~db_index ~key ~offset ~value =
+      Api.octez_riscv_durable_on_disk_verify_database_write
+        t
+        db_index
+        key
+        offset
+        value
+      |> wrap_verification_argument_error
+
+    let read t ~db_index ~key ~offset ~len =
+      Api.octez_riscv_durable_on_disk_verify_database_read
+        t
+        db_index
+        key
+        offset
+        len
+      |> wrap_verification_argument_error
+
+    let value_length t ~db_index ~key =
+      Api.octez_riscv_durable_on_disk_verify_database_value_length
+        t
+        db_index
+        key
+      |> wrap_verification_argument_error
+
+    let delete t ~db_index ~key =
+      Api.octez_riscv_durable_on_disk_verify_database_delete t db_index key
+      |> wrap_verification_argument_error
+
+    let hash t ~db_index =
+      Api.octez_riscv_durable_on_disk_verify_database_hash t db_index
+      |> wrap_verification_argument_error
+  end
+
+  let start_verify proof = Api.octez_riscv_durable_on_disk_start_verify proof
+end
