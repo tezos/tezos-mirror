@@ -14767,6 +14767,146 @@ let test_eip7702_auto_sign =
     ~error_msg:"Expected msg.sender of %R, got %L" ;
   unit
 
+(* Per EIP-7702, a transaction carrying an authorization with a stale nonce
+   should not be rejected by the node — the invalid authorization is silently
+   skipped during execution. This test sends a type-4 tx to set a delegation,
+   then sends a second type-4 tx reusing the same (now stale) authorization.
+   The second tx must be accepted into a block. *)
+let test_eip7702_stale_auth_is_skipped =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "eip7702"; "nonce"; "stale_auth"]
+    ~title:"EIP-7702 stale authorization is skipped, not rejected"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let authority = Eth_account.bootstrap_accounts.(1) in
+  let endpoint = Evm_node.endpoint sequencer in
+  (* Deploy the delegation contract. *)
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let*@ whale_nonce =
+    Rpc.get_transaction_count ~address:whale.address sequencer
+  in
+  let whale_nonce = Int64.to_int whale_nonce in
+  (* Authority signs an authorization at nonce 0. *)
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~nonce:0
+      ~authorization:eip7702_contract
+      ~private_key:authority.private_key
+      ~endpoint
+      ()
+  in
+  (* Build the eth_call JSON for gas estimation with the authorization list. *)
+  let base_call =
+    [("from", `String whale.address); ("to", `String authority.address)]
+  in
+  let auth_list_json =
+    ( "authorizationList",
+      `A
+        [
+          `O
+            [
+              ("chainId", `String "0x539");
+              ("address", `String eip7702_contract);
+              ("nonce", `String "0x0");
+              ("yParity", `String "0x0");
+              ("r", `String "0x0");
+              ("s", `String "0x0");
+            ];
+        ] )
+  in
+  let*@ gas = Rpc.estimate_gas (auth_list_json :: base_call) sequencer in
+  let gas = Int64.to_int gas in
+  (* TX1: whale sends type-4 tx with the fresh authorization.
+     The bare call may revert (delegation contract has no fallback), but
+     the authorization is processed regardless and sets the delegation. *)
+  let* raw_tx1 =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:whale_nonce
+      ~gas
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:authority.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ tx1_hash = Rpc.send_raw_transaction ~raw_tx:raw_tx1 sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@! _tx1_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:tx1_hash sequencer
+  in
+  (* Verify the delegation was set and authority nonce bumped. *)
+  let*@ code = Rpc.get_code ~address:authority.address sequencer in
+  let expected_code =
+    "0xef0100" ^ String.(lowercase_ascii @@ sub eip7702_contract 2 40)
+  in
+  Check.((code = expected_code) string)
+    ~error_msg:"Expected delegation code %R after TX1, got %L" ;
+  let*@ authority_nonce =
+    Rpc.get_transaction_count ~address:authority.address sequencer
+  in
+  Check.((authority_nonce = 1L) int64)
+    ~error_msg:"Expected authority nonce of 1 after TX1, got %L" ;
+  (* TX2: whale sends another type-4 tx reusing the SAME signed_auth.
+     The authorization has nonce 0, but authority's nonce is now 1.
+     Per EIP-7702 spec, the stale auth is silently skipped during execution.
+     The node must accept and include this transaction — not reject it. *)
+  let* raw_tx2 =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:(whale_nonce + 1)
+      ~gas
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization:signed_auth
+      ~address:authority.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let*@ tx2_hash = Rpc.send_raw_transaction ~raw_tx:raw_tx2 sequencer in
+  let*@ _ = produce_block sequencer in
+  (* The critical check: TX2 must have been included in a block.
+     Getting a receipt proves the node accepted the transaction despite
+     the stale authorization. *)
+  let*@! tx2_receipt =
+    Rpc.get_transaction_receipt ~tx_hash:tx2_hash sequencer
+  in
+  Check.((tx2_receipt.Transaction.type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected TX2 to be type 4, got %L" ;
+  (* The delegation should still be intact — the stale auth was skipped,
+     it did not overwrite the existing delegation. *)
+  let*@ code_after = Rpc.get_code ~address:authority.address sequencer in
+  Check.((code_after = expected_code) string)
+    ~error_msg:"Expected delegation code unchanged after stale auth, got %L" ;
+  (* The stale authorization must not have bumped the authority nonce. *)
+  let*@ authority_nonce_after =
+    Rpc.get_transaction_count ~address:authority.address sequencer
+  in
+  Check.((authority_nonce_after = 1L) int64)
+    ~error_msg:"Expected authority nonce still 1 after stale auth, got %L" ;
+  unit
+
 let test_eip2537 =
   register_all
     ~__FILE__
@@ -16244,4 +16384,5 @@ let () =
   test_xtz_deposit_watchtower_with_fa_whitelist [Alpha] ;
   test_evm_events_cleanup () ;
   test_locked_tx_queue_timestamp () ;
-  test_next_block_info_ic_reset ()
+  test_next_block_info_ic_reset () ;
+  test_eip7702_stale_auth_is_skipped [Alpha]

@@ -347,47 +347,21 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations ~session ~chain_id ~caller txn =
+let validate_authorizations txn =
   let open Lwt_result_syntax in
   let authorization_list = Transaction_object.authorization_list txn in
   if not (Transaction_object.is_eip7702 txn) then return (Ok ())
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else
-    let read_nonce address =
-      Etherlink_durable_storage.nonce (Types.read session.state) address
-      |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
-    in
-    let check_auth (item : Transaction_object.authorization_item) =
-      let (Qty tx_chain_id) = item.chain_id in
-      if not (Z.equal chain_id tx_chain_id) then
-        fail "Authorization chain id mismatch"
-      else
-        let*? signer_address = Transaction_object.authorization_signer item in
-        let* current_nonce = read_nonce signer_address in
-        let current_nonce =
-          match current_nonce with
-          | Some (Qty current_nonce) -> current_nonce
-          | None -> Z.zero
-        in
-        let nonce_check =
-          (* The authorization list is processed before the execution portion of
-             the transaction begins, but after the sender’s nonce is incremented.
-             If the sender of the transaction is also the one that signed the
-             authorization, the nonce of the signed authorization must be equal
-             to its current nonce + 1. *)
-          if Address.equal caller signer_address then Z.succ current_nonce
-          else current_nonce
-        in
-        let (Qty nonce) = item.nonce in
-        if Z.equal nonce_check nonce then return_unit
-        else fail "Authorization nonce mismatch"
-    in
-    let*! opt_err =
-      Lwt_list.map_p check_auth authorization_list
-      |> Lwt.map (List.find Result.is_error)
-    in
-    match opt_err with Some error -> return error | None -> return (Ok ())
+    (* Per EIP-7702, invalid authorizations (wrong chain id, nonce mismatch,
+       etc.) are silently skipped during execution — they do not invalidate
+       the transaction. The kernel (revm) already implements this correctly.
+       The prevalidator should not reject transactions based on individual
+       authorization validity, as this is stricter than the spec requires
+       and breaks legitimate use cases (e.g., concurrent submissions with
+       the same authorization). *)
+    return (Ok ())
 
 let validate_sender_not_a_contract session caller :
     (unit, string) result tzresult Lwt.t =
@@ -566,7 +540,7 @@ let minimal_validation ~next_nonce ~max_number_of_chunks ctxt
   let** () = validate_chain_id chain_id transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract session caller in
-  let** () = validate_authorizations ~session ~chain_id ~caller transaction in
+  let** () = validate_authorizations transaction in
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   let** () = validate_gas_limit session transaction in
   return (Ok ())

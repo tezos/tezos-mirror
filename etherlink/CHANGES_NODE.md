@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- `eth_sendRawTransaction` no longer rejects EIP-7702 transactions with invalid
+  authorizations (e.g., stale nonce). Per the EIP-7702 specification, invalid
+  authorizations are silently skipped during execution. (!21395)
+
 ### Monitoring changes
 
 ### Command-line interface changes
