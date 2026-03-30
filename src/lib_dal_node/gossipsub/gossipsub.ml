@@ -88,6 +88,13 @@ module Transport_layer = struct
         return_unit)
       additional_points
 
+  let ban_addr p2p addr =
+    match P2p.pool p2p with
+    | None -> Lwt.return_unit
+    | Some pool ->
+        (* Port is ignored by ban. *)
+        P2p_pool.Points.ban pool (addr, 0)
+
   let shutdown p2p = P2p.shutdown p2p
 
   let connect p2p ?timeout point =

@@ -89,6 +89,9 @@ type t = {
   ignore_l1_config_peers : bool;
       (** Ignore the boot(strap) peers provided by L1. *)
   disable_amplification : bool;  (** Disable amplification. *)
+  banned_addrs : P2p_addr.t list;
+      (** List of IP addresses to ban at startup. Connections from/to these
+          addresses will be rejected by the P2P layer. *)
   batching_configuration : batching_configuration;
       (** The configuration of the batching of the shards.
           The default is [Enabled{time_interval=100}]. *)

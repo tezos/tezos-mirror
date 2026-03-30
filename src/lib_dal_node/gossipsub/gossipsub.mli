@@ -102,6 +102,11 @@ module Transport_layer : sig
     P2p_limits.t ->
     t tzresult Lwt.t
 
+  (** [ban_addr t addr] bans the given IP address. Existing connections
+      from this address are terminated, and future connections from/to
+      it are rejected. The port in the point is ignored. *)
+  val ban_addr : t -> P2p_addr.t -> unit Lwt.t
+
   (** [shutdown t] shutdowns the transport layer and ensures that
       active connections are closed. *)
   val shutdown : t -> unit Lwt.t

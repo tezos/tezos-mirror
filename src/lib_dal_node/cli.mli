@@ -106,6 +106,9 @@ module Term : sig
   (** Disable amplification. Default value is false. *)
   val disable_amplification_switch : switch
 
+  (** A list of IP addresses to ban at startup. *)
+  val banned_addrs_arg : P2p_addr.t list arg
+
   (** Emit events related to connections. Default value is false. *)
   val verbose_switch : switch
 
@@ -150,6 +153,7 @@ module Action : sig
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?ignore_topics:Signature.public_key_hash list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     ?publish_slots_regularly:Configuration_file.publish_slots_regularly ->
@@ -179,6 +183,7 @@ module Action : sig
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
@@ -206,6 +211,7 @@ module Action : sig
     ?verbose:bool ->
     ?ignore_l1_config_peers:bool ->
     ?disable_amplification:bool ->
+    ?banned_addrs:P2p_addr.t list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t

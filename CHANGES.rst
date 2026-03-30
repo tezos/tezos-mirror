@@ -206,6 +206,8 @@ DAL node
   levels before the migration to protocol U to avoid publishing a slot that cannot
   be attested under the new protocol. (MR :gl:`!20957`)
 
+- Added a ``--ban-addr`` option to ban an IP address when launching the DAL node.
+  (MR :gl:`!21358`)
 
 Miscellaneous
 -------------
