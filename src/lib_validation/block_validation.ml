@@ -1147,6 +1147,9 @@ module Make (Proto : Protocol_plugin.T) = struct
         live_operations;
       }
     in
+    let plugin_state =
+      Proto.Plugin.init_block_validation_state validation_state
+    in
     let apply_operation_with_preapply_result preapp t receipts op =
       let open Preapply_result in
       let*! r = preapply_operation t op in
@@ -1180,31 +1183,96 @@ module Make (Proto : Protocol_plugin.T) = struct
     let*! ( validation_passes,
             validation_result_list_rev,
             receipts_rev,
-            validation_state ) =
+            validation_state,
+            _plugin_state ) =
       List.fold_left_s
         (fun ( acc_validation_passes,
                acc_validation_result_rev,
                receipts,
-               acc_validation_state )
+               acc_validation_state,
+               acc_plugin_state )
              operations
            ->
-          let*! new_validation_result, new_validation_state, rev_receipts =
+          let*! ( new_validation_result,
+                  new_validation_state,
+                  rev_receipts,
+                  new_plugin_state ) =
             List.fold_left_s
-              (fun (acc_validation_result, acc_validation_state, receipts)
+              (fun ( acc_validation_result,
+                     acc_validation_state,
+                     receipts,
+                     acc_plugin_state )
                    operation
                  ->
                 match parse operation with
                 | Error _ ->
                     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1721  *)
                     Lwt.return
-                      (acc_validation_result, acc_validation_state, receipts)
-                | Ok op ->
-                    apply_operation_with_preapply_result
-                      acc_validation_result
-                      acc_validation_state
-                      receipts
-                      op)
-              (Preapply_result.empty, acc_validation_state, [])
+                      ( acc_validation_result,
+                        acc_validation_state,
+                        receipts,
+                        acc_plugin_state )
+                | Ok op -> (
+                    let operation : Proto.operation =
+                      {shell = op.raw.shell; protocol_data = op.protocol_data}
+                    in
+                    let*! plugin_check_result =
+                      Proto.Plugin.check_block_operation
+                        acc_plugin_state
+                        operation
+                    in
+                    match plugin_check_result with
+                    | Ok plugin_state ->
+                        let*! ( acc_validation_result,
+                                acc_validation_state,
+                                receipts ) =
+                          apply_operation_with_preapply_result
+                            acc_validation_result
+                            acc_validation_state
+                            receipts
+                            op
+                        in
+                        Lwt.return
+                          ( acc_validation_result,
+                            acc_validation_state,
+                            receipts,
+                            plugin_state )
+                    | Error trace ->
+                        let acc_validation_result =
+                          let open Preapply_result in
+                          match classify_trace trace with
+                          | Branch ->
+                              let branch_refused =
+                                Operation_hash.Map.add
+                                  op.hash
+                                  (op.raw, trace)
+                                  acc_validation_result.branch_refused
+                              in
+                              {acc_validation_result with branch_refused}
+                          | Permanent ->
+                              let refused =
+                                Operation_hash.Map.add
+                                  op.hash
+                                  (op.raw, trace)
+                                  acc_validation_result.refused
+                              in
+                              {acc_validation_result with refused}
+                          | Temporary ->
+                              let branch_delayed =
+                                Operation_hash.Map.add
+                                  op.hash
+                                  (op.raw, trace)
+                                  acc_validation_result.branch_delayed
+                              in
+                              {acc_validation_result with branch_delayed}
+                          | Outdated -> acc_validation_result
+                        in
+                        Lwt.return
+                          ( acc_validation_result,
+                            acc_validation_state,
+                            receipts,
+                            acc_plugin_state )))
+              (Preapply_result.empty, acc_validation_state, [], acc_plugin_state)
               operations
           in
           (* Applied operations are reverted ; revert to the initial ordering *)
@@ -1218,8 +1286,9 @@ module Make (Proto : Protocol_plugin.T) = struct
             ( acc_validation_passes + 1,
               new_validation_result :: acc_validation_result_rev,
               List.rev rev_receipts :: receipts,
-              new_validation_state ))
-        (0, [], [], preapply_state)
+              new_validation_state,
+              new_plugin_state ))
+        (0, [], [], preapply_state, plugin_state)
         operations
     in
     let validation_result_list = List.rev validation_result_list_rev in
@@ -1404,27 +1473,34 @@ module Make (Proto : Protocol_plugin.T) = struct
          {verbosity = Notice; metadata = [("prometheus", "")]}
            "begin_validation"])
     in
-    let* state =
+    let plugin_state = Proto.Plugin.init_block_validation_state state in
+    let* state, (_ : Proto.Plugin.block_validation_state) =
       (List.fold_left_i_es
-         (fun [@warning "-27"] i state ops ->
+         (fun [@warning "-27"] i (state, plugin_state) ops ->
            (List.fold_left_es
-              (fun state (oph, op, check_signature) ->
-                (Proto.validate_operation
-                   ~check_signature
-                   state
-                   oph
-                   op
-                 [@profiler.record_s
-                   {
-                     verbosity = Info;
-                     metadata = [("prometheus", "validate_operation")];
-                   }
-                     ("operation : " ^ Operation_hash.to_b58check oph)]))
-              state
+              (fun (state, plugin_state) (oph, op, check_signature) ->
+                let* plugin_state =
+                  Proto.Plugin.check_block_operation plugin_state op
+                in
+                let* state =
+                  (Proto.validate_operation
+                     ~check_signature
+                     state
+                     oph
+                     op
+                   [@profiler.record_s
+                     {
+                       verbosity = Info;
+                       metadata = [("prometheus", "validate_operation")];
+                     }
+                       ("operation : " ^ Operation_hash.to_b58check oph)])
+                in
+                return (state, plugin_state))
+              (state, plugin_state)
               ops
             [@profiler.record_s
               {verbosity = Info} ("operation_list(" ^ string_of_int i ^ ")")]))
-         state
+         (state, plugin_state)
          operations
        [@profiler.record_s {verbosity = Notice} "validate_operations"])
     in
