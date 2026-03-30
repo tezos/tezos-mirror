@@ -723,14 +723,14 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
-    ?(uses = fun _ -> []) ?additional_bootstrap_accounts ?attestation_lag
-    ?number_of_shards ?number_of_slots ?slot_size ?custom_constants
-    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
-    ?traps_fraction ?dal_rewards_weight ?event_sections_levels ?node_arguments
-    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
-    ?delay_increment_per_round ?blocks_per_cycle ?blocks_per_commitment variant
-    scenario =
+let scenario_with_layer1_node ~__FILE__ ?attestation_threshold ?regression
+    ?(tags = []) ?(uses = fun _ -> []) ?additional_bootstrap_accounts
+    ?attestation_lag ?number_of_shards ?number_of_slots ?slot_size
+    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?incentives_enable ?traps_fraction ?dal_rewards_weight
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    ?blocks_per_cycle ?blocks_per_commitment variant scenario =
   let description = "Testing DAL L1 integration" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -766,7 +766,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
+let scenario_with_layer1_and_dal_nodes ~__FILE__ ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?blocks_per_cycle ?delay_increment_per_round ?consensus_committee_size
     ?consensus_threshold_size ?redundancy_factor ?slot_size ?number_of_shards
@@ -833,7 +833,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
-let scenario_with_all_nodes ?custom_constants ?node_arguments
+let scenario_with_all_nodes ~__FILE__ ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
     ?(pvm_name = "arith") ?(dal_enable = true) ?incentives_enable
@@ -4271,7 +4271,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   unit
 
 (* Adapted from sc_rollup.ml *)
-let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
+let test_l1_migration_scenario ~__FILE__ ?(tags = []) ?(uses = []) ~migrate_from
     ~migrate_to ~migration_level ~scenario ~description ?bootstrap_profile
     ?operator_profiles ?custom_constants ?attestation_lag ?attestation_threshold
     ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
@@ -4364,6 +4364,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     wait_for_plugin
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~migrate_from
     ~migrate_to
     ~scenario
@@ -4450,6 +4451,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
       (Array.to_list Account.Bootstrap.keys)
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~scenario
     ~tags
     ~description
@@ -4730,6 +4732,7 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     unit
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~scenario
     ~tags
     ~description
@@ -4939,6 +4942,7 @@ let test_migration_with_rollup ~migrate_from ~migrate_to =
         unit
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~scenario
     ~tags
     ~description
@@ -5487,6 +5491,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
   in
   if Protocol.number migrate_from >= 024 then
     test_l1_migration_scenario
+      ~__FILE__
       ~scenario
       ~tags
       ~description
@@ -5649,6 +5654,7 @@ let test_skip_list_store_with_migration ~migrate_from ~migrate_to
       ~expected_levels
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~migrate_from
     ~migrate_to
     ~migration_level
@@ -5879,6 +5885,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       unit
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~scenario
     ~tags
     ~description
@@ -7185,6 +7192,7 @@ module Skip_list_rpcs = struct
     let tags = ["rpc"; "skip_list"] in
     let description = "skip-list RPCs" in
     scenario_with_layer1_and_dal_nodes
+      ~__FILE__
       ~tags
       ~operator_profiles:[3; 15]
       description
@@ -7218,6 +7226,7 @@ module Skip_list_rpcs = struct
     let description = "test skip-list RPCs with migration" in
     let tags = ["rpc"; "skip_list"] in
     test_l1_migration_scenario
+      ~__FILE__
       ~migrate_from
       ~migrate_to
       ~migration_level
@@ -14055,12 +14064,14 @@ let test_no_redundant_dal_attestations protocol parameters _cryptobox node
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
+    ~__FILE__
     ~additional_bootstrap_accounts:1
     ~slot_size:190_416
     "dal basic logic"
     test_slot_management_logic
     protocols ;
   scenario_with_layer1_node
+    ~__FILE__
     "attesters receive expected DAL rewards depending on participation"
     test_dal_rewards_distribution
     (List.filter (fun p -> Protocol.number p >= 022) protocols)
@@ -14071,6 +14082,7 @@ let register ~protocols =
     ~blocks_per_cycle:16
     ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
   scenario_with_layer1_node
+    ~__FILE__
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
     protocols ;
@@ -14079,6 +14091,7 @@ let register ~protocols =
      mainnet value. It could be extended to higher values if
      desired. *)
   scenario_with_layer1_node
+    ~__FILE__
     ~regression:true
     ~number_of_slots:32
     ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
@@ -14086,6 +14099,7 @@ let register ~protocols =
     test_all_available_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     "slots attestation operation dal committee membership check"
     test_slots_attestation_operation_dal_committee_membership_check
     (* We need to set the prevalidator's event level to [`Debug]
@@ -14094,49 +14108,58 @@ let register ~protocols =
     ~consensus_committee_size:1024
     protocols ;
   scenario_with_layer1_node
+    ~__FILE__
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "slot is protocol attested even if attestations are aggregated"
     test_aggregation_required_to_pass_quorum
     (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
+    ~__FILE__
     ~traps_fraction:Q.one
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
+    ~__FILE__
     ~traps_fraction:Q.one
     "inject accusation with dynamic multi-lag attestations"
     ~tags:["traps"; "denunciation"; "multi_lag"]
     test_inject_accusation_dynamic_multi_lag
     (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~traps_fraction:Q.one
     ~operator_profiles:[0]
     "inject accusation of aggregated attestation"
     (test_inject_accusation_aggregated_attestation 1)
     (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~traps_fraction:Q.one
     ~operator_profiles:[0]
     "inject several accusations for the same aggregated attestation"
     (test_inject_accusation_aggregated_attestation 2)
     (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
+    ~__FILE__
     ~traps_fraction:Q.one
     "inject a duplicated denunciation at different steps"
     test_duplicate_denunciations
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_node
+    ~__FILE__
     ~traps_fraction:Q.one
     "inject a denunciation at the next cycle"
     test_denunciation_next_cycle
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   (* Tests with layer1 and dal nodes *)
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~number_of_slots:1
     ~operator_profiles:[0]
     ~traps_fraction:Q.one
@@ -14146,21 +14169,25 @@ let register ~protocols =
   test_dal_node_startup protocols ;
   test_dal_node_invalid_config () ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "dal node slot management"
     test_dal_node_slot_management
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
     "dal node slot headers tracking"
     test_dal_node_slots_headers_tracking
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "dal node shard fetching and slot reconstruction"
     test_dal_node_rebuild_from_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["rpc"]
     ~regression:true
     ~prover:false
@@ -14168,33 +14195,39 @@ let register ~protocols =
     test_dal_node_rpc_list
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "dal node POST /slots"
     test_dal_node_test_post_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "dal node GET /levels/<level>/slots/<index>/content"
     test_dal_node_test_get_level_slot_content
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~prover:false
     "dal node PATCH+GET /profiles"
     test_dal_node_test_patch_profile
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~prover:false
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
     test_dal_node_get_assigned_shard_indices
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
     ~operator_profiles:[0; 1; 2]
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~attestation_threshold:100
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
@@ -14202,6 +14235,7 @@ let register ~protocols =
     test_attester_with_bake_for
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~attestation_threshold:100
     ~attestation_lag:8
@@ -14216,12 +14250,14 @@ let register ~protocols =
     test_attester_with_daemon
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["l1_snapshot"; "import"]
     ~operator_profiles:[0]
     "dal node import l1 snapshot"
     test_dal_node_import_l1_snapshot
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["snapshot"; Tag.slow]
     ~operator_profiles:[0; 3]
     ~l1_history_mode:(Custom Node.Archive)
@@ -14230,6 +14266,7 @@ let register ~protocols =
     (test_dal_node_snapshot ~operators:[0; 3])
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["baker"; "dal"; "attestation"; "redundant"; "multi_lag"]
     ~operator_profiles:[0]
@@ -14242,12 +14279,14 @@ let register ~protocols =
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~prover:false
     ~tags:["gossipsub"]
     "GS/P2P connection and disconnection"
     test_dal_node_p2p_connection_and_disconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~prover:false
     ~tags:["gossipsub"]
     "GS join topic"
@@ -14256,6 +14295,7 @@ let register ~protocols =
   List.iter
     (fun batching_time_interval ->
       scenario_with_layer1_and_dal_nodes
+        ~__FILE__
         ~tags:["gossipsub"]
         ~batching_time_interval
         ~operator_profiles:[0]
@@ -14265,6 +14305,7 @@ let register ~protocols =
         (test_dal_node_gs_valid_messages_exchange ~batching_time_interval)
         protocols ;
       scenario_with_layer1_and_dal_nodes
+        ~__FILE__
         ~tags:["gossipsub"]
         ~batching_time_interval
         (Format.sprintf
@@ -14274,6 +14315,7 @@ let register ~protocols =
         (test_dal_node_gs_invalid_messages_exchange ~batching_time_interval)
         protocols ;
       scenario_with_layer1_and_dal_nodes
+        ~__FILE__
         ~tags:["attestation"; "p2p"]
         ~batching_time_interval
         ~attestation_threshold:100
@@ -14286,12 +14328,14 @@ let register ~protocols =
         protocols)
     ["disabled"; "100"; "20"] ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~attestation_threshold:1
     ~l1_history_mode:Default_with_refutation
     "Attester attests produced slot"
     test_producer_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~attestation_threshold:1
     ~l1_history_mode:Default_with_refutation
     ~event_sections_levels:[("prevalidator", `Debug)]
@@ -14299,6 +14343,7 @@ let register ~protocols =
     test_attester_did_not_attest
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     "baker registers profiles with dal node"
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~activation_timestamp:Now
@@ -14306,6 +14351,7 @@ let register ~protocols =
     test_baker_registers_profiles
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["bootstrap"]
     ~bootstrap_profile:true
     ~prover:false
@@ -14314,6 +14360,7 @@ let register ~protocols =
     test_peer_discovery_via_bootstrap_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["gossipsub"; "rpc"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -14322,6 +14369,7 @@ let register ~protocols =
     protocols ;
 
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["bootstrap"; "trusted"; "connection"]
     ~bootstrap_profile:true
     "trusted peers reconnection"
@@ -14330,6 +14378,7 @@ let register ~protocols =
     test_peers_reconnection
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["operator"; "profile"]
     "operator profile"
     ~prover:false
@@ -14337,6 +14386,7 @@ let register ~protocols =
     protocols ;
   Skip_list_rpcs.test_skip_list_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["amplification"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -14352,6 +14402,7 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["amplification"; "simple"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -14366,6 +14417,7 @@ let register ~protocols =
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["gc"; "simple"; Tag.memory_hungry]
     ~operator_profiles:[0]
     ~number_of_slots:1
@@ -14373,6 +14425,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["gc"; "attester"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -14381,6 +14434,7 @@ let register ~protocols =
     Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["gc"; "multi"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
@@ -14390,18 +14444,21 @@ let register ~protocols =
     protocols ;
   Garbage_collection.test_gc_skip_list_cells ~protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing (non-producer case)"
     ~prover:false
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["crawler"; "reconnection"]
     "DAL node crawler reconnects to L1 without crashing (producer case)"
     ~operator_profiles:[0]
     test_dal_node_crawler_reconnects_to_l1
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~traps_fraction:Q.zero
@@ -14410,6 +14467,7 @@ let register ~protocols =
     test_new_attester_attests
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~l1_history_mode:Default_with_refutation
     ~traps_fraction:(Q.of_float 0.5)
@@ -14418,6 +14476,7 @@ let register ~protocols =
     test_dal_low_stake_attester_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~l1_history_mode:Default_with_refutation
     ~traps_fraction:(Q.of_float 0.5)
@@ -14427,6 +14486,7 @@ let register ~protocols =
     test_dal_low_stake_attester_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
@@ -14434,6 +14494,7 @@ let register ~protocols =
     test_dal_one_level_reorg
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~number_of_slots:1
     ~operator_profiles:[0]
     ~regression:true
@@ -14441,6 +14502,7 @@ let register ~protocols =
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["restart"]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom (Rolling (Some 5)))
@@ -14448,6 +14510,7 @@ let register ~protocols =
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["restart"]
     ~observer_profiles:[0]
     (* Use default L1 history (Default_without_refutation): observer profile
@@ -14457,12 +14520,14 @@ let register ~protocols =
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["restart"]
     ~bootstrap_profile:true
     "restart DAL node (bootstrap)"
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom Node.Archive)
@@ -14473,6 +14538,7 @@ let register ~protocols =
     (dal_slots_retrievability ~store_kind:`Slots)
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom Node.Archive)
@@ -14483,6 +14549,7 @@ let register ~protocols =
     (dal_slots_retrievability ~store_kind:`Shards)
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["traps"]
     ~operator_profiles:[0]
     ~traps_fraction:Q.one
@@ -14491,6 +14558,7 @@ let register ~protocols =
     test_denunciation_when_all_bakers_attest
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["restart"; "statuses"]
     "Status information is backfilled at restart"
     ~operator_profiles:[0]
@@ -14499,6 +14567,7 @@ let register ~protocols =
 
   (* Tests with all nodes *)
   scenario_with_all_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     "test reveal_dal_page in fast exec wasm pvm"
     ~uses:(fun _protocol ->
@@ -14512,6 +14581,7 @@ let register ~protocols =
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
+    ~__FILE__
     "test tx_kernel"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
@@ -14525,6 +14595,7 @@ let register ~protocols =
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes
+    ~__FILE__
     "test echo_kernel"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
@@ -14538,6 +14609,7 @@ let register ~protocols =
   (* This test only asserts the echo kernel used by tezt-cloud scenarios is
      correct. It isn't meant to be ran by the CI. *)
   scenario_with_all_nodes
+    ~__FILE__
     "test echo_kernel_for_bandwidth"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel_bandwidth])
@@ -14555,6 +14627,7 @@ let register ~protocols =
   scenario_tutorial_dal_baker protocols ;
 
   scenario_with_all_nodes
+    ~__FILE__
     "Rollup injects DAL slots"
     ~regression:false
     ~pvm_name:"wasm_2_0_0"
@@ -14568,6 +14641,7 @@ let register ~protocols =
     protocols ;
 
   scenario_with_all_nodes
+    ~__FILE__
     "Rollup batches and injects optimal DAL slots"
     ~regression:false
     ~pvm_name:"wasm_2_0_0"
@@ -14582,6 +14656,7 @@ let register ~protocols =
 
   dal_crypto_benchmark () ;
   scenario_with_layer1_node
+    ~__FILE__
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~activation_timestamp:Now
     "mockup get_attestable_slots"
@@ -14590,6 +14665,7 @@ let register ~protocols =
 
   (* Scenarios for disabling shard validation *)
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~wait_ready:false
     ~env:
@@ -14600,6 +14676,7 @@ let register ~protocols =
     test_disable_shard_validation_wrong_cli
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~wait_ready:false
     ~disable_shard_validation:true
@@ -14607,6 +14684,7 @@ let register ~protocols =
     test_disable_shard_validation_wrong_env
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~wait_ready:true
     ~env:
@@ -14621,6 +14699,7 @@ let register ~protocols =
 
   (* Scenarios for --ignore-topics *)
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~wait_ready:false
     ~env:
@@ -14629,6 +14708,7 @@ let register ~protocols =
     test_ignore_topics_wrong_cli
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~operator_profiles:[0]
     ~wait_ready:false
     ~ignore_pkhs:
@@ -14640,6 +14720,7 @@ let register ~protocols =
     test_ignore_topics_wrong_env
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~__FILE__
     ~tags:["amplification"; "ignore_topics"]
     ~bootstrap_profile:true
     ~wait_ready:true
@@ -14900,6 +14981,7 @@ let test_dal_node_snapshot_over_migration ~operators ~migration_level
 let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
   let operators = [0; 3] in
   test_l1_migration_scenario
+    ~__FILE__
     ~tags:[Tag.slow]
     ~description:"snapshot over migration"
     ~migrate_from
@@ -14961,6 +15043,7 @@ let test_restart_dal_node_across_migration ~migrate_from ~migrate_to =
     unit
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~migrate_from
     ~migrate_to
     ~migration_level:10
@@ -15073,6 +15156,7 @@ let test_traps_fraction_uses_published_level ~migrate_from ~migrate_to =
     unit
   in
   test_l1_migration_scenario
+    ~__FILE__
     ~migrate_from
     ~migrate_to
     ~migration_level:13
@@ -15108,6 +15192,7 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to ;
   test_l1_migration_scenario
+    ~__FILE__
     ~scenario:(fun ~migration_level:_ dal_params client node dal_node ->
       Amplification.test_amplification () dal_params () node client dal_node)
     ~tags:["migration"; "dal"; "amplification"]
