@@ -27,6 +27,7 @@ module Assert = Assert
 open Tezos_protocol_alpha
 open Protocol
 open Alpha_context
+module Plugin = Tezos_protocol_plugin_alpha
 
 module Proto_nonce = struct
   module Table = Hashtbl.Make (struct
@@ -749,7 +750,7 @@ let bake chain_store ?synchronous_merge ?policy ?operation ?operations pred =
 (********** Cycles ****************)
 
 (* This function is duplicated from Context to avoid a cyclic dependency *)
-let get_constants rpc_ctxt b = Alpha_services.Constants.all rpc_ctxt b
+let get_constants rpc_ctxt b = Plugin.Alpha_services.Constants.all rpc_ctxt b
 
 let bake_n chain_store ?synchronous_merge ?policy n b =
   let open Lwt_result_syntax in
