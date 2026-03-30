@@ -32,6 +32,7 @@ module Metrics = Metrics_plugin
 module Script_interpreter_logging = Script_interpreter_logging
 module Http_cache_headers = Http_cache_headers
 module Shell_helpers = Shell_helpers
+module Block_validation = Block_validation
 
 module Alpha_services = struct
   include Protocol.Alpha_services

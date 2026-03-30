@@ -63,6 +63,15 @@ module type T = sig
       head:Block_header.shell_header ->
       ctxt tzresult Lwt.t
 
+    type block_validation_state
+
+    val init_block_validation_state : validation_state -> block_validation_state
+
+    val check_block_operation :
+      block_validation_state ->
+      operation ->
+      block_validation_state tzresult Lwt.t
+
     val sources_from_operation :
       ctxt -> operation -> Signature.public_key_hash list Lwt.t
   end
@@ -124,6 +133,12 @@ module No_plugin (Proto : Registered_protocol.T) :
     type ctxt = unit
 
     let get_context _ ~head:_ = Lwt_result_syntax.return_unit
+
+    type block_validation_state = unit
+
+    let init_block_validation_state _ = ()
+
+    let check_block_operation () _ = Lwt_result_syntax.return ()
 
     let sources_from_operation _ _ = Lwt_syntax.return_nil
   end
