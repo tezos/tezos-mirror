@@ -1269,6 +1269,109 @@ function source_helper_update_alpha_constants_previous() {
   ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
 }
 
+# SOURCE HELPER: Fix DAL storage migration after constants_previous update
+#
+# DESCRIPTION:
+#   After source_helper_update_alpha_constants_previous() makes
+#   Constants_parametric_previous_repr identical to Constants_parametric_repr,
+#   the migration code in dal_storage.ml and its test file must be updated
+#   to reflect the new field set.
+#   Dynamically extracts DAL field names from constants_parametric_repr.mli
+#   and generates identity migration code (destructure all fields, reconstruct
+#   with same fields, no hardcoded defaults).
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_fix_dal_storage_migration() {
+  local dal_storage="src/proto_alpha/lib_protocol/dal_storage.ml"
+  local dal_test="src/proto_alpha/lib_protocol/test/unit/test_dal_past_parameters_storage.ml"
+  local mli="src/proto_alpha/lib_protocol/constants_parametric_repr.mli"
+
+  log_blue "fix DAL storage migration after constants_previous update"
+
+  # Extract DAL field names from type dal = { ... } in constants_parametric_repr.mli
+  local dal_fields
+  dal_fields=$(awk '/^type dal = \{/,/^\}/' "$mli" | sed -n 's/^[[:space:]]*\([a-z_]*\)[[:space:]]*:.*/\1/p')
+
+  # Build the destructure pattern: "feature_enable; incentives_enable; ..."
+  local field_list
+  field_list=$(echo "$dal_fields" | tr '\n' ';' | sed 's/;$//' | sed 's/;/; /g')
+
+  # === Fix dal_storage.ml ===
+  # Replace the migration let-binding with an identity pass-through.
+  # Write replacement to temp file to avoid shell escaping issues with perl.
+  local tmp_migration="/tmp/dal_migration_replacement.txt"
+  cat > "$tmp_migration" << OCAML
+let previous_parameters : Constants_parametric_repr.dal =
+    let Constants_parametric_previous_repr.{${field_list}} =
+      previous_parameters
+    in
+    {${field_list}}
+  in
+OCAML
+
+  perl -0777 -e '
+    my $replacement = do { local $/; open my $fh, $ARGV[0]; <$fh> };
+    chomp $replacement;
+    my $file = do { local $/; open my $fh, $ARGV[1]; <$fh> };
+    $file =~ s/let previous_parameters : Constants_parametric_repr\.dal =.*?\n  in\n/$replacement\n/s;
+    open my $out, ">", $ARGV[1];
+    print $out $file;
+  ' "$tmp_migration" "$dal_storage"
+  ocamlformat -i "$dal_storage"
+
+  # === Fix test file ===
+  if [[ -f "$dal_test" ]]; then
+    # Build new record literal with test default values
+    local new_record_fields=""
+    for field in $dal_fields; do
+      case "$field" in
+      feature_enable) new_record_fields="${new_record_fields}        ${field} = true;\n" ;;
+      incentives_enable) new_record_fields="${new_record_fields}        ${field} = true;\n" ;;
+      dynamic_lag_enable) new_record_fields="${new_record_fields}        ${field} = false;\n" ;;
+      number_of_slots) new_record_fields="${new_record_fields}        ${field} = 1;\n" ;;
+      attestation_lag) new_record_fields="${new_record_fields}        ${field} = n;\n" ;;
+      attestation_lags) new_record_fields="${new_record_fields}        ${field} = [n];\n" ;;
+      attestation_threshold) new_record_fields="${new_record_fields}        ${field} = 1;\n" ;;
+      cryptobox_parameters)
+        new_record_fields="${new_record_fields}        ${field} =\n          Cryptobox.\n            {\n              redundancy_factor = 1;\n              page_size = 1;\n              slot_size = 1;\n              number_of_shards = 1;\n            };\n"
+        ;;
+      minimal_participation_ratio) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      rewards_ratio) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      traps_fraction) new_record_fields="${new_record_fields}        ${field} = Q.zero;\n" ;;
+      *) new_record_fields="${new_record_fields}        ${field} = Obj.magic ();\n" ;;
+      esac
+    done
+
+    # Write record and conversion replacements to temp files
+    local tmp_record="/tmp/dal_test_record.txt"
+    printf "Constants_parametric_previous_repr.\n      {\n%b      }" "$new_record_fields" > "$tmp_record"
+
+    local tmp_conversion="/tmp/dal_test_conversion.txt"
+    cat > "$tmp_conversion" << OCAML
+let previous_parameters_to_current previous_parameters =
+    let Constants_parametric_previous_repr.{${field_list}} =
+      previous_parameters
+    in
+    Constants_parametric_repr.{${field_list}}
+  in
+OCAML
+
+    perl -0777 -e '
+      my $record = do { local $/; open my $fh, $ARGV[0]; <$fh> };
+      my $conversion = do { local $/; open my $fh, $ARGV[1]; <$fh> };
+      chomp $conversion;
+      my $file = do { local $/; open my $fh, $ARGV[2]; <$fh> };
+      $file =~ s/Constants_parametric_previous_repr\.\s*\{[^}]*cryptobox_parameters\s*=\s*\n\s*Cryptobox\.\s*\{[^}]*\}[^}]*\}/$record/s;
+      $file =~ s/let previous_parameters_to_current previous_parameters =.*?\n  in\n/$conversion\n/s;
+      open my $out, ">", $ARGV[2];
+      print $out $file;
+    ' "$tmp_record" "$tmp_conversion" "$dal_test"
+    ocamlformat -i "$dal_test"
+
+    rm -f "$tmp_migration" "$tmp_record" "$tmp_conversion"
+  fi
+}
+
 # SOURCE HELPER: Define stitching markers
 #
 # MODE: both (used by snapshot/copy and stabilise)
@@ -1382,6 +1485,7 @@ function source_commit_02_fix_alpha_raw_context_snapshot() {
 function source_commit_03_fix_alpha_raw_context_stabilise() {
   # Call helper to update alpha constants (needed for stabilise mode)
   source_helper_update_alpha_constants_previous
+  source_helper_fix_dal_storage_migration
 
   source_helper_define_stitching_markers
   # === Process raw_context.ml ===
@@ -1513,34 +1617,20 @@ let register () =
   commit "tezt: generate regression test"
 }
 
-function update_tezt_tests() {
-
-  if [[ $skip_update_tezt_tests ]]; then
-    echo "Skipping tezt tests update"
-    return 0
-  fi
-
-  # ensure protocols compile and parameter files are generated
-  make
-
-  # Update tezt tests
-
-  # automatically add the new protocol tag to alcotezt
-
-  if [[ ${is_snapshot} == true ]]; then
-    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: update protocol tag in alcotezt"
-  else
-    temp_file=$(mktemp)
-    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
-    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
-    echo "  | Some _ -> assert false" >> "${temp_file}"
-    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
-    commit "tezt: add new protocol tag to alcotezt"
-  fi
-
-  cd "${script_dir}"/..
-
+# TEZT COMMIT 02: Adapt lib_tezos/protocol.ml and protocol.mli
+#
+# MODE: snapshot (replace), stabilise (add + increment), copy (add + duplicate)
+# MODIFIES: tezt/lib_tezos/protocol.ml, tezt/lib_tezos/protocol.mli
+#
+# DESCRIPTION:
+#   Updates the protocol type definition, hash mapping, number mapping,
+#   tag mapping, and predecessor chain in tezt protocol files.
+#   Snapshot: replaces all source references with new label.
+#   Stabilise: adds new variant before Alpha, increments Alpha number.
+#   Copy: adds new variant duplicating source's number.
+#
+# CREATES: 1 commit — "tezt: adapt lib_tezos/protocol.ml"
+function tezt_commit_02_adapt_lib_tezos_protocol() {
   log_blue "Adapt tezt/lib_tezos/protocol.ml"
 
   if [[ ${is_snapshot} == true ]]; then
@@ -1583,28 +1673,74 @@ function update_tezt_tests() {
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit "tezt: adapt lib_tezos/protocol.ml"
+}
 
-  # TODO: fix and reintroduce this test
-  #generate_regression_test
-
-  #fix testnets_scenarios:
+# TEZT COMMIT 01: Update alcotezt protocol tag
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: tezt/lib_alcotezt/alcotezt_utils.ml
+#
+# DESCRIPTION:
+#   Updates the protocol tag in alcotezt utilities.
+#   Snapshot: replaces the source protocol tag with the new label.
+#   Stabilise/copy: appends a new protocol tag entry before the catch-all.
+#
+# CREATES: 1 commit — "tezt: update protocol tag in alcotezt" (snapshot)
+#          or "tezt: add new protocol tag to alcotezt" (stabilise/copy)
+function tezt_commit_01_update_alcotezt() {
   if [[ ${is_snapshot} == true ]]; then
-    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i src/bin_testnet_scenarios/*.ml
+    sed -i.old -e "s/| Some \"${protocol_source}\" -> \[\"${protocol_source}\"\]/| Some \"${new_protocol_name}\" -> [\"${label}\"]"/ tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: update protocol tag in alcotezt"
   else
-    sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i src/bin_testnet_scenarios/*.ml
+    temp_file=$(mktemp)
+    tac tezt/lib_alcotezt/alcotezt_utils.ml | tail -n +2 | tac > "${temp_file}"
+    echo "  | Some \"${new_protocol_name}\" -> [\"${label}\"]" >> "${temp_file}"
+    echo "  | Some _ -> assert false" >> "${temp_file}"
+    mv "${temp_file}" tezt/lib_alcotezt/alcotezt_utils.ml
+    commit "tezt: add new protocol tag to alcotezt"
   fi
-  ocamlformat -i src/bin_testnet_scenarios/*.ml
-  commit_if_changes "tezt: fix testnets_scenarios"
+}
 
-  #fix other tests:
+# TEZT COMMIT 04: Fix other tests
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: tezt/tests/*.ml
+#
+# DESCRIPTION:
+#   Updates protocol references in tezt test files.
+#   Snapshot: replaces source protocol with new label.
+#   Stabilise/copy: adds new label as alternative match.
+#
+# CREATES: 1 commit — "tezt: fix other tests"
+function tezt_commit_04_fix_other_tests() {
   if [[ ${is_snapshot} == true ]]; then
-    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" -i tezt/tests/*.ml
+    # Handle both qualified (Protocol.Alpha) and bare (| Alpha ->) variant names
+    sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
+      -e "s/| ${capitalized_source} ->/| ${capitalized_label} ->/g" \
+      -i tezt/tests/*.ml
   else
+    # Handle qualified variant names (e.g., Protocol.Alpha -> ...)
     sed -r "s/(.*) Protocol.${capitalized_source} -> (.*)/ \1 Protocol.${capitalized_source} -> \2 | Protocol.${capitalized_label} -> \2/g" -i tezt/tests/*.ml
+    # Handle bare variant names in match expressions (e.g., | Alpha -> ...)
+    sed -r "s/(\|) ${capitalized_source} -> (.*)/\1 ${capitalized_source} -> \2 | ${capitalized_label} -> \2/g" -i tezt/tests/*.ml
   fi
   ocamlformat -i tezt/tests/*.ml
   commit "tezt: fix other tests"
+}
 
+# TEZT COMMIT 05: Handle encoding samples
+#
+# MODE: snapshot (git mv), copy (cp from source_label), stabilise (cp from protocol_source)
+# MODIFIES: tezt/tests/encoding_samples/ directory
+#
+# DESCRIPTION:
+#   Moves or copies encoding sample files to the new protocol label directory.
+#   Snapshot: git mv from protocol_source.
+#   Copy: cp from source_label.
+#   Stabilise: cp from protocol_source.
+#
+# CREATES: 1 commit — "tezt: move/copy encoding samples"
+function tezt_commit_05_handle_encoding_samples() {
   mkdir -p "tezt/tests/encoding_samples/${label}"
   if [[ ${is_snapshot} == true ]]; then
     git mv tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
@@ -1616,7 +1752,20 @@ function update_tezt_tests() {
     cp -r tezt/tests/encoding_samples/"${protocol_source}"/* tezt/tests/encoding_samples/"${label}"
     commit "tezt: copy ${protocol_source} encoding samples to ${label}"
   fi
+}
 
+# TEZT COMMIT 06: Handle regression files
+#
+# MODE: snapshot (git mv + sed), stabilise/copy (cp + sed)
+# MODIFIES: tezt/tests/encoding_samples/*/*.out regression files
+#
+# DESCRIPTION:
+#   Moves or copies regression .out files, renaming them with the new
+#   protocol name and updating their content (protocol references, hashes).
+#   Handles 80-char filename limit. Largest extraction block (~77 lines).
+#
+# CREATES: 1 commit — "tezt: move/copy regression files"
+function tezt_commit_06_handle_regression_files() {
   regression_protocol_name="${capitalized_label}-"
   regression_source_name="${capitalized_source}-"
   alpha_regression="Alpha-"
@@ -1695,7 +1844,20 @@ function update_tezt_tests() {
   else
     commit "tezt: copy ${protocol_source} regression files"
   fi
+}
 
+# TEZT COMMIT 07: Add unused baker
+#
+# MODE: stabilise/copy (awk insert), snapshot (awk rename)
+# MODIFIES: tezt/lib_tezos/constant.ml
+#
+# DESCRIPTION:
+#   Adds or renames the unused baker constant for the new protocol.
+#   Stabilise/copy: duplicates the source baker entry with new target name.
+#   Snapshot: renames the source baker entry to use the short hash.
+#
+# CREATES: 0-1 commits — "tezt: add unused ${protocol_target} baker" (conditional)
+function tezt_commit_07_add_unused_baker() {
   # add new protocol baker
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
   if [[ ${is_snapshot} == false ]]; then
@@ -1732,7 +1894,20 @@ $0 ~ "let _octez_baker_" source " =" {
 
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} baker"
+}
 
+# TEZT COMMIT 08: Add unused accuser
+#
+# MODE: stabilise/copy (awk insert), snapshot (awk rename)
+# MODIFIES: tezt/lib_tezos/constant.ml
+#
+# DESCRIPTION:
+#   Adds or renames the unused accuser constant for the new protocol.
+#   Stabilise/copy: duplicates the source accuser entry with new target name.
+#   Snapshot: renames the source accuser entry to use the short hash.
+#
+# CREATES: 0-1 commits — "tezt: add unused ${protocol_target} accuser" (conditional)
+function tezt_commit_08_add_unused_accuser() {
   # add new protocol accuser
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
   if [[ ${is_snapshot} == false ]]; then
@@ -1769,41 +1944,99 @@ $0 ~ "let _octez_accuser_" source " =" {
 
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} accuser"
+}
 
-  # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
-  # rm -rf /tmp/tezos_proto_snapshot
-  # mkdir -p /tmp/tezos_proto_snapshot
-  # git archive HEAD "src/proto_${new_protocol_name}/" | tar -x -C /tmp/tezos_proto_snapshot
-  # find /tmp/tezos_proto_snapshot -type f -exec md5sum {} \; | sort -k 2 | md5sum >"tezt/tests/expected/check_proto_${label}_changes.ml/Check that the ${label} protocol has not changed.out"
-  # rm -rf /tmp/tezos_proto_snapshot
-  # if [[ -n ${git} ]]; then
-  #   git add "tezt/tests/expected/check_proto_${label}_changes.ml"
-  # fi
-  # commit "tezt: add expected output for stabilisation regression test"
-
+# TEZT COMMIT 09: Delete unknown regression files
+#
+# MODE: all modes
+# MODIFIES: regression output files (via dune exec)
+#
+# DESCRIPTION:
+#   Runs the tezt test suite with --on-unknown-regression-files delete
+#   to clean up regression files that no longer match any test.
+#
+# CREATES: 0-1 commits — "tezt: delete unknown regression files" (conditional)
+function tezt_commit_09_delete_unknown_regression_files() {
   dune exec tezt/tests/main.exe -- --on-unknown-regression-files delete
   commit_if_changes "tezt: delete unknown regression files"
+}
 
+# TEZT COMMIT 10: Reset runtime dependencies regressions
+#
+# MODE: all modes
+# MODIFIES: regression output files (via dune exec)
+#
+# DESCRIPTION:
+#   Resets the runtime dependencies regression test output.
+#
+# CREATES: 1 commit — "tezt: reset runtime dependencies regressions"
+function tezt_commit_10_reset_runtime_deps_regressions() {
   dune exec tezt/tests/main.exe -- --title 'meta: list runtime dependencies' --reset-regressions
   commit "tezt: reset runtime dependencies regressions"
+}
 
+# TEZT COMMIT 11: Reset weeklynet regression test
+#
+# MODE: stabilise/copy only (not snapshot)
+# MODIFIES: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json,
+#           regression files (via dune exec)
+#
+# DESCRIPTION:
+#   Copies alpha weeklynet config to last_snapshotted_protocol.json and
+#   resets the weeklynet regression test. Only runs for non-snapshot modes.
+#
+# CREATES: 0-1 commits — "tezt: reset weeklynet regression test" (conditional)
+function tezt_commit_11_reset_weeklynet_regression() {
   if [[ ${is_snapshot} != true ]]; then
     cp tezt/tests/weeklynet_configs/alpha.json tezt/tests/weeklynet_configs/last_snapshotted_protocol.json
     dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
     commit_if_changes "tezt: reset weeklynet regression test"
   fi
-
 }
 
-function misc_updates() {
+function update_tezt_tests() {
 
-  if [[ $skip_misc_updates ]]; then
-    echo "Skipping miscellaneous updates"
+  if [[ $skip_update_tezt_tests ]]; then
+    echo "Skipping tezt tests update"
     return 0
   fi
 
-  # Misc. updates
+  # ensure protocols compile and parameter files are generated
+  make
 
+  # Update tezt tests
+
+  tezt_commit_01_update_alcotezt
+
+  cd "${script_dir}"/..
+
+  tezt_commit_02_adapt_lib_tezos_protocol
+
+  # TODO: fix and reintroduce this test
+  #generate_regression_test
+
+  tezt_commit_04_fix_other_tests
+  tezt_commit_05_handle_encoding_samples
+  tezt_commit_06_handle_regression_files
+  tezt_commit_07_add_unused_baker
+  tezt_commit_08_add_unused_accuser
+  tezt_commit_09_delete_unknown_regression_files
+  tezt_commit_10_reset_runtime_deps_regressions
+  tezt_commit_11_reset_weeklynet_regression
+
+}
+
+# MISC COMMIT 01: Update kaitai structs
+#
+# MODE: all modes; snapshot also removes source files
+# MODIFIES: client-libs/kaitai-struct-files/files/
+#
+# DESCRIPTION:
+#   Regenerates kaitai struct files for the new protocol.
+#   Snapshot: also removes source protocol kaitai files.
+#
+# CREATES: 0-1 commits — "kaitai: update structs" (conditional)
+function misc_commit_01_update_kaitai_structs() {
   log_blue "Update kaitai structs"
   make check-kaitai-struct-files || log_blue "updated kaitai files"
   make kaitai-struct-files-update
@@ -1811,7 +2044,20 @@ function misc_updates() {
     rm -rf "client-libs/kaitai-struct-files/files/${protocol_source}*"
   fi
   commit_if_changes "kaitai: update structs"
+}
 
+# MISC COMMIT 02: Update testnet_experiment_tools
+#
+# MODE: snapshot (replace), stabilise/copy (add)
+# MODIFIES: devtools/testnet_experiment_tools/testnet_experiment_tools.ml
+#
+# DESCRIPTION:
+#   Updates the testnet experiment tools with the new protocol parameters.
+#   Snapshot: removes source protocol template, replaces references.
+#   Stabilise/copy: adds new protocol template and match case.
+#
+# CREATES: 1 commit — "devtools: update testnet_experiment_tools"
+function misc_commit_02_update_testnet_experiment_tools() {
   log_blue "add octez-activate-${label} command to client sandbox"
 
   if [[ ${is_snapshot} == true ]]; then
@@ -1825,7 +2071,19 @@ function misc_updates() {
   fi
   ocamlformat -i devtools/testnet_experiment_tools/testnet_experiment_tools.ml
   commit "devtools: update testnet_experiment_tools"
+}
 
+# MISC COMMIT 03: Update linter
+#
+# MODE: snapshot (remove rule), stabilise/copy (add rule)
+# MODIFIES: scripts/lint.sh
+#
+# DESCRIPTION:
+#   Snapshot: removes the special formatting exclusion for the source protocol.
+#   Stabilise/copy: adds the new protocol to the formatting exclusion list.
+#
+# CREATES: 1 commit — "scripts: update linter to remove/add rule"
+function misc_commit_03_update_linter() {
   if [[ ${is_snapshot} == true ]]; then
     # update linter to remove special rule for stabilised protocol
     sed -i.old -e "s/ -not -name \"proto_${protocol_source}\"//" scripts/lint.sh
@@ -1835,25 +2093,77 @@ function misc_updates() {
     sed -i.old -e "s/-not -name \"proto_alpha\"/-not -name \"proto_${label}\" -not -name \"proto_alpha\"/" scripts/lint.sh
     commit "scripts: update linter to allow reformating of ${label} protocol"
   fi
+}
 
+# MISC COMMIT 04: Run linting
+#
+# MODE: all modes
+# MODIFIES: OCaml files (via scripts/lint.sh)
+#
+# DESCRIPTION:
+#   Cleans up .old files, then runs ocamlformat update and check.
+#
+# CREATES: 0-1 commits — "scripts: lint" (conditional)
+function misc_commit_04_run_linting() {
   find . -name '*.old' -exec rm {} \;
   scripts/lint.sh --update-ocamlformat || echo "updating ocamlformat files"
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
+}
 
+# MISC COMMIT 05: Regenerate CI
+#
+# MODE: all modes
+# MODIFIES: CI configuration files (via make -C ci)
+#
+# DESCRIPTION:
+#   Regenerates CI configuration after all protocol changes.
+#
+# CREATES: 1 commit — "ci: regenerate ci"
+function misc_commit_05_regenerate_ci() {
   log_blue "Update ci"
   make -C ci
   commit "ci: regenerate ci"
-
 }
 
-function generate_doc() {
+function misc_updates() {
 
-  if [[ $skip_generate_doc ]]; then
-    echo "Skipping doc generation"
+  if [[ $skip_misc_updates ]]; then
+    echo "Skipping miscellaneous updates"
     return 0
   fi
 
+  # Misc. updates
+
+  misc_commit_01_update_kaitai_structs
+  misc_commit_02_update_testnet_experiment_tools
+  misc_commit_03_update_linter
+  misc_commit_04_run_linting
+  misc_commit_05_regenerate_ci
+
+}
+
+# =============================================================================
+# DOCS COMMIT FUNCTIONS
+# =============================================================================
+# Extracted from generate_doc(). Each function produces exactly one commit.
+# Functions are listed in execution order.
+# =============================================================================
+
+# DOCS COMMIT 01: Move or copy docs directory
+#
+# MODE: snapshot (git mv), stabilise/copy (archive + extract)
+# MODIFIES: docs/<label>/ directory
+#
+# DESCRIPTION:
+#   Moves or copies the protocol documentation directory.
+#   Snapshot: git mv from docs/<source> to docs/<label>.
+#   Stabilise/copy: archives and extracts docs/<source> to docs/<label>.
+#
+# CREATES: 1 commit — "docs: move from docs/<source>"
+#          (snapshot) or "docs: copy from docs/<source>"
+#          (stabilise/copy)
+function docs_commit_01_move_or_copy_docs_dir() {
   if [[ ${command} == "copy" ]]; then
     doc_path="${source_label}"
   else
@@ -1873,6 +2183,22 @@ function generate_doc() {
     rm -rf /tmp/tezos_proto_doc_snapshot
     commit "docs: copy from docs/${doc_path}"
   fi
+}
+
+# DOCS COMMIT 02: Fix versioned links
+#
+# MODE: copy (sed on source_label refs), snapshot/stabilise (sed on
+#       protocol_source refs)
+# MODIFIES: docs/<label>/*.rst
+#
+# DESCRIPTION:
+#   Fixes versioned links in labels, references, and paths within
+#   the protocol documentation rst files.
+#   Copy: replaces source_label-based references with new label.
+#   Snapshot/stabilise: replaces protocol_source-based references.
+#
+# CREATES: 1 commit — "docs: fix versioned links"
+function docs_commit_02_fix_versioned_links() {
   # fix versioned links (in labels, references, and paths) in docs
   echo "Fixing versioned links in docs"
   cd "docs/${label}"
@@ -1902,7 +2228,15 @@ function generate_doc() {
   commit "docs: fix versioned links"
 
   cd ../..
+}
 
+# DOCS HELPER: Adjust protocol_source for copy mode
+#
+# DESCRIPTION:
+#   In copy mode, adjusts protocol_source to use source_label for
+#   the protocols index operations. Saves original value for later
+#   restoration.
+function docs_helper_adjust_protocol_source_for_copy() {
   if [[ ${command} == "copy" ]]; then
     protocol_source_original="${protocol_source}"
     #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
@@ -1910,6 +2244,22 @@ function generate_doc() {
     protocol_source="${protocol_source}_${source_label}"
     log_blue "protocol_source is now ${protocol_source}"
   fi
+}
+
+# DOCS COMMIT 03: Move or copy protocols index
+#
+# MODE: snapshot (git mv), stabilise/copy (cp)
+# MODIFIES: docs/protocols/<name>.rst
+#
+# DESCRIPTION:
+#   Moves or copies the protocol index rst file.
+#   Snapshot: git mv from protocol_source.rst to new_versioned_name.rst.
+#   Stabilise/copy: cp from protocol_source.rst to new_versioned_name.rst.
+#
+# CREATES: 1 commit — "docs: move docs/protocols/..." (snapshot) or
+#          "docs: copy docs/protocols/..." (stabilise/copy)
+function docs_commit_03_move_or_copy_protocols_index() {
+  docs_helper_adjust_protocol_source_for_copy
 
   # generate docs/protocols/${new_versioned_name}.rst from docs/protocols/${protocol_source}.rst
   echo "Copying docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
@@ -1920,6 +2270,23 @@ function generate_doc() {
     cp "docs/protocols/${protocol_source}.rst" "docs/protocols/${new_versioned_name}.rst"
     commit "docs: copy docs/protocols/${protocol_source}.rst to docs/protocols/${new_versioned_name}.rst"
   fi
+}
+
+# DOCS COMMIT 04: Fix protocols rst
+#
+# MODE: copy (additional sed on source_label), all modes (sed on
+#       capitalized_source + label-length padding)
+# MODIFIES: docs/protocols/<new_versioned_name>.rst
+#
+# DESCRIPTION:
+#   Fixes protocol rst content: replaces protocol names, capitalizations,
+#   and paths. In copy mode, also replaces source_label references and
+#   restores protocol_source. Handles label-length padding for rst
+#   underlines when label > 5 chars.
+#
+# CREATES: 0-1 commits — "docs: fix docs/protocols/<name>.rst"
+#          (conditional)
+function docs_commit_04_fix_protocols_rst() {
   if [[ ${command} == "copy" ]]; then
     sed -e "s/^Protocol ${capitalized_source}/Protocol ${capitalized_label}/" \
       -e "s/protocol ${capitalized_source}/protocol ${capitalized_label}/" \
@@ -1946,10 +2313,36 @@ function generate_doc() {
   fi
 
   commit_if_changes "docs: fix docs/protocols/${new_protocol_name}.rst"
+}
 
+# DOCS COMMIT 05: Reset alpha.rst
+#
+# MODE: all modes (no mode checks)
+# MODIFIES: docs/protocols/alpha.rst
+#
+# DESCRIPTION:
+#   Regenerates docs/protocols/alpha.rst using the alpha_rst function
+#   with the new capitalized label.
+#
+# CREATES: 1 commit — "docs: reset docs/protocols/alpha.rst"
+function docs_commit_05_reset_alpha_rst() {
   alpha_rst "${capitalized_label}" > "docs/protocols/alpha.rst"
   commit "docs: reset docs/protocols/alpha.rst"
+}
 
+# DOCS COMMIT 06: Update doc index
+#
+# MODE: snapshot (sed replace), stabilise/copy (awk insert)
+# MODIFIES: docs/index.rst
+#
+# DESCRIPTION:
+#   Adds entries in the doc index for the snapshotted protocol.
+#   Snapshot: replaces protocol_source references with new label.
+#   Stabilise/copy: inserts new entries before existing alpha entries
+#   using awk pattern matching.
+#
+# CREATES: 1 commit — "docs: add entries in the doc index"
+function docs_commit_06_update_doc_index() {
   # add entries in the doc index for the snaptshotted protocol by
   # pattern-matching some existing lines and inserting variations thereof
   echo "Add entries in the doc index"
@@ -1982,7 +2375,22 @@ function generate_doc() {
     mv "${doc_index}.tmp" "${doc_index}"
   fi
   commit "docs: add entries in the doc index"
+}
 
+# DOCS COMMIT 07: Update docs Makefile
+#
+# MODE: snapshot (sed replace), stabilise/copy (sed insert)
+# MODIFIES: docs/Makefile
+#
+# DESCRIPTION:
+#   Updates the docs Makefile with new protocol entries.
+#   Snapshot: replaces protocol_source references with new label,
+#   updates NAMED_PROTOS, PROTOCOLS, short hash, and rpc paths.
+#   Stabilise/copy: inserts new entries for xrefscheck, PROTOCOLS,
+#   long/short hashes, and rpc paths.
+#
+# CREATES: 1 commit — "docs: update docs Makefile"
+function docs_commit_07_update_docs_makefile() {
   # update docs Makefile
   if [[ ${is_snapshot} == true ]]; then
     sed -i.old -r "s/(NAMED_PROTOS .*)/\1 ${label}/" docs/Makefile
@@ -2005,10 +2413,39 @@ function generate_doc() {
     sed -i.old -r "s/alpha\/octez-\*\.html/alpha\/octez-*.html ${label}\/octez-*.html/g" docs/Makefile
   fi
   commit "docs: update docs Makefile"
+}
 
+# DOCS COMMIT 08: Generate rpc.rst
+#
+# MODE: all modes (no mode checks)
+# MODIFIES: docs/<label>/rpc.rst
+#
+# DESCRIPTION:
+#   Generates the rpc.rst file for the new protocol by running
+#   make in the docs directory.
+#
+# CREATES: 1 commit — "docs: generate <label>/rpc.rst"
+function docs_commit_08_generate_rpc_rst() {
   rm -f "docs/${label}/rpc.rst"
   make -C docs "${label}"/rpc.rst
   commit "docs: generate ${label}/rpc.rst"
+}
+
+function generate_doc() {
+
+  if [[ $skip_generate_doc ]]; then
+    echo "Skipping doc generation"
+    return 0
+  fi
+
+  docs_commit_01_move_or_copy_docs_dir
+  docs_commit_02_fix_versioned_links
+  docs_commit_03_move_or_copy_protocols_index
+  docs_commit_04_fix_protocols_rst
+  docs_commit_05_reset_alpha_rst
+  docs_commit_06_update_doc_index
+  docs_commit_07_update_docs_makefile
+  docs_commit_08_generate_rpc_rst
 
 }
 
@@ -2158,10 +2595,8 @@ function remove_from_tezt_tests() {
     commit_if_changes "tezt: adapt protocol_migration.ml"
   fi
 
-  sed -i.old -e "/| Protocol.${capitalized_label} -> */d" src/bin_testnet_scenarios/upgrade_etherlink.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup_migration.ml
   sed -i.old -e "/| Protocol.${capitalized_label} -> */d" tezt/tests/sc_rollup.ml
-  ocamlformat -i src/bin_testnet_scenarios/upgrade_etherlink.ml
   ocamlformat -i tezt/tests/sc_rollup_migration.ml
   ocamlformat -i tezt/tests/sc_rollup.ml
   commit "test: fix other tests"
@@ -2709,12 +3144,6 @@ function hash() {
   ocamlformat -i tezt/lib_tezos/protocol.ml
   ocamlformat -i tezt/lib_tezos/protocol.mli
   commit_if_changes "tezt: adapt lib_tezos/protocol.ml"
-
-  #fix testnets_scenarios:
-  sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
-    -e "s/${previous_tag}/${new_tag}/g" -i src/bin_testnet_scenarios/*.ml
-  ocamlformat -i src/bin_testnet_scenarios/*.ml
-  commit_if_changes "tezt: fix testnets_scenarios"
 
   # fix tezt/lib_tezos/constants.ml
   # replace short hash in Uses.make ~tag:"baker_<uncapitalized short hash>" ~path:"./octez-baker-<short hash>" ()
