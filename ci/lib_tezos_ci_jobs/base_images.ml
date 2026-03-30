@@ -277,7 +277,7 @@ let jobs ?start_job ?(changeset = false) () =
             than to have no rule and consistent with what is done in
             [code_verification]. Will be done cleanly when migrated to
             Cacio. *)
-           else [job_rule ~when_:Always ()])
+           else [job_rule ~when_:On_success ()])
       ~parallel:(Matrix [matrix @ tags])
       ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
       ?dependencies
@@ -378,7 +378,7 @@ let jobs ?start_job ?(changeset = false) () =
          (* To force the run of the job. Similar to
             [make_job_base_images] and cf. comment above.
             Migration to Cacio will clean this hack. *)
-           else [job_rule ~when_:Always ()])
+           else [job_rule ~when_:On_success ()])
       ~variables:
         [
           ("RELEASE", "trixie");
@@ -443,7 +443,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~when_:On_success
                ();
            ]
-         else [job_rule ~when_:Always ()])
+         else [job_rule ~when_:On_success ()])
       ~tag:Gcp_very_high_cpu
       ~__POS__
       ~image:Images_external.docker
@@ -492,7 +492,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~when_:On_success
                ();
            ]
-         else [job_rule ~when_:Always ()])
+         else [job_rule ~when_:On_success ()])
       ~parallel:(Matrix [Distribution.(release_matrix Debian)])
       ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-build")]
       ["scripts/ci/docker-merge-base-images.sh"]
@@ -528,7 +528,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~when_:On_success
                ();
            ]
-         else [job_rule ~when_:Always ()])
+         else [job_rule ~when_:On_success ()])
       ~parallel:(Matrix [Distribution.(release_matrix Ubuntu)])
       ~variables:[("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/ubuntu-build")]
       ["scripts/ci/docker-merge-base-images.sh"]

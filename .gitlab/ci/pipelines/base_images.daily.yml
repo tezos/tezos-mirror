@@ -33,7 +33,7 @@ images.debian:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -66,7 +66,7 @@ images.ubuntu:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -100,7 +100,7 @@ images.debian-rust:
   tags:
   - $TAGS
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian
   dependencies: []
@@ -137,7 +137,7 @@ images.debian-rust.merge:
   tags:
   - gcp
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian-rust
   dependencies: []
@@ -166,7 +166,7 @@ images.debian-homebrew:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian
   dependencies: []
@@ -200,7 +200,7 @@ images.alpine-docker-ci:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -236,7 +236,7 @@ images.debian-build:
   tags:
   - $TAGS
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian
   dependencies: []
@@ -274,7 +274,7 @@ images.debian-build.merge:
   tags:
   - gcp
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian-build
   dependencies: []
@@ -307,7 +307,7 @@ images.ubuntu-build:
   tags:
   - $TAGS
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.ubuntu
   dependencies: []
@@ -346,7 +346,7 @@ images.ubuntu-build.merge:
   tags:
   - gcp
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.ubuntu-build
   dependencies: []
@@ -380,7 +380,7 @@ images.debian-systemd:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian
   dependencies: []
@@ -415,7 +415,7 @@ images.ubuntu-systemd:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.ubuntu
   dependencies: []
@@ -451,7 +451,7 @@ images.debian-jsonnet:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   needs:
   - images.debian
   dependencies: []
@@ -485,7 +485,7 @@ images.ci-release:
   tags:
   - gcp_very_high_cpu
   rules:
-  - when: always
+  - when: on_success
   dependencies: []
   timeout: 60 minutes
   interruptible: false
