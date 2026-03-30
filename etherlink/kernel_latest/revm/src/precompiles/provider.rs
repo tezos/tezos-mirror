@@ -108,6 +108,7 @@ impl EtherlinkPrecompiles {
             Err(CustomPrecompileError::Revert(reason)) => {
                 revert(reason, Gas::new_spent(inputs.gas_limit))
             }
+            Err(CustomPrecompileError::RevertKeepGas(reason, gas)) => revert(reason, gas),
             Err(CustomPrecompileError::Abort(runtime)) => {
                 return Err(Error::Runtime(runtime))
             }

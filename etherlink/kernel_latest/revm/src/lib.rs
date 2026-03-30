@@ -560,6 +560,7 @@ mod test {
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::Registry as RegistryTrait;
     use tezosx_journal::TezosXJournal;
+    use utilities::MOCK_TEZOS_GAS_CONSUMED;
 
     use tezos_ethereum::block::BlockConstants;
     use utilities::{test_alias_creation_context, Registry, DEFAULT_SPEC_ID};
@@ -620,6 +621,10 @@ mod test {
         use tezosx_journal::TezosXJournal;
 
         use crate::test::GAS_LIMIT;
+
+        /// Milligas consumed by the mock Tezos runtime for every CRAC call.
+        /// 10_000 milligas = 1_000 EVM gas (Tezos milligas / 10).
+        pub(crate) const MOCK_TEZOS_GAS_CONSUMED: u64 = 10_000;
 
         // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
         // It contains a MockTezosRuntime for testing cross-runtime functionality,
@@ -807,7 +812,10 @@ mod test {
 
                 Ok(http::Response::builder()
                     .status(http::StatusCode::OK)
-                    .header(tezosx_interfaces::X_TEZOS_GAS_CONSUMED, "0")
+                    .header(
+                        tezosx_interfaces::X_TEZOS_GAS_CONSUMED,
+                        MOCK_TEZOS_GAS_CONSUMED.to_string(),
+                    )
                     .body(Vec::new())
                     .unwrap())
             }
@@ -1101,12 +1109,25 @@ mod test {
         .unwrap();
 
         // Check the outcome of the transaction
-        match execution_result.result {
-            ExecutionResult::Success { .. } => (),
-            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
-                panic!("Transfer to implicit address should have succeeded")
-            }
-        }
+        assert!(
+            execution_result.result.is_success(),
+            "Transfer to implicit address should have succeeded"
+        );
+
+        // Verify the CRAC gas was actually charged (mock returns 10_000
+        // milligas = 1_000 EVM gas, plus the precompile base cost).
+        let gas_used = execution_result.result.gas_used();
+        let mock_evm_gas = tezosx_interfaces::gas::convert(
+            tezosx_interfaces::RuntimeId::Tezos,
+            tezosx_interfaces::RuntimeId::Ethereum,
+            MOCK_TEZOS_GAS_CONSUMED,
+        )
+        .unwrap();
+        assert!(
+            gas_used >= mock_evm_gas,
+            "Transaction should have consumed at least {mock_evm_gas} EVM gas \
+             from the CRAC call, but only used {gas_used}"
+        );
         let balance = registry
             .get_balance(
                 &mut host,

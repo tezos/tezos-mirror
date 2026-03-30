@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use revm_interpreter::Gas;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
 use crate::Error;
@@ -11,6 +12,7 @@ use crate::Error;
 pub enum CustomPrecompileError {
     Abort(RuntimeError),
     Revert(String),
+    RevertKeepGas(String, Gas),
 }
 
 impl From<RuntimeError> for CustomPrecompileError {

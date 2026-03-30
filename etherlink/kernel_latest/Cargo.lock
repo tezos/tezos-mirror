@@ -1184,6 +1184,7 @@ dependencies = [
  "michelson-types",
  "primitive-types",
  "revm-database-interface",
+ "revm-interpreter",
  "rlp",
  "tezos-evm-logging-latest",
  "tezos-smart-rollup-encoding",

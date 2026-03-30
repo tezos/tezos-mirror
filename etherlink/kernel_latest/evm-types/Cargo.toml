@@ -12,6 +12,7 @@ license = "MIT"
 # VM
 alloy-primitives.workspace = true
 revm-database-interface.workspace = true
+revm-interpreter.workspace = true
 
 # Types
 primitive-types.workspace = true

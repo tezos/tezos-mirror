@@ -1453,6 +1453,40 @@ let test_crac_evm_journal_state_preserved =
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_reverter in
   unit
 
+(** Simplest catch scenario: a TEZ revert behind one CRAC is caught by the
+ *  EVM caller. Verifies that Solidity try/catch works across a single
+ *  cross-runtime boundary: the caught callee is rolled back while the
+ *  outer caller continues execution.
+ *
+ *    EVM[evm_main]
+ *     |-> (Catch) EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter]
+ *                                         |-> REVERT
+ *)
+let test_crac_catch_tez_revert =
+  register_crac_runner_test ~title:"CRAC: catch TEZ revert" ~tags:["revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* _ = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify counters" ;
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_main
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
+  in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -1470,4 +1504,5 @@ let () =
   test_crac_evm_to_tez_reverts [Alpha] ;
   test_crac_tez_to_evm_reverts [Alpha] ;
   test_crac_tez_revert_propagates_to_evm [Alpha] ;
-  test_crac_evm_journal_state_preserved [Alpha]
+  test_crac_evm_journal_state_preserved [Alpha] ;
+  test_crac_catch_tez_revert [Alpha]
