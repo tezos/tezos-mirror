@@ -237,50 +237,9 @@ include PVM
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick state =
-  let open Lwt_syntax in
-  let* tick = Backend.get_tick state in
-  return (Sc_rollup.Tick.of_z tick)
-
 type status = Backend.status
 
-let get_status ~is_reveal_enabled:_ state = Backend.get_status state
-
 let string_of_status status = Backend.string_of_status status
-
-let outbox_message_encoding = Sc_rollup_outbox_message_repr.encoding
-
-let make_get_outbox
-    (get_outbox :
-      'state -> Bounded.Non_negative_int32.t -> Backend.output list Lwt.t)
-    (to_int32 : 'level -> int32) =
-  let f level state =
-    let open Lwt_syntax in
-    let maybe_level = Bounded.Non_negative_int32.of_value (to_int32 level) in
-    match maybe_level with
-    | Some level ->
-        let* outbox_messages = get_outbox state level in
-        Lwt.return (List.filter_map of_pvm_output outbox_messages)
-    | None -> Lwt.return []
-  in
-  f
-
-let get_outbox (level : Raw_level.t) state =
-  make_get_outbox Backend.get_outbox Raw_level.to_int32 level state
-
-let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_ ~reveal_builtins:_
-    ~write_debug ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state
-    =
-  let debug_printer =
-    match write_debug with
-    | Tezos_scoru_wasm.Builtins.Noop -> None
-    | Tezos_scoru_wasm.Builtins.Printer p -> Some p
-  in
-  Backend.compute_step_many
-    ?stop_at_snapshot
-    ?write_debug:debug_printer
-    ~max_steps
-    initial_state
 
 module Mutable_state :
   Pvm_sig.MUTABLE_STATE_S
@@ -308,7 +267,13 @@ module Mutable_state :
   let get_current_level state = Backend.Mutable_state.get_current_level state
 
   let get_outbox level state =
-    make_get_outbox Backend.Mutable_state.get_outbox Fun.id level state
+    let open Lwt_syntax in
+    let maybe_level = Bounded.Non_negative_int32.of_value level in
+    match maybe_level with
+    | Some level ->
+        let* outbox_messages = Backend.Mutable_state.get_outbox state level in
+        Lwt.return (List.filter_map of_pvm_output outbox_messages)
+    | None -> Lwt.return []
 
   let get_status ~is_reveal_enabled:_ state =
     Backend.Mutable_state.get_status state
@@ -355,11 +320,6 @@ module Mutable_state :
 end
 
 let new_dissection = Game_helpers.default_new_dissection
-
-module Inspect_durable_state = struct
-  let lookup _state _keys =
-    raise (Invalid_argument "No durable storage for riscv PVM")
-end
 
 module Unsafe_patches = struct
   (** No unsafe patches for the riscv PVM. *)

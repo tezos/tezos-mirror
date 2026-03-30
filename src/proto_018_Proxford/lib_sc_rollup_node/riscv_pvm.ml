@@ -170,30 +170,9 @@ include
 
 let kind = Sc_rollup.Kind.Riscv
 
-let get_tick state =
-  let open Lwt_syntax in
-  let* state = decode state in
-  Lwt.return (Sc_rollup.Tick.of_z state.Sc_rollup_riscv.tick)
-
 type status = Riscv_dummy_status
 
-let get_status ~is_reveal_enabled:_ _state = Lwt.return Riscv_dummy_status
-
 let string_of_status Riscv_dummy_status = "riscv_dummy_status"
-
-let get_outbox _level _state = Lwt.return []
-
-(* It is safe to pass the [is_reveal_enabled_predicate]:
-   [eval_many] always stops at the beginning of a new Tezos block,
-   so no execution of several Tezos block inboxes is possible. *)
-(* Copied from [arith_pvm.ml]. *)
-let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_ ~reveal_builtins:_
-    ~write_debug:_ ~is_reveal_enabled ?stop_at_snapshot ~max_steps initial_state
-    =
-  ignore stop_at_snapshot ;
-  ignore max_steps ;
-  ignore is_reveal_enabled ;
-  Lwt.return (initial_state, 0L)
 
 let new_dissection = Game_helpers.default_new_dissection
 
@@ -215,7 +194,10 @@ module Mutable_state :
 
   type nonrec status = status
 
-  let get_tick state = get_tick !state
+  let get_tick state =
+    let open Lwt_syntax in
+    let* s = decode !state in
+    Lwt.return (Sc_rollup.Tick.of_z s.Sc_rollup_riscv.tick)
 
   let state_hash state = state_hash !state
 
@@ -224,9 +206,9 @@ module Mutable_state :
     let+ level = get_current_level !state in
     Option.map Raw_level.to_int32 level
 
-  let get_outbox level state = get_outbox (Raw_level.of_int32_exn level) !state
+  let get_outbox _level _state = Lwt.return []
 
-  let get_status ~is_reveal_enabled state = get_status ~is_reveal_enabled !state
+  let get_status ~is_reveal_enabled:_ _state = Lwt.return Riscv_dummy_status
 
   let set_initial_state ~empty =
     let open Lwt_syntax in
@@ -247,22 +229,10 @@ module Mutable_state :
     state := imm_state ;
     return_unit
 
-  let eval_many ?check_invalid_kernel ?fallback_to_slow_vm ~reveal_builtins
-      ~write_debug ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
-    let open Lwt_syntax in
-    let* imm_state, steps =
-      eval_many
-        ?check_invalid_kernel
-        ?fallback_to_slow_vm
-        ~reveal_builtins
-        ~write_debug
-        ~is_reveal_enabled
-        ?stop_at_snapshot
-        ~max_steps
-        !mut_state
-    in
-    mut_state := imm_state ;
-    return steps
+  let eval_many ?check_invalid_kernel:_ ?fallback_to_slow_vm:_
+      ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled:_ ?stop_at_snapshot:_
+      ~max_steps:_ _mut_state =
+    Lwt.return 0L
 
   module Inspect_durable_state = struct
     let lookup _state _keys =
@@ -276,11 +246,6 @@ module Mutable_state :
       state := imm_state ;
       return_unit
   end
-end
-
-module Inspect_durable_state = struct
-  let lookup _state _keys =
-    raise (Invalid_argument "No durable storage for riscv PVM")
 end
 
 module Unsafe_patches = struct

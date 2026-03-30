@@ -459,13 +459,7 @@ module Wrapper = struct
 
     val of_node_context : 'a index -> ('a, repo) Context_sigs.index
 
-    val to_node_context : ('a, repo) Context_sigs.index -> 'a index
-
     val of_node_pvmstate : _ pvmstate -> mut_state
-
-    val to_node_pvmstate : mut_state -> Access_mode.rw pvmstate
-
-    val from_imm : state -> mut_state
 
     val to_imm : mut_state -> state
   end
@@ -485,20 +479,6 @@ module Wrapper = struct
          pmv_context to the next one. *)
         assert false
 
-  let to_node_context : type repo state mut_state.
-      (module Context_sigs.S
-         with type repo = repo
-          and type state = state
-          and type mut_state = mut_state) ->
-      ('a, repo) Context_sigs.index ->
-      'a index =
-   fun (module C) index ->
-    make_index
-      ~index
-      ~pvm_context_impl:(module C)
-      ~equality_witness:C.equality_witness
-      ~impl_name:C.impl_name
-
   (* PVMState *)
   let of_node_pvmstate : type repo state mut_state.
       (repo, state, mut_state) equality_witness -> _ pvmstate -> mut_state =
@@ -506,18 +486,6 @@ module Wrapper = struct
     match equiv equality_witness eqw with
     | _, _, Some Refl -> pvmstate
     | _ -> assert false
-
-  let to_node_pvmstate : type mut_state.
-      (module Context_sigs.S with type mut_state = mut_state) ->
-      mut_state ->
-      _ pvmstate =
-   fun (module C) pvmstate ->
-    make_pvmstate
-      Read_write
-      ~pvmstate
-      ~pvm_context_impl:(module C)
-      ~equality_witness:C.equality_witness
-      ~impl_name:C.impl_name
 
   module Make (C : Context_sigs.S) :
     S
@@ -533,15 +501,8 @@ module Wrapper = struct
     let of_node_context : 'a index -> ('a, repo) Context_sigs.index =
      fun ctxt -> of_node_context C.equality_witness ctxt
 
-    let to_node_context : ('a, repo) Context_sigs.index -> 'a index =
-     fun ctxt -> to_node_context (module C) ctxt
-
     let of_node_pvmstate : _ pvmstate -> mut_state =
      fun c -> of_node_pvmstate C.equality_witness c
-
-    let to_node_pvmstate : mut_state -> _ pvmstate = to_node_pvmstate (module C)
-
-    let from_imm : state -> mut_state = C.from_imm
 
     let to_imm : mut_state -> state = C.to_imm
   end

@@ -45,7 +45,7 @@ let get_state (node_ctxt : _ Node_context.t) block_hash =
   let*! state = Context.PVMState.find ctxt in
   match state with
   | None -> failwith "No state"
-  | Some state -> return (state, !(of_node_pvmstate state))
+  | Some state -> return (state, of_node_pvmstate state)
 
 let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     ~insight_requests ~log_kernel_debug_file messages =
@@ -94,8 +94,10 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
       insight_requests
   in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
+  let*! outbox =
+    PVM.Mutable_state.get_outbox inbox_level (of_node_pvmstate state)
+  in
   let level = Raw_level.of_int32_exn inbox_level in
-  let*! outbox = PVM.get_outbox level !(of_node_pvmstate state) in
   let output =
     List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
@@ -109,7 +111,9 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status = PVM.get_status ~is_reveal_enabled !(of_node_pvmstate state) in
+  let*! status =
+    PVM.Mutable_state.get_status ~is_reveal_enabled (of_node_pvmstate state)
+  in
   let status = PVM.string_of_status status in
   return
     Sc_rollup_services.
@@ -135,7 +139,7 @@ let () =
         |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
         |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
       in
-      let*! status = PVM.get_status ~is_reveal_enabled state in
+      let*! status = PVM.Mutable_state.get_status ~is_reveal_enabled state in
       return (PVM.string_of_status status)
 
 let () =
@@ -144,7 +148,11 @@ let () =
   let open Lwt_result_syntax in
   let* _, state = get_state node_ctxt block in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! outbox = PVM.get_outbox outbox_level state in
+  let*! outbox =
+    PVM.Mutable_state.get_outbox
+      (Alpha_context.Raw_level.to_int32 outbox_level)
+      state
+  in
   return outbox
 
 let () =
@@ -153,7 +161,11 @@ let () =
   let open Lwt_result_syntax in
   let* _, state = get_state node_ctxt block in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
-  let*! outbox = PVM.get_outbox outbox_level state in
+  let*! outbox =
+    PVM.Mutable_state.get_outbox
+      (Alpha_context.Raw_level.to_int32 outbox_level)
+      state
+  in
   return outbox
 
 let () =

@@ -237,8 +237,6 @@ module Wrapper : sig
 
     val of_node_context : 'a index -> ('a, repo) Context_sigs.index
 
-    val to_node_context : ('a, repo) Context_sigs.index -> 'a index
-
     (* TODO: TZX-69
        Here we erase access permissions on states because we don't track
        permissions at the backend level (in the protocol plugins). We may need
@@ -246,11 +244,6 @@ module Wrapper : sig
 
     (** WARNING: erase access permissions information. *)
     val of_node_pvmstate : _ pvmstate -> mut_state
-
-    (** WARNING: inject any access permissions information. *)
-    val to_node_pvmstate : mut_state -> Access_mode.rw pvmstate
-
-    val from_imm : state -> mut_state
 
     val to_imm : mut_state -> state
   end

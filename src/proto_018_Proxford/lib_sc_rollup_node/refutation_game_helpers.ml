@@ -235,7 +235,9 @@ let generate_proof (node_ctxt : _ Node_context.t)
     end
   end in
   let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick !(of_node_pvmstate start_state) in
+  let*! start_tick =
+    PVM.Mutable_state.get_tick (of_node_pvmstate start_state)
+  in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->
