@@ -28,6 +28,28 @@ type launch_mode = Socket | Local | Http
 (** A signer instance *)
 type t
 
+(** Create a signer instance and import [keys], but do not start the daemon.
+
+    This is useful for running one-shot signer CLI commands (e.g.
+    [gen keys], [create bls proof]) without launching a listening daemon.
+
+    The signer is configured to use its private base directory. *)
+val create :
+  ?name:string ->
+  ?color:Log.Color.t ->
+  ?event_pipe:string ->
+  ?base_dir:string ->
+  ?launch_mode:launch_mode ->
+  ?uri:Uri.t ->
+  ?runner:Runner.t ->
+  ?check_highwatermark:bool ->
+  ?magic_byte:string ->
+  ?allow_list_known_keys:bool ->
+  ?allow_to_prove_possession:bool ->
+  ?keys:Account.key list ->
+  unit ->
+  t Lwt.t
+
 (** Initialize a signer.
 
     This creates a signer, waits for it to be ready, and then returns it.
@@ -122,3 +144,42 @@ val uri : t -> Uri.t
     The base directory is the location where signers store their keys, logs and
     highwatermarks. It corresponds to the [--base-dir] option. *)
 val base_dir : t -> string
+
+(** Spawn a signer CLI command.
+
+    This runs [octez-signer --base-dir <base_dir> <command>] and returns
+    the resulting process. The signer does not need to be running as a
+    daemon for this to work. *)
+val spawn_command :
+  ?env:string String_map.t ->
+  ?hooks:Process.hooks ->
+  t ->
+  string list ->
+  Process.t
+
+(** Import a secret key into the signer's wallet. *)
+val import_secret_key : t -> Account.key -> unit Lwt.t
+
+(** Spawn [octez-signer gen keys <alias> --sig <sig_alg>]. *)
+val spawn_gen_keys : ?alias:string -> ?sig_alg:string -> t -> Process.t
+
+(** Generate keys in the signer's wallet. Returns the alias used. *)
+val gen_keys : ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
+
+(** Spawn [octez-signer show address <alias> --show-secret]. *)
+val spawn_show_address : alias:string -> t -> Process.t
+
+(** Show address details for an alias. Returns the public key hash. *)
+val show_address : alias:string -> t -> string Lwt.t
+
+(** Spawn [octez-signer create bls proof for <sk_uri>].
+    If [override_pk] is provided, the [--override-public-key] option is passed. *)
+val spawn_bls_prove_possession :
+  ?override_pk:string -> sk_uri:string -> t -> Process.t
+
+(** Create a BLS proof of possession for the given secret key URI.
+    If [override_pk] is provided, the proof signs the given public key
+    instead of the one derived from the secret key.
+    Returns the Base58-encoded BLS signature (BLsig...). *)
+val bls_prove_possession :
+  ?override_pk:string -> sk_uri:string -> t -> string Lwt.t

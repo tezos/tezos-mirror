@@ -114,6 +114,48 @@ let spawn_import_secret_key signer (key : Account.key) =
 let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
+let id = Atomic.make 0
+
+let fresh_alias () = sf "signer_%d" (Atomic.fetch_and_add id 1)
+
+let spawn_gen_keys ?alias ?sig_alg signer =
+  let alias = Option.value ~default:(fresh_alias ()) alias in
+  let sig_args = match sig_alg with Some s -> ["--sig"; s] | None -> [] in
+  spawn_command signer (["gen"; "keys"; alias] @ sig_args)
+
+let gen_keys ?alias ?sig_alg signer =
+  let alias = Option.value ~default:(fresh_alias ()) alias in
+  let* () = spawn_gen_keys ~alias ?sig_alg signer |> Process.check in
+  return alias
+
+let spawn_show_address ~alias signer =
+  spawn_command signer ["show"; "address"; alias; "--show-secret"]
+
+let show_address ~alias signer =
+  let* output =
+    spawn_show_address ~alias signer |> Process.check_and_read_stdout
+  in
+  match output =~* rex "Hash: (\\S+)" with
+  | Some pkh -> return pkh
+  | None ->
+      Test.fail "Could not extract public key hash from show address output"
+
+let spawn_bls_prove_possession ?override_pk ~sk_uri signer =
+  let args = ["create"; "bls"; "proof"; "for"; sk_uri] in
+  let args =
+    match override_pk with
+    | None -> args
+    | Some pk -> args @ ["--override-public-key"; pk]
+  in
+  spawn_command signer args
+
+let bls_prove_possession ?override_pk ~sk_uri signer =
+  let* output =
+    spawn_bls_prove_possession ?override_pk ~sk_uri signer
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim output)
+
 let create ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner
     ?(check_highwatermark = true) ?magic_byte ?(allow_list_known_keys = false)
     ?(allow_to_prove_possession = false) ?(keys = [Constant.bootstrap1]) () =
