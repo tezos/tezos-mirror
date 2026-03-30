@@ -2352,15 +2352,6 @@ let record_dal_content ctxt ~delegate level slot
   match dal_content_opt with
   | None -> return ctxt
   | Some {attestations} ->
-      let* proto_activation_level = Protocol_activation_level.get ctxt in
-      let lag = Constants.dal_attestation_lag ctxt in
-      let attestations =
-        if Raw_level.(level < add proto_activation_level lag) then
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
-             CODE TO BE REVERTED IN PROTOCOL V *)
-          Dal.Attestations.empty
-        else attestations
-      in
       let attested_level = Raw_level.succ level in
       let committee_level_to_shard_count =
         let level_map = Consensus.delegate_to_shard_count ctxt in
