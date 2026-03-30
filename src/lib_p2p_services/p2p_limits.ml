@@ -38,9 +38,9 @@ type t = {
   read_buffer_size : int;
   read_queue_size : int option;
   write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
+  incoming_app_message_queue_size : int option;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
   peer_greylist_size : int;
@@ -75,10 +75,11 @@ let default =
     read_buffer_size = 1 lsl 14;
     read_queue_size = default_queue_size;
     write_queue_size = default_queue_size;
-    incoming_app_message_queue_size = default_queue_size;
     incoming_message_queue_size = default_queue_size;
     outgoing_message_queue_size = default_queue_size;
     max_known_points = Some (400, 300);
+    incoming_app_message_queue_size =
+      Some 10 (* max 10 decoded messages per connection *);
     max_known_peer_ids = Some (400, 300);
     peer_greylist_size = 1023 (* historical value *);
     ip_greylist_size_in_kilobytes =
@@ -106,9 +107,9 @@ let encoding : t Data_encoding.t =
            read_buffer_size;
            read_queue_size;
            write_queue_size;
-           incoming_app_message_queue_size;
            incoming_message_queue_size;
            outgoing_message_queue_size;
+           incoming_app_message_queue_size;
            max_known_points;
            max_known_peer_ids;
            peer_greylist_size;
@@ -132,9 +133,9 @@ let encoding : t Data_encoding.t =
             read_buffer_size,
             read_queue_size,
             write_queue_size,
-            incoming_app_message_queue_size,
             incoming_message_queue_size,
             outgoing_message_queue_size,
+            incoming_app_message_queue_size,
             max_known_points ) ),
         ( max_known_peer_ids,
           peer_greylist_size,
@@ -156,9 +157,9 @@ let encoding : t Data_encoding.t =
                read_buffer_size,
                read_queue_size,
                write_queue_size,
-               incoming_app_message_queue_size,
                incoming_message_queue_size,
                outgoing_message_queue_size,
+               incoming_app_message_queue_size,
                max_known_points ) ),
            ( max_known_peer_ids,
              peer_greylist_size,
@@ -182,9 +183,9 @@ let encoding : t Data_encoding.t =
         read_buffer_size;
         read_queue_size;
         write_queue_size;
-        incoming_app_message_queue_size;
         incoming_message_queue_size;
         outgoing_message_queue_size;
+        incoming_app_message_queue_size;
         max_known_points;
         max_known_peer_ids;
         peer_greylist_size;
