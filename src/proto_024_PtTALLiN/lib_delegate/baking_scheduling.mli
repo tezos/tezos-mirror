@@ -62,9 +62,9 @@ val run :
   unit tzresult Lwt.t
 
 (** [create_initial_state ?canceler context ?dal_node_rpc_ctxt ?synchronize
-    ?monitor_node_operations chain baking_configuration round_durations
-    current_proposal ?constants consensus_keys] creates an initial
-    {!Baking_state.t} by initializing a {!type-Baking_state.global_state}, a
+    ?monitor_node_operations chain baking_configuration current_proposal
+    ?constants consensus_keys] creates an initial {!Baking_state.t} by
+    initializing a {!type-Baking_state.global_state}, a
     {!type-Baking_state.automaton_state}, a {!type-Baking_state.level_state}
     and a {!type-Baking_state.round_state}.
 
@@ -93,7 +93,6 @@ val create_initial_state :
   ?monitor_node_operations:bool ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

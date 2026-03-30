@@ -58,23 +58,19 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let* constants =
     Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
-  let*? round_durations =
-    Round.Durations.create
-      ~first_round_duration:constants.parametric.minimal_block_delay
-      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
-    |> Environment.wrap_tzresult
+  let* state =
+    Baking_scheduling.create_initial_state
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?monitor_node_operations
+      ?synchronize
+      ~chain
+      config
+      ~current_proposal
+      ~constants
+      delegates
   in
-  Baking_scheduling.create_initial_state
-    cctxt
-    ?dal_node_rpc_ctxt
-    ?monitor_node_operations
-    ?synchronize
-    ~chain
-    config
-    round_durations
-    ~current_proposal
-    ~constants
-    delegates
+  return state
 
 let get_current_proposal cctxt ?cache () =
   let open Lwt_result_syntax in
