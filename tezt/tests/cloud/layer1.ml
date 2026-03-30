@@ -1209,7 +1209,7 @@ let get_migration_level_offsets (migration : Protocol_migration.t) ~snapshot
           last_cycle_level - current_level + (c * blocks_per_cycle)
     in
     let termination_level_offset =
-      match migration.migration_offset with
+      match migration.termination_offset with
       | Level_offset l -> l
       | Cycle_offset c -> c * blocks_per_cycle
     in
