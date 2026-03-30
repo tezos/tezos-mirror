@@ -367,8 +367,9 @@ let encode_inner ~inner_tag hash raw =
   let bytes = String.to_bytes raw in
   Rlp.(List [Value hash; List [Value (Rlp.encode_int inner_tag); Value bytes]])
 
-let execute_single_transaction ~data_dir ~pool ~native_execution ~config
-    evm_state block_in_progress (Hash hash) (tx : Broadcast.transaction) =
+let execute_single_transaction ~storage_version ~data_dir ~pool
+    ~native_execution ~config evm_state block_in_progress (Hash hash)
+    (tx : Broadcast.transaction) =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.add_attrs (fun () ->
       Telemetry.Attributes.
@@ -394,7 +395,7 @@ let execute_single_transaction ~data_dir ~pool ~native_execution ~config
   in
   let*! evm_state =
     modify
-      ~key:Durable_storage_path.Single_tx.input_tx
+      ~key:(Durable_storage_path.Single_tx.input_tx ~storage_version)
       ~value:(Rlp.encode rlp |> Bytes.to_string)
       evm_state
   in
@@ -513,7 +514,7 @@ let retrieve_block ~chain_family evm_state =
   in
   return (Option.map (fun block -> (block, tezos_block)) block_opt)
 
-let assemble_block (type f) ~pool ~data_dir
+let assemble_block (type f) ~storage_version ~pool ~data_dir
     ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
     ~native_execution evm_state =
   let open Lwt_result_syntax in
@@ -532,7 +533,7 @@ let assemble_block (type f) ~pool ~data_dir
   in
   let*! evm_state =
     modify
-      ~key:Durable_storage_path.Assemble_block.input
+      ~key:(Durable_storage_path.Assemble_block.input ~storage_version)
       ~value:(Rlp.encode rlp |> Bytes.to_string)
       evm_state
   in

@@ -72,7 +72,7 @@ val maximum_gas_per_transaction : path
 
 (** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
-  val input_tx : path
+  val input_tx : storage_version:int -> path
 end
 
 (** Kernel communication canal for Tezos X operation simulation *)
@@ -93,7 +93,7 @@ val delayed_input : storage_version:int -> path
 
 (** Kernel communication canal for block assembling (instant confirmations) *)
 module Assemble_block : sig
-  val input : path
+  val input : storage_version:int -> path
 end
 
 (** Paths related to accounts. *)

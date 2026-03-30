@@ -1100,6 +1100,7 @@ module State = struct
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
+            ~storage_version:ctxt.session.storage_version
             ~pool:ctxt.execution_pool
             ~native_execution:
               (ctxt.configuration.kernel_execution.native_execution_policy
@@ -1370,6 +1371,7 @@ module State = struct
           | Executing {timestamp; applied_sequencer_upgrade; _} ->
               let+ result =
                 Evm_state.assemble_block
+                  ~storage_version:ctxt.session.storage_version
                   ~pool:ctxt.execution_pool
                   ~native_execution:
                     (ctxt.configuration.kernel_execution.native_execution_policy

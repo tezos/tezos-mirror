@@ -48,9 +48,14 @@ module World_state = struct
 end
 
 module Single_tx = struct
-  let single_tx_path = World_state.make "/single_tx"
+  let input_tx_base = BASE.make "/instant_confirmation/input_tx"
 
-  let input_tx = single_tx_path ^ "/input_tx"
+  let input_tx_legacy = World_state.make "/single_tx/input_tx"
+
+  let input_tx ~storage_version =
+    if Storage_version.ipc_paths_moved_to_base ~storage_version then
+      input_tx_base
+    else input_tx_legacy
 end
 
 module Tezosx_simulation = struct
@@ -75,9 +80,13 @@ let delayed_input ~storage_version =
   else "/__delayed_input"
 
 module Assemble_block = struct
-  let path = World_state.make "/assemble_block"
+  let input_base = BASE.make "/instant_confirmation/assemble_block/input"
 
-  let input = path ^ "/input"
+  let input_legacy = World_state.make "/assemble_block/input"
+
+  let input ~storage_version =
+    if Storage_version.ipc_paths_moved_to_base ~storage_version then input_base
+    else input_legacy
 end
 
 let etherlink_root = World_state.make ""

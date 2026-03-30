@@ -142,6 +142,7 @@ type block_in_progress = {
     to execute [txn] on top of [evm_state], where [txn] is the
     [block_in_progress.transactions_count]th transaction of the next block. *)
 val execute_single_transaction :
+  storage_version:int ->
   data_dir:string ->
   pool:Lwt_domain.pool ->
   native_execution:bool ->
@@ -176,6 +177,7 @@ val execute_entrypoint :
     assembles the block from already recorded effects and returns the result
     of this operation. *)
 val assemble_block :
+  storage_version:int ->
   pool:Lwt_domain.pool ->
   data_dir:string ->
   chain_family:'a L2_types.chain_family ->
