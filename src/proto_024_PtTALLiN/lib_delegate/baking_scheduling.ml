@@ -172,24 +172,11 @@ let create_global_state cctxt ?dal_node_rpc_ctxt ?constants ~chain config
     } ;
   return global_state
 
-let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
-    ?(synchronize = true) ?monitor_node_operations ~chain config
-    ~(current_proposal : proposal) ?constants delegates =
+let create_level_state ~chain_id ~cctxt ~current_proposal ~delegates
+    ~dal_node_rpc_ctxt =
   let open Lwt_result_syntax in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
-     consider saved attestable value *)
-  let open Baking_state in
-  let* global_state =
-    create_global_state
-      cctxt
-      ?dal_node_rpc_ctxt
-      ?constants
-      ~chain
-      config
-      delegates
-  in
-  let chain = `Hash global_state.chain_id in
   let current_level = current_proposal.block.shell.level in
+  let chain = `Hash chain_id in
   let* delegate_infos =
     Baking_state.compute_delegate_infos
       cctxt
@@ -211,7 +198,6 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
       Some {proposal = current_proposal; attestation_qc = []}
     else None
   in
-  let current_level = current_proposal.block.shell.level in
   let dal_attestable_slots =
     Option.fold
       ~none:[]
@@ -232,7 +218,7 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
           (Delegate_infos.own_delegates next_level_delegate_infos))
       dal_node_rpc_ctxt
   in
-  let level_state =
+  return
     {
       current_level;
       latest_proposal = current_proposal;
@@ -247,31 +233,49 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
       dal_attestable_slots;
       next_level_dal_attestable_slots;
     }
-  in
-  let* round_state =
+
+let create_round_state ~global_state ~synchronize ~current_proposal =
+  let open Result_syntax in
+  let* current_round =
     if synchronize then
-      let*? current_round =
-        Baking_actions.compute_round
-          current_proposal
-          global_state.round_durations
-      in
-      return
-        {
-          current_round;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
-    else
-      return
-        {
-          Baking_state.current_round = Round.zero;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
+      Baking_actions.compute_round current_proposal global_state.round_durations
+    else return Round.zero
+  in
+  return
+    {
+      current_round;
+      current_phase = Idle;
+      delayed_quorum = None;
+      early_attestations = [];
+      awaiting_unlocking_pqc = false;
+    }
+
+let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
+    ?(synchronize = true) ?monitor_node_operations ~chain config
+    ~(current_proposal : proposal) ?constants delegates =
+  let open Lwt_result_syntax in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
+     consider saved attestable value *)
+  let open Baking_state in
+  let* global_state =
+    create_global_state
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?constants
+      ~chain
+      config
+      delegates
+  in
+  let* level_state =
+    create_level_state
+      ~chain_id:global_state.chain_id
+      ~cctxt
+      ~current_proposal
+      ~delegates:global_state.delegates
+      ~dal_node_rpc_ctxt:global_state.dal_node_rpc_ctxt
+  in
+  let*? round_state =
+    create_round_state ~global_state ~synchronize ~current_proposal
   in
   let* automaton_state =
     Baking_automaton.create_automaton_state
