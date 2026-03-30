@@ -279,6 +279,7 @@ type baker_test_env = {
   cctxt : Protocol_client_context.full;
   delegates : Baking_state_types.Key.t list;
   global_state : Baking_state.global_state;
+  automaton_state : Baking_state.automaton_state;
   genesis_block_info : Baking_state_types.block_info;
 }
 

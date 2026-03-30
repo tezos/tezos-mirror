@@ -466,7 +466,14 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
-type forge_request =
+type automaton_state = {
+  name : string;
+  cctxt : Protocol_client_context.full;
+  validation_mode : validation_mode;
+  operation_worker : Operation_worker.t;
+}
+
+type forge_request_content =
   | Forge_and_sign_block of block_to_bake
   | Forge_and_sign_preattestations of {
       unsigned_preattestations : unsigned_consensus_vote_batch;
@@ -475,6 +482,11 @@ type forge_request =
       unsigned_attestations : unsigned_consensus_vote_batch;
     }
 
+type forge_request = {
+  automaton_state : automaton_state;
+  request : forge_request_content;
+}
+
 type forge_worker_hooks = {
   push_request : forge_request -> bool Lwt.t;
   get_forge_event_stream : unit -> forge_event Lwt_stream.t;
@@ -482,22 +494,16 @@ type forge_worker_hooks = {
 }
 
 type global_state = {
-  (* client context *)
-  cctxt : Protocol_client_context.full;
   (* chain id *)
   chain_id : Chain_id.t;
   (* baker configuration *)
   config : Baking_configuration.t;
-  (* protocol constants *)
-  constants : Constants.t;
   (* round durations *)
   round_durations : Round.round_durations;
-  (* worker that monitor and aggregates new operations *)
-  operation_worker : Operation_worker.t;
+  (* protocol constants *)
+  constants : Constants.t;
   (* hooks to the consensus and block forge worker *)
   mutable forge_worker_hooks : forge_worker_hooks;
-  (* the validation mode used by the baker*)
-  validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
   delegates : Baking_state_types.Key.t list;
   cache : cache;
@@ -506,6 +512,7 @@ type global_state = {
 
 type state = {
   global_state : global_state;
+  automaton_state : automaton_state;
   level_state : level_state;
   round_state : round_state;
 }
@@ -769,7 +776,7 @@ let state_data_encoding =
 
 let record_state (state : state) =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let location =
     Baking_files.resolve_location ~chain_id:state.global_state.chain_id `State
   in
@@ -886,7 +893,7 @@ let load_attestable_data cctxt location =
 
 let may_load_attestable_data state =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let location = Baking_files.resolve_location ~chain_id `State in
   protect ~on_error:(fun _ -> return state) @@ fun () ->
@@ -1054,17 +1061,22 @@ let pp_validation_mode fmt = function
   | Node -> Format.fprintf fmt "node"
   | Local _ -> Format.fprintf fmt "local"
 
-let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
+let pp_automaton_state fmt {validation_mode; _} =
   Format.fprintf
     fmt
-    "@[<v 2>Global state:@ chain_id: %a@ @[<v 2>config:@ %a@]@ \
-     validation_mode: %a@ @[<v 2>delegates:@ %a@]@]"
+    "@[<v 2>Automaton state:@ validation_mode: %a@]"
+    pp_validation_mode
+    validation_mode
+
+let pp_global_state fmt {chain_id; config; delegates; _} =
+  Format.fprintf
+    fmt
+    "@[<v 2>Global state:@ chain_id: %a@ @[<v 2>config:@ %a@]@ @[<v \
+     2>delegates:@ %a@]@]"
     Chain_id.pp
     chain_id
     Baking_configuration.pp
     config
-    pp_validation_mode
-    validation_mode
     Format.(pp_print_list Baking_state_types.Key.pp)
     delegates
 
@@ -1272,12 +1284,14 @@ let pp_round_state fmt
     (List.length early_attestations)
     awaiting_unlocking_pqc
 
-let pp fmt {global_state; level_state; round_state} =
+let pp fmt {global_state; automaton_state; level_state; round_state} =
   Format.fprintf
     fmt
-    "@[<v 2>State:@ %a@ %a@ %a@]"
+    "@[<v 2>State:@ %a@ %a@ %a@ %a@]"
     pp_global_state
     global_state
+    pp_automaton_state
+    automaton_state
     pp_level_state
     level_state
     pp_round_state
