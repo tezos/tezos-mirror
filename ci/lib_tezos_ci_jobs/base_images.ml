@@ -42,6 +42,9 @@ type upstream_image = Pipeline_dep of string | Upstream of string
 module Files = struct
   let build_script = ["scripts/ci/build-base-images.sh"]
 
+  (* Used in jobs merging manifests of natively build Docker images. *)
+  let merge_script = ["scripts/ci/docker-merge-base-images.sh"]
+
   (* Direct changesets of jobs, i.e. files directly used by the corresponding jobs.
 
      The full changeset of a job should also contain the files indirectly used.
@@ -111,18 +114,6 @@ module Files = struct
     ]
     @ build_script
 
-  let debian_build_merge =
-    [
-      "images/base-images/Dockerfile.debian-build";
-      "images/scripts/install_sccache_static.sh";
-      "images/scripts/install_opam_static.sh";
-      "scripts/kiss-fetch.sh";
-      "scripts/kiss-logs.sh";
-      "scripts/version.sh";
-      (* job script *)
-      "scripts/ci/docker-merge-base-images.sh";
-    ]
-
   let debian_rust_build =
     [
       "images/base-images/Dockerfile.rust";
@@ -130,15 +121,6 @@ module Files = struct
       "images/scripts/install_sccache_static.sh";
     ]
     @ build_script
-
-  let debian_rust_merge =
-    [
-      "images/base-images/Dockerfile.rust";
-      (* script used in Dockerfile *)
-      "images/scripts/install_sccache_static.sh";
-      (* job script *)
-      "scripts/ci/docker-merge-base-images.sh";
-    ]
 
   let alpine_docker_ci =
     [
@@ -320,7 +302,7 @@ let jobs ?start_job ?(changeset = false) () =
          [debian-rust] jobs *)
       Changeset.make
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
-       @ Files.debian_rust_merge @ Files.debian_build @ Files.debian_build_merge
+       @ Files.merge_script @ Files.debian_build @ Files.merge_script
        @ Files.debian_systemd)
     in
     make_job_base_image_distribution ~changes Distribution.Debian
@@ -328,7 +310,7 @@ let jobs ?start_job ?(changeset = false) () =
   let job_ubuntu_based_images =
     let changes =
       Changeset.make
-        (Files.debian_base @ Files.debian_build @ Files.debian_build_merge
+        (Files.debian_base @ Files.debian_build @ Files.merge_script
        @ Files.debian_systemd)
     in
     make_job_base_image_distribution ~changes Distribution.Ubuntu
@@ -357,7 +339,7 @@ let jobs ?start_job ?(changeset = false) () =
              build of [debian-rust] if [debian] is rebuild. *)
           @ Files.debian_base
            (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
-           @ Files.debian_rust_merge))
+           @ Files.merge_script))
       "images/base-images/Dockerfile.rust"
   in
   (* dedicated merge job exist because QEMU compilation takes too much
@@ -375,7 +357,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~changes:
                  (Changeset.encode
                     (Changeset.make
-                       (Files.debian_rust_merge
+                       (Files.merge_script
                       (* Adding changesets of [debian] and
                         [debian-rust] build jobs as if we rebuild one
                         of these images, we want to test the
@@ -480,7 +462,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~compilation:Native
       ~changes:
         (Changeset.make
-           (Files.debian_build @ Files.debian_base @ Files.debian_build_merge))
+           (Files.debian_build @ Files.debian_base @ Files.merge_script))
       "images/base-images/Dockerfile.debian-build"
   in
   let job_debian_build_base_images_merge =
@@ -496,7 +478,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~changes:
                  (Changeset.encode
                     (Changeset.make
-                       (Files.debian_build_merge @ Files.debian_build
+                       (Files.merge_script @ Files.debian_build
                       @ Files.debian_base)))
                ~when_:On_success
                ();
@@ -516,7 +498,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~compilation:Native
       ~changes:
         (Changeset.make
-           (Files.debian_build @ Files.debian_base @ Files.debian_build_merge))
+           (Files.debian_build @ Files.debian_base @ Files.merge_script))
       "images/base-images/Dockerfile.debian-build"
   in
   let job_ubuntu_build_base_images_merge =
@@ -532,7 +514,7 @@ let jobs ?start_job ?(changeset = false) () =
                ~changes:
                  (Changeset.encode
                     (Changeset.make
-                       (Files.debian_build_merge @ Files.debian_build
+                       (Files.merge_script @ Files.debian_build
                       @ Files.debian_base)))
                ~when_:On_success
                ();
