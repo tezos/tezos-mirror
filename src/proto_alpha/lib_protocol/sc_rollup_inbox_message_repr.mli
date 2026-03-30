@@ -135,7 +135,7 @@ val dal_attested_slots_serialized :
     protocol attested and who published them. Only slots published by implicit
     accounts that are protocol attested are included.
 
-    Returns a list of messages, one per published level found in the cells,
+    Returns a list of messages, one or more per published level found in the cells,
     ordered by increasing published levels. Only includes levels where at least
     one slot is attested (non-empty [slots_by_publisher]).
 
@@ -145,3 +145,19 @@ val dal_attested_slots_messages_of_cells :
   (published_level:Raw_level_repr.t -> (int * int * int) tzresult Lwt.t) ->
   (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list ->
   internal_inbox_message list tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [dal_attested_slots_messages_for_level ~published_level ~number_of_slots
+      ~slot_size ~page_size ~slots_by_publisher] splits DAL attested slots
+      information for one [published_level] into one or more
+      {!Dal_attested_slots} messages that each fit the inbox message size
+      constraints. *)
+  val dal_attested_slots_messages_for_level :
+    published_level:Raw_level_repr.t ->
+    number_of_slots:int ->
+    slot_size:int ->
+    page_size:int ->
+    slots_by_publisher:
+      Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t ->
+    internal_inbox_message list tzresult
+end

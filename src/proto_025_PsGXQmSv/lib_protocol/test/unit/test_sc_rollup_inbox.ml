@@ -919,12 +919,69 @@ let test_dal_attested_slots_encoding () =
   let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[7]) 0x10 in
   return_unit
 
+let test_dal_attested_slots_messages_of_cells_split_large_messages () =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_inbox_message_repr in
+  let published_level = Raw_level_repr.of_int32_exn 8l in
+  let number_of_slots = 160 in
+  let slots_by_publisher =
+    Stdlib.List.init number_of_slots Fun.id
+    |> List.fold_left
+         (fun acc i ->
+           let seed = Bytes.make 32 '\000' in
+           Bytes.set_int8 seed 0 i ;
+           let pkh, _pk, _sk = Signature.generate_key ~seed () in
+           let slot_index =
+             WithExceptions.Option.get ~loc:__LOC__
+             @@ Dal_slot_index_repr.of_int_opt ~number_of_slots i
+           in
+           Environment.Signature.Public_key_hash.Map.add pkh [slot_index] acc)
+         Environment.Signature.Public_key_hash.Map.empty
+  in
+  let*? messages =
+    Environment.wrap_tzresult
+      (Internal_for_tests.dal_attested_slots_messages_for_level
+         ~published_level
+         ~number_of_slots
+         ~slot_size:380_832
+         ~page_size:3967
+         ~slots_by_publisher)
+  in
+  let* () = Assert.leq_int ~loc:__LOC__ 2 (List.length messages) in
+  let check_serializable msg =
+    match serialize (Internal msg) with
+    | Ok _ -> return_unit
+    | Error _ ->
+        failwith "split Dal_attested_slots message should remain serializable"
+  in
+  let* () = List.iter_es check_serializable messages in
+  let* () =
+    let nb_serialized_slots =
+      List.fold_left
+        (fun acc -> function
+          | Dal_attested_slots {slots_by_publisher; _} ->
+              Environment.Signature.Public_key_hash.Map.fold
+                (fun _key slots acc -> acc + List.length slots)
+                slots_by_publisher
+                acc
+          | _ -> 0)
+        0
+        messages
+    in
+    Assert.equal_int ~loc:__LOC__ nb_serialized_slots number_of_slots
+  in
+  return_unit
+
 let inbox_tests =
   [
     Tztest.tztest
       "Dal_attested_slots encoding matches expected format"
       `Quick
       test_dal_attested_slots_encoding;
+    Tztest.tztest
+      "Dal_attested_slots messages are split to satisfy size limit"
+      `Quick
+      test_dal_attested_slots_messages_of_cells_split_large_messages;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inclusion proof and verifies it."
