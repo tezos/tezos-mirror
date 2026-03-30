@@ -7187,8 +7187,8 @@ let test_preimages_endpoint =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
-    ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.mainnet_kernel]
+    ~kernels:[Mainnet]
+    ~additional_uses:[Constant.WASM.evm_kernel]
     ~genesis_timestamp
   @@
   fun {
@@ -7278,7 +7278,7 @@ let test_preimages_endpoint =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.mainnet_kernel
+      ~upgrade_to:Constant.WASM.evm_kernel
       ~activation_timestamp
   in
   let* _ =
@@ -7344,8 +7344,8 @@ let test_preimages_endpoint_retry =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
     ~title:"Sequencer use remote server to get preimages with retries"
-    ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.mainnet_kernel]
+    ~kernels:[Mainnet]
+    ~additional_uses:[Constant.WASM.evm_kernel]
     ~genesis_timestamp
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
@@ -7407,7 +7407,7 @@ let test_preimages_endpoint_retry =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.mainnet_kernel
+      ~upgrade_to:Constant.WASM.evm_kernel
       ~activation_timestamp
   in
   let* () = finalizeL1 () in
