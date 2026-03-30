@@ -7,8 +7,6 @@ use revm::{
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
-use tezos_data_encoding::nom::NomReader;
-use tezos_protocol::contract::Contract;
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
     gas, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
@@ -108,8 +106,8 @@ fn build_http_request(
 #[allow(clippy::too_many_arguments)]
 fn inject_tezos_headers(
     headers: &mut HeaderMap,
-    sender_alias: &[u8],
-    source_alias: &[u8],
+    sender_alias: &str,
+    source_alias: &str,
     amount: U256,
     gas_limit: u64,
     timestamp: U256,
@@ -121,15 +119,8 @@ fn inject_tezos_headers(
             CustomPrecompileError::Revert(format!("invalid header value: {e}"))
         })
     };
-    //TODO: Avoid michelson specific formatting with https://linear.app/tezos/issue/L2-954/read-string-for-alias-on-durable-storage
-    let sender_alias: String = Contract::nom_read_exact(sender_alias)
-        .map_err(|_| CustomPrecompileError::Revert("invalid sender alias".to_string()))?
-        .to_string();
-    headers.insert(X_TEZOS_SENDER, parse_value(&sender_alias)?);
-    let source_alias: String = Contract::nom_read_exact(source_alias)
-        .map_err(|_| CustomPrecompileError::Revert("invalid source alias".to_string()))?
-        .to_string();
-    headers.insert(X_TEZOS_SOURCE, parse_value(&source_alias)?);
+    headers.insert(X_TEZOS_SENDER, parse_value(sender_alias)?);
+    headers.insert(X_TEZOS_SOURCE, parse_value(source_alias)?);
     // Format the amount (in wei) as a TEZ decimal string.
     // The receiving runtime truncates to its own precision (ADR L2-1004).
     headers.insert(
@@ -475,7 +466,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tezos_data_encoding::enc::BinWriter;
+    use tezos_protocol::contract::Contract;
 
     use super::*;
 
@@ -611,8 +602,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            &sender_alias.to_bytes().unwrap(),
-            &source_alias.to_bytes().unwrap(),
+            &sender_alias.to_b58check(),
+            &source_alias.to_b58check(),
             amount,
             gas_limit,
             timestamp,
@@ -738,8 +729,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            &sender_alias.to_bytes().unwrap(),
-            &source_alias.to_bytes().unwrap(),
+            &sender_alias.to_b58check(),
+            &source_alias.to_b58check(),
             U256::ZERO,
             100_000,
             U256::from(1_700_000_000u64),
@@ -772,8 +763,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            &sender_alias.to_bytes().unwrap(),
-            &source_alias.to_bytes().unwrap(),
+            &sender_alias.to_b58check(),
+            &source_alias.to_b58check(),
             amount,
             100_000,
             U256::from(1_700_000_000u64),
@@ -804,8 +795,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            &sender_alias.to_bytes().unwrap(),
-            &source_alias.to_bytes().unwrap(),
+            &sender_alias.to_b58check(),
+            &source_alias.to_b58check(),
             U256::ZERO,
             0,
             U256::ZERO,
@@ -954,8 +945,8 @@ mod tests {
 
         inject_tezos_headers(
             request.headers_mut(),
-            &sender_alias.to_bytes().unwrap(),
-            &sender_alias.to_bytes().unwrap(),
+            &sender_alias.to_b58check(),
+            &sender_alias.to_b58check(),
             // 1 TEZ in wei
             U256::from(10u64).pow(U256::from(18u64)),
             50_000,

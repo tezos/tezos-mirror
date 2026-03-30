@@ -323,8 +323,8 @@ fn build_http_request(
 /// `timestamp` is a Unix timestamp in seconds (must be non-negative).
 fn inject_context_headers_raw(
     headers: &mut http::HeaderMap,
-    sender_alias: &[u8],
-    source_alias: &[u8],
+    sender_alias: &str,
+    source_alias: &str,
     amount_mutez: u64,
     gas_limit: u64,
     timestamp: u64,
@@ -335,15 +335,8 @@ fn inject_context_headers_raw(
             TransferError::GatewayError(format!("invalid header value: {e}"))
         })
     };
-    //TODO: Avoid ethereum specific formatting with https://linear.app/tezos/issue/L2-954/read-string-for-alias-on-durable-storage
-    headers.insert(
-        X_TEZOS_SENDER,
-        parse_value(&format!("0x{}", hex::encode(sender_alias)))?,
-    );
-    headers.insert(
-        X_TEZOS_SOURCE,
-        parse_value(&format!("0x{}", hex::encode(source_alias)))?,
-    );
+    headers.insert(X_TEZOS_SENDER, parse_value(sender_alias)?);
+    headers.insert(X_TEZOS_SOURCE, parse_value(source_alias)?);
     headers.insert(
         X_TEZOS_AMOUNT,
         parse_value(&format_tez_from_mutez(amount_mutez))?,
@@ -506,7 +499,7 @@ fn get_or_create_alias<Host>(
     address: &AddressHash,
     context: CrossRuntimeContext,
     registry: &impl Registry,
-) -> Result<Vec<u8>, TransferError>
+) -> Result<String, TransferError>
 where
     Host: StorageV1 + Logging,
 {
@@ -514,17 +507,11 @@ where
         return Ok(alias);
     }
     let address_b58 = address.to_base58_check();
-    let alias = registry
-        .generate_alias(
-            host,
-            journal,
-            address_b58.as_bytes(),
-            RuntimeId::Ethereum,
-            context,
-        )
+    let alias_str = registry
+        .generate_alias(host, journal, &address_b58, RuntimeId::Ethereum, context)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    store_alias(host, address, RuntimeId::Ethereum, &alias)?;
-    Ok(alias)
+    store_alias(host, address, RuntimeId::Ethereum, &alias_str)?;
+    Ok(alias_str)
 }
 
 /// Build a `CrossRuntimeContext` from the current execution context.
@@ -740,8 +727,7 @@ mod tests {
     #[test]
     fn test_tezosx_cross_runtime_call_passes_calldata() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias.clone());
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -773,11 +759,11 @@ mod tests {
         assert_eq!(serve_calls[0].body(), &calldata);
         assert_eq!(
             serve_calls[0].headers().get(X_TEZOS_SENDER).unwrap(),
-            "0x01020304"
+            "KT1_mock_alias"
         );
         assert_eq!(
             serve_calls[0].headers().get(X_TEZOS_SOURCE).unwrap(),
-            "0x01020304"
+            "KT1_mock_alias"
         );
         assert_eq!(
             serve_calls[0].headers().get(X_TEZOS_AMOUNT).unwrap(),
@@ -788,8 +774,7 @@ mod tests {
     #[test]
     fn test_tezosx_transfer_creates_alias_when_absent() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias.clone());
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         // tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb as AddressHash
         let source = AddressHash::from_bytes(&[
@@ -825,8 +810,7 @@ mod tests {
     #[test]
     fn test_tezosx_transfer_reuses_existing_alias() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias.clone());
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -971,22 +955,16 @@ mod tests {
         let mut headers = http::HeaderMap::new();
         inject_context_headers_raw(
             &mut headers,
-            b"sender_alias",
-            b"source_alias",
+            "sender_alias",
+            "source_alias",
             42u64, // 42 mutez = 0.000042 TEZ
             1000,
             1700000000u64,
             5,
         )
         .unwrap();
-        assert_eq!(
-            headers.get("X-Tezos-Sender").unwrap(),
-            "0x73656e6465725f616c696173"
-        );
-        assert_eq!(
-            headers.get("X-Tezos-Source").unwrap(),
-            "0x736f757263655f616c696173"
-        );
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
+        assert_eq!(headers.get("X-Tezos-Source").unwrap(), "source_alias");
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0.000042");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
@@ -1002,18 +980,15 @@ mod tests {
         );
         inject_context_headers_raw(
             &mut headers,
-            b"new_alias",
-            b"source_alias",
+            "new_alias",
+            "source_alias",
             0u64,
             0,
             0u64,
             0,
         )
         .unwrap();
-        assert_eq!(
-            headers.get("X-Tezos-Sender").unwrap(),
-            "0x6e65775f616c696173"
-        );
+        assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
     }
 
     #[test]
@@ -1056,8 +1031,7 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_zero_amount() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias);
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -1081,8 +1055,7 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_negative_amount_rejected() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias);
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -1107,9 +1080,8 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_non_success_response() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
         let registry = MockRegistryWithStatus::new(
-            generated_alias,
+            "KT1_mock_alias".to_string(),
             500,
             b"internal server error".to_vec(),
         );
@@ -1137,9 +1109,11 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_400_response() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry =
-            MockRegistryWithStatus::new(generated_alias, 400, b"bad request".to_vec());
+        let registry = MockRegistryWithStatus::new(
+            "KT1_mock_alias".to_string(),
+            400,
+            b"bad request".to_vec(),
+        );
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -1236,7 +1210,7 @@ mod tests {
     #[test]
     fn test_inject_context_headers_raw_zero_amount() {
         let mut headers = http::HeaderMap::new();
-        inject_context_headers_raw(&mut headers, b"sender", b"source", 0u64, 0, 0u64, 0)
+        inject_context_headers_raw(&mut headers, "sender", "source", 0u64, 0, 0u64, 0)
             .unwrap();
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "0");
@@ -1249,8 +1223,8 @@ mod tests {
         let mut headers = http::HeaderMap::new();
         inject_context_headers_raw(
             &mut headers,
-            b"sender",
-            b"source",
+            "sender",
+            "source",
             u64::MAX,
             u64::MAX,
             u64::MAX,
@@ -1424,8 +1398,7 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_large_amount_header() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias);
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
@@ -1449,8 +1422,7 @@ mod tests {
     #[test]
     fn test_cross_runtime_call_fractional_amount_header() {
         let mut host = MockKernelHost::default();
-        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
-        let registry = MockRegistry::new(generated_alias);
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
         let source = AddressHash::from_bytes(&[
             0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,

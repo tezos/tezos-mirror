@@ -33,11 +33,11 @@ pub fn store_alias(
     host: &mut impl StorageV1,
     source: &AddressHash,
     runtime: RuntimeId,
-    alias: &[u8],
+    alias: &str,
 ) -> Result<(), TransferError> {
     let path = alias_path(source, runtime)?;
 
-    host.store_write_all(&path, alias)
+    host.store_write_all(&path, alias.as_bytes())
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
 
     Ok(())
@@ -47,11 +47,14 @@ pub fn get_alias(
     host: &mut impl StorageV1,
     source: &AddressHash,
     runtime: RuntimeId,
-) -> Result<Option<Vec<u8>>, TransferError> {
+) -> Result<Option<String>, TransferError> {
     let path = alias_path(source, runtime)?;
 
     match host.store_read_all(&path) {
-        Ok(bytes) => Ok(Some(bytes)),
+        Ok(bytes) => Ok(Some(
+            String::from_utf8(bytes)
+                .map_err(|e| TransferError::GatewayError(e.to_string()))?,
+        )),
         Err(tezos_smart_rollup_host::runtime::RuntimeError::PathNotFound) => Ok(None),
         Err(e) => Err(TransferError::GatewayError(e.to_string())),
     }

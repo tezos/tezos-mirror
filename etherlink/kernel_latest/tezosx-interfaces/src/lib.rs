@@ -74,10 +74,10 @@ pub trait Registry {
         &self,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &[u8],
+        native_address: &str,
         runtime_id: RuntimeId,
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    ) -> Result<String, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging;
 
@@ -108,9 +108,9 @@ pub trait RuntimeInterface {
         registry: &impl Registry,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &[u8],
+        native_address: &str,
         context: CrossRuntimeContext,
-    ) -> Result<Vec<u8>, TezosXRuntimeError>
+    ) -> Result<String, TezosXRuntimeError>
     where
         Host: StorageV1 + Logging;
 

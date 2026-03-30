@@ -1047,13 +1047,12 @@ let dispatch_request (type f) ~websocket
         | Tezosx.Get_tezos_ethereum_address.Method ->
             let f tezos_address =
               tezos_address |> Tezos_types.Contract.to_b58check
-              |> Bytes.of_string |> Tezosx_mod.Ethereum_runtime.generate_alias
-              |> rpc_ok
+              |> Tezosx_mod.Ethereum_runtime.generate_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters
         | Tezosx.Get_ethereum_tezos_address.Method ->
             let f ethereum_address =
-              ethereum_address |> Ethereum_types.encode_address
+              ethereum_address |> Ethereum_types.Address.to_string
               |> Tezosx_mod.Tezos_runtime.generate_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters

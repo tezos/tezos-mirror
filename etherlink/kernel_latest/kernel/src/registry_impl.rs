@@ -32,10 +32,10 @@ impl Registry for RegistryImpl {
         &self,
         host: &mut Host,
         journal: &mut TezosXJournal,
-        native_address: &[u8],
+        native_address: &str,
         runtime_id: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
-    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError>
+    ) -> Result<String, tezosx_interfaces::TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
