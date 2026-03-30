@@ -39,7 +39,7 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       let* () =
         Client_confirmations.really_wait_for_bootstrapped
           ~retry:
-            (Baking_scheduling.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
+            (Baking_automaton.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
           cctxt
       in
       retry_on_disconnection cctxt f
@@ -164,7 +164,7 @@ module Baker = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5
@@ -212,7 +212,7 @@ module Accuser = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5
@@ -252,7 +252,7 @@ module VDF = struct
     let* () =
       Client_confirmations.really_wait_for_bootstrapped
         ~retry:
-          (Baking_scheduling.retry
+          (Baking_automaton.retry
              cctxt
              ~delay:1.
              ~factor:1.5
