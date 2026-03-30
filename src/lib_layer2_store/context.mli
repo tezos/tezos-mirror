@@ -183,6 +183,19 @@ module PVMState : sig
   (** [maybe_readone mode state] returns a read-only version of [state] if
       [mode] is [Read_only]. *)
   val maybe_readonly : 'a Access_mode.t -> [`Read | `Write] value -> 'a value
+
+  (** Returns the cache preference for the context backend. *)
+  val cache_preference : _ index -> Context_sigs.cache_preference
+
+  (** [commit index state] commits the PVM [state] to disk and returns the
+      commit hash. This commits the raw PVM state tree, not a full context tree
+      with the [/pvm_state] subtree prefix. Used for on-disk caching of
+      refutation game states. *)
+  val commit : [`Read | `Write] index -> [`Read | `Write] value -> hash Lwt.t
+
+  (** [checkout index hash] restores a PVM state from the commit [hash].
+      Returns [None] if the commit is not found. *)
+  val checkout : _ index -> hash -> [`Read | `Write] value option Lwt.t
 end
 
 module Version : sig

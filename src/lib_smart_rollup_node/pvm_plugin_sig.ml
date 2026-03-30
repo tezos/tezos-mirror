@@ -57,14 +57,26 @@ let to_mut_eval_state s = {s with state = Context.PVMState.mut_copy s.state}
 
 let to_imm_eval_state s = {s with state = Context.PVMState.imm_copy s.state}
 
+(** A cached snapshot is either an in-memory immutable copy or an on-disk
+    commit hash. The choice depends on the context backend's
+    {!Context.PVMState.cache_preference}. *)
+type cached_snapshot =
+  | In_memory_snapshot of Context.PVMState.immutable_value
+  | On_disk_snapshot of Context.hash
+
+(** Cached evaluation state: the {!eval_state_info} metadata plus a
+    {!cached_snapshot} for the PVM state itself. *)
+type 'fuel cached_eval_state = {
+  cached_info : 'fuel eval_state_info;
+  snapshot : cached_snapshot;
+}
+
 (* The cache allows cache intermediate states of the PVM in e.g. dissections. *)
 module Tick_state_cache : Aches_lwt.Lache.MAP_RESULT with type key = Z.t =
   Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (Z))
 
 type state_cache =
-  ( (Fuel.Accounted.t, Context.PVMState.immutable_value) eval_state,
-    tztrace )
-  Tick_state_cache.t
+  (Fuel.Accounted.t cached_eval_state, tztrace) Tick_state_cache.t
 
 let make_state_cache n = Tick_state_cache.create n
 

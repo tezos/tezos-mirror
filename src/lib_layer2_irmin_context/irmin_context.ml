@@ -331,6 +331,28 @@ module PVMState = struct
     @@ fun _ ->
     let+ tree = IStore.Tree.add_tree (to_imm ctxt.state) key (to_imm state) in
     ctxt.state := tree
+
+  let cache_preference = Context_sigs.In_memory
+
+  (** Note: for the Irmin backend, in-memory caching via immutable copies is
+      preferred (see {!cache_preference}). These functions are provided for
+      interface completeness but are not expected to be used in practice.
+      They commit/checkout the raw PVM state tree directly, not the full
+      context tree with the [/pvm_state] subtree prefix. *)
+
+  let commit index state =
+    let open Lwt_syntax in
+    let+ commit = raw_commit ~message:"refutation_cache" index (to_imm state) in
+    IStore.Commit.hash commit
+
+  let checkout index key =
+    let open Lwt_syntax in
+    let* commit = IStore.Commit.of_hash index.repo key in
+    match commit with
+    | None -> return_none
+    | Some commit ->
+        let tree = IStore.Commit.tree commit in
+        return_some (from_imm tree)
 end
 
 let load ~cache_size ?async_domain mode path =
