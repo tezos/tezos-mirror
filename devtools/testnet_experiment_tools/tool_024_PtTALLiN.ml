@@ -259,16 +259,13 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
       ~delay_increment_per_round:constants.parametric.delay_increment_per_round
     |> Environment.wrap_tzresult
   in
-  let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
-  in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
+    ?monitor_node_operations
     ~constants
     ~chain
     config
-    operation_worker
     ~current_proposal
     round_durations
     delegates

@@ -79,12 +79,13 @@ val run :
     {!Baking_actions.compute_round} with [current_proposal] information if
     [synchronize] is set to [true] (which is the default). *)
 val create_initial_state :
+  ?canceler:Lwt_canceler.t ->
   Protocol_client_context.full ->
   ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?synchronize:bool ->
+  ?monitor_node_operations:bool ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Operation_worker.t ->
   Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->

@@ -729,3 +729,30 @@ let try_resolve_consensus_keys cctxt key =
         (* we query only one level, the returned list length must be 1 *)
       in
       try_find_delegate_key levels_to_inspect
+
+let create_automaton_state ?canceler ?monitor_node_operations ~global_state
+    cctxt =
+  let open Lwt_result_syntax in
+  let name = Uri.to_string cctxt#base in
+  let*! operation_worker =
+    Operation_worker.run
+      ?monitor_node_operations
+      ~round_durations:global_state.round_durations
+      cctxt
+  in
+  Option.iter
+    (fun canceler ->
+      Lwt_canceler.on_cancel canceler (fun () ->
+          let*! _ = Operation_worker.shutdown_worker operation_worker in
+          Lwt.return_unit))
+    canceler ;
+  let* validation_mode =
+    Baking_state.(
+      match global_state.config.Baking_configuration.validation with
+      | Node -> return Node
+      | Local {data_dir} ->
+          let* index = Baking_simulator.load_context ~data_dir in
+          return (Local index)
+      | ContextIndex index -> return (Local index))
+  in
+  return {name; cctxt; validation_mode; operation_worker}
