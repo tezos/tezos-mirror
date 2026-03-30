@@ -74,7 +74,7 @@ oc.create-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-homebrew-formula-macosx:
-  image: macos-15-xcode-16
+  image: $MACOS_IMAGE
   stage: build
   tags:
   - $TAGS
@@ -97,3 +97,8 @@ oc.build-homebrew-formula-macosx:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TAGS: saas-macos-large-m2pro
+  parallel:
+    matrix:
+    - MACOS_IMAGE:
+      - macos-15-xcode-16
+      - macos-26-xcode-26
