@@ -129,7 +129,10 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state.global_state consensus_batch
+    Baking_actions.sign_consensus_votes
+      state.automaton_state
+      state.global_state
+      consensus_batch
   in
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
@@ -170,7 +173,10 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state.global_state consensus_batch
+    Baking_actions.sign_consensus_votes
+      state.automaton_state
+      state.global_state
+      consensus_batch
   in
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
@@ -187,7 +193,7 @@ let do_action (state, action) =
 
 let bake_at_next_level_event state =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let*! baking_time =
     Baking_automaton.compute_next_potential_baking_time_at_next_level state
   in
@@ -218,7 +224,10 @@ let bake_at_next_level state =
   match action with
   | Prepare_block {block_to_bake} ->
       let* prepared_block =
-        Baking_actions.prepare_block state.global_state block_to_bake
+        Baking_actions.prepare_block
+          state.automaton_state
+          state.global_state
+          block_to_bake
       in
       let*! () = sleep_until_block_timestamp prepared_block in
       let* new_state =
@@ -257,7 +266,8 @@ let attestations_attesting_power state attestations =
 let generic_attesting_power (filter : packed_operation list -> 'a list)
     (extract : 'a -> consensus_content) state =
   let current_mempool =
-    Operation_worker.get_current_operations state.global_state.operation_worker
+    Operation_worker.get_current_operations
+      state.automaton_state.operation_worker
   in
   let latest_proposal = state.level_state.latest_proposal in
   let block_round = latest_proposal.block.round in
@@ -297,7 +307,7 @@ let state_attesting_power =
 
 let propose_at_next_level ~minimal_timestamp state =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   assert (Option.is_some state.level_state.elected_block) ;
   if minimal_timestamp then
     let* minimal_round, delegate =
@@ -311,7 +321,7 @@ let propose_at_next_level ~minimal_timestamp state =
     in
     let pool =
       Operation_worker.get_current_operations
-        state.global_state.operation_worker
+        state.automaton_state.operation_worker
     in
     let kind = Fresh pool in
     let force_apply =
@@ -327,7 +337,10 @@ let propose_at_next_level ~minimal_timestamp state =
       }
     in
     let* prepared_block =
-      Baking_actions.prepare_block state.global_state block_to_bake
+      Baking_actions.prepare_block
+        state.automaton_state
+        state.global_state
+        block_to_bake
     in
     let*! () = sleep_until_block_timestamp prepared_block in
     let* state =
@@ -398,7 +411,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   let* () =
     Operation_worker.retrieve_pending_operations
       cctxt
-      state.global_state.operation_worker
+      state.automaton_state.operation_worker
   in
   let* _ =
     match state.level_state.elected_block with
@@ -466,6 +479,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                       | Prepare_block {block_to_bake} ->
                           let* prepared_block =
                             Baking_actions.prepare_block
+                              state.automaton_state
                               state.global_state
                               block_to_bake
                           in
@@ -525,7 +539,9 @@ let mk_prequorum state latest_proposal =
       state
       latest_proposal
       Preattestation
-    |> Baking_actions.sign_consensus_votes state.global_state
+    |> Baking_actions.sign_consensus_votes
+         state.automaton_state
+         state.global_state
   in
   let {level; round; block_payload_hash} : batch_content =
     batch.batch_content
@@ -600,7 +616,10 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
             match action with
             | Prepare_block {block_to_bake} ->
                 let* signed_block =
-                  Baking_actions.prepare_block state.global_state block_to_bake
+                  Baking_actions.prepare_block
+                    state.automaton_state
+                    state.global_state
+                    block_to_bake
                 in
                 let*! () = sleep_until_block_timestamp signed_block in
                 let* _state =
@@ -634,7 +653,7 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
 
 let bake_using_automaton ~count config state heads_stream =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
   let forge_event_stream =
@@ -644,7 +663,7 @@ let bake_using_automaton ~count config state heads_stream =
     Baking_automaton.create_loop_state
       ~heads_stream
       ~forge_event_stream
-      state.global_state.operation_worker
+      state.automaton_state.operation_worker
   in
   let stop_on_next_level_block = function
     | New_head_proposal proposal ->
@@ -677,7 +696,7 @@ let bake_using_automaton ~count config state heads_stream =
 let rec baking_minimal_timestamp ~count state
     (block_stream : proposal Lwt_stream.t) =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
   let own_attestations =
     State_transitions.make_consensus_vote_batch
@@ -686,7 +705,8 @@ let rec baking_minimal_timestamp ~count state
       Attestation
   in
   let current_mempool =
-    Operation_worker.get_current_operations state.global_state.operation_worker
+    Operation_worker.get_current_operations
+      state.automaton_state.operation_worker
   in
   let attestations_in_mempool =
     Operation_pool.(
@@ -744,6 +764,7 @@ let rec baking_minimal_timestamp ~count state
         own_attestations
     in
     Baking_actions.sign_consensus_votes
+      state.automaton_state
       state.global_state
       own_attestations_with_dal
   in
@@ -768,7 +789,10 @@ let rec baking_minimal_timestamp ~count state
     }
   in
   let* prepared_block =
-    Baking_actions.prepare_block state.global_state block_to_bake
+    Baking_actions.prepare_block
+      state.automaton_state
+      state.global_state
+      block_to_bake
   in
   let*! () = sleep_until_block_timestamp prepared_block in
   let* new_state =
@@ -861,7 +885,7 @@ let bake (cctxt : Protocol_client_context.full) ?dal_node_rpc_ctxt ?minimal_fees
            blocks being baked *)
         Operation_worker.retrieve_pending_operations
           cctxt
-          state.global_state.operation_worker)
+          state.automaton_state.operation_worker)
   in
   if not minimal_timestamp then
     bake_using_automaton ~count config state block_stream

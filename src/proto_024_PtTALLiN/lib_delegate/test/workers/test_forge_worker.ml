@@ -227,8 +227,14 @@ let test_mixed_concurrent_access () =
 let with_forge_worker_test_env ?forge_consensus_vote_hook f =
   let open Lwt_result_syntax in
   (* Create baker test environment - reuses same setup as baker_process/run *)
-  let* Mockup_simulator.{cctxt = _; delegates; global_state; genesis_block_info}
-      =
+  let* Mockup_simulator.
+         {
+           cctxt = _;
+           delegates;
+           global_state;
+           automaton_state;
+           genesis_block_info;
+         } =
     Mockup_simulator.create_baker_test_env ~num_delegates:3 ()
   in
   (* Start forge worker - with optional hook if provided *)
@@ -241,7 +247,12 @@ let with_forge_worker_test_env ?forge_consensus_vote_hook f =
   let event_stream = Forge_worker.get_event_stream worker in
   (* Run the test function *)
   let* result =
-    f ~worker ~event_stream ~delegates ~block_info:genesis_block_info
+    f
+      ~worker
+      ~event_stream
+      ~delegates
+      ~automaton_state
+      ~block_info:genesis_block_info
   in
   (* Shutdown worker *)
   let*! () = Forge_worker.shutdown worker in
@@ -283,7 +294,7 @@ let collect_n_events ~event_stream ~matches ~expected =
 *)
 let test_forge_attestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -308,7 +319,11 @@ let test_forge_attestations () =
       let*! pushed =
         Forge_worker.push_request
           worker
-          (Baking_state.Forge_and_sign_attestations {unsigned_attestations})
+          Baking_state.
+            {
+              automaton_state;
+              request = Forge_and_sign_attestations {unsigned_attestations};
+            }
       in
       if not pushed then failwith "Failed to push attestation request"
       else
@@ -340,7 +355,7 @@ let test_forge_attestations () =
 *)
 let test_forge_preattestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create preattestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -365,8 +380,12 @@ let test_forge_preattestations () =
       let*! pushed =
         Forge_worker.push_request
           worker
-          (Baking_state.Forge_and_sign_preattestations
-             {unsigned_preattestations})
+          Baking_state.
+            {
+              automaton_state;
+              request =
+                Forge_and_sign_preattestations {unsigned_preattestations};
+            }
       in
       if not pushed then failwith "Failed to push preattestation request"
       else
@@ -398,7 +417,7 @@ let test_forge_preattestations () =
 *)
 let test_forge_block () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       match delegates with
       | [] -> failwith "No delegates available"
@@ -421,7 +440,8 @@ let test_forge_block () =
           let*! pushed =
             Forge_worker.push_request
               worker
-              (Baking_state.Forge_and_sign_block block_to_bake)
+              Baking_state.
+                {automaton_state; request = Forge_and_sign_block block_to_bake}
           in
           if not pushed then failwith "Failed to push block forging request"
           else
@@ -459,7 +479,7 @@ let test_forge_block () =
 *)
 let test_multiple_delegates_concurrent () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation requests for each delegate separately *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -482,8 +502,12 @@ let test_multiple_delegates_concurrent () =
             let* _pushed =
               Forge_worker.push_request
                 worker
-                (Baking_state.Forge_and_sign_attestations
-                   {unsigned_attestations})
+                Baking_state.
+                  {
+                    automaton_state;
+                    request =
+                      Forge_and_sign_attestations {unsigned_attestations};
+                  }
             in
             return_unit)
           delegates
@@ -541,7 +565,7 @@ let test_multiple_delegates_concurrent () =
 let test_cancel_pending_tasks () =
   with_forge_worker_test_env
     ~forge_consensus_vote_hook:(fun () -> Lwt_unix.sleep 1.0)
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let key = Stdlib.List.hd delegates in
       let delegate =
@@ -578,8 +602,12 @@ let test_cancel_pending_tasks () =
               let* _pushed =
                 Forge_worker.push_request
                   worker
-                  (Baking_state.Forge_and_sign_attestations
-                     {unsigned_attestations})
+                  Baking_state.
+                    {
+                      automaton_state;
+                      request =
+                        Forge_and_sign_attestations {unsigned_attestations};
+                    }
               in
               return_unit)
             (Array.to_list (Array.init num_requests Fun.id))
@@ -644,7 +672,7 @@ let test_cancel_pending_tasks () =
 *)
 let test_same_delegate_serialization () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~block_info ->
+    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
       (* Push one request per delegate - each request contains one attestation *)
@@ -667,8 +695,12 @@ let test_same_delegate_serialization () =
             let* _pushed =
               Forge_worker.push_request
                 worker
-                (Baking_state.Forge_and_sign_attestations
-                   {unsigned_attestations})
+                Baking_state.
+                  {
+                    automaton_state;
+                    request =
+                      Forge_and_sign_attestations {unsigned_attestations};
+                  }
             in
             return_unit)
           delegates

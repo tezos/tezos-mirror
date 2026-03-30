@@ -73,7 +73,8 @@ val pp_action : Format.formatter -> action -> unit
 
 (** {2 Functions used by the baker} *)
 
-(** [prepare_block global_state block_to_bake] prepares a block by:
+(** [prepare_block automaton_state global_state block_to_bake]
+    prepares a block by:
     - inferring the block timestamp
 
     - recovering the operations from the mempool if the block is a new proposal,
@@ -92,21 +93,26 @@ val pp_action : Format.formatter -> action -> unit
     - registering the seed nonce if needed
 *)
 val prepare_block :
-  global_state -> block_to_bake -> prepared_block tzresult Lwt.t
+  automaton_state ->
+  global_state ->
+  block_to_bake ->
+  prepared_block tzresult Lwt.t
 
-(** [authorized_consensus_votes global_state unsigned_consensus_vote_batch]
+(** [authorized_consensus_votes automaton_state global_state unsigned_consensus_vote_batch]
     records and returns the list of unsigned_consensus_vote authorized according
     to the [Baking_highwatermarks]. This function emits an event for each
     unauthorized consensus vote.*)
 val authorized_consensus_votes :
+  automaton_state ->
   global_state ->
   unsigned_consensus_vote_batch ->
   unsigned_consensus_vote list tzresult Lwt.t
 
-(** [forge_and_sign_consensus_vote global_state branch unsigned_consensus_vote]
+(** [forge_and_sign_consensus_vote automaton_state global_state branch unsigned_consensus_vote]
     forges a consensus operation by encoding the operation consensus content
     from [unsigned_consensus_vote] with the [branch] and then sign it. *)
 val forge_and_sign_consensus_vote :
+  automaton_state ->
   global_state ->
   branch:Block_hash.t ->
   unsigned_consensus_vote ->
@@ -127,6 +133,7 @@ val perform_action : state -> t -> state tzresult Lwt.t
     signs these operation by calling [forge_and_sign_consensus_vote], and then
     creates a batch with [Baking_state.make_signed_consensus_vote_batch]. *)
 val sign_consensus_votes :
+  automaton_state ->
   global_state ->
   unsigned_consensus_vote_batch ->
   signed_consensus_vote_batch tzresult Lwt.t

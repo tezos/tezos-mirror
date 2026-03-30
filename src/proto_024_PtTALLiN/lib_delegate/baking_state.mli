@@ -347,9 +347,23 @@ type block_to_bake = {
           [baking_commands.ml]). *)
 }
 
-(** [forge_request] type used to push a concurrent forging task in the forge
-    worker. *)
-type forge_request =
+(** The validation mode specifies whether the baker (filters and) validates
+    mempool operations via an RPC to the node, or if it does so "locally", by
+    using the context. *)
+type validation_mode = Node | Local of Abstract_context_index.t
+
+(** State specific to one automaton instance (one per node). *)
+type automaton_state = {
+  name : string;
+  cctxt : Protocol_client_context.full;
+  validation_mode : validation_mode;
+  operation_worker : Operation_worker.t;
+}
+
+(** The content of a [forge_request]: identifies what needs to be forged
+    and signed, without the node-specific context. Paired with an
+    {!automaton_state} in {!forge_request}. *)
+type forge_request_content =
   | Forge_and_sign_block of block_to_bake
   | Forge_and_sign_preattestations of {
       unsigned_preattestations : unsigned_consensus_vote_batch;
@@ -357,6 +371,12 @@ type forge_request =
   | Forge_and_sign_attestations of {
       unsigned_attestations : unsigned_consensus_vote_batch;
     }
+
+(** [forge_request] type used to push a concurrent forging task in the forge worker. *)
+type forge_request = {
+  automaton_state : automaton_state;
+  request : forge_request_content;
+}
 
 (** [manager_operations_infos] contains information about the number of manager
     operations in the forged block and the summing fees from these operations *)
@@ -408,11 +428,6 @@ type forge_worker_hooks = {
 
 (** {2 Global_state types and functions} *)
 
-(** The validation mode specifies whether the baker (filters and) validates
-    mempool operations via an RPC to the node, or if it does so "locally", by
-    using the context. *)
-type validation_mode = Node | Local of Abstract_context_index.t
-
 val pp_validation_mode : Format.formatter -> validation_mode -> unit
 
 (** Caches of timestamps *)
@@ -422,17 +437,16 @@ type cache = {
 
 val create_cache : unit -> cache
 
-(** A global state contains all information related to the chain and baker
-    configuration. *)
+(** Static data shared across all automaton instances: chain identity, baker
+    configuration, round durations, and shared workers.  Node-specific context
+    (cctxt, constants, validation mode, operation worker) lives in
+    {!automaton_state}. *)
 type global_state = {
-  cctxt : Protocol_client_context.full;
   chain_id : Chain_id.t;
   config : Baking_configuration.t;
-  constants : Constants.t;
   round_durations : Round.round_durations;
-  operation_worker : Operation_worker.t;
+  constants : Constants.t;
   mutable forge_worker_hooks : forge_worker_hooks;
-  validation_mode : validation_mode;
   delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
@@ -440,8 +454,11 @@ type global_state = {
 
 val pp_global_state : Format.formatter -> global_state -> unit
 
+val pp_automaton_state : Format.formatter -> automaton_state -> unit
+
 type state = {
   global_state : global_state;
+  automaton_state : automaton_state;
   level_state : level_state;
   round_state : round_state;
 }

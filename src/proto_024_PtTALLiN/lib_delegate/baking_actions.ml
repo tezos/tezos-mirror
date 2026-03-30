@@ -227,10 +227,9 @@ let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
       Lwt.return (Error errs)
   | `Signature_result (Ok res) -> Lwt.return (Ok res)
 
-let sign_block_header round_duration global_state proposer unsigned_block_header
-    =
+let sign_block_header (cctxt : Protocol_client_context.full) round_duration
+    global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let force = global_state.config.force in
   let {Block_header.shell; protocol_data = {contents; _}} =
@@ -295,15 +294,15 @@ let sign_block_header round_duration global_state proposer unsigned_block_header
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
-    =
+let prepare_block (automaton_state : automaton_state)
+    (global_state : global_state) (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
+  let cctxt = automaton_state.cctxt in
   let level = Int32.succ predecessor.shell.level in
   let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let simulation_mode = global_state.validation_mode in
+  let simulation_mode = automaton_state.validation_mode in
   let round_durations = global_state.round_durations in
   let*? timestamp =
     Environment.wrap_tzresult
@@ -449,6 +448,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let*! () = Events.(emit signing_block (level, round, delegate)) in
   let* signed_block_header =
     (sign_block_header
+       cctxt
        round_duration
        global_state
        delegate.consensus_key
@@ -610,7 +610,8 @@ let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   in
   may_sign || global_state.config.force
 
-let authorized_consensus_votes global_state
+let authorized_consensus_votes (automaton_state : automaton_state)
+    (global_state : global_state)
     (unsigned_consensus_vote_batch : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   (* Hypothesis: all consensus votes have the same round and level *)
@@ -622,8 +623,8 @@ let authorized_consensus_votes global_state
   } =
     unsigned_consensus_vote_batch
   in
+  let cctxt = automaton_state.cctxt in
   let level = Raw_level.to_int32 level in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
@@ -678,10 +679,10 @@ let authorized_consensus_votes global_state
   in
   return authorized_votes
 
-let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
+let forge_and_sign_consensus_vote (automaton_state : automaton_state)
+    (global_state : global_state) ~branch unsigned_consensus_vote :
     signed_consensus_vote tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let {
     vote_kind;
@@ -780,7 +781,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     @@ sign
          ?timeout:global_state.config.remote_calls_timeout
          ~signing_request
-         cctxt
+         automaton_state.cctxt
          ~watermark
          sk_consensus_uri
          unsigned_operation_bytes
@@ -808,7 +809,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
           @@ sign
                ?timeout:global_state.config.remote_calls_timeout
                ~signing_request
-               cctxt
+               automaton_state.cctxt
                ~watermark
                sk_companion_uri
                unsigned_operation_bytes
@@ -860,13 +861,15 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let unsigned_consensus_vote = {unsigned_consensus_vote with dal_content} in
   return {unsigned_consensus_vote; signed_operation}
 
-let sign_consensus_votes (global_state : global_state)
+let sign_consensus_votes (automaton_state : automaton_state)
+    (global_state : global_state)
     ({batch_kind; batch_content; batch_branch; _} as
      unsigned_consensus_vote_batch :
       unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let* authorized_consensus_votes =
     (authorized_consensus_votes
+       automaton_state
        global_state
        unsigned_consensus_vote_batch
      [@profiler.record_s {verbosity = Info} "authorized consensus votes"])
@@ -877,6 +880,7 @@ let sign_consensus_votes (global_state : global_state)
         let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
+             automaton_state
              global_state
              ~branch:batch_branch
              unsigned_consensus_vote
@@ -905,7 +909,7 @@ let sign_consensus_votes (global_state : global_state)
 let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
     =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let chain_id = state.global_state.chain_id in
   protect
     ~on_error:(fun err ->
@@ -979,7 +983,7 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
     in
     let* bh =
       (Node_rpc.inject_block
-         state.global_state.cctxt
+         state.automaton_state.cctxt
          ~force:state.global_state.config.force
          ~chain:(`Hash state.global_state.chain_id)
          signed_block_header
@@ -1073,7 +1077,7 @@ let start_waiting_for_preattestation_quorum state =
       =
     prepare_waiting_for_quorum state
   in
-  let operation_worker = state.global_state.operation_worker in
+  let operation_worker = state.automaton_state.operation_worker in
   Operation_worker.monitor_preattestation_quorum
     operation_worker
     ~consensus_threshold
@@ -1086,7 +1090,7 @@ let start_waiting_for_attestation_quorum state =
       =
     prepare_waiting_for_quorum state
   in
-  let operation_worker = state.global_state.operation_worker in
+  let operation_worker = state.automaton_state.operation_worker in
   Operation_worker.monitor_attestation_quorum
     operation_worker
     ~consensus_threshold
@@ -1124,13 +1128,13 @@ let notice_delegates_without_slots all_delegates delegate_infos level =
 let update_to_level state level_update =
   let open Lwt_result_syntax in
   let {new_level_proposal; compute_new_state} = level_update in
-  let cctxt = state.global_state.cctxt in
+  let cctxt = state.automaton_state.cctxt in
   let delegates = state.global_state.delegates in
   let new_level = new_level_proposal.block.shell.level in
   let chain = `Hash state.global_state.chain_id in
   (* Sync the context to clean-up potential GC artifacts *)
   let*! () =
-    match state.global_state.validation_mode with
+    match state.automaton_state.validation_mode with
     | Node -> Lwt.return_unit
     | Local index -> index.sync_fun ()
   in
@@ -1232,13 +1236,23 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
 
 let prepare_block_request state block_to_bake =
   let open Lwt_result_syntax in
-  let request = Forge_and_sign_block block_to_bake in
+  let request =
+    {
+      automaton_state = state.automaton_state;
+      request = Forge_and_sign_block block_to_bake;
+    }
+  in
   let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_preattestations_request state unsigned_preattestations =
   let open Lwt_result_syntax in
-  let request = Forge_and_sign_preattestations {unsigned_preattestations} in
+  let request =
+    {
+      automaton_state = state.automaton_state;
+      request = Forge_and_sign_preattestations {unsigned_preattestations};
+    }
+  in
   let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state
 
@@ -1248,8 +1262,12 @@ let prepare_attestations_request state unsigned_attestations =
     dal_content_map_p (may_get_dal_content state) unsigned_attestations
   in
   let request =
-    Forge_and_sign_attestations
-      {unsigned_attestations = unsigned_attestations_with_dal}
+    {
+      automaton_state = state.automaton_state;
+      request =
+        Forge_and_sign_attestations
+          {unsigned_attestations = unsigned_attestations_with_dal};
+    }
   in
   let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state

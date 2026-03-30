@@ -78,18 +78,23 @@ module Name = struct
 end
 
 module Request = struct
-  type (_, _) t =
+  type (_, _) content =
     (* The Empty.t type is used to ensure the fact that this case can not be
        associated to any error *)
-    | Forge_and_sign_block : block_to_bake -> (unit, Empty.t) t
+    | Forge_and_sign_block : block_to_bake -> (unit, Empty.t) content
     | Forge_and_sign_preattestations : {
         unsigned_preattestations : unsigned_consensus_vote_batch;
       }
-        -> (unit, error trace) t
+        -> (unit, error trace) content
     | Forge_and_sign_attestations : {
         unsigned_attestations : unsigned_consensus_vote_batch;
       }
-        -> (unit, error trace) t
+        -> (unit, error trace) content
+
+  type ('res, 'error) t = {
+    automaton_state : automaton_state;
+    content : ('res, 'error) content;
+  }
 
   type view =
     | Forge_and_sign_block of Block_hash.t
@@ -128,7 +133,7 @@ module Request = struct
       ]
 
   let view (type a b) (req : (a, b) t) : view =
-    match req with
+    match req.content with
     | Forge_and_sign_block block_to_bake ->
         Forge_and_sign_block block_to_bake.predecessor.hash
     | Forge_and_sign_preattestations {unsigned_preattestations} ->
@@ -205,11 +210,15 @@ let get_or_create_queue state delegate =
       queue
   | Some queue -> queue
 
-let handle_forge_block (state : Types.state) (block_to_bake : block_to_bake) =
+let handle_forge_block (state : Types.state) automaton_state
+    (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let task () =
     let* prepared_block =
-      Baking_actions.prepare_block state.baking_state block_to_bake
+      Baking_actions.prepare_block
+        automaton_state
+        state.baking_state
+        block_to_bake
     in
     state.push_event (Some (Block_ready prepared_block)) ;
     return_unit
@@ -224,7 +233,7 @@ let handle_forge_block (state : Types.state) (block_to_bake : block_to_bake) =
     task
     queue
 
-let handle_forge_consensus_votes (state : Types.state)
+let handle_forge_consensus_votes (state : Types.state) automaton_state
     (unsigned_consensus_votes : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let batch_branch = unsigned_consensus_votes.batch_branch in
@@ -237,6 +246,7 @@ let handle_forge_consensus_votes (state : Types.state)
     in
     let*! signed_consensus_vote_r =
       Baking_actions.forge_and_sign_consensus_vote
+        automaton_state
         state.baking_state
         ~branch:batch_branch
         unsigned_consensus_vote
@@ -263,6 +273,7 @@ let handle_forge_consensus_votes (state : Types.state)
         return_nil)
       (fun () ->
         Baking_actions.authorized_consensus_votes
+          automaton_state
           state.baking_state
           unsigned_consensus_votes)
   in
@@ -299,14 +310,20 @@ module Handlers = struct
       =
    fun worker request ->
     let state = Worker.state worker in
-    match request with
+    match request.content with
     | Forge_and_sign_block block_to_bake ->
-        handle_forge_block state block_to_bake ;
+        handle_forge_block state request.automaton_state block_to_bake ;
         Lwt.return (Ok ())
     | Forge_and_sign_preattestations {unsigned_preattestations} ->
-        handle_forge_consensus_votes state unsigned_preattestations
+        handle_forge_consensus_votes
+          state
+          request.automaton_state
+          unsigned_preattestations
     | Forge_and_sign_attestations {unsigned_attestations} ->
-        handle_forge_consensus_votes state unsigned_attestations
+        handle_forge_consensus_votes
+          state
+          request.automaton_state
+          unsigned_attestations
 
   let on_close _worker = Lwt.return_unit
 
@@ -323,7 +340,7 @@ module Handlers = struct
       let*! () = Events.(emit error_while_processing_forge_request errs) in
       return `Continue
     in
-    match request with
+    match request.content with
     | Forge_and_sign_preattestations _ -> emit_and_return_errors errs
     | Forge_and_sign_attestations _ -> emit_and_return_errors errs
     | Forge_and_sign_block _ -> assert false
@@ -347,20 +364,28 @@ let start global_state =
       {baking_state = global_state; forge_consensus_vote_hook = None}
       (module Handlers))
 
-let push_request (worker : worker) request =
+let push_request (worker : worker) {automaton_state; request} =
   match request with
   | Forge_and_sign_block block_to_bake ->
       Worker.Queue.push_request
         worker
-        (Request.Forge_and_sign_block block_to_bake)
+        Request.{automaton_state; content = Forge_and_sign_block block_to_bake}
   | Forge_and_sign_preattestations {unsigned_preattestations} ->
       Worker.Queue.push_request
         worker
-        (Request.Forge_and_sign_preattestations {unsigned_preattestations})
+        Request.
+          {
+            automaton_state;
+            content = Forge_and_sign_preattestations {unsigned_preattestations};
+          }
   | Forge_and_sign_attestations {unsigned_attestations} ->
       Worker.Queue.push_request
         worker
-        (Request.Forge_and_sign_attestations {unsigned_attestations})
+        Request.
+          {
+            automaton_state;
+            content = Forge_and_sign_attestations {unsigned_attestations};
+          }
 
 module Internal_for_tests = struct
   module Delegate_signing_queue = Delegate_signing_queue

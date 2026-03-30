@@ -156,19 +156,16 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   let cache = Baking_state.create_cache () in
   let global_state =
     {
-      cctxt;
       chain_id;
       config;
       constants;
       round_durations;
-      operation_worker;
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
           get_forge_event_stream = (fun _ -> assert false);
           cancel_all_pending_tasks = (fun _ -> assert false);
         };
-      validation_mode;
       delegates;
       cache;
       dal_node_rpc_ctxt;
@@ -268,7 +265,11 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
           awaiting_unlocking_pqc = false;
         }
   in
-  let state = {global_state; level_state; round_state} in
+  let automaton_state =
+    let name = Uri.to_string cctxt#base in
+    {name; cctxt; validation_mode; operation_worker}
+  in
+  let state = {global_state; automaton_state; level_state; round_state} in
   (* Try loading locked round and attestable round from disk *)
   let* state = Baking_state.may_load_attestable_data state in
   may_initialise_with_latest_proposal_pqc state
@@ -352,7 +353,7 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
       ~get_valid_blocks_stream
       ~forge_event_stream
       ~heads_stream
-      initial_state.global_state.operation_worker
+      initial_state.automaton_state.operation_worker
   in
   let on_error err =
     let*! () = Events.(emit error_while_baking err) in
