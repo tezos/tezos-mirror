@@ -37,8 +37,6 @@ type upstream_image = Pipeline_dep of string | Upstream of string
    ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$COMMIT_REF_SLUG )
 *)
 
-(* FIXME: remove changesets from [base_images.daily] which is a branch
-   pipeline cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
 module Files = struct
   let build_script = ["scripts/ci/build-base-images.sh"]
 
