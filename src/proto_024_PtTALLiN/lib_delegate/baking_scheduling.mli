@@ -68,9 +68,9 @@ val run :
     {!type-Baking_state.automaton_state}, a {!type-Baking_state.level_state}
     and a {!type-Baking_state.round_state}.
 
-    - For the [global_state] initialization, a forge worker is started. If
-    [constants] is not provided, an RPC is called to recover them from the
-    [context].
+    - For the [global_state] initialization, [round_durations] are created from
+    [constants], and a forge worker is started. If [constants] is not provided,
+    an RPC is called to recover them from the [context].
 
     - For the [automaton_state] initialization, a validation mode is set based
     on the [baking_configuration] and an operation worker is started. If
