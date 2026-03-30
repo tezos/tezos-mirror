@@ -8225,7 +8225,7 @@ let octez_store_tests =
         Protocol.(embedded genesis);
         Protocol.(embedded alpha);
         Protocol.(parameters_exn alpha |> open_);
-        Protocol.(plugin_exn alpha) |> open_;
+        Protocol.(plugin_exn alpha);
         alcotezt;
         tezt_lib;
         octez_test_helpers |> open_;
