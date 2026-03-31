@@ -464,7 +464,7 @@ let test_multi_node_connection_recovery =
     ~__FILE__
     ~title:"Agnostic baker multi-node connection recovery"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:Protocol.(From_protocol (number T024))
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P" ;
