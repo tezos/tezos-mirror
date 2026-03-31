@@ -294,6 +294,20 @@ let different_delegates pkh =
     (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
     (Array.to_list Account.Bootstrap.keys)
 
+let get_delegate client ~protocol ~level ~tb_index =
+  let* pkh_to_rounds = Operation.Consensus.get_rounds ~level ~protocol client in
+  let pkh =
+    Option.get
+    @@ List.find_map
+         (fun (pkh, rounds) ->
+           if List.mem tb_index rounds then Some pkh else None)
+         pkh_to_rounds
+  in
+  return
+  @@ List.find
+       (fun acc -> acc.Account.public_key_hash = pkh)
+       Constant.all_secret_keys
+
 (* --- Protocol parameter builders --- *)
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
@@ -1335,6 +1349,57 @@ let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
     client
     (Slots [index])
     dal_parameters
+
+(* Produce a slot, store it in the DAL node, and then (try to) publish the same
+   commitment for each level between [from] and [into]. *)
+let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
+    l1_client =
+  (* This is the account used to sign injected slot headers on L1. *)
+  let source = Constant.bootstrap2 in
+  let slot =
+    Cryptobox.Internal_for_tests.generate_slot ~slot_size
+    |> Bytes.to_string
+    |> Helpers.make_slot ~slot_size
+  in
+  let* commitment, proof = Helpers.store_slot ~slot_index dal_node slot in
+  let rec loop current_level =
+    if current_level > into then unit
+    else
+      let* level = Node.wait_for_level l1_node current_level in
+      (* Warn when we don't advance level by level, because this means we
+         couldn't publish at each level. Also, we force the injection because
+         when a level is missed then probably there will be two injection
+         attempts at the same level later. *)
+      if current_level < level then
+        Log.warn
+          "[slot_producer] missed some levels (expected level is %d, got %d)"
+          current_level
+          level ;
+      Log.info
+        "[slot_producer] publish at slot index %d at level %d"
+        slot_index
+        level ;
+      let* _op_hash =
+        publish_commitment
+          ~force:true
+            (* This value is quite high (way higher than required). But the
+             default value of 1200µtez was not sufficient for a publication to
+             be validated by the mempool in the test
+             [test_migration_accuser_issue]. I do not understand why, since
+             publication fees on real networks are less than 1000µtez.
+          *)
+          ~fee:5000
+          ~source
+          ~index:slot_index
+          ~commitment
+          ~proof
+          l1_client
+      in
+      loop (level + 1)
+  in
+  let* () = loop from in
+  Log.info "[slot_producer] will terminate" ;
+  unit
 
 (* --- Status and verification helpers --- *)
 
