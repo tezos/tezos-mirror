@@ -1222,30 +1222,6 @@ let expected_attestation dal_parameters attested_slots =
   List.iter (fun i -> arr.(i) <- true) attested_slots ;
   arr
 
-let get_validated_dal_attestations_in_mempool node for_level =
-  let* mempool_json =
-    Node.RPC.call node
-    @@ RPC.get_chain_mempool_pending_operations
-         ~version:"2"
-         ~validated:true
-         ~branch_delayed:false
-         ~branch_refused:false
-         ~refused:false
-         ~outdated:false
-         ~validation_passes:[0]
-         ()
-  in
-  let validated = JSON.(mempool_json |-> "validated" |> as_list) in
-  List.filter
-    (fun op ->
-      let contents = JSON.(op |-> "contents" |> geti 0) in
-      let level = JSON.(contents |-> "level" |> as_int) in
-      level = for_level
-      && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
-         String.equal kind "attestation_with_dal")
-    validated
-  |> return
-
 (* --- Slot publication helpers --- *)
 
 let generate_dummy_slot slot_size =
