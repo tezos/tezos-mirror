@@ -653,6 +653,9 @@ val id_tokens : Gitlab_ci.Types.id_tokens
 
 val job_datadog_pipeline_trace : tezos_job
 
+(* Toggle to enable security scan jobs. Jobs activated if set to [true]. Currently set to [false]. *)
+val container_scanning_flag : bool
+
 (** Add common variables used by jobs compiling kernels *)
 val enable_kernels : tezos_job -> tezos_job
 

@@ -312,12 +312,14 @@ let jobs pipeline_type =
         in
         if pipeline_type = Merge_train then jobs
         else
-          [
-            job_homebrew_repository_trigger;
-            job_debian_repository_trigger_partial;
-            job_base_images_trigger;
-            security_scan_trigger;
-          ]
+          ([
+             job_homebrew_repository_trigger;
+             job_debian_repository_trigger_partial;
+             job_base_images_trigger;
+           ]
+          @
+          if Tezos_ci.container_scanning_flag then [security_scan_trigger]
+          else [])
           @ jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
