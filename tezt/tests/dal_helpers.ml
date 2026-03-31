@@ -457,6 +457,8 @@ let history_mode base protocol parameter_overrides proto_parameters
           return (new_parameter_overrides, Node.Rolling (Some additional_cycles)))
       else return (parameter_overrides, Node.Rolling (Some additional_cycles))
 
+(** Initialize an L1 node with protocol parameters customized for DAL testing.
+    Returns the DAL parameters, cryptobox, node, client, and a bootstrap key. *)
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
     ~parameter_overrides ~protocol ?activation_timestamp
     ?(event_sections_levels = []) ?(node_arguments = [])
@@ -522,6 +524,8 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   in
   return (node, client, dal_parameters)
 
+(** High-level wrapper: set up an L1 node with DAL-enabled protocol parameters,
+    then call [f] with the parameters, cryptobox, node, client, and bootstrap key. *)
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?consensus_committee_size ?consensus_threshold_size ?minimal_block_delay
     ?delay_increment_per_round ?attestation_lag ?slot_size ?number_of_slots
@@ -638,6 +642,8 @@ let noop_wasm_bootsector =
 let default_boot_sector ~pvm_name =
   match pvm_name with "wasm_2_0_0" -> noop_wasm_bootsector | _ -> ""
 
+(** Originate a fresh smart rollup and call [f] with the rollup address,
+    rollup node, and related context. *)
 let with_fresh_rollup ?(pvm_name = "arith") ?boot_sector ?dal_node f tezos_node
     tezos_client bootstrap1_key =
   let boot_sector =
@@ -696,6 +702,8 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
   let* () = Dal_node.run ?env ~event_level dal_node ~wait_ready in
   return dal_node
 
+(** Create and run a DAL node connected to [tezos_node], then call [f]
+    with the bootstrap key and DAL node. *)
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?wait_ready ?env
     ?disable_shard_validation ?disable_amplification ?ignore_pkhs
@@ -731,6 +739,10 @@ let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
+
+(** Register a test that sets up an L1 node only (no DAL node).
+    The [scenario] function receives the protocol parameters, cryptobox,
+    node, client, and bootstrap key. *)
 let scenario_with_layer1_node ~__FILE__ ?attestation_threshold ?regression
     ?(tags = []) ?(uses = fun _ -> []) ?additional_bootstrap_accounts
     ?attestation_lag ?number_of_shards ?number_of_slots ?slot_size
@@ -774,6 +786,9 @@ let scenario_with_layer1_node ~__FILE__ ?attestation_threshold ?regression
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
+(** Register a test that sets up both an L1 node and a DAL node.
+    The [scenario] function receives the protocol, DAL parameters, cryptobox,
+    node, client, and DAL node. This is the most commonly used scenario builder. *)
 let scenario_with_layer1_and_dal_nodes ~__FILE__ ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?blocks_per_cycle ?delay_increment_per_round ?consensus_committee_size
@@ -841,6 +856,8 @@ let scenario_with_layer1_and_dal_nodes ~__FILE__ ?regression ?(tags = [])
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
+(** Register a test that sets up an L1 node, a DAL node, and a smart rollup
+    node. Used for tests that involve DAL page imports in rollup kernels. *)
 let scenario_with_all_nodes ~__FILE__ ?custom_constants ?node_arguments
     ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
@@ -923,6 +940,8 @@ type attestation_availability =
   | Bitset of bool array
   | No_dal_attestation
 
+(** Craft a DAL attestation operation without injecting it. The [availability]
+    specifies which slots to attest (as slot indices, a bitset, or no attestation). *)
 let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
     ~signer availability client dal_parameters node_endpoint =
   let* dal_attestation =
@@ -1085,6 +1104,7 @@ let inject_dal_attestations ~protocol ?payload_level ?level ?round ?lag_index
         node_endpoint)
     signers
 
+(** Inject DAL attestations for all bootstrap delegates and bake a block. *)
 let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
     dal_parameters =
   let* baker =
