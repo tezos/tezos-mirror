@@ -1088,7 +1088,7 @@ let test_dal_rewards () =
       attestation_threshold;
     }
   in
-  let* genesis, contracts =
+  let* b, contracts =
     Context.init_n ~dal_enable:true ~dal ~consensus_threshold_size:0 3 ()
   in
   let contract1 =
@@ -1119,10 +1119,6 @@ let test_dal_rewards () =
     Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
   in
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
-     We need to bake [attestation_lag] blocks, otherwise the DAL payload is
-     ignored. *)
-  let* b = Block.bake_n attestation_lag genesis in
   Log.info "Level %ld: publishing slot" b.header.shell.level ;
   let* op = Op.dal_publish_commitment (B b) contract1 slot_header in
   let* b = Block.bake b ~operation:op in
