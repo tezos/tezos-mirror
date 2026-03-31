@@ -5,6 +5,9 @@ for arg in "$@"; do
   "--resume")
     RESUME='--resume'
     ;;
+  "--update-patch")
+    UPDATE_PATCH="--update-patch"
+    ;;
   "--check-patch-only")
     CHECKPATCHONLY='--check-patch-only'
     ;;
@@ -13,7 +16,8 @@ for arg in "$@"; do
     ;;
   "--help")
     echo "$0: regenerates the profiler patch and automatically creates a commit with it."
-    echo "  --resume: resumes the scripts after conflict resolution. Only use it if asked by the script."
+    echo "  --update-patch: only applies the patch on the protocol, and wait for --resume to continue. Useful to update the patch to take new features into account"
+    echo "  --resume: resumes the scripts after conflict resolution or patch update. Only use it if asked by the script."
     echo "  --check-patch-only: compilation of the protocol with the patch, without commiting it."
     echo "  --no-check: update the patch without compiling it. Use with care as it will eventually generate an invalid patch."
     exit 0
@@ -38,11 +42,16 @@ if [ "$RESUME" = "" ]; then
   git apply -3 scripts/profile_alpha.patch
 fi
 
+if [ "$UPDATE_PATCH" != "" ]; then
+  echo "Update the patch with your changes, then continue with --resume. DON'T commit them!"
+  exit 0
+fi
+
 CONFLICTS=$(git status | grep "Unmerged paths")
 
 if [ "$CONFLICTS" != "" ]; then
 
-  echo "Please fix conflicts and resume with $0 --resume."
+  echo "Please fix conflicts and resume with $0 --resume. DON'T commit them!"
   echo "You should also first try with '--resume --check-patch-only' to ensure the patch is correct and compiling."
 
   exit 2
@@ -72,7 +81,11 @@ if [ "$CHECKPATCHONLY" = "" ]; then
 
   git add scripts/profile_alpha.patch
 
-  git commit -m "Scripts: regenerate protocol alpha patches" --no-verify
+  if [ "$UPDATE_PATCH" = "" ]; then
+    git commit -m "Scripts: update protocol alpha patches" --no-verify
+  else
+    git commit -m "Scripts: regenerate protocol alpha patches" --no-verify
+  fi
 
   # If not resuming after a conflict, this means we are only trying to check the patch
 elif [ "$RESUME" = "" ]; then
