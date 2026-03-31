@@ -170,6 +170,13 @@ pub enum TcError {
     /// View instructions must be a sequence
     #[error("{0} instructions are not a sequence")]
     NonSeqViewInstrs(String),
+    /// Side-effectful instruction used directly in a view body.
+    /// Allowed in lambdas within views (they can be returned and executed elsewhere).
+    // TODO: !21472
+    // Update link once the "Forbidden instructions" section is added to the views doc.
+    /// See https://octez.tezos.com/docs/active/views.html
+    #[error("{0} is forbidden in view context")]
+    ForbiddenInView(Prim),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -1988,6 +1995,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNPACK, [_], _), []) => no_overload!(UNPACK, len 1),
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(TRANSFER_TOKENS, [], _), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::TRANSFER_TOKENS))?
+        }
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
             ensure_ty_eq(gas, ct, arg_t)?;
             stack.drop_top(3);
@@ -1998,6 +2008,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(TRANSFER_TOKENS, [], _), [] | [_] | [_, _]) => no_overload!(TRANSFER_TOKENS, len 3),
         (App(TRANSFER_TOKENS, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(SET_DELEGATE, [], _), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))?
+        }
         (App(SET_DELEGATE, [], _), [.., T::Option(ot)]) if matches!(ot.as_ref(), T::KeyHash) => {
             pop!();
             stack.push(T::Operation);
@@ -2319,6 +2332,9 @@ pub(crate) fn typecheck_instruction<'a>(
         #[cfg(feature = "bls")]
         (App(PAIRING_CHECK, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(CREATE_CONTRACT, ..), _) if in_view => {
+            Err(TcError::ForbiddenInView(Prim::CREATE_CONTRACT))?
+        }
         (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
@@ -2757,6 +2773,7 @@ pub fn typecheck_lambda<'a>(
     } else {
         tc_stk![in_ty.clone()]
     };
+    // in_view=false: lambdas create a new scope, view restrictions don't propagate
     let code = Rc::from(typecheck(instrs, gas, None, stk, false)?);
     unify_stacks(gas, stk, tc_stk![out_ty.clone()])?;
     let micheline_code = Micheline::Seq(instrs);
@@ -2776,7 +2793,7 @@ pub fn typecheck_lambda<'a>(
 }
 
 /// Typecheck a view body. Similar to [typecheck_lambda] but specialized for
-/// views: always non-recursive, and sets `in_view` to forbid side-effectful
+/// views: sets the `in_view` flag to forbid side-effectful
 /// instructions.
 pub fn typecheck_view<'a>(
     instrs: &'a [Micheline<'a>],
@@ -9064,5 +9081,120 @@ mod typecheck_tests {
                 "App(RENAME, [App(bool, [], [])], [])".to_string()
             ))
         );
+    }
+
+    // -- View restriction tests (L2-1049) --
+    // Ref: https://octez.tezos.com/docs/active/views.html
+
+    fn typecheck_script_with_view(view_body: &str) -> Result<(), TcError> {
+        let src = format!(
+            "parameter unit; storage unit; code {{ CAR; NIL operation; PAIR }}; \
+             view \"v\" unit unit {{ {view_body} }};",
+        );
+        parse_contract_script(&src)
+            .unwrap()
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)?;
+        Ok(())
+    }
+
+    // -- Forbidden direct in view body --
+    // in_view is checked before stack type, so minimal stacks suffice.
+
+    #[test]
+    fn transfer_tokens_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view("TRANSFER_TOKENS"),
+            Err(TcError::ForbiddenInView(Prim::TRANSFER_TOKENS))
+        );
+    }
+
+    #[test]
+    fn set_delegate_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view("SET_DELEGATE"),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    #[test]
+    fn create_contract_forbidden_in_view() {
+        assert_eq!(
+            typecheck_script_with_view("CREATE_CONTRACT { parameter unit; storage unit; code { CDR; NIL operation; PAIR } }"),
+            Err(TcError::ForbiddenInView(Prim::CREATE_CONTRACT))
+        );
+    }
+
+    // -- Allowed in view body --
+
+    #[test]
+    fn balance_allowed_in_view() {
+        assert!(typecheck_script_with_view("DROP; BALANCE; DROP; UNIT").is_ok());
+    }
+
+    #[test]
+    fn amount_allowed_in_view() {
+        assert!(typecheck_script_with_view("DROP; AMOUNT; DROP; UNIT").is_ok());
+    }
+
+    // -- Lambda escape: forbidden instruction inside LAMBDA in view is ok --
+
+    #[test]
+    fn set_delegate_in_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; LAMBDA (option key_hash) operation { SET_DELEGATE }; DROP; UNIT"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn create_contract_in_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; LAMBDA unit operation { \
+               DROP; UNIT; PUSH mutez 0; NONE key_hash; \
+               CREATE_CONTRACT { parameter unit; storage unit; code { CDR; NIL operation; PAIR } }; \
+               SWAP; DROP \
+             }; DROP; UNIT",
+        )
+        .is_ok());
+    }
+
+    // -- Nested: forbidden in IF inside view --
+
+    #[test]
+    fn set_delegate_in_if_in_view_forbidden() {
+        assert_eq!(
+            typecheck_script_with_view("DROP; PUSH bool True; IF { SET_DELEGATE } { UNIT }"),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    // -- Code after lambda in view still has restriction --
+
+    #[test]
+    fn forbidden_after_lambda_in_view() {
+        assert_eq!(
+            typecheck_script_with_view(
+                "DROP; \
+                 LAMBDA unit unit { }; DROP; \
+                 SET_DELEGATE"
+            ),
+            Err(TcError::ForbiddenInView(Prim::SET_DELEGATE))
+        );
+    }
+
+    // -- Nested lambda: forbidden in nested lambda escape is still ok --
+
+    #[test]
+    fn forbidden_in_nested_lambda_in_view_ok() {
+        assert!(typecheck_script_with_view(
+            "DROP; \
+             LAMBDA unit operation { \
+               DROP; LAMBDA (option key_hash) operation { SET_DELEGATE }; \
+               NONE key_hash; EXEC \
+             }; DROP; UNIT"
+        )
+        .is_ok());
     }
 }
