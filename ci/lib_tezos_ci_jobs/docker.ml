@@ -7,9 +7,12 @@
 
 module CI = Cacio.Shared
 
+let version = "24.0.7"
+
 let job_docker =
-  Cacio.parameterize @@ fun arch ->
   Cacio.parameterize @@ fun contents ->
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun arch ->
   CI.job
     ("oc.docker:" ^ Tezos_ci.Runner.Arch.show_uniform arch)
     ~__POS__
@@ -30,26 +33,31 @@ let job_docker =
     ~image:Tezos_ci.Images_external.docker
     ~image_dependencies:
       (match contents with
-      | `with_evm ->
+      | `experimental_with_evm ->
           [Tezos_ci.Images.CI.runtime; Tezos_ci.Images.rust_toolchain]
-      | `without_evm -> [Tezos_ci.Images.CI.runtime])
+      | `released | `experimental -> [Tezos_ci.Images.CI.runtime])
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
       [
-        ("DOCKER_VERSION", Release_tag.docker_version);
-        ("CI_DOCKER_HUB", "true");
+        ("DOCKER_VERSION", version);
+        ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
         ( "DOCKER_BUILD_TARGET",
           match contents with
-          | `with_evm -> "with-evm-artifacts"
-          | `without_evm -> "without-evm-artifacts" );
+          | `experimental_with_evm -> "with-evm-artifacts"
+          | `released | `experimental -> "without-evm-artifacts" );
         ("IMAGE_ARCH_PREFIX", Tezos_ci.Runner.Arch.show_uniform arch ^ "_");
         ( "EXECUTABLE_FILES",
-          "script-inputs/released-executables \
-           script-inputs/experimental-executables" );
+          match contents with
+          | `experimental_with_evm | `experimental ->
+              "script-inputs/released-executables \
+               script-inputs/experimental-executables"
+          | `released -> "script-inputs/released-executables" );
       ]
     ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
 
 let job_docker_merge_manifests =
+  Cacio.parameterize @@ fun contents ->
+  Cacio.parameterize @@ fun mode ->
   CI.job
     "docker:merge_manifests"
     ~__POS__
@@ -60,11 +68,22 @@ let job_docker_merge_manifests =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~image:Tezos_ci.Images_external.docker
     ~needs:
-      [(Job, job_docker Amd64 `with_evm); (Job, job_docker Arm64 `without_evm)]
+      [
+        (Job, job_docker contents mode Amd64);
+        ( Job,
+          job_docker
+            (match contents with
+            | `experimental_with_evm ->
+                (* No EVM node on arm64. *) `experimental
+            | `experimental | `released -> contents)
+            mode
+            Arm64 );
+      ]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
       [
-        ("DOCKER_VERSION", Release_tag.docker_version); ("CI_DOCKER_HUB", "true");
+        ("DOCKER_VERSION", version);
+        ("CI_DOCKER_HUB", match mode with `real -> "true" | `test -> "false");
       ]
     [
       "./scripts/ci/docker_initialize.sh";
@@ -72,8 +91,10 @@ let job_docker_merge_manifests =
     ]
 
 let register () =
-  Cacio.register_jobs Master [(Auto, job_docker_merge_manifests)] ;
+  Cacio.register_jobs
+    Master
+    [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
   Cacio.register_jobs
     Scheduled_docker_build
-    [(Auto, job_docker_merge_manifests)] ;
+    [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
   ()
