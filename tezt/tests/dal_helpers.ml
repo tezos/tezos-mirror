@@ -6,6 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Shared helpers, types, and scenario builders for DAL integration tests.
+   Used by all dal_*.ml test files via [open Dal_helpers]. *)
+
+(* --- Module aliases and constants --- *)
+
 let team = Tag.tezos2
 
 let hooks = Tezos_regression.hooks
@@ -23,6 +28,8 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+(* --- Logging and utilities --- *)
+
 type logger = {log_step : 'a. ('a, Format.formatter, unit, unit) format4 -> 'a}
 
 let init_logger () : logger =
@@ -37,6 +44,8 @@ let init_logger () : logger =
 
 (* Returns [i; i+1; ...; j] *)
 let rec ( --> ) i j = if i > j then [] else i :: (succ i --> j)
+
+(* --- Store helpers --- *)
 
 let store_path dal_node store_kind =
   Format.sprintf
@@ -116,6 +125,8 @@ let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
   let _ = Sqlite3.db_close db in
   unit
 
+(* --- Event waiting helpers --- *)
+
 (* Wait for 'new_head' event. Note that the DAL node processes a new head with a
    delay of one level. Also, this event is emitted before block processing. *)
 let wait_for_layer1_head dal_node level =
@@ -127,70 +138,6 @@ let wait_for_layer1_head dal_node level =
 let wait_for_layer1_final_block dal_node level =
   Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
       if JSON.(e |-> "level" |> as_int) = level then Some () else None)
-
-(* We use a custom [bake_for], which by default bakes with all delegates, unlike
-   [Client.bake_for], to highlight the following: baking in the past with all
-   delegates ensures that the baked block has round 0, which is the default
-   round used when injecting DAL attestation operations. Note that it is
-   normally not necessary to bake with a particular delegate, therefore there is
-   no downside to set the case [`All] as the default. *)
-let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
-  let keys =
-    match delegates with
-    | `All ->
-        (* The argument ~keys:[] allows to bake with all available delegates. *)
-        []
-    | `For keys -> keys
-  in
-  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
-
-(* Bake until a block at some given [level] has been finalized and
-   processed by the given [dal_nodes]. The head level after this is
-   [level + 2]. *)
-let bake_until_processed ~level client dal_nodes =
-  let* current_level = Client.level client in
-  let final_level = level + 2 in
-  assert (current_level < final_level) ;
-  let p =
-    List.map
-      (fun dal_node -> wait_for_layer1_final_block dal_node level)
-      dal_nodes
-  in
-  let* () = bake_for ~count:(final_level - current_level) client in
-  Lwt.join p
-
-module Client = struct
-  include Client
-
-  let msg =
-    "Please use 'bake_for' for DAL tests and not 'Client.bake_for' to be sure \
-     to read the comment about the 'keys' argument."
-
-  let bake_for _client = Test.fail "%s" msg
-
-  let bake_for_and_wait _client = Test.fail "%s" msg
-end
-
-let next_level node =
-  let* current_level = Node.get_level node in
-  return (current_level + 1)
-
-let check_in_TB_committee ~__LOC__ ~protocol node ?(inside = true) ?level pkh =
-  let* slots =
-    Node.RPC.call node
-    @@ RPC.get_chain_block_helper_validators ?level ~delegate:pkh ()
-  in
-  let in_committee =
-    if Protocol.number protocol >= 024 then
-      JSON.(as_list slots |> List.hd |-> "delegates" |> as_list) <> []
-    else JSON.as_list slots <> []
-  in
-  Check.(
-    (in_committee = inside)
-      ~__LOC__
-      bool
-      ~error_msg:"The account is in the TB committee? Expected %R, got %L") ;
-  unit
 
 let wait_for_cached_slot ~shard_index dal_node ~published_level ~slot_index =
   let check_slot_id e =
@@ -257,6 +204,98 @@ let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
   in
   Lwt.join (save_on_disk_promise :: promises)
 
+(* --- Baking and block helpers --- *)
+
+(* We use a custom [bake_for], which by default bakes with all delegates, unlike
+   [Client.bake_for], to highlight the following: baking in the past with all
+   delegates ensures that the baked block has round 0, which is the default
+   round used when injecting DAL attestation operations. Note that it is
+   normally not necessary to bake with a particular delegate, therefore there is
+   no downside to set the case [`All] as the default. *)
+let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
+  let keys =
+    match delegates with
+    | `All ->
+        (* The argument ~keys:[] allows to bake with all available delegates. *)
+        []
+    | `For keys -> keys
+  in
+  Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
+
+(* Bake until a block at some given [level] has been finalized and
+   processed by the given [dal_nodes]. The head level after this is
+   [level + 2]. *)
+let bake_until_processed ~level client dal_nodes =
+  let* current_level = Client.level client in
+  let final_level = level + 2 in
+  assert (current_level < final_level) ;
+  let p =
+    List.map
+      (fun dal_node -> wait_for_layer1_final_block dal_node level)
+      dal_nodes
+  in
+  let* () = bake_for ~count:(final_level - current_level) client in
+  Lwt.join p
+
+module Client = struct
+  include Client
+
+  let msg =
+    "Please use 'bake_for' for DAL tests and not 'Client.bake_for' to be sure \
+     to read the comment about the 'keys' argument."
+
+  let bake_for _client = Test.fail "%s" msg
+
+  let bake_for_and_wait _client = Test.fail "%s" msg
+end
+
+let next_level node =
+  let* current_level = Node.get_level node in
+  return (current_level + 1)
+
+(* --- Committee and delegate helpers --- *)
+
+let check_in_TB_committee ~__LOC__ ~protocol node ?(inside = true) ?level pkh =
+  let* slots =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_helper_validators ?level ~delegate:pkh ()
+  in
+  let in_committee =
+    if Protocol.number protocol >= 024 then
+      JSON.(as_list slots |> List.hd |-> "delegates" |> as_list) <> []
+    else JSON.as_list slots <> []
+  in
+  Check.(
+    (in_committee = inside)
+      ~__LOC__
+      bool
+      ~error_msg:"The account is in the TB committee? Expected %R, got %L") ;
+  unit
+
+(* Return the baker at round 0 at the given level. *)
+let baker_for_round_zero node ~level =
+  let* rights =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_helper_baking_rights ~level ~max_round:0 ()
+  in
+  JSON.(List.hd JSON.(rights |> as_list) |-> "delegate" |> as_string) |> return
+
+(* Return a delegate from the list of bootstrap accounts that is different from
+   the given delegate. *)
+let different_delegate pkh =
+  List.find
+    (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
+    (Array.to_list Account.Bootstrap.keys)
+
+(* Return the delegates from the list of bootstrap accounts that are different
+   from the given delegate. *)
+let different_delegates pkh =
+  List.filter
+    (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
+    (Array.to_list Account.Bootstrap.keys)
+
+(* --- Protocol parameter builders --- *)
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -284,15 +323,6 @@ let make_q_parameter name = function
             ] );
       ]
 
-let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
-    ?(supports = Protocol.From_protocol 19) title f =
-  let tags = Tag.tezos2 :: "dal" :: tags in
-  let register_test =
-    if regression then Protocol.register_regression_test
-    else Protocol.register_test
-  in
-  register_test ~__FILE__ ~title ~tags ?uses ~supports f
-
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
@@ -312,6 +342,8 @@ let redundancy_factor_param redundancy_factor =
 
 let slot_size_param slot_size =
   make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+
+(* --- Protocol parameters and node setup --- *)
 
 (* Some initialization functions to start needed nodes. *)
 type l1_history_mode =
@@ -686,6 +718,17 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
   in
   f key dal_node
 
+(* --- Test registration and scenario builders --- *)
+
+let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
+    ?(supports = Protocol.From_protocol 19) title f =
+  let tags = Tag.tezos2 :: "dal" :: tags in
+  let register_test =
+    if regression then Protocol.register_regression_test
+    else Protocol.register_test
+  in
+  register_test ~__FILE__ ~title ~tags ?uses ~supports f
+
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
 let scenario_with_layer1_node ~__FILE__ ?attestation_threshold ?regression
@@ -871,27 +914,7 @@ let scenario_with_all_nodes ~__FILE__ ?custom_constants ?node_arguments
         client
         key)
 
-(* Return the baker at round 0 at the given level. *)
-let baker_for_round_zero node ~level =
-  let* rights =
-    Node.RPC.call node
-    @@ RPC.get_chain_block_helper_baking_rights ~level ~max_round:0 ()
-  in
-  JSON.(List.hd JSON.(rights |> as_list) |-> "delegate" |> as_string) |> return
-
-(* Return a delegate from the list of bootstrap accounts that is different from
-   the given delegate. *)
-let different_delegate pkh =
-  List.find
-    (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
-    (Array.to_list Account.Bootstrap.keys)
-
-(* Return the delegates from the list of bootstrap accounts that are different
-   from the given delegate. *)
-let different_delegates pkh =
-  List.filter
-    (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
-    (Array.to_list Account.Bootstrap.keys)
+(* --- Attestation operation helpers --- *)
 
 (* We support two formats for specifying the attested slots: either a
    list of slot ids or a bitset. *)
@@ -1114,6 +1137,8 @@ let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment
     ~proof
     client
+
+(* --- Status and verification helpers --- *)
 
 type status = Applied | Failed of {error_id : string}
 
