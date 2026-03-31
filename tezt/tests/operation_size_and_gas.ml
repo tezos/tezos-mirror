@@ -364,7 +364,7 @@ let test_dal_publish_commitment =
   @@ fun protocol ->
   let test _protocol dal_parameters _cryptobox node client dal_node =
     let* commitment, proof =
-      Dal.Helpers.(
+      Dal_common.Helpers.(
         store_slot dal_node ~slot_index:0
         @@ make_slot
              ~slot_size:dal_parameters.Dal_common.Parameters.cryptobox.slot_size
@@ -381,12 +381,12 @@ let test_dal_publish_commitment =
       op_dal_publish_commitment
       client
   in
-  Dal.with_layer1
+  Dal_helpers.with_layer1
     ~l1_history_mode:Default_with_refutation
     ~protocol
     ~dal_enable:true
   @@ fun parameters cryptobox node client ->
-  Dal.with_dal_node ~operator_profiles:[0] node @@ fun _key dal_node ->
+  Dal_helpers.with_dal_node ~operator_profiles:[0] node @@ fun _key dal_node ->
   test protocol parameters cryptobox node client dal_node
 
 (* inspired by test_cont_refute_pre_migration from tests/sc_rollup_migration.ml *)
