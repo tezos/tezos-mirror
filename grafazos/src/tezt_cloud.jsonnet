@@ -46,35 +46,59 @@ local graph = base.graph;
   // Hardware
 
   cpu(agg='', app_group, h, w, x, y):
-    local avgUser = 'User ' + agg;
-    local avgSystem = 'System ' + agg;
-    local avgUserQuery = self.query(agg, 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="user"}', avgUser);
-    local avgSystemQuery = self.query(agg, 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="system"}', avgSystem);
-    graph.new('[' + app_group + '] ' + 'Cpu activity', [avgUserQuery, avgSystemQuery], h, w, x, y)
+    local userEntries = base.selectMetrics({
+      netdata: 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="user"}',
+      'process-exporter': 'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"' + app_group + '.*",mode="user"}[5m])*100',
+    }, { netdata: 'User ' + agg, 'process-exporter': 'User ' + agg + ' ({{ groupname }})' });
+    local systemEntries = base.selectMetrics({
+      netdata: 'netdata_app_cpu_utilization_percentage_average{app_group="' + app_group + '",dimension="system"}',
+      'process-exporter': 'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"' + app_group + '.*",mode="system"}[5m])*100',
+    }, { netdata: 'System ' + agg, 'process-exporter': 'System ' + agg + ' ({{ groupname }})' });
+    local userQueries = std.map(function(e) self.query(agg, e.metric, e.legend), userEntries);
+    local systemQueries = std.map(function(e) self.query(agg, e.metric, e.legend), systemEntries);
+    graph.new('[' + app_group + '] ' + 'Cpu activity', userQueries + systemQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('percent'),
 
   memory(agg='', app_group, h, w, x, y):
-    local ram = 'RAM ' + agg;
-    local swap = 'swap ' + agg;
-    local avgRamQuery = self.query(agg, 'netdata_app_mem_usage_MiB_average{app_group="' + app_group + '"}', ram);
-    local avgSwapQuery = self.query(agg, 'netdata_app_swap_usage_MiB_average{app_group="' + app_group + '"}', swap);
-    graph.new('[' + app_group + '] ' + 'Memory usage', [avgRamQuery, avgSwapQuery], h, w, x, y)
+    local ramEntries = base.selectMetrics({
+      netdata: 'netdata_app_mem_usage_MiB_average{app_group="' + app_group + '"}',
+      'process-exporter': 'namedprocess_namegroup_memory_bytes{groupname=~"' + app_group + '.*",memtype="resident"}/1024/1024',
+    }, { netdata: 'RAM ' + agg, 'process-exporter': 'RAM ' + agg + ' ({{ groupname }})' });
+    local swapEntries = base.selectMetrics({
+      netdata: 'netdata_app_swap_usage_MiB_average{app_group="' + app_group + '"}',
+      'process-exporter': 'namedprocess_namegroup_memory_bytes{groupname=~"' + app_group + '.*",memtype="swapped"}/1024/1024',
+    }, { netdata: 'Swap ' + agg, 'process-exporter': 'Swap ' + agg + ' ({{ groupname }})' });
+    local ramQueries = std.map(function(e) self.query(agg, e.metric, e.legend), ramEntries);
+    local swapQueries = std.map(function(e) self.query(agg, e.metric, e.legend), swapEntries);
+    graph.new('[' + app_group + '] ' + 'Memory usage', ramQueries + swapQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('MB'),
 
   ios(agg='', app_group, h, w, x, y):
-    local reads = 'Reads ' + agg;
-    local writes = 'Writes ' + agg;
-    local readsQuery = self.query(agg, 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}', reads);
-    local writesQuery = self.query(agg, 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '"}', writes);
-    graph.new('[' + app_group + '] ' + 'Disk IOs', [readsQuery, writesQuery], h, w, x, y)
+    local readsEntries = base.selectMetrics({
+      netdata: 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '",dimension="reads"}',
+      'process-exporter': 'rate(namedprocess_namegroup_read_bytes_total{groupname=~"' + app_group + '.*"}[5m])/1024',
+    }, { netdata: 'Reads ' + agg, 'process-exporter': 'Reads ' + agg + ' ({{ groupname }})' });
+    local writesEntries = base.selectMetrics({
+      netdata: 'netdata_app_disk_logical_io_KiB_persec_average{app_group="' + app_group + '",dimension="writes"}',
+      'process-exporter': 'rate(namedprocess_namegroup_write_bytes_total{groupname=~"' + app_group + '.*"}[5m])/1024',
+    }, { netdata: 'Writes ' + agg, 'process-exporter': 'Writes ' + agg + ' ({{ groupname }})' });
+    local readsQueries = std.map(function(e) self.query(agg, e.metric, e.legend), readsEntries);
+    local writesQueries = std.map(function(e) self.query(agg, e.metric, e.legend), writesEntries);
+    graph.new('[' + app_group + '] ' + 'Disk IOs', readsQueries + writesQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('kB/s'),
 
   networkIOS(agg='', h, w, x, y):
-    local received = 'Received ' + agg;
-    local transmitted = 'Transmitted ' + agg;
-    local avgReceivedQuery = self.query(agg, 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received"}) / 8', received);
-    local avgTransmittedQuery = self.query(agg, 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent"}) / 8', transmitted);
-    graph.new('Network traffic', [avgReceivedQuery, avgTransmittedQuery], h, w, x, y)
+    local receivedEntries = base.selectMetrics({
+      netdata: 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received"}) / 8',
+      'node-exporter': 'rate(node_network_receive_bytes_total{device=~".+"}[5m])*8/1000',
+    }, { netdata: 'Received ' + agg + ' ({{ dimension }})', 'node-exporter': 'Received ' + agg + ' ({{ device }})' });
+    local transmittedEntries = base.selectMetrics({
+      netdata: 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent"}) / 8',
+      'node-exporter': 'rate(node_network_transmit_bytes_total{device=~".+"}[5m])*8/1000',
+    }, { netdata: 'Transmitted ' + agg + ' ({{ dimension }})', 'node-exporter': 'Transmitted ' + agg + ' ({{ device }})' });
+    local receivedQueries = std.map(function(e) self.query(agg, e.metric, e.legend), receivedEntries);
+    local transmittedQueries = std.map(function(e) self.query(agg, e.metric, e.legend), transmittedEntries);
+    graph.new('Network traffic', receivedQueries + transmittedQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('kB/s'),
 
   gcOperations(agg='', h, w, x, y):

@@ -44,37 +44,73 @@ local mountpoint = std.extVar('mountpoint');
     + query.prometheus.withLegendFormat(legendFormat),
 
   ios(h, w, x, y):
-    local reads = 'reads';
-    local writes = 'writes';
-    local readsQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + base.node_instance + '="$node_instance"}', reads);
-    local writesQuery = self.query('netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + base.node_instance + '="$node_instance"}', writes);
-    graph.new('IOs', [readsQuery, writesQuery], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local readsEntries = base.selectMetrics({
+      netdata: 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="reads",' + inst + '}',
+      'process-exporter': 'rate(namedprocess_namegroup_read_bytes_total{groupname=~"octez.*",' + inst + '}[1m])/1024',
+      cadvisor: 'rate(container_fs_reads_bytes_total{pod=~"octez-.*",' + inst + '}[1m]) / 1024',
+    }, { netdata: 'reads', 'process-exporter': 'reads ({{ groupname }})', cadvisor: 'reads ({{ pod }})' });
+    local writesEntries = base.selectMetrics({
+      netdata: 'netdata_app_disk_logical_io_KiB_persec_average{app_group="octez",dimension="writes",' + inst + '}',
+      'process-exporter': 'rate(namedprocess_namegroup_write_bytes_total{groupname=~"octez.*",' + inst + '}[1m])/1024',
+      cadvisor: 'rate(container_fs_writes_bytes_total{pod=~"octez-.*",' + inst + '}[1m]) / 1024',
+    }, { netdata: 'writes', 'process-exporter': 'writes ({{ groupname }})', cadvisor: 'writes ({{ pod }})' });
+    local readsQueries = std.map(function(e) self.query(e.metric, e.legend), readsEntries);
+    local writesQueries = std.map(function(e) self.query(e.metric, e.legend), writesEntries);
+    local readsColors = std.map(function(e) [e.legend, 'light-green'], readsEntries);
+    local writesColors = std.map(function(e) [e.legend, 'light-yellow'], writesEntries);
+    graph.new('IOs', readsQueries + writesQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('kbytes')
     + graph.withLegendBottom(calcs=['mean', 'lastNotNull', 'max'])
-    + graph.withQueryColor([[reads, 'light-green'], [writes, 'light-yellow']]),
+    + graph.withQueryColor(readsColors + writesColors),
 
   cpu(h, w, x, y):
-    local load = 'Cpu load';
-    local loadQuery = self.query('sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + base.node_instance + '="$node_instance"})', load);
-    graph.new('Cpu activity', [loadQuery], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local loadEntries = base.selectMetrics({
+      netdata: 'sum(netdata_app_cpu_utilization_percentage_average{app_group="octez",' + inst + '})',
+      'process-exporter': 'rate(namedprocess_namegroup_cpu_seconds_total{groupname=~"octez.*",mode="user",' + inst + '}[5m])*100',
+      cadvisor: 'rate(container_cpu_usage_seconds_total{pod=~"octez-.*",' + inst + '}[5m]) * 100',
+    }, { netdata: 'Cpu load', 'process-exporter': 'Cpu load ({{ groupname }})', cadvisor: 'Cpu load ({{ pod }})' });
+    local loadQueries = std.map(function(e) self.query(e.metric, e.legend), loadEntries);
+    local loadColors = std.map(function(e) [e.legend, 'light-yellow'], loadEntries);
+    graph.new('Cpu activity', loadQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('percent')
-    + graph.withQueryColor([[load, 'light-yellow']]),
+    + graph.withQueryColor(loadColors),
 
   memory(h, w, x, y):
-    local ram = 'reads';
-    local swap = 'writes';
-    local ramQuery = self.query('netdata_app_mem_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', ram);
-    local swapQuery = self.query('netdata_app_swap_usage_MiB_average{app_group="octez",' + base.node_instance + '="$node_instance"}', swap);
-    graph.new('Memory usage', [ramQuery, swapQuery], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local ramEntries = base.selectMetrics({
+      netdata: 'netdata_app_mem_usage_MiB_average{app_group="octez",' + inst + '}',
+      'process-exporter': 'namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="resident",' + inst + '} / 1024 / 1024',
+      cadvisor: 'sum by (pod)(container_memory_working_set_bytes{pod=~"octez-.*",' + inst + '}) / 1024 / 1024',
+    }, { netdata: 'RAM', 'process-exporter': 'RAM ({{ groupname }})', cadvisor: 'RAM ({{ pod }})' });
+    local swapEntries = base.selectMetrics({
+      netdata: 'netdata_app_swap_usage_MiB_average{app_group="octez",' + inst + '}',
+      'process-exporter': 'namedprocess_namegroup_memory_bytes{groupname=~"octez.*",memtype="swapped",' + inst + '} / 1024 / 1024',
+      cadvisor: 'sum by (pod)(container_memory_swap{pod=~"octez-.*",' + inst + '}) / 1024 / 1024',
+    }, { netdata: 'Swap', 'process-exporter': 'Swap ({{ groupname }})', cadvisor: 'Swap ({{ pod }})' });
+    local ramQueries = std.map(function(e) self.query(e.metric, e.legend), ramEntries);
+    local swapQueries = std.map(function(e) self.query(e.metric, e.legend), swapEntries);
+    local ramColors = std.map(function(e) [e.legend, 'light-green'], ramEntries);
+    local swapColors = std.map(function(e) [e.legend, 'light-orange'], swapEntries);
+    graph.new('Memory usage', ramQueries + swapQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('mbytes')
     + graph.withLegendBottom(calcs=['mean', 'max'])
-    + graph.withQueryColor([[ram, 'light-green'], [swap, 'light-orange']]),
+    + graph.withQueryColor(ramColors + swapColors),
 
   storage(h, w, x, y):
-    local q =
-      if filecheck then self.query('netdata_filecheck_dir_size_bytes_average{' + base.node_instance + '="$node_instance"}', '{{dimension}}')
-      else self.query('netdata_disk_space_GiB_average{dimension="used", ' + base.node_instance + '="$node_instance"}', '{{family}}');
-    graph.new('Storage', [q], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local queries =
+      if filecheck then [self.query('netdata_filecheck_dir_size_bytes_average{' + inst + '}', '{{dimension}}')]
+      else
+        local entries = base.selectMetrics({
+          netdata: 'netdata_disk_space_GiB_average{dimension="used", ' + inst + '}',
+          'node-exporter': 'node_filesystem_size_bytes{' + inst + '} / (1024 * 1024 * 1024)',
+          'local-storage-exporter': 'local_storage_pv_used_bytes{' + inst + '}',
+          cadvisor: 'sum(container_fs_usage_bytes{pod=~"octez-.*",' + inst + '}) / 1024 / 1024 / 1024',
+        }, { netdata: '{{ family }}', 'node-exporter': '{{ mountpoint }}', 'local-storage-exporter': '{{ persistentvolume }}', cadvisor: 'Used Space ({{ pod }})' });
+        std.map(function(e) self.query(e.metric, e.legend), entries);
+    graph.new('Storage', queries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('bytes'),
 
   diskFreeSpace(h, w, x, y):
@@ -87,26 +123,65 @@ local mountpoint = std.extVar('mountpoint');
     + stat.options.withReduceOptions(stat.options.reduceOptions.withCalcs(['lastNotNull'])),
 
   fileDescriptors(h, w, x, y):
-    local total = 'All fds';
-    local sockets = 'Sockets';
-    local files = 'reads';
-    local pipes = 'writes';
-    local socketsTarget = 'netdata_app_fds_open_fds_average{dimension="sockets",app_group="octez",' + base.node_instance + '="$node_instance"}';
-    local filesTarget = 'netdata_app_fds_open_fds_average{dimension="files",app_group="octez",' + base.node_instance + '="$node_instance"}';
-    local pipesTarget = 'netdata_app_fds_open_fds_average{dimension="pipes",app_group="octez",' + base.node_instance + '="$node_instance"}';
-    local totalTarget = 'sum(' + socketsTarget + ') + sum(' + filesTarget + ') + sum(' + pipesTarget + ')';
-    local totalQuery = self.query(totalTarget, total);
-    local socketsQuery = self.query(socketsTarget, sockets);
-    local filesQuery = self.query(filesTarget, files);
-    local pipesQuery = self.query(pipesTarget, pipes);
-    graph.new('File descriptors', [totalQuery, socketsQuery, filesQuery, pipesQuery], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local isDefault = std.length(base.hardware_exporters) == 1 && base.hardware_exporters[0] == 'netdata';
+    local hasMultiple = !isDefault;
+    local suffix(e) = if hasMultiple then ' [' + e + ']' else '';
+    // Netdata: individual dimensions + computed total
+    local netdataEntries = if base.hasExporter('netdata') then
+      local s = suffix('netdata');
+      local socketsTarget = 'netdata_app_fds_open_fds_average{dimension="sockets",app_group="octez",' + inst + '}';
+      local filesTarget = 'netdata_app_fds_open_fds_average{dimension="files",app_group="octez",' + inst + '}';
+      local pipesTarget = 'netdata_app_fds_open_fds_average{dimension="pipes",app_group="octez",' + inst + '}';
+      local totalTarget = 'sum(' + socketsTarget + ') + sum(' + filesTarget + ') + sum(' + pipesTarget + ')';
+      [
+        { metric: totalTarget, legend: 'All fds' + s, color: 'light-green' },
+        { metric: socketsTarget, legend: 'Sockets' + s, color: 'light-yellow' },
+        { metric: filesTarget, legend: 'Files' + s, color: 'light-blue' },
+        { metric: pipesTarget, legend: 'Pipes' + s, color: 'light-orange' },
+      ]
+    else [];
+    // Process-exporter: single aggregate metric
+    local processExporterEntries = if base.hasExporter('process-exporter') then
+      local s = suffix('process-exporter');
+      local fdMetric = 'sum(namedprocess_namegroup_open_filedesc{groupname=~"octez.*",' + inst + '})';
+      [
+        { metric: fdMetric, legend: 'All fds' + s, color: 'light-green' },
+      ]
+    else [];
+    // cadvisor: process_open_fds on pods
+    local cadvisorEntries = if base.hasExporter('cadvisor') then
+      local s = suffix('cadvisor');
+      [
+        { metric: 'sum(process_open_fds{pod=~"octez-.*",' + inst + '})', legend: 'All fds' + s, color: 'light-green' },
+      ]
+    else [];
+    local allEntries = netdataEntries + processExporterEntries + cadvisorEntries;
+    local queries = std.map(function(e) self.query(e.metric, e.legend), allEntries);
+    local colors = std.map(function(e) [e.legend, e.color], allEntries);
+    graph.new('File descriptors', queries, h, w, x, y)
     + graph.withLegendRight(calcs=['current', 'mean', 'min', 'max'])
-    + graph.withQueryColor([[total, 'light-green'], [sockets, 'light-yellow'], [files, 'light-blue'], [pipes, 'light-orange']]),
+    + graph.withQueryColor(colors),
 
   networkIOS(h, w, x, y):
-    local receivedQuery = self.query('-(irate(node_network_receive_bytes_total{' + base.node_instance + '="$node_instance"}[5m]))', 'Bytes received');
-    local transmittedQuery = self.query('irate(node_network_transmit_bytes_total{' + base.node_instance + '="$node_instance"}[5m])', 'Bytes transmitted');
-    graph.new('Network traffic', [receivedQuery, transmittedQuery], h, w, x, y)
+    local inst = base.node_instance + '="$node_instance"';
+    local receivedEntries = base.selectMetrics({
+      // netdata: kilobits/s × 125 = bytes/s
+      netdata: 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="received",' + inst + '}) * 125',
+      'node-exporter': '-(irate(node_network_receive_bytes_total{' + inst + '}[5m]))',
+      cadvisor: 'rate(container_network_receive_bytes_total{pod=~"octez-.*",' + inst + '}[5m])',
+    }, { netdata: 'Bytes received', 'node-exporter': 'Bytes received', cadvisor: 'Bytes received ({{ pod }})' });
+    local transmittedEntries = base.selectMetrics({
+      netdata: 'abs(netdata_net_net_kilobits_persec_average{interface_type="real",dimension="sent",' + inst + '}) * 125',
+      'node-exporter': 'irate(node_network_transmit_bytes_total{' + inst + '}[5m])',
+      cadvisor: 'rate(container_network_transmit_bytes_total{pod=~"octez-.*",' + inst + '}[5m])',
+    }, { netdata: 'Bytes transmitted', 'node-exporter': 'Bytes transmitted', cadvisor: 'Bytes transmitted ({{ pod }})' });
+    local receivedQueries = std.map(function(e) self.query(e.metric, e.legend), receivedEntries);
+    local transmittedQueries = std.map(function(e) self.query(e.metric, e.legend), transmittedEntries);
+    local receivedColors = std.map(function(e) [e.legend, 'light-blue'], receivedEntries);
+    local transmittedColors = std.map(function(e) [e.legend, 'light-orange'], transmittedEntries);
+    graph.new('Network traffic', receivedQueries + transmittedQueries, h, w, x, y)
     + timeSeries.standardOptions.withUnit('Bps')
-    + graph.withLegendBottom(calcs=['current', 'mean', 'max']),
+    + graph.withLegendBottom(calcs=['current', 'mean', 'max'])
+    + graph.withQueryColor(receivedColors + transmittedColors),
 }

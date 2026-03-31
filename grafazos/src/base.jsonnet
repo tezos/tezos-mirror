@@ -28,6 +28,38 @@ local timeSeries = panel.timeSeries;
 local query = grafonnet.query;
 local logs = panel.logs;
 
+// Parse HARDWARE_SRC as comma-separated list of exporters.
+// Valid values: netdata, process-exporter, node-exporter, local-storage-exporter
+local hardwareExporters = std.split(std.extVar('hardware_src'), ',');
+
+// Returns array of {metric: string, legend: string} for all matching exporters.
+// Appends ' [exporter-name]' to every legend whenever more than one exporter is
+// configured (regardless of how many define this particular metric), so the data
+// source is always identifiable in multi-exporter builds.
+// legendFormat can be:
+//   - a string: used for all exporters (original behavior)
+//   - an object { exporter-name: legend }: per-exporter legend templates
+local selectMetrics(metricsByExporter, legendFormat) =
+  local activeKeys = [
+    k
+    for k in std.objectFields(metricsByExporter)
+    if std.member(hardwareExporters, k)
+  ];
+  local isDefault = std.length(hardwareExporters) == 1 && hardwareExporters[0] == 'netdata';
+  local addSuffix = !isDefault;
+  local legendFor(k) =
+    local base = if std.isString(legendFormat) then legendFormat else legendFormat[k];
+    if addSuffix then base + ' [' + k + ']' else base;
+  [
+    {
+      metric: metricsByExporter[k],
+      legend: legendFor(k),
+    }
+    for k in activeKeys
+  ];
+
+local hasExporter(name) = std.member(hardwareExporters, name);
+
 {
 
   // Parameters
@@ -49,6 +81,12 @@ local logs = panel.logs;
   datasource_default: std.extVar('datasource_default'),
 
   endpoint_label: std.extVar('endpoint_label'),
+
+  hardware_src: std.extVar('hardware_src'),
+
+  hardware_exporters: hardwareExporters,
+  selectMetrics: selectMetrics,
+  hasExporter: hasExporter,
 
   slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index"}',
 
