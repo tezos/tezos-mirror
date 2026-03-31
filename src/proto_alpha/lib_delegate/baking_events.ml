@@ -747,14 +747,23 @@ module Scheduling = struct
       ("uri", Data_encoding.string)
 
   let supervisor_automaton_crashed =
-    declare_2
+    declare_1
       ~section
       ~name:"supervisor_automaton_crashed"
       ~level:Warning
       ~msg:
-        "Supervisor: automaton for node {uri} crashed, restarting in {delay}s"
+        "Supervisor: automaton for node {uri} crashed, restarting the \
+         connection."
       ("uri", Data_encoding.string)
-      ("delay", Data_encoding.float)
+
+  let supervisor_automaton_retry =
+    declare_1
+      ~section
+      ~name:"supervisor_automaton_retry"
+      ~level:Warning
+      ~msg:"Supervisor: retrying connection to node {uri}."
+      ~pp1:Format.pp_print_string
+      ("uri", Data_encoding.string)
 
   let supervisor_all_down =
     declare_0

@@ -242,7 +242,7 @@ let create_initial_state ?canceler cctxt ?(synchronize = true)
   may_initialise_with_latest_proposal_pqc state
 
 module Supervisor = struct
-  let run ~delay_between_restarts ~run_automaton cctxts =
+  let run ~run_automaton cctxts =
     let rec loop running_automatons_count pending_promises =
       let open Lwt_syntax in
       (* waits until one (or many) [pending_promises] gets fulfilled *)
@@ -260,24 +260,33 @@ module Supervisor = struct
                 let promise =
                   (* promise that resolves to (`Crash cctxt)
                      when [run_automaton cctxt] resumes *)
-                  let* res = run_automaton cctxt in
-                  return (`Crash (cctxt, res))
+                  let* _res = run_automaton cctxt in
+                  return (`Crash cctxt)
                 in
                 return
                   (succ running_automatons_count, promise :: pending_promises)
-            | `Crash (cctxt, _res) ->
+            | `Crash cctxt ->
                 let uri = Uri.to_string cctxt#base in
-                let* () =
-                  Events.(
-                    emit
-                      supervisor_automaton_crashed
-                      (uri, delay_between_restarts))
-                in
+                let* () = Events.(emit supervisor_automaton_crashed uri) in
                 let promise =
-                  (* promise that resolves to (`Start cctxt)
-                     after [delay_between_restarts] seconds *)
-                  let* () = Lwt_unix.sleep delay_between_restarts in
-                  return (`Start cctxt)
+                  (* promise that resolves to (`Start cctxt) when the connection
+                    is restored. *)
+                  let* res =
+                    Client_confirmations.really_wait_for_bootstrapped
+                      ~retry:
+                        (Baking_automaton.retry
+                           ~emit:(fun _ ->
+                             Events.(emit supervisor_automaton_retry uri))
+                           cctxt
+                           ~is_error:(fun _ -> true)
+                           ~delay:1.
+                           ~factor:1.5
+                           ~max_delay:20.)
+                      cctxt
+                  in
+                  match res with
+                  | Ok _ -> return (`Start cctxt)
+                  | Error _ -> return (`Crash cctxt)
                 in
                 return
                   (pred running_automatons_count, promise :: pending_promises))
@@ -430,7 +439,4 @@ let run cctxt ~extra_nodes ?dal_node_rpc_ctxt ?canceler
                      }))
               extra_nodes
           in
-          Supervisor.run
-            ~delay_between_restarts:20.
-            ~run_automaton
-            (cctxt :: extra_nodes))
+          Supervisor.run ~run_automaton (cctxt :: extra_nodes))

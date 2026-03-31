@@ -22,14 +22,16 @@ type loop_state
 
 (** {2 Functions used by the baker} *)
 
-(** [retry ctxt ~delay ?max_delay ~factor ~tries ?msg f x] retries applying [f
-    x] [tries] until it succeeds or returns an error different from
-    [Connection_failed], at most [tries] number of times. After each try it
-    waits for a number of seconds, but not more than [max_delay], if given. The
-    wait time between tries is given by the initial [delay], multiplied by
-    [factor] at each subsequent try. At each failure, [msg] together with the
-    current delay is printed using [ctxt#message].*)
+(** [retry ?is_error ?emit ctxt ~delay ?max_delay ~factor ~tries ?msg f x]
+    retries applying [f x] [tries] until it succeeds or returns an error
+    different from [Connection_failed], at most [tries] number of times. After
+    each try it waits for a number of seconds, but not more than [max_delay], if
+    given. The wait time between tries is given by the initial [delay],
+    multiplied by [factor] at each subsequent try. At each failure, [msg]
+    together with the current delay is printed using [ctxt#message].*)
 val retry :
+  ?is_error:(error -> bool) ->
+  ?emit:(string -> unit Lwt.t) ->
   #Protocol_client_context.full ->
   ?max_delay:float ->
   delay:float ->

@@ -2114,30 +2114,20 @@ let multi_node_staggered_crash =
   and* () = node2_start_waiter in
   Log.info "Wait 5 levels" ;
   let* _ = Node.wait_for_level node1 5 in
-  Log.info "Kill node1 and wait for the related automaton to crash" ;
   let crash_waiter =
     Agnostic_baker.wait_for_supervisor_automaton_crash
       ~endpoint:node1_endpoint
       baker
   in
-  let* () = Node.kill node1 and* () = crash_waiter in
-  let restart_waiter =
-    Agnostic_baker.wait_for_supervisor_automaton_start
+  let retry_waiter =
+    Agnostic_baker.wait_for_supervisor_automaton_retry
       ~timeout:60.
       ~endpoint:node1_endpoint
       baker
   in
-  let crash_waiter =
-    Agnostic_baker.wait_for_supervisor_automaton_crash
-      ~endpoint:node1_endpoint
-      baker
-  in
-  Log.info "Wait for supervisor to retry connecting to node1" ;
-  let* () = restart_waiter in
-  Log.info "Wait for node1 automaton to crash again (node1 still offline)" ;
-  let* () = crash_waiter in
-  (* Now kill node2: both automatons are down, the baker must shut down. *)
-  Log.info "Kill node2 while node1 automaton is in its second restart delay" ;
+  Log.info "Wait for supervisor to crash and retry connecting to node1" ;
+  let* () = crash_waiter and* () = retry_waiter and* () = Node.kill node1 in
+
   let supervisor_shutdown_waiter =
     Agnostic_baker.wait_for_supervisor_all_automatons_down baker
   in

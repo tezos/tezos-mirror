@@ -59,6 +59,12 @@ val wait_for_supervisor_automaton_start :
 val wait_for_supervisor_automaton_crash :
   ?timeout:float -> ?endpoint:Endpoint.t -> t -> unit Lwt.t
 
+(** [wait_for_supervisor_automaton_retr baker] resolves once [baker] emits a
+    [supervisor_automaton_retry] event. If [endpoint] is provided, only
+    events for that endpoint are considered. *)
+val wait_for_supervisor_automaton_retry :
+  ?timeout:float -> ?endpoint:Endpoint.t -> t -> unit Lwt.t
+
 (** [wait_for_supervisor_all_automatons_down baker] resolves once [baker] emits
     a [supervisor_all_automatons_down] event, which fires just before the baker
     shuts down because all supervised nodes are simultaneously unreachable. *)
