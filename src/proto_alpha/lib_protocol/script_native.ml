@@ -229,19 +229,19 @@ module CLST_contract = struct
   (** - If the sender is [from_] itself, no permission is needed.
       - Otherwise, infinite allowance take precedence over finite allowance.
       - If the sender is a spender, the allowance is decremented by
-        [amount] and an [allowance_update] event is emitted.
+        [amount] and the allowance event is accumulated for later deduplication.
       - Fails with [FA2_NOT_OPERATOR] if no relationship exists, or
         with [FA2.1_INSUFFICIENT_ALLOWANCE] if the spender's allowance
         is insufficient. *)
   let allowance_check_and_update (step_constants : step_constants)
-      entrypoint_str (ctxt, storage, ops) from_ (token_id, amount) =
+      (ctxt, storage, events) from_ (_token_id, amount) =
     let open Lwt_result_syntax in
     let from_is_sender =
       let {destination; entrypoint} = from_ in
       Destination.equal destination step_constants.sender
       && Entrypoint.is_default entrypoint
     in
-    if from_is_sender then return (ctxt, storage, ops)
+    if from_is_sender then return (ctxt, storage, events)
     else
       let sender_address =
         {destination = step_constants.sender; entrypoint = Entrypoint.default}
@@ -254,7 +254,7 @@ module CLST_contract = struct
           ~spender:sender_address
       in
       match allowance with
-      | Some Infinite -> return (ctxt, storage, ops)
+      | Some Infinite -> return (ctxt, storage, events)
       | Some (Finite allowance) ->
           let*? () =
             error_unless
@@ -270,21 +270,19 @@ module CLST_contract = struct
               ~spender:sender_address
               (Some (Finite new_allowance))
           in
-          let* op_allowance_event, ctxt =
-            Clst_events.allowance_update_event
-              (ctxt, step_constants)
-              ~entrypoint:entrypoint_str
+          let events =
+            Clst_events.update_allowance_events
+              events
               ~owner:from_
               ~spender:sender_address
-              ~token_id
               ~new_allowance
               ~diff:(Script_int.neg amount)
           in
-          return (ctxt, storage, op_allowance_event :: ops)
+          return (ctxt, storage, events)
       | None -> tzfail (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
 
-  let execute_transfer_one_from (step_constants : step_constants) entrypoint_str
-      (ctxt, storage, ops) from_ (token_id, amount) =
+  let execute_transfer_one_from (step_constants : step_constants)
+      (ctxt, storage, events) from_ (token_id, amount) =
     let open Lwt_result_syntax in
     let*? () = check_token_id token_id in
     (* Smart contracts cannot hold tokens at all.
@@ -299,11 +297,10 @@ module CLST_contract = struct
     in
     (* Check permission and update the allowance if the sender has a
        finite allowance on the owner's tokens. *)
-    let* ctxt, storage, ops =
+    let* ctxt, storage, events =
       allowance_check_and_update
         step_constants
-        entrypoint_str
-        (ctxt, storage, ops)
+        (ctxt, storage, events)
         from_
         (token_id, amount)
     in
@@ -332,16 +329,14 @@ module CLST_contract = struct
         from_
         new_balance_from
     in
-    let* op_balance_event_from, ctxt =
-      Clst_events.balance_update_event
-        (ctxt, step_constants)
-        ~entrypoint:entrypoint_str
+    let events =
+      Clst_events.update_balance_events
+        events
         ~owner:from_
-        ~token_id:Clst_contract_storage.token_id
         ~new_balance:new_balance_from
         ~diff:(Script_int.neg amount)
     in
-    return (ctxt, storage, op_balance_event_from :: ops)
+    return (ctxt, storage, events)
 
   (** Implementation of the [transfer] entrypoint, compliant with the
       FA2.1 standard:
@@ -362,17 +357,16 @@ module CLST_contract = struct
         Tez.(step_constants.amount = zero)
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
-    let execute_one from_ (ctxt, storage, ops) (to_, (token_id, amount)) =
+    let execute_one from_ (ctxt, storage, events) (to_, (token_id, amount)) =
       let*? () =
         error_unless
           (is_implicit to_.destination)
           (Non_implicit_contract to_.destination)
       in
-      let* ctxt, storage, ops =
+      let* ctxt, storage, events =
         execute_transfer_one_from
           step_constants
-          entrypoint_str
-          (ctxt, storage, ops)
+          (ctxt, storage, events)
           from_
           (token_id, amount)
       in
@@ -387,12 +381,10 @@ module CLST_contract = struct
           to_
           new_balance_to
       in
-      let* op_balance_event_dest, ctxt =
-        Clst_events.balance_update_event
-          (ctxt, step_constants)
-          ~entrypoint:entrypoint_str
+      let events =
+        Clst_events.update_balance_events
+          events
           ~owner:to_
-          ~token_id:Clst_contract_storage.token_id
           ~new_balance:new_balance_to
           ~diff:(Script_int.int amount)
       in
@@ -405,27 +397,32 @@ module CLST_contract = struct
           ~token_id:Clst_contract_storage.token_id
           ~amount
       in
-      return (ctxt, storage, op_balance_event_dest :: op_transfer_event :: ops)
+      return
+        (ctxt, storage, Clst_events.add_transfer_event events op_transfer_event)
     in
-    let execute_from (ctxt, storage, ops) (from_, txs) =
+    let execute_from (ctxt, storage, events) (from_, txs) =
       List.fold_left_es
         (execute_one from_)
-        (ctxt, storage, ops)
+        (ctxt, storage, events)
         (Script_list.to_list txs)
     in
-    let* ctxt, storage, rev_ops =
+    let* ctxt, storage, events =
       List.fold_left_es
         execute_from
-        (ctxt, storage, [])
+        (ctxt, storage, Clst_events.init_events)
         (Script_list.to_list transfer)
     in
-    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+    let* all_events_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    return (Script_list.of_list all_events_ops, storage, [], ctxt)
 
-  let execute_approval (step_constants : step_constants)
-      (operations, storage, ctxt)
+  let execute_approval (step_constants : step_constants) (ctxt, storage, events)
       ((owner, (spender, (token_id, delta))) : approval) =
     let open Lwt_result_syntax in
-    let*? entrypoint_str = Entrypoint.of_string_lax "approve" in
     (* Restrict operator updates only to the owner of the token. *)
     let*? () =
       error_when
@@ -474,38 +471,42 @@ module CLST_contract = struct
     in
     match new_allowance with
     | Finite new_allowance ->
-        let* op_allowance_update_event, ctxt =
-          Clst_events.allowance_update_event
-            (ctxt, step_constants)
-            ~entrypoint:entrypoint_str
+        let events =
+          Clst_events.update_allowance_events
+            events
             ~owner
             ~spender
-            ~token_id:Clst_contract_storage.token_id
             ~new_allowance
             ~diff
         in
-        return (op_allowance_update_event :: operations, storage, ctxt)
+        return (ctxt, storage, events)
     | Infinite ->
         (* the allowance_update event is not issued iff the allowance
            is infinite *)
-        return (operations, storage, ctxt)
+        return (ctxt, storage, events)
 
   let execute_approve (ctxt, (step_constants : step_constants))
       (value : approve) (storage : Clst_contract_storage.t) =
     let open Lwt_result_syntax in
-    let* rev_ops, storage, ctxt =
+    let*? entrypoint_str = Entrypoint.of_string_lax "approve" in
+    let* ctxt, storage, events =
       List.fold_left_es
         (execute_approval step_constants)
-        ([], storage, ctxt)
+        (ctxt, storage, Clst_events.init_events)
         (Script_list.to_list value)
     in
-    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+    let* all_events_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    return (Script_list.of_list all_events_ops, storage, [], ctxt)
 
   let execute_update_operator (step_constants : step_constants)
-      (operations, storage, ctxt) ((owner, (operator, token_id)) : operator)
-      action =
+      (ctxt, storage, events) ((owner, (operator, token_id)) : operator) action
+      =
     let open Lwt_result_syntax in
-    let*? entrypoint_str = Entrypoint.of_string_lax "update_operators" in
     (* Restrict operator updates only to the owner of the token. *)
     let*? () =
       error_when
@@ -528,31 +529,32 @@ module CLST_contract = struct
         ~spender:operator
         new_allowance
     in
-    let* op_operator_update_event, ctxt =
-      Clst_events.operator_update_event
-        (ctxt, step_constants)
-        ~entrypoint:entrypoint_str
-        ~owner
-        ~operator
-        ~token_id:Clst_contract_storage.token_id
-        ~is_operator
+    let events =
+      Clst_events.update_operator_events events ~owner ~operator ~is_operator
     in
-    return (op_operator_update_event :: operations, storage, ctxt)
+    return (ctxt, storage, events)
 
   let execute_update_operators (ctxt, (step_constants : step_constants))
       (value : update_operators) (storage : Clst_contract_storage.t) =
     let open Lwt_result_syntax in
-    let* rev_ops, storage, ctxt =
+    let*? entrypoint_str = Entrypoint.of_string_lax "update_operators" in
+    let* ctxt, storage, events =
       List.fold_left_es
         (fun acc add_or_remove ->
           let action, op =
             match add_or_remove with L op -> (`Add, op) | R op -> (`Remove, op)
           in
           execute_update_operator step_constants acc op action)
-        ([], storage, ctxt)
+        (ctxt, storage, Clst_events.init_events)
         (Script_list.to_list value)
     in
-    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+    let* all_events_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    return (Script_list.of_list all_events_ops, storage, [], ctxt)
 
   let execute_balance_of_one (storage : Clst_contract_storage.t)
       (responses, ctxt) ((owner, token_id) : balance_request) =
@@ -611,12 +613,11 @@ module CLST_contract = struct
         Tez.(step_constants.amount = zero)
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
-    let create_ticket_one (ctxt, storage, ops) (from_, (token_id, amount)) =
-      let* ctxt, storage, ops =
+    let create_ticket_one (ctxt, storage, events) (from_, (token_id, amount)) =
+      let* ctxt, storage, events =
         execute_transfer_one_from
           step_constants
-          entrypoint_str
-          (ctxt, storage, ops)
+          (ctxt, storage, events)
           from_
           (token_id, amount)
       in
@@ -632,7 +633,7 @@ module CLST_contract = struct
           amount = ticket_amount;
         }
       in
-      return (ctxt, storage, ops, ticket)
+      return (ctxt, storage, events, ticket)
     in
 
     let transfer_ticket (ctxt, ops) (to_, ticket) =
@@ -675,8 +676,9 @@ module CLST_contract = struct
       return (ctxt, op :: ops)
     in
 
-    let execute_export_ticket_one (ctxt, storage, all_ops) (destination, txs) =
-      let* ctxt, storage, rev_ops =
+    let execute_export_ticket_one (ctxt, storage, events, all_ops)
+        (destination, txs) =
+      let* ctxt, storage, events, rev_ops =
         match destination with
         | None ->
             (* None, an operation is emitted for each exported ticket to
@@ -687,19 +689,19 @@ module CLST_contract = struct
              "FA2.1_INVALID_DESTINATION" if an address %to_ can't be
              correctly typed. *)
             List.fold_left_es
-              (fun (ctxt, storage, ops) (to_, tickets_to_export) ->
+              (fun (ctxt, storage, events, ops) (to_, tickets_to_export) ->
                 List.fold_left_es
-                  (fun acc ticket_to_export ->
-                    let* ctxt, storage, ops, ticket =
-                      create_ticket_one acc ticket_to_export
+                  (fun (ctxt, storage, events, ops) ticket_to_export ->
+                    let* ctxt, storage, events, ticket =
+                      create_ticket_one (ctxt, storage, events) ticket_to_export
                     in
                     let* ctxt, ops =
                       transfer_ticket (ctxt, ops) (to_, ticket)
                     in
-                    return (ctxt, storage, ops))
-                  (ctxt, storage, ops)
+                    return (ctxt, storage, events, ops))
+                  (ctxt, storage, events, ops)
                   (Script_list.to_list tickets_to_export))
-              (ctxt, storage, all_ops)
+              (ctxt, storage, events, all_ops)
               (Script_list.to_list txs)
         | Some destination_contract ->
             (* (Some contract), only one operation is necessary to
@@ -707,26 +709,26 @@ module CLST_contract = struct
                parameter (list (pair address (list (ticket (pair nat
                (option bytes)))))) MUST be constructed using (address
                %to_) and (list %tickets_to_export). *)
-            let* ctxt, storage, rev_ops, rev_tickets =
+            let* ctxt, storage, events, rev_tickets =
               List.fold_left_es
-                (fun (ctxt, storage, ops, tickets_acc)
+                (fun (ctxt, storage, events, tickets_acc)
                      (to_, tickets_to_export)
                    ->
-                  let* ctxt, storage, ops, tickets_rev =
+                  let* ctxt, storage, events, tickets_rev =
                     List.fold_left_es
-                      (fun (ctxt, storage, ops, tickets) ticket_to_export ->
-                        let* ctxt, storage, ops, ticket =
+                      (fun (ctxt, storage, events, tickets) ticket_to_export ->
+                        let* ctxt, storage, events, ticket =
                           create_ticket_one
-                            (ctxt, storage, ops)
+                            (ctxt, storage, events)
                             ticket_to_export
                         in
-                        return (ctxt, storage, ops, ticket :: tickets))
-                      (ctxt, storage, ops, [])
+                        return (ctxt, storage, events, ticket :: tickets))
+                      (ctxt, storage, events, [])
                       (Script_list.to_list tickets_to_export)
                   in
                   let tickets = List.rev tickets_rev in
-                  return (ctxt, storage, ops, (to_, tickets) :: tickets_acc))
-                (ctxt, storage, all_ops, [])
+                  return (ctxt, storage, events, (to_, tickets) :: tickets_acc))
+                (ctxt, storage, events, [])
                 (Script_list.to_list txs)
             in
             let tickets = List.rev rev_tickets in
@@ -751,21 +753,29 @@ module CLST_contract = struct
             let ctxt =
               Local_gas_counter.update_context gas_counter outdated_ctxt
             in
-            return (ctxt, storage, op :: rev_ops)
+            return (ctxt, storage, events, op :: all_ops)
       in
-      return (ctxt, storage, rev_ops)
+      return (ctxt, storage, events, rev_ops)
     in
-
-    let* ctxt, storage, rev_ops =
+    let* ctxt, storage, events, rev_ops =
       List.fold_left_es
         execute_export_ticket_one
-        (ctxt, storage, [])
+        (ctxt, storage, Clst_events.init_events, [])
         (Script_list.to_list export_ticket)
     in
-    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+    let* balance_and_allowance_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    let all_ops =
+      List.rev_append balance_and_allowance_ops (List.rev rev_ops)
+    in
+    return (Script_list.of_list all_ops, storage, [], ctxt)
 
   let import_one_ticket (step_constants : Script_typed_ir.step_constants)
-      entrypoint_str (ctxt, storage) to_ ticket =
+      (ctxt, storage, events) to_ ticket =
     let open Lwt_result_syntax in
     let {ticketer; contents = token_id, _option_bytes; amount} = ticket in
     let*? () =
@@ -791,16 +801,14 @@ module CLST_contract = struct
         to_
         new_balance_to
     in
-    let* op_balance_event_dest, ctxt =
-      Clst_events.balance_update_event
-        (ctxt, step_constants)
-        ~entrypoint:entrypoint_str
+    let events =
+      Clst_events.update_balance_events
+        events
         ~owner:to_
-        ~token_id:Clst_contract_storage.token_id
         ~new_balance:new_balance_to
         ~diff:(Script_int.int amount)
     in
-    return (ctxt, storage, op_balance_event_dest)
+    return (ctxt, storage, events)
 
   let execute_import_ticket
       (ctxt, (step_constants : Script_typed_ir.step_constants))
@@ -813,26 +821,23 @@ module CLST_contract = struct
         Tez.(step_constants.amount = zero)
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
-    let* ctxt, storage, rev_ops =
+    let* ctxt, storage, events =
       List.fold_left_es
-        (fun (ctxt, storage, ops) (to_, tickets) ->
+        (fun acc (to_, tickets) ->
           List.fold_left_es
-            (fun (ctxt, storage, ops) ticket ->
-              let* ctxt, storage, op_balance_event =
-                import_one_ticket
-                  step_constants
-                  entrypoint_str
-                  (ctxt, storage)
-                  to_
-                  ticket
-              in
-              return (ctxt, storage, op_balance_event :: ops))
-            (ctxt, storage, ops)
+            (fun acc ticket -> import_one_ticket step_constants acc to_ ticket)
+            acc
             (Script_list.to_list tickets))
-        (ctxt, storage, [])
+        (ctxt, storage, Clst_events.init_events)
         (Script_list.to_list import_ticket)
     in
-    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+    let* all_events_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    return (Script_list.of_list all_events_ops, storage, [], ctxt)
 
   let execute_import_ticket_from_implicit
       (ctxt, (step_constants : Script_typed_ir.step_constants))
@@ -855,15 +860,20 @@ module CLST_contract = struct
     let sender_address =
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
-    let* ctxt, storage, op_balance_event =
+    let* ctxt, storage, events =
       import_one_ticket
         step_constants
-        entrypoint_str
-        (ctxt, storage)
+        (ctxt, storage, Clst_events.init_events)
         sender_address
         ticket
     in
-    return (Script_list.of_list [op_balance_event], storage, [], ctxt)
+    let* all_events_ops, ctxt =
+      Clst_events.emit_all_events
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        events
+    in
+    return (Script_list.of_list all_events_ops, storage, [], ctxt)
 
   let execute_lambda_export
       (_ctxt, (_step_constants : Script_typed_ir.step_constants))

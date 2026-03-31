@@ -1625,36 +1625,39 @@ let clst_finalize ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     Tez.zero
 
 let clst_approve ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) ~(src : Contract.t) ?(owner = src)
-    ~(spender : Contract.t) (amount : int64) =
+    (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * Contract.t * int64) list) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
   let open Environment.Micheline in
-  let elm =
-    (* (owner, spender, token_id, increase or decrease amount) *)
-    let amount =
-      let l_or_r = if amount < 0L then Script.D_Right else Script.D_Left in
-      Prim
-        ( dummy_location,
-          l_or_r,
-          [Int (dummy_location, Z.of_int64 (Int64.abs amount))],
-          [] )
-    in
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [
-          String (dummy_location, Contract.to_b58check owner);
-          String (dummy_location, Contract.to_b58check spender);
-          Int (dummy_location, Z.zero);
-          amount;
-        ],
-        [] )
+  let elements =
+    List.map
+      (fun (owner, spender, amount) ->
+        (* (owner, spender, token_id, increase or decrease amount) *)
+        let amount =
+          let l_or_r = if amount < 0L then Script.D_Right else Script.D_Left in
+          Prim
+            ( dummy_location,
+              l_or_r,
+              [Int (dummy_location, Z.of_int64 (Int64.abs amount))],
+              [] )
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [
+              String (dummy_location, Contract.to_b58check owner);
+              String (dummy_location, Contract.to_b58check spender);
+              Int (dummy_location, Z.zero);
+              amount;
+            ],
+            [] ))
+      batch
   in
   let parameters =
     Alpha_context.Script.lazy_expr
-      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+      Environment.Micheline.(Seq (dummy_location, elements) |> strip_locations)
   in
   unsafe_transaction
     ?force_reveal
@@ -1665,41 +1668,44 @@ let clst_approve ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~entrypoint:(Entrypoint.of_string_strict_exn "approve")
     ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
 let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) ~(src : Contract.t) ?(owner = src)
-    ~(operator : Contract.t) action =
+    (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * Contract.t * [< `Add | `Remove]) list) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
   let open Environment.Micheline in
-  let elm =
-    (* add or remove (owner, operator, token_id) *)
-    let l_or_r =
-      match action with `Add -> Script.D_Left | `Remove -> Script.D_Right
-    in
-    Prim
-      ( dummy_location,
-        l_or_r,
-        [
-          Prim
-            ( dummy_location,
-              Script.D_Pair,
-              [
-                String (dummy_location, Contract.to_b58check owner);
-                String (dummy_location, Contract.to_b58check operator);
-                Int (dummy_location, Z.zero);
-              ],
-              [] );
-        ],
-        [] )
+  let elms =
+    List.map
+      (fun (owner, operator, action) ->
+        (* add or remove (owner, operator, token_id) *)
+        let l_or_r =
+          match action with `Add -> Script.D_Left | `Remove -> Script.D_Right
+        in
+        Prim
+          ( dummy_location,
+            l_or_r,
+            [
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check owner);
+                    String (dummy_location, Contract.to_b58check operator);
+                    Int (dummy_location, Z.zero);
+                  ],
+                  [] );
+            ],
+            [] ))
+      batch
   in
   let parameters =
     Alpha_context.Script.lazy_expr
-      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+      Environment.Micheline.(Seq (dummy_location, elms) |> strip_locations)
   in
   unsafe_transaction
     ?force_reveal
@@ -1710,41 +1716,47 @@ let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ~entrypoint:(Entrypoint.of_string_strict_exn "update_operators")
     ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
 let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) ~(src : Contract.t) ~(dst : Contract.t) ?(sender = src)
-    (amount : int64) =
+    (ctxt : Context.t) ~sender
+    (batch : (Contract.t * (Contract.t * int64) list) list) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
   let open Environment.Micheline in
-  let tx =
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [
-          String (dummy_location, Contract.to_b58check dst);
-          Int (dummy_location, Z.zero);
-          Int (dummy_location, Z.of_int64 amount);
-        ],
-        [] )
-  in
-  let elm =
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [
-          String (dummy_location, Contract.to_b58check src);
-          Seq (dummy_location, [tx]);
-        ],
-        [] )
+  let elements =
+    List.map
+      (fun (src, txs) ->
+        let txs =
+          List.map
+            (fun (dst, amount) ->
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check dst);
+                    Int (dummy_location, Z.zero);
+                    Int (dummy_location, Z.of_int64 amount);
+                  ],
+                  [] ))
+            txs
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [
+              String (dummy_location, Contract.to_b58check src);
+              Seq (dummy_location, txs);
+            ],
+            [] ))
+      batch
   in
   let parameters =
     Alpha_context.Script.lazy_expr
-      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+      Environment.Micheline.(Seq (dummy_location, elements) |> strip_locations)
   in
   unsafe_transaction
     ?force_reveal
@@ -1760,33 +1772,12 @@ let clst_transfer ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     Tez.zero
 
 let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    ?(destination_contract = None) (ctxt : Context.t) ~(src : Contract.t)
-    ~(dst : Contract.t) ?(sender = src) (amount : int64) =
+    ?(destination_contract = None) (ctxt : Context.t) ~(sender : Contract.t)
+    (batch : (Contract.t * (Contract.t * int64) list) list) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
   let open Environment.Micheline in
-  let ticket_to_export =
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [
-          String (dummy_location, Contract.to_b58check src);
-          Int (dummy_location, Z.zero);
-          Int (dummy_location, Z.of_int64 amount);
-        ],
-        [] )
-  in
-  let tx =
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [
-          String (dummy_location, Contract.to_b58check dst);
-          Seq (dummy_location, [ticket_to_export]);
-        ],
-        [] )
-  in
   let destination_contract =
     match destination_contract with
     | None -> Prim (dummy_location, Script.D_None, [], [])
@@ -1797,16 +1788,43 @@ let clst_export_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
             [String (dummy_location, contract)],
             [] )
   in
-  let elm =
-    Prim
-      ( dummy_location,
-        Script.D_Pair,
-        [destination_contract; Seq (dummy_location, [tx])],
-        [] )
+  let elms =
+    List.map
+      (fun (dst, tickets) ->
+        let tickets_to_export =
+          List.map
+            (fun (src, amount) ->
+              Prim
+                ( dummy_location,
+                  Script.D_Pair,
+                  [
+                    String (dummy_location, Contract.to_b58check src);
+                    Int (dummy_location, Z.zero);
+                    Int (dummy_location, Z.of_int64 amount);
+                  ],
+                  [] ))
+            tickets
+        in
+        let tx =
+          Prim
+            ( dummy_location,
+              Script.D_Pair,
+              [
+                String (dummy_location, Contract.to_b58check dst);
+                Seq (dummy_location, tickets_to_export);
+              ],
+              [] )
+        in
+        Prim
+          ( dummy_location,
+            Script.D_Pair,
+            [destination_contract; Seq (dummy_location, [tx])],
+            [] ))
+      batch
   in
   let parameters =
     Alpha_context.Script.lazy_expr
-      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+      Environment.Micheline.(Seq (dummy_location, elms) |> strip_locations)
   in
   unsafe_transaction
     ?force_reveal

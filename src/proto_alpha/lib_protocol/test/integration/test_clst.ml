@@ -216,6 +216,45 @@ let check_expected_pending_parameters ~loc expected parameters =
         (parameter_to_string expected)
         (parameter_to_string parameters)
 
+(* Returns a list of event type names extracted from internal event
+   operations of packed operation metadata *)
+let extract_events (metadata : Apply_results.packed_operation_metadata) =
+  let extract_from_internal_ops internal_operation_results =
+    List.filter_map
+      (fun (Apply_internal_results.Internal_operation_result (op, _result)) ->
+        match op.operation with
+        | Event {tag = _; payload = _; ty} -> (
+            match ty |> Environment.Micheline.root with
+            | Environment.Micheline.Prim (_, _, _, [annot]) -> Some annot
+            | _ -> None)
+        | _ -> None)
+      internal_operation_results
+  in
+  let extract_from_result : type a. a Apply_results.contents_result -> _ =
+    function
+    | Manager_operation_result {internal_operation_results; _} ->
+        extract_from_internal_ops internal_operation_results
+    | _ -> []
+  in
+  let rec extract_from_contents_result_list : type a.
+      a Apply_results.contents_result_list -> _ = function
+    | Single_result r -> extract_from_result r
+    | Cons_result (r, rest) ->
+        extract_from_result r @ extract_from_contents_result_list rest
+  in
+  match metadata with
+  | Apply_results.Operation_metadata {contents} ->
+      extract_from_contents_result_list contents
+  | Apply_results.No_operation_metadata -> []
+
+let get_events_from_metadata metadata =
+  let _header_metadata, operation_receipts = metadata in
+  List.concat_map extract_events operation_receipts
+
+let check_number_events ~loc ~expected event_type events =
+  let count = List.length (List.filter (String.equal event_type) events) in
+  Assert.equal_int ~loc count expected
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -894,7 +933,10 @@ let () =
 
   let amount_incr_allowance = 40_000L in
   let* approve_tx =
-    Op.clst_approve (B b) ~src:owner ~spender amount_incr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [(owner, spender, amount_incr_allowance)]
   in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender b in
@@ -902,14 +944,20 @@ let () =
 
   let amount_decr_allowance = -30_000L in
   let* approve_tx =
-    Op.clst_approve (B b) ~src:owner ~spender amount_decr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [(owner, spender, amount_decr_allowance)]
   in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender b in
   let* () = Assert.equal_int64 ~loc:__LOC__ 10_000L allowance in
 
   let* approve_tx =
-    Op.clst_approve (B b) ~src:spender ~owner ~spender amount_incr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:spender
+      [(owner, spender, amount_incr_allowance)]
   in
   let*! b = Block.bake ~operation:approve_tx b in
   match b with
@@ -932,21 +980,21 @@ let () =
   let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:owner ~operator `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
   let* is_operator = is_operator_view ~owner ~operator b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:owner ~operator `Remove
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Remove)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
   let* is_operator = is_operator_view ~owner ~operator b in
   let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:operator ~owner ~operator `Add
+    Op.clst_update_operator (B b) ~sender:operator [(owner, operator, `Add)]
   in
   let*! b = Block.bake ~operation:update_operator_tx b in
 
@@ -958,6 +1006,24 @@ let () =
         trace
 
 let () =
+  register_test
+    ~title:
+      "Test update_operator: remove operator for non-operator has no effect"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, operator) = Context.init2 ~consensus_threshold_size:0 () in
+  let* op =
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Remove)]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%operator_update" events
+  in
+  let* is_operator = is_operator_view ~owner ~operator b in
+  Assert.equal_bool ~loc:__LOC__ false is_operator
+
+let () =
   register_test ~title:"Test adding operator on finite allowance" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, (owner, account) = Context.init2 ~consensus_threshold_size:0 () in
@@ -965,7 +1031,9 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) owner amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src:owner ~spender:account 50_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:owner [(owner, account, 50_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender:account b in
   let* () = Assert.equal_int64 ~loc:__LOC__ 50_000L allowance in
@@ -974,7 +1042,7 @@ let () =
 
   (* Adding an operator to a finite allowance replaces the allowance. *)
   let* update_op =
-    Op.clst_update_operator (B b) ~src:owner ~operator:account `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, account, `Add)]
   in
   let* b = Block.bake ~operation:update_op b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
@@ -992,14 +1060,16 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_op =
-    Op.clst_update_operator (B b) ~src:owner ~operator:account `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, account, `Add)]
   in
   let* b = Block.bake ~operation:update_op b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
 
   (* Adding a finite allowance on an operator has no effect. *)
-  let* approve_tx = Op.clst_approve (B b) ~src:owner ~spender:account 50_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:owner [(owner, account, 50_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
@@ -1126,7 +1196,10 @@ let () =
 
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1147,7 +1220,9 @@ let () =
       ticket_amount_export
   in
 
-  let* op_export_ticket_zero = Op.clst_export_ticket (B b) ~src ~dst 0L in
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender:src [(dst, [(src, 0L)])]
+  in
   let*! b = Block.bake ~operation:op_export_ticket_zero b in
   match b with
   | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
@@ -1172,9 +1247,8 @@ let () =
     Op.clst_export_ticket
       ~destination_contract:(Some clst_import_ticket_entrypoint)
       (B b)
-      ~src
-      ~dst
-      ticket_amount
+      ~sender:src
+      [(dst, [(src, ticket_amount)])]
   in
   let* b = Block.bake ~operation:op b in
   let* () =
@@ -1521,7 +1595,9 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender:src [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1536,7 +1612,7 @@ let () =
   in
 
   (* Test a zero transfer *)
-  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender:src [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1560,11 +1636,13 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:src [(src, sender, 40_000_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a zero transfer with an approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1579,7 +1657,9 @@ let () =
   (* Test a non-zero transfer with an approved sender with sufficient
      allowance *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1597,7 +1677,9 @@ let () =
 
   (* Test a non-zero transfer with an approved sender with
      insufficient allowance *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1611,7 +1693,7 @@ let () =
 
   (* Test a non-zero transfer with a non-approved sender *)
   let* transfer_tx =
-    Op.clst_transfer (B b) ~sender:dst ~src ~dst transfer_amount
+    Op.clst_transfer (B b) ~sender:dst [(src, [(dst, transfer_amount)])]
   in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
@@ -1627,7 +1709,7 @@ let () =
   in
 
   (* Test a zero transfer with a non-approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender:dst ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender:dst [(src, [(dst, 0L)])] in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1653,12 +1735,12 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+    Op.clst_update_operator (B b) ~sender:src [(src, sender, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
 
   (* Test a zero transfer with an approved operator *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1672,7 +1754,9 @@ let () =
 
   (* Test a non-zero transfer with an approved operator *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1687,7 +1771,9 @@ let () =
   in
 
   (* Test a second non-zero transfer with an approved operator *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1709,7 +1795,7 @@ let () =
   (* Test a non-zero transfer with an approved operator but with
      owner's insufficient balance *)
   let* transfer_tx =
-    Op.clst_transfer (B b) ~sender ~src ~dst (Tez.to_mutez amount)
+    Op.clst_transfer (B b) ~sender [(src, [(dst, Tez.to_mutez amount)])]
   in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
@@ -1733,14 +1819,16 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:src [(src, sender, 40_000_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a non-zero ticket export with an approved sender with
      sufficient allowance *)
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1764,7 +1852,7 @@ let () =
   (* Test a non-zero ticket export with an approved sender with
      insufficient allowance *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1779,7 +1867,10 @@ let () =
 
   (* Test a non-zero ticket export with a non-approved sender *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:dst
+      [(dst, [(src, ticket_amount_export)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1796,7 +1887,7 @@ let () =
 
   (* Test a zero ticket export with an approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1807,7 +1898,7 @@ let () =
 
   (* Test a zero ticket export with a non-approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender:dst [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1834,14 +1925,14 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+    Op.clst_update_operator (B b) ~sender:src [(src, sender, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
 
   (* Test a non-zero ticket export with an approved operator *)
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1864,7 +1955,7 @@ let () =
 
   (* Test a second non-zero ticket export with an approved operator *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1887,7 +1978,7 @@ let () =
 
   (* Test a zero ticket export with an approved operator *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1906,11 +1997,11 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 0L in
+  let* approve_tx = Op.clst_approve (B b) ~sender:src [(src, sender, 0L)] in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a zero transfer with an approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1925,7 +2016,9 @@ let () =
   (* Test a non-zero transfer with an approved sender with insufficient
      allowance *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1940,7 +2033,7 @@ let () =
   (* Test a non-zero ticket export with an approved sender with
      insufficient allowance *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst transfer_amount
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, transfer_amount)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1955,7 +2048,7 @@ let () =
 
   (* Test a zero ticket export with an approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1977,7 +2070,10 @@ let () =
 
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
 
@@ -2233,3 +2329,220 @@ let () =
         ~loc:__LOC__
         "Operation is invalid, a non registered delegate cannot unregister"
   | Error e -> Error_helpers.expect_clst_unregistered_delegate ~loc:__LOC__ e
+
+let () =
+  register_test ~title:"Test event deduplication in transfer" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* Test the same dst twice *)
+  let* transfer_tx =
+    Op.clst_transfer
+      (B b)
+      ~sender:src
+      [(src, [(dst1, 10_000_000L); (dst1, 20_000_000L); (dst2, 5_000_000L)])]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:transfer_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:3 "%balance_update" events
+  in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:3 "%transfer_event" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 35_000_000L)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:30_000_000L b dst1
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:5_000_000L b dst2
+  in
+
+  (* Test self-transfer *)
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender:src [(src, [(src, 10_000_000L)])]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:transfer_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%balance_update" events
+  in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%transfer_event" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Int64.sub (Tez.to_mutez amount) 35_000_000L)
+      ~diff:0L
+      b
+      src
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in approve" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, spender1, spender2) =
+    Context.init3 ~consensus_threshold_size:0 ()
+  in
+  (* Test the same spender twice *)
+  let* approve_tx =
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [
+        (owner, spender1, 10_000L);
+        (owner, spender2, 5_000L);
+        (owner, spender1, 20_000L);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:approve_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:2 "%allowance_update" events
+  in
+  let* allowance = get_allowance ~owner ~spender:spender1 b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 30_000L allowance in
+  let* allowance = get_allowance ~owner ~spender:spender2 b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 5_000L allowance in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in update_operators"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, operator1, operator2) =
+    Context.init3 ~consensus_threshold_size:0 ()
+  in
+  (* Test the same operator twice *)
+  let* update_tx =
+    Op.clst_update_operator
+      (B b)
+      ~sender:owner
+      [
+        (owner, operator1, `Add);
+        (owner, operator2, `Add);
+        (owner, operator1, `Remove);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:update_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:2 "%operator_update" events
+  in
+  let* is_op1 = is_operator_view ~owner ~operator:operator1 b in
+  let* () = Assert.equal_bool ~loc:__LOC__ false is_op1 in
+  let* is_op2 = is_operator_view ~owner ~operator:operator2 b in
+  let* () = Assert.equal_bool ~loc:__LOC__ true is_op2 in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in export_ticket" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* op_export =
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [
+        (dst1, [(src, 10_000_000L)]);
+        (dst2, [(src, 5_000_000L)]);
+        (dst1, [(src, 20_000_000L)]);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op_export b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%balance_update" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 35_000_000L)
+      b
+      src
+  in
+  let* clst_ticket_balance_dst1 =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst1
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance_dst1)
+      30_000_000L
+  in
+  let* clst_ticket_balance_dst2 =
+    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst2
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance_dst2)
+      5_000_000L
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in import_ticket" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let clst_import_ticket_entrypoint =
+    Contract.to_b58check (Contract.Originated clst_hash) ^ "%import_ticket"
+  in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_op = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_op b in
+
+  let* op =
+    Op.clst_export_ticket
+      ~destination_contract:(Some clst_import_ticket_entrypoint)
+      (B b)
+      ~sender:src
+      [
+        (dst1, [(src, 10_000_000L)]);
+        (dst2, [(src, 5_000_000L); (src, 3_000_000L)]);
+        (dst1, [(src, 20_000_000L)]);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    (* export_ticket: 1 update_balance event for src + 3 calls to
+       import_ticket *)
+    check_number_events ~loc:__LOC__ ~expected:4 "%balance_update" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 38_000_000L)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:30_000_000L b dst1
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:8_000_000L b dst2
+  in
+  return_unit
