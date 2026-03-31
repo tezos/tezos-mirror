@@ -156,5 +156,7 @@ let child_pipeline =
     ~description:
       "A child pipeline of 'before_merging' to launch the security scans for \
        the images on the master branch"
-    ~jobs
+    ~jobs:
+      (if Tezos_ci.container_scanning_flag then jobs
+       else [Tezos_ci.job_datadog_pipeline_trace])
     "security-scans-master"
