@@ -530,3 +530,43 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           unit)
   in
   iter ()
+
+let register ~__FILE__ ~protocols =
+  scenario_with_layer1_node
+    ~__FILE__
+    ~additional_bootstrap_accounts:1
+    ~slot_size:190_416
+    "dal basic logic"
+    test_slot_management_logic
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    "slots attestation operation behavior"
+    test_slots_attestation_operation_behavior
+    protocols ;
+  (* We want to test that the number of slots following mainnet
+     parameters can be included into one block. We hard-code the
+     mainnet value. It could be extended to higher values if
+     desired. *)
+  scenario_with_layer1_node
+    ~__FILE__
+    ~regression:true
+    ~number_of_slots:32
+    ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
+    "Use all available slots"
+    test_all_available_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    "slots attestation operation dal committee membership check"
+    test_slots_attestation_operation_dal_committee_membership_check
+    (* We need to set the prevalidator's event level to [`Debug]
+       in order to capture the errors thrown in the validation phase. *)
+    ~event_sections_levels:[("prevalidator", `Debug)]
+    ~consensus_committee_size:1024
+    protocols ;
+  scenario_with_layer1_node
+    ~__FILE__
+    "one_committee_per_level"
+    test_one_committee_per_level
+    protocols
