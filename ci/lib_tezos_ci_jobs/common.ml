@@ -78,7 +78,6 @@ module Docker = struct
 
     - [Release] Docker builds include only released executables whereas other
       types also includes experimental ones.
-    - [Octez_evm_node_release] Docker build include only `octez-evm-node`
     - [Test_manual] and [Experimental] Docker builds include the EVM kernels in
       amd64 builds.
     - [Release] and [Experimental] Docker builds are pushed to Docker hub,
@@ -86,12 +85,7 @@ module Docker = struct
     - [Test_manual] Docker builds are started manually, put in the stage
       [manual] and their failure is allowed. The other types are in the build
       stage, run [on_success] and are not allowed to fail. *)
-  type docker_build_type =
-    | Experimental
-    | Release
-    | Octez_evm_node_release
-    | Test
-    | Test_manual
+  type docker_build_type = Experimental | Release | Test | Test_manual
 
   (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
   let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
@@ -99,7 +93,7 @@ module Docker = struct
     let arch_string = Runner.Arch.show_uniform arch in
     let ci_docker_hub =
       match docker_build_type with
-      | Release | Octez_evm_node_release | Experimental -> true
+      | Release | Experimental -> true
       | Test | Test_manual -> false
     in
     (* Whether to include evm artifacts.
@@ -130,7 +124,6 @@ module Docker = struct
         ( "EXECUTABLE_FILES",
           match docker_build_type with
           | Release -> "script-inputs/released-executables"
-          | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
           | Test | Test_manual | Experimental ->
               "script-inputs/released-executables \
                script-inputs/experimental-executables" );
