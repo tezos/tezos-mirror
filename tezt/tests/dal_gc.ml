@@ -496,7 +496,7 @@ let test_gc_with_all_profiles protocol parameters cryptobox node client dal_node
     client
     dal_node
 
-let test_gc_skip_list_cells ~protocols =
+let test_gc_skip_list_cells ~__FILE__ ~protocols =
   let title = "garbage collection of skip list cells" in
   let tags = Tag.[tezos2; "dal"; "gc"; "skip_list"] in
   Protocol.register_test
@@ -585,3 +585,32 @@ let test_gc_skip_list_cells ~protocols =
       in
       check_skip_list_store dal_node ~number_of_slots ~expected_levels)
     protocols
+
+let register ~__FILE__ ~protocols =
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["gc"; "simple"; Tag.memory_hungry]
+    ~operator_profiles:[0]
+    ~number_of_slots:1
+    "garbage collection of shards for producer"
+    test_gc_simple_producer
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["gc"; "attester"]
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    ~number_of_slots:1
+    "garbage collection of shards for producer and attester"
+    test_gc_producer_and_attester
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["gc"; "multi"; Tag.memory_hungry]
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    ~number_of_slots:1
+    "garbage collection of shards for all profiles"
+    test_gc_with_all_profiles
+    protocols ;
+  test_gc_skip_list_cells ~__FILE__ ~protocols

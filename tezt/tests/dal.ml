@@ -10940,33 +10940,7 @@ let register ~protocols =
     protocols ;
   Dal_skip_list.register ~__FILE__ ~protocols ;
   Dal_amplification.register ~__FILE__ ~protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["gc"; "simple"; Tag.memory_hungry]
-    ~operator_profiles:[0]
-    ~number_of_slots:1
-    "garbage collection of shards for producer"
-    Dal_gc.test_gc_simple_producer
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["gc"; "attester"]
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    ~number_of_slots:1
-    "garbage collection of shards for producer and attester"
-    Dal_gc.test_gc_producer_and_attester
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["gc"; "multi"; Tag.memory_hungry]
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    ~number_of_slots:1
-    "garbage collection of shards for all profiles"
-    Dal_gc.test_gc_with_all_profiles
-    protocols ;
-  Dal_gc.test_gc_skip_list_cells ~protocols ;
+  Dal_gc.register ~__FILE__ ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["crawler"; "reconnection"]
