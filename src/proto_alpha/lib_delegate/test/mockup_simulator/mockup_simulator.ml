@@ -1594,11 +1594,76 @@ let get_bootstrap_accounts () =
     to test baker components like the forge worker. *)
 type baker_test_env = {
   cctxt : Protocol_client_context.full;
+  hooks : Faked_services.hooks;
   delegates : Baking_state_types.Key.t list;
   global_state : Baking_state.global_state;
   automaton_state : Baking_state.automaton_state;
   genesis_block_info : Baking_state_types.block_info;
 }
+
+(** [wrap_hooks_with_delay ~delay hooks] wraps an existing
+    [Faked_services.hooks] first-class module so that every RPC called by
+    [prepare_unsigned_block] ([rpc_context_callback], [resulting_context_hash],
+    [live_blocks]) sleeps for [delay] seconds before delegating to the original
+    implementation. This simulates a slow node.
+
+    Returns the wrapped hooks and a promise that resolves once [live_blocks]
+    (the last delayed RPC in [prepare_unsigned_block]) has been called and
+    completed. This allows tests to know when the slow node's preparation
+    is fully done. *)
+let wrap_hooks_with_delay ~delay (hooks : Faked_services.hooks) :
+    Faked_services.hooks * unit Lwt.t =
+  let module H = (val hooks : Faked_services.Mocked_services_hooks) in
+  let preparation_done, notify_preparation_done = Lwt.wait () in
+  ( (module struct
+      include H
+
+      let rpc_context_callback block =
+        let open Lwt_syntax in
+        let* () = Lwt_unix.sleep delay in
+        H.rpc_context_callback block
+
+      let resulting_context_hash block =
+        let open Lwt_syntax in
+        let* () = Lwt_unix.sleep delay in
+        H.resulting_context_hash block
+
+      let live_blocks block =
+        let open Lwt_syntax in
+        let* () = Lwt_unix.sleep delay in
+        let* result = H.live_blocks block in
+        Lwt.wakeup_later notify_preparation_done () ;
+        return result
+    end),
+    preparation_done )
+
+(** [create_cctxt ~hooks env] creates a fresh [Protocol_client_context.full]
+    from the given [hooks], with all delegates from [env] registered in
+    its wallet. Use the returned [cctxt] with
+    [Baking_automaton.create_automaton_state] to build an automaton that
+    simulates an additional node. *)
+let create_cctxt =
+  let cctxt_counter = ref 0 in
+  fun ~hooks ({global_state; _} : baker_test_env) ->
+    let open Lwt_result_syntax in
+    incr cctxt_counter ;
+    let base_dir = Format.asprintf "test-extra-%d" !cctxt_counter in
+    let filesystem = String.Hashtbl.create 10 in
+    let wallet =
+      new Faked_client_context.faked_io_wallet ~base_dir ~filesystem
+    in
+    let cctxt =
+      new Protocol_client_context.wrap_full
+        (new Faked_client_context.unix_faked
+           ~base_dir
+           ~filesystem
+           ~chain_id
+           ~hooks)
+    in
+    let* () =
+      register_delegates_in_wallet ~wallet ~delegates:global_state.delegates
+    in
+    return cctxt
 
 (** Create a test environment for baker component testing.
 
@@ -1763,7 +1828,8 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
               grandparent = shell.predecessor;
             }
   in
-  return {cctxt; delegates; global_state; automaton_state; genesis_block_info}
+  return
+    {cctxt; hooks; delegates; global_state; automaton_state; genesis_block_info}
 
 (** Create a batch_content for consensus vote testing. *)
 let create_batch_content ~(block_info : Baking_state_types.block_info) :
