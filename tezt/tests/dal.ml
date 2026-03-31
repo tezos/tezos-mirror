@@ -155,32 +155,6 @@ let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
   in
   iter [] from_level
 
-(* We check that publishing a slot header with a proof for the "same"
-   slot contents but represented using a different [slot_size] leads
-   to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
-    ~index parameters cryptobox ?counter ?force ?error client =
-  let cryptobox_params =
-    {
-      parameters.Dal.Parameters.cryptobox with
-      slot_size = 2 * parameters.cryptobox.slot_size;
-    }
-  in
-  let* cryptobox' = Helpers.make_cryptobox cryptobox_params in
-  let msg = "a" in
-  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
-  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
-  Helpers.publish_commitment
-    ~source
-    ?fee
-    ~index
-    ~commitment
-    ~proof
-    ?counter
-    ?force
-    ?error
-    client
-
 let test_slot_management_logic protocol parameters cryptobox node client
     _bootstrap_key =
   let*! () = Client.reveal ~src:"bootstrap6" client in
