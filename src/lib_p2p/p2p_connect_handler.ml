@@ -532,10 +532,8 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
     in
     (* we have a common version, checking if there is an available slot *)
     let* () =
-      if
-        (* Reject connection if [max_connections] is reached. *)
-        P2p_pool.active_connections t.pool >= t.config.max_connections
-      then P2p_rejection.(rejecting Too_many_connections)
+      if P2p_pool.active_connections t.pool >= t.connections_threshold then
+        P2p_rejection.(rejecting Too_many_connections)
       else return_unit
     in
     (* we have a slot, checking if point and peer are acceptable *)
