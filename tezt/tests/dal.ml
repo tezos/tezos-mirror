@@ -11508,37 +11508,7 @@ let register ~protocols =
     test_operator_profile
     protocols ;
   Dal_skip_list.register ~__FILE__ ~protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["amplification"; Tag.memory_hungry]
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    ~redundancy_factor:2
-      (* With a redundancy factor of 4 or more, not much luck is
-         needed for a bootstrap account (with 1/5 of the stake) to be
-         assigned enough shards to reconstruct alone. Since the
-         redundancy factor must be a power of 2, we use 2 which means
-         that half of the shards are needed to perform a
-         reconstruction. *)
-    ~number_of_slots:1
-    "banned attesters receive their shards thanks to amplification"
-    Dal_amplification.test_amplification
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["amplification"; "simple"; Tag.memory_hungry]
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-      (* In this test, receiving all shards should happen before amplification
-         starts. With [minimal_block_delay = 1], it may start 1 second after the
-         first shard is received, which results in flakiness. With
-         [minimal_block_delay = 3], it may start only after 4s (see !18139),
-         which should be enough time for the observer to receive all the
-         shards. *)
-    ~minimal_block_delay:"3"
-    "observer triggers amplification (without lost shards)"
-    Dal_amplification.test_amplification_without_lost_shards
-    protocols ;
+  Dal_amplification.register ~__FILE__ ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["gc"; "simple"; Tag.memory_hungry]
@@ -11841,14 +11811,6 @@ let register ~protocols =
       ]
     "DAL node ignore topics wrong env"
     test_ignore_topics_wrong_env
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["amplification"; "ignore_topics"]
-    ~bootstrap_profile:true
-    ~wait_ready:true
-    "Test amplification by ignoring topics"
-    Dal_amplification.test_by_ignoring_topics
     protocols ;
 
   test_attestations_encode_decode_single_lag protocols ;
@@ -12310,19 +12272,7 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:11
     ~migrate_from
     ~migrate_to ;
-  test_l1_migration_scenario
-    ~__FILE__
-    ~scenario:(fun ~migration_level:_ dal_params client node dal_node ->
-      Dal_amplification.test_amplification () dal_params () node client dal_node)
-    ~tags:["migration"; "dal"; "amplification"]
-    ~description:"Test amplification after migration"
-    ~bootstrap_profile:true
-    ~activation_timestamp:Now
-    ~redundancy_factor:2
-    ~migration_level:3
-    ~migrate_from
-    ~migrate_to
-    () ;
+  Dal_amplification.register_migration ~__FILE__ ~migrate_from ~migrate_to ;
   test_snapshot_export_over_migration ~migrate_from ~migrate_to
 
 let () =
