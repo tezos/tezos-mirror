@@ -71,8 +71,9 @@ let create_connection_pool ?fd_pool config limits meta_cfg log triggers =
   in
   P2p_pool.create ?fd_pool pool_cfg meta_cfg ~log triggers
 
-let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
-    triggers log answerer =
+let create_connect_handler config limits
+    (maintenance_bounds : P2p_connect_handler.maintenance_bounds) pool msg_cfg
+    conn_meta_cfg io_sched triggers log answerer =
   let open P2p_limits in
   let connect_handler_cfg =
     {
@@ -94,6 +95,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
       disable_peer_discovery = config.disable_peer_discovery;
     }
   in
+  let maintenance_active = not (Option.is_none limits.maintenance_idle_time) in
   P2p_connect_handler.create
     connect_handler_cfg
     pool
@@ -103,6 +105,8 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     triggers
     ~log
     ~answerer
+    ~maintenance_bounds
+    ~maintenance_active
 
 let may_create_discovery_worker _limits config pool =
   let open Lwt_result_syntax in
@@ -201,6 +205,12 @@ module Real = struct
     let*! pool =
       create_connection_pool ?fd_pool config limits meta_cfg log triggers
     in
+    let maintenance_bounds =
+      P2p_connect_handler.make_maintenance_bounds
+        ~min:limits.min_connections
+        ~expected:limits.expected_connections
+        ~max:limits.max_connections
+    in
     (* There is a mutual recursion between an answerer and connect_handler,
        for the default answerer. Because of the swap request mechanism, the
        default answerer needs to initiate new connections using the
@@ -228,6 +238,7 @@ module Real = struct
         (create_connect_handler
            config
            limits
+           maintenance_bounds
            pool
            msg_cfg
            conn_meta_cfg
