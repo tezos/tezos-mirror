@@ -409,3 +409,47 @@ let test_manual_echo_kernel_for_bandwidth protocol parameters dal_node
           int
           ~error_msg:"Expected number of bytes length %R. Got %L") ;
       unit
+
+let register ~__FILE__ ~protocols =
+  scenario_with_all_nodes
+    ~__FILE__
+    "test tx_kernel"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
+    ~pvm_name:"wasm_2_0_0"
+    ~operator_profiles:[0]
+    ~number_of_shards:256
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:8
+    ~page_size:128
+    ~attestation_lag:4
+    test_tx_kernel_e2e
+    protocols ;
+  scenario_with_all_nodes
+    ~__FILE__
+    "test echo_kernel"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~pvm_name:"wasm_2_0_0"
+    ~slot_size:2048
+    ~page_size:256
+    ~number_of_shards:64
+    ~operator_profiles:[0]
+    test_echo_kernel_e2e
+    protocols ;
+  (* This test only asserts the echo kernel used by tezt-cloud scenarios is
+     correct. It isn't meant to be ran by the CI. *)
+  scenario_with_all_nodes
+    ~__FILE__
+    "test echo_kernel_for_bandwidth"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel_bandwidth])
+    ~pvm_name:"wasm_2_0_0"
+    ~slot_size:2048
+    ~page_size:256
+    ~number_of_shards:64
+    ~operator_profiles:[0]
+    ~tags:[Tag.ci_disabled]
+    ~regression:false
+    test_manual_echo_kernel_for_bandwidth
+    protocols
