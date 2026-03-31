@@ -61,31 +61,38 @@ val run :
   Baking_state_types.Key.t list ->
   unit tzresult Lwt.t
 
-(** [create_initial_state context ?synchronize chain baking_configuration
-    operation_worker current_proposal ?constants consensus_keys] creates an
-    initial {!Baking_state.t} by initializing a
-    {!type-Baking_state.global_state}, a {!type-Baking_state.level_state}
+(** [create_initial_state ?canceler context ?dal_node_rpc_ctxt ?synchronize
+    ?monitor_node_operations chain baking_configuration current_proposal
+    ?constants consensus_keys] creates an initial {!Baking_state.t} by
+    initializing a {!type-Baking_state.global_state}, a
+    {!type-Baking_state.automaton_state}, a {!type-Baking_state.level_state}
     and a {!type-Baking_state.round_state}.
 
-    - For the [global_state] initialization, a validation mode is set based on
-    the [baking_configuration] and a forge worker is started. If [constants] is
-    not provided, an RPC is called to recover them from the [context].
+    - For the [global_state] initialization, [round_durations] are created from
+    [constants], and a forge worker is started. If [constants] is not provided,
+    an RPC is called to recover them from the [context].
+
+    - For the [automaton_state] initialization, a validation mode is set based
+    on the [baking_configuration] and an operation worker is started. If
+    [canceler] is provided, cancelling it will trigger a shutdown of the
+    operation worker. See {!Baking_automaton.create_automaton_state}.
 
     - For the [level_state] initialization, information regarding the current
-    level is retrieved (the current level being that of the [current_proposal])
-    and delegates slots are computed for the given [consensus_keys].
+    and next levels is retrieved (the current level being that of the
+    [current_proposal]) and delegate slots are computed for the given
+    [consensus_keys] at both levels.
 
-    - For the [round_state] initialization, current round is compute by calling
+    - For the [round_state] initialization, current round is computed by calling
     {!Baking_actions.compute_round} with [current_proposal] information if
     [synchronize] is set to [true] (which is the default). *)
 val create_initial_state :
+  ?canceler:Lwt_canceler.t ->
   Protocol_client_context.full ->
   ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?synchronize:bool ->
+  ?monitor_node_operations:bool ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  Operation_worker.t ->
-  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

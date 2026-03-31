@@ -131,28 +131,16 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
-let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker round_durations ~(current_proposal : proposal)
-    ?constants delegates =
+let create_global_state cctxt ?dal_node_rpc_ctxt ?constants ~chain config
+    delegates =
   let open Lwt_result_syntax in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
-     consider saved attestable value *)
-  let open Baking_state in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
     match constants with
     | Some c -> return c
     | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
-  let* validation_mode =
-    Baking_state.(
-      match config.Baking_configuration.validation with
-      | Node -> return Node
-      | Local {data_dir} ->
-          let* index = Baking_simulator.load_context ~data_dir in
-          return (Local index)
-      | ContextIndex index -> return (Local index))
-  in
+  let*? round_durations = create_round_durations constants in
   let cache = Baking_state.create_cache () in
   let global_state =
     {
@@ -182,8 +170,13 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       cancel_all_pending_tasks =
         (fun () -> Forge_worker.cancel_all_pending_tasks forge_worker);
     } ;
-  let chain = `Hash chain_id in
+  return global_state
+
+let create_level_state ~chain_id ~cctxt ~current_proposal ~delegates
+    ~dal_node_rpc_ctxt =
+  let open Lwt_result_syntax in
   let current_level = current_proposal.block.shell.level in
+  let chain = `Hash chain_id in
   let* delegate_infos =
     Baking_state.compute_delegate_infos
       cctxt
@@ -205,7 +198,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       Some {proposal = current_proposal; attestation_qc = []}
     else None
   in
-  let current_level = current_proposal.block.shell.level in
   let dal_attestable_slots =
     Option.fold
       ~none:[]
@@ -226,7 +218,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
           (Delegate_infos.own_delegates next_level_delegate_infos))
       dal_node_rpc_ctxt
   in
-  let level_state =
+  return
     {
       current_level;
       latest_proposal = current_proposal;
@@ -241,33 +233,56 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       dal_attestable_slots;
       next_level_dal_attestable_slots;
     }
-  in
-  let* round_state =
+
+let create_round_state ~global_state ~synchronize ~current_proposal =
+  let open Result_syntax in
+  let* current_round =
     if synchronize then
-      let*? current_round =
-        Baking_actions.compute_round current_proposal round_durations
-      in
-      return
-        {
-          current_round;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
-    else
-      return
-        {
-          Baking_state.current_round = Round.zero;
-          current_phase = Idle;
-          delayed_quorum = None;
-          early_attestations = [];
-          awaiting_unlocking_pqc = false;
-        }
+      Baking_actions.compute_round current_proposal global_state.round_durations
+    else return Round.zero
   in
-  let automaton_state =
-    let name = Uri.to_string cctxt#base in
-    {name; cctxt; validation_mode; operation_worker}
+  return
+    {
+      current_round;
+      current_phase = Idle;
+      delayed_quorum = None;
+      early_attestations = [];
+      awaiting_unlocking_pqc = false;
+    }
+
+let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
+    ?(synchronize = true) ?monitor_node_operations ~chain config
+    ~(current_proposal : proposal) ?constants delegates =
+  let open Lwt_result_syntax in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
+     consider saved attestable value *)
+  let open Baking_state in
+  let* global_state =
+    create_global_state
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?constants
+      ~chain
+      config
+      delegates
+  in
+  let* level_state =
+    create_level_state
+      ~chain_id:global_state.chain_id
+      ~cctxt
+      ~current_proposal
+      ~delegates:global_state.delegates
+      ~dal_node_rpc_ctxt:global_state.dal_node_rpc_ctxt
+  in
+  let*? round_state =
+    create_round_state ~global_state ~synchronize ~current_proposal
+  in
+  let* automaton_state =
+    Baking_automaton.create_automaton_state
+      ?canceler
+      ?monitor_node_operations
+      ~global_state
+      cctxt
   in
   let state = {global_state; automaton_state; level_state; round_state} in
   (* Try loading locked round and attestable round from disk *)
@@ -282,11 +297,6 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let*! () = Events.emit Node_rpc_events.chain_id chain_id in
-  let* constants =
-    match constants with
-    | Some c -> return c
-    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
-  in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
   let* heads_stream, _block_stream_stopper =
@@ -298,24 +308,15 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*? round_durations = create_round_durations constants in
-  let*! operation_worker = Operation_worker.run ~round_durations cctxt in
-  Option.iter
-    (fun canceler ->
-      Lwt_canceler.on_cancel canceler (fun () ->
-          let*! _ = Operation_worker.shutdown_worker operation_worker in
-          Lwt.return_unit))
-    canceler ;
   let* initial_state =
     create_initial_state
+      ?canceler
       cctxt
       ?dal_node_rpc_ctxt
       ~chain
       config
-      operation_worker
-      round_durations
       ~current_proposal
-      ~constants
+      ?constants
       delegates
   in
   let _promise =
