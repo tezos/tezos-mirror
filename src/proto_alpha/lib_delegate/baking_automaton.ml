@@ -34,7 +34,7 @@ end
 
 type loop_state = {
   heads_stream : proposal Lwt_stream.t;
-  on_head_proposal_callback : proposal -> unit;
+  on_head_proposal_callback : Protocol_client_context.full -> proposal -> unit;
   get_valid_blocks_stream : proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
   forge_event_stream : forge_event Lwt_stream.t;
@@ -109,7 +109,7 @@ let terminated =
   let+ _ = Lwt_exit.clean_up_starts in
   `Termination
 
-let rec wait_next_event ~timeout loop_state =
+let rec wait_next_event ~timeout ~cctxt loop_state =
   let open Lwt_result_syntax in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7388
      should we prioritize head events/timeouts to resynchronize if needs be ? *)
@@ -229,11 +229,11 @@ let rec wait_next_event ~timeout loop_state =
               loop_state.push_future_block (`New_future_valid_proposal proposal) ;
               Lwt.return_unit)
             (fun _exn -> ()) ;
-          wait_next_event ~timeout loop_state
+          wait_next_event ~timeout ~cctxt loop_state
       | None -> return_some (New_valid_proposal proposal))
   | `New_head_proposal (Some proposal) -> (
       loop_state.last_get_head_event <- None ;
-      loop_state.on_head_proposal_callback proposal ;
+      loop_state.on_head_proposal_callback cctxt proposal ;
       (* Is the block in the future? *)
       match sleep_until proposal.block.shell.timestamp with
       | Some waiter ->
@@ -245,7 +245,7 @@ let rec wait_next_event ~timeout loop_state =
               loop_state.push_future_block (`New_future_head proposal) ;
               Lwt.return_unit)
             (fun _exn -> ()) ;
-          wait_next_event ~timeout loop_state
+          wait_next_event ~timeout ~cctxt loop_state
       | None -> return_some (New_head_proposal proposal))
   | `New_future_head proposal ->
       let*! () =
@@ -635,6 +635,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         ~timeout:
           (let*! e = next_timeout in
            Lwt.return (`Timeout e))
+        ~cctxt:state.automaton_state.cctxt
         loop_state [@profiler.record_s {verbosity = Notice} "Wait : next event"])
    in
    () [@profiler.stop] ;
