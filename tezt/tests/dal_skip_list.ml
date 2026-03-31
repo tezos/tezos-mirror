@@ -14,7 +14,7 @@ module Dal = Dal_common
 (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. When there
      is no migration, [migrate_from = migrate_to]. *)
-let main_scenario ?(migration_level = 1) ~slot_index
+let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
     ~last_confirmed_published_level ~migrate_from ~migrate_to dal_parameters
     client node dal_node =
   let module Map_int = Map.Make (Int) in
@@ -517,9 +517,10 @@ let main_scenario ?(migration_level = 1) ~slot_index
   let* () = call_get_status 2 in
   unit
 
-let test_skip_list_rpcs protocols =
+let test_skip_list_rpcs ~__FILE__ protocols =
   let scenario protocol dal_parameters _ client node dal_node =
     main_scenario
+      ~__FILE__
       ~slot_index:3
       ~last_confirmed_published_level:3
       ~migrate_from:protocol
@@ -539,7 +540,7 @@ let test_skip_list_rpcs protocols =
     scenario
     protocols
 
-let test_skip_list_rpcs_with_migration ~migrate_from ~migrate_to
+let test_skip_list_rpcs_with_migration ~__FILE__ ~migrate_from ~migrate_to
     ~migration_level =
   let slot_index = 3 in
   let scenario ~migrate_to ~migration_level dal_parameters =
@@ -555,6 +556,7 @@ let test_skip_list_rpcs_with_migration ~migrate_from ~migrate_to
     (* We'll have 3 levels with a published and attested slot. *)
     let last_confirmed_published_level = migration_level + 3 in
     main_scenario
+      ~__FILE__
       ~slot_index
       ~last_confirmed_published_level
       ~migration_level
@@ -575,3 +577,13 @@ let test_skip_list_rpcs_with_migration ~migrate_from ~migrate_to
     ~description
     ~operator_profiles:[slot_index] (* use the same parameters as Alpha *)
     ()
+
+let register ~__FILE__ ~protocols = test_skip_list_rpcs ~__FILE__ protocols
+
+let register_migration ~__FILE__ ~migrate_from ~migrate_to =
+  if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
+    test_skip_list_rpcs_with_migration
+      ~__FILE__
+      ~migration_level:11
+      ~migrate_from
+      ~migrate_to

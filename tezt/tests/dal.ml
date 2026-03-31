@@ -12514,7 +12514,7 @@ let register ~protocols =
     ~prover:false
     test_operator_profile
     protocols ;
-  Dal_skip_list.test_skip_list_rpcs protocols ;
+  Dal_skip_list.register ~__FILE__ ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~__FILE__
     ~tags:["amplification"; Tag.memory_hungry]
@@ -13300,11 +13300,7 @@ let test_traps_fraction_uses_published_level ~migrate_from ~migrate_to =
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
-  if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
-    Dal_skip_list.test_skip_list_rpcs_with_migration
-      ~migration_level:11
-      ~migrate_from
-      ~migrate_to ;
+  Dal_skip_list.register_migration ~__FILE__ ~migrate_from ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_restart_dal_node_across_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
