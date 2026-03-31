@@ -1905,12 +1905,11 @@ fn interpret_one<'a>(
             let output_type = view.output_type.parse_ty(ctx.gas())?;
 
             if let Micheline::Seq(instrs) = view.code {
-                if let Ok(Lambda::Lambda { code, .. }) = crate::typechecker::typecheck_lambda(
+                if let Ok(code) = crate::typechecker::typecheck_view(
                     instrs,
                     ctx.gas(),
                     Type::Pair(Rc::new((input_type, storage_ty))),
                     output_type,
-                    false,
                 ) {
                     let mut stk = stk![TypedValue::new_pair(input, storage)];
                     let old = (
