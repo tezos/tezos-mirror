@@ -316,7 +316,7 @@ let test_forge_attestations () =
           delegates_with_slots
       in
       (* Push attestation request *)
-      let*! pushed =
+      let* () =
         Forge_worker.push_request
           worker
           Baking_state.
@@ -325,27 +325,25 @@ let test_forge_attestations () =
               request = Forge_and_sign_attestations {unsigned_attestations};
             }
       in
-      if not pushed then failwith "Failed to push attestation request"
-      else
-        (* Wait for attestation events *)
-        let is_attestation_ready = function
-          | Baking_state.Attestation_ready _ -> true
-          | _ -> false
-        in
-        let expected = List.length delegates in
-        let*! received =
-          with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
-              collect_n_events
-                ~event_stream
-                ~matches:is_attestation_ready
-                ~expected)
-        in
-        if received < expected then
-          failwith
-            "Expected %d Attestation_ready events, got %d"
-            expected
-            received
-        else return_unit)
+      (* Wait for attestation events *)
+      let is_attestation_ready = function
+        | Baking_state.Attestation_ready _ -> true
+        | _ -> false
+      in
+      let expected = List.length delegates in
+      let*! received =
+        with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
+            collect_n_events
+              ~event_stream
+              ~matches:is_attestation_ready
+              ~expected)
+      in
+      if received < expected then
+        failwith
+          "Expected %d Attestation_ready events, got %d"
+          expected
+          received
+      else return_unit)
 
 (**
    Integration Test 2: Forge and sign preattestations
@@ -377,7 +375,7 @@ let test_forge_preattestations () =
           delegates_with_slots
       in
       (* Push preattestation request *)
-      let*! pushed =
+      let* () =
         Forge_worker.push_request
           worker
           Baking_state.
@@ -387,27 +385,25 @@ let test_forge_preattestations () =
                 Forge_and_sign_preattestations {unsigned_preattestations};
             }
       in
-      if not pushed then failwith "Failed to push preattestation request"
-      else
-        (* Wait for preattestation events *)
-        let is_preattestation_ready = function
-          | Baking_state.Preattestation_ready _ -> true
-          | _ -> false
-        in
-        let expected = List.length delegates in
-        let*! received =
-          with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
-              collect_n_events
-                ~event_stream
-                ~matches:is_preattestation_ready
-                ~expected)
-        in
-        if received < expected then
-          failwith
-            "Expected %d Preattestation_ready events, got %d"
-            expected
-            received
-        else return_unit)
+      (* Wait for preattestation events *)
+      let is_preattestation_ready = function
+        | Baking_state.Preattestation_ready _ -> true
+        | _ -> false
+      in
+      let expected = List.length delegates in
+      let*! received =
+        with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
+            collect_n_events
+              ~event_stream
+              ~matches:is_preattestation_ready
+              ~expected)
+      in
+      if received < expected then
+        failwith
+          "Expected %d Preattestation_ready events, got %d"
+          expected
+          received
+      else return_unit)
 
 (**
    Integration Test 3: Forge and sign block
@@ -437,39 +433,37 @@ let test_forge_block () =
               }
           in
           (* Push block forging request *)
-          let*! pushed =
+          let* () =
             Forge_worker.push_request
               worker
               Baking_state.
                 {automaton_state; request = Forge_and_sign_block block_to_bake}
           in
-          if not pushed then failwith "Failed to push block forging request"
-          else
-            (* Wait for block ready event *)
-            let block_ready = ref false in
-            let timeout = 10.0 in
-            let*! () =
-              Lwt.pick
-                [
-                  (let rec collect () =
-                     let open Lwt_syntax in
-                     let* event = Lwt_stream.get event_stream in
-                     match event with
-                     | Some (Baking_state.Block_ready _) ->
-                         block_ready := true ;
-                         return_unit
-                     | Some _ -> collect ()
-                     | None -> return_unit
-                   in
-                   collect ());
-                  (let open Lwt_syntax in
-                   let* () = Lwt_unix.sleep timeout in
-                   return_unit);
-                ]
-            in
-            if not !block_ready then
-              failwith "Did not receive Block_ready event within timeout"
-            else return_unit)
+          (* Wait for block ready event *)
+          let block_ready = ref false in
+          let timeout = 10.0 in
+          let*! () =
+            Lwt.pick
+              [
+                (let rec collect () =
+                   let open Lwt_syntax in
+                   let* event = Lwt_stream.get event_stream in
+                   match event with
+                   | Some (Baking_state.Block_ready _) ->
+                       block_ready := true ;
+                       return_unit
+                   | Some _ -> collect ()
+                   | None -> return_unit
+                 in
+                 collect ());
+                (let open Lwt_syntax in
+                 let* () = Lwt_unix.sleep timeout in
+                 return_unit);
+              ]
+          in
+          if not !block_ready then
+            failwith "Did not receive Block_ready event within timeout"
+          else return_unit)
 
 (**
    Integration Test 4: Multiple delegates produce events concurrently

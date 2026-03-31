@@ -29,6 +29,8 @@ type error += Cannot_load_local_file of string
 
 type error += Broken_locked_values_invariant
 
+type error += Forge_worker_unavailable
+
 let register_error_kind category ~id ~title ~description ~pp encoding from_error
     to_error =
   Error_monad.register_error_kind
@@ -73,7 +75,17 @@ let () =
         "The expected consistency invariant on locked values does not hold")
     Data_encoding.unit
     (function Broken_locked_values_invariant -> Some () | _ -> None)
-    (fun () -> Broken_locked_values_invariant)
+    (fun () -> Broken_locked_values_invariant) ;
+  register_error_kind
+    `Temporary
+    ~id:"Forge_worker.unavailable"
+    ~title:"Forge worker unavailable"
+    ~description:"The forge worker is unavailable (queue closed or crashed)."
+    ~pp:(fun fmt () ->
+      Format.fprintf fmt "Forge worker unavailable (queue closed or crashed)")
+    Data_encoding.unit
+    (function Forge_worker_unavailable -> Some () | _ -> None)
+    (fun () -> Forge_worker_unavailable)
 
 type signing_request = [`Preattestation | `Attestation | `Block_header]
 

@@ -1701,7 +1701,8 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
         round_durations;
         forge_worker_hooks =
           {
-            push_request = (fun _ -> Lwt.return_false);
+            push_request =
+              (fun _ -> failwith "Forge worker not supported in simulator");
             get_forge_event_stream = (fun () -> Lwt_stream.of_list []);
             cancel_all_pending_tasks = (fun () -> ());
           };

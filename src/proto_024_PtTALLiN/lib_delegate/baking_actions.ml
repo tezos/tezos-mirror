@@ -1242,7 +1242,7 @@ let prepare_block_request state block_to_bake =
       request = Forge_and_sign_block block_to_bake;
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_preattestations_request state unsigned_preattestations =
@@ -1253,7 +1253,7 @@ let prepare_preattestations_request state unsigned_preattestations =
       request = Forge_and_sign_preattestations {unsigned_preattestations};
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_attestations_request state unsigned_attestations =
@@ -1269,7 +1269,7 @@ let prepare_attestations_request state unsigned_attestations =
           {unsigned_attestations = unsigned_attestations_with_dal};
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539
