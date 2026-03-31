@@ -1,28 +1,28 @@
-From 84e69d24b11ca840d3fb3f9b61f1848ba2354095 Mon Sep 17 00:00:00 2001
+From 4cba8cf2cc0ba876977bade05183ecfa8ed54d42 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Thu, 19 Mar 2026 14:07:54 +0100
+Date: Tue, 31 Mar 2026 10:56:47 +0200
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
  src/lib_protocol_environment/sigs/v17.in.ml   |  2 +
- src/lib_protocol_environment/sigs/v17.ml      | 85 ++++++++++++++-----
- .../sigs/v17/profiler.mli                     | 39 +++++++++
+ src/lib_protocol_environment/sigs/v17.ml      | 85 +++++++++++++----
+ .../sigs/v17/profiler.mli                     | 39 ++++++++
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
  src/proto_alpha/lib_protocol/baking.ml        |  4 +-
  .../lib_protocol/dal_slot_storage.ml          |  5 +-
- .../lib_protocol/delegate_cycles.ml           | 85 +++++++++++++++----
+ .../lib_protocol/delegate_cycles.ml           | 91 +++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
  src/proto_alpha/lib_protocol/init_storage.ml  | 28 +++++-
- src/proto_alpha/lib_protocol/main.ml          | 43 ++++++++--
+ src/proto_alpha/lib_protocol/main.ml          | 43 +++++++--
  src/proto_alpha/lib_protocol/raw_context.ml   |  4 +-
- src/proto_alpha/lib_protocol/script_cache.ml  | 19 +++--
+ src/proto_alpha/lib_protocol/script_cache.ml  | 19 ++--
  .../lib_protocol/script_interpreter.ml        | 21 ++++-
- .../lib_protocol/script_ir_translator.ml      | 26 +++---
- 14 files changed, 301 insertions(+), 79 deletions(-)
+ .../lib_protocol/script_ir_translator.ml      | 26 ++++--
+ 14 files changed, 306 insertions(+), 80 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v17/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v17.in.ml b/src/lib_protocol_environment/sigs/v17.in.ml
-index e4372cbc3b..7d8acf506a 100644
+index d32dcb6db3..707f471c1b 100644
 --- a/src/lib_protocol_environment/sigs/v17.in.ml
 +++ b/src/lib_protocol_environment/sigs/v17.in.ml
 @@ -107,6 +107,8 @@ module type T = sig
@@ -35,7 +35,7 @@ index e4372cbc3b..7d8acf506a 100644
  
    module Context_hash : [%sig "v17/context_hash.mli"]
 diff --git a/src/lib_protocol_environment/sigs/v17.ml b/src/lib_protocol_environment/sigs/v17.ml
-index 1eb576a94e..35cd3fe9d0 100644
+index be2221d09e..ecf25ac4be 100644
 --- a/src/lib_protocol_environment/sigs/v17.ml
 +++ b/src/lib_protocol_environment/sigs/v17.ml
 @@ -10128,6 +10128,51 @@ end
@@ -388,7 +388,7 @@ index 11ddd857f1..1aae4caf15 100644
  module Internal_for_tests = struct
    let get_delegate_ordering = get_delegate_ordering
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-index f26ec47631..08e83bb054 100644
+index 73d5aa9356..3c3f38dc44 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
 @@ -225,21 +225,41 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
@@ -438,7 +438,17 @@ index f26ec47631..08e83bb054 100644
    (* Reset SWRR credits for delegates deactivated at cycle end.
  
     Must run before computing next-cycle SWRR selection state, so that
-@@ -258,26 +278,61 @@ let cycle_end ctxt last_cycle =
+@@ -260,31 +280,70 @@ let cycle_end ctxt last_cycle =
+      so allocations are included. *)
+   let* ctxt =
+     if Constants_storage.native_contracts_enable ctxt then
+-      Clst_stake_allocation.rebalance_at_cycle_end ctxt ~new_cycle
++      Clst_stake_allocation.rebalance_at_cycle_end
++        ctxt
++        ~new_cycle
++      [@profiler.record_s
++        {verbosity = Notice} "rebalance stez stake allocation at cycle end"]
+     else return ctxt
    in
    (* Computing future staking rights *)
    let* ctxt =
@@ -511,7 +521,7 @@ index f26ec47631..08e83bb054 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index 9ddeb8aa27..fafd84d398 100644
+index 835242d7ff..2ebb5c3cc3 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
