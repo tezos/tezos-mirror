@@ -112,6 +112,9 @@ module Files = struct
     ]
     @ build_script
 
+  let debian_jsonnet =
+    ["images/base-images/Dockerfile.debian-jsonnet"] @ build_script
+
   let debian_rust_build =
     [
       "images/base-images/Dockerfile.rust";
@@ -301,7 +304,7 @@ let jobs ?start_job ?(changeset = false) () =
       Changeset.make
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
        @ Files.merge_script @ Files.debian_build @ Files.merge_script
-       @ Files.debian_systemd)
+       @ Files.debian_systemd @ Files.debian_jsonnet)
     in
     make_job_base_image_distribution ~changes Distribution.Debian
   in
@@ -544,6 +547,18 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make (Files.debian_systemd @ Files.debian_base))
       "images/base-images/Dockerfile.debian-systemd"
   in
+  (* debian-jsonnet: based on [debian:trixie] *)
+  let job_jsonnet_base_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"debian-jsonnet"
+      ~base_name:(Pipeline_dep "debian")
+      ~dependencies:(Dependent [Job job_debian_based_images])
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make (Files.debian_jsonnet @ Files.debian_base))
+      "images/base-images/Dockerfile.debian-jsonnet"
+  in
   [
     job_debian_based_images;
     job_ubuntu_based_images;
@@ -557,6 +572,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_ubuntu_build_base_images_merge;
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
+    job_jsonnet_base_images;
     job_ci_release_based_images;
   ]
   @
