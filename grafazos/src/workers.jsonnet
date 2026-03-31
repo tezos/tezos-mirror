@@ -51,22 +51,22 @@ local graph = base.graph;
     + graph.withLegendRight(calcs=['current']),
 
   distributedDB(h, w, x, y):
-    local headersTableQuery = query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_table_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
+    local headersTableQuery = query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_table_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
                               + query.prometheus.withLegendFormat('headers table');
     local headersSchedulerQuery =
-      query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
+      query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
       + query.prometheus.withLegendFormat('headers scheduler');
     local operationsTableQuery =
-      query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
+      query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header",' + base.node_instance + '="$node_instance"}')
       + query.prometheus.withLegendFormat('operations table');
     local operationsSchedulerQuery =
-      query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_table_length{requester_kind="operations",' + base.node_instance + '="$node_instance"}')
+      query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_table_length{requester_kind="operations",' + base.node_instance + '="$node_instance"}')
       + query.prometheus.withLegendFormat('operations scheduler');
     local operationTableQuery =
-      query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_table_length{requester_kind="operation",' + base.node_instance + '="$node_instance"}')
+      query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_table_length{requester_kind="operation",' + base.node_instance + '="$node_instance"}')
       + query.prometheus.withLegendFormat('operation table');
     local operationSchedulerQuery =
-      query.prometheus.new('Prometheus', base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation",' + base.node_instance + '="$node_instance"}')
+      query.prometheus.new(base.datasource, base.namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation",' + base.node_instance + '="$node_instance"}')
       + query.prometheus.withLegendFormat('operation scheduler');
     graph.new('DDB Workers', [headersTableQuery, headersSchedulerQuery, operationsTableQuery, operationsSchedulerQuery, operationTableQuery, operationSchedulerQuery], h, w, x, y)
     + graph.withLegendRight(calcs=['mean', 'min', 'max']),
@@ -136,9 +136,9 @@ local graph = base.graph;
     local chainTreatment = base.namespace + '_validator_chain_last_finished_request_treatment_timestamp' + base.node_instance_query;
     local blockPush = base.namespace + '_validator_block_last_finished_request_push_timestamp' + base.node_instance_query;
     local blockTreatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
-    local chainTreatmentTimeQuery = query.prometheus.new('Prometheus', chainTreatment + ' - ' + chainPush)
+    local chainTreatmentTimeQuery = query.prometheus.new(base.datasource, chainTreatment + ' - ' + chainPush)
                                     + query.prometheus.withLegendFormat('chain validator');
-    local blockTreatmentTimeQuery = query.prometheus.new('Prometheus', blockTreatment + ' - ' + blockPush)
+    local blockTreatmentTimeQuery = query.prometheus.new(base.datasource, blockTreatment + ' - ' + blockPush)
                                     + query.prometheus.withLegendFormat('block validator');
     graph.new('Validators Requests Treatments', [chainTreatmentTimeQuery, blockTreatmentTimeQuery], h, w, x, y)
     + graph.withLegendBottom(calcs=['mean', 'min', 'max'])
@@ -150,9 +150,9 @@ local graph = base.graph;
     local chainCompletion = base.namespace + '_validator_chain_last_finished_request_completion_timestamp' + base.node_instance_query;
     local blockTreatment = base.namespace + '_validator_block_last_finished_request_treatment_timestamp' + base.node_instance_query;
     local blockCompletion = base.namespace + '_validator_block_last_finished_request_completion_timestamp' + base.node_instance_query;
-    local chainCompletionTimeQuery = query.prometheus.new('Prometheus', chainCompletion + ' - ' + chainTreatment)
+    local chainCompletionTimeQuery = query.prometheus.new(base.datasource, chainCompletion + ' - ' + chainTreatment)
                                      + query.prometheus.withLegendFormat('chain validator');
-    local blockCompletionTimeQuery = query.prometheus.new('Prometheus', blockCompletion + ' - ' + blockTreatment)
+    local blockCompletionTimeQuery = query.prometheus.new(base.datasource, blockCompletion + ' - ' + blockTreatment)
                                      + query.prometheus.withLegendFormat('block validator');
     graph.new('Validators Requests Completion', [chainCompletionTimeQuery, blockCompletionTimeQuery], h, w, x, y)
     + graph.withLegendBottom(calcs=['mean', 'min', 'max'])
@@ -162,7 +162,7 @@ local graph = base.graph;
   chainValidatorRequestCompletionMean(h, w, x, y):
     local chainTreatment = base.namespace + '_validator_chain_last_finished_request_treatment_timestamp' + base.node_instance;
     local chainCompletion = base.namespace + '_validator_chain_last_finished_request_completion_timestamp' + base.node_instance;
-    local q = query.prometheus.new('Prometheus', chainCompletion + ' - ' + chainTreatment);
+    local q = query.prometheus.new(base.datasource, chainCompletion + ' - ' + chainTreatment);
     info.new('Chain validator request completion', q, h, w, x, y, instant=false)
     + stat.options.withGraphMode('area'),
 

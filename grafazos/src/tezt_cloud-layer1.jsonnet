@@ -30,6 +30,7 @@ local uid = uid_ext == 'default';
 dashboard.new('Tezt Cloud - Layer 1 dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('tezt-cloud-layer1' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Layer 1 related experiments with tezt cloud')
++ dashboard.withTags(['tezos', 'tezt', 'cloud', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
 + dashboard.withVariables(tezt_cloud.datasource)

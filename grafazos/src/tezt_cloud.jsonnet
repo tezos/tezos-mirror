@@ -26,7 +26,7 @@ local graph = base.graph;
   ,
 
   query(agg, q, legendFormat):
-    query.prometheus.new('Prometheus', agg + '(' + q + ')')
+    query.prometheus.new(base.datasource, agg + '(' + q + ')')
     + variable.query.withDatasourceFromVariable(self.datasource)
     + query.prometheus.withLegendFormat(legendFormat),
 

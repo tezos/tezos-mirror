@@ -5,6 +5,8 @@ LOGS_LABEL ?= job
 ENDPOINT_LABEL ?= endpoint
 STORAGE_MODE ?= default
 UID ?= default
+DATASOURCE_SELECTION ?= false
+DATASOURCE_DEFAULT ?= Prometheus
 
 %.jsonnet:
 	jsonnet \
@@ -18,6 +20,8 @@ UID ?= default
 		--ext-str gcp_project="$(GCP_PROJECT_ID)" \
 		--ext-str gcp_datasource_uid="$(GCP_DATASOURCE_UID)" \
 		--ext-str uid_ext="$(UID)" \
+		--ext-str datasource_selection="$(DATASOURCE_SELECTION)" \
+		--ext-str datasource_default="$(DATASOURCE_DEFAULT)" \
 		src/$@ \
 			> output/$*.json
 

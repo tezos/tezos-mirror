@@ -20,6 +20,7 @@
 
 local grafonnet = import 'github.com/grafana/grafonnet/gen/grafonnet-latest/main.libsonnet';
 local variableQuery = grafonnet.dashboard.variable.query;
+local variableDatasource = grafonnet.dashboard.variable.datasource;
 local panel = grafonnet.panel;
 local stat = panel.stat;
 local table = panel.table;
@@ -32,11 +33,20 @@ local logs = panel.logs;
   // Parameters
   namespace: 'octez',
 
+  // Datasource: uses variable when datasource selection is enabled, otherwise the default
+  datasource: if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default,
+
   node_instance: std.extVar('node_instance_label'),
 
   node_instance_query: '{' + self.node_instance + '="$node_instance"}',
 
   logs_label: std.extVar('logs_label'),
+
+  // Datasource selection option (default: false, keeps backward compatibility)
+  enable_datasource_selection: std.extVar('datasource_selection') == 'true',
+
+  // Default datasource name (default: 'Prometheus')
+  datasource_default: std.extVar('datasource_default'),
 
   endpoint_label: std.extVar('endpoint_label'),
 
@@ -52,7 +62,7 @@ local logs = panel.logs;
   prometheus(q, legendFormat='', namespace=self.namespace):
     local withLegendFormat = if legendFormat != ''
     then query.prometheus.withLegendFormat(legendFormat) else {};
-    grafonnet.query.prometheus.new('Prometheus', namespace + '_' + q + self.node_instance_query)
+    grafonnet.query.prometheus.new(self.datasource, namespace + '_' + q + self.node_instance_query)
     + withLegendFormat,
 
   // Stat panel helpers
@@ -188,25 +198,36 @@ local logs = panel.logs;
 
   // Variables
   nodeInstance:
-    variableQuery.new(
-      name='node_instance',
-      query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
-    )
-    + variableQuery.generalOptions.withLabel('Node Instance')
-    + variableQuery.refresh.onLoad()
-    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
+    local base_var = variableQuery.new(
+                       name='node_instance',
+                       query='label_values(octez_version,' + std.extVar('node_instance_label') + ')',
+                     )
+                     + variableQuery.generalOptions.withLabel('Node Instance')
+                     + variableQuery.refresh.onLoad()
+                     + variableQuery.withDatasource('prometheus', datasource);
+    if self.enable_datasource_selection then
+      base_var { refresh: 'on variable change' }
+    else
+      base_var,
 
   // To be removed once the DAL-node expose octez-version metric
   nodeInstanceDal:
-    variableQuery.new(
-      name='node_instance',
-      query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
-    )
-    + variableQuery.generalOptions.withLabel('Node Instance')
-    + variableQuery.refresh.onLoad()
-    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
+    local base_var = variableQuery.new(
+                       name='node_instance',
+                       query='label_values(dal_node_new_layer1_head,' + std.extVar('node_instance_label') + ')',
+                     )
+                     + variableQuery.generalOptions.withLabel('Node Instance')
+                     + variableQuery.refresh.onLoad()
+                     + variableQuery.withDatasource('prometheus', datasource);
+    if self.enable_datasource_selection then
+      base_var { refresh: 'on variable change' }
+    else
+      base_var,
 
   slotIndex:
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
     variableQuery.new(
       name='slot_index',
       query='label_values(dal_gs_count_peers_per_topic, slot_index)',
@@ -216,9 +237,10 @@ local logs = panel.logs;
     + { allValue: '.*' }
     + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
-    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+    + variableQuery.withDatasource('prometheus', datasource),
 
   pkh:
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
     variableQuery.new(
       name='pkh',
       query='label_values(dal_gs_count_peers_per_topic, pkh)',
@@ -228,9 +250,10 @@ local logs = panel.logs;
     + { allValue: '.*' }
     + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
-    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+    + variableQuery.withDatasource('prometheus', datasource),
 
   peer:
+    local datasource = if self.enable_datasource_selection then '$prometheus_datasource' else self.datasource_default;
     variableQuery.new(
       name='peer',
       query='label_values(dal_gs_scores_of_peers, peer)',
@@ -240,6 +263,31 @@ local logs = panel.logs;
     + { allValue: '.*' }
     + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
-    + variableQuery.withDatasource('prometheus', 'Prometheus'),
+    + variableQuery.withDatasource('prometheus', datasource),
+
+  // Datasource variable for Prometheus datasources
+  prometheusDatasource:
+    variableDatasource.new(
+      name='prometheus_datasource',
+      type='prometheus',
+    )
+    + variableDatasource.generalOptions.withLabel('Prometheus Datasource')
+    + variableDatasource.generalOptions.withDescription('Select the Prometheus datasource to query')
+    + variableDatasource.selectionOptions.withIncludeAll(false)
+    + variableDatasource.generalOptions.withCurrent(self.datasource_default, self.datasource_default),
+
+  // Helper function to get the standard variables based on configuration
+  standardVariables:
+    if self.enable_datasource_selection then
+      [self.prometheusDatasource, self.nodeInstance]
+    else
+      [self.nodeInstance],
+
+  // Helper function for DAL dashboards that use nodeInstanceDal
+  standardVariablesDAL:
+    if self.enable_datasource_selection then
+      [self.prometheusDatasource, self.nodeInstanceDal, self.slotIndex, self.pkh, self.peer]
+    else
+      [self.nodeInstanceDal, self.slotIndex, self.pkh, self.peer],
 
 }

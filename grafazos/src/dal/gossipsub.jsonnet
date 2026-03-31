@@ -64,13 +64,13 @@ local graph = base.graph;
     local receivedInvalid = 'Received & invalid';
     local receivedUnknown = 'Received & unchecked validity';
     local sent = 'Sent';
-    local receivedValidQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_valid_messages' + base.node_instance_query + '[1m])')
+    local receivedValidQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_valid_messages' + base.node_instance_query + '[1m])')
                                + query.prometheus.withLegendFormat(receivedValid);
-    local receivedInvalidQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_invalid_messages' + base.node_instance_query + '[1m])')
+    local receivedInvalidQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_invalid_messages' + base.node_instance_query + '[1m])')
                                  + query.prometheus.withLegendFormat(receivedInvalid);
-    local receivedUnknownQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_unknown_validity_messages' + base.node_instance_query + '[1m])')
+    local receivedUnknownQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_unknown_validity_messages' + base.node_instance_query + '[1m])')
                                  + query.prometheus.withLegendFormat(receivedUnknown);
-    local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_messages' + base.node_instance_query + '[1m])')
+    local sentQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_sent_messages' + base.node_instance_query + '[1m])')
                       + query.prometheus.withLegendFormat(sent);
     graph.new('Average sent & received app messages per second (over 1min)', [receivedValidQuery, receivedInvalidQuery, receivedUnknownQuery, sentQuery], h, w, x, y)
     + graph.withQueryColor([[receivedValid, 'green'], [receivedInvalid, 'red'], [receivedUnknown, 'orange'], [sent, 'blue']]),
@@ -80,13 +80,13 @@ local graph = base.graph;
     local prunes = 'Prune';
     local ihaves = 'IHave';
     local iwants = 'IWant';
-    local graftsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_grafts' + base.node_instance_query + '[1m])')
+    local graftsQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_sent_grafts' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(grafts);
-    local prunesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_prunes' + base.node_instance_query + '[1m])')
+    local prunesQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_sent_prunes' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(prunes);
-    local ihavesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_ihaves' + base.node_instance_query + '[1m])')
+    local ihavesQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_sent_ihaves' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(ihaves);
-    local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_iwants' + base.node_instance_query + '[1m])')
+    local iwantsQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_sent_iwants' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(iwants);
     graph.new('Average sent control & metadata messages per second (over 1min)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
     + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
@@ -96,24 +96,24 @@ local graph = base.graph;
     local prunes = 'Prune';
     local ihaves = 'IHave';
     local iwants = 'IWant';
-    local graftsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_grafts' + base.node_instance_query + '[1m])')
+    local graftsQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_grafts' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(grafts);
-    local prunesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_prunes' + base.node_instance_query + '[1m])')
+    local prunesQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_prunes' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(prunes);
-    local ihavesQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_ihaves' + base.node_instance_query + '[1m])')
+    local ihavesQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_ihaves' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(ihaves);
-    local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_iwants' + base.node_instance_query + '[1m])')
+    local iwantsQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_count_received_iwants' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(iwants);
     graph.new('Average received control & metadata messages per second (over 1min)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
     + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
 
   scoresOfPeers(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_scores_of_peers' + base.peer_instance_query)
+    local q = grafonnet.query.prometheus.new(base.datasource, namespace + '_scores_of_peers' + base.peer_instance_query)
               + query.prometheus.withLegendFormat('{{ peer }}');
     graph.new('Score of the peers connected to this node', [q], h, w, x, y),
 
   peersOfTopics(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_count_peers_per_topic' + base.topic_instance_query)
+    local q = grafonnet.query.prometheus.new(base.datasource, namespace + '_count_peers_per_topic' + base.topic_instance_query)
               + query.prometheus.withLegendFormat('Topic: {{ slot_index }}, {{ pkh }}');
     graph.new('Number of peers in the mesh for each subscribed topic', [q], h, w, x, y),
 

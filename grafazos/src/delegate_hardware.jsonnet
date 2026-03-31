@@ -36,7 +36,7 @@ local graph = base.graph;
 
   // Query helper
   query(q, legendFormat):
-    query.prometheus.new('Prometheus', q)
+    query.prometheus.new(base.datasource, q)
     + query.prometheus.withLegendFormat(legendFormat),
 
   ios(h, w, x, y):
