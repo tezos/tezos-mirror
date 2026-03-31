@@ -147,6 +147,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.72.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
+dependencies = [
+ "bitflags 2.9.1",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,12 +268,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
+name = "bzip2-sys"
+version = "0.1.13+1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "225bff33b2141874fe80d71e07d6eec4f85c5c216453dd96388240f96e1acc14"
+dependencies = [
+ "cc",
+ "pkg-config",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be714c154be609ec7f5dad223a33bf1482fff90472de28f7362806e6d4832b8c"
 dependencies = [
+ "jobserver",
+ "libc",
  "shlex",
+]
+
+[[package]]
+name = "cexpr"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
+dependencies = [
+ "nom",
 ]
 
 [[package]]
@@ -273,6 +312,17 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
  "rand_core 0.10.0",
+]
+
+[[package]]
+name = "clang-sys"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
+dependencies = [
+ "glob",
+ "libc",
+ "libloading",
 ]
 
 [[package]]
@@ -882,6 +932,18 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "r-efi",
+ "wasip2",
+]
+
+[[package]]
+name = "getrandom"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "139ef39800118c7683f2fd3c98c1b23c09ae076556b435f8e9064ae108aaeeec"
@@ -904,6 +966,12 @@ dependencies = [
  "indexmap",
  "stable_deref_trait",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "goldenfile"
@@ -1043,6 +1111,15 @@ checksum = "f8478577c03552c21db0e2724ffb8986a5ce7af88107e6be5d2ee6e158c12800"
 
 [[package]]
 name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -1055,6 +1132,16 @@ name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
+name = "jobserver"
+version = "0.1.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
+dependencies = [
+ "getrandom 0.3.4",
+ "libc",
+]
 
 [[package]]
 name = "js-sys"
@@ -1091,6 +1178,31 @@ name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+
+[[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
+name = "librocksdb-sys"
+version = "0.17.3+10.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cef2a00ee60fe526157c9023edab23943fae1ce2ab6f4abb2a807c1746835de9"
+dependencies = [
+ "bindgen",
+ "bzip2-sys",
+ "cc",
+ "libc",
+ "libz-sys",
+ "lz4-sys",
+ "zstd-sys",
+]
 
 [[package]]
 name = "libsecp256k1"
@@ -1141,6 +1253,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "libz-sys"
+version = "1.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52f4c29e2a68ac30c9087e1b772dc9f44a2b66ed44edf2266cf2be9b03dafc1"
+dependencies = [
+ "cc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1169,6 +1292,16 @@ name = "log"
 version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
+
+[[package]]
+name = "lz4-sys"
+version = "1.11.1+lz4-1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
+dependencies = [
+ "cc",
+ "libc",
+]
 
 [[package]]
 name = "mach2"
@@ -1332,7 +1465,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#778813c7b5e2dc2381d8221905c162e22ac08748"
+source = "git+https://github.com/tezos/riscv-pvm.git#faf41177cc23820b828e96c46b48f39dc8f98657"
 dependencies = [
  "arbitrary-int 2.1.1",
  "bincode",
@@ -1346,7 +1479,7 @@ dependencies = [
  "enum-tag",
  "hex",
  "ieee-apsqrt",
- "itertools",
+ "itertools 0.14.0",
  "libsecp256k1",
  "num_enum",
  "octez-riscv-data",
@@ -1400,7 +1533,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-data"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#778813c7b5e2dc2381d8221905c162e22ac08748"
+source = "git+https://github.com/tezos/riscv-pvm.git#faf41177cc23820b828e96c46b48f39dc8f98657"
 dependencies = [
  "bincode",
  "blake3",
@@ -1418,7 +1551,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-durable-storage"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#778813c7b5e2dc2381d8221905c162e22ac08748"
+source = "git+https://github.com/tezos/riscv-pvm.git#faf41177cc23820b828e96c46b48f39dc8f98657"
 dependencies = [
  "bincode",
  "bytes",
@@ -1430,10 +1563,22 @@ dependencies = [
  "octez-riscv-data",
  "perfect-derive",
  "rand 0.10.0",
+ "rocksdb",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "trait-set",
+]
+
+[[package]]
+name = "octez-riscv-durable-storage-common"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "ocaml",
+ "octez-riscv-api-common",
+ "octez-riscv-data",
+ "octez-riscv-durable-storage",
 ]
 
 [[package]]
@@ -1448,6 +1593,22 @@ dependencies = [
  "octez-riscv-api-common",
  "octez-riscv-data",
  "octez-riscv-durable-storage",
+ "octez-riscv-durable-storage-common",
+]
+
+[[package]]
+name = "octez-riscv-durable-storage-on-disk"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "ocaml",
+ "ocaml-boxroot-sys",
+ "ocaml-build",
+ "ocaml-sys",
+ "octez-riscv-api-common",
+ "octez-riscv-data",
+ "octez-riscv-durable-storage",
+ "octez-riscv-durable-storage-common",
 ]
 
 [[package]]
@@ -1554,6 +1715,12 @@ dependencies = [
  "der 0.7.9",
  "spki",
 ]
+
+[[package]]
+name = "pkg-config"
+version = "0.3.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "powerfmt"
@@ -1829,6 +1996,16 @@ dependencies = [
  "libc",
  "mach2",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "rocksdb"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddb7af00d2b17dbd07d82c0063e25411959748ff03e8d4f96134c2ff41fce34f"
+dependencies = [
+ "libc",
+ "librocksdb-sys",
 ]
 
 [[package]]
@@ -2162,7 +2339,7 @@ dependencies = [
 [[package]]
 name = "tezos-protocol"
 version = "0.1.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "hex",
  "nom",
@@ -2174,7 +2351,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "rustc_version",
 ]
@@ -2182,12 +2359,12 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 
 [[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
@@ -2196,7 +2373,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-encoding"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "hex",
  "nom",
@@ -2216,7 +2393,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
@@ -2227,7 +2404,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-mock"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -2240,7 +2417,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "clap",
  "hex",
@@ -2256,7 +2433,7 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2281,7 +2458,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -2298,7 +2475,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0c592d1ff85948d96aa1a990d10142f74ec21f34"
+source = "git+https://gitlab.com/tezos/tezos.git#ce48957df3be578435383a5551f5f912cce5de34"
 dependencies = [
  "lazy_static",
  "once_cell",
@@ -2497,6 +2674,12 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
+
+[[package]]
+name = "vcpkg"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"
@@ -2980,3 +3163,13 @@ name = "zeroize"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "525b4ec142c6b68a2d10f01f7bbf6755599ca3f81ea53b8431b7dd348f5fdb2d"
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.16+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+dependencies = [
+ "cc",
+ "pkg-config",
+]

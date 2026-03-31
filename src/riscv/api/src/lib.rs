@@ -666,7 +666,7 @@ pub fn octez_riscv_verify_proof(
     };
 
     Ok(node_pvm
-        .verify_proof(&merkle_tree, &final_state_hash, input, NoHooks)
+        .verify_proof(merkle_tree, &final_state_hash, input, NoHooks)
         .map(InputRequest::from))
 }
 

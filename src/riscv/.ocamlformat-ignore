@@ -1,3 +1,4 @@
 durable-in-memory/octez_riscv_durable_storage_in_memory_api.ml
 durable-in-memory/octez_riscv_durable_storage_in_memory_api.mli
-
+durable-on-disk/octez_riscv_durable_storage_on_disk_api.ml
+durable-on-disk/octez_riscv_durable_storage_on_disk_api.mli
