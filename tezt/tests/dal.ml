@@ -748,19 +748,14 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
   unit
 
 let register ~protocols =
-  (* Tests with Layer1 node only *)
   Dal_l1.register ~__FILE__ ~protocols ;
   Dal_attestation.register ~__FILE__ ~protocols ;
   Dal_denunciation.register ~__FILE__ ~protocols ;
   Dal_node_tests.register ~__FILE__ ~protocols ;
-
-  (* Tests with layer1 and dal nodes (with p2p/GS) *)
   Dal_p2p.register ~__FILE__ ~protocols ;
-
   Dal_skip_list.register ~__FILE__ ~protocols ;
   Dal_amplification.register ~__FILE__ ~protocols ;
   Dal_gc.register ~__FILE__ ~protocols ;
-
   Dal_tx_kernel.register ~__FILE__ ~protocols ;
 
   (* Register tutorial test *)
