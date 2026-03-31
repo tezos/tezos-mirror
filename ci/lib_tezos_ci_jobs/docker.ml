@@ -26,6 +26,7 @@ let job_docker =
       "Build the Docker image for Octez for the specified architecture, with \
        experimental executables."
     ~stage:Build
+    ~only_if_changed:["build.Dockerfile"; "Dockerfile"]
     ~allow_failure:No
     ~retry:
       {
@@ -96,7 +97,49 @@ let job_docker_merge_manifests =
       "./scripts/ci/docker_merge_manifests.sh";
     ]
 
+let job_script_docker_verify_image =
+  Cacio.parameterize @@ fun arch ->
+  let arch_string = Tezos_ci.Runner.Arch.show_uniform arch in
+  CI.job
+    ("oc.script.docker_verify_image_" ^ arch_string)
+    ~__POS__
+    ~description:"Verify the signature of the Docker image."
+    ~stage:Test
+    ~only_if_changed:["build.Dockerfile"; "Dockerfile"]
+    ~needs:
+      [
+        ( Job,
+          job_docker
+            (match arch with
+            | Amd64 -> `experimental_with_evm
+            | Arm64 -> `experimental)
+            `test
+            arch );
+      ]
+    ~image:Tezos_ci.Images_external.docker
+    ~variables:
+      [("DOCKER_VERSION", version); ("IMAGE_ARCH_PREFIX", arch_string ^ "_")]
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "./scripts/ci/docker_verify_signature.sh";
+    ]
+
 let register () =
+  Cacio.register_jobs
+    Before_merging
+    [
+      (Auto, job_docker `experimental_with_evm `test Amd64);
+      (Auto, job_docker `experimental `test Arm64);
+      (Manual, job_script_docker_verify_image Amd64);
+      (Manual, job_script_docker_verify_image Arm64);
+    ] ;
+  Cacio.register_jobs
+    Merge_train
+    [
+      (Auto, job_docker `experimental_with_evm `test Amd64);
+      (Auto, job_docker `experimental `test Arm64);
+    ] ;
   Cacio.register_jobs
     Master
     [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
