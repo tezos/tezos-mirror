@@ -64,43 +64,27 @@ pub mod url;
 // possible.
 fn build_response(
     result: Result<TransferSuccess, TezosXRuntimeError>,
+    consumed_milligas: u64,
 ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
-    let builder_result = match result {
-        Ok(response) => {
-            // X-Tezos-Gas-Consumed is in Tezos milligas.
-            // The calling runtime is responsible for converting to its own units.
-            let consumed_milligas: u64 = response
-                .consumed_milligas
-                .0
-                .clone()
-                .try_into()
-                .map_err(|_| {
-                    TezosXRuntimeError::Custom(
-                        "consumed milligas overflows u64".to_string(),
-                    )
-                })?;
-            // TODO: Do something meaningful with the rest of the response
-            http::Response::builder()
-                .status(StatusCode::OK)
-                .header(X_TEZOS_GAS_CONSUMED, &consumed_milligas.to_string())
-                .body(response.storage.unwrap_or(vec![]))
+    let gas_header = consumed_milligas.to_string();
+    let (status, body) = match result {
+        Ok(response) => (StatusCode::OK, response.storage.unwrap_or_default()),
+        Err(TezosXRuntimeError::BadRequest(msg)) => {
+            (StatusCode::BAD_REQUEST, msg.into_bytes())
         }
-        Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(msg.into_bytes()),
-        Err(TezosXRuntimeError::NotFound(msg)) => http::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(msg.into_bytes()),
-        Err(e) => return Err(e),
+        Err(TezosXRuntimeError::NotFound(msg)) => {
+            (StatusCode::NOT_FOUND, msg.into_bytes())
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e:?}").into_bytes(),
+        ),
     };
-    builder_result.or_else(|_| {
-        http::Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(b"internal server error".to_vec())
-            .map_err(|e| {
-                TezosXRuntimeError::Custom(format!("Failed to build response: {e}"))
-            })
-    })
+    http::Response::builder()
+        .status(status)
+        .header(X_TEZOS_GAS_CONSUMED, &gas_header)
+        .body(body)
+        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to build response: {e}")))
 }
 
 /// Execute a cross-runtime request: parse the URL, extract parameters,
@@ -108,11 +92,16 @@ fn build_response(
 ///
 /// This is the core logic behind [`TezosRuntime::serve`], separated so
 /// that `serve` only handles the error-to-HTTP-status mapping.
+///
+/// `consumed_milligas` is an output parameter rather than part of the
+/// return type so that early `?` returns keep their ergonomics, since
+/// this result is used as-is to build the http reponse.
 fn execute_request<Host>(
     registry: &impl Registry,
     host: &mut Host,
     journal: &mut TezosXJournal,
     request: http::Request<Vec<u8>>,
+    consumed_milligas: &mut u64,
 ) -> Result<TransferSuccess, TezosXRuntimeError>
 where
     Host: StorageV1 + Logging,
@@ -177,7 +166,7 @@ where
     };
     let parser = mir::parser::Parser::new();
 
-    cross_runtime_transfer(
+    let result = cross_runtime_transfer(
         &mut tc_ctx,
         &mut operation_ctx,
         registry,
@@ -189,7 +178,18 @@ where
         &parser,
     )
     .map(|s| s.into())
-    .map_err(|e| TezosXRuntimeError::Custom(format!("{e}")))
+    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()));
+
+    *consumed_milligas = gas
+        .milligas_consumed_by_operation()
+        .0
+        .clone()
+        .try_into()
+        .map_err(|_| {
+            TezosXRuntimeError::Custom("consumed milligas overflows u64".to_string())
+        })?;
+
+    result
 }
 
 impl RuntimeInterface for TezosRuntime {
@@ -243,7 +243,13 @@ impl RuntimeInterface for TezosRuntime {
     where
         Host: StorageV1 + Logging,
     {
-        build_response(execute_request(registry, host, journal, request))
+        // Default to max: if execute_request fails before writing the
+        // actual value (early setup error), the caller sees full gas
+        // consumption rather than a free call.
+        let mut consumed_milligas = u64::MAX;
+        let result =
+            execute_request(registry, host, journal, request, &mut consumed_milligas);
+        build_response(result, consumed_milligas)
     }
 
     fn host(&self) -> &'static str {
@@ -343,14 +349,14 @@ mod tests {
 
     #[test]
     fn build_response_success() {
-        let resp = build_response(Ok(make_success(Some(b"hello".to_vec())))).unwrap();
+        let resp = build_response(Ok(make_success(Some(b"hello".to_vec()))), 0).unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), b"hello");
     }
 
     #[test]
     fn build_response_success_empty_body() {
-        let resp = build_response(Ok(make_success(None))).unwrap();
+        let resp = build_response(Ok(make_success(None)), 0).unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
     }
@@ -358,7 +364,7 @@ mod tests {
     #[test]
     fn build_response_bad_request() {
         let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())))
+            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())), 0)
                 .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
@@ -367,7 +373,7 @@ mod tests {
     #[test]
     fn build_response_not_found() {
         let resp =
-            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())))
+            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())), 0)
                 .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(String::from_utf8_lossy(resp.body()).contains("KT1 not found"));
@@ -376,7 +382,7 @@ mod tests {
     #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(make_success(None))).unwrap();
+        let resp = build_response(Ok(make_success(None)), 0).unwrap();
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -388,7 +394,8 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp = build_response(Ok(make_success_with_milligas(None, 5000))).unwrap();
+        let resp =
+            build_response(Ok(make_success_with_milligas(None, 5000)), 5000).unwrap();
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -400,8 +407,13 @@ mod tests {
     #[test]
     fn build_response_error_has_no_gas_consumed_header() {
         let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("err".into()))).unwrap();
-        assert!(resp.headers().get(X_TEZOS_GAS_CONSUMED).is_none());
+            build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0).unwrap();
+        assert_eq!(
+            resp.headers()
+                .get(X_TEZOS_GAS_CONSUMED)
+                .and_then(|v| v.to_str().ok()),
+            Some("0")
+        );
     }
 
     // --- generate_alias tests ---

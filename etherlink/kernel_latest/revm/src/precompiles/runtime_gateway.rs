@@ -95,6 +95,34 @@ fn build_http_request(
     })
 }
 
+/// Extract `X-Tezos-Gas-Consumed` from a CRAC response, convert to
+/// EVM gas units, and charge the caller's gas tracker.
+///
+/// Called on both success and failure paths so that the EVM caller
+/// always pays for the work done by the target runtime.
+///
+/// Returns `Ok(true)` if gas was recorded, `Ok(false)` if the caller
+/// ran out of gas. The caller should return `out_of_gas` in that case.
+fn charge_crac_gas(
+    response: &http::Response<Vec<u8>>,
+    target_runtime: RuntimeId,
+    gas: &mut Gas,
+) -> Result<bool, CustomPrecompileError> {
+    let callee_consumed = response
+        .headers()
+        .get(X_TEZOS_GAS_CONSUMED)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or(CustomPrecompileError::Revert(
+            "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
+        ))?;
+    let evm_consumed = gas::convert(target_runtime, RuntimeId::Ethereum, callee_consumed)
+        .ok_or(CustomPrecompileError::Revert(
+            "X-Tezos-Gas-Consumed overflows EVM gas units".into(),
+        ))?;
+    Ok(gas.record_cost(evm_consumed))
+}
+
 /// Inject X-Tezos-* headers carrying the trusted execution context.
 ///
 /// - `X-Tezos-Sender`: The resolved alias of the immediate caller (UTF-8 string).
@@ -208,12 +236,18 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request)?;
+            if !charge_crac_gas(&response, RuntimeId::Tezos, &mut gas)? {
+                return Ok(out_of_gas(inputs.gas_limit));
+            }
             if !response.status().is_success() {
-                return Err(CustomPrecompileError::Revert(format!(
-                    "Cross-runtime call failed with status {}: {}",
-                    response.status(),
-                    String::from_utf8_lossy(response.body())
-                )));
+                return Err(CustomPrecompileError::RevertKeepGas(
+                    format!(
+                        "Cross-runtime call failed with status {}: {}",
+                        response.status(),
+                        String::from_utf8_lossy(response.body())
+                    ),
+                    gas,
+                ));
             }
 
             // Emit CracSent event
@@ -286,12 +320,18 @@ where
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request)?;
+            if !charge_crac_gas(&response, RuntimeId::Tezos, &mut gas)? {
+                return Ok(out_of_gas(inputs.gas_limit));
+            }
             if !response.status().is_success() {
-                return Err(CustomPrecompileError::Revert(format!(
-                    "Cross-runtime call failed with status {}: {}",
-                    response.status(),
-                    String::from_utf8_lossy(response.body())
-                )));
+                return Err(CustomPrecompileError::RevertKeepGas(
+                    format!(
+                        "Cross-runtime call failed with status {}: {}",
+                        response.status(),
+                        String::from_utf8_lossy(response.body())
+                    ),
+                    gas,
+                ));
             }
 
             // Emit CracSent event
@@ -369,38 +409,13 @@ where
             let target_rt = uri.host().unwrap_or("unknown").to_string();
             let target_addr = uri.path().trim_start_matches('/').to_string();
 
-            // TODO: L2-918 Handle http code responses
             let response = context.journal_mut().tezosx_call_http(request)?;
-
-            // Charge the EVM caller for gas consumed in the CRAC, whether it
-            // succeeded or failed. X-Tezos-Gas-Consumed is in the called
-            // runtime's units; convert to EVM units to keep the gas object
-            // in sync.
-            //
-            // Both error cases (missing header, overflow) use Revert rather
-            // than Abort: Revert fails only this call (consuming all its gas)
-            // while letting EVM execution continue in the caller; Abort would
-            // kill the entire blueprint. Our runtimes always set this header,
-            // so either condition indicates a bug in the target runtime.
-            let callee_consumed = response
-                .headers()
-                .get(X_TEZOS_GAS_CONSUMED)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|s| s.parse::<u64>().ok())
-                .ok_or(CustomPrecompileError::Revert(
-                    "X-Tezos-Gas-Consumed header missing or invalid in CRAC response"
-                        .into(),
-                ))?;
-            let evm_consumed =
-                gas::convert(target_runtime, RuntimeId::Ethereum, callee_consumed)
-                    .ok_or(CustomPrecompileError::Revert(
-                        "X-Tezos-Gas-Consumed overflows EVM gas units".into(),
-                    ))?;
-            if !gas.record_cost(evm_consumed) {
+            if !charge_crac_gas(&response, target_runtime, &mut gas)? {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
-            let output: Vec<u8> = (true, response.body()).abi_encode_params();
+            let success = response.status().is_success();
+            let output: Vec<u8> = (success, response.body()).abi_encode_params();
 
             // The precompile is expected to have a zero balance at this stage.
             // However, due to differences in representation precision across runtimes,
