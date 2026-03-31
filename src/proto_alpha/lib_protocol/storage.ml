@@ -127,13 +127,6 @@ module Protocol_activation_level =
     (Raw_level_repr)
 
 module Tenderbake = struct
-  module First_level_of_protocol =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["first_level_of_protocol"]
-      end)
-      (Raw_level_repr)
-
   module Branch = struct
     type t = Block_hash.t * Block_payload_hash.t
 
