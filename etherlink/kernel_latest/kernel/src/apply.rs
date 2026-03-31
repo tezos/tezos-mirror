@@ -265,11 +265,11 @@ pub fn extract_cross_runtime_effects(
 ) -> Vec<CrossRuntimeEffect> {
     let mut effects = Vec::new();
 
-    if let Some((logs, tx_info)) = journal.evm.take_crac_data() {
+    if let Some(tx_info) = journal.evm.take_crac_data() {
         let crac_id = journal.crac_id().to_string();
         effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
             crac_id,
-            logs,
+            logs: journal.evm.inner.logs.to_vec(),
             source: H160(*tx_info.source.0),
             sender: H160(*tx_info.sender.0),
             gas_limit: U256::from_little_endian(&tx_info.gas_limit.to_le_bytes::<32>()),

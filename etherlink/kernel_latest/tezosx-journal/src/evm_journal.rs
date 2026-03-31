@@ -6,7 +6,7 @@
 use anyhow::anyhow;
 use revm::{
     context::{transaction::AccessList, JournalInner},
-    primitives::{Address, Log, U256},
+    primitives::{Address, U256},
     JournalEntry,
 };
 
@@ -34,13 +34,6 @@ pub struct EvmJournal {
     pub layered_state: LayeredState,
     pub inner: JournalInner<JournalEntry>,
     access_list: Option<AccessList>,
-    /// Logs accumulated from cross-runtime EVM executions (incoming CRACs).
-    /// Multiple `serve()` calls within one foreign-runtime transaction
-    /// append their logs here. Used to build the fake EVM transaction.
-    ///
-    /// Note: cross-runtime reverts for these logs are not handled here.
-    /// See L2-1097.
-    crac_logs: Vec<Log>,
     /// Header info from the first incoming CRAC.
     crac_tx_info: Option<CracTransactionInfo>,
 }
@@ -51,7 +44,6 @@ impl EvmJournal {
             layered_state: LayeredState::new(),
             inner: JournalInner::new(),
             access_list: None,
-            crac_logs: Vec::new(),
             crac_tx_info: None,
         }
     }
@@ -62,7 +54,6 @@ impl EvmJournal {
     pub fn clear(&mut self) {
         let _ = self.inner.finalize();
         let _ = self.layered_state.finalize();
-        self.crac_logs.clear();
         self.crac_tx_info = None;
         self.access_list = None;
     }
@@ -84,12 +75,7 @@ impl EvmJournal {
     }
 
     /// Append logs and gas from a cross-runtime EVM execution.
-    pub fn accumulate_crac_execution(
-        &mut self,
-        logs: impl IntoIterator<Item = Log>,
-        gas_used: u64,
-    ) {
-        self.crac_logs.extend(logs);
+    pub fn accumulate_crac_execution(&mut self, gas_used: u64) {
         if let Some(ref mut info) = self.crac_tx_info {
             info.gas_used = info.gas_used.saturating_add(gas_used);
         }
@@ -111,10 +97,9 @@ impl EvmJournal {
 
     /// Take accumulated CRAC data (logs + tx info).
     /// Returns `None` if no incoming CRAC happened.
-    pub fn take_crac_data(&mut self) -> Option<(Vec<Log>, CracTransactionInfo)> {
+    pub fn take_crac_data(&mut self) -> Option<CracTransactionInfo> {
         let info = self.crac_tx_info.take()?;
-        let logs = std::mem::take(&mut self.crac_logs);
-        Some((logs, info))
+        Some(info)
     }
 
     /// Whether an incoming CRAC has been received.
@@ -132,37 +117,7 @@ impl Default for EvmJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use revm::primitives::{Address, LogData};
-
-    fn make_log(addr: [u8; 20], data: &[u8]) -> Log {
-        Log {
-            address: Address::from(addr),
-            data: LogData::new_unchecked(vec![], data.to_vec().into()),
-        }
-    }
-
-    #[test]
-    fn test_accumulate_crac_logs() {
-        let mut journal = EvmJournal::new();
-        journal
-            .set_crac_tx_info(CracTransactionInfo {
-                source: Address::from([0x11; 20]),
-                sender: Address::from([0x22; 20]),
-                gas_limit: U256::from(1000),
-                amount: U256::ZERO,
-                gas_used: 0,
-            })
-            .unwrap();
-        let log1 = make_log([0x11; 20], b"log1");
-        let log2 = make_log([0x22; 20], b"log2");
-
-        journal.accumulate_crac_execution(vec![log1.clone()], 100);
-        journal.accumulate_crac_execution(vec![log2.clone()], 200);
-
-        assert!(journal.has_crac_data());
-        let (logs, _) = journal.take_crac_data().unwrap();
-        assert_eq!(logs.len(), 2);
-    }
+    use revm::primitives::Address;
 
     #[test]
     fn test_set_crac_tx_info_errors_on_duplicate() {
@@ -195,7 +150,7 @@ mod tests {
     #[test]
     fn test_take_crac_data_returns_none_without_tx_info() {
         let mut journal = EvmJournal::new();
-        journal.accumulate_crac_execution(vec![make_log([0x11; 20], b"x")], 100);
+        journal.accumulate_crac_execution(100);
         // No tx info set → returns None
         assert!(journal.take_crac_data().is_none());
     }
@@ -213,8 +168,8 @@ mod tests {
             })
             .unwrap();
         // No logs but tx info is set → returns Some with empty logs
-        let (logs, _) = journal.take_crac_data().unwrap();
-        assert!(logs.is_empty());
+        let _ = journal.take_crac_data().unwrap();
+        assert!(!journal.has_crac_data());
     }
 
     #[test]
@@ -229,10 +184,9 @@ mod tests {
                 gas_used: 0,
             })
             .unwrap();
-        journal.accumulate_crac_execution(vec![make_log([0x11; 20], b"x")], 100);
+        journal.accumulate_crac_execution(100);
 
-        let (logs, _) = journal.take_crac_data().unwrap();
-        assert_eq!(logs.len(), 1);
+        let _ = journal.take_crac_data().unwrap();
 
         // Second call returns None (consumed)
         assert!(journal.take_crac_data().is_none());
