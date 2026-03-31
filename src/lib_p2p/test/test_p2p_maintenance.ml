@@ -361,6 +361,7 @@ module Triggers = struct
       in
       Node.detach_nodes
         ~prefix
+        ~expected_connections:(fun _ -> expected_connections)
         ~max_connections
         ~min_connections
         (node expected_connections (max_connections 0) overconnect_points)
@@ -492,6 +493,7 @@ module Triggers = struct
       let min_connections i = if i = 0 then expected_connections / 2 else 0 in
       Node.detach_nodes
         ~prefix
+        ~expected_connections:(fun _ -> expected_connections)
         ~min_connections
         (node expected_connections (min_connections 0))
         points
