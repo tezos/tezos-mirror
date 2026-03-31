@@ -11,7 +11,7 @@
    Component:    Data-availability layer
    Requirement:  make -f kernels.mk build
 
-                 For dev-purpose you can also run the follwing to enable debug outputs and faster build time:
+                 For dev-purpose you can also run the following to enable debug outputs and faster build time:
 
                  cd src/kernel_tx_demo/kernel
                  cargo build --release --target wasm32-unknown-unknown --features debug --features dal
