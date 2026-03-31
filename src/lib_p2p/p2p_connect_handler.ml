@@ -123,10 +123,13 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   mutable disconnection_hook : (P2p_peer.Id.t -> unit) list;
   answerer : 'msg P2p_answerer.t Lazy.t;
   dependencies : ('msg, 'peer_meta, 'conn_meta) dependencies;
+  maintenance_bounds : maintenance_bounds;
+  connections_threshold : int;
 }
 
 let create ?(p2p_versions = P2p_version.supported) config pool message_config
-    conn_meta_config io_sched triggers ~log ~answerer =
+    conn_meta_config io_sched triggers ~log ~answerer ~maintenance_bounds
+    ~maintenance_active =
   let dependencies =
     {
       pool_greylist_peer = P2p_pool.greylist_peer;
@@ -158,11 +161,22 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     pool;
     answerer;
     dependencies;
+    maintenance_bounds;
+    (* [connections_threshold] is defined depending on the maintenance status.
+       If the maintenance is running, we reject a connection if [max_threshold]
+       is reached. This threshold that is lower than [max_connection] allows to
+       be in sync with maintenance behaviour. If no maintenance is running,
+       [max_connection] is used to avoid unexpected bounds. *)
+    connections_threshold =
+      (if maintenance_active then maintenance_bounds.max_threshold
+       else config.max_connections);
   }
 
 let config t = t.config
 
 let get_pool t = t.pool
+
+let maintenance_bounds t = t.maintenance_bounds
 
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
@@ -1003,6 +1017,9 @@ module Internal_for_tests = struct
         distributed_db_versions = [Distributed_db_version.zero];
       }
 
+  let dumb_bounds =
+    {min_threshold = 10; min_target = 10; max_target = 10; max_threshold = 10}
+
   let create ?(config = dumb_config) ?(log = fun _ -> ())
       ?(triggers = P2p_trigger.create ()) ?io_sched
       ?(announced_version = Network_version.Internal_for_tests.mock ())
@@ -1012,7 +1029,9 @@ module Internal_for_tests = struct
       ?(encoding = make_crashing_encoding ())
       ?(incoming = P2p_point.Table.create ~random:true 53)
       ?(new_connection_hook = []) ?(disconnection_hook = [])
-      ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
+      ?(answerer = lazy (P2p_protocol.create_private ()))
+      ?(maintenance_bounds = dumb_bounds)
+      ?(connections_threshold = dumb_bounds.max_threshold) pool dependencies :
       ('msg, 'peer_meta, 'conn_meta) t tzresult Lwt.t =
     let open Lwt_result_syntax in
     let* io_sched =
@@ -1051,5 +1070,7 @@ module Internal_for_tests = struct
         disconnection_hook;
         answerer;
         dependencies;
+        maintenance_bounds;
+        connections_threshold;
       }
 end
