@@ -976,7 +976,12 @@ val get_chain_block_context_contract_delegate :
     [block] defaults to ["head"].
 *)
 val get_chain_block_context_contract_entrypoints :
-  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?normalize_types:bool ->
+  id:string ->
+  unit ->
+  JSON.t t
 
 (** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/manager_key]
 
@@ -1497,6 +1502,9 @@ val get_monitor_heads_chain : ?chain:string -> unit -> JSON.t t
 
 (** RPC: [GET /monitor/validated_blocks] *)
 val get_monitor_validated_blocks : JSON.t t
+
+(** RPC: [GET /monitor/bootstrapped] *)
+val get_monitor_bootstrapped : JSON.t t
 
 (** A nonexistent RPC. *)
 val nonexistent_path : JSON.t t

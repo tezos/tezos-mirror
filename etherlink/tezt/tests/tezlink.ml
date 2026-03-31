@@ -289,23 +289,14 @@ let test_tezlink_current_level =
     ~tags:["rpc"; "current_level"]
   @@ fun {sequencer; _} _protocol ->
   (* call the current_level rpc and parse the result *)
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+
   let rpc_current_level ?offset block =
-    let offset_str =
-      Option.map (fun offset -> "?offset=" ^ string_of_int offset) offset
-      |> Option.value ~default:""
+    let* response =
+      RPC_core.call_json tezlink_endpoint
+      @@ RPC.get_chain_block_helper_current_level ~block ?offset ()
     in
-    let path =
-      "/tezlink/chains/main/blocks/" ^ block ^ "/helpers/current_level"
-      ^ offset_str
-    in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_current_level" res
+    return response.body
   in
 
   (* verify an answer by the current_level rpc *)
@@ -384,21 +375,12 @@ let test_tezlink_protocols =
     ~title:"Test of the protocols rpc"
     ~tags:["rpc"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
-  (* call the protocols rpc and parse the result *)
-  let rpc_protocols () =
-    let path = "/tezlink/chains/main/blocks/head/protocols" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_protocols" res
-  in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let protocol_hash = Protocol.hash Michelson_contracts.tezlink_protocol in
 
-  let* res = rpc_protocols () in
+  let* res =
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_protocols ()
+  in
   Check.(
     JSON.(res |-> "protocol" |> as_string = protocol_hash)
       string
@@ -410,19 +392,9 @@ let test_tezlink_genesis_block_arg =
     ~title:"Test of the genesis block argument"
     ~tags:["rpc"; "genesis"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
-  (* call the protocols rpc and parse the result *)
-  let rpc_protocols block_arg =
-    let path =
-      Format.sprintf "/tezlink/chains/main/blocks/%s/protocols" block_arg
-    in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_protocols" res
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let rpc_protocols block =
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_protocols ~block ()
   in
 
   let* res_genesis = rpc_protocols "genesis" in
@@ -440,22 +412,11 @@ let test_tezlink_expected_issuance =
     ~title:"Test the mocked expected issuance rpc"
     ~tags:["rpc"; "issuance"; "mock"]
   @@ fun {sequencer; _} _protocol ->
-  (* call the rpc and parse the result *)
-  let rpc () =
-    let path =
-      "/tezlink/chains/main/blocks/head/context/issuance/expected_issuance"
-    in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl" res
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let* res =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_issuance_expected_issuance ()
   in
-
-  let* res = rpc () in
   let rewards = JSON.(res |> as_list) in
   (* The mock assumes we stay in cycle 0 for now *)
   Check.(
@@ -507,31 +468,20 @@ let test_tezlink_storage_via_client =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let account_str_rpc sequencer account key =
-  let path =
-    sf "/tezlink/chains/main/blocks/head/context/contracts/%s/%s" account key
-  in
-
-  let* res =
-    Curl.get_raw
-      ~name:("curl#" ^ Evm_node.name sequencer)
-      ~args:["-v"]
-      (Evm_node.endpoint sequencer ^ path)
-    |> Runnable.run
-  in
-  return @@ JSON.parse ~origin:"curl_protocols" res
-
-let account_rpc sequencer account key =
-  account_str_rpc sequencer account.Account.public_key_hash key
-
 let test_tezlink_contract_info =
   register_tezlink_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   (* call the contract info rpc and check the result *)
-  let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
+  let* valid_info =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract
+         ~id:Constant.bootstrap1.Account.public_key_hash
+         ()
+  in
   let balance = JSON.(valid_info |-> "balance" |> as_int) in
   let counter = JSON.(valid_info |-> "counter" |> as_int) in
 
@@ -547,8 +497,12 @@ let test_tezlink_list_entrypoints =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   (* call the list_entrypoint rpc and check the result *)
-  let* entrypoints = account_str_rpc sequencer contract.address "entrypoints" in
+  let* entrypoints =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_entrypoints ~id:contract.address ()
+  in
   let expected =
     JSON.parse
       ~origin:"expected_entrypoints"
@@ -565,8 +519,12 @@ let test_tezlink_contract_info_script =
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   (* call the contract info rpc and check the result *)
-  let* valid_info = account_str_rpc sequencer contract.address "" in
+  let* valid_info =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract ~id:contract.address ()
+  in
   let balance = JSON.(valid_info |-> "balance" |> as_int) in
   let counter = JSON.(valid_info |-> "counter" |> as_int_opt) in
   let script = JSON.(valid_info |-> "script") in
@@ -591,12 +549,22 @@ let test_tezlink_manager_key =
     ~tags:["rpc"; "manager_key"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let* valid_res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let get_contract_manager_key account =
+    let* res =
+      RPC_core.call_json tezlink_endpoint
+      @@ RPC.get_chain_block_context_contract_manager_key
+           ~id:account.Account.public_key_hash
+           ()
+    in
+    return res.body
+  in
+  let* valid_res = get_contract_manager_key Constant.bootstrap1 in
   Check.(
     JSON.(valid_res |> as_string_opt = Some Constant.bootstrap1.public_key)
       (option string)
       ~error_msg:"Expected %R but got %L") ;
-  let* invalid_res = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  let* invalid_res = get_contract_manager_key Constant.bootstrap2 in
   Check.(
     JSON.(invalid_res |> as_string_opt = None)
       (option string)
@@ -609,16 +577,29 @@ let test_tezlink_counter =
     ~tags:["evm"; "rpc"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let* res = account_rpc sequencer Constant.bootstrap1 "counter" in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let get_contract_counter account =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:account.Account.public_key_hash
+         ()
+  in
+  let get_contract_info account =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract
+         ~id:account.Account.public_key_hash
+         ()
+  in
+  let* res = get_contract_counter Constant.bootstrap1 in
   Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
-  let* res = account_rpc sequencer Constant.bootstrap1 "" in
+  let* res = get_contract_info Constant.bootstrap1 in
   Check.(
     JSON.(res |-> "counter" |> as_int = 0)
       int
       ~error_msg:"Expected %R but got %L") ;
-  let* res = account_rpc sequencer Constant.bootstrap2 "counter" in
+  let* res = get_contract_counter Constant.bootstrap2 in
   Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
-  let* res = account_rpc sequencer Constant.bootstrap2 "" in
+  let* res = get_contract_info Constant.bootstrap2 in
   Check.(
     JSON.(res |-> "counter" |> as_int = 0)
       int
@@ -630,21 +611,13 @@ let test_tezlink_contract_info_on_liquidity_baking =
     ~title:"Test of the contract info rpc on liquidity baking addresses"
     ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
   @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   (* call the balance rpc and check the result *)
   let verify_account_info_rpc address =
-    let path =
-      Format.sprintf
-        "/tezlink/chains/main/blocks/head/context/contracts/%s"
-        address
+    let* json =
+      RPC_core.call tezlink_endpoint
+      @@ RPC.get_chain_block_context_contract ~id:address ()
     in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    let json = JSON.parse ~origin:"curl_protocols" res in
     (* Verify that the script field exists*)
     let script = JSON.(json |-> "script") in
     return
@@ -666,20 +639,8 @@ let test_tezlink_version =
     ~title:"Test of the version rpc"
     ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
-  (* call the version rpc and parse the result *)
-  let rpc_version () =
-    let path = "/tezlink/version" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_version" res
-  in
-
-  let* res = rpc_version () in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let* res = RPC_core.call tezlink_endpoint RPC.get_version in
   Check.(
     JSON.(res |-> "version" |-> "major" |> as_int = 0)
       int
@@ -1017,7 +978,8 @@ let test_tezlink_bootstrapped =
     ~title:"Test of the bootstrapped rpc"
     ~tags:["rpc"; "bootstrapped"]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let current_timestamp =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
@@ -1029,15 +991,7 @@ let test_tezlink_bootstrapped =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
   in
   let* rpc_bootstrapped =
-    let path = "/tezlink/monitor/bootstrapped" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_bootstrapped" res
+    RPC_core.call tezlink_endpoint RPC.get_monitor_bootstrapped
   in
   Check.(
     JSON.(
@@ -1143,23 +1097,19 @@ let test_tezlink_produceBlock =
     ~title:"Test Tezlink production block"
     ~tags:["kernel"; "produce_block"]
   @@ fun {sequencer; _} _protocol ->
-  let rpc_current_level_head sequencer =
-    let path = "/tezlink/chains/main/blocks/head/helpers/current_level" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let rpc_current_level_head () =
+    let* json =
+      RPC_core.call_json tezlink_endpoint
+      @@ RPC.get_chain_block_helper_current_level ()
     in
-    let json = JSON.parse ~origin:"curl_current_level" res in
-    return @@ JSON.(json |-> "level" |> as_int)
+    return @@ JSON.(json.body |-> "level" |> as_int)
   in
-  let* start_level = rpc_current_level_head sequencer in
+  let* start_level = rpc_current_level_head () in
   let*@ _ = produce_block sequencer in
   let*@ _ = produce_block sequencer in
   let*@ _ = produce_block sequencer in
-  let* end_level = rpc_current_level_head sequencer in
+  let* end_level = rpc_current_level_head () in
   Check.((start_level + 3 = end_level) int)
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
@@ -1167,16 +1117,9 @@ let test_tezlink_produceBlock =
 let test_tezlink_hash_rpc =
   register_tezlink_test ~title:"Test Tezlink hash rpc" ~tags:["rpc"; "hash"]
   @@ fun {sequencer; _} _protocol ->
-  let path block = sf "/tezlink/chains/main/blocks/%s/hash" block in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let rpc_hash block =
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path block)
-      |> Runnable.run
-    in
-    return @@ JSON.(parse ~origin:"curl_hash" res |> as_string)
+    RPC_core.call tezlink_endpoint @@ RPC.get_chain_block_hash ~block ()
   in
   let* hash_old_head = rpc_hash "head" in
   let*@ _ = produce_block sequencer in
@@ -1507,7 +1450,11 @@ let test_contract_counter =
     ~tags:["rpc"; "counter"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; _} _protocol ->
-  let* valid_res = account_str_rpc sequencer contract.address "" in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let* valid_res =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract ~id:contract.address ()
+  in
   Check.(
     JSON.(valid_res |-> "counter" |> as_int_opt = None)
       (option int)
@@ -1519,19 +1466,12 @@ let test_tezlink_raw_json_cycle =
     ~title:"Test Tezlink raw json cycle rpc"
     ~tags:["rpc"; "cycle"; "raw"]
   @@ fun {sequencer; _} _protocol ->
-  let path_head = "/tezlink/chains/main/blocks/head/" in
-  let rpc_raw_json_cycle () =
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path_head ^ "context/raw/json/cycle/0")
-      |> Runnable.run
-    in
-    return @@ JSON.parse ~origin:"curl_hash" res
-  in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let*@ _ = produce_block sequencer in
-  let* cycle_0 = rpc_raw_json_cycle () in
+  let* cycle_0 =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_raw_json ~path:["cycle"; "0"] ()
+  in
   (* 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8 is the mock value
      used for the ranom seed and never changes *)
   Check.(
@@ -1670,7 +1610,14 @@ let test_tezlink_reveal =
     ~tags:["kernel"; "reveal"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.Foreign_endpoint tezlink_endpoint in
+  let get_contract_manager_key account =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_manager_key
+         ~id:account.Account.public_key_hash
+         ()
+  in
   let amount = Tez.one in
   let* () =
     Client.transfer
@@ -1682,14 +1629,14 @@ let test_tezlink_reveal =
       client
   in
   let*@ _ = produce_block sequencer in
-  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  let* manager_key = get_contract_manager_key Constant.bootstrap2 in
   Check.(
     JSON.(manager_key |> as_string_opt = None)
       (option string)
       ~error_msg:"Expected %R but got %L") ;
   let*! () = Client.reveal ~endpoint ~src:Constant.bootstrap2.alias client in
   let*@ _ = produce_block sequencer in
-  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  let* manager_key = get_contract_manager_key Constant.bootstrap2 in
   Check.(
     JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
       (option string)
@@ -2149,7 +2096,8 @@ let test_tezlink_long_batch =
     ~tags:["transaction"; "long"; "batch"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let batch_size = 64 in
   let json_transfer =
     `O
@@ -2171,7 +2119,12 @@ let test_tezlink_long_batch =
       client
   in
   let*@ _ = produce_block sequencer in
-  let* counter = account_rpc sequencer Constant.bootstrap1 "counter" in
+  let* counter =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.Account.public_key_hash
+         ()
+  in
   Check.(
     (batch_size = (counter |> JSON.as_int))
       int
@@ -2310,7 +2263,7 @@ let test_tezlink_internal_receipts =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~bootstrap_contracts:[faucet]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_path = "/tezlink" in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let amount = 1000000 in
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* () =
@@ -2328,16 +2281,11 @@ let test_tezlink_internal_receipts =
   let*@ _ = produce_block sequencer in
 
   let* operation =
-    let path = tezlink_path ^ "/chains/main/blocks/head/operations/3/0" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    let json = JSON.parse ~origin:"curl_operation_hashes" res in
-    return json
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
   in
 
   let operation_metadata =
@@ -2557,7 +2505,7 @@ let test_event =
     ~tags:["operation"; "event"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let tezlink_path = "/tezlink" in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* deployed_emit_events_contract =
     Client.originate_contract
@@ -2584,16 +2532,11 @@ let test_event =
   let*@ _l2_level = produce_block sequencer in
 
   let* first_manager_operation =
-    let path = tezlink_path ^ "/chains/main/blocks/head/operations/3/0" in
-    let* res =
-      Curl.get_raw
-        ~name:("curl#" ^ Evm_node.name sequencer)
-        ~args:["-v"]
-        (Evm_node.endpoint sequencer ^ path)
-      |> Runnable.run
-    in
-    let json = JSON.parse ~origin:"curl_operation_hashes" res in
-    return json
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
   in
 
   let open JSON in
@@ -2652,10 +2595,10 @@ let test_tezlink_forge_operations =
     ~tags:["rpc"; "forge"; "operations"]
     ~additional_uses:[Constant.octez_codec]
   @@ fun {sequencer; _} _protocol ->
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   (* call the forge/operations rpc and parse the result *)
   let json_data =
-    JSON.parse
-      ~origin:"curl_forge_operations"
+    Ezjsonm.value_from_string
       {|
 {
   "branch": "BL5HqLzfzPd4b72LwoGtwgXYth26dvit8S8RW4tMkQgbzTWfzww",
@@ -2683,24 +2626,21 @@ let test_tezlink_forge_operations =
 }
 |}
   in
-  let rpc_forge_operations () =
-    let path = "/tezlink/chains/main/blocks/head/helpers/forge/operations" in
-    Curl.post_raw
-      ~name:("curl#" ^ Evm_node.name sequencer)
-      (Evm_node.endpoint sequencer ^ path)
-      json_data
-    |> Runnable.run
-  in
   let* binary =
     let name =
       Protocol.encoding_prefix Michelson_contracts.tezlink_protocol
       ^ ".operation.unsigned"
     in
-    Codec.encode ~name (JSON.unannotate json_data)
+    Codec.encode ~name json_data
   in
   let expected_res = sf "\"%s\"\n" binary in
-  let* res = rpc_forge_operations () in
-  Check.((res = expected_res) string ~error_msg:"Expected %R but got %L") ;
+  let* res =
+    RPC_core.call_raw tezlink_endpoint
+    @@ RPC.post_chain_block_helpers_forge_operations
+         ~data:(RPC_core.Data json_data)
+         ()
+  in
+  Check.((res.body = expected_res) string ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_prevalidation =
@@ -4490,7 +4430,8 @@ let test_bridged_tez_transfer =
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.Foreign_endpoint tezlink_endpoint in
 
   (* Check that account is empty and not revealed. *)
   let* balance_1 =
@@ -4498,7 +4439,12 @@ let test_bridged_tez_transfer =
   in
   Check.((balance_1 = Tez.zero) Tez.typ)
     ~error_msg:"Expected balance at 0 for bootstrap1" ;
-  let* manager_key = account_rpc sequencer Constant.bootstrap1 "manager_key" in
+  let* manager_key =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_manager_key
+         ~id:Constant.bootstrap1.Account.public_key_hash
+         ()
+  in
   Check.(
     JSON.(manager_key |> as_string_opt = None)
       (option string)
@@ -4756,20 +4702,12 @@ let test_tezlink_upgrade_kernel_auto_sync =
   unit
 
 (** Query the /entrypoints RPC for [address] via the Tezlink endpoint. *)
-let get_entrypoints ?(normalize_types = false) sequencer address =
-  let path =
-    sf
-      "/tezlink/chains/main/blocks/head/context/contracts/%s/entrypoints%s"
-      address
-      (if normalize_types then "?normalize_types=true" else "")
-  in
-  let* res =
-    Curl.get_raw
-      ~name:("curl#" ^ Evm_node.name sequencer)
-      (Evm_node.endpoint sequencer ^ path)
-    |> Runnable.run
-  in
-  return @@ JSON.parse ~origin:"entrypoints" res
+let get_entrypoints ?normalize_types tezlink_endpoint address =
+  RPC_core.call tezlink_endpoint
+  @@ RPC.get_chain_block_context_contract_entrypoints
+       ?normalize_types
+       ~id:address
+       ()
 
 (** Test that the /entrypoints RPC works for an originated Michelson contract.
     The faucet contract has a single [%fund : mutez] entrypoint. *)
@@ -4780,7 +4718,11 @@ let test_entrypoints_originated =
     ~tags:["rpc"; "entrypoints"; "originated"]
     ~bootstrap_contracts:[faucet]
   @@ fun {sequencer; _} _protocol ->
-  let* ep_json = get_entrypoints sequencer faucet.address in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let* ep_json =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_entrypoints ~id:faucet.address ()
+  in
   let expected =
     JSON.parse
       ~origin:"expected_entrypoints"
@@ -4799,7 +4741,8 @@ let test_entrypoints_normalize_types =
     ~tags:["rpc"; "entrypoints"; "originated"; "normalize_types"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
+  let endpoint = Client.Foreign_endpoint tezlink_endpoint in
   let* _alias, kt1_address =
     Client.originate_contract_at
       ~amount:Tez.zero
@@ -4814,7 +4757,10 @@ let test_entrypoints_normalize_types =
   in
   let*@ _ = Rpc.produce_block sequencer in
   (* Without normalize_types, %transfer retains its :from/:to/:value annotations. *)
-  let* entrypoints = get_entrypoints sequencer kt1_address in
+  let* entrypoints =
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_entrypoints ~id:kt1_address ()
+  in
   let transfer_type = JSON.(entrypoints |-> "entrypoints" |-> "transfer") in
   let expected_transfer_without_normalize =
     JSON.parse
@@ -4828,7 +4774,11 @@ let test_entrypoints_normalize_types =
   (* With normalize_types=true, all annotations are stripped and the type is in
      canonical comb form. *)
   let* entrypoints_normalized =
-    get_entrypoints ~normalize_types:true sequencer kt1_address
+    RPC_core.call tezlink_endpoint
+    @@ RPC.get_chain_block_context_contract_entrypoints
+         ~normalize_types:true
+         ~id:kt1_address
+         ()
   in
   let transfer_type_normalized =
     JSON.(entrypoints_normalized |-> "entrypoints" |-> "transfer")
