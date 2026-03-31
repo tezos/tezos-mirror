@@ -1263,14 +1263,6 @@ let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
 let slot_idx parameters level =
   level mod parameters.Dal.Parameters.number_of_slots
 
-(* We check that publishing a slot header with a proof for a different
-   slot leads to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
-    cryptobox =
-  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox "a") in
-  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox "b") in
-  Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
-
 let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment ~proof client =
   let commitment = Dal.Commitment.of_string commitment in
@@ -1377,32 +1369,6 @@ let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
     client
     (Slots [index])
     dal_parameters
-
-(* We check that publishing a slot header with a proof for the "same"
-   slot contents but represented using a different [slot_size] leads
-   to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
-    ~index parameters cryptobox ?counter ?force ?error client =
-  let cryptobox_params =
-    {
-      parameters.Dal.Parameters.cryptobox with
-      slot_size = 2 * parameters.cryptobox.slot_size;
-    }
-  in
-  let* cryptobox' = Helpers.make_cryptobox cryptobox_params in
-  let msg = "a" in
-  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
-  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
-  Helpers.publish_commitment
-    ~source
-    ?fee
-    ~index
-    ~commitment
-    ~proof
-    ?counter
-    ?force
-    ?error
-    client
 
 (** For each level in the range [from_level, to_level]:
     1. Publishes a dummy slot with content derived from the level and slot index
@@ -1525,70 +1491,6 @@ let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
   unit
 
 (* --- Status and verification helpers --- *)
-
-type status = Applied | Failed of {error_id : string}
-
-let pp fmt = function
-  | Applied -> Format.fprintf fmt "applied"
-  | Failed {error_id} -> Format.fprintf fmt "failed: %s" error_id
-
-let status_typ = Check.equalable pp ( = )
-
-let check_manager_operation_status result expected_status oph =
-  let manager_operations = JSON.(result |=> 3 |> as_list) in
-  let op =
-    try
-      List.find
-        (fun op -> JSON.(op |-> "hash" |> as_string) = oph)
-        manager_operations
-    with Not_found ->
-      Test.fail
-        "Test expecting operation %s to be included into the last block."
-        oph
-  in
-  let op_result =
-    JSON.(op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
-  in
-  let status_kind = JSON.(op_result |-> "status" |> as_string) in
-  let status =
-    match status_kind with
-    | "applied" -> Applied
-    | "failed" ->
-        let error_id =
-          JSON.(op_result |-> "errors" |=> 0 |-> "id" |> as_string)
-        in
-        Failed {error_id}
-    | s -> Test.fail "Unexpected status: %s" s
-  in
-  let prefix_msg = sf "Unexpected operation result for %s." oph in
-  Check.(expected_status = status)
-    status_typ
-    ~error_msg:(prefix_msg ^ " Expected: %L. Got: %R.")
-
-let check_dal_raw_context node =
-  let* dal_raw_json =
-    Node.RPC.(call node @@ get_chain_block_context_raw_json ~path:["dal"] ())
-  in
-  if JSON.is_null dal_raw_json then
-    Test.fail "Expected the context to contain information under /dal key."
-  else
-    let json_to_string j =
-      JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
-    in
-    let* confirmed_slots_opt =
-      Node.RPC.(call node @@ get_chain_block_context_dal_commitments_history ())
-    in
-    if JSON.is_null confirmed_slots_opt then
-      Test.fail
-        "confirmed_slots_history RPC is not expected to return None if DAL is \
-         enabled" ;
-    let confirmed_slots = json_to_string confirmed_slots_opt in
-    let confirmed_slots_from_ctxt =
-      json_to_string @@ JSON.(dal_raw_json |-> "slot_headers_history")
-    in
-    if not (String.equal confirmed_slots confirmed_slots_from_ctxt) then
-      Test.fail "Confirmed slots history mismatch." ;
-    unit
 
 (** This function checks that the status of the slot at
     [(~slot_level, ~slot_index)] on [dal_node] matches [~expected_status].
