@@ -790,44 +790,6 @@ let () =
            e)
   | _ -> None
 
-let publish_store_and_attest_slot ~protocol ?counter ?force ?fee client node
-    dal_node source ~index ~content dal_parameters =
-  let* _commitment =
-    Helpers.publish_and_store_slot
-      ?counter
-      ?force
-      ?fee
-      client
-      dal_node
-      source
-      ~index
-      content
-  in
-  let* () =
-    repeat dal_parameters.Dal.Parameters.attestation_lag (fun () ->
-        bake_for client)
-  in
-  inject_dal_attestations_and_bake
-    ~protocol
-    node
-    client
-    (Slots [index])
-    dal_parameters
-
-let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
-    dal_node source ~index ~content dal_parameters =
-  let* _commitment =
-    Helpers.publish_and_store_slot client dal_node source ~index content
-  in
-  let* () = repeat lag (fun () -> bake_for client) in
-  inject_dal_attestations_and_bake
-    ~protocol
-    ~lag_index
-    node
-    client
-    (Slots [index])
-    dal_parameters
-
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
     (fun (slot_index, commitment') ->
@@ -3275,20 +3237,6 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to
     ()
-
-let boot_sector kernel_path =
-  let read_kernel ?(suffix = ".wasm") name : string =
-    let load_kernel_file name : string =
-      let open Tezt.Base in
-      let kernel_file = project_root // name in
-      read_file kernel_file
-    in
-    let hex_encode (input : string) : string =
-      match Hex.of_string input with `Hex s -> s
-    in
-    hex_encode (load_kernel_file (name ^ suffix))
-  in
-  read_kernel ~suffix:"" (Uses.path kernel_path)
 
 (* A migration test for smart rollups importing a DAL page.
    There are 5 levels involved when a DAL page is imported by a rollup:
