@@ -118,6 +118,8 @@ val create :
   P2p_trigger.t ->
   log:(P2p_connection.P2p_event.t -> unit) ->
   answerer:'msg P2p_answerer.t Lazy.t ->
+  maintenance_bounds:maintenance_bounds ->
+  maintenance_active:bool ->
   ('msg, 'peer, 'conn) t
 
 (** [get_pool t] is the [P2p_pool.t] pool of peers and connections passed to
@@ -153,6 +155,10 @@ val accept : ('msg, 'peer, 'conn) t -> P2p_fd.t -> P2p_point.Id.t -> unit
 (** [stat t] is a snapshot of current bandwidth usage for the entire connected
     peers. *)
 val stat : ('msg, 'peer, 'conn) t -> P2p_stat.t
+
+(** [maintenance_bounds t] returns the connection thresholds and targets
+    used by the maintenance worker. *)
+val maintenance_bounds : ('msg, 'peer, 'conn) t -> maintenance_bounds
 
 (** [on_new_connection t f] installs [f] as a hook for new connections in [t].   *)
 val on_new_connection :
@@ -237,6 +243,8 @@ module Internal_for_tests : sig
       (P2p_peer.Id.t -> ('msg, 'peer, 'conn) P2p_conn.t -> unit) list ->
     ?disconnection_hook:(P2p_peer.Id.t -> unit) list ->
     ?answerer:'msg P2p_answerer.t Lazy.t ->
+    ?maintenance_bounds:maintenance_bounds ->
+    ?connections_threshold:int ->
     [< `Pool of ('msg, 'peer, 'conn) P2p_pool.t | `Make_default_pool of 'peer] ->
     [< `Dependencies of ('msg, 'peer, 'conn) dependencies
     | `Make_default_dependencies of 'conn ] ->

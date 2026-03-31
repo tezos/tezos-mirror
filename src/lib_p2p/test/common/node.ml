@@ -150,9 +150,9 @@ let sync_nodes nodes =
 
 (**Detach a process with a p2p_pool and a welcome worker.  *)
 let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
-    ?max_connections ?max_incoming_connections ?p2p_versions
-    ?(msg_config = msg_config) canceler f trusted_points all_points_with_fd addr
-    port =
+    ?expected_connections ?max_connections ?max_incoming_connections
+    ?p2p_versions ?(msg_config = msg_config) canceler f trusted_points
+    all_points_with_fd addr port =
   let trusted_points =
     List.filter
       (fun p -> not (P2p_point.Id.equal (addr, port) p))
@@ -253,6 +253,12 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
             P2p_pool.create pool_config peer_meta_config ~log trigger
           in
           let answerer = lazy (P2p_protocol.create_private ()) in
+          let maintenance_bounds =
+            P2p_connect_handler.make_maintenance_bounds
+              ~min:(unopt min_connections)
+              ~expected:(unopt expected_connections)
+              ~max:(unopt max_connections)
+          in
           let connect_handler =
             P2p_connect_handler.create
               ?p2p_versions
@@ -264,6 +270,8 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
               trigger
               ~log
               ~answerer
+              ~maintenance_bounds
+              ~maintenance_active:true
           in
           let*! _ =
             Lwt_list.map_p
@@ -352,8 +360,8 @@ let gen_points npoints addr =
   each detached node.
 
   *)
-let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
-    ?max_incoming_connections ?p2p_versions ?msg_config
+let detach_nodes ?timeout ?prefix ?min_connections ?expected_connections
+    ?max_connections ?max_incoming_connections ?p2p_versions ?msg_config
     ?(trusted = fun _ points -> points) run_node points_with_holding_fd =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
@@ -365,6 +373,9 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         let p2p_versions = Option.map (fun f -> f n) p2p_versions in
         let msg_config = Option.map (fun f -> f n) msg_config in
         let min_connections = Option.map (fun f -> f n) min_connections in
+        let expected_connections =
+          Option.map (fun f -> f n) expected_connections
+        in
         let max_connections = Option.map (fun f -> f n) max_connections in
         let max_incoming_connections =
           Option.map (fun f -> f n) max_incoming_connections
@@ -374,6 +385,7 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
           ?p2p_versions
           ?timeout
           ?min_connections
+          ?expected_connections
           ?max_connections
           ?max_incoming_connections
           ?msg_config
