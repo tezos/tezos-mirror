@@ -11,7 +11,7 @@
 open Dal_helpers
 module Dal = Dal_common
 
-let test_migration_plugin ~migrate_from ~migrate_to =
+let test_migration_plugin ~__FILE__ ~migrate_from ~migrate_to =
   let tags = ["plugin"]
   and description = "test plugin update"
   and scenario ~migration_level _dal_parameters client node dal_node =
@@ -60,7 +60,7 @@ let test_migration_plugin ~migrate_from ~migrate_to =
    migrating to the new protocol, so they also did not check for traps when the
    DAL incentives were enabled.
 *)
-let test_migration_accuser_issue ~migrate_from ~migrate_to =
+let test_migration_accuser_issue ~__FILE__ ~migrate_from ~migrate_to =
   let slot_index = 0 in
   let tags = ["accuser"; "migration"] in
   let description = "test accuser" in
@@ -197,7 +197,8 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
    We assume in this test that the publications between
    M - previous_attestations_lag + 1 and M are not attested.
 *)
-let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
+let test_migration_with_attestation_lag_change ~__FILE__ ~migrate_from
+    ~migrate_to =
   let tags = ["migration"; "dal"; "attestation_lag"] in
   let description = "test migration with reduction of the attestation_lag" in
   let {log_step} = init_logger () in
@@ -431,7 +432,7 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
 
    In this test, we enforce that the migration level (M) is such that A < M < I. *)
 
-let test_migration_with_rollup ~migrate_from ~migrate_to =
+let test_migration_with_rollup ~__FILE__ ~migrate_from ~migrate_to =
   let tags = ["migration"; "dal"; "rollup"; "page_import"; "page_size"] in
   let description =
     "rollup DAL page import across migration uses DAL parameters at \
@@ -641,8 +642,8 @@ let test_migration_with_rollup ~migrate_from ~migrate_to =
    cryptobox parameters at the slot's publication level (old protocol), not the
    import level (new protocol).  This ensures the dal_snapshot stored in the
    game is correctly populated from the old protocol's history. *)
-let test_refutation_with_dal_page_import_across_migration ~migrate_from
-    ~migrate_to =
+let test_refutation_with_dal_page_import_across_migration ~__FILE__
+    ~migrate_from ~migrate_to =
   let tags = ["rollup"; "refutation"; "page_import"] in
   let description =
     "refutation game over DAL page import across protocol migration"
@@ -1184,7 +1185,7 @@ let test_refutation_with_dal_page_import_across_migration ~migrate_from
 (* Test that the DAL node's skip-list store contains the expected published
    levels after a protocol migration. This verifies that the data store is
    correctly maintained across the migration boundary. *)
-let test_skip_list_store_with_migration ~migrate_from ~migrate_to
+let test_skip_list_store_with_migration ~__FILE__ ~migrate_from ~migrate_to
     ~migration_level =
   let slot_index = 3 in
   let non_gc_period, parameter_overrides =
@@ -1338,8 +1339,8 @@ let test_skip_list_store_with_migration ~migrate_from ~migrate_to
    expect the one using the "new attestation lag" attestation to be invalid and
    the other one to be included.
 *)
-let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
-    ~migrate_to =
+let test_accusation_migration_with_attestation_lag_decrease ~__FILE__
+    ~migrate_from ~migrate_to =
   let slot_index = 0 in
   let tags = ["migration"; "dal"; "accusation"; "attestation_lag"] in
   let description =
@@ -1556,8 +1557,8 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
    If [check_rpc] is set, a call is made to [get_attestable_slots] on the
    migration level. This will fail if the encoding of the DAL committee has
    changed between protocols and the node does not use the right plugin. *)
-let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
-    ~check_rpc =
+let test_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to
+    ~offset ~check_rpc =
   Test.register
     ~__FILE__
     ~tags:
@@ -1640,12 +1641,13 @@ let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset
   let* () = wait_for_dal_node in
   unit
 
-let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
+let tests_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in
   let tests ~migrate_from ~migrate_to ~check_rpc =
     List.iter
       (fun offset ->
         test_start_dal_node_around_migration
+          ~__FILE__
           ~migrate_from
           ~migrate_to
           ~offset
@@ -1887,7 +1889,7 @@ let test_dal_node_snapshot_over_migration ~operators ~migration_level
   in
   Dal_node.terminate fresh_dal_node
 
-let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
+let test_snapshot_export_over_migration ~__FILE__ ~migrate_from ~migrate_to =
   let operators = [0; 3] in
   test_l1_migration_scenario
     ~__FILE__
@@ -1910,7 +1912,7 @@ let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
 
 (* Test that a DAL node that is stopped before a migration and restarted
    after it correctly catches up through the migration boundary. *)
-let test_restart_dal_node_across_migration ~migrate_from ~migrate_to =
+let test_restart_dal_node_across_migration ~__FILE__ ~migrate_from ~migrate_to =
   let slot_index = 0 in
   let scenario ~migration_level dal_parameters client _node dal_node =
     let lag = dal_parameters.Dal.Parameters.attestation_lag in
@@ -1962,7 +1964,8 @@ let test_restart_dal_node_across_migration ~migrate_from ~migrate_to =
     ~operator_profiles:[slot_index]
     ()
 
-let test_traps_fraction_uses_published_level ~migrate_from ~migrate_to =
+let test_traps_fraction_uses_published_level ~__FILE__ ~migrate_from ~migrate_to
+    =
   (* Fail early if Mainnet traps_fraction differs between the two protocols.
      If this triggers, the trap count assertions below may need updating. *)
   let get_mainnet_traps_fraction protocol =
@@ -2076,3 +2079,30 @@ let test_traps_fraction_uses_published_level ~migrate_from ~migrate_to =
     ~traps_fraction:Q.zero
     ~operator_profiles:[slot_index]
     ()
+
+let register_migration ~__FILE__ ~migrate_from ~migrate_to =
+  test_migration_plugin ~__FILE__ ~migration_level:11 ~migrate_from ~migrate_to ;
+  tests_start_dal_node_around_migration ~__FILE__ ~migrate_from ~migrate_to ;
+  test_restart_dal_node_across_migration ~__FILE__ ~migrate_from ~migrate_to ;
+  test_migration_accuser_issue
+    ~__FILE__
+    ~migration_level:4
+    ~migrate_from
+    ~migrate_to ;
+  test_traps_fraction_uses_published_level ~__FILE__ ~migrate_from ~migrate_to ;
+  test_migration_with_attestation_lag_change ~__FILE__ ~migrate_from ~migrate_to ;
+  test_accusation_migration_with_attestation_lag_decrease
+    ~__FILE__
+    ~migrate_from
+    ~migrate_to ;
+  test_migration_with_rollup ~__FILE__ ~migrate_from ~migrate_to ;
+  test_refutation_with_dal_page_import_across_migration
+    ~__FILE__
+    ~migrate_from
+    ~migrate_to ;
+  test_skip_list_store_with_migration
+    ~__FILE__
+    ~migration_level:11
+    ~migrate_from
+    ~migrate_to ;
+  test_snapshot_export_over_migration ~__FILE__ ~migrate_from ~migrate_to

@@ -9029,36 +9029,9 @@ let register ~protocols =
   test_attestations_encode_decode_multiple_lags protocols
 
 let register_migration ~migrate_from ~migrate_to =
-  Dal_migration.test_migration_plugin
-    ~migration_level:11
-    ~migrate_from
-    ~migrate_to ;
   Dal_skip_list.register_migration ~__FILE__ ~migrate_from ~migrate_to ;
-  Dal_migration.tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
-  Dal_migration.test_restart_dal_node_across_migration ~migrate_from ~migrate_to ;
-  Dal_migration.test_migration_accuser_issue
-    ~migration_level:4
-    ~migrate_from
-    ~migrate_to ;
-  Dal_migration.test_traps_fraction_uses_published_level
-    ~migrate_from
-    ~migrate_to ;
-  Dal_migration.test_migration_with_attestation_lag_change
-    ~migrate_from
-    ~migrate_to ;
-  Dal_migration.test_accusation_migration_with_attestation_lag_decrease
-    ~migrate_from
-    ~migrate_to ;
-  Dal_migration.test_migration_with_rollup ~migrate_from ~migrate_to ;
-  Dal_migration.test_refutation_with_dal_page_import_across_migration
-    ~migrate_from
-    ~migrate_to ;
-  Dal_migration.test_skip_list_store_with_migration
-    ~migration_level:11
-    ~migrate_from
-    ~migrate_to ;
   Dal_amplification.register_migration ~__FILE__ ~migrate_from ~migrate_to ;
-  Dal_migration.test_snapshot_export_over_migration ~migrate_from ~migrate_to
+  Dal_migration.register_migration ~__FILE__ ~migrate_from ~migrate_to
 
 let () =
   Regression.register
