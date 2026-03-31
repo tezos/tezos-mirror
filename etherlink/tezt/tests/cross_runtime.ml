@@ -2406,7 +2406,10 @@ let test_crac_tez_catch_evm_revert_between_cracs =
     TezMultiRunCaller.originate ~callees:[tez_leaf; tez_bridge; tez_leaf] ()
   in
   Log.debug ~prefix "Call TEZ main" ;
-  let* () = TezRunner.call_run tez_main in
+  (* The default gas_limit (10_000) is too low: the inner try-catch path
+     crosses two runtimes (TEZ->EVM->TEZ) and adds extra EVM contract calls,
+     exhausting the budget. 20_000 provides enough headroom. *)
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
   let* () = TezMultiRunCaller.check_storage ~expected_counter:2 tez_leaf in
@@ -2537,7 +2540,10 @@ let test_crac_tez_catch_deep_revert_through_double_crac =
       ()
   in
   Log.debug ~prefix "Call TEZ main" ;
-  let* () = TezRunner.call_run tez_main in
+  (* The default gas_limit (10_000) is too low: the inner try-catch path
+     crosses three runtimes (TEZ->EVM->TEZ->EVM) and adds extra EVM contract calls,
+     exhausting the budget. 20_000 provides enough headroom. *)
+  let* () = TezRunner.call_run ~gas_limit:20_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
   let* () =
