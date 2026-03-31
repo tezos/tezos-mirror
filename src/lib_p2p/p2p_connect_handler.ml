@@ -26,6 +26,24 @@
 
 module Events = P2p_events.P2p_connect_handler
 
+type maintenance_bounds = {
+  min_threshold : int;
+  min_target : int;
+  max_target : int;
+  max_threshold : int;
+}
+
+let make_maintenance_bounds ~min ~expected ~max =
+  assert (min <= expected) ;
+  assert (expected <= max) ;
+  let step_min = (expected - min) / 3 and step_max = (max - expected) / 3 in
+  {
+    min_threshold = min + step_min;
+    min_target = min + (2 * step_min);
+    max_target = max - (2 * step_max);
+    max_threshold = max - step_max;
+  }
+
 type config = {
   incoming_app_message_queue_size : int option;
   private_mode : bool;

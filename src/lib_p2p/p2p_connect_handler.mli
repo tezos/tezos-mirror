@@ -39,6 +39,18 @@
 
 type ('msg, 'peer, 'conn) t
 
+type maintenance_bounds = {
+  min_threshold : int;
+  min_target : int;
+  max_target : int;
+  max_threshold : int;
+}
+
+(** [make_maintenance_bounds ~min ~expected ~max] computes connection thresholds
+    and targets from the configured min/expected/max connection counts. *)
+val make_maintenance_bounds :
+  min:int -> expected:int -> max:int -> maintenance_bounds
+
 type config = {
   incoming_app_message_queue_size : int option;
       (** Maximum number of messages in the queue for user messages
