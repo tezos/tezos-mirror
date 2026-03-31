@@ -2995,60 +2995,7 @@ let register ~protocols =
     ~attestation_lag:2
     ~blocks_per_cycle:16
     ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~operator_profiles:[0]
-    "slot is protocol attested even if attestations are aggregated"
-    Dal_denunciation.test_aggregation_required_to_pass_quorum
-    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
-  scenario_with_layer1_node
-    ~__FILE__
-    ~traps_fraction:Q.one
-    "inject accusation"
-    Dal_denunciation.test_inject_accusation
-    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
-  scenario_with_layer1_node
-    ~__FILE__
-    ~traps_fraction:Q.one
-    "inject accusation with dynamic multi-lag attestations"
-    ~tags:["traps"; "denunciation"; "multi_lag"]
-    Dal_denunciation.test_inject_accusation_dynamic_multi_lag
-    (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~traps_fraction:Q.one
-    ~operator_profiles:[0]
-    "inject accusation of aggregated attestation"
-    (Dal_denunciation.test_inject_accusation_aggregated_attestation 1)
-    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~traps_fraction:Q.one
-    ~operator_profiles:[0]
-    "inject several accusations for the same aggregated attestation"
-    (Dal_denunciation.test_inject_accusation_aggregated_attestation 2)
-    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
-  scenario_with_layer1_node
-    ~__FILE__
-    ~traps_fraction:Q.one
-    "inject a duplicated denunciation at different steps"
-    Dal_denunciation.test_duplicate_denunciations
-    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
-  scenario_with_layer1_node
-    ~__FILE__
-    ~traps_fraction:Q.one
-    "inject a denunciation at the next cycle"
-    Dal_denunciation.test_denunciation_next_cycle
-    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
-  (* Tests with layer1 and dal nodes *)
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~number_of_slots:1
-    ~operator_profiles:[0]
-    ~traps_fraction:Q.one
-    "faulty DAL node entrapment"
-    Dal_denunciation.test_e2e_trap_faulty_dal_node
-    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  Dal_denunciation.register ~__FILE__ ~protocols ;
   Dal_node_tests.register ~__FILE__ ~protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
@@ -3117,15 +3064,6 @@ let register ~protocols =
     "attesters receive DAL rewards"
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~tags:["traps"]
-    ~operator_profiles:[0]
-    ~traps_fraction:Q.one
-    ~all_bakers_attest_activation_threshold:Q.(Z.one /// Z.of_int 2)
-    "Trap is denounced when all bakers attest"
-    Dal_denunciation.test_denunciation_when_all_bakers_attest
-    protocols ;
   Dal_tx_kernel.register ~__FILE__ ~protocols ;
 
   (* Register tutorial test *)
