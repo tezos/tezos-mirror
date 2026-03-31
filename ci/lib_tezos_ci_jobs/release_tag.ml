@@ -197,9 +197,7 @@ let job_release_page =
        bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
        its [index.html] is updated accordingly."
     ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~expire_in:(Duration (Days 1))
-         ["./index.md"; "index.html"])
+      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) ["index.html"])
     ?needs:
       (match wait_for with
       | `wait_for_nothing -> None
@@ -227,11 +225,7 @@ let job_release_page =
             ("URL", "octez.tezos.com");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    [
-      "eval $(opam env)";
-      "./scripts/releases/publish_release_page.sh";
-      "cp /tmp/release_page*/index.md ./index.md";
-    ]
+    ["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
 
 let job_opam_release =
   Cacio.parameterize @@ fun mode ->

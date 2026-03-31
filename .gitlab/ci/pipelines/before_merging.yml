@@ -3006,6 +3006,7 @@ release_page.build:
     expire_in: 1 day
     paths:
     - _build/default/ci/bin_release_page/src/version_manager.exe
+    - _build/default/ci/bin_release_page/src/release_page.exe
     when: on_success
 
 release_page.build_tezt:

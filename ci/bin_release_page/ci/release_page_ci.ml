@@ -25,7 +25,10 @@ let job_build =
          ~name:"release_page_exe"
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
-         ["_build/default/ci/bin_release_page/src/version_manager.exe"])
+         [
+           "_build/default/ci/bin_release_page/src/version_manager.exe";
+           "_build/default/ci/bin_release_page/src/release_page.exe";
+         ])
     ["eval $(opam env)"; "make -C ci/bin_release_page/ build"]
 
 let job_build_tezt =

@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Test_version_manager = Test_version_manager
+module _ = Test_version_manager
+module _ = Test_generate_release_page
 
 let () = Test.run ()
