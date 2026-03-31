@@ -767,86 +767,17 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
 let register ~protocols =
   (* Tests with Layer1 node only *)
   Dal_l1.register ~__FILE__ ~protocols ;
-  scenario_with_layer1_node
-    ~__FILE__
-    "attesters receive expected DAL rewards depending on participation"
-    Dal_attestation.test_dal_rewards_distribution
-    (List.filter (fun p -> Protocol.number p >= 022) protocols)
-    (* We set attestation threshold to 30% because we'll have 2 regular bakers
-       who attest sufficiently. *)
-    ~attestation_threshold:30
-    ~attestation_lag:2
-    ~blocks_per_cycle:16
-    ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
+  Dal_attestation.register ~__FILE__ ~protocols ;
   Dal_denunciation.register ~__FILE__ ~protocols ;
   Dal_node_tests.register ~__FILE__ ~protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
   Dal_p2p.register ~__FILE__ ~protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~attestation_threshold:1
-    ~l1_history_mode:Default_with_refutation
-    "Attester attests produced slot"
-    Dal_attestation.test_producer_attester
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~attestation_threshold:1
-    ~l1_history_mode:Default_with_refutation
-    ~event_sections_levels:[("prevalidator", `Debug)]
-    "attester_did_not_attest warning is emitted"
-    Dal_attestation.test_attester_did_not_attest
-    protocols ;
 
   Dal_skip_list.register ~__FILE__ ~protocols ;
   Dal_amplification.register ~__FILE__ ~protocols ;
   Dal_gc.register ~__FILE__ ~protocols ;
 
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    ~traps_fraction:Q.zero
-    ~number_of_slots:1
-    "new attester attests"
-    Dal_attestation.test_new_attester_attests
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~operator_profiles:[0]
-    ~l1_history_mode:Default_with_refutation
-    ~traps_fraction:(Q.of_float 0.5)
-    ~number_of_slots:1
-    "low stake attester attests (with traps)"
-    Dal_attestation.test_dal_low_stake_attester_attestable_slots
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~operator_profiles:[0]
-    ~l1_history_mode:Default_with_refutation
-    ~traps_fraction:(Q.of_float 0.5)
-    ~all_bakers_attest_activation_threshold:Q.zero
-    ~number_of_slots:1
-    "low stake attester attests (with traps and ABA activated)"
-    Dal_attestation.test_dal_low_stake_attester_attestable_slots
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    ~number_of_slots:1
-    "publish slot in one level reorganisation"
-    Dal_attestation.test_dal_one_level_reorg
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~__FILE__
-    ~number_of_slots:1
-    ~operator_profiles:[0]
-    ~regression:true
-    "attesters receive DAL rewards"
-    Dal_attestation.test_attesters_receive_dal_rewards
-    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   Dal_tx_kernel.register ~__FILE__ ~protocols ;
 
   (* Register tutorial test *)
@@ -880,17 +811,7 @@ let register ~protocols =
     ~attestation_threshold:1
     protocols ;
 
-  dal_crypto_benchmark () ;
-  scenario_with_layer1_node
-    ~__FILE__
-    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
-    ~activation_timestamp:Now
-    "mockup get_attestable_slots"
-    Dal_attestation.use_mockup_node_for_getting_attestable_slots
-    protocols ;
-
-  Dal_attestation.test_attestations_encode_decode_single_lag protocols ;
-  Dal_attestation.test_attestations_encode_decode_multiple_lags protocols
+  dal_crypto_benchmark ()
 
 let register_migration ~migrate_from ~migrate_to =
   Dal_skip_list.register_migration ~__FILE__ ~migrate_from ~migrate_to ;

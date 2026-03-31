@@ -2064,7 +2064,7 @@ let test_dal_low_stake_attester_attestable_slots protocol dal_parameters
   unit
 
 (** Test encode/decode round-trip for single lag. *)
-let test_attestations_encode_decode_single_lag =
+let test_attestations_encode_decode_single_lag ~__FILE__ =
   Protocol.register_test
     ~__FILE__
     ~title:"DAL attestations encode/decode single lag"
@@ -2145,7 +2145,7 @@ let test_attestations_encode_decode_single_lag =
   unit
 
 (** Test encode/decode round-trip for multiple lags. *)
-let test_attestations_encode_decode_multiple_lags =
+let test_attestations_encode_decode_multiple_lags ~__FILE__ =
   Protocol.register_test
     ~__FILE__
     ~title:"DAL attestations encode/decode multiple lags"
@@ -2229,3 +2229,84 @@ let test_attestations_encode_decode_multiple_lags =
 
   Log.info "Multi-lag encode/decode succeeded" ;
   unit
+
+let register ~__FILE__ ~protocols =
+  scenario_with_layer1_node
+    ~__FILE__
+    "attesters receive expected DAL rewards depending on participation"
+    test_dal_rewards_distribution
+    (List.filter (fun p -> Protocol.number p >= 022) protocols)
+    (* We set attestation threshold to 30% because we'll have 2 regular bakers
+       who attest sufficiently. *)
+    ~attestation_threshold:30
+    ~attestation_lag:2
+    ~blocks_per_cycle:16
+    ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    "Attester attests produced slot"
+    test_producer_attester
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~attestation_threshold:1
+    ~l1_history_mode:Default_with_refutation
+    ~event_sections_levels:[("prevalidator", `Debug)]
+    "attester_did_not_attest warning is emitted"
+    test_attester_did_not_attest
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:Q.zero
+    ~number_of_slots:1
+    "new attester attests"
+    test_new_attester_attests
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:(Q.of_float 0.5)
+    ~number_of_slots:1
+    "low stake attester attests (with traps)"
+    test_dal_low_stake_attester_attestable_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:(Q.of_float 0.5)
+    ~all_bakers_attest_activation_threshold:Q.zero
+    ~number_of_slots:1
+    "low stake attester attests (with traps and ABA activated)"
+    test_dal_low_stake_attester_attestable_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    ~number_of_slots:1
+    "publish slot in one level reorganisation"
+    test_dal_one_level_reorg
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~number_of_slots:1
+    ~operator_profiles:[0]
+    ~regression:true
+    "attesters receive DAL rewards"
+    test_attesters_receive_dal_rewards
+    (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_node
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~activation_timestamp:Now
+    "mockup get_attestable_slots"
+    use_mockup_node_for_getting_attestable_slots
+    protocols ;
+  test_attestations_encode_decode_single_lag ~__FILE__ protocols ;
+  test_attestations_encode_decode_multiple_lags ~__FILE__ protocols
