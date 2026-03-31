@@ -856,6 +856,70 @@ let scenario_with_layer1_and_dal_nodes ~__FILE__ ?regression ?(tags = [])
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
+(* Adapted from sc_rollup.ml *)
+let test_l1_migration_scenario ~__FILE__ ?(tags = []) ?(uses = []) ~migrate_from
+    ~migrate_to ~migration_level ~scenario ~description ?bootstrap_profile
+    ?operator_profiles ?custom_constants ?attestation_lag ?attestation_threshold
+    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
+    ?traps_fraction ?consensus_committee_size ?blocks_per_cycle
+    ?minimal_block_delay ?parameter_overrides ?activation_timestamp () =
+  let tags =
+    Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
+    :: "migration" :: tags
+  in
+  Test.register
+    ~__FILE__
+    ~tags
+    ~uses:(Constant.octez_dal_node :: uses)
+    ~title:
+      (sf
+         "%s->%s: %s"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         description)
+  @@ fun () ->
+  let parameter_overrides =
+    make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
+    @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
+    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter
+        ["dal_parametric"; "attestation_threshold"]
+        attestation_threshold
+    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+    @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
+    @ Option.value ~default:[] parameter_overrides
+  in
+  let* node, client, dal_parameters =
+    setup_node
+      ~custom_constants
+      ~parameter_overrides
+      ~protocol:migrate_from
+      ~l1_history_mode:Default_with_refutation
+      ?activation_timestamp
+      ()
+  in
+
+  Log.info "Set user-activated-upgrade at level %d" migration_level ;
+  let* () = Node.terminate node in
+  let patch_config =
+    Node.Config_file.update_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let nodes_args = Node.[Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.run ~patch_config node nodes_args in
+  let* () = Node.wait_for_ready node in
+
+  let* dal_node = make_dal_node ?operator_profiles ?bootstrap_profile node in
+
+  scenario ~migration_level dal_parameters client node dal_node
+
 (** Register a test that sets up an L1 node, a DAL node, and a smart rollup
     node. Used for tests that involve DAL page imports in rollup kernels. *)
 let scenario_with_all_nodes ~__FILE__ ?custom_constants ?node_arguments
@@ -1223,3 +1287,65 @@ let check_dal_raw_context node =
     if not (String.equal confirmed_slots confirmed_slots_from_ctxt) then
       Test.fail "Confirmed slots history mismatch." ;
     unit
+
+(** This function checks that the status of the slot at
+    [(~slot_level, ~slot_index)] on [dal_node] matches [~expected_status].
+
+    [?check_attested_lag] controls how the lag value is compared when both
+    the actual and expected statuses are [Attested]. This is particularly
+    relevant for multi-lag configurations where a slot can be attested at
+    different lags (e.g., with [attestation_lags = [2; 3; 5]], a slot could be
+    attested at lag 2, 3, or 5). The possible values are:
+
+    - [`Exact] (default): The actual lag must equal the expected lag exactly;
+    - [`At_most]: The actual lag must be less than or equal to the expected lag.
+
+    For non-[Attested] statuses, [?check_attested_lag] has no effect and exact
+    equality is always used. *)
+let check_slot_status ~__LOC__ ~expected_status ?(check_attested_lag = `Exact)
+    dal_node ~slot_level ~slot_index =
+  match expected_status with
+  | Dal_RPC.Not_found ->
+      (* DAL node has no record for this slot. *)
+      let* response =
+        Dal_RPC.(
+          call_raw dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+      in
+      RPC_core.check_string_response ~code:404 response ;
+      unit
+  | _ ->
+      let* status =
+        Dal_RPC.(call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+      in
+      let prefix =
+        sf "Unexpected slot status at level %d, index %d " slot_level slot_index
+      in
+      let status_matches =
+        match (status, expected_status, check_attested_lag) with
+        | Dal_RPC.Attested lag, Dal_RPC.Attested expected_lag, `At_most ->
+            lag <= expected_lag
+        | _ -> status = expected_status
+      in
+      if not status_matches then
+        Test.fail
+          ~__LOC__
+          "%s(got = %a, expected = %a)"
+          prefix
+          Dal_RPC.pp_slot_id_status
+          status
+          Dal_RPC.pp_slot_id_status
+          expected_status ;
+      unit
+
+let check_slots_statuses ~__LOC__ ~expected_status ?check_attested_lag dal_node
+    ~slot_level slots_info =
+  let test (slot_index, _commitment) =
+    check_slot_status
+      ~__LOC__
+      ~expected_status
+      ?check_attested_lag
+      dal_node
+      ~slot_level
+      ~slot_index
+  in
+  Lwt_list.iter_s test slots_info
