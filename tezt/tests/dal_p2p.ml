@@ -611,3 +611,80 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
   in
   Log.info "Slot sucessfully attested" ;
   unit
+
+let register ~__FILE__ ~protocols =
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~prover:false
+    ~tags:["gossipsub"]
+    "GS/P2P connection and disconnection"
+    test_dal_node_p2p_connection_and_disconnection
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~prover:false
+    ~tags:["gossipsub"]
+    "GS join topic"
+    test_dal_node_join_topic
+    protocols ;
+  List.iter
+    (fun batching_time_interval ->
+      scenario_with_layer1_and_dal_nodes
+        ~__FILE__
+        ~tags:["gossipsub"]
+        ~batching_time_interval
+        ~operator_profiles:[0]
+        (Format.sprintf
+           "GS valid messages exchange (with batching %s)"
+           batching_time_interval)
+        (test_dal_node_gs_valid_messages_exchange ~batching_time_interval)
+        protocols ;
+      scenario_with_layer1_and_dal_nodes
+        ~__FILE__
+        ~tags:["gossipsub"]
+        ~batching_time_interval
+        (Format.sprintf
+           "GS invalid messages exchange (with batching %s)"
+           batching_time_interval)
+        ~operator_profiles:[0]
+        (test_dal_node_gs_invalid_messages_exchange ~batching_time_interval)
+        protocols ;
+      scenario_with_layer1_and_dal_nodes
+        ~__FILE__
+        ~tags:["attestation"; "p2p"]
+        ~batching_time_interval
+        ~attestation_threshold:100
+        ~bootstrap_profile:true
+        ~l1_history_mode:Default_with_refutation
+        (Format.sprintf
+           "attestation through p2p (with batching %s)"
+           batching_time_interval)
+        (test_attestation_through_p2p ~batching_time_interval)
+        protocols)
+    ["disabled"; "100"; "20"] ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    "baker registers profiles with dal node"
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~activation_timestamp:Now
+    ~prover:false
+    test_baker_registers_profiles
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["bootstrap"]
+    ~bootstrap_profile:true
+    ~prover:false
+    ~l1_history_mode:Default_with_refutation
+    "peer discovery via bootstrap node"
+    test_peer_discovery_via_bootstrap_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["bootstrap"; "trusted"; "connection"]
+    ~bootstrap_profile:true
+    "trusted peers reconnection"
+    ~prover:false
+    ~l1_history_mode:Default_with_refutation
+    test_peers_reconnection
+    protocols
