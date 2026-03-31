@@ -1145,17 +1145,21 @@ module Actions = struct
       ~pp3:Error_monad.pp_print_trace
 
   let no_attestable_dal_slots_for_levels =
-    declare_3
+    declare_4
       ~section
       ~name:"no_attestable_dal_slots_for_levels"
       ~level:Warning
       ~msg:
-        "No DAL attestation data received for {delegate_id} at attested level \
-         {attested_level} for published levels [{published_levels}]"
+        "[{automaton_name}] No DAL attestation data received for {delegate_id} \
+         at attested level {attested_level} for published levels \
+         [{published_levels}]"
+      ~pp1:Format.pp_print_string
+      ("automaton_name", Data_encoding.string)
       ("delegate_id", Delegate_id.encoding)
+      ~pp3:pp_int32
       ("attested_level", Data_encoding.int32)
+      ~pp4:Format.pp_print_string
       ("published_levels", Data_encoding.string)
-      ~pp3:Format.pp_print_string
 
   let dal_slots_not_attested_due_to_traps =
     declare_2

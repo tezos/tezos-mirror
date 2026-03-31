@@ -51,6 +51,17 @@ module Events = struct
       ~level:Error
       ~msg:"consume_streams ended with error {stacktrace}"
       ("stacktrace", Data_encoding.string)
+
+  let dal_worker_started =
+    declare_2
+      ~section
+      ~name:"dal_worker_started"
+      ~level:Info
+      ~msg:
+        "DAL worker started for automaton {automaton_name} with DAL endpoint \
+         {dal_endpoint}"
+      ("automaton_name", Data_encoding.string)
+      ("dal_endpoint", Data_encoding.string)
 end
 
 module DelegateSet = Set.Make (Delegate_id)
@@ -77,6 +88,7 @@ module Level_map =
 module LevelSet = Set.Make (Int32)
 
 type t = {
+  automaton_name : string;
   attestation_lag : int;
   attestation_lags : int list;
   number_of_slots : int;
@@ -319,8 +331,9 @@ let is_not_in_committee state ~delegate_id ~committee_level =
   | None -> false
   | Some level_set -> LevelSet.mem committee_level level_set
 
-let create ~attestation_lag ~attestation_lags ~number_of_slots =
+let create ~automaton_name ~attestation_lag ~attestation_lags ~number_of_slots =
   {
+    automaton_name;
     attestation_lag;
     attestation_lags;
     number_of_slots;
@@ -347,3 +360,8 @@ let shutdown_worker state =
   in
   List.iter (fun stopper -> stopper ()) stoppers ;
   return_unit
+
+let get_automaton_name state = state.automaton_name
+
+let emit_dal_worker_started automaton_name dal_endpoint =
+  Events.(emit dal_worker_started (automaton_name, dal_endpoint))

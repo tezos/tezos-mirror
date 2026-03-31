@@ -1680,13 +1680,6 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
       ~monitor_node_operations:false
       ()
   in
-  (* Create DAL worker *)
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~attestation_lags:constants.parametric.dal.attestation_lags
-      ~number_of_slots:constants.parametric.dal.number_of_slots
-  in
   (* Create global state - same structure as Baking_scheduling.create_initial_state *)
   let cache = Baking_state.create_cache () in
   let dal_included_attestations_cache =
@@ -1695,6 +1688,14 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
   let name = Uri.to_string cctxt#base in
+  (* Create DAL worker *)
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~automaton_name:name
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~attestation_lags:constants.parametric.dal.attestation_lags
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   let automaton_state =
     let validation_mode = Baking_state.Local context_index in
     let forge_event_stream, push_forge_event =
@@ -1707,6 +1708,7 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
         cctxt;
         validation_mode;
         operation_worker;
+        dal_attestable_slots_worker;
         push_forge_event;
         forge_event_stream;
       }
@@ -1721,9 +1723,8 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
             validation = ContextIndex context_index;
             state_recorder = Memory;
           };
-        constants;
         round_durations;
-        dal_attestable_slots_worker;
+        constants;
         forge_worker_hooks =
           {
             push_request =

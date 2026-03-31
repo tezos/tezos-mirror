@@ -27,15 +27,12 @@ open Baking_state
 open Baking_state_types
 open Protocol.Alpha_context
 
-(** [create_global_state ?canceler ?dal_node_rpc_ctxt ?constants ~chain context
+(** [create_global_state ?dal_node_rpc_ctxt ?constants ~chain context
     baking_configuration consensus_keys] creates a
-    {!type-Baking_state.global_state}: [round_durations] and a DAL attestable
-    slots worker are created from [constants], and a forge worker is started. If
-    [constants] is not provided, an RPC is called to recover them from
-    [context]. If [canceler] is provided, cancelling it will trigger a shutdown
-    of the DAL attestable slots worker. *)
+    {!type-Baking_state.global_state}: [round_durations] are created from
+    [constants], and a forge worker is started. If [constants] is not provided,
+    an RPC is called to recover them from [context]. *)
 val create_global_state :
-  ?canceler:Lwt_canceler.t ->
   ?dal_node_rpc_ctxt:Tezos_rpc.Context.generic ->
   ?constants:Constants.t ->
   chain:Chain_services.chain ->

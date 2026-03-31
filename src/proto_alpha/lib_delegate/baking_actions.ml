@@ -584,7 +584,7 @@ let trap_slot_indices slots =
     slots
   |> List.rev
 
-let emit_dal_attestation_logs ~delegate_id ~attested_level
+let emit_dal_attestation_logs ~automaton_name ~delegate_id ~attested_level
     ~no_dal_attestations_levels ~dal_trap_slots_per_level ~dal_content
     ~published_levels ~level ~round =
   let open Lwt_syntax in
@@ -597,7 +597,7 @@ let emit_dal_attestation_logs ~delegate_id ~attested_level
       Events.(
         emit
           no_attestable_dal_slots_for_levels
-          (delegate_id, attested_level, published_levels_str))
+          (automaton_name, delegate_id, attested_level, published_levels_str))
     else return_unit
   in
   let* () =
@@ -632,7 +632,7 @@ let may_get_dal_content state consensus_vote =
   in
   let delegate_id = Delegate.delegate_id delegate in
   let dal_attestable_slots_worker =
-    state.global_state.dal_attestable_slots_worker
+    state.automaton_state.dal_attestable_slots_worker
   in
   only_if_dal_feature_enabled
     state
@@ -726,6 +726,7 @@ let may_get_dal_content state consensus_vote =
       let dal_content = {attestations = dal_attestations} in
       let* () =
         emit_dal_attestation_logs
+          ~automaton_name:state.automaton_state.name
           ~delegate_id
           ~attested_level
           ~no_dal_attestations_levels
@@ -1365,7 +1366,7 @@ let update_to_level state level_update =
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
         Dal_attestable_slots_worker.update_streams_subscriptions
-          state.global_state.dal_attestable_slots_worker
+          state.automaton_state.dal_attestable_slots_worker
           dal_node_rpc_ctxt
           ~delegate_ids:next_level_delegate_ids)
   in
