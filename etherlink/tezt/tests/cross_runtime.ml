@@ -1337,7 +1337,26 @@ let test_crac_tez_to_evm_fake_tx_in_block =
       ~error_msg:
         "Expected at least 1 transaction in the EVM block (the CRAC envelope), \
          but found %L") ;
-  unit
+  let first_tx_hash =
+    match block.transactions with
+    | Block.Full (tx :: _) -> tx.hash
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected at least one transaction in block"
+  in
+  Log.debug ~prefix "Fetch receipt for first transaction %s" first_tx_hash ;
+  let*@ receipt =
+    Rpc.get_transaction_receipt ~tx_hash:first_tx_hash sequencer
+  in
+  match receipt with
+  | None -> Test.fail "No receipt for transaction %s" first_tx_hash
+  | Some receipt ->
+      let log_count = List.length receipt.logs in
+      Log.info "First transaction receipt contains %d log(s)" log_count ;
+      Check.(
+        (log_count = 1)
+          int
+          ~error_msg:"Expected 1 logs in the receipt, but found %L") ;
+      unit
 
 (** Two separate TEZ->EVM CRAC calls in separate blocks must produce fake
  *  transactions with distinct hashes.  Regression test for a bug where the
