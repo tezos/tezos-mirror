@@ -9,8 +9,8 @@
 
     {1 Overview}
 
-    This module extends {!Dal_attestation_repr} to handle multiple DAL
-    attestations at different lags. A lag represents the difference between the
+    This module manages groups of multiple DAL attestations at different
+    attestation lags. An attestation lag represents the difference between the
     attested level of a slot and its published level.
 
     The structure stores a fixed number of attestations, determined by

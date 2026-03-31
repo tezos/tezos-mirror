@@ -3039,7 +3039,7 @@ module Dal : sig
     val attestations : context -> t Slot.Map.t
 
     module Dal_dependent_signing : sig
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.weight}. *)
+      (** See {!Dal_attestations_repr.Dal_dependent_signing.weight}. *)
       val weight :
         consensus_pk:Bls.Public_key.t ->
         companion_pk:Bls.Public_key.t ->
@@ -3047,7 +3047,7 @@ module Dal : sig
         t ->
         Z.t
 
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
+      (** See {!Dal_attestations_repr.Dal_dependent_signing.aggregate_pk}. *)
       val aggregate_pk :
         subgroup_check:bool ->
         consensus_pk:Bls.Public_key.t ->
@@ -3056,7 +3056,7 @@ module Dal : sig
         t ->
         Bls.Public_key.t option
 
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_sig}. *)
+      (** See {!Dal_attestations_repr.Dal_dependent_signing.aggregate_sig}. *)
       val aggregate_sig :
         subgroup_check:bool ->
         consensus_pk:Bls.Public_key.t ->
@@ -3069,22 +3069,12 @@ module Dal : sig
     end
 
     module Internal_for_tests : sig
-      (** See {!Dal_attestation_repr.Internal_for_tests.of_z}. *)
+      (** See {!Dal_attestations_repr.Internal_for_tests.of_z}. *)
       val of_z : Z.t -> t tzresult
     end
   end
 
-  (** This module re-exports definitions from {!Dal_attestation_repr} and
-      {!Raw_context.Dal}. *)
-  module Attestation : sig
-    type t
-
-    val of_attestations : Attestations.t -> t
-
-    val is_attested : t -> Slot_index.t -> bool
-  end
-
-  (** See {!Dal_attestation_repr.Slot_availability}. *)
+  (** See {!Dal_attestations_repr.Slot_availability}. *)
   module Slot_availability : sig
     type t = private Bitset.t
 
@@ -3344,7 +3334,7 @@ end
 (** This module re-exports definitions from {!Dal_errors_repr}. *)
 module Dal_errors : sig
   (* We could not expose these errors and instead return them in functions from
-     [Dal_slot_repr] or [Dal_attestation_repr]. *)
+     [Dal_slot_repr] or [Dal_attestations_repr]. *)
   type error +=
     | Dal_feature_disabled
     | Dal_incentives_disabled
