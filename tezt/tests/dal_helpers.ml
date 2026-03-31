@@ -1216,10 +1216,6 @@ let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
   in
   bake_for ~delegates:(`For [baker]) client
 
-let wait_for_classified oph node =
-  let filter json = if JSON.as_string json = oph then Some () else None in
-  Node.wait_for node "operation_classified.v0" filter
-
 (** Create expected attestation array with given slots attested. *)
 let expected_attestation dal_parameters attested_slots =
   let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
