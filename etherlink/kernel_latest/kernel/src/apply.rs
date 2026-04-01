@@ -10,6 +10,7 @@ use alloy_sol_types::{sol, SolCall};
 use anyhow::anyhow;
 use mir::ast::ChainId;
 use primitive_types::{H160, U256};
+use revm::primitives::alloy_primitives::IntoLogData;
 use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
@@ -19,7 +20,7 @@ use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::journal::commit_evm_journal_from_external;
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
-    XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
+    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
@@ -61,6 +62,13 @@ use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
+
+sol! {
+    /// Emitted once at the top of every EVM transaction receipt that
+    /// involves cross-runtime calls, whether incoming or outgoing.
+    /// Allows indexers to correlate operations across derived blocks.
+    event CracIdEvent(string cracId);
+}
 
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
@@ -265,8 +273,21 @@ pub fn extract_cross_runtime_effects(
 ) -> Vec<CrossRuntimeEffect> {
     let mut effects = Vec::new();
 
-    if let Some((logs, tx_info)) = journal.evm.take_crac_data() {
+    if let Some(tx_info) = journal.evm.take_crac_data() {
         let crac_id = journal.crac_id().to_string();
+
+        // Build a synthetic CracIdEvent log as the first log in the receipt.
+        let crac_id_log = revm::primitives::Log {
+            address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            data: CracIdEvent {
+                cracId: crac_id.clone(),
+            }
+            .to_log_data(),
+        };
+
+        let mut logs = vec![crac_id_log];
+        logs.extend(journal.evm.inner.logs.iter().cloned());
+
         effects.push(CrossRuntimeEffect::Evm(EvmCracEffect {
             crac_id,
             logs,

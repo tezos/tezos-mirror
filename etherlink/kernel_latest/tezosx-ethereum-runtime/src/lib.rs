@@ -213,13 +213,10 @@ where
     )
     .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
 
-    // Accumulate EVM logs and gas from this CRAC execution.
-    // Note: cross-runtime reverts for accumulated logs are not handled.
-    // See L2-1097.
-    journal.evm.accumulate_crac_execution(
-        outcome.result.logs().iter().cloned(),
-        outcome.result.gas_used(),
-    );
+    // Accumulate EVM gas from this CRAC execution.
+    journal
+        .evm
+        .accumulate_crac_execution(outcome.result.gas_used());
 
     Ok(outcome)
 }
