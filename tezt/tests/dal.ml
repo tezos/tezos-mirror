@@ -13070,10 +13070,12 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
       cryptobox
       client
   in
-  let* published_level =
-    let* op_level = Node.get_level l1_node in
-    return @@ (op_level + 1)
-  in
+  (* Bake one block manually to include the slot operation, so that
+     published_level is deterministic. Without this, the baker might
+     bake the next block before the operation reaches the validated
+     mempool, pushing it to a later level. *)
+  let* () = bake_for client in
+  let* published_level = Node.get_level l1_node in
 
   Log.info "Start the baker" ;
   let* () = Agnostic_baker.run baker in
