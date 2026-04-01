@@ -19,10 +19,6 @@ let run ?(port = 16686) ?(interface = "0.0.0.0") () =
         "--rm";
         "--name";
         "jaeger";
-        "-p";
-        sf "%d:%d" port port;
-        "-p";
-        "14250:14250";
         "-e";
         sf "QUERY_HTTP_SERVER_HOST_PORT=%s:%d" interface port;
         "-e";
