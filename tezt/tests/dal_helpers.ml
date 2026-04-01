@@ -1350,6 +1350,32 @@ let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
     (Slots [index])
     dal_parameters
 
+(* We check that publishing a slot header with a proof for the "same"
+   slot contents but represented using a different [slot_size] leads
+   to a proof-checking error. *)
+let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
+    ~index parameters cryptobox ?counter ?force ?error client =
+  let cryptobox_params =
+    {
+      parameters.Dal.Parameters.cryptobox with
+      slot_size = 2 * parameters.cryptobox.slot_size;
+    }
+  in
+  let* cryptobox' = Helpers.make_cryptobox cryptobox_params in
+  let msg = "a" in
+  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
+  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
+  Helpers.publish_commitment
+    ~source
+    ?fee
+    ~index
+    ~commitment
+    ~proof
+    ?counter
+    ?force
+    ?error
+    client
+
 (* Produce a slot, store it in the DAL node, and then (try to) publish the same
    commitment for each level between [from] and [into]. *)
 let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
