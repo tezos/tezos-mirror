@@ -850,13 +850,11 @@ let register_merge_request_jobs jobs =
 
 let register_release_jobs jobs =
   register_jobs Major_release_tag jobs ;
-  register_jobs Beta_release_tag jobs ;
-  register_jobs Non_release_tag jobs
+  register_jobs Beta_release_tag jobs
 
 let register_test_release_jobs jobs =
   register_jobs Major_release_tag_test jobs ;
-  register_jobs Beta_release_tag_test jobs ;
-  register_jobs Non_release_tag_test jobs
+  register_jobs Beta_release_tag_test jobs
 
 let get_jobs pipeline =
   let jobs = Hashtbl.find_all global_jobs pipeline |> List.rev in

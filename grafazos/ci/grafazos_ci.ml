@@ -93,6 +93,8 @@ let register () =
     [(Manual, job_release_page `real `build_dependencies)] ;
   Cacio.register_test_release_jobs
     [(Manual, job_release_page `test `build_dependencies)] ;
+  Cacio.register_jobs Non_release_tag [(Auto, job_build Build)] ;
+  Cacio.register_jobs Non_release_tag_test [(Auto, job_build Build)] ;
   Cacio.register_jobs
     Scheduled_test_release
     [
