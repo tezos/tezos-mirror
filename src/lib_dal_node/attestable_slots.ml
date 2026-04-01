@@ -112,8 +112,12 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
   let*? should_drop = published_just_before_migration ctxt ~published_level in
   if should_drop then return_none
   else
-    let*? last_known_parameters =
-      get_proto_parameters ctxt ~level:(`Level attested_level)
+    let*? params = get_proto_parameters ctxt ~level:(`Level attested_level) in
+    let last_known_parameters =
+      let traps_fraction =
+        get_traps_fraction ctxt ~published_level ~default:params.traps_fraction
+      in
+      {params with traps_fraction}
     in
     let shards_store = Store.shards (get_store ctxt) in
     (* For retrieving the assigned shard indexes, we consider the committee
@@ -261,9 +265,18 @@ let get_backfill_payload ctxt ~pkh =
         else
           (* Check each slot for attestability. *)
           let*? lag = get_attestation_lag ctxt ~level:published_level in
-          let*? last_known_parameters =
+          let*? params =
             let attested_level = Int32.(add published_level lag) in
             get_proto_parameters ctxt ~level:(`Level attested_level)
+          in
+          let last_known_parameters =
+            let traps_fraction =
+              get_traps_fraction
+                ctxt
+                ~published_level
+                ~default:params.traps_fraction
+            in
+            {params with traps_fraction}
           in
           let shards_store = Store.shards store in
           let* shard_indices =

@@ -238,8 +238,6 @@ module Shards_disk = struct
     Dal_metrics.update_kvs_shards_metrics ~opened_files ~ongoing_actions ;
     return r
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
-     Make storage more resilient to DAL parameters change. *)
   let number_of_shards_available {shards_store = store; _} slot_id shard_indexes
       =
     let open Lwt_result_syntax in

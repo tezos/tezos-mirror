@@ -94,6 +94,13 @@ val set_proto_plugins : t -> Proto_plugins.t -> unit
 val get_proto_parameters :
   level:[`Head | `Level of int32] -> t -> Types.proto_parameters tzresult
 
+(** [get_traps_fraction ctxt ~published_level ~default] returns the
+    [traps_fraction] from the protocol parameters at [~published_level].
+    Falls back to [~default] if the lookup fails. The published level is
+    used because trap detection depends on the shard content, which is
+    fixed at publication time. *)
+val get_traps_fraction : t -> published_level:int32 -> default:Q.t -> Q.t
+
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
     ongoing in which case the ongoing promise is returned instead. *)

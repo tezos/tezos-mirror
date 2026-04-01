@@ -14968,6 +14968,120 @@ let test_restart_dal_node_across_migration ~migrate_from ~migrate_to =
     ~operator_profiles:[slot_index]
     ()
 
+let test_traps_fraction_uses_published_level ~migrate_from ~migrate_to =
+  (* Fail early if Mainnet traps_fraction differs between the two protocols.
+     If this triggers, the trap count assertions below may need updating. *)
+  let get_mainnet_traps_fraction protocol =
+    let params =
+      JSON.parse_file
+        (Protocol.parameter_file ~constants:Constants_mainnet protocol)
+    in
+    let tf = JSON.(params |-> "dal_parametric" |-> "traps_fraction") in
+    let num = JSON.(tf |-> "numerator" |> as_string) in
+    let den = JSON.(tf |-> "denominator" |> as_string) in
+    sf "%s/%s" num den
+  in
+  let from_tf = get_mainnet_traps_fraction migrate_from in
+  let to_tf = get_mainnet_traps_fraction migrate_to in
+  Check.(
+    (from_tf = to_tf)
+      string
+      ~__LOC__
+      ~error_msg:
+        "Mainnet traps_fraction changed across migration (%L != %R): update \
+         this test") ;
+  let slot_index = 0 in
+  let scenario ~migration_level dal_parameters client _node dal_node =
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let pkh = Constant.bootstrap1.public_key_hash in
+    (* Publish a slot before migration *)
+    let* current_level = Client.level client in
+    let* () =
+      repeat (migration_level - 2 - current_level) (fun () -> bake_for client)
+    in
+    let* _commitment =
+      Helpers.publish_and_store_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+        ~force:true
+      @@ Helpers.make_slot ~slot_size "pre-migration"
+    in
+    let* () = bake_for client in
+    let* pre_published_level = Client.level client in
+    Log.info "Published pre-migration slot at level %d" pre_published_level ;
+    (* Bake through migration *)
+    let* current_level = Client.level client in
+    let* () =
+      repeat (migration_level + 3 - current_level) (fun () -> bake_for client)
+    in
+    Log.info "Migrated at level %d" migration_level ;
+    (* Publish a slot after migration *)
+    let* _commitment =
+      Helpers.publish_and_store_slot
+        client
+        dal_node
+        Constant.bootstrap1
+        ~index:slot_index
+        ~force:true
+      @@ Helpers.make_slot ~slot_size "post-migration"
+    in
+    let* () = bake_for client in
+    let* post_published_level = Client.level client in
+    Log.info "Published post-migration slot at level %d" post_published_level ;
+    (* Bake until the post-migration slot is finalized *)
+    let* () =
+      bake_until_processed ~level:post_published_level client [dal_node]
+    in
+    let* pre_traps =
+      Dal_RPC.(
+        call dal_node
+        @@ get_published_level_known_traps
+             ~published_level:pre_published_level
+             ~pkh
+             ~slot_index)
+    in
+    Check.(
+      (List.length pre_traps = 0)
+        int
+        ~__LOC__
+        ~error_msg:
+          "Pre-migration slot should have 0 traps (traps_fraction was 0), got \
+           %L") ;
+    let* post_traps =
+      Dal_RPC.(
+        call dal_node
+        @@ get_published_level_known_traps
+             ~published_level:post_published_level
+             ~pkh
+             ~slot_index)
+    in
+    (* Post-migration traps_fraction is also 0 because the stitching code
+       preserves the value from the previous protocol. With traps_fraction = 0,
+       no shard can be a trap. If the stitching code or Mainnet constants change,
+       this assertion may fail, signaling that the test needs updating. *)
+    Check.(
+      (List.length post_traps = 0)
+        int
+        ~__LOC__
+        ~error_msg:
+          "Post-migration slot should have 0 traps (traps_fraction preserved \
+           as 0 across migration), got %L") ;
+    unit
+  in
+  test_l1_migration_scenario
+    ~migrate_from
+    ~migrate_to
+    ~migration_level:13
+    ~scenario
+    ~tags:["traps_fraction"]
+    ~description:
+      "test traps_fraction uses published level value across migration"
+    ~traps_fraction:Q.zero
+    ~operator_profiles:[slot_index]
+    ()
+
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
   if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
@@ -14978,6 +15092,7 @@ let register_migration ~migrate_from ~migrate_to =
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_restart_dal_node_across_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
+  test_traps_fraction_uses_published_level ~migrate_from ~migrate_to ;
   test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;
   test_accusation_migration_with_attestation_lag_decrease
     ~migrate_from
