@@ -35,6 +35,107 @@ type ('msg, 'peer, 'conn) config = {
   mutable latest_successful_swap : Time.System.t;
 }
 
+type throttle_entry = {
+  mutable last_handled : Time.System.t;
+      (** Timestamp of the last invocation of this callback. *)
+  cooldown_s : float option;
+      (** [None] = no rate limiting; the callback is always forwarded
+          immediately.
+          [Some s] = minimum time between consecutive calls, in seconds; a call
+          arriving sooner than [s] after the previous one is delayed. *)
+}
+
+type throttle_state = {
+  advertise : throttle_entry;
+  bootstrap : throttle_entry;
+  swap_request : throttle_entry;
+  swap_ack : throttle_entry;
+  message : throttle_entry;
+}
+
+(** [throttle_callbacks conn_lost state callback] wraps [callback] so that each
+    callback type is subject to a per-type cooldown: if the same callback is
+    invoked more than once within [cooldown_s] seconds, the new call sleeps for
+    [cooldown_s] (or until [conn_lost] resolves, whichever comes first) before
+    being forwarded. Calls are rate-limited, not dropped. *)
+let throttle_callbacks ~conn_lost (throttle_state : throttle_state)
+    (callback : _ P2p_answerer.callback) =
+  let open Lwt_syntax in
+  let throttle ({last_handled; cooldown_s} as entry) =
+    match cooldown_s with
+    | None -> return_unit
+    | Some cooldown_s ->
+        let now = Time.System.now () in
+        let throttled =
+          Ptime.Span.compare
+            (Ptime.diff now last_handled)
+            (Time.System.Span.of_seconds_exn cooldown_s)
+          < 0
+        in
+        if throttled then (
+          let* () =
+            Lwt.choose
+              [
+                Lwt_unix.sleep cooldown_s;
+                (let* () = conn_lost in
+                 Lwt.pause ());
+              ]
+          in
+          (* Stamp the time after the sleep so that the cooldown window restarts
+             from the wake-up point: a sustained burst is continuously throttled. *)
+          entry.last_handled <- Time.System.now () ;
+          return_unit)
+        else (
+          entry.last_handled <- now ;
+          return_unit)
+  in
+  P2p_answerer.
+    {
+      message =
+        (fun info i msg ->
+          let* () = throttle throttle_state.message in
+          callback.message info i msg);
+      advertise =
+        (fun info points ->
+          let* () = throttle throttle_state.advertise in
+          callback.advertise info points);
+      bootstrap =
+        (fun info ->
+          let* () = throttle throttle_state.bootstrap in
+          callback.bootstrap info);
+      swap_request =
+        (fun info point k ->
+          let* () = throttle throttle_state.swap_request in
+          callback.swap_request info point k);
+      swap_ack =
+        (fun info point k ->
+          let* () = throttle throttle_state.swap_ack in
+          callback.swap_ack info point k);
+    }
+
+(* Use [epoch] so that the first message on a fresh connection is never
+   throttled: [now - epoch] is always much larger than any [cooldown_s]. *)
+let make_entry cooldown_s =
+  {last_handled = Ptime.epoch; cooldown_s = Some cooldown_s}
+
+let no_throttle_entry () = {last_handled = Ptime.epoch; cooldown_s = None}
+
+(** Default per-connection throttle parameters.
+    - [message]: no throttle — application messages are forwarded immediately.
+    - [advertise], [bootstrap]: 100 ms — these messages are harmless but can
+      arrive in rapid bursts.
+    - [swap_request], [swap_ack]: 60 s — a connection swap is a single
+      round-trip; there is no legitimate reason to process more than one per
+      minute. *)
+let throttler () =
+  {
+    message = no_throttle_entry ();
+    advertise = make_entry 0.1;
+    bootstrap = make_entry 0.1;
+    swap_request = make_entry 60.;
+    swap_ack = make_entry 60.;
+  }
+
 open P2p_answerer
 
 let message conn _request size msg =
@@ -54,14 +155,17 @@ module Private_answerer = struct
     Events.(emit private_node_swap_ack) conn.peer_id
 
   let create conn =
-    P2p_answerer.
-      {
-        message = message conn;
-        advertise = advertise conn;
-        bootstrap = bootstrap conn;
-        swap_request = swap_request conn;
-        swap_ack = swap_ack conn;
-      }
+    throttle_callbacks
+      ~conn_lost:conn.conn_lost
+      (throttler ())
+      P2p_answerer.
+        {
+          message = message conn;
+          advertise = advertise conn;
+          bootstrap = bootstrap conn;
+          swap_request = swap_request conn;
+          swap_ack = swap_ack conn;
+        }
 end
 
 module Default_answerer = struct
@@ -240,14 +344,17 @@ module Default_answerer = struct
       do_swap
 
   let create config conn =
-    P2p_answerer.
-      {
-        message = message conn;
-        advertise = advertise config conn;
-        bootstrap = bootstrap config conn;
-        swap_request = swap_request config conn;
-        swap_ack = swap_ack config conn;
-      }
+    throttle_callbacks
+      ~conn_lost:conn.conn_lost
+      (throttler ())
+      P2p_answerer.
+        {
+          message = message conn;
+          advertise = advertise config conn;
+          bootstrap = bootstrap config conn;
+          swap_request = swap_request config conn;
+          swap_ack = swap_ack config conn;
+        }
 end
 
 let create_default = Default_answerer.create

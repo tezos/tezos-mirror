@@ -202,6 +202,12 @@ module Handlers = struct
           write_advertise = write_advertise ~disable_peer_discovery conn;
           write_swap_ack = write_swap_ack conn;
           messages;
+          conn_lost =
+            Lwt.choose
+              [
+                P2p_socket.wait_reader_closed conn;
+                P2p_socket.wait_writer_closed conn;
+              ];
         }
     in
     let t =
