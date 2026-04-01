@@ -1192,6 +1192,14 @@ let wait_for_classified oph node =
   let filter json = if JSON.as_string json = oph then Some () else None in
   Node.wait_for node "operation_classified.v0" filter
 
+(** Create expected attestation array with given slots attested. *)
+let expected_attestation dal_parameters attested_slots =
+  let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
+  List.iter (fun i -> arr.(i) <- true) attested_slots ;
+  arr
+
+(* --- Slot publication helpers --- *)
+
 let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof = Dal.(Commitment.dummy_commitment cryptobox message) in
   Helpers.publish_commitment ~source ?fee ?error ~index ~commitment ~proof
@@ -1221,6 +1229,60 @@ let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment
     ~proof
     client
+
+(* Similar to [publish_and_store_slot] but additionally bakes [1 +
+   number_of_extra_blocks] blocks to trigger the publication of the
+   shards of the published slot commitment. Moreover, the [wait_slot]
+   argument can be used to wait for the shards to be received by one
+   or several other DAL nodes. Returns the published commitment and
+   the level at which it was published. *)
+let publish_store_and_wait_slot ?counter ?force ?(fee = 12_000) node client
+    slot_producer_dal_node source ~index ~wait_slot
+    ~number_of_extra_blocks_to_bake ?delegates content =
+  let* commitment, proof =
+    Helpers.store_slot slot_producer_dal_node ~slot_index:index content
+  in
+  let* first_level = Client.level client in
+  let published_level = first_level + 1 in
+  let p = wait_slot ~published_level ~slot_index:index in
+  let* (`OpHash ophash) =
+    publish_commitment
+      ?counter
+      ?force
+      ~source
+      ~fee
+      ~index
+      ~commitment
+      ~proof
+      client
+  in
+  (* Bake a first block to include the operation. *)
+  let* () = bake_for ?delegates client in
+  (* Check that the operation is included. *)
+  let* included_manager_operations =
+    let manager_operation_pass = 3 in
+    Node.RPC.(
+      call node
+      @@ get_chain_block_operation_hashes_of_validation_pass
+           manager_operation_pass)
+  in
+  let () =
+    Check.list_mem
+      Check.string
+      ~__LOC__
+      ophash
+      included_manager_operations
+      ~error_msg:"DAL commitment publishment operation not found in head block."
+  in
+  (* Bake some more blocks to finalize the block containing the publication. *)
+  let* () =
+    if number_of_extra_blocks_to_bake > 0 then
+      bake_for ~count:number_of_extra_blocks_to_bake ?delegates client
+    else unit
+  in
+  (* Wait for the shards to be received *)
+  let* res = p in
+  return (published_level, commitment, res)
 
 (* --- Status and verification helpers --- *)
 
@@ -1349,3 +1411,116 @@ let check_slots_statuses ~__LOC__ ~expected_status ?check_attested_lag dal_node
       ~slot_index
   in
   Lwt_list.iter_s test slots_info
+
+let check_profiles ~__LOC__ dal_node ~expected =
+  let* profiles = Dal_RPC.(call dal_node @@ get_profiles ()) in
+  return
+    Check.(
+      (profiles = expected)
+        Dal.Check.profiles_typ
+        ~error_msg:
+          (__LOC__ ^ " : Unexpected profiles (Actual: %L <> Expected: %R)"))
+
+(* --- P2P and Gossipsub helpers --- *)
+
+let check_expected expected found = if expected <> found then None else Some ()
+
+let ( let*?? ) a b = Option.bind a b
+
+type peer_id = string
+
+type event_with_topic =
+  | Subscribe of peer_id
+  | Unsubscribe of peer_id
+  | Graft of peer_id
+  | Prune of peer_id
+  | Join
+  | Leave
+
+let event_with_topic_to_string = function
+  | Subscribe _ -> "subscribe"
+  | Unsubscribe _ -> "unsubscribe"
+  | Graft _ -> "graft"
+  | Prune _ -> "prune"
+  | Join -> "join"
+  | Leave -> "leave"
+
+(** This function monitors the Gossipsub worker events whose name is given by
+    [event_with_topic].
+
+    More precisely, since topics depend on a pkh and the number of DAL slots,
+    this function monitors all the events {pkh; slot_index = 0} ... {pkh;
+    slot_index = num_slots - 1}. When the [already_seen_slots] array paramenter
+    is used however, the events corresponding to slot indices marked with [true]
+    in this array are not monitored.
+
+    Depending on the value of [event_with_topic], some extra checks, such as the
+    peer id in case of Graft and Subscribe, are also done.
+*)
+let check_events_with_topic ~event_with_topic dal_node ~num_slots
+    ?(already_seen_slots = Array.make num_slots false) expected_pkh =
+  assert (Array.length already_seen_slots = num_slots) ;
+  let remaining =
+    ref
+      (Array.fold_left
+         (fun remaining b -> if b then remaining else remaining + 1)
+         0
+         already_seen_slots)
+  in
+  let seen = Array.copy already_seen_slots in
+  let get_slot_index_opt event =
+    let*?? topic =
+      match event_with_topic with
+      | Subscribe expected_peer
+      | Unsubscribe expected_peer
+      | Graft expected_peer
+      | Prune expected_peer ->
+          let*?? () =
+            check_expected
+              expected_peer
+              JSON.(event |-> "peer" |> JSON.as_string)
+          in
+          Some JSON.(event |-> "topic")
+      | Join | Leave -> Some event
+    in
+    let*?? () =
+      check_expected expected_pkh JSON.(topic |-> "pkh" |> JSON.as_string)
+    in
+    Some JSON.(topic |-> "slot_index" |> as_int)
+  in
+  Dal_common.Helpers.wait_for_gossipsub_worker_event
+    dal_node
+    ~name:(event_with_topic_to_string event_with_topic)
+    (fun event ->
+      let*?? slot_index = get_slot_index_opt event in
+      Check.(
+        (seen.(slot_index) = false)
+          bool
+          ~error_msg:
+            (sf "Slot_index %d already seen. Invariant broken" slot_index)) ;
+      seen.(slot_index) <- true ;
+      let () = remaining := !remaining - 1 in
+      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
+      else None)
+
+(* Create two promises for Grafts between [node1] and [node2] on topic
+   [(slot_index, pkh)], one in each direction. *)
+let check_grafts ~number_of_slots ~slot_index (node1, node1_peer_id)
+    (node2, node2_peer_id) pkh =
+  (* The connections have no reason to be grafted on other slot indices than
+     the one they are both subscribed to, so we instruct
+     [check_events_with_topic] to skip all events but the one for [index]. *)
+  let already_seen_slots =
+    Array.init number_of_slots (fun index -> slot_index <> index)
+  in
+  let check_graft on_node to_peer_id pkh =
+    check_events_with_topic
+      ~event_with_topic:(Graft to_peer_id)
+      on_node
+      ~num_slots:number_of_slots
+      ~already_seen_slots
+      pkh
+  in
+  let graft_from_node1 = check_graft node1 node2_peer_id pkh in
+  let graft_from_node2 = check_graft node2 node1_peer_id pkh in
+  [graft_from_node1; graft_from_node2]
