@@ -3812,6 +3812,61 @@ let _octez_riscv_nds_memory =
         octez_riscv_durable_storage_in_memory_api;
       ]
 
+(* Rustzcash is not used by the rollup node directly but
+   octez_client_base depends on octez_sapling which declares
+   RustDep Rustzcash; the archive must cover the full
+   transitive link_deps set. *)
+let rollup_node_rust_link_deps =
+  Manifest_link_deps.LinkTypes.
+    [RustDep Rustzcash; RustDep Wasmer; RustDep Riscv_pvm; RustDep Nds_on_disk]
+
+let lib_rollup_node_rust_deps =
+  rust_archive
+    rollup_node_rust_link_deps
+    ~inline_tests_link_flags:["-cclib"; "-loctez_rollup_node_rust_deps"]
+    (public_lib
+       "octez-rollup-node-rust-deps"
+       ~path:"src/rollup_node_rust_deps"
+       ~synopsis:"Rust dependencies for the smart rollup node"
+       ~foreign_archives:["octez_rollup_node_rust_deps"]
+       ~c_library_flags:["-lc++"]
+       ~dune:
+         Dune.
+           [
+             [
+               S "dirs";
+               S ":standard";
+               S ".cargo";
+               (* Do not track Cargo output directory. *)
+               [S "not"; S "target"];
+             ];
+             [
+               S "rule";
+               [
+                 S "targets";
+                 S "liboctez_rollup_node_rust_deps.a";
+                 S "dlloctez_rollup_node_rust_deps.so";
+               ];
+               [
+                 S "deps";
+                 [S "file"; S "build.sh"];
+                 [S "file"; S "Cargo.toml"];
+                 [S "file"; S "Cargo.lock"];
+                 [S "file"; S "../../rust-toolchain"];
+                 [S "source_tree"; S ".cargo"];
+                 [S "source_tree"; S "src"];
+                 [S "source_tree"; S "../riscv"];
+                 [S "source_tree"; S "../rustzcash_deps"];
+                 [S "source_tree"; S "../rust_deps/wasmer-3.3.0"];
+                 [S "source_tree"; S "../rust_deps/rust_igd_next"];
+                 [S "source_tree"; S "../rust_deps/rust_tezos_context"];
+                 [S "source_tree"; S "../kernel_sdk"];
+                 [S "source_tree"; S "../../sdk/rust"];
+               ];
+               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
+             ];
+           ])
+
 let octez_riscv_durable_storage_on_disk_api =
   public_lib
     "octez-riscv-nds-disk-api"
@@ -3819,7 +3874,7 @@ let octez_riscv_durable_storage_on_disk_api =
     ~synopsis:"OCaml API of the RISC-V durable storage on-disk Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
     ~dep_globs_rec:["../../../riscv/*"]
-    ~link_deps:lib_wasmer_riscv
+    ~link_deps:lib_rollup_node_rust_deps
       (* TODO: TZX-119
          We link against rust deps but ultimately the rust durable on disk
          library should go in another static library. *)

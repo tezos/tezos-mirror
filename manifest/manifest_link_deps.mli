@@ -7,7 +7,12 @@
 
 (** Module holding types related to handling [link_deps] of targets. *)
 module LinkTypes : sig
-  type rust_dep = Rustzcash | Wasmer | Riscv_pvm | Etherlink_wasm_runtime
+  type rust_dep =
+    | Rustzcash
+    | Wasmer
+    | Riscv_pvm
+    | Etherlink_wasm_runtime
+    | Nds_on_disk
 
   type t = RustDep of rust_dep
 end

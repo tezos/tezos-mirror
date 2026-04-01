@@ -94,6 +94,7 @@
 (package (name octez-riscv-nds-memory-api))
 (package (name octez-riscv-pvm))
 (package (name octez-riscv-pvm-test)(allow_empty))
+(package (name octez-rollup-node-rust-deps))
 (package (name octez-rpc-process))
 (package (name octez-rust-deps))
 (package (name octez-rust-tezos-context))

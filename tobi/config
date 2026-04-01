@@ -129,6 +129,7 @@ octez-riscv-nds-disk-api: src/lib_riscv_nds/disk/api
 octez-riscv-nds-memory-api: src/lib_riscv_nds/memory/api
 octez-riscv-pvm: src/lib_riscv/pvm
 octez-riscv-pvm-test: src/lib_riscv/kernels, src/lib_riscv/pvm/test
+octez-rollup-node-rust-deps: src/rollup_node_rust_deps
 octez-rpc-process: src/lib_rpc_process
 octez-rust-deps: src/rust_deps
 octez-rust-tezos-context: src/rust_deps/rust_tezos_context/ocaml-api
