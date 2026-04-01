@@ -3674,11 +3674,11 @@ let test_dal_commitment_with_pre_genesis_attested_levels =
     repeat (attestation_lag - 2) (fun () -> Client.bake_for_and_wait client)
   in
   let* () =
-    Dal.inject_dal_attestations_and_bake
+    Dal_helpers.inject_dal_attestations_and_bake
       ~protocol
       node
       client
-      (Dal.Slots [0])
+      (Slots [0])
       dal_parameters
   in
   (* Bake past the commitment period + finality, then bake extra blocks so the
