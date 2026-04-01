@@ -1339,6 +1339,34 @@ let test_crac_tez_to_evm_fake_tx_in_block =
          but found %L") ;
   unit
 
+(** Two separate TEZ->EVM CRAC calls in separate blocks must produce fake
+ *  transactions with distinct hashes.  Regression test for a bug where the
+ *  CRAC transaction hash was computed from the block-local transaction index
+ *  only (without the block number), causing a UNIQUE constraint violation in
+ *  the EVM node's transactions table on the second insertion.
+ *)
+let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ->EVM fake transactions have unique hashes across blocks"
+    ~tags:["crac_tx"; "regression"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HASH" in
+  Log.debug ~prefix "Deploy EVM runner" ;
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "Originate TEZ bridge to EVM runner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  Log.debug ~prefix "Originate TEZ runner calling the bridge" ;
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  Log.debug ~prefix "First CRAC call (TEZ->EVM)" ;
+  let* () = TezRunner.call_run tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  Log.debug ~prefix "Second CRAC call (TEZ->EVM) — must not crash the node" ;
+  let* () = TezRunner.call_run tez_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
+  Log.debug ~prefix "Both CRAC fake transactions stored successfully" ;
+  unit
+
 (** EVM journal is preserved across CrossRuntime boundaries: TEZ revert must
  *  roll back inner EVM storage changes made via a TEZ->EVM CRAC.
  *
@@ -2998,6 +3026,7 @@ let () =
   test_crac_evm_to_tez_reverts [Alpha] ;
   test_crac_tez_to_evm_reverts [Alpha] ;
   test_crac_tez_to_evm_fake_tx_in_block [Alpha] ;
+  test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks [Alpha] ;
   test_crac_tez_revert_rolls_back_inner_evm_storage [Alpha] ;
   test_crac_tez_revert_propagates_to_evm [Alpha] ;
   test_crac_evm_journal_state_preserved [Alpha] ;

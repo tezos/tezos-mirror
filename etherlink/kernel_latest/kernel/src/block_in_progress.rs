@@ -640,9 +640,15 @@ impl BlockInProgress {
     ) -> Result<(), anyhow::Error> {
         use sha3::{Digest, Keccak256};
 
-        // Compute deterministic tx hash from CRAC-ID.
+        // Compute deterministic tx hash from block number and CRAC-ID.
+        // The block number is included to ensure uniqueness across blocks,
+        // since the CRAC-ID only contains the transaction index within a
+        // block.
         let mut hasher = Keccak256::new();
         hasher.update(b"CRAC-TX");
+        let mut block_number_bytes = [0u8; 32];
+        self.number.to_big_endian(&mut block_number_bytes);
+        hasher.update(block_number_bytes);
         hasher.update(effect.crac_id.as_bytes());
         let hash_bytes: [u8; 32] = hasher.finalize().into();
 
