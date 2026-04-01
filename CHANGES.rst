@@ -175,6 +175,10 @@ Smart Rollup node
   head in the snapshot is on a branch that was reorganized on L1. (MR
   :gl:`!21201`)
 
+- Fixed an expensive and unnecessary reorg computation when the rollup node
+  connects to an L1 node that is behind on the same chain. Previously this could
+  cause the daemon to catch up very slowly. (MR :gl:`!21323`)
+
 - Added ``--commit-on`` option to control how frequently the rollup node commits
   PVM context to disk, reducing I/O overhead for PVMs with expensive
   serialization such as RISC-V. (MR :gl:`!19902`)

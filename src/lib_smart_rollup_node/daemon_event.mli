@@ -43,6 +43,11 @@ val new_head_processed : Block_hash.t -> int32 -> Ptime.Span.t -> unit Lwt.t
     the given [level]. *)
 val new_head_degraded : Block_hash.t -> int32 -> unit Lwt.t
 
+(** [l1_behind ~l1_level ~l2_level] emits an event indicating the L1 node
+    is on the same chain but behind the rollup node, waiting for it to catch
+    up. *)
+val l1_behind : l1_level:int32 -> l2_level:int32 -> unit Lwt.t
+
 (** [catch_up level] emits the event that we need to catch up on multiple
     levels. *)
 val catch_up : int32 -> unit Lwt.t

@@ -691,6 +691,84 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
        Test.fail "Refutation loop did not process after reconnection");
     ]
 
+let test_rollup_node_l1_behind ~kind =
+  test_full_scenario
+    {
+      variant = None;
+      tags = ["l1_behind"];
+      description = "rollup node skips reorg when L1 is behind on same chain";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  (* Create a second L1 node and keep it connected so both share the same
+     chain throughout. *)
+  let nodes_args =
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
+  in
+  let* node2, client2 = Client.init_with_node ~nodes_args `Client () in
+  let* () = Client.Admin.trust_address client ~peer:node2
+  and* () = Client.Admin.trust_address client2 ~peer:node in
+  let* () = Client.Admin.connect_address client ~peer:node2 in
+  (* Start the rollup node and bake some blocks *)
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () = send_messages 1 client in
+  let* level_ahead = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  (* Ensure node2 has synced all blocks *)
+  let* _ = Node.wait_for_level node2 level_ahead in
+  Log.info
+    "Both nodes synced, rollup node has processed up to level %d"
+    level_ahead ;
+  (* Now disconnect node2 so it stops receiving new blocks *)
+  let* identity2 = Node.wait_for_identity node2 in
+  let* () = Client.Admin.kick_peer client ~peer:identity2 in
+  (* Bake more blocks on node1 only, rollup node processes them *)
+  let* () = send_messages 3 client in
+  let* level_final = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+  Log.info
+    "Rollup node has processed up to level %d, node2 stuck at %d"
+    level_final
+    level_ahead ;
+  (* Switch rollup node to node2 which is behind but on the same chain *)
+  let* () =
+    Sc_rollup_node.change_node_and_restart sc_rollup_node sc_rollup node2
+  in
+  Log.info "Switched rollup node to node2 (behind at level %d)" level_ahead ;
+  (* Register event handlers after restart (terminate clears them) *)
+  let reorg_seen = ref false in
+  Sc_rollup_node.on_event sc_rollup_node (fun Sc_rollup_node.{name; _} ->
+      if name = "smart_rollup_node_daemon_reorg.v0" then reorg_seen := true) ;
+  let* l1_level, l2_level =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      ~timeout:30.
+      "smart_rollup_node_daemon_l1_behind.v0"
+    @@ fun json ->
+    let l1_level = JSON.(json |-> "l1_level" |> as_int) in
+    let l2_level = JSON.(json |-> "l2_level" |> as_int) in
+    Some (l1_level, l2_level)
+  in
+  Log.info "Got l1_behind event: l1_level=%d, l2_level=%d" l1_level l2_level ;
+  Check.((l1_level = level_ahead) int)
+    ~error_msg:"l1_level should be %R but got %L" ;
+  Check.((l2_level = level_final) int)
+    ~error_msg:"l2_level should be %R but got %L" ;
+  (* No reorg should have been computed while L1 was behind *)
+  if !reorg_seen then
+    Test.fail "No reorg should have been emitted while L1 was behind" ;
+  (* Reconnect node2 to node1 so it syncs the missing blocks (same chain),
+     then bake more so the rollup node resumes processing. *)
+  let* () = Client.Admin.connect_address client2 ~peer:node in
+  let* _ = Node.wait_for_level node2 level_final in
+  let num_messages = 2 in
+  let* () = send_messages num_messages client in
+  let* _ = Node.wait_for_level node2 (level_final + num_messages) in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  Log.info "Rollup node resumed processing after L1 caught up" ;
+  (* Still no reorg since the chain is the same *)
+  if !reorg_seen then
+    Test.fail "No reorg should have been emitted (L1 is on the same chain)" ;
+  unit
+
 let setup_reorg node client =
   let nodes_args =
     Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
@@ -8540,6 +8618,7 @@ let register_protocol_independent () =
     ~variant:"disconnects"
     sc_rollup_node_disconnects_scenario
     protocols ;
+  test_rollup_node_l1_behind ~kind protocols ;
   test_rollup_node_inbox
     ~kind
     ~variant:"handles_chain_reorg"
