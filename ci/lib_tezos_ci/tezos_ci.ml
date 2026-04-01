@@ -1584,11 +1584,11 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2412618967
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
-       https://gitlab.com/tezos/tezos/-/commit/d79172a8/pipelines
+       https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines
      *)
-    let common_version = "master-d79172a8"
+    let common_version = "master-be43e621"
 
     let debian_version = common_version
 
