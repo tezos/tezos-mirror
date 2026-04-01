@@ -1356,6 +1356,17 @@ let test_crac_tez_to_evm_fake_tx_in_block =
         (log_count = 1)
           int
           ~error_msg:"Expected 1 logs in the receipt, but found %L") ;
+      let first_log = List.hd receipt.logs in
+      let first_topic = List.hd first_log.topics in
+      let expected_topic =
+        "0x7c61c77057c7568c0d0f2350fa7ab90f164008888ba00c9105b5ef6988d0255d"
+      in
+      Log.debug ~prefix "First log topic: %s" first_topic ;
+      Check.(
+        (first_topic = expected_topic)
+          string
+          ~error_msg:"Expected log topic %s, but found %s") ;
+
       unit
 
 (** Two separate TEZ->EVM CRAC calls in separate blocks must produce fake
