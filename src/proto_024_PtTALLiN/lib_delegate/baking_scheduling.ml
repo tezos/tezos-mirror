@@ -131,7 +131,7 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
-let create_global_state cctxt ?dal_node_rpc_ctxt ?constants ~chain config
+let create_global_state ?dal_node_rpc_ctxt ?constants ~chain cctxt config
     delegates =
   let open Lwt_result_syntax in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
@@ -247,28 +247,19 @@ let create_round_state ~global_state ~synchronize ~current_proposal =
       awaiting_unlocking_pqc = false;
     }
 
-let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
-    ?(synchronize = true) ?monitor_node_operations ~chain config
-    ~(current_proposal : proposal) ?constants delegates =
+let create_initial_state ?canceler cctxt ?(synchronize = true)
+    ?monitor_node_operations ~global_state ~(current_proposal : proposal)
+    delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
   let open Baking_state in
-  let* global_state =
-    create_global_state
-      cctxt
-      ?dal_node_rpc_ctxt
-      ?constants
-      ~chain
-      config
-      delegates
-  in
   let* level_state =
     create_level_state
       ~chain_id:global_state.chain_id
       ~cctxt
       ~current_proposal
-      ~delegates:global_state.delegates
+      ~delegates
       ~dal_node_rpc_ctxt:global_state.dal_node_rpc_ctxt
   in
   let*? round_state =
@@ -286,6 +277,42 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
   let* state = Baking_state.may_load_attestable_data state in
   may_initialise_with_latest_proposal_pqc state
 
+let initialize_automaton ?canceler ?(synchronize = true) ~chain ~cache
+    ~on_head_proposal_callback global_state delegates cctxt =
+  let open Lwt_result_syntax in
+  let* heads_stream, _ = Node_rpc.monitor_heads cctxt ~cache ~chain () in
+  let* current_proposal =
+    let*! head_opt = Lwt_stream.get heads_stream in
+    match head_opt with
+    | Some head -> return head
+    | None -> failwith "monitor_heads stream unexpectedly ended."
+  in
+  let* state =
+    create_initial_state
+      ?canceler
+      cctxt
+      ~synchronize
+      ~global_state
+      ~current_proposal
+      delegates
+  in
+  let loop_state =
+    let get_valid_blocks_stream =
+      let*! vbs = Node_rpc.monitor_valid_proposals cctxt ~cache ~chain () in
+      match vbs with
+      | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
+      | Ok (vbs, _) -> Lwt.return vbs
+    in
+    create_loop_state
+      ~get_valid_blocks_stream
+      ~on_head_proposal_callback
+      ~forge_event_stream:state.automaton_state.forge_event_stream
+      ~heads_stream
+      state.automaton_state.operation_worker
+  in
+  let*? event = compute_bootstrap_event state in
+  return (state, event, loop_state)
+
 let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
@@ -296,38 +323,24 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
   let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
-  let* heads_stream, _block_stream_stopper =
-    Node_rpc.monitor_heads cctxt ~cache ~chain ()
-  in
-  let* current_proposal =
-    let*! proposal = Lwt_stream.get heads_stream in
-    match proposal with
-    | Some current_head -> return current_head
-    | None -> failwith "head stream unexpectedly ended"
-  in
-  let* initial_state =
-    create_initial_state
-      ?canceler
-      cctxt
+  let* global_state =
+    create_global_state
       ?dal_node_rpc_ctxt
-      ~chain
-      config
-      ~current_proposal
       ?constants
+      ~chain
+      cctxt
+      config
       delegates
   in
   let _promise =
-    register_dal_profiles
-      cctxt
-      initial_state.global_state.dal_node_rpc_ctxt
-      delegates
+    register_dal_profiles cctxt global_state.dal_node_rpc_ctxt delegates
   in
   let*! revelation_worker_canceler, revelation_worker_push_proposal =
     Baking_nonces.start_revelation_worker
       cctxt
-      initial_state.global_state.config.nonce
-      initial_state.global_state.chain_id
-      initial_state.global_state.constants
+      global_state.config.nonce
+      global_state.chain_id
+      global_state.constants
   in
   Option.iter
     (fun canceler ->
@@ -335,20 +348,6 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
           let*! _ = Lwt_canceler.cancel revelation_worker_canceler in
           Lwt.return_unit))
     canceler ;
-  let get_valid_blocks_stream =
-    let*! vbs = Node_rpc.monitor_valid_proposals cctxt ~cache ~chain () in
-    match vbs with
-    | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
-    | Ok (vbs, _) -> Lwt.return vbs
-  in
-  let loop_state =
-    create_loop_state
-      ~get_valid_blocks_stream
-      ~forge_event_stream:initial_state.automaton_state.forge_event_stream
-      ~heads_stream
-      ~on_head_proposal_callback:revelation_worker_push_proposal
-      initial_state.automaton_state.operation_worker
-  in
   let on_error err =
     let*! () = Events.(emit error_while_baking err) in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7393
@@ -356,9 +355,20 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     (* let retries = config.Baking_configuration.retries_on_failure in *)
     on_error err
   in
-  let*? initial_event = compute_bootstrap_event initial_state in
+  let* initial_state, initial_event, loop_state =
+    initialize_automaton
+      ?canceler
+      ~chain
+      ~cache
+      ~on_head_proposal_callback:revelation_worker_push_proposal
+      global_state
+      delegates
+      cctxt
+  in
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
-  let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
+  let[@warning "-26"] profiler_section =
+    New_valid_proposal initial_state.level_state.latest_proposal
+  in
   () [@profiler.stop] ;
   () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
   protect
