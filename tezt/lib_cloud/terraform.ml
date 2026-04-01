@@ -205,7 +205,7 @@ module VM = struct
 
   let deploy ~auto_approve ~max_run_duration ~machine_type ~disk_type
       ~disk_size_gb ~base_port ~ports_per_vm ~number_of_vms ~docker_image ~os
-      ~prometheus_port =
+      ~prometheus_port ~auth_enabled =
     let* project_id = Gcloud.project_id () in
     let max_run_duration =
       match max_run_duration with
@@ -242,6 +242,7 @@ module VM = struct
           "--var";
           Format.asprintf "prometheus_port=%d" prometheus_port;
         ]
+      @ if auth_enabled then ["--var"; "auth_enabled=true"] else []
     in
     if auto_approve then
       Process.run

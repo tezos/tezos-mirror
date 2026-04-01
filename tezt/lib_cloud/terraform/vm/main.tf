@@ -185,6 +185,12 @@ module "gce-container" {
         mountPath = "/tmp/otel"
         name      = "otel"
         readOnly  = false
+      },
+      {
+        # Same for Nginx (auth reverse proxy)
+        mountPath = "/tmp/nginx"
+        name      = "nginx"
+        readOnly  = false
       }
     ]
   }
@@ -224,6 +230,12 @@ module "gce-container" {
       name = "grafana"
       hostPath = {
         path = "/tmp/grafana"
+      }
+    },
+    {
+      name = "nginx"
+      hostPath = {
+        path = "/tmp/nginx"
       }
     }
   ]

@@ -32,6 +32,7 @@ exception Interrupted
 
 type t = {
   agents : Agent.t list;
+  nginx : Nginx.t option;
   website : Web.t option;
   prometheus : Prometheus.t option;
   grafana : Grafana.t option;
@@ -53,6 +54,8 @@ let shutdown ?exn t =
       Lwt.return_unit)
     else Lwt.return_unit
   in
+  (* Shutdown nginx first so external ports are freed before services stop *)
+  let* () = Option.fold ~none:Lwt.return_unit ~some:Nginx.shutdown t.nginx in
   (* Shutdown the service managers before alert_manager *)
   let* () =
     Lwt_list.iter_p
@@ -167,9 +170,23 @@ let wait_ssh_server_running agent =
 
 let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
   let agents = Deployement.agents deployement in
+  let auth = Env.auth_enabled in
+  let is_auth = Option.is_some auth in
+  let auth_interface = if is_auth then "127.0.0.1" else "0.0.0.0" in
+  (* Port shifting: when auth is enabled, services bind to shifted internal
+     ports (original + 10000) so that nginx can listen on the original
+     external ports and reverse-proxy to them. *)
+  let port_shifting port = if is_auth then port + 10000 else port in
+  let website_port = port_shifting Env.website_port in
+  let prometheus_port = port_shifting Env.prometheus_port in
+  let grafana_port = port_shifting 3000 in
+  let alert_manager_port = port_shifting 9093 in
+  let jaeger_port = port_shifting 16686 in
   let* website =
     if Env.website then
-      let* website = Web.start ~agents () in
+      let* website =
+        Web.start ~interface:auth_interface ~port:website_port ~agents ()
+      in
       Lwt.return_some website
     else Lwt.return_none
   in
@@ -177,7 +194,14 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
     if Env.prometheus then
       (* Alerts requires to update prometheus configuration. *)
       let alerts = List.map (fun Alert_manager.{alert; _} -> alert) alerts in
-      let* prometheus = Prometheus.start ~alerts agents in
+      let* prometheus =
+        Prometheus.start
+          ~interface:auth_interface
+          ~port:prometheus_port
+          ~website_port
+          ~alerts
+          agents
+      in
       Lwt.return_some prometheus
     else Lwt.return_none
   in
@@ -256,22 +280,80 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
           ~bot_token:slack_bot_token
           ()
   in
-  let* alert_manager = Alert_manager.run ~default_receiver alerts in
+  let* alert_manager =
+    Alert_manager.run
+      ~port:alert_manager_port
+      ~interface:auth_interface
+      ~default_receiver
+      alerts
+  in
   let* grafana =
     if Env.grafana then
-      let* grafana = Grafana.run () in
+      (* Grafana reaches Prometheus via localhost because both containers
+         share the host network namespace (--network host). When auth is
+         enabled, prometheus_port is the shifted internal port that
+         Prometheus actually listens on. *)
+      let grafana_sources =
+        [
+          sf
+            {|
+- name: Prometheus
+  type: prometheus
+  access: proxy
+  url: http://localhost:%d
+  isDefault: true
+|}
+            prometheus_port;
+        ]
+      in
+      let* grafana =
+        Grafana.run
+          ~port:grafana_port
+          ~interface:auth_interface
+          ~sources:grafana_sources
+          ?auth_info:auth
+          ()
+      in
       Lwt.return_some grafana
     else Lwt.return_none
   in
   let* otel, jaeger =
     if Env.open_telemetry then
       let* otel = Otel.run ~jaeger:true in
-      let* jaeger = Jaeger.run () in
+      let* jaeger = Jaeger.run ~port:jaeger_port ~interface:auth_interface () in
       Lwt.return (Some otel, Some jaeger)
     else Lwt.return (None, None)
   in
+  (* When auth is enabled, start nginx to proxy external ports with basic
+     auth to the shifted internal ports. *)
+  let* nginx =
+    match auth with
+    | None -> Lwt.return_none
+    | Some {username; password} ->
+        let add_if cond external_port internal_port acc =
+          if cond then
+            Nginx.
+              {
+                listen_port = external_port;
+                proxy_target = sf "http://127.0.0.1:%d" internal_port;
+              }
+            :: acc
+          else acc
+        in
+        let services =
+          []
+          |> add_if Env.website Env.website_port website_port
+          |> add_if Env.prometheus Env.prometheus_port prometheus_port
+          |> add_if Env.grafana 3000 grafana_port
+          |> add_if (Option.is_some alert_manager) 9093 alert_manager_port
+          |> add_if Env.open_telemetry 16686 jaeger_port
+        in
+        let* nginx = Nginx.run ~username ~password ~services () in
+        Lwt.return_some nginx
+  in
   let t =
     {
+      nginx;
       website;
       agents;
       prometheus;
@@ -478,21 +560,31 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
     |> Process.check
   in
   let args =
-    (* remove "--ssh-host host" from the commande line *)
-    let rec filter_ssh acc args =
+    (* remove "--ssh-host host" and the authentication arguments from the
+       command line *)
+    let rec filter_ssh_and_auth_args acc args =
       match args with
       | [] -> List.rev acc
       (* We need to remove the private key argument. This permanent key
          is only used to connect to the proxy. The key that is generated
          and uploaded to the proxy allow to connect to the containers. *)
-      | "--ssh-private-key" :: _priv :: args -> filter_ssh acc args
+      | "--ssh-private-key" :: _priv :: args ->
+          filter_ssh_and_auth_args acc args
       (* FIXME: remove proxy-localhost when agent name bug is fixed *)
       | "--ssh-host" :: _host :: args ->
-          filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args
-      | arg :: args -> filter_ssh (arg :: acc) args
+          filter_ssh_and_auth_args
+            ("--proxy-localhost" :: "--proxy" :: acc)
+            args
+      (* Auth credentials are forwarded via environment variables in the
+         script (see [auth_exports] below), so we strip them from the
+         command line to avoid duplication and exposure in the process
+         list. *)
+      | "--auth-username" :: _user :: args -> filter_ssh_and_auth_args acc args
+      | "--auth-password" :: _pass :: args -> filter_ssh_and_auth_args acc args
+      | arg :: args -> filter_ssh_and_auth_args (arg :: acc) args
     in
     let args = Sys.argv |> Array.to_list |> List.tl in
-    let args = filter_ssh [] args in
+    let args = filter_ssh_and_auth_args [] args in
     args @ ["--localhost"; "--tezt-cloud"; Env.tezt_cloud]
     (* [--localhost] will be combined with [--proxy], this enables to detect we
        want to run in [`Remote_orchestrator_local_agents] mode.
@@ -513,13 +605,29 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   let cmd_line =
     (self :: args) @ proxy_args |> List.map quote_arg |> String.concat " "
   in
+  (* Auth credentials are forwarded via environment variables rather than CLI
+     arguments so they don't appear in the process list (ps aux /
+     /proc/*/cmdline). They may come from environment variables which are not
+     available on the remote machine. *)
+  let auth_exports =
+    match Env.auth_enabled with
+    | Some {username; password} ->
+        Printf.sprintf
+          "export TEZT_CLOUD_AUTH_USERNAME=%s\n\
+           export TEZT_CLOUD_AUTH_PASSWORD=%s"
+          (quote_arg username)
+          (quote_arg password)
+    | None -> ""
+  in
   let script_contents =
     Printf.sprintf
       {|
         #!/bin/sh
         set -e
+        %s
         exec %s "$@"
       |}
+      auth_exports
       cmd_line
   in
 
@@ -716,6 +824,7 @@ let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
       f
         {
           agents = [default_agent];
+          nginx = None;
           website = None;
           grafana = None;
           otel = None;

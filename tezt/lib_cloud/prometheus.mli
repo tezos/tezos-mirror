@@ -52,7 +52,13 @@ val make_alert :
   alert
 
 (** [start agents] starts the prometheus server. *)
-val start : ?interface:string -> alerts:alert list -> Agent.t List.t -> t Lwt.t
+val start :
+  ?interface:string ->
+  ?port:int ->
+  ?website_port:int ->
+  alerts:alert list ->
+  Agent.t List.t ->
+  t Lwt.t
 
 (** [shutdown prometheus] shutdowns the prometheus server. *)
 val shutdown : t -> unit Lwt.t

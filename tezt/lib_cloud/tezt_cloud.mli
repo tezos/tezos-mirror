@@ -303,6 +303,12 @@ module Tezt_cloud_cli : sig
 
   (** The tezt-cloud workspace name *)
   val tezt_cloud : string
+
+  (** Equivalent to [Cli.website_port] *)
+  val website_port : int
+
+  (** Equivalent to [Cli.prometheus_port] *)
+  val prometheus_port : int
 end
 
 module Artifact_helpers : sig

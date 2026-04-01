@@ -103,6 +103,7 @@ module Remote = struct
         ~number_of_vms
         ~docker_image
         ~prometheus_port
+        ~auth_enabled:(Option.is_some Env.auth_enabled)
         ~os
     in
     let names =
@@ -536,6 +537,7 @@ module Ssh_host = struct
         ("/tmp/grafana", "/tmp/grafana");
         ("/tmp/alert_manager", "/tmp/alert_manager");
         ("/tmp/otel", "/tmp/otel");
+        ("/tmp/nginx", "/tmp/nginx");
       ]
     in
     let* registry_uri_opt =

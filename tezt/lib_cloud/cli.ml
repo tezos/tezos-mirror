@@ -536,7 +536,9 @@ let prometheus_port =
     ~long:"prometheus-port"
     ~description:
       (sf
-         "Set the port on which the prometheus instance will run (default: %d)."
+         "Set the port on which the prometheus instance will run (default: \
+          %d). When authentication is enabled, the internal service binds to \
+          port + 10000 while nginx listens on the original port."
          default_prometheus_port)
     (Option.value ~default:default_prometheus_port config.prometheus_port)
 
@@ -654,7 +656,10 @@ let website_port =
   Clap.default_int
     ~section
     ~long:"website-port"
-    ~description:"Set the port used for the website. Default is 8080"
+    ~description:
+      "Set the port used for the website. Default is 8080. When authentication \
+       is enabled, the internal service binds to port + 10000 while nginx \
+       listens on the original port."
     (* When the website is run by the orchestrator, it is easier to
        use port 80. We could decide in the future to use 80 by
        default. *)
