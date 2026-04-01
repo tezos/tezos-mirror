@@ -672,6 +672,20 @@ let with_fresh_rollup ?(pvm_name = "arith") ?boot_sector ?dal_node f tezos_node
   let* () = bake_for tezos_client in
   f rollup_address sc_rollup_node
 
+let boot_sector kernel_path =
+  let read_kernel ?(suffix = ".wasm") name : string =
+    let load_kernel_file name : string =
+      let open Tezt.Base in
+      let kernel_file = project_root // name in
+      read_file kernel_file
+    in
+    let hex_encode (input : string) : string =
+      match Hex.of_string input with `Hex s -> s
+    in
+    hex_encode (load_kernel_file (name ^ suffix))
+  in
+  read_kernel ~suffix:"" (Uses.path kernel_path)
+
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?(wait_ready = true)
     ?env ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
@@ -1283,6 +1297,44 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 12_000) node client
   (* Wait for the shards to be received *)
   let* res = p in
   return (published_level, commitment, res)
+
+let publish_store_and_attest_slot ~protocol ?counter ?force ?fee client node
+    dal_node source ~index ~content dal_parameters =
+  let* _commitment =
+    Helpers.publish_and_store_slot
+      ?counter
+      ?force
+      ?fee
+      client
+      dal_node
+      source
+      ~index
+      content
+  in
+  let* () =
+    repeat dal_parameters.Dal.Parameters.attestation_lag (fun () ->
+        bake_for client)
+  in
+  inject_dal_attestations_and_bake
+    ~protocol
+    node
+    client
+    (Slots [index])
+    dal_parameters
+
+let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
+    dal_node source ~index ~content dal_parameters =
+  let* _commitment =
+    Helpers.publish_and_store_slot client dal_node source ~index content
+  in
+  let* () = repeat lag (fun () -> bake_for client) in
+  inject_dal_attestations_and_bake
+    ~protocol
+    ~lag_index
+    node
+    client
+    (Slots [index])
+    dal_parameters
 
 (* --- Status and verification helpers --- *)
 

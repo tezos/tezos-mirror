@@ -3768,7 +3768,7 @@ let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
             "Expected attestation_lag %d, got %d@."
             expected_attestation_lag
             attestation_lag ;
-        Dal.publish_store_and_attest_slot
+        Dal_helpers.publish_store_and_attest_slot
           ~protocol
           tezos_client
           tezos_node
@@ -3864,7 +3864,7 @@ let with_dal_ready_for_echo_dal_reveal_pages_at_lag ~operator_profiles
         "target_lag and target_lag_index don't match: got %L, expected %R") ;
   let slot_size = dal_parameters.cryptobox.slot_size in
   let* () =
-    Dal.publish_store_and_attest_slot_at_lag
+    Dal_helpers.publish_store_and_attest_slot_at_lag
       ~protocol
       ~lag_index:target_lag_index
       ~lag:target_lag
