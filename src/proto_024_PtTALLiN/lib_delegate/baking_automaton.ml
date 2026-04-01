@@ -758,4 +758,16 @@ let create_automaton_state ?canceler ?monitor_node_operations ~global_state
           return (Local index)
       | ContextIndex index -> return (Local index))
   in
-  return {name; cctxt; validation_mode; operation_worker}
+  let forge_event_stream, push_forge_event =
+    let stream, push = Lwt_stream.create () in
+    (stream, fun e -> push (Some e))
+  in
+  return
+    {
+      name;
+      cctxt;
+      validation_mode;
+      operation_worker;
+      forge_event_stream;
+      push_forge_event;
+    }

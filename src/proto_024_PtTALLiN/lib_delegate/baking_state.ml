@@ -471,6 +471,8 @@ type automaton_state = {
   cctxt : Protocol_client_context.full;
   validation_mode : validation_mode;
   operation_worker : Operation_worker.t;
+  push_forge_event : forge_event -> unit;
+  forge_event_stream : forge_event Lwt_stream.t;
 }
 
 type forge_request_content =
@@ -489,7 +491,6 @@ type forge_request = {
 
 type forge_worker_hooks = {
   push_request : forge_request -> unit tzresult Lwt.t;
-  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
   cancel_all_pending_tasks : unit -> unit;
 }
 

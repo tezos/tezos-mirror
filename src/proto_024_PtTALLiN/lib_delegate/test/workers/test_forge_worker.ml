@@ -243,16 +243,9 @@ let with_forge_worker_test_env ?forge_consensus_vote_hook f =
       ?forge_consensus_vote_hook
       global_state
   in
-  (* Get event stream *)
-  let event_stream = Forge_worker.get_event_stream worker in
   (* Run the test function *)
   let* result =
-    f
-      ~worker
-      ~event_stream
-      ~delegates
-      ~automaton_state
-      ~block_info:genesis_block_info
+    f ~worker ~delegates ~automaton_state ~block_info:genesis_block_info
   in
   (* Shutdown worker *)
   let*! () = Forge_worker.shutdown worker in
@@ -294,7 +287,7 @@ let collect_n_events ~event_stream ~matches ~expected =
 *)
 let test_forge_attestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -334,7 +327,7 @@ let test_forge_attestations () =
       let*! received =
         with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
             collect_n_events
-              ~event_stream
+              ~event_stream:automaton_state.forge_event_stream
               ~matches:is_attestation_ready
               ~expected)
       in
@@ -353,7 +346,7 @@ let test_forge_attestations () =
 *)
 let test_forge_preattestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create preattestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -394,7 +387,7 @@ let test_forge_preattestations () =
       let*! received =
         with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
             collect_n_events
-              ~event_stream
+              ~event_stream:automaton_state.forge_event_stream
               ~matches:is_preattestation_ready
               ~expected)
       in
@@ -413,7 +406,7 @@ let test_forge_preattestations () =
 *)
 let test_forge_block () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       match delegates with
       | [] -> failwith "No delegates available"
@@ -447,7 +440,9 @@ let test_forge_block () =
               [
                 (let rec collect () =
                    let open Lwt_syntax in
-                   let* event = Lwt_stream.get event_stream in
+                   let* event =
+                     Lwt_stream.get automaton_state.forge_event_stream
+                   in
                    match event with
                    | Some (Baking_state.Block_ready _) ->
                        block_ready := true ;
@@ -473,7 +468,7 @@ let test_forge_block () =
 *)
 let test_multiple_delegates_concurrent () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation requests for each delegate separately *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -514,7 +509,7 @@ let test_multiple_delegates_concurrent () =
           [
             (let rec collect () =
                let open Lwt_syntax in
-               let* event = Lwt_stream.get event_stream in
+               let* event = Lwt_stream.get automaton_state.forge_event_stream in
                match event with
                | Some (Baking_state.Attestation_ready signed_vote) -> (
                    let delegate_id =
@@ -559,7 +554,7 @@ let test_multiple_delegates_concurrent () =
 let test_cancel_pending_tasks () =
   with_forge_worker_test_env
     ~forge_consensus_vote_hook:(fun () -> Lwt_unix.sleep 1.0)
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let key = Stdlib.List.hd delegates in
       let delegate =
@@ -615,7 +610,9 @@ let test_cancel_pending_tasks () =
             [
               (let rec collect () =
                  let open Lwt_syntax in
-                 let* event = Lwt_stream.get event_stream in
+                 let* event =
+                   Lwt_stream.get automaton_state.forge_event_stream
+                 in
                  match event with
                  | Some (Baking_state.Attestation_ready _) ->
                      incr events_received ;
@@ -666,7 +663,7 @@ let test_cancel_pending_tasks () =
 *)
 let test_same_delegate_serialization () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
       (* Push one request per delegate - each request contains one attestation *)
@@ -708,7 +705,7 @@ let test_same_delegate_serialization () =
       let*! received =
         with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
             collect_n_events
-              ~event_stream
+              ~event_stream:automaton_state.forge_event_stream
               ~matches:is_attestation_ready
               ~expected)
       in
