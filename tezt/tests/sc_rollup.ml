@@ -29,6 +29,7 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups
+   Requirements: make -f kernels.mk riscv-echo
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
 *)
 
@@ -144,6 +145,24 @@ let gen_keys_then_transfer_tez ?(giver = Constant.bootstrap1.alias)
   in
   let* _ = Client.bake_for_and_wait client in
   return keys
+
+let make_read_outbox_echo_kernel kind () =
+  match kind with
+  | "wasm_2_0_0" -> read_kernel "echo"
+  | "riscv" -> (
+      let kernel = "riscv-echo" in
+      try
+        read_riscv_kernel
+          (Uses.make ~tag:"riscv" ~path:kernel ())
+          (Uses.make ~tag:"riscv" ~path:(kernel ^ ".checksum") ())
+      with Sys_error e ->
+        Test.fail
+          ~__LOC__
+          "Could not read RISC-V echo kernel (%s). If absent, run `make -f \
+           kernels.mk riscv-echo` then try again"
+          e)
+  | kind ->
+      Test.fail ~__LOC__ "read_outbox_echo_kernel: unsupported PVM kind %s" kind
 
 let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
     ?whitelist_enable ?whitelist ?commitment_period ?challenge_window ?timeout
@@ -5351,7 +5370,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
                 ~amount:Tez.(of_int 100)
                 ~burn_cap:Tez.(of_int 100)
                 ~storage_limit:100000
-                ~giver:Constant.bootstrap1.alias
+                ~giver:Constant.bootstrap3.alias
                 ~receiver:source_address
                 ~arg:(sf "Pair %s %S" payload sc_rollup)
                 client
@@ -5362,6 +5381,14 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       unit
     in
     let* () =
+      if kind = "riscv" then
+        (* RISC-V commits the context to disk only on commitments. Bake an extra
+           level so the outbox is on a commitment block and thus so all outbox
+           queries work. *)
+        Client.bake_for_and_wait client
+      else unit
+    in
+    let* () =
       match reorg with
       | None -> trigger_output_message client
       | Some (divergence, _) ->
@@ -5369,7 +5396,18 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
             ~branch1:trigger_output_message
             ~branch2:(trigger_output_message ~extra_empty_messages:2)
     in
-    let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    let* outbox_level =
+      let* () =
+        if kind = "riscv" then
+          (* When running the RISC-V PVM, Sc_rollup_node.wait_sync waits until
+            the current finalized block. Since the transfer operation gets
+            injected at head, the chain must be progressed twice before we
+            can see its effect *)
+          bake_levels 2 client
+        else Lwt.return_unit
+      in
+      Sc_rollup_node.wait_sync rollup_node ~timeout:10.
+    in
     let* () =
       match reorg with
       | None -> unit
@@ -5577,8 +5615,8 @@ let test_outbox_message ?supports ?regression ?expected_error ?expected_l1_error
           return @@ wrap payload
         in
         (None, input_message, outbox_parameters)
-    | "wasm_2_0_0" ->
-        let bootsector () = read_kernel "echo" in
+    | "wasm_2_0_0" | "riscv" ->
+        let bootsector = make_read_outbox_echo_kernel kind in
         let input_message protocol contract_address =
           let parameters_json = `O [("int", `String outbox_parameters)] in
           let transaction =
@@ -5640,11 +5678,13 @@ let test_outbox_message_reorg protocols ~kind =
 
 let test_outbox_message_reorg_disappear ~kind =
   let commitment_period = 2 and challenge_window = 2 in
+  let boot_sector = make_read_outbox_echo_kernel kind in
   test_full_scenario
     ~parameters_ty:"bytes"
     ~kind
     ~commitment_period
     ~challenge_window
+    ~boot_sector
     {
       tags = ["outbox"; "reorg"];
       variant = None;
@@ -5703,7 +5743,12 @@ let test_outbox_message_reorg_disappear ~kind =
        message on the rollup. *)
     divergence ~branch1:trigger_output_message ~branch2:Client.bake_for_and_wait
   in
-  let* outbox_level = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+  let* outbox_level =
+    let* () =
+      if kind = "riscv" then bake_levels 2 client else Lwt.return_unit
+    in
+    Sc_rollup_node.wait_sync rollup_node ~timeout:10.
+  in
   let* () = trigger_reorg () in
   let* _ =
     bake_until_lcc_updated ~timeout:100. client rollup_node ~level:outbox_level
@@ -8436,6 +8481,7 @@ let register ~protocols =
   register_riscv ~protocols:[Protocol.Alpha] ;
   register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"jstz" ;
   register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"etherlink" ;
+  test_outbox_message ~kind:"riscv" [Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
