@@ -385,6 +385,10 @@ module Tezt_cloud_cli = struct
 
   let dns_domains = Cli.dns_domains
 
+  let website_port = Cli.website_port
+
+  let prometheus_port = Cli.prometheus_port
+
   let tezt_cloud = Env.tezt_cloud
 end
 

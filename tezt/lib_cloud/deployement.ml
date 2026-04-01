@@ -536,6 +536,7 @@ module Ssh_host = struct
         ("/tmp/grafana", "/tmp/grafana");
         ("/tmp/alert_manager", "/tmp/alert_manager");
         ("/tmp/otel", "/tmp/otel");
+        ("/tmp/nginx", "/tmp/nginx");
       ]
     in
     let* registry_uri_opt =

@@ -88,8 +88,8 @@ let dashboards_filepaths () =
   in
   List.map (fun basename -> path // basename) basenames |> Lwt.return
 
-let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source]) ()
-    =
+let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source])
+    ?auth_info () =
   let cmd = "docker" in
   let* () = Process.run "mkdir" ["-p"; Path.tmp_dir // "grafana"] in
   let dashboard_directory = Path.tmp_dir // "grafana" // "dashboards" in
@@ -97,9 +97,15 @@ let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source]) ()
     Process.run "mkdir" ["-p"; dashboard_directory |> Filename.dirname]
   in
   let* provisioning_directory = provisioning_directory sources in
-  (* We generate a password to use admin features. This is not completely
-     secured but this should prevent easy attacks if the grafana port is opened. *)
-  let password = generate_password () in
+  let password, anonymous_enabled =
+    match auth_info with
+    | Some (auth : Env.auth_infos) -> (auth.password, "false")
+    | None ->
+        (* We generate a password to use admin features. This is not completely
+           secured but this should prevent easy attacks if the grafana port is
+           opened. *)
+        (generate_password (), "true")
+  in
   Log.info "Grafana admin password: %s" password ;
   (* This is the last version supporting api keys *)
   let grafana_docker_tag = "grafana/grafana:11.2.3" in
@@ -113,7 +119,7 @@ let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source]) ()
       "--network";
       "host";
       "-e";
-      "GF_AUTH_ANONYMOUS_ENABLED=true";
+      sf "GF_AUTH_ANONYMOUS_ENABLED=%s" anonymous_enabled;
       "-e";
       "GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer";
       "-e";

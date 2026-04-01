@@ -80,13 +80,6 @@ variable "prometheus_port" {
   default     = 9090
 }
 
-variable "auth_enabled" {
-  type        = bool
-  description = "When true, monitoring ports are closed at the firewall level. Services are accessed through nginx with basic auth on the orchestrator."
-  default     = false
-}
-
-
 # Those values should not be modified
 locals {
   artifact_registry = "europe-west1-docker.pkg.dev"
@@ -185,6 +178,12 @@ module "gce-container" {
         mountPath = "/tmp/otel"
         name      = "otel"
         readOnly  = false
+      },
+      {
+        # Same for Nginx (auth reverse proxy)
+        mountPath = "/tmp/nginx"
+        name      = "nginx"
+        readOnly  = false
       }
     ]
   }
@@ -224,6 +223,12 @@ module "gce-container" {
       name = "grafana"
       hostPath = {
         path = "/tmp/grafana"
+      }
+    },
+    {
+      name = "nginx"
+      hostPath = {
+        path = "/tmp/nginx"
       }
     }
   ]
@@ -297,20 +302,18 @@ resource "google_compute_firewall" "default" {
     ports    = ["80", "443", "8080"]
   }
 
-  # Monitoring UI ports: only open when auth is disabled (default).
-  # When auth is enabled, these services are accessed through nginx
-  # with basic auth on the orchestrator, so direct access is blocked.
+  # Monitoring UI ports: always open at the firewall level.
+  # When auth is disabled, services listen on 0.0.0.0 and are directly accessible.
+  # When auth is enabled, services bind to 127.0.0.1 (unreachable from outside)
+  # and nginx listens on these same ports with basic auth.
   # 3000 used by Grafana dashboard
   # prometheus_port (default 9090) used by Prometheus web UI
   # 9093 used by AlertManager web UI
   # 16686 used by Jaeger web UI for tracing visualization
   # 19999 used by Netdata monitoring dashboard
-  dynamic "allow" {
-    for_each = var.auth_enabled ? [] : [true]
-    content {
-      protocol = "tcp"
-      ports    = ["3000", "${var.prometheus_port}", "9093", "16686", "19999"]
-    }
+  allow {
+    protocol = "tcp"
+    ports    = ["3000", "${var.prometheus_port}", "9093", "16686", "19999"]
   }
 
   # Anybody can contact the machine on the open ports.

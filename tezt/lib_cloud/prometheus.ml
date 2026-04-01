@@ -114,19 +114,11 @@ let opentelemetry_source =
   let targets = [{address; port; app_name}] in
   {name; metrics_path; targets}
 
-let tezt_source =
+let tezt_source ~website_port =
   {
     name = "tezt_metrics";
     metrics_path = "/metrics";
-    targets =
-      [
-        {
-          address = "localhost";
-          port =
-            (if Env.mode = `Remote_orchestrator_local_agents then 80 else 8080);
-          app_name = "tezt";
-        };
-      ];
+    targets = [{address = "localhost"; port = website_port; app_name = "tezt"}];
   }
 
 let jingoo_configuration_template t =
@@ -304,7 +296,8 @@ let register_rules ?(group_name = default_group_name) ?interval rules t =
   write_rules_file t ;
   reload t
 
-let start ?(interface = "0.0.0.0") ~alerts agents =
+let start ?(interface = "0.0.0.0") ?(port = Env.prometheus_port)
+    ?(website_port = Env.website_port) ~alerts agents =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Path.tmp_dir // "prometheus" in
@@ -314,6 +307,7 @@ let start ?(interface = "0.0.0.0") ~alerts agents =
     List.iter (add_rule groups) alerts ;
     groups
   in
+  let tezt_source = tezt_source ~website_port in
   let jobs =
     if Env.monitoring then [tezt_source; netdata_source_of_agents agents]
     else [tezt_source]
@@ -325,7 +319,6 @@ let start ?(interface = "0.0.0.0") ~alerts agents =
   let configuration_file = dir // "prometheus.yml" in
   let rules_file = dir // "rules" // "tezt.rules" in
   let snapshot_filename = Env.prometheus_export_path in
-  let port = Env.prometheus_port in
   let name = sf "prometheus-%d" port in
   let scrape_interval = Env.prometheus_scrape_interval in
   let t =

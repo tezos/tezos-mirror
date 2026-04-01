@@ -190,13 +190,12 @@ let add_service t ~agents service =
   t.services <- service :: t.services ;
   write t ~agents
 
-let run ~interface () =
+let run ~interface ~port () =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
   let dir = Path.tmp_dir // "website" in
   let* () = Process.run "mkdir" ["-p"; dir] in
   let index = index dir in
-  let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
   let opentelemetry = Env.open_telemetry in
@@ -262,8 +261,8 @@ let run ~interface () =
       services = [];
     }
 
-let start ?(interface = "0.0.0.0") ~agents () =
-  let* t = run ~interface () in
+let start ?(interface = "0.0.0.0") ?(port = Env.website_port) ~agents () =
+  let* t = run ~interface ~port () in
   let* () = write t ~agents in
   Lwt.return t
 

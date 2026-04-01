@@ -19,12 +19,13 @@ let run ?(port = 16686) ?(interface = "0.0.0.0") () =
         "--rm";
         "--name";
         "jaeger";
-        "-p";
-        sf "%d:%d" port port;
-        "-p";
-        "14250:14250";
         "-e";
         sf "QUERY_HTTP_SERVER_HOST_PORT=%s:%d" interface port;
+        "-e";
+        (* Turned off to avoid port collision with the OTel collector on port
+           4317. The OTel collector already collects OpenTelemetry traces, so
+           there is no need to launch a second receiver. *)
+        "COLLECTOR_OTLP_ENABLED=false";
         "jaegertracing/all-in-one:latest";
       ]
   in
