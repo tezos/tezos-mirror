@@ -2198,18 +2198,18 @@ mod test {
             let global_counter = system_account.read_global_counter(&host).unwrap();
             assert_eq!(balance, U256::ZERO);
 
+            let burn_event =
+                Burn::decode_log_data(&outcome.result.logs()[0].data).unwrap();
+            assert_eq!(burn_event.sender, fa_withdrawal.sender);
+            assert_eq!(burn_event.amount, fa_withdrawal.amount);
+
             let withdrawal_event =
-                Withdrawal::decode_log_data(&outcome.result.logs()[0].data).unwrap();
+                Withdrawal::decode_log_data(&outcome.result.logs()[1].data).unwrap();
             assert_eq!(withdrawal_event.ticketHash, fa_withdrawal.ticketHash);
             assert_eq!(withdrawal_event.ticketOwner, fa_withdrawal.ticketOwner);
             assert_eq!(withdrawal_event.amount, fa_withdrawal.amount);
             assert_eq!(withdrawal_event.receiver, fa_withdrawal.receiver);
             assert_eq!(withdrawal_event.withdrawalId, U256::ZERO);
-
-            let burn_event =
-                Burn::decode_log_data(&outcome.result.logs()[1].data).unwrap();
-            assert_eq!(burn_event.sender, fa_withdrawal.sender);
-            assert_eq!(burn_event.amount, fa_withdrawal.amount);
 
             assert_eq!(global_counter, U256::ONE);
         }
