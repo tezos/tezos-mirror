@@ -124,6 +124,8 @@ let () = Tezos_ci_jobs.Tezt.register ()
 
 let () = Tezos_ci_jobs.Installation.register ()
 
+let () = Tezos_ci_jobs.Docker.register ()
+
 (** {3 General pipelines} *)
 
 let () =
@@ -157,7 +159,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Master_branch.jobs @ Cacio.get_jobs Master)
+    ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: Cacio.get_jobs Master)
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -536,8 +538,7 @@ let () =
     schedule_docker_build
     ~jobs:
       (Tezos_ci.job_datadog_pipeline_trace
-       :: Master_branch.octez_distribution_docker_jobs
-      @ Cacio.get_jobs Scheduled_docker_build)
+      :: Cacio.get_jobs Scheduled_docker_build)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \

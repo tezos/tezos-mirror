@@ -412,6 +412,7 @@ let jobs ?start_job ?(changeset = false) () =
   let job_docker_ci_based_images =
     (* use docker/docker image to bootstrap docker-ci base images. This is
        the upstream image for this image *)
+    (* See also the comment on [let version] in [docker.ml]. *)
     let docker_version = "28.5.1" in
     let variables =
       [
