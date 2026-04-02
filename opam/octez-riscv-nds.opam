@@ -13,6 +13,9 @@ depends: [
   "octez-libs" { = version }
   "octez-riscv-nds-memory-api" { = version }
   "octez-riscv-nds-disk-api" { = version }
+  "octez-rollup-node-rust-deps" { with-test & = version }
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "bls12-381" { with-test & = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
