@@ -464,7 +464,9 @@ let test_operation_worker_crash_shuts_down_baker_single_node =
     ~__FILE__
     ~title:"Baker shuts down when node crashes"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "single_node"; "crash"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
@@ -519,7 +521,9 @@ let test_operation_worker_crash_shuts_down_baker_multi_node =
     ~__FILE__
     ~title:"Baker does not shut down when operation_worker crashes"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P (in archive mode)" ;

@@ -248,8 +248,8 @@ let create_round_state ~global_state ~synchronize ~current_proposal =
     }
 
 let create_initial_state ?canceler cctxt ?(synchronize = true)
-    ?monitor_node_operations ~global_state ~(current_proposal : proposal)
-    delegates =
+    ?monitor_node_operations ~multi_node_setup ~global_state
+    ~(current_proposal : proposal) delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
@@ -269,6 +269,7 @@ let create_initial_state ?canceler cctxt ?(synchronize = true)
     Baking_automaton.create_automaton_state
       ?canceler
       ?monitor_node_operations
+      ~multi_node_setup
       ~global_state
       cctxt
   in
@@ -340,8 +341,8 @@ module Supervisor = struct
     loop 0 (List.map (fun cctxt -> Lwt.return (`Start cctxt)) cctxts)
 end
 
-let initialize_automaton ?canceler ?(synchronize = true) ~chain ~cache
-    ~on_head_proposal_callback global_state delegates cctxt =
+let initialize_automaton ?canceler ?(synchronize = true) ~multi_node_setup
+    ~chain ~cache ~on_head_proposal_callback global_state delegates cctxt =
   let open Lwt_result_syntax in
   let* heads_stream, _ = Node_rpc.monitor_heads cctxt ~cache ~chain () in
   let* current_proposal =
@@ -355,6 +356,7 @@ let initialize_automaton ?canceler ?(synchronize = true) ~chain ~cache
       ?canceler
       cctxt
       ~synchronize
+      ~multi_node_setup
       ~global_state
       ~current_proposal
       delegates
@@ -418,10 +420,12 @@ let run cctxt ~extra_nodes ?dal_node_rpc_ctxt ?canceler
     (* let retries = config.Baking_configuration.retries_on_failure in *)
     on_error err
   in
+  let multi_node_setup = extra_nodes <> [] in
   let run_automaton cctxt =
     let* initial_state, initial_event, loop_state =
       initialize_automaton
         ?canceler
+        ~multi_node_setup
         ~chain
         ~cache
         ~on_head_proposal_callback:revelation_worker_push_proposal

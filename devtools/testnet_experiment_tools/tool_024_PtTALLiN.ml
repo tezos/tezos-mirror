@@ -262,6 +262,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
       delegates
   in
   Baking_scheduling.create_initial_state
+    ~multi_node_setup:false
     cctxt
     ?synchronize
     ?monitor_node_operations
