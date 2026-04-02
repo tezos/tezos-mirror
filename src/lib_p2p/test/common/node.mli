@@ -87,6 +87,7 @@ val detach_nodes :
   ?timeout:float ->
   ?prefix:(int -> string) ->
   ?min_connections:(int -> int) ->
+  ?expected_connections:(int -> int) ->
   ?max_connections:(int -> int) ->
   ?max_incoming_connections:(int -> int) ->
   ?p2p_versions:(int -> P2p_version.t list) ->

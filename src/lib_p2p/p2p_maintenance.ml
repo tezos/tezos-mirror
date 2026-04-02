@@ -26,13 +26,6 @@
 
 module Events = P2p_events.P2p_maintainance
 
-type bounds = {
-  min_threshold : int;
-  min_target : int;
-  max_target : int;
-  max_threshold : int;
-}
-
 type config = {
   maintenance_idle_time : Time.System.Span.t;
   private_mode : bool;
@@ -51,7 +44,7 @@ type test_config = {
 type ('msg, 'meta, 'meta_conn) inner_state = {
   config : config;
   debug_config : test_config option;
-  bounds : bounds;
+  bounds : P2p_connect_handler.maintenance_bounds;
   connect_handler : ('msg, 'meta, 'meta_conn) P2p_connect_handler.t;
   discovery : P2p_discovery.t option;
   just_maintained : unit Lwt_condition.t;
@@ -315,17 +308,6 @@ let rec maintain t motive =
     in
     return_unit
 
-let bounds ~min ~expected ~max =
-  assert (min <= expected) ;
-  assert (expected <= max) ;
-  let step_min = (expected - min) / 3 and step_max = (max - expected) / 3 in
-  {
-    min_threshold = min + step_min;
-    min_target = min + (2 * step_min);
-    max_target = max - (2 * step_max);
-    max_threshold = max - step_max;
-  }
-
 module Name = P2p_workers.Unique_name_maker (struct
   let base = ["lib_p2p"; "p2p_maintenance"]
 end)
@@ -368,6 +350,7 @@ module Types = struct
   type ('msg, 'meta, 'meta_conn) inner_parameters = {
     discovery : P2p_discovery.t option;
     config : config;
+    bounds : P2p_connect_handler.maintenance_bounds;
     debug_config : test_config option;
     connect_handler : ('msg, 'meta, 'meta_conn) P2p_connect_handler.t;
     triggers : P2p_trigger.t;
@@ -402,6 +385,7 @@ module Handlers = struct
          {
            discovery;
            config;
+           bounds;
            debug_config;
            connect_handler;
            triggers;
@@ -410,12 +394,6 @@ module Handlers = struct
            please_maintain;
          }) =
     let inner_state =
-      let bounds =
-        bounds
-          ~min:config.min_connections
-          ~expected:config.expected_connections
-          ~max:config.max_connections
-      in
       {
         config;
         debug_config;
@@ -495,6 +473,7 @@ module Internal = struct
       Lwt_syntax.return
       @@ Worker.Any_request (Request.Maintain motive, {scope = None})
     in
+    let bounds = P2p_connect_handler.maintenance_bounds connect_handler in
     Worker.create
       ~callback
       ()
@@ -502,6 +481,7 @@ module Internal = struct
          {
            discovery;
            config;
+           bounds;
            debug_config;
            connect_handler;
            triggers;

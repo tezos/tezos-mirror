@@ -38,9 +38,9 @@ type t = {
   read_buffer_size : int;
   read_queue_size : int option;
   write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
   incoming_message_queue_size : int option;
   outgoing_message_queue_size : int option;
+  incoming_app_message_queue_size : int option;
   max_known_peer_ids : (int * int) option;
   max_known_points : (int * int) option;
   peer_greylist_size : int;
@@ -54,6 +54,10 @@ let default =
   let greylist_timeout =
     Time.System.Span.of_seconds_exn 86400.
     (* one day *)
+  in
+  let default_queue_size =
+    Some (1 lsl 23)
+    (* 8 MB *)
   in
   {
     connection_timeout = Time.System.Span.of_seconds_exn 10.;
@@ -69,12 +73,13 @@ let default =
     max_download_speed = None;
     max_upload_speed = None;
     read_buffer_size = 1 lsl 14;
-    read_queue_size = None;
-    write_queue_size = None;
-    incoming_app_message_queue_size = None;
-    incoming_message_queue_size = None;
-    outgoing_message_queue_size = None;
+    read_queue_size = default_queue_size;
+    write_queue_size = default_queue_size;
+    incoming_message_queue_size = default_queue_size;
+    outgoing_message_queue_size = default_queue_size;
     max_known_points = Some (400, 300);
+    incoming_app_message_queue_size =
+      Some 10 (* max 10 decoded messages per connection *);
     max_known_peer_ids = Some (400, 300);
     peer_greylist_size = 1023 (* historical value *);
     ip_greylist_size_in_kilobytes =
@@ -102,9 +107,9 @@ let encoding : t Data_encoding.t =
            read_buffer_size;
            read_queue_size;
            write_queue_size;
-           incoming_app_message_queue_size;
            incoming_message_queue_size;
            outgoing_message_queue_size;
+           incoming_app_message_queue_size;
            max_known_points;
            max_known_peer_ids;
            peer_greylist_size;
@@ -128,9 +133,9 @@ let encoding : t Data_encoding.t =
             read_buffer_size,
             read_queue_size,
             write_queue_size,
-            incoming_app_message_queue_size,
             incoming_message_queue_size,
             outgoing_message_queue_size,
+            incoming_app_message_queue_size,
             max_known_points ) ),
         ( max_known_peer_ids,
           peer_greylist_size,
@@ -152,9 +157,9 @@ let encoding : t Data_encoding.t =
                read_buffer_size,
                read_queue_size,
                write_queue_size,
-               incoming_app_message_queue_size,
                incoming_message_queue_size,
                outgoing_message_queue_size,
+               incoming_app_message_queue_size,
                max_known_points ) ),
            ( max_known_peer_ids,
              peer_greylist_size,
@@ -178,9 +183,9 @@ let encoding : t Data_encoding.t =
         read_buffer_size;
         read_queue_size;
         write_queue_size;
-        incoming_app_message_queue_size;
         incoming_message_queue_size;
         outgoing_message_queue_size;
+        incoming_app_message_queue_size;
         max_known_points;
         max_known_peer_ids;
         peer_greylist_size;
@@ -260,11 +265,20 @@ let encoding : t Data_encoding.t =
                 ~description:"Size of the buffer passed to read(2)."
                 int31
                 default.read_buffer_size)
-             (opt "read-queue-size" int31)
-             (opt "write-queue-size" int31)
-             (opt "incoming-app-message-queue-size" int31)
-             (opt "incoming-message-queue-size" int31)
-             (opt "outgoing-message-queue-size" int31)
+             (dft "read-queue-size" (option int31) default.read_queue_size)
+             (dft "write-queue-size" (option int31) default.write_queue_size)
+             (dft
+                "incoming-app-message-queue-size"
+                (option int31)
+                default.incoming_app_message_queue_size)
+             (dft
+                "incoming-message-queue-size"
+                (option int31)
+                default.incoming_message_queue_size)
+             (dft
+                "outgoing-message-queue-size"
+                (option int31)
+                default.outgoing_message_queue_size)
              (opt
                 "max_known_points"
                 ~description:

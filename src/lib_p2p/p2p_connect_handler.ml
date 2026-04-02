@@ -26,6 +26,24 @@
 
 module Events = P2p_events.P2p_connect_handler
 
+type maintenance_bounds = {
+  min_threshold : int;
+  min_target : int;
+  max_target : int;
+  max_threshold : int;
+}
+
+let make_maintenance_bounds ~min ~expected ~max =
+  assert (min <= expected) ;
+  assert (expected <= max) ;
+  let step_min = (expected - min) / 3 and step_max = (max - expected) / 3 in
+  {
+    min_threshold = min + step_min;
+    min_target = min + (2 * step_min);
+    max_target = max - (2 * step_max);
+    max_threshold = max - step_max;
+  }
+
 type config = {
   incoming_app_message_queue_size : int option;
   private_mode : bool;
@@ -105,10 +123,13 @@ type ('msg, 'peer_meta, 'conn_meta) t = {
   mutable disconnection_hook : (P2p_peer.Id.t -> unit) list;
   answerer : 'msg P2p_answerer.t Lazy.t;
   dependencies : ('msg, 'peer_meta, 'conn_meta) dependencies;
+  maintenance_bounds : maintenance_bounds;
+  connections_threshold : int;
 }
 
 let create ?(p2p_versions = P2p_version.supported) config pool message_config
-    conn_meta_config io_sched triggers ~log ~answerer =
+    conn_meta_config io_sched triggers ~log ~answerer ~maintenance_bounds
+    ~maintenance_active =
   let dependencies =
     {
       pool_greylist_peer = P2p_pool.greylist_peer;
@@ -140,11 +161,22 @@ let create ?(p2p_versions = P2p_version.supported) config pool message_config
     pool;
     answerer;
     dependencies;
+    maintenance_bounds;
+    (* [connections_threshold] is defined depending on the maintenance status.
+       If the maintenance is running, we reject a connection if [max_threshold]
+       is reached. This threshold that is lower than [max_connection] allows to
+       be in sync with maintenance behaviour. If no maintenance is running,
+       [max_connection] is used to avoid unexpected bounds. *)
+    connections_threshold =
+      (if maintenance_active then maintenance_bounds.max_threshold
+       else config.max_connections);
   }
 
 let config t = t.config
 
 let get_pool t = t.pool
+
+let maintenance_bounds t = t.maintenance_bounds
 
 let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
@@ -155,9 +187,13 @@ let create_connection t p2p_conn id_point point_info peer_info
     Option.map
       (fun qs ->
         ( qs,
-          fun (size, _) ->
-            (Sys.word_size / 8 * 11)
-            + size + Lwt_pipe.Maybe_bounded.push_overhead ))
+          (* The size function returns 1 for every message, making [qs] a cap on
+             the number of decoded application messages buffered per connection
+             (rather than a byte budget). This provides simple, predictable
+             back-pressure: once [qs] messages are queued and waiting to be
+             consumed by the shell, the reader loop stalls until the shell
+             drains the pipe. *)
+          fun _ -> 1 ))
       t.config.incoming_app_message_queue_size
   in
   let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
@@ -233,7 +269,7 @@ let create_connection t p2p_conn id_point point_info peer_info
        Improve invariant stability using a better encapsulation. *)
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5294
        Stop triggering the maintenance while performing a connection swap. *)
-    if t.config.max_connections < P2p_pool.active_connections t.pool then (
+    if t.config.max_connections <= P2p_pool.active_connections t.pool then (
       P2p_trigger.broadcast_too_many_connections t.triggers ;
       Events.(emit trigger_maintenance_too_many_connections)
         (P2p_pool.active_connections t.pool, t.config.max_connections))
@@ -496,12 +532,9 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
     in
     (* we have a common version, checking if there is an available slot *)
     let* () =
-      if
-        (* randomly allow one additional incoming connection *)
-        t.config.max_connections + Random.int 2
-        > P2p_pool.active_connections t.pool
-      then return_unit
-      else P2p_rejection.(rejecting Too_many_connections)
+      if P2p_pool.active_connections t.pool >= t.connections_threshold then
+        P2p_rejection.(rejecting Too_many_connections)
+      else return_unit
     in
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
@@ -982,6 +1015,9 @@ module Internal_for_tests = struct
         distributed_db_versions = [Distributed_db_version.zero];
       }
 
+  let dumb_bounds =
+    {min_threshold = 10; min_target = 10; max_target = 10; max_threshold = 10}
+
   let create ?(config = dumb_config) ?(log = fun _ -> ())
       ?(triggers = P2p_trigger.create ()) ?io_sched
       ?(announced_version = Network_version.Internal_for_tests.mock ())
@@ -991,7 +1027,9 @@ module Internal_for_tests = struct
       ?(encoding = make_crashing_encoding ())
       ?(incoming = P2p_point.Table.create ~random:true 53)
       ?(new_connection_hook = []) ?(disconnection_hook = [])
-      ?(answerer = lazy (P2p_protocol.create_private ())) pool dependencies :
+      ?(answerer = lazy (P2p_protocol.create_private ()))
+      ?(maintenance_bounds = dumb_bounds)
+      ?(connections_threshold = dumb_bounds.max_threshold) pool dependencies :
       ('msg, 'peer_meta, 'conn_meta) t tzresult Lwt.t =
     let open Lwt_result_syntax in
     let* io_sched =
@@ -1030,5 +1068,7 @@ module Internal_for_tests = struct
         disconnection_hook;
         answerer;
         dependencies;
+        maintenance_bounds;
+        connections_threshold;
       }
 end
