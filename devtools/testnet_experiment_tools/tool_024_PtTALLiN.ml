@@ -253,13 +253,19 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let* constants =
     Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
+  let* global_state =
+    Baking_scheduling.create_global_state
+      ~constants
+      ~chain
+      cctxt
+      config
+      delegates
+  in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
     ?monitor_node_operations
-    ~constants
-    ~chain
-    config
+    ~global_state
     ~current_proposal
     delegates
 

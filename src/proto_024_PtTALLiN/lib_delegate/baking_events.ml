@@ -737,6 +737,32 @@ module Scheduling = struct
         "The DAL node has no registered attester profile. It is recommended to \
          start the DAL node with '--attester-profiles <manager_key>'."
       ()
+
+  let supervisor_starting_automaton =
+    declare_1
+      ~section
+      ~name:"supervisor_starting_automaton"
+      ~level:Notice
+      ~msg:"Supervisor: starting automaton for node {uri}"
+      ("uri", Data_encoding.string)
+
+  let supervisor_automaton_crashed =
+    declare_2
+      ~section
+      ~name:"supervisor_automaton_crashed"
+      ~level:Warning
+      ~msg:
+        "Supervisor: automaton for node {uri} crashed, restarting in {delay}s"
+      ("uri", Data_encoding.string)
+      ("delay", Data_encoding.float)
+
+  let supervisor_all_down =
+    declare_0
+      ~section
+      ~name:"supervisor_all_automatons_down"
+      ~level:Error
+      ~msg:"Supervisor: all automatons are simultaneously down, shutting down"
+      ()
 end
 
 module Lib = struct

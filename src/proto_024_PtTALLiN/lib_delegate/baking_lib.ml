@@ -54,20 +54,21 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
-  let* chain_id = Node_rpc.chain_id cctxt ~chain in
-  let* constants =
-    Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
-  in
   let* state =
+    let* global_state =
+      Baking_scheduling.create_global_state
+        ?dal_node_rpc_ctxt
+        ~chain
+        cctxt
+        config
+        delegates
+    in
     Baking_scheduling.create_initial_state
       cctxt
-      ?dal_node_rpc_ctxt
-      ?monitor_node_operations
       ?synchronize
-      ~chain
-      config
+      ?monitor_node_operations
+      ~global_state
       ~current_proposal
-      ~constants
       delegates
   in
   return state
@@ -649,13 +650,10 @@ let bake_using_automaton ~count config state heads_stream =
   let cctxt = state.automaton_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
-  let forge_event_stream =
-    state.global_state.forge_worker_hooks.get_forge_event_stream ()
-  in
   let loop_state =
     Baking_automaton.create_loop_state
       ~heads_stream
-      ~forge_event_stream
+      ~forge_event_stream:state.automaton_state.forge_event_stream
       ~on_head_proposal_callback:ignore
       state.automaton_state.operation_worker
   in
