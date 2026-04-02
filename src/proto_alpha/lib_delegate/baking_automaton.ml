@@ -208,6 +208,13 @@ let rec wait_next_event ~timeout ~cctxt loop_state =
       (* Node connection lost *)
       loop_state.last_get_head_event <- None ;
       tzfail Baking_errors.Node_connection_lost
+  | `QC_reached (Some Operation_worker.Shutdown) ->
+      (* Operation worker has closed the quorum stream, indicating a fatal error
+         (e.g., node unreachable). In multi-node setups, fail the automaton so
+         the supervisor can restart it. In single-node setups, this should not
+         happen as the worker uses Lwt_exit.exit_and_raise. *)
+      loop_state.last_get_qc_event <- None ;
+      tzfail Baking_errors.Node_connection_lost
   | `QC_reached None ->
       (* Not supposed to happen: exit the loop *)
       loop_state.last_get_qc_event <- None ;
@@ -787,8 +794,8 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
         ())
     dal_node_rpc_ctxt
 
-let create_automaton_state ?canceler ?monitor_node_operations ~global_state
-    cctxt =
+let create_automaton_state ?canceler ?monitor_node_operations ~multi_node_setup
+    ~global_state cctxt =
   let open Lwt_result_syntax in
   let name = Uri.to_string cctxt#base in
   (* Create DAL worker for this automaton *)
@@ -810,6 +817,7 @@ let create_automaton_state ?canceler ?monitor_node_operations ~global_state
   let*! operation_worker =
     Operation_worker.run
       ?monitor_node_operations
+      ~multi_node_setup
       ~round_durations:global_state.round_durations
       cctxt
   in

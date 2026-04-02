@@ -67,6 +67,7 @@ val create_initial_state :
   Protocol_client_context.full ->
   ?synchronize:bool ->
   ?monitor_node_operations:bool ->
+  multi_node_setup:bool ->
   global_state:global_state ->
   current_proposal:proposal ->
   Baking_state_types.Key.t list ->
