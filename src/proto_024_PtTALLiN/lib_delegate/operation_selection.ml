@@ -231,7 +231,8 @@ let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
     =
   let open Lwt_syntax in
   let {Tezos_protocol_environment.max_size; max_op} = quota in
-  let rec loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) =
+  let rec loop
+      (inc, filter_state, curr_size, nb_ops, total_fees, remaining_gas, acc) =
     function
     | [] -> return (inc, nb_ops, total_fees, List.rev acc)
     | {op; size = op_size; gas = op_gas; fee; _} :: l -> (
@@ -242,36 +243,92 @@ let filter_valid_managers_up_to_quota inc ~hard_gas_limit_per_block (ops, quota)
             if Gas.Arith.(remaining_gas < op_gas) then
               (* If the remaining available gas is lower than the
                  considered operation's gas, we ignore this operation. *)
-              loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) l
+              loop
+                ( inc,
+                  filter_state,
+                  curr_size,
+                  nb_ops,
+                  total_fees,
+                  remaining_gas,
+                  acc )
+                l
             else
               let new_size = curr_size + op_size in
               if new_size > max_size then
                 (* We ignore the operation if summing its size to the
                    size of managers operations already validated is
                    greater than the quota. *)
-                loop (inc, curr_size, nb_ops, total_fees, remaining_gas, acc) l
+                loop
+                  ( inc,
+                    filter_state,
+                    curr_size,
+                    nb_ops,
+                    total_fees,
+                    remaining_gas,
+                    acc )
+                  l
               else
                 let packed_op = Prioritized_operation.packed op in
-                let* inc'_opt = validate_operation inc packed_op in
-                match inc'_opt with
+                let* filter_result =
+                  Plugin.Block_validation.check_block_operation
+                    filter_state
+                    packed_op
+                in
+                let* filter_state_opt =
+                  match filter_result with
+                  | Ok filter_state' -> return_some filter_state'
+                  | Error errs ->
+                      let* () =
+                        Events.(emit invalid_operation_filtered)
+                          (Operation.hash_packed packed_op, errs)
+                      in
+                      return_none
+                in
+                match filter_state_opt with
                 | None ->
                     loop
-                      (inc, curr_size, nb_ops, total_fees, remaining_gas, acc)
+                      ( inc,
+                        filter_state,
+                        curr_size,
+                        nb_ops,
+                        total_fees,
+                        remaining_gas,
+                        acc )
                       l
-                | Some inc' ->
-                    let new_remaining_gas =
-                      Gas.Arith.sub remaining_gas op_gas
-                    in
-                    loop
-                      ( inc',
-                        new_size,
-                        succ nb_ops,
-                        Int64.add total_fees (Tez.to_mutez fee),
-                        new_remaining_gas,
-                        packed_op :: acc )
-                      l))
+                | Some filter_state' -> (
+                    let* inc'_opt = validate_operation inc packed_op in
+                    match inc'_opt with
+                    | None ->
+                        loop
+                          ( inc,
+                            filter_state,
+                            curr_size,
+                            nb_ops,
+                            total_fees,
+                            remaining_gas,
+                            acc )
+                          l
+                    | Some inc' ->
+                        let new_remaining_gas =
+                          Gas.Arith.sub remaining_gas op_gas
+                        in
+                        loop
+                          ( inc',
+                            filter_state',
+                            new_size,
+                            succ nb_ops,
+                            Int64.add total_fees (Tez.to_mutez fee),
+                            new_remaining_gas,
+                            packed_op :: acc )
+                          l)))
   in
-  loop (inc, 0, 0, Int64.zero, hard_gas_limit_per_block, []) ops
+  let init_block_state =
+    Plugin.Block_validation.init_block_validation_state
+      (fst inc.Baking_simulator.state)
+  in
+  loop
+    (inc, init_block_state, 0, 0, Int64.zero, hard_gas_limit_per_block, [])
+    ops
 
 let filter_operations_with_simulation initial_inc fees_config
     ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
