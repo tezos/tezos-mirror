@@ -2823,3 +2823,31 @@ let () =
   let* alloc = clst_allocated_tez (B b) delegate_pkh in
   (* Allocation matches the exact computed cap *)
   Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test ratio cap includes global limit" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* With ratio = 20% and global_limit = 9, the ratio cap is
+     own_frozen * 9 * 0.2 = 1.8 * own_frozen = 360k tez.
+     We deposit more than own_frozen to ensure the ratio cap is the binding
+     constraint, and verify the allocation exceeds own_frozen * ratio (which
+     would be the result if global_limit were not included). *)
+  let ratio = 200_000_000l in
+  let deposit_mutez = 1_000_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let expected_cap =
+    Tez.of_mutez 360_000_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
