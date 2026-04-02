@@ -13,6 +13,7 @@ pub enum CustomPrecompileError {
     Abort(RuntimeError),
     Revert(String),
     RevertKeepGas(String, Gas),
+    OutOfGas(Gas),
 }
 
 impl From<RuntimeError> for CustomPrecompileError {

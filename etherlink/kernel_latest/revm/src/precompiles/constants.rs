@@ -183,11 +183,25 @@ pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 24_200;
 // cold write 22100 (inserting a non zero value to a zero value).
 pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 
-// TODO Define the cost: https://linear.app/tezos/issue/L2-662/define-cost-of-precompile-gateway-on-ethereum
-pub(crate) const RUNTIME_GATEWAY_TRANSFER_BASE_COST: u64 = 1_000;
+// Gateway base cost: covers ABI decoding, HTTP request construction,
+// header injection (7 X-Tezos-* headers), gas conversion arithmetic,
+// response parsing, and CracSent event emission (LOG4).
+// Derived from Ethereum gas schedule: G_log=375, G_logtopic=375,
+// G_logdata=8/byte, G_copy=3/word, G_memory=3/word.
+// See RFC: Gas model for gateways and aliases.
+pub(crate) const RUNTIME_GATEWAY_BASE_COST: u64 = 5_000;
 
-// TODO Define the cost for call (cross-runtime HTTP call)
-pub(crate) const RUNTIME_GATEWAY_CALL_BASE_COST: u64 = 1_000;
+// Alias lookup: charged upfront before each alias resolution (durable
+// storage read). Equivalent to a cold SLOAD (EIP-2929).
+pub(crate) const ALIAS_CACHE_HIT_COST: u64 = 2_100;
+
+// Surcharge when msg.value > 0 (precompile balance burn after cross-runtime
+// value transfer). Equivalent to SSTORE non-zero to zero (EIP-2929 + YP).
+pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
+
+// Per user-supplied header validation cost for the generic call() function.
+// Covers the string prefix check against forbidden X-Tezos-* headers.
+pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 10;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints

@@ -229,7 +229,8 @@ impl RuntimeInterface for EthereumRuntime {
         journal: &mut TezosXJournal,
         native_address: &str,
         context: CrossRuntimeContext,
-    ) -> Result<String, TezosXRuntimeError>
+        gas_remaining: u64,
+    ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1 + tezos_evm_logging::Logging,
     {
@@ -291,8 +292,8 @@ impl RuntimeInterface for EthereumRuntime {
         let evm_version = read_evm_version(host);
         let block_constants = self.create_block_constants(host, &context);
 
-        // Set up gas data (zero gas price since this is an internal transaction)
-        let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
+        // Use the caller's remaining gas so it controls the budget.
+        let gas_data = GasData::new(gas_remaining, 0, gas_remaining);
 
         // Ensure the TezosX caller account has balance for gas
         let mut caller_account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS)?;
@@ -324,9 +325,11 @@ impl RuntimeInterface for EthereumRuntime {
             TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
         })?;
 
-        // Check that the call succeeded
+        // Check that the call succeeded; return remaining EVM gas.
+        let gas_used = outcome.result.gas_used();
+        let remaining_after = gas_remaining.saturating_sub(gas_used);
         match outcome.result {
-            ExecutionResult::Success { .. } => Ok(alias.to_string()),
+            ExecutionResult::Success { .. } => Ok((alias.to_string(), remaining_after)),
             ExecutionResult::Revert { output, .. } => Err(TezosXRuntimeError::Custom(
                 format!("init_tezosx_alias reverted: {output:?}"),
             )),
@@ -412,7 +415,8 @@ mod tests {
             _native_address: &str,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<String, TezosXRuntimeError>
+            _gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {

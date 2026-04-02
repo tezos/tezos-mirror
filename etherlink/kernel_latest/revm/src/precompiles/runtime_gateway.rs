@@ -5,7 +5,7 @@ use revm::{
     context::{Block, ContextTr, JournalTr, Transaction},
     context_interface::journaled_state::account::JournaledAccountTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
-    primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
+    primitives::{alloy_primitives::IntoLogData, Address, Bytes, Log, U256},
 };
 use tezosx_interfaces::headers::format_tez_from_wei;
 use tezosx_interfaces::{
@@ -20,8 +20,9 @@ use crate::{
     journal::{CrossRuntimeCall, Journal},
     precompiles::{
         constants::{
-            RUNTIME_GATEWAY_CALL_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            RUNTIME_GATEWAY_TRANSFER_BASE_COST,
+            ALIAS_CACHE_HIT_COST, HEADER_VALIDATION_PER_HEADER,
+            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            VALUE_TRANSFER_SURCHARGE,
         },
         guard::out_of_gas,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
@@ -68,7 +69,18 @@ fn build_http_request(
     headers: &[(String, String)],
     body: &[u8],
     method_u8: u8,
+    gas: &mut Gas,
 ) -> Result<http::Request<Vec<u8>>, CustomPrecompileError> {
+    // Charge per-header validation cost for user-supplied headers
+    let header_cost =
+        HEADER_VALIDATION_PER_HEADER
+            .checked_mul(headers.len().try_into().map_err(|_| {
+                CustomPrecompileError::Revert("header cost overflow".into())
+            })?)
+            .ok_or(CustomPrecompileError::Revert("header cost overflow".into()))?;
+    if header_cost > 0 && !gas.record_cost(header_cost) {
+        return Err(CustomPrecompileError::OutOfGas(*gas));
+    }
     let method = match method_u8 {
         0 => http::Method::GET,
         1 => http::Method::POST,
@@ -121,6 +133,53 @@ fn charge_crac_gas(
             "X-Tezos-Gas-Consumed overflows EVM gas units".into(),
         ))?;
     Ok(gas.record_cost(evm_consumed))
+}
+
+/// Resolve sender and source aliases, charging gas for lookups and any
+/// alias generation triggered on cache miss.
+///
+/// Returns `Ok(Some((sender_alias, source_alias)))` on success, or
+/// `Ok(None)` when the caller runs out of gas.
+fn resolve_aliases<'j, CTX, Host, R>(
+    context: &mut CTX,
+    gas: &mut Gas,
+    sender: Address,
+    source: Address,
+) -> Result<Option<(String, String)>, CustomPrecompileError>
+where
+    Host: StorageV1 + Logging + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    // --- sender alias ---
+    if !gas.record_cost(ALIAS_CACHE_HIT_COST) {
+        return Ok(None);
+    }
+    let (sender_alias, sender_gen_gas) = context
+        .journal_mut()
+        .tezosx_resolve_source_alias(sender, gas.remaining())?;
+    let sender_gen_evm =
+        gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, sender_gen_gas)
+            .unwrap_or(u64::MAX);
+    if sender_gen_evm > 0 && !gas.record_cost(sender_gen_evm) {
+        return Ok(None);
+    }
+
+    // --- source alias ---
+    if !gas.record_cost(ALIAS_CACHE_HIT_COST) {
+        return Ok(None);
+    }
+    let (source_alias, source_gen_gas) = context
+        .journal_mut()
+        .tezosx_resolve_source_alias(source, gas.remaining())?;
+    let source_gen_evm =
+        gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, source_gen_gas)
+            .unwrap_or(u64::MAX);
+    if source_gen_evm > 0 && !gas.record_cost(source_gen_evm) {
+        return Ok(None);
+    }
+
+    Ok(Some((sender_alias, source_alias)))
 }
 
 /// Inject X-Tezos-* headers carrying the trusted execution context.
@@ -187,7 +246,7 @@ where
 
     match function_call {
         RuntimeGatewayCalls::transfer(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_TRANSFER_BASE_COST) {
+            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
@@ -206,23 +265,29 @@ where
                     ))
                 })?;
 
-            // Resolve cross-runtime aliases and inject context headers
             let tx_caller = context.tx().caller();
-            // Convert EVM gas to Tezos milligas for the target runtime
+            let (sender_alias, source_alias) =
+                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                    Some(aliases) => aliases,
+                    None => return Ok(out_of_gas(inputs.gas_limit)),
+                };
+
+            // Charge value transfer surcharge before the CRAC so the
+            // caller cannot trigger a cross-runtime transfer without
+            // enough gas to cover the balance burn.
+            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
+                return Ok(out_of_gas(inputs.gas_limit));
+            }
+
+            // Convert remaining EVM gas to Tezos milligas for the target runtime
             let gas_limit =
-                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, inputs.gas_limit)
+                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
                     .ok_or(CustomPrecompileError::Revert(
                         "transfer: EVM gas limit overflows Tezos milligas".into(),
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-            let sender_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(inputs.caller)?;
-            let source_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(tx_caller)?;
 
             inject_tezos_headers(
                 request.headers_mut(),
@@ -264,7 +329,7 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::callMichelson(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_TRANSFER_BASE_COST) {
+            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
@@ -274,7 +339,6 @@ where
             let amount = inputs.value.get();
 
             // Build HTTP request targeting the Tezos runtime.
-            // Entrypoint goes in the URL path, Micheline parameters in the body.
             let url = if entrypoint.is_empty() {
                 format!("http://tezos/{destination}")
             } else {
@@ -290,23 +354,26 @@ where
                     ))
                 })?;
 
-            // Resolve cross-runtime aliases and inject context headers
             let tx_caller = context.tx().caller();
-            // Convert EVM gas to Tezos milligas for the target runtime
+            let (sender_alias, source_alias) =
+                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                    Some(aliases) => aliases,
+                    None => return Ok(out_of_gas(inputs.gas_limit)),
+                };
+
+            // Charge value transfer surcharge before the CRAC
+            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
+                return Ok(out_of_gas(inputs.gas_limit));
+            }
+
             let gas_limit =
-                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, inputs.gas_limit)
+                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
                     .ok_or(CustomPrecompileError::Revert(
                         "callMichelson: EVM gas limit overflows Tezos milligas".into(),
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-            let sender_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(inputs.caller)?;
-            let source_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(tx_caller)?;
 
             inject_tezos_headers(
                 request.headers_mut(),
@@ -348,20 +415,31 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::call(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_CALL_BASE_COST) {
+            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
                 return Ok(out_of_gas(inputs.gas_limit));
             }
 
-            let mut request =
-                build_http_request(&call.url, &call.headers, &call.body, call.method)?;
+            let mut request = build_http_request(
+                &call.url,
+                &call.headers,
+                &call.body,
+                call.method,
+                &mut gas,
+            )?;
 
-            // Resolve cross-runtime aliases for the caller and tx originator,
-            // just like the transfer/callMichelson handlers do.
             let tx_caller = context.tx().caller();
             let amount = inputs.value.get();
-            // Convert EVM gas to the target runtime's units.
-            // Unknown host is a user error (bad URL); overflow is impossible
-            // for EVM→Tezos (÷10) but we guard it defensively. Both revert.
+            let (sender_alias, source_alias) =
+                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                    Some(aliases) => aliases,
+                    None => return Ok(out_of_gas(inputs.gas_limit)),
+                };
+
+            // Charge value transfer surcharge before the CRAC
+            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
+                return Ok(out_of_gas(inputs.gas_limit));
+            }
+
             let target_runtime =
                 request.uri().host().and_then(RuntimeId::from_host).ok_or(
                     CustomPrecompileError::Revert(
@@ -369,26 +447,13 @@ where
                     ),
                 )?;
             let gas_limit =
-                gas::convert(RuntimeId::Ethereum, target_runtime, inputs.gas_limit)
+                gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
                     .ok_or(CustomPrecompileError::Revert(
                         "httpCall: EVM gas limit overflows target runtime units".into(),
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
-            let sender_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(inputs.caller)?;
-            let source_alias = context
-                .journal_mut()
-                .tezosx_resolve_source_alias(tx_caller)?;
-
-            let target_runtime =
-                request.uri().host().and_then(RuntimeId::from_host).ok_or(
-                    CustomPrecompileError::Revert(
-                        "httpCall: unknown or missing target runtime in URL host".into(),
-                    ),
-                )?;
 
             // Inject X-Tezos-* headers with trusted execution context.
             // These carry the call context that the target runtime's `serve`
@@ -495,6 +560,7 @@ mod tests {
             )],
             &[],
             0, // GET
+            &mut Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -515,6 +581,7 @@ mod tests {
             &[],
             &body,
             1, // POST
+            &mut Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -531,8 +598,14 @@ mod tests {
             ),
             ("X-Custom".to_string(), "some-value".to_string()),
         ];
-        let request =
-            build_http_request("http://michelson/KT1abc", &headers, &[], 1).unwrap();
+        let request = build_http_request(
+            "http://michelson/KT1abc",
+            &headers,
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
 
         assert_eq!(
             request.headers().get("Content-Type").unwrap(),
@@ -543,7 +616,13 @@ mod tests {
 
     #[test]
     fn test_build_http_request_unsupported_method() {
-        let result = build_http_request("http://michelson/KT1abc", &[], &[], 42);
+        let result = build_http_request(
+            "http://michelson/KT1abc",
+            &[],
+            &[],
+            42,
+            &mut Gas::new(u64::MAX),
+        );
         assert!(matches!(
             result,
             Err(CustomPrecompileError::Revert(msg)) if msg.contains("unsupported HTTP method")
@@ -602,6 +681,7 @@ mod tests {
             )],
             &[0xCA, 0xFE],
             1,
+            &mut Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -710,6 +790,7 @@ mod tests {
             &[("X-Tezos-Sender".to_string(), "0xevil".to_string())],
             &[],
             0,
+            &mut Gas::new(u64::MAX),
         );
         assert!(matches!(
             result,
@@ -724,6 +805,7 @@ mod tests {
             &[("x-tezos-amount".to_string(), "999".to_string())],
             &[],
             0,
+            &mut Gas::new(u64::MAX),
         );
         assert!(matches!(
             result,
@@ -735,7 +817,14 @@ mod tests {
 
     #[test]
     fn test_inject_tezos_headers_zero_amount() {
-        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        let mut request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
 
         let sender_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
@@ -767,7 +856,14 @@ mod tests {
 
     #[test]
     fn test_inject_tezos_headers_fractional_amount() {
-        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        let mut request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
 
         let sender_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
@@ -801,7 +897,14 @@ mod tests {
 
     #[test]
     fn test_inject_tezos_headers_zero_gas_and_block() {
-        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        let mut request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
 
         let sender_alias =
             Contract::from_b58check("KT1GRAN26ni19mgd6xpL6tsH52LNnhKSQzP2").unwrap();
@@ -853,7 +956,14 @@ mod tests {
 
     #[test]
     fn test_build_http_request_empty_body() {
-        let request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
         assert!(request.body().is_empty());
         assert_eq!(request.method(), http::Method::POST);
     }
@@ -861,7 +971,14 @@ mod tests {
     #[test]
     fn test_build_http_request_preserves_large_body() {
         let body = vec![0xAB; 1024];
-        let request = build_http_request("http://tezos/KT1abc", &[], &body, 1).unwrap();
+        let request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &body,
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
         assert_eq!(request.body().len(), 1024);
         assert!(request.body().iter().all(|&b| b == 0xAB));
     }
@@ -873,6 +990,7 @@ mod tests {
             &[("X-TEZOS-Sender".to_string(), "bad".to_string())],
             &[],
             1,
+            &mut Gas::new(u64::MAX),
         );
         assert!(matches!(
             result,
@@ -933,7 +1051,14 @@ mod tests {
 
     #[test]
     fn test_inject_tezos_headers_overwrites_all_existing() {
-        let mut request = build_http_request("http://tezos/KT1abc", &[], &[], 1).unwrap();
+        let mut request = build_http_request(
+            "http://tezos/KT1abc",
+            &[],
+            &[],
+            1,
+            &mut Gas::new(u64::MAX),
+        )
+        .unwrap();
 
         // Pre-populate with old values
         request

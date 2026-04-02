@@ -582,10 +582,16 @@ impl<Host: StorageV1 + Logging, R: Registry> Journal<'_, Host, R> {
 /// This is implemented for Journal backed by EtherlinkVMDB, which has access
 /// to the host, registry, and block constants needed for cross-runtime calls.
 pub trait CrossRuntimeCall {
+    /// Resolve the Tezos alias for an EVM address. `remaining_evm_gas` is the
+    /// caller's remaining gas budget (used to cap alias generation).
+    ///
+    /// Returns `(alias, generation_gas_consumed)` where `generation_gas_consumed`
+    /// is in target runtime units (milligas for Tezos), 0 on cache hit.
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
-    ) -> Result<String, CustomPrecompileError>;
+        remaining_evm_gas: u64,
+    ) -> Result<(String, u64), CustomPrecompileError>;
 
     fn tezosx_call_http(
         &mut self,
@@ -603,17 +609,28 @@ where
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
-    ) -> Result<String, CustomPrecompileError> {
+        remaining_evm_gas: u64,
+    ) -> Result<(String, u64), CustomPrecompileError> {
         let context = CrossRuntimeContext {
             gas_limit: self.database.block.gas_limit,
             timestamp: self.database.block.timestamp,
             block_number: self.database.block.number,
         };
         match get_alias(self.database.host, &source, RuntimeId::Tezos)? {
-            Some(alias) => Ok(alias),
+            Some(alias) => Ok((alias, 0)),
             None => {
+                // Convert remaining EVM gas to Tezos milligas to cap
+                // the generation cost.
+                let tezos_gas_budget = tezosx_interfaces::gas::convert(
+                    RuntimeId::Ethereum,
+                    RuntimeId::Tezos,
+                    remaining_evm_gas,
+                )
+                .ok_or(CustomPrecompileError::Revert(
+                    "alias generation: EVM gas overflows Tezos milligas".into(),
+                ))?;
                 let source_hex = source.to_string().to_lowercase();
-                let alias_str = self
+                let (alias_str, tezos_gas_remaining) = self
                     .database
                     .registry
                     .generate_alias(
@@ -622,6 +639,7 @@ where
                         &source_hex,
                         RuntimeId::Tezos,
                         context,
+                        tezos_gas_budget,
                     )
                     .map_err(|e| {
                         CustomPrecompileError::Revert(format!(
@@ -629,7 +647,8 @@ where
                         ))
                     })?;
                 store_alias(self.database.host, &source, RuntimeId::Tezos, &alias_str)?;
-                Ok(alias_str)
+                let consumed_milligas = tezos_gas_budget - tezos_gas_remaining;
+                Ok((alias_str, consumed_milligas))
             }
         }
     }

@@ -72,6 +72,14 @@ pub enum TezosXRuntimeError {
     OutOfGas,
 }
 pub trait Registry {
+    /// Generate an alias in the target runtime.
+    ///
+    /// `gas_remaining` is the caller's remaining gas budget in the **target
+    /// runtime's gas units** (milligas for Tezos, EVM gas for Ethereum).
+    /// The function consumes gas incrementally and fails early if the
+    /// budget is exceeded.
+    ///
+    /// Returns `(alias, gas_remaining_after)`.
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
@@ -79,7 +87,8 @@ pub trait Registry {
         native_address: &str,
         runtime_id: RuntimeId,
         context: CrossRuntimeContext,
-    ) -> Result<String, TezosXRuntimeError>
+        gas_remaining: u64,
+    ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1 + Logging;
 
@@ -103,8 +112,9 @@ pub trait Registry {
 pub trait RuntimeInterface {
     /// Generate an alias address for a native address in this runtime.
     ///
-    /// This function creates an alias that allows the native address to receive
-    /// funds in this runtime and have them forwarded to the original address.
+    /// `gas_remaining` is the caller's remaining budget in this runtime's
+    /// native gas units. Returns `(alias, gas_remaining_after)`. Fails if
+    /// the budget is exceeded.
     fn generate_alias<Host>(
         &self,
         registry: &impl Registry,
@@ -112,7 +122,8 @@ pub trait RuntimeInterface {
         journal: &mut TezosXJournal,
         native_address: &str,
         context: CrossRuntimeContext,
-    ) -> Result<String, TezosXRuntimeError>
+        gas_remaining: u64,
+    ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1 + Logging;
 
