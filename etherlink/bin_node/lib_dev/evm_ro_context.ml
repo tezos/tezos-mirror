@@ -520,6 +520,7 @@ let apply_blueprint ?log_file ?profile ctxt blueprint evm_state =
 
 let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
   let open Lwt_result_syntax in
+  let* storage_version = storage_version ctxt in
   let*? txns =
     Blueprint_decoder.transactions blueprint.Blueprint_types.blueprint.payload
   in
@@ -549,6 +550,7 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
         (fun (evm_state, idx) (hash, txn) ->
           let* _, evm_state =
             Evm_state.execute_single_transaction
+              ~storage_version
               ~data_dir:ctxt.data_dir
               ~pool:ctxt.execution_pool
               ~native_execution:(ctxt.native_execution_policy = Always)
@@ -568,6 +570,7 @@ let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
     in
 
     Evm_state.assemble_block
+      ~storage_version
       ~pool:ctxt.execution_pool
       ~data_dir:ctxt.data_dir
       ~chain_family:EVM

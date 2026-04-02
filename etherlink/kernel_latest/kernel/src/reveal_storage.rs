@@ -21,7 +21,7 @@ use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::ValueType;
 use tezos_smart_rollup_host::storage::StorageV1;
 
-const CONFIG_PATH: RefPath = RefPath::assert_from(b"/__tmp/reveal_config");
+const CONFIG_PATH: RefPath = RefPath::assert_from(b"/base/__tmp/reveal_config");
 
 #[derive(Debug)]
 struct Set {

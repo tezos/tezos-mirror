@@ -151,9 +151,16 @@ fn set_kernel_version(host: &mut impl StorageV1) -> Result<(), Error> {
 }
 
 fn init_storage_versioning(host: &mut impl StorageV1) -> Result<(), Error> {
+    // Check both the new /base/ path and the legacy /evm/ path.
+    // If either exists, storage versioning is already initialised and the
+    // migration framework will take it from here.
+    use crate::storage::LEGACY_STORAGE_VERSION_PATH;
     match host.store_read(&STORAGE_VERSION_PATH, 0, 0) {
         Ok(_) => Ok(()),
-        Err(_) => store_storage_version(host, STORAGE_VERSION),
+        Err(_) => match host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, 0) {
+            Ok(_) => Ok(()),
+            Err(_) => store_storage_version(host, STORAGE_VERSION),
+        },
     }
 }
 

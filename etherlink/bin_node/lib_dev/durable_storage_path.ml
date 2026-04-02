@@ -14,19 +14,32 @@ type path = string
 
 let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
-let evm_node_flag = "/__evm_node"
-
 module Tezlink = struct
   let root = "/tezlink"
 end
 
 let tezlink_root = Tezlink.root
 
+module BASE = struct
+  let root = "/base"
+
+  let make s = root ^ s
+end
+
 module EVM = struct
   let root = "/evm"
 
   let make s = root ^ s
 end
+
+let evm_node_flag_legacy = "/__evm_node"
+
+let evm_node_flag_base = BASE.make evm_node_flag_legacy
+
+let evm_node_flag ~storage_version =
+  if Storage_version.ipc_paths_moved_to_base ~storage_version then
+    evm_node_flag_base
+  else evm_node_flag_legacy
 
 module World_state = struct
   let root = "/world_state"
@@ -35,13 +48,18 @@ module World_state = struct
 end
 
 module Single_tx = struct
-  let single_tx_path = World_state.make "/single_tx"
+  let input_tx_base = BASE.make "/instant_confirmation/input_tx"
 
-  let input_tx = single_tx_path ^ "/input_tx"
+  let input_tx_legacy = World_state.make "/single_tx/input_tx"
+
+  let input_tx ~storage_version =
+    if Storage_version.ipc_paths_moved_to_base ~storage_version then
+      input_tx_base
+    else input_tx_legacy
 end
 
 module Tezosx_simulation = struct
-  let path = "/__simulation"
+  let path = BASE.make "/__simulation"
 
   let input = path ^ "/input"
 
@@ -49,17 +67,26 @@ module Tezosx_simulation = struct
 end
 
 module Tezosx_entrypoints = struct
-  let path = "/tezosx_entrypoints"
+  let path = BASE.make "/tezosx_entrypoints"
 
   let input = path ^ "/input"
 
   let result = path ^ "/result"
 end
 
-module Assemble_block = struct
-  let path = World_state.make "/assemble_block"
+let delayed_input ~storage_version =
+  if Storage_version.ipc_paths_moved_to_base ~storage_version then
+    BASE.make "/__delayed_input"
+  else "/__delayed_input"
 
-  let input = path ^ "/input"
+module Assemble_block = struct
+  let input_base = BASE.make "/instant_confirmation/assemble_block/input"
+
+  let input_legacy = World_state.make "/assemble_block/input"
+
+  let input ~storage_version =
+    if Storage_version.ipc_paths_moved_to_base ~storage_version then input_base
+    else input_legacy
 end
 
 let etherlink_root = World_state.make ""
@@ -92,7 +119,9 @@ let kernel_version = EVM.make "/kernel_version"
 
 let kernel_verbosity = EVM.make "/logging_verbosity"
 
-let storage_version = EVM.make "/storage_version"
+let storage_version_base = BASE.make "/storage_version"
+
+let storage_version_legacy = EVM.make "/storage_version"
 
 let kernel_root_hash = EVM.make "/kernel_root_hash"
 

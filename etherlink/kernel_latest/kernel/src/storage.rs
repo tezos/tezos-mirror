@@ -87,6 +87,7 @@ pub enum StorageVersion {
     V48,
     V49,
     V50,
+    V51,
 }
 
 impl From<StorageVersion> for u64 {
@@ -101,11 +102,13 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V50;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V51;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
-pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
+pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
+    RefPath::assert_from(b"/evm/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
 
@@ -695,25 +698,32 @@ pub fn store_storage_version(
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
     host.store_write(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes(), 0)
-        .map_err(Error::from)
+        .map_err(Error::from)?;
+    // Clean up legacy path so only /base/storage_version remains.
+    let _ = host.store_delete(&LEGACY_STORAGE_VERSION_PATH);
+    Ok(())
 }
 
 pub fn read_storage_version<Host>(host: &mut Host) -> Result<StorageVersion, Error>
 where
     Host: StorageV1 + Logging,
 {
-    match host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>()) {
-        Ok(bytes) => {
-            let slice_of_bytes: [u8; 8] =
-                bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
-            let version_u64 = u64::from_le_bytes(slice_of_bytes);
-            let version =
-                FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
-            log!(host, Debug, "Current storage version: {:?}", version);
-            Ok(version)
+    // Try the new /base/ path first, fall back to legacy /evm/ path
+    // only when the new path does not exist yet.
+    let size = std::mem::size_of::<u64>();
+    let bytes = match host.store_read(&STORAGE_VERSION_PATH, 0, size) {
+        Ok(bytes) => bytes,
+        Err(RuntimeError::PathNotFound) => {
+            host.store_read(&LEGACY_STORAGE_VERSION_PATH, 0, size)?
         }
-        Err(e) => Err(e.into()),
-    }
+        Err(e) => return Err(e.into()),
+    };
+    let slice_of_bytes: [u8; 8] =
+        bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
+    let version_u64 = u64::from_le_bytes(slice_of_bytes);
+    let version = FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
+    log!(host, Debug, "Current storage version: {:?}", version);
+    Ok(version)
 }
 
 pub fn read_kernel_version(host: &mut impl StorageV1) -> Result<String, Error> {

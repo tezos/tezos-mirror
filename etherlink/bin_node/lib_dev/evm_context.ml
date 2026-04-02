@@ -555,7 +555,9 @@ module State = struct
       let*! () =
         modify_in_place
           ctxt
-          ~key:"/__delayed_input"
+          ~key:
+            (Durable_storage_path.delayed_input
+               ~storage_version:ctxt.session.storage_version)
           ~value:
             (Bytes.to_string
             @@ Rlp.encode
@@ -1098,6 +1100,7 @@ module State = struct
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
+            ~storage_version:ctxt.session.storage_version
             ~pool:ctxt.execution_pool
             ~native_execution:
               (ctxt.configuration.kernel_execution.native_execution_policy
@@ -1368,6 +1371,7 @@ module State = struct
           | Executing {timestamp; applied_sequencer_upgrade; _} ->
               let+ result =
                 Evm_state.assemble_block
+                  ~storage_version:ctxt.session.storage_version
                   ~pool:ctxt.execution_pool
                   ~native_execution:
                     (ctxt.configuration.kernel_execution.native_execution_policy
@@ -2133,6 +2137,7 @@ module State = struct
         (`Inbox [])
     in
     let* storage_version = Evm_state.storage_version evm_state in
+    let*! evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
     (* Now that the storage version is known, remove whichever
        key path is not canonical for this version, so no stale
        entry is left in the state. *)
@@ -2979,8 +2984,9 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
+  let* storage_version = Evm_state.storage_version evm_state in
   (* Tell the kernel that it is executed by an EVM node *)
-  let*! evm_state = Evm_state.flag_local_exec evm_state in
+  let*! evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
   (* We remove the delayed inbox from the EVM state. Its contents will be
      retrieved by the sequencer by inspecting the evm events. *)
   let*! evm_state = Evm_state.clear_delayed_inbox evm_state in

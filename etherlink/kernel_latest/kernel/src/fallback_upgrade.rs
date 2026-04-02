@@ -10,10 +10,10 @@ use tezos_smart_rollup_host::{path::RefPath, runtime::RuntimeError, KERNEL_BOOT_
 use crate::upgrade::KERNEL_ROOT_HASH;
 
 const BACKUP_KERNEL_BOOT_PATH: RefPath =
-    RefPath::assert_from(b"/__backup_kernel/boot.wasm");
+    RefPath::assert_from(b"/base/__backup_kernel/boot.wasm");
 
 const BACKUP_KERNEL_ROOT_HASH: RefPath =
-    RefPath::assert_from(b"/__backup_kernel/root_hash");
+    RefPath::assert_from(b"/base/__backup_kernel/root_hash");
 
 pub fn backup_current_kernel<Host>(host: &mut Host) -> Result<(), RuntimeError>
 where

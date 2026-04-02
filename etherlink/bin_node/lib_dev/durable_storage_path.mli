@@ -26,7 +26,11 @@ val root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
 
-val evm_node_flag : path
+module BASE : sig
+  val make : string -> path
+end
+
+val evm_node_flag : storage_version:int -> path
 
 val chain_id : path
 
@@ -44,7 +48,9 @@ val kernel_version : path
 
 val kernel_verbosity : path
 
-val storage_version : path
+val storage_version_base : path
+
+val storage_version_legacy : path
 
 val kernel_root_hash : path
 
@@ -66,7 +72,7 @@ val maximum_gas_per_transaction : path
 
 (** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
-  val input_tx : path
+  val input_tx : storage_version:int -> path
 end
 
 (** Kernel communication canal for Tezos X operation simulation *)
@@ -83,9 +89,11 @@ module Tezosx_entrypoints : sig
   val result : path
 end
 
+val delayed_input : storage_version:int -> path
+
 (** Kernel communication canal for block assembling (instant confirmations) *)
 module Assemble_block : sig
-  val input : path
+  val input : storage_version:int -> path
 end
 
 (** Paths related to accounts. *)

@@ -41,15 +41,17 @@ use tezosx_tezos_runtime::context::TezosRuntimeContext;
 #[cfg(target_arch = "wasm32")]
 use tezos_smart_rollup_core::rollup_host::RollupHost;
 
-const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/__delayed_input");
+const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/base/__delayed_input");
 
-const TEZOSX_SIMULATION_INPUT: RefPath = RefPath::assert_from(b"/__simulation/input");
-const TEZOSX_SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/__simulation/result");
+const TEZOSX_SIMULATION_INPUT: RefPath =
+    RefPath::assert_from(b"/base/__simulation/input");
+const TEZOSX_SIMULATION_RESULT: RefPath =
+    RefPath::assert_from(b"/base/__simulation/result");
 
 pub(crate) const TEZOSX_ENTRYPOINTS_INPUT: RefPath =
-    RefPath::assert_from(b"/tezosx_entrypoints/input");
+    RefPath::assert_from(b"/base/tezosx_entrypoints/input");
 pub(crate) const TEZOSX_ENTRYPOINTS_RESULT: RefPath =
-    RefPath::assert_from(b"/tezosx_entrypoints/result");
+    RefPath::assert_from(b"/base/tezosx_entrypoints/result");
 
 #[cfg(target_arch = "wasm32")]
 #[no_mangle]
