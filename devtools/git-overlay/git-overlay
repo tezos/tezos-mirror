@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>
+
+# git-overlay: manage git repos overlaid on an existing working tree.
+#
+# Each overlay gets a separate git directory (.git-<name>) and a working
+# directory (<name>/), both excluded from the host repo's git status.
+# See devtools/git-overlay/ in the Octez repository for documentation.
+
+set -euo pipefail
+
+usage() {
+    cat >&2 <<'EOF'
+Usage:
+  git-overlay --init <name> <remote>
+  git-overlay --rm <name>
+  git-overlay --overlay <name> <git-command> [args...]
+  git-overlay --list
+EOF
+    exit 1
+}
+
+die() {
+    echo "git-overlay: $*" >&2
+    exit 1
+}
+
+# ---------- locate host repo root ----------
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" \
+    || die "not inside a git working tree"
+
+# ---------- helpers ----------
+
+# Ensure an entry is present in .git/info/exclude (no duplicates).
+add_exclude() {
+    local entry="$1"
+    local host_git_dir
+    host_git_dir="$(git rev-parse --git-dir)"
+    local exclude="${host_git_dir}/info/exclude"
+    mkdir -p "$(dirname "$exclude")"
+    if ! grep -qxF "$entry" "$exclude" 2>/dev/null; then
+        echo "$entry" >> "$exclude"
+    fi
+}
+
+# Remove an entry from .git/info/exclude.
+remove_exclude() {
+    local entry="$1"
+    local host_git_dir
+    host_git_dir="$(git rev-parse --git-dir)"
+    local exclude="${host_git_dir}/info/exclude"
+    [ -f "$exclude" ] || return 0
+    # Delete exact line match, write in-place.
+    sed -i "\|^$(printf '%s' "$entry" | sed 's/[.[\*^$/]/\\&/g')$|d" "$exclude"
+}
+
+# Detect the remote's default branch after a fetch.
+# Looks at remote HEAD symref first, then falls back to common names,
+# then to whatever ref exists.
+detect_default_branch() {
+    local gitdir="$1"
+    local symbolic
+    symbolic="$(git --git-dir="$gitdir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)"
+    if [ -n "$symbolic" ]; then
+        echo "${symbolic#refs/remotes/origin/}"
+        return
+    fi
+    # Fallback: check common branch names
+    for candidate in main master; do
+        if git --git-dir="$gitdir" rev-parse "origin/${candidate}" >/dev/null 2>&1; then
+            echo "$candidate"
+            return
+        fi
+    done
+    # Last resort: pick the first remote branch
+    local first
+    first="$(git --git-dir="$gitdir" branch -r 2>/dev/null | head -n1 | sed 's|.*origin/||; s/^[[:space:]]*//')"
+    if [ -n "$first" ]; then
+        echo "$first"
+        return
+    fi
+    # Remote is truly empty
+    return 1
+}
+
+# ---------- commands ----------
+
+cmd_init() {
+    [ $# -ge 2 ] || usage
+    local name="$1"
+    local remote="$2"
+    local gitdir="${root}/.git-${name}"
+    local workdir="${root}/${name}"
+
+    # Idempotence: if already initialized, re-fetch and ensure linkage.
+    if [ -d "$gitdir" ] && [ -f "${gitdir}/HEAD" ]; then
+        echo "git-overlay: overlay '${name}' already exists, re-fetching."
+        git --git-dir="$gitdir" fetch origin || true
+        # Re-ensure gitdir linkage (for overlays created before this feature).
+        echo "gitdir: ${gitdir}" > "${workdir}/.git"
+        git --git-dir="$gitdir" config core.worktree "$workdir"
+        # Re-ensure exclusions (in case .git/info/exclude was reset)
+        add_exclude ".git-${name}"
+        add_exclude "${name}/"
+        return 0
+    fi
+
+    # Guard against name collisions with existing non-overlay dirs.
+    if [ -e "$gitdir" ]; then
+        die "'${gitdir}' already exists and is not an overlay git directory"
+    fi
+
+    # 1. Create bare git dir, then mark it non-bare so worktree ops work.
+    git init --bare "$gitdir"
+    git --git-dir="$gitdir" config core.bare false
+    git --git-dir="$gitdir" config pull.rebase true
+
+    # 2. Add remote and fetch.
+    git --git-dir="$gitdir" remote add origin "$remote"
+    git --git-dir="$gitdir" fetch origin || true
+
+    # 3. Create working directory.
+    mkdir -p "$workdir"
+
+    # 4. Point the overlay workdir to its git dir so native git works.
+    echo "gitdir: ${gitdir}" > "${workdir}/.git"
+    git --git-dir="$gitdir" config core.worktree "$workdir"
+
+    # 5. Checkout if remote has content.
+    local branch
+    if branch="$(detect_default_branch "$gitdir")"; then
+        git --git-dir="$gitdir" --work-tree="$workdir" \
+            checkout -b "$branch" "origin/${branch}"
+    fi
+
+    # 6. Add exclusions to host repo.
+    add_exclude ".git-${name}"
+    add_exclude "${name}/"
+
+    echo "Overlay '${name}' initialized: ${name}/ -> ${remote}"
+}
+
+cmd_rm() {
+    [ $# -ge 1 ] || usage
+    local name="$1"
+    local gitdir="${root}/.git-${name}"
+    local workdir="${root}/${name}"
+
+    [ -d "$gitdir" ] || die "overlay '${name}' not found (no ${gitdir})"
+
+    rm -rf "$gitdir" "$workdir"
+    remove_exclude ".git-${name}"
+    remove_exclude "${name}/"
+
+    echo "Overlay '${name}' removed."
+}
+
+cmd_overlay() {
+    [ $# -ge 2 ] || usage
+    local name="$1"
+    shift
+
+    local gitdir="${root}/.git-${name}"
+    local workdir="${root}/${name}"
+
+    [ -d "$gitdir" ] || die "overlay '${name}' not found (no ${gitdir})"
+
+    exec git --git-dir="$gitdir" --work-tree="$workdir" "$@"
+}
+
+cmd_list() {
+    local found=0
+    for d in "${root}"/.git-*/; do
+        [ -d "$d" ] && [ -f "${d}HEAD" ] || continue
+        found=1
+        local name
+        name="$(basename "$d")"
+        name="${name#.git-}"
+        local remote
+        remote="$(git --git-dir="$d" remote get-url origin 2>/dev/null \
+                  || echo "(no remote)")"
+        echo "${name} -> ${remote}"
+    done
+    if [ "$found" -eq 0 ]; then
+        echo "No overlays found."
+    fi
+}
+
+# ---------- dispatch ----------
+
+[ $# -ge 1 ] || usage
+
+case "$1" in
+    --init)
+        shift
+        cmd_init "$@"
+        ;;
+    --rm)
+        shift
+        cmd_rm "$@"
+        ;;
+    --overlay)
+        shift
+        cmd_overlay "$@"
+        ;;
+    --list)
+        cmd_list
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        usage
+        ;;
+esac
