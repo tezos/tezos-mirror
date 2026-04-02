@@ -498,7 +498,8 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
-    Returns [None] if the cell is not found in the store. *)
+   Returns [None] if the cell is found but contains an unpublished slot.
+   Raises [Not_found] if no matching cell is found in the store. *)
 let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
@@ -507,7 +508,7 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
       slot_id
   in
   match cell_bytes_opt with
-  | None -> return_none
+  | None -> raise Not_found
   | Some (cell_bytes, attestation_lag) ->
       let*? (module Plugin : Dal_plugin.T) =
         let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
@@ -523,7 +524,11 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
    For each [lag] in [attestation_lags], fetch the skip list at
    [slot_level + lag] and look for a cell matching both [slot_index] and [lag]
    (the lag check is required with dynamic lags to avoid matching a cell from a
-   different published level). Returns [None] if no match is found. *)
+   different published level).
+
+   Returns [None] if a matching cell is found but it contains an unpublished
+   slot. Returns an error if no matching cell is found after all lags are
+   exhausted. *)
 let try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
@@ -540,7 +545,7 @@ let try_get_slot_header_from_L1_skip_list ctxt slot_id =
            ~level:(`Level pred_published_level))
   in
   let rec find_in_lags = function
-    | [] -> return_none
+    | [] -> tzfail (Exn Not_found)
     | lag :: rest -> (
         let attested_level = Int32.(add slot_level (of_int lag)) in
         match
@@ -580,30 +585,30 @@ let try_get_slot_header_from_L1_skip_list ctxt slot_id =
        [try_get_slot_header_from_L1_skip_list].
 
     Returns [Some commitment] if a commitment was published for [slot_id],
-    [None] if the slot was not published (confirmed by either local store or
-    L1 context), or an error if the lookup itself failed. *)
+    [None] if the slot was confirmed unpublished by either local or L1 data,
+    or an error if the lookup itself failed or there is no skip-list data
+    available to answer the query. *)
 let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
-  let*! published_slot_header_opt =
-    try_get_slot_header_from_indexed_skip_list ctxt slot_id
-  in
-  match published_slot_header_opt with
-  | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
-      (* These invariants are expected to hold by design. *)
-      assert (Int32.equal published_level slot_id.slot_level) ;
-      assert (Int.equal slot_index slot_id.slot_index) ;
-      return_some commitment
-  | Ok None ->
-      (* Local lookup did not yield a slot header for this [slot_id].
-         Fall back to the L1 context as the source of truth. *)
-      let* slot_header_opt =
-        try_get_slot_header_from_L1_skip_list ctxt slot_id
+  Lwt.catch
+    (fun () ->
+      let+ slot_header_opt =
+        try_get_slot_header_from_indexed_skip_list ctxt slot_id
       in
-      return
-        (Option.map
-           (fun Dal_plugin.{commitment; _} -> commitment)
-           slot_header_opt)
-  | Error trace -> Lwt.return_error trace
+      Option.map
+        (fun Dal_plugin.{published_level; slot_index; commitment} ->
+          (* These invariants are expected to hold by design. *)
+          assert (Int32.equal published_level slot_id.slot_level) ;
+          assert (Int.equal slot_index slot_id.slot_index) ;
+          commitment)
+        slot_header_opt)
+    (fun exn ->
+      match exn with
+      | Not_found ->
+          try_get_slot_header_from_L1_skip_list ctxt slot_id
+          |> Lwt_result.map
+             @@ Option.map (fun Dal_plugin.{commitment; _} -> commitment)
+      | exn -> Lwt.reraise exn)
 
 (* This function attempts to retrieve the commitment associated to a (published)
    slot whose id is given in [slot_id]. For that, we check in various places:
