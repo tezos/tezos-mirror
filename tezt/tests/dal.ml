@@ -1,25 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2026 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -28,7 +11,7 @@
    Component:    Data-availability layer
    Requirement:  make -f kernels.mk build
 
-                 For dev-purpose you can also run the follwing to enable debug outputs and faster build time:
+                 For dev-purpose you can also run the following to enable debug outputs and faster build time:
 
                  cd src/kernel_tx_demo/kernel
                  cargo build --release --target wasm32-unknown-unknown --features debug --features dal
@@ -765,19 +748,14 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
   unit
 
 let register ~protocols =
-  (* Tests with Layer1 node only *)
   Dal_l1.register ~__FILE__ ~protocols ;
   Dal_attestation.register ~__FILE__ ~protocols ;
   Dal_denunciation.register ~__FILE__ ~protocols ;
   Dal_node_tests.register ~__FILE__ ~protocols ;
-
-  (* Tests with layer1 and dal nodes (with p2p/GS) *)
   Dal_p2p.register ~__FILE__ ~protocols ;
-
   Dal_skip_list.register ~__FILE__ ~protocols ;
   Dal_amplification.register ~__FILE__ ~protocols ;
   Dal_gc.register ~__FILE__ ~protocols ;
-
   Dal_tx_kernel.register ~__FILE__ ~protocols ;
 
   (* Register tutorial test *)

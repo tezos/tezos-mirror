@@ -13,12 +13,6 @@
 open Dal_helpers
 module Dal = Dal_common
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-   In the following accusation tests, we bake two blocks because we
-   need the accusation to be introduced at level at least 10 (2 = 10 -
-   attestation_lag). In protocol S we will not need this
-   restriction. *)
-
 let test_inject_accusation protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
@@ -29,8 +23,6 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
   let commitment, proof, shards_with_proofs =
     Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
   in
-  Log.info "Bake two blocks" ;
-  let* () = bake_for ~count:2 client in
   let* _op_hash =
     Helpers.publish_commitment
       ~source:Constant.bootstrap2

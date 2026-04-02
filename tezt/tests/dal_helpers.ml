@@ -1216,39 +1216,11 @@ let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
   in
   bake_for ~delegates:(`For [baker]) client
 
-let wait_for_classified oph node =
-  let filter json = if JSON.as_string json = oph then Some () else None in
-  Node.wait_for node "operation_classified.v0" filter
-
 (** Create expected attestation array with given slots attested. *)
 let expected_attestation dal_parameters attested_slots =
   let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
   List.iter (fun i -> arr.(i) <- true) attested_slots ;
   arr
-
-let get_validated_dal_attestations_in_mempool node for_level =
-  let* mempool_json =
-    Node.RPC.call node
-    @@ RPC.get_chain_mempool_pending_operations
-         ~version:"2"
-         ~validated:true
-         ~branch_delayed:false
-         ~branch_refused:false
-         ~refused:false
-         ~outdated:false
-         ~validation_passes:[0]
-         ()
-  in
-  let validated = JSON.(mempool_json |-> "validated" |> as_list) in
-  List.filter
-    (fun op ->
-      let contents = JSON.(op |-> "contents" |> geti 0) in
-      let level = JSON.(contents |-> "level" |> as_int) in
-      level = for_level
-      && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
-         String.equal kind "attestation_with_dal")
-    validated
-  |> return
 
 (* --- Slot publication helpers --- *)
 
@@ -1262,14 +1234,6 @@ let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
 
 let slot_idx parameters level =
   level mod parameters.Dal.Parameters.number_of_slots
-
-(* We check that publishing a slot header with a proof for a different
-   slot leads to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
-    cryptobox =
-  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox "a") in
-  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox "b") in
-  Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
 
 let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment ~proof client =
@@ -1377,32 +1341,6 @@ let publish_store_and_attest_slot_at_lag ~protocol ~lag_index ~lag client node
     client
     (Slots [index])
     dal_parameters
-
-(* We check that publishing a slot header with a proof for the "same"
-   slot contents but represented using a different [slot_size] leads
-   to a proof-checking error. *)
-let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
-    ~index parameters cryptobox ?counter ?force ?error client =
-  let cryptobox_params =
-    {
-      parameters.Dal.Parameters.cryptobox with
-      slot_size = 2 * parameters.cryptobox.slot_size;
-    }
-  in
-  let* cryptobox' = Helpers.make_cryptobox cryptobox_params in
-  let msg = "a" in
-  let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
-  let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
-  Helpers.publish_commitment
-    ~source
-    ?fee
-    ~index
-    ~commitment
-    ~proof
-    ?counter
-    ?force
-    ?error
-    client
 
 (** For each level in the range [from_level, to_level]:
     1. Publishes a dummy slot with content derived from the level and slot index
@@ -1525,70 +1463,6 @@ let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
   unit
 
 (* --- Status and verification helpers --- *)
-
-type status = Applied | Failed of {error_id : string}
-
-let pp fmt = function
-  | Applied -> Format.fprintf fmt "applied"
-  | Failed {error_id} -> Format.fprintf fmt "failed: %s" error_id
-
-let status_typ = Check.equalable pp ( = )
-
-let check_manager_operation_status result expected_status oph =
-  let manager_operations = JSON.(result |=> 3 |> as_list) in
-  let op =
-    try
-      List.find
-        (fun op -> JSON.(op |-> "hash" |> as_string) = oph)
-        manager_operations
-    with Not_found ->
-      Test.fail
-        "Test expecting operation %s to be included into the last block."
-        oph
-  in
-  let op_result =
-    JSON.(op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
-  in
-  let status_kind = JSON.(op_result |-> "status" |> as_string) in
-  let status =
-    match status_kind with
-    | "applied" -> Applied
-    | "failed" ->
-        let error_id =
-          JSON.(op_result |-> "errors" |=> 0 |-> "id" |> as_string)
-        in
-        Failed {error_id}
-    | s -> Test.fail "Unexpected status: %s" s
-  in
-  let prefix_msg = sf "Unexpected operation result for %s." oph in
-  Check.(expected_status = status)
-    status_typ
-    ~error_msg:(prefix_msg ^ " Expected: %L. Got: %R.")
-
-let check_dal_raw_context node =
-  let* dal_raw_json =
-    Node.RPC.(call node @@ get_chain_block_context_raw_json ~path:["dal"] ())
-  in
-  if JSON.is_null dal_raw_json then
-    Test.fail "Expected the context to contain information under /dal key."
-  else
-    let json_to_string j =
-      JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
-    in
-    let* confirmed_slots_opt =
-      Node.RPC.(call node @@ get_chain_block_context_dal_commitments_history ())
-    in
-    if JSON.is_null confirmed_slots_opt then
-      Test.fail
-        "confirmed_slots_history RPC is not expected to return None if DAL is \
-         enabled" ;
-    let confirmed_slots = json_to_string confirmed_slots_opt in
-    let confirmed_slots_from_ctxt =
-      json_to_string @@ JSON.(dal_raw_json |-> "slot_headers_history")
-    in
-    if not (String.equal confirmed_slots confirmed_slots_from_ctxt) then
-      Test.fail "Confirmed slots history mismatch." ;
-    unit
 
 (** This function checks that the status of the slot at
     [(~slot_level, ~slot_index)] on [dal_node] matches [~expected_status].
@@ -1765,227 +1639,8 @@ let check_grafts ~number_of_slots ~slot_index (node1, node1_peer_id)
   let graft_from_node2 = check_graft node2 node1_peer_id pkh in
   [graft_from_node1; graft_from_node2]
 
-let check_topics_peers ~__LOC__ dal_node ~expected =
-  let normalize_peers l = List.sort String.compare l in
-  let compare_topics {Dal.RPC.topic_slot_index = s1; topic_pkh = p1}
-      {Dal.RPC.topic_slot_index = s2; topic_pkh = p2} =
-    let c = Int.compare s1 s2 in
-    if c = 0 then String.compare p1 p2 else c
-  in
-  let normalize_topics_peers l =
-    l
-    |> List.map (fun (topic, peers) -> (topic, normalize_peers peers))
-    |> List.sort (fun (t1, _p1) (t2, _p2) -> compare_topics t1 t2)
-  in
-  let* topic_peers = Dal_RPC.(call dal_node @@ get_topics_peers ()) in
-  return
-    Check.(
-      (normalize_topics_peers topic_peers = normalize_topics_peers expected)
-        Dal.Check.topics_peers_typ
-        ~error_msg:
-          (__LOC__
-         ^ " : Unexpected topic - peers association (Actual: %L <> Expected: \
-            %R)"))
-
 type event_with_message = Publish_message | Message_with_header of peer_id
 
 let event_with_message_to_string = function
   | Publish_message -> "publish_message"
   | Message_with_header _ -> "message_with_header"
-
-(** This function monitors the Gossipsub worker events whose name is given by
-    [event_with_message]. It's somehow similar to function
-    {!check_events_with_topic}, except that what varies here is the shard index
-    instead of slot index. Moreover, shards do not necessiraly start from 0 or
-    end at number_of_shards - 1. *)
-let check_events_with_message ~event_with_message dal_node ~number_of_shards
-    ~shard_indexes ~expected_commitment ~expected_level ~expected_pkh
-    ~expected_slot =
-  let remaining = ref (List.length shard_indexes) in
-  let seen = Array.make number_of_shards false in
-  let get_shard_index_opt event =
-    let topic_slot_index =
-      JSON.(event |-> "topic" |-> "slot_index" |> as_int)
-    in
-    let topic_pkh = JSON.(event |-> "topic" |-> "pkh" |> as_string) in
-    let level = JSON.(event |-> "message_id" |-> "level" |> as_int) in
-    let slot_index = JSON.(event |-> "message_id" |-> "slot_index" |> as_int) in
-    let shard_index =
-      JSON.(event |-> "message_id" |-> "shard_index" |> as_int)
-    in
-    let pkh = JSON.(event |-> "message_id" |-> "pkh" |> as_string) in
-    let commitment =
-      JSON.(event |-> "message_id" |-> "commitment" |> as_string)
-    in
-    let*?? () = check_expected expected_pkh topic_pkh in
-    let*?? () = check_expected expected_pkh pkh in
-    let*?? () = check_expected expected_level level in
-    let*?? () = check_expected expected_slot slot_index in
-    let*?? () = check_expected expected_slot topic_slot_index in
-    let*?? () = check_expected expected_commitment commitment in
-    let*?? () =
-      match event_with_message with
-      | Publish_message -> Some ()
-      | Message_with_header expected_peer_id ->
-          check_expected expected_peer_id JSON.(event |-> "peer" |> as_string)
-    in
-    Some shard_index
-  in
-  let all_seen () =
-    seen |> Array.to_seqi
-    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
-  in
-  Dal_common.Helpers.wait_for_gossipsub_worker_event
-    dal_node
-    ~name:(event_with_message_to_string event_with_message)
-    (fun event ->
-      let*?? shard_index = get_shard_index_opt event in
-      Check.(
-        (seen.(shard_index) = false)
-          bool
-          ~error_msg:
-            (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
-      seen.(shard_index) <- true ;
-      let () = remaining := !remaining - 1 in
-      if !remaining = 0 && all_seen () then Some () else None)
-
-(** This function is quite similar to those above, except that it checks that a
-    range of messages (shards) on a tracked topic have been notified by GS to
-    the DAL node. This is typically needed to then be able to attest slots. *)
-let check_message_notified_to_app_event dal_node ~number_of_shards
-    ~shard_indexes ~expected_commitment ~expected_level ~expected_pkh
-    ~expected_slot =
-  let remaining = ref (List.length shard_indexes) in
-  let seen = Array.make number_of_shards false in
-  let get_shard_index_opt event =
-    let level = JSON.(event |-> "level" |> as_int) in
-    let slot_index = JSON.(event |-> "slot_index" |> as_int) in
-    let shard_index = JSON.(event |-> "shard_index" |> as_int) in
-    let pkh = JSON.(event |-> "pkh" |> as_string) in
-    let commitment = JSON.(event |-> "commitment" |> as_string) in
-    let*?? () = check_expected expected_pkh pkh in
-    let*?? () = check_expected expected_level level in
-    let*?? () = check_expected expected_slot slot_index in
-    let*?? () = check_expected expected_commitment commitment in
-    Some shard_index
-  in
-  let all_seen () =
-    seen |> Array.to_seqi
-    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
-  in
-  Dal_node.wait_for dal_node "dal_gs_message_notified_to_app.v0" (fun event ->
-      let*?? shard_index = get_shard_index_opt event in
-      Check.(
-        (seen.(shard_index) = false)
-          bool
-          ~error_msg:
-            (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
-      seen.(shard_index) <- true ;
-      let () = remaining := !remaining - 1 in
-      if !remaining = 0 && all_seen () then Some () else None)
-
-(** This helper function makes the nodes [dal_node1] and [dal_node2] join the
-    topics of the attester [pkh], by calling the RPC for tracking the corresponding profile.
-    The second node calls the RPC only after receiving the Subscribe messages
-    from the first node, so that when it joins the topics, it also sends Graft messages
-    in addition to sending Subscribe messages. *)
-let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
-  let profile1 = Dal_RPC.Attester pkh1 in
-  let* peer_id1 = Dal_node.read_identity dal_node1 in
-  let* peer_id2 = Dal_node.read_identity dal_node2 in
-  (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
-  let event_waiter =
-    check_events_with_topic
-      ~event_with_topic:(Subscribe peer_id1)
-      dal_node2
-      ~num_slots
-      pkh1
-  in
-  let* () = Dal_RPC.(call dal_node1 @@ patch_profiles [profile1]) in
-  let* () = event_waiter in
-
-  (* node2 joins topic {pkh} -> it sends subscribe and graft messages to
-     node1. *)
-  let event_waiter_subscribe =
-    check_events_with_topic
-      ~event_with_topic:(Subscribe peer_id2)
-      dal_node1
-      ~num_slots
-      pkh1
-  in
-  let event_waiter_graft =
-    check_events_with_topic
-      ~event_with_topic:(Graft peer_id2)
-      dal_node1
-      ~num_slots
-      pkh1
-  in
-  let* () = Dal_RPC.(call dal_node2 @@ patch_profiles [profile1]) in
-  Lwt.join [event_waiter_subscribe; event_waiter_graft]
-
-(** This helper returns the list of promises that allow to wait for the
-    publication of a slot's shards into the Gossipsub layer.
-
-    The [l1_committee] used to determine the topic of published messages is the
-    one at the attesattion level corresponding to [publish_level].
-*)
-let waiters_publish_shards l1_committee dal_node commitment ~publish_level
-    ~slot_index ~number_of_shards =
-  let open Dal.Committee in
-  List.map
-    (fun {attester; indexes} ->
-      check_events_with_message
-        ~event_with_message:Publish_message
-        dal_node
-        ~number_of_shards
-        ~shard_indexes:indexes
-        ~expected_commitment:commitment
-        ~expected_level:publish_level
-        ~expected_pkh:attester
-        ~expected_slot:slot_index)
-    l1_committee
-
-(** This helper returns the promise that allows to wait for the reception of
-    messages of [slot_index] published at level [publish_level] by the attester
-    [pkh].
-
-    The [l1_committee] used to determine the topic of published messages is the
-    one at the attesattion level corresponding to [publish_level]. *)
-let waiter_receive_shards l1_committee dal_node commitment ~publish_level
-    ~slot_index ~pkh ~from_peer ~number_of_shards =
-  let open Dal.Committee in
-  match List.find (fun {attester; _} -> attester = pkh) l1_committee with
-  | {attester; indexes} ->
-      check_events_with_message
-        ~event_with_message:(Message_with_header from_peer)
-        dal_node
-        ~number_of_shards
-        ~shard_indexes:indexes
-        ~expected_commitment:commitment
-        ~expected_level:publish_level
-        ~expected_pkh:attester
-        ~expected_slot:slot_index
-  | exception Not_found ->
-      Test.fail "Should not happen as %s is part of the committee" pkh
-
-(** This helper returns the promise that allows to wait for the successful
-    notification of messages of [slot_index] published at level [publish_level]
-    to the app layer of the attester [pkh].
-
-    The [l1_committee] used to determine the topic of published messages is the
-    one at the attesattion level corresponding to [publish_level]. *)
-let waiter_successful_shards_app_notification l1_committee dal_node commitment
-    ~publish_level ~slot_index ~pkh ~number_of_shards =
-  let open Dal.Committee in
-  match List.find (fun {attester; _} -> attester = pkh) l1_committee with
-  | {attester; indexes} ->
-      check_message_notified_to_app_event
-        dal_node
-        ~number_of_shards
-        ~shard_indexes:indexes
-        ~expected_commitment:commitment
-        ~expected_level:publish_level
-        ~expected_pkh:attester
-        ~expected_slot:slot_index
-  | exception Not_found ->
-      Test.fail "Should not happen as %s is part of the committee" pkh

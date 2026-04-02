@@ -653,6 +653,10 @@ let test_producer_attester (protocol : Protocol.t)
   in
   unit
 
+let wait_for_classified oph node =
+  let filter json = if JSON.as_string json = oph then Some () else None in
+  Node.wait_for node "operation_classified.v0" filter
+
 (* Check if the [attester_did_not_attest] warning is correctly emitted.
    This test is a variation of [test_producer_attester] where an attestation
    not attesting the published DAL slot is injected. *)
