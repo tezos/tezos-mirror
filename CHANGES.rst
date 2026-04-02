@@ -62,12 +62,7 @@ Node
   avoiding EPIPE errors and slow shutdown when many external RPC processes are
   running. (MR :gl:`!20476`)
 
-- Updated the default secure RPC ACL policy: tightened ``contracts`` and
-  ``delegates`` endpoint patterns to require an explicit identifier, and removed
-  ``merkle_tree``, ``merkle_tree_v2``, ``network/version``, and
-  ``network/versions`` endpoints from the default allowlist.
-
-  - Disable backward compatibility of v8 snapshot import (MR :gl:`!19542`)
+- Disable backward compatibility of v8 snapshot import (MR :gl:`!19542`)
 
 Client
 ------

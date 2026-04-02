@@ -108,6 +108,10 @@ RPC Changes
   It returns the first level at which the All Bakers Attest feature activates. If this
   level is not yet set, it returns ``null`` instead. (MR :gl:`!19757`)
 
+- ``POST ../helpers/scripts/run_code``: the gas parameter supplied by the caller
+  is now capped to ``hard_gas_limit_per_operation``. Previously an explicit gas
+  value was accepted as-is, allowing simulations to run with more gas than any
+  real on-chain operation can consume, producing misleading results. (MR :gl:`!21375`)
 
 Blocks and block receipts
 -------------------------
