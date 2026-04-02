@@ -978,7 +978,9 @@ let test_multi_node_nonce_connection_recovery =
     ~__FILE__
     ~title:"Baker multi-node nonce worker connection recovery"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P" ;
@@ -1109,7 +1111,9 @@ let test_multi_node_nonce_revelation_injection =
       [
         team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"; "revelation";
       ]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P" ;
