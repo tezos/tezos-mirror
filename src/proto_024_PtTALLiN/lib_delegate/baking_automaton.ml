@@ -654,21 +654,18 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
            event)
   [@profiler.record_s {verbosity = Notice} "Scheduler loop"]
 
-let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
-    ?tries ?(msg = fun _errs -> "Connection failed. ") f x =
-  Utils.retry
-    ~emit:(cctxt#message "%s")
-    ?max_delay
-    ~delay
-    ~factor
-    ?tries
-    ~msg
-    ~is_error:(function
-      | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
-          true
-      | _ -> false)
-    f
-    x
+let retry ?is_error ?emit (cctxt : #Protocol_client_context.full) ?max_delay
+    ~delay ~factor ?tries ?(msg = fun _errs -> "Connection failed. ") f x =
+  let is_error =
+    Option.value
+      ~default:(function
+        | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
+            true
+        | _ -> false)
+      is_error
+  in
+  let emit = Option.value ~default:(cctxt#message "%s") emit in
+  Utils.retry ~emit ?max_delay ~delay ~factor ?tries ~msg ~is_error f x
 
 (* This function attempts to resolve the primary delegate associated with the given [key].
 
