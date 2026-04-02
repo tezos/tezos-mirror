@@ -44,7 +44,7 @@ if [ -z "$base_branch" ]; then
   exit 0
 fi
 
-commit_range="$base_branch..HEAD"
+commit_range="HEAD..HEAD"
 total_count=$(git log "$commit_range" --pretty=oneline | wc -l | tr -d ' ')
 
 if [ "$total_count" -eq 0 ]; then
@@ -54,7 +54,7 @@ fi
 
 # Check which commits are not signed
 unsigned_commits=()
-for commit in $(git rev-list --no-merges "$base_branch..HEAD"); do
+for commit in $(git rev-list "$commit_range"); do
   if ! git log -1 --format='%G?' "$commit" | grep -qv 'N'; then
     unsigned_commits+=("$commit")
   fi
