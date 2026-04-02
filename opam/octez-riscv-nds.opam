@@ -19,4 +19,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "RISC-V new durable storage - in-memory implementation"
+synopsis: "RISC-V new durable storage"

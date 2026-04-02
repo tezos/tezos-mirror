@@ -7,7 +7,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
+  octez-riscv-nds.common
   octez-riscv-nds-memory-api)
  (flags
   (:standard)
-  -open Tezos_base.TzPervasives))
+  -open Tezos_base.TzPervasives
+  -open Octez_riscv_nds_common))
