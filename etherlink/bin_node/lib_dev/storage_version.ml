@@ -34,3 +34,5 @@ let sequencer_key_storage_migrated_to_world_state ~storage_version =
   storage_version >= 50
 
 let ipc_paths_moved_to_base ~storage_version = storage_version >= 51
+
+let tezosx_single_tx ~storage_version = storage_version >= 52

@@ -833,6 +833,11 @@ where
 
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V52 => {
+            // Starting version 52, the EVM node uses the TezosX
+            // envelope format (List [runtime_id, inner_transaction]).
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
