@@ -6,7 +6,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* DAL L1-only tests (slot management, attestation operations, committee). *)
+(* DAL tests that run without a DAL node (slot management, attestation
+   operations, committee checks). These tests exercise DAL functionality
+   at the protocol/L1 level only. *)
 
 open Dal_helpers
 module Dal = Dal_common
