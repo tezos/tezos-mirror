@@ -568,7 +568,7 @@ oc.docker:arm64:
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    EXECUTABLE_FILES: script-inputs/released-executables
   retry:
     max: 1
     when:
@@ -604,7 +604,7 @@ oc.docker:amd64:
     CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
-    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    EXECUTABLE_FILES: script-inputs/released-executables
   retry:
     max: 1
     when:
