@@ -7,6 +7,12 @@
 
 module CI = Cacio.Shared
 
+(* This constant is meant to replace similar constants that are defined elsewhere,
+   in particular the one in [job_docker_authenticated] in [ci/lib_tezos_ci/tezos_ci.ml].
+   During the migration to Cacio however, those other instances will continue to exist.
+
+   There is another Docker version being used by [base_images.ml]: 28.5.1.
+   We should probably try to use the same version everywhere. *)
 let version = "24.0.7"
 
 let job_docker =
