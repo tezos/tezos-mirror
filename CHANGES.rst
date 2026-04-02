@@ -78,6 +78,13 @@ Node
   ``merkle_tree``, ``merkle_tree_v2``, ``network/version``, and
   ``network/versions`` endpoints from the default allowlist.
 
+- P2P hardening improvements: setting message-queue size and count limit
+  (:gl:`!21349`, :gl:`!21363`); per-connection throttling (:gl:`!21436`); faster
+  on connection loss peer shutdown (:gl:`!21335`); updated welcome-worker
+  admission rules (:gl:`!21415`).
+
+- RPC: Updated the default secure RPC ACL policy. (MR :gl:`!21131`)
+
 Client
 ------
 
