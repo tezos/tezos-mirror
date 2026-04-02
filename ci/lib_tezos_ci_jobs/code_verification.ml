@@ -34,7 +34,6 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
-open Common.Docker
 open Changesets
 
 (** Variants of the code verification pipeline.
@@ -256,7 +255,7 @@ let jobs pipeline_type =
     in
 
     match pipeline_type with
-    | Before_merging | Merge_train ->
+    | Before_merging ->
         (* Note: manual jobs in stage [manual] (which is the final
              stage) in [Before_merging] pipelines should be [Dependent]
              by default, and in particular [Dependent []] if they have
@@ -265,64 +264,15 @@ let jobs pipeline_type =
              already manual, and what's more, puts the pipeline in a
              confusing "pending state" with a yellow "pause" icon on the
              [manual] stage. *)
-        let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build
-            ~__POS__
-            ~arch:Amd64
-            ~dependencies:(Dependent [])
-            ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
-            Test_manual
-        in
-        let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build
-            ~__POS__
-            ~arch:Arm64
-            ~storage:Ramfs
-            ~dependencies:(Dependent [])
-            ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
-            Test_manual
-        in
-        let job_docker_verify_test_amd64 : tezos_job =
-          job_docker_authenticated
-            ~__POS__
-            ~name:"oc.script.docker_verify_image_amd64"
-            ~stage:Stages.manual
-            ~variables:[("IMAGE_ARCH_PREFIX", "amd64_")]
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [Job job_docker_amd64_test_manual])
-            ["./scripts/ci/docker_verify_signature.sh"]
-        in
-        let job_docker_verify_test_arm64 : tezos_job =
-          job_docker_authenticated
-            ~__POS__
-            ~name:"oc.script.docker_verify_image_arm64"
-            ~stage:Stages.manual
-            ~variables:[("IMAGE_ARCH_PREFIX", "arm64_")]
-            ~rules:(make_rules ~manual:Yes ())
-            ~dependencies:(Dependent [Job job_docker_arm64_test_manual])
-            ["./scripts/ci/docker_verify_signature.sh"]
-        in
-        let jobs =
-          [
-            job_docker_amd64_test_manual;
-            job_docker_arm64_test_manual;
-            job_docker_verify_test_arm64;
-            job_docker_verify_test_amd64;
-          ]
-        in
-        if pipeline_type = Merge_train then jobs
-        else
-          ([
-             job_homebrew_repository_trigger;
-             job_debian_repository_trigger_partial;
-             job_base_images_trigger;
-           ]
-          @
-          if Tezos_ci.container_scanning_flag then [security_scan_trigger]
-          else [])
-          @ jobs
+        [
+          job_homebrew_repository_trigger;
+          job_debian_repository_trigger_partial;
+          job_base_images_trigger;
+        ]
+        @
+        if Tezos_ci.container_scanning_flag then [security_scan_trigger] else []
     (* No manual jobs on the scheduled pipeline *)
-    | Schedule_extended_test -> []
+    | Merge_train | Schedule_extended_test -> []
   in
   start_stage @ test @ manual
   @
