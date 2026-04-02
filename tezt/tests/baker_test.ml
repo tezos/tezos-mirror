@@ -2017,7 +2017,9 @@ let multi_node_inconsistent_chain_id =
     ~__FILE__
     ~title:"Multi node inconsistent chain id"
     ~tags:[team; "baker"; "extra_nodes"; "sanity_check"]
-    ~supports:Protocol.(From_protocol 026)
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Start node1 with sandbox protocol" ;
@@ -2066,7 +2068,9 @@ let multi_node_staggered_crash =
     ~__FILE__
     ~title:"Multi node staggered crash"
     ~tags:[team; "baker"; "extra_nodes"]
-    ~supports:Protocol.(From_protocol 026)
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
@@ -2154,7 +2158,9 @@ let multi_node_crash_resilience =
     ~__FILE__
     ~title:"Multi node crash resilience"
     ~tags:[team; "baker"; "extra_nodes"]
-    ~supports:Protocol.(From_protocol 026)
+    ~supports:
+      Protocol.(
+        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
