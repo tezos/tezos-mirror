@@ -512,12 +512,14 @@ module Term = struct
   let history_mode_arg =
     let open Result_syntax in
     let doc =
-      "The duration for the shards to be kept in the node storage. Either a \
-       number, the string \"full\" or the string \"auto\". A number is \
-       interpreted as the number of blocks the shards should be kept; the \
-       string \"full\" means no shard deletion, the string \"auto\" means the \
-       default of the profile: 3 months for an operator, twice the attestation \
-       lag for an attester and other profiles."
+      Format.sprintf
+        "The duration for the shards to be kept in the node storage. Either a \
+         number, the string \"full\" or the string \"auto\". A number is \
+         interpreted as the number of levels the shards should be kept; the \
+         string \"full\" means no shard deletion, the string \"auto\" means \
+         the default of the profile: about 3 months for an operator, %d levels \
+         for the other controller profiles."
+        Constants.shard_retention_period_in_levels
     in
     let decoder =
       Configuration_file.(
