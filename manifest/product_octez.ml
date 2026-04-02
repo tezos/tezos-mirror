@@ -3812,6 +3812,40 @@ let _octez_riscv_nds_memory =
         octez_riscv_durable_storage_in_memory_api;
       ]
 
+let octez_riscv_durable_storage_on_disk_api =
+  public_lib
+    "octez-riscv-nds-disk-api"
+    ~path:"src/lib_riscv_nds/disk/api"
+    ~synopsis:"OCaml API of the RISC-V durable storage on-disk Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~dep_globs_rec:["../../../riscv/*"]
+    ~link_deps:lib_wasmer_riscv
+      (* TODO: TZX-119
+         We link against rust deps but ultimately the rust durable on disk
+         library should go in another static library. *)
+    ~modules:["octez_riscv_durable_storage_on_disk_api"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "copy_files";
+            S
+              "../../../riscv/durable-on-disk/octez_riscv_durable_storage_on_disk_api.*";
+          ];
+        ]
+
+let _octez_riscv_nds_disk =
+  public_lib
+    "octez-riscv-nds.disk"
+    ~path:"src/lib_riscv_nds/disk"
+    ~synopsis:"RISC-V new durable storage"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_riscv_nds_common |> open_;
+        octez_riscv_durable_storage_on_disk_api;
+      ]
+
 let octez_riscv_kernels =
   let kernels = ["riscv-echo"] in
   let target_files = List.concat_map (fun k -> [k; k ^ ".checksum"]) kernels in

@@ -10,9 +10,6 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs" { = version }
-  "octez-riscv-nds-memory-api" { = version }
-  "octez-riscv-nds-disk-api" { = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
@@ -20,4 +17,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "RISC-V new durable storage"
+synopsis: "OCaml API of the RISC-V durable storage on-disk Rust components"
