@@ -90,6 +90,7 @@
 (package (name octez-requester-tests)(allow_empty))
 (package (name octez-riscv-api))
 (package (name octez-riscv-nds))
+(package (name octez-riscv-nds-disk-api))
 (package (name octez-riscv-nds-memory-api))
 (package (name octez-riscv-pvm))
 (package (name octez-riscv-pvm-test)(allow_empty))
