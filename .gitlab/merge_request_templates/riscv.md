@@ -52,22 +52,18 @@ make -C src/riscv all
 -->
 
 ```
-/assign @ole.kruger
 /assign @victor-dumitrescu
 /assign @emturner
 /assign @santnr
 /assign @kurtis.charnock
 /assign @thomas.athorne
-/assign @ryan.tan3
 
-/assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
 /assign_reviewer @emturner
 /assign_reviewer @santnr
 /assign_reviewer @jobjo
 /assign_reviewer @kurtis.charnock
 /assign_reviewer @thomas.athorne
-/assign_reviewer @ryan.tan3
 
 /unassign me
 /unassign_reviewer me
