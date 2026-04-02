@@ -3942,7 +3942,7 @@ let octez_riscv_nds_disk =
 
 let _octez_riscv_nds_test =
   tezt
-    ["test_nds_pbt"; "helpers"]
+    ["test_nds_pbt"; "helpers"; "model"]
     ~path:"src/lib_riscv_nds/test"
     ~opam:"octez-riscv-nds"
     ~deps:

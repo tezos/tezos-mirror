@@ -21,7 +21,7 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Octez_riscv_nds_common)
- (modules test_nds_pbt helpers))
+ (modules test_nds_pbt helpers model))
 
 (executable
  (name main)

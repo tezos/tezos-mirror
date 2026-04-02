@@ -9,6 +9,7 @@
 (** Shared helpers for NDS property-based tests: generators, backend
     abstraction, and assertion utilities. *)
 
+open Nds_errors
 open Intf
 
 (** {1 Backend abstraction} *)
@@ -244,8 +245,21 @@ let pp_ops fmt ops =
 
 let print_ops ops = Format.asprintf "%a" pp_ops ops
 
+let pp_op_result : type a. a op -> Format.formatter -> a -> unit = function
+  | Set _ -> Format.pp_print_nothing
+  | Write _ -> fun fmt -> Format.fprintf fmt "%Ld"
+  | Read _ -> fun fmt b -> Format.fprintf fmt "%S" (String.of_bytes b)
+  | Delete _ -> Format.pp_print_nothing
+  | Exists _ -> Format.pp_print_bool
+  | Value_length _ -> fun fmt -> Format.fprintf fmt "%Ld"
+  | Copy_database _ -> Format.pp_print_nothing
+  | Move_database _ -> Format.pp_print_nothing
+  | Clear _ -> Format.pp_print_nothing
+  | Resize _ -> Format.pp_print_nothing
+
+(** Build an [nds_ops] handle from a backend module and registry. *)
 let apply_op (type r) (type a) (module B : BACKEND with type Registry.t = r)
-    (r : r) (op : a op) : a tzresult =
+    (r : r) (op : a op) : (a, Nds_errors.invalid_argument_error) result =
   match op with
   | Set {db; key; value} -> B.Database.set r ~db_index:db ~key ~value
   | Write {db; key; offset; value} ->
@@ -265,6 +279,121 @@ let apply_op (type r) (type a) (module B : BACKEND with type Registry.t = r)
 let apply_ops (type r) (module B : BACKEND with type Registry.t = r) (r : r) ops
     =
   List.iter (fun (Any op) -> ignore (apply_op (module B) r op)) ops
+
+(** Pretty-print a [result] for bisimulation violation messages. *)
+let pp_result (type a) (op : a op)
+    (r : (a, Nds_errors.invalid_argument_error) result) =
+  match r with
+  | Ok r -> Format.asprintf "Ok(%a)" (pp_op_result op) r
+  | Error e -> Format.asprintf "Error(%a)" pp_invalid_argument_error e
+
+(** Build a [check_state] callback that verifies the NDS contains every
+    key-value pair present in the model, with matching value lengths and
+    contents.  Also checks that the number of databases is the same.
+    Note: this does not detect extra keys in the NDS that are absent from
+    the model, because the DATABASE interface has no key enumeration. *)
+let check_state_full (type r) (model_reg : Model.registry)
+    (module Nds : BACKEND with type Registry.t = r) (nds : r) _idx _op =
+  let^? nds_size = Nds.Registry.size nds in
+  let^? model_size = Model.Registry.size model_reg in
+  if not (Int64.equal nds_size model_size) then
+    Test.fail
+      "State check: registry size mismatch: model=%Ld nds=%Ld"
+      model_size
+      nds_size ;
+  Model.iter_all_keys model_reg (fun ~db_index ~key ~value:expected_value ->
+      let^? exists = Nds.Database.exists nds ~db_index ~key in
+      if not exists then
+        Test.fail "State check: key %a missing in db %Ld" pp_bytes key db_index ;
+      let expected_len = Int64.of_int (Bytes.length expected_value) in
+      let^? nds_len = Nds.Database.value_length nds ~db_index ~key in
+      if not (Int64.equal nds_len expected_len) then
+        Test.fail
+          "State check: value_length mismatch for key %a in db %Ld: model=%Ld \
+           nds=%Ld"
+          pp_bytes
+          key
+          db_index
+          expected_len
+          nds_len ;
+      let^? nds_value =
+        Nds.Database.read nds ~db_index ~key ~offset:0L ~len:expected_len
+      in
+      if not (Bytes.equal nds_value expected_value) then
+        Test.fail
+          "State check: value mismatch for key %a in db %Ld"
+          pp_bytes
+          key
+          db_index) ;
+  true
+
+(** Build a [check_state] callback that verifies two NDS handles agree on
+    all per-database hashes at each step. *)
+let check_state_hash (type r1) (type r2)
+    (module Nds1 : BACKEND with type Registry.t = r1) (nds1 : r1)
+    (module Nds2 : BACKEND with type Registry.t = r2) (nds2 : r2) idx op =
+  let^? size1 = Nds1.Registry.size nds1 in
+  let^? size2 = Nds2.Registry.size nds2 in
+  if not (Int64.equal size1 size2) then
+    Test.fail
+      "Hash state check: registry size mismatch at op %d: %a (%Ld vs %Ld)"
+      idx
+      pp_op
+      op
+      size1
+      size2 ;
+  let n = Int64.to_int size1 in
+  for i = 0 to n - 1 do
+    let db_index = Int64.of_int i in
+    let h1 = Nds1.Database.hash nds1 ~db_index in
+    let h2 = Nds2.Database.hash nds2 ~db_index in
+    match (h1, h2) with
+    | Ok h1, Ok h2 ->
+        if not (Bytes.equal h1 h2) then
+          Test.fail
+            "Hash state check: db %d hash mismatch at op %d: %a"
+            i
+            idx
+            pp_op
+            op
+    | Error _, Error _ -> ()
+    | _ ->
+        Test.fail
+          "Hash state check: db %d hash error mismatch at op %d: %a"
+          i
+          idx
+          pp_op
+          op
+  done ;
+  true
+
+(** Check the bisimulation relation at one step: run the operation on both
+    handles, verify that they agree on the result, then call [check_state]
+    to verify observable state agreement. Fails the Tezt test on any
+    mismatch. *)
+let check_op ~check_state ~label (type r1) (type r2)
+    (module Nds1 : BACKEND with type Registry.t = r1) (r1 : r1)
+    (module Nds2 : BACKEND with type Registry.t = r2) (r2 : r2) idx (Any op) =
+  let res1 = apply_op (module Nds1) r1 op in
+  let res2 = apply_op (module Nds2) r2 op in
+  let ok =
+    match (res1, res2) with
+    | Ok v1, Ok v2 -> v1 = v2
+    | Error e1, Error e2 -> e1 = e2
+    | _ -> false
+  in
+  if not ok then
+    Test.fail
+      "%s violation at op %d: %a\n  %s: %s\n  %s: %s"
+      label
+      idx
+      pp_op
+      (Any op)
+      Nds1.name
+      (pp_result op res1)
+      Nds2.name
+      (pp_result op res2) ;
+  check_state idx (Any op)
 
 (** {2 Operation generators for model-based tests} *)
 

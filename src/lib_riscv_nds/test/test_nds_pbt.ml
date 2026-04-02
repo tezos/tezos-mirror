@@ -389,6 +389,67 @@ let test_commit_checkout_snapshot ?long_factor =
   let^? h_restored = Registry.hash r2 in
   Bytes.equal h_at_commit h_restored
 
+(** {2 Model-based (stateful) properties} *)
+
+(** Bisimulation: a random sequence of operations on the NDS must produce
+    the same accept/reject decisions as the reference model (a plain
+    [Map.t array]), and the final states must agree. Two systems are
+    bisimilar when they accept and reject the same operations at every step
+    and converge to the same observable state. *)
+let test_bisimulation ?long_factor (module B : BACKEND) =
+  QCheck2.Test.make
+    ?long_factor
+    ~name:(B.name ^ ": bisimulation on random op sequences")
+    ~print:print_scenario
+    (gen_scenario ~max_dbs:3 ~max_keys:5 ~max_ops:40)
+  @@ fun (num_dbs, ops) ->
+  let r = B.create_registry_with_dbs num_dbs in
+  let model_reg = Model.create_registry_with_dbs num_dbs in
+  let check_state = check_state_full model_reg (module B) r in
+  List.for_all
+    Fun.id
+    (List.mapi
+       (check_op
+          ~check_state
+          ~label:"Bisimulation"
+          (module B)
+          r
+          (module Model)
+          model_reg)
+       ops)
+
+(** {3 Cross-backend equivalence} *)
+
+(** Cross-backend bisimulation: same random ops on memory and disk must
+    produce identical results and per-database hashes at every step. *)
+let test_cross_backend_bisimulation ?long_factor =
+  QCheck2.Test.make
+    ?long_factor
+    ~name:"cross-backend: memory and disk agree at every step"
+    ~print:print_scenario
+    (gen_scenario ~max_dbs:2 ~max_keys:4 ~max_ops:20)
+    (fun (num_dbs, ops) ->
+      let r_mem = Memory_backend.create_registry_with_dbs num_dbs in
+      let r_disk = Disk_backend.create_registry_with_dbs num_dbs in
+      let check_state =
+        check_state_hash
+          (module Memory_backend)
+          r_mem
+          (module Disk_backend)
+          r_disk
+      in
+      List.for_all
+        Fun.id
+        (List.mapi
+           (check_op
+              ~check_state
+              ~label:"Cross-backend"
+              (module Disk_backend)
+              r_disk
+              (module Memory_backend)
+              r_mem)
+           ops))
+
 (** {1 Test registration} *)
 
 let register_unit (module B : BACKEND) (name, f) =
@@ -465,4 +526,16 @@ let () =
       test_commit_checkout_roundtrip;
       test_multiple_commits;
       test_commit_checkout_snapshot;
-    ]
+    ] ;
+  (* Bisimulation *)
+  register_pbt
+    ~long:true
+    ~long_factor:500
+    (module Memory_backend)
+    test_bisimulation ;
+  register_pbt
+    ~long:true
+    ~long_factor:50
+    (module Disk_backend)
+    test_bisimulation ;
+  register_pbt_disk ~long:true ~long_factor:5 test_cross_backend_bisimulation
