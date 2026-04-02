@@ -150,6 +150,31 @@ let test_delete_preserves_hash =
     ~error_msg:"hash changed after deleting absent key" ;
   unit
 
+(** Regression test for a disk backend bug uncovered by bisimulation:
+    after deleting a key from an empty database and then copying that
+    database over one that held the same key, [write] at a non-zero
+    offset to the (now absent) key should return [Offset_not_found] but
+    the Rust backend could return [Key_not_found]. The [delete] on the
+    empty db is a no-op semantically but leaves stale state in the
+    Rust AVL tree that [copy_database] propagates.
+    {v Set(db=0, key="a", val="")    -- create key in db 0
+       Delete(db=1, key="a")         -- no-op delete on empty db 1
+       Copy_database(src=1, dst=0)   -- overwrite db 0 with db 1
+       Write(db=0, key="a", off=1, val="") -- expects Offset_too_large v} *)
+let test_write_after_copy_clears_key =
+  unit_test "write after copy_database returns wrong error"
+  @@ fun (module B : BACKEND) ->
+  let r = B.create_registry_with_dbs 2 in
+  let key = Bytes.of_string "a" in
+  let^? () = B.Database.set r ~db_index:0L ~key ~value:Bytes.empty in
+  let^? () = B.Database.delete r ~db_index:1L ~key in
+  let^? () = B.Registry.copy_database r ~src:1L ~dst:0L in
+  let res =
+    B.Database.write r ~db_index:0L ~key ~offset:1L ~value:Bytes.empty
+  in
+  check_error ~msg:"write after copy" Offset_too_large res ;
+  unit
+
 let test_checkout_unknown_commit =
   unit_test "disk: checkout unknown commit fails" @@ fun () ->
   let repo = get_disk_repo () in
@@ -501,6 +526,7 @@ let register_with_backend (backend : (module BACKEND)) =
       test_registry_ops_oob;
       test_shrink_makes_oob;
       test_delete_preserves_hash;
+      test_write_after_copy_clears_key;
     ] ;
   (* PBT tests *)
   List.iter
