@@ -917,7 +917,7 @@ let test_dal_node_snapshot_import_merging ~operators _protocol parameters
   in
   unit
 
-let test_dal_node_startup =
+let test_dal_node_startup ~__FILE__ =
   Protocol.register_test
     ~__FILE__
     ~title:"dal node startup"
@@ -965,7 +965,7 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let test_dal_node_invalid_config () =
+let test_dal_node_invalid_config ~__FILE__ () =
   Test.register
     ~__FILE__
     ~title:"dal node invalid config"
@@ -2614,3 +2614,276 @@ let test_no_redundant_dal_attestations protocol parameters _cryptobox node
   in
   let* () = check_level (first_level + 1) in
   unit
+
+let register ~__FILE__ ~protocols =
+  test_dal_node_startup ~__FILE__ protocols ;
+  test_dal_node_invalid_config ~__FILE__ () ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    "dal node slot management"
+    test_dal_node_slot_management
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6]
+    "dal node slot headers tracking"
+    test_dal_node_slots_headers_tracking
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    "dal node shard fetching and slot reconstruction"
+    test_dal_node_rebuild_from_shards
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["rpc"]
+    ~regression:true
+    ~prover:false
+    "dal node list RPCs"
+    test_dal_node_rpc_list
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    "dal node POST /slots"
+    test_dal_node_test_post_slot
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    "dal node GET /levels/<level>/slots/<index>/content"
+    test_dal_node_test_get_level_slot_content
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~prover:false
+    "dal node PATCH+GET /profiles"
+    test_dal_node_test_patch_profile
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~prover:false
+    "dal node GET \
+     /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
+    test_dal_node_get_assigned_shard_indices
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    "dal node GET \
+     /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+    ~operator_profiles:[0; 1; 2]
+    test_dal_node_get_attestable_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~attestation_threshold:100
+    ~number_of_slots:8
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+    "dal attester with bake for"
+    test_attester_with_bake_for
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~attestation_threshold:100
+    ~attestation_lag:8
+    ~activation_timestamp:Now
+    ~number_of_slots:8
+    ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+      (* when consensus_rights_delay = 1 and attestation_lag = 16,
+         blocks_per_cycle must be at least 16:
+         attestation_lag <= consensus_rights_delay * blocks_per_cycle *)
+    ~blocks_per_cycle:16
+    "dal attester with baker daemon"
+    test_attester_with_daemon
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["l1_snapshot"; "import"]
+    ~operator_profiles:[0]
+    "dal node import l1 snapshot"
+    test_dal_node_import_l1_snapshot
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; Tag.slow]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot export/import"
+    (test_dal_node_snapshot ~operators:[0; 3])
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~tags:["baker"; "dal"; "attestation"; "redundant"; "multi_lag"]
+    ~operator_profiles:[0]
+    ~activation_timestamp:Now
+    ~consensus_committee_size:256
+    ~consensus_threshold_size:171 (* 2/3 * 256 *)
+    "No redundant DAL attestations with multi-lag"
+    test_no_redundant_dal_attestations
+    (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["snapshot"; "merge"]
+    ~operator_profiles:[0; 3]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot import with merging into existing store"
+    (test_dal_node_snapshot_import_merging ~operators:[0; 3])
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["gossipsub"; "rpc"]
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    "GS/RPC get_connections"
+    test_rpc_get_connections
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["operator"; "profile"]
+    "operator profile"
+    ~prover:false
+    test_operator_profile
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["crawler"; "reconnection"]
+    "DAL node crawler reconnects to L1 without crashing (non-producer case)"
+    ~prover:false
+    test_dal_node_crawler_reconnects_to_l1
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["crawler"; "reconnection"]
+    "DAL node crawler reconnects to L1 without crashing (producer case)"
+    ~operator_profiles:[0]
+    test_dal_node_crawler_reconnects_to_l1
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["restart"]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom (Rolling (Some 5)))
+    "restart DAL node (producer)"
+    test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["restart"]
+    ~observer_profiles:[0]
+    (* Use default L1 history (Default_without_refutation): observer profile
+       requires shard_retention_period_in_levels (150 levels ≈ 19 cycles),
+       so we cannot use a small fixed rolling window like the producer test. *)
+    "restart DAL node (observer)"
+    test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["restart"]
+    ~bootstrap_profile:true
+    "restart DAL node (bootstrap)"
+    test_restart_dal_node
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    ~number_of_slots:8
+    ~attestation_threshold:0
+    "fetching slots from backup sources"
+    (dal_slots_retrievability ~store_kind:`Slots)
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    ~number_of_slots:8
+    ~attestation_threshold:0
+    "fetching shards from backup sources"
+    (dal_slots_retrievability ~store_kind:`Shards)
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~tags:["restart"; "statuses"]
+    "Status information is backfilled at restart"
+    ~operator_profiles:[0]
+    test_statuses_backfill_at_restart
+    protocols ;
+  scenario_with_all_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    "test reveal_dal_page in fast exec wasm pvm"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~tags:[Tag.memory_hungry]
+    ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:256
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:8
+    ~page_size:128
+    test_reveal_dal_page_in_fast_exec_wasm_pvm
+    protocols ;
+  (* Scenarios for disabling shard validation *)
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~env:
+      (String_map.singleton
+         Dal_node.disable_shard_validation_environment_variable
+         "yes")
+    "DAL node disable shard validation wrong CLI"
+    test_disable_shard_validation_wrong_cli
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~disable_shard_validation:true
+    "DAL node disable shard validation wrong env"
+    test_disable_shard_validation_wrong_env
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~wait_ready:true
+    ~env:
+      (String_map.singleton
+         Dal_node.disable_shard_validation_environment_variable
+         "yes")
+    ~disable_shard_validation:true
+    "DAL node disable shard validation correct CLI"
+    (fun _protocol _parameters _cryptobox _node _client dal_node ->
+      Dal_node.terminate dal_node)
+    protocols ;
+  (* Scenarios for --ignore-topics *)
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~env:
+      (String_map.singleton Dal_node.ignore_topics_environment_variable "yes")
+    "DAL node ignore topics wrong CLI"
+    test_ignore_topics_wrong_cli
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~__FILE__
+    ~operator_profiles:[0]
+    ~wait_ready:false
+    ~ignore_pkhs:
+      [
+        Constant.bootstrap1.Account.public_key_hash;
+        Constant.bootstrap2.Account.public_key_hash;
+      ]
+    "DAL node ignore topics wrong env"
+    test_ignore_topics_wrong_env
+    protocols
