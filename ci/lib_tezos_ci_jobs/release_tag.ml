@@ -16,7 +16,6 @@
    GitLab}, the associated artifacts, and to push releases to opam. *)
 
 open Tezos_ci
-open Common.Docker
 
 (* Some jobs have been migrated to Cacio, in the shared component. *)
 module CI = Cacio.Shared
@@ -44,23 +43,45 @@ let docker_version = "24.0.7"
 
 let job_docker =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize @@ fun trigger ->
   Cacio.parameterize @@ fun arch ->
-  job_docker_build
+  CI.job
+    ("oc.docker:" ^ Runner.Arch.show_uniform arch)
     ~__POS__
-    ~dependencies:(Dependent [])
-    ?rules:
-      (match trigger with
-      | `manual ->
-          Some [Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
-      | `auto -> None)
+    ~description:
+      "Build the Docker image for Octez for the specified architecture."
+    ~stage:Build
+    ~allow_failure:No
+    ~retry:
+      {
+        (* Set retry to 1 because the job is a bit flaky.
+           The runner sometimes dies, causing the job to fail with EOF.
+           Perhaps surprisingly, this surfaces as a [Script_failure]. *)
+        Gitlab_ci.Types.max = 1;
+        when_ = [Script_failure; Runner_system_failure];
+      }
     ~arch
-    ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
-    (match mode with `test -> Test | `real -> Release)
+    ~image:Images_external.docker
+    ~image_dependencies:[Images.CI.runtime]
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~variables:
+      [
+        ("DOCKER_VERSION", docker_version);
+        ("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true");
+        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
+        ("IMAGE_ARCH_PREFIX", Runner.Arch.show_uniform arch ^ "_");
+        ( "EXECUTABLE_FILES",
+          match mode with
+          | `test ->
+              (* TODO: why this special case?
+                 Don't we want the test pipeline to mimic the real pipeline? *)
+              "script-inputs/released-executables \
+               script-inputs/experimental-executables"
+          | `real -> "script-inputs/released-executables" );
+      ]
+    ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
 
 let job_docker_merge_manifests =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize @@ fun trigger ->
   CI.job
     "docker:merge_manifests"
     ~__POS__
@@ -70,11 +91,7 @@ let job_docker_merge_manifests =
     ~stage:Publish
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~image:Images_external.docker
-    ~needs_legacy:
-      [
-        (Job, job_docker mode trigger Amd64);
-        (Job, job_docker mode trigger Arm64);
-      ]
+    ~needs:[(Job, job_docker mode Amd64); (Job, job_docker mode Arm64)]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
       [
@@ -106,7 +123,7 @@ let job_docker_promote_to_latest =
       | `test_wait ->
           (* In pipelines other than latest release pipelines,
              we want to wait for the Docker image to exist. *)
-          [(Job, job_docker_merge_manifests `test `auto)]
+          [(Job, job_docker_merge_manifests `test)]
       | `test | `real ->
           (* In latest release pipelines, the Docker image already exists,
              as it was created by another pipeline (the tag pipeline). *)
@@ -144,7 +161,7 @@ let job_gitlab_release =
       [
         (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
         (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
-        (Job, job_docker_merge_manifests mode `auto);
+        (Job, job_docker_merge_manifests mode);
       ]
     ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ~id_tokens:Tezos_ci.id_tokens
@@ -269,7 +286,7 @@ let () =
   Cacio.register_jobs
     Major_release_tag
     [
-      (Auto, job_docker_merge_manifests `real `auto);
+      (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
@@ -278,7 +295,7 @@ let () =
   Cacio.register_jobs
     Major_release_tag_test
     [
-      (Auto, job_docker_merge_manifests `test `auto);
+      (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -288,7 +305,7 @@ let () =
   Cacio.register_jobs
     Minor_release_tag
     [
-      (Auto, job_docker_merge_manifests `real `auto);
+      (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
@@ -297,7 +314,7 @@ let () =
   Cacio.register_jobs
     Minor_release_tag_test
     [
-      (Auto, job_docker_merge_manifests `test `auto);
+      (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -307,7 +324,7 @@ let () =
   Cacio.register_jobs
     Beta_release_tag
     [
-      (Auto, job_docker_merge_manifests `real `auto);
+      (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
@@ -315,7 +332,7 @@ let () =
   Cacio.register_jobs
     Beta_release_tag_test
     [
-      (Auto, job_docker_merge_manifests `test `auto);
+      (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
     ] ;
@@ -323,20 +340,20 @@ let () =
   Cacio.register_jobs
     Non_release_tag
     [
-      (Auto, job_docker_merge_manifests `real `auto);
+      (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   Cacio.register_jobs
     Non_release_tag_test
     [
-      (Auto, job_docker_merge_manifests `test `auto);
+      (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_publish `non_release_tag);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
     Scheduled_test_release
     [
-      (Auto, job_docker_merge_manifests `test `auto);
+      (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_publish `scheduled_test);
     ] ;
   (* Release page *)
@@ -358,13 +375,6 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  let mode =
-    match pipeline_type with
-    | Major_release_tag | Minor_release_tag | Beta_release_tag | Non_release_tag
-      ->
-        `real
-    | _ -> `test
-  in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
@@ -379,8 +389,6 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
-    job_docker mode `auto Amd64;
-    job_docker mode `auto Arm64;
     job_build_homebrew_release;
   ]
   @ [job_trigger_monitoring] @ jobs_debian_repository
@@ -397,7 +405,7 @@ let job_docker_promote_to_version =
     ~image:Images_external.docker
     ~stage:Publish
     ~allow_failure:No
-    ~needs:[(Job, job_docker_merge_manifests mode `manual)]
+    ~needs:[(Job, job_docker_merge_manifests mode)]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
@@ -450,9 +458,9 @@ let () =
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
-      (* [`manual] because the docker build jobs should be manual.
-         This will go away after the docker build jobs are migrated to Cacio. *)
-      (Auto, job_docker_merge_manifests `real `manual);
+      (Manual, job_docker `real Amd64);
+      (Manual, job_docker `real Arm64);
+      (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_promote_to_version `real);
     ] ;
   Cacio.register_jobs
@@ -460,13 +468,14 @@ let () =
     [
       (Manual, job_create_gitlab_package);
       (Auto, job_update_gitlab_release);
-      (Auto, job_docker_merge_manifests `test `manual);
+      (Manual, job_docker `test Amd64);
+      (Manual, job_docker `test Arm64);
+      (Auto, job_docker_merge_manifests `test);
       (Manual, job_docker_promote_to_version `test);
     ] ;
   ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
-  let mode = if test then `test else `real in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
   in
@@ -475,13 +484,7 @@ let octez_packaging_revision_jobs ?(test = false) () =
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
-  [
-    (* Stage: start *)
-    job_datadog_pipeline_trace;
-    (* Docker images *)
-    job_docker mode `manual Amd64;
-    job_docker mode `manual Arm64;
-  ]
+  [(* Stage: start *) job_datadog_pipeline_trace]
   @ jobs_debian_repository
   @
   if test then Cacio.get_jobs Packaging_revision_test

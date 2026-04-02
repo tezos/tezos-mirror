@@ -86,74 +86,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.docker:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: amd64_
-    EXECUTABLE_FILES: script-inputs/released-executables
-  retry:
-    max: 1
-    when:
-    - script_failure
-    - runner_system_failure
-
-oc.docker:arm64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: build
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
-    IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/released-executables
-  retry:
-    max: 1
-    when:
-    - script_failure
-    - runner_system_failure
-
 oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-be43e621
   stage: build
@@ -645,6 +577,78 @@ publish:release-page:
     paths:
     - index.html
   retry: 0
+
+oc.docker:arm64:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: arm64_
+    EXECUTABLE_FILES: script-inputs/released-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
+
+oc.docker:amd64:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
+    EXECUTABLE_FILES: script-inputs/released-executables
+  retry:
+    max: 1
+    when:
+    - script_failure
+    - runner_system_failure
 
 docker:merge_manifests:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
