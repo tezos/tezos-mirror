@@ -1873,6 +1873,15 @@ let reset_before store ~l2_level ~history_mode =
         let* () = Sequencer_upgrades.clear_before store l2_level in
         let* () = Delayed_transactions.clear_before store l2_level in
         return_unit
+    | Configuration.Blueprints_only _ ->
+        (* Blueprints are kept forever: they are the only data served to
+           consumers in this mode. Blocks and transactions are pruned.
+           Delayed_transactions, Kernel_upgrades and Sequencer_upgrades are
+           kept because [find_with_events] reads them to reconstruct
+           blueprint events served at the /evm/v2/blueprint endpoint. *)
+        let* () = Blocks.clear_before store l2_level in
+        let* () = Transactions.clear_before store l2_level in
+        return_unit
     | _ -> return_unit
   in
 

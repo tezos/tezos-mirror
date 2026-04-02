@@ -6,6 +6,12 @@
 
 ### Configuration changes
 
+- Added a new `Blueprints_only` history mode (`--history blueprints_only:<days>`).
+  In this mode, the node retains only blueprints with their associated events
+  (deposits, kernel upgrades, sequencer upgrades). Blocks, transactions, and
+  context are pruned by the GC. Intended for nodes that only need to serve
+  blueprints to observers. (!21317)
+
 ### RPCs changes
 
 - `eth_sendRawTransaction` no longer rejects EIP-7702 transactions with invalid

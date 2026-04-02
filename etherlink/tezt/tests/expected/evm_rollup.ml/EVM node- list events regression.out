@@ -886,9 +886,9 @@ evm_context_start_history_mode:
     { /* evm_context_start_history_mode version 0 */
       "evm_context_start_history_mode.v0": $history_mode }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
-         `N` being the number of days to use as the retention period */
-      "archive" | "rolling:n"
+      /* Compact notation for the history mode. Can be `archive`, `full:N`, `rolling:N` or
+         `blueprints_only:N` with `N` being the number of days to use as the retention period */
+      "archive" | "full:n" | "rolling:n" | "blueprints_only:n"
   
 evm_context_switch_history_mode:
   description: switching history mode from {from} to {to_}
@@ -899,9 +899,9 @@ evm_context_switch_history_mode:
       "evm_context_switch_history_mode.v0": { "from": $history_mode,
                                               "to_": $history_mode } }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
-         `N` being the number of days to use as the retention period */
-      "archive" | "rolling:n"
+      /* Compact notation for the history mode. Can be `archive`, `full:N`, `rolling:N` or
+         `blueprints_only:N` with `N` being the number of days to use as the retention period */
+      "archive" | "full:n" | "rolling:n" | "blueprints_only:n"
   
 evm_context_unexpected_l1_block:
   description: received L1 block of level {provided_level} to process, but was expected level {expected_level}

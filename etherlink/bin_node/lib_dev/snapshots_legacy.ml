@@ -126,7 +126,7 @@ let export ?snapshot_file ~compression ~data_dir () =
             [""; "-wal"; "-shm"]
         in
         return (sqlite_files @ files)
-    | Rolling _ | Full _ ->
+    | Rolling _ | Full _ | Blueprints_only _ ->
         let output_db_file =
           Filename.concat tmp_dir Evm_store.sqlite_file_name
         in

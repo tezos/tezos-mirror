@@ -3499,7 +3499,7 @@ let pp_snapshot_history fmt history_info =
         "@,History mode:    %s@,First level:     %a"
         (match history_mode with
         | Archive -> "Archive"
-        | Rolling gc | Full gc ->
+        | Rolling gc | Full gc | Blueprints_only gc ->
             let hist_span =
               Ptime.Span.of_int_s
                 (gc.split_frequency_in_seconds * gc.number_of_chunks)

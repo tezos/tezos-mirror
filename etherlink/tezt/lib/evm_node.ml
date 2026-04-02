@@ -28,7 +28,11 @@
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
-type history_mode = Archive | Rolling of int | Full of int
+type history_mode =
+  | Archive
+  | Rolling of int
+  | Full of int
+  | Blueprints_only of int
 
 type tez_contract = {address : string; path : string; initial_storage : string}
 
@@ -1208,7 +1212,8 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         (function
           | Archive -> "archive"
           | Rolling n -> sf "rolling:%d" n
-          | Full n -> sf "full:%d" n)
+          | Full n -> sf "full:%d" n
+          | Blueprints_only n -> sf "blueprints_only:%d" n)
         ps.history
     @ Cli_arg.optional_switch "ws" ps.websockets
     @ Cli_arg.optional_arg "preimages-dir" Fun.id ps.preimages_dir
@@ -1415,7 +1420,9 @@ let patch_config_gc ?history_mode json =
   |> Config_file.optional_json_put ~name:"history" history_mode (function
        | Archive -> `String "archive"
        | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
-       | Full retention -> `String (Format.sprintf "full:%d" retention))
+       | Full retention -> `String (Format.sprintf "full:%d" retention)
+       | Blueprints_only retention ->
+           `String (Format.sprintf "blueprints_only:%d" retention))
 
 let init ?patch_config ?node_setup ~mode ?end_test_on_failure ?extra_arguments
     () =
@@ -2005,6 +2012,7 @@ let switch_history_mode evm_node history =
     | Archive -> "archive"
     | Rolling n -> sf "rolling:%d" n
     | Full n -> sf "full:%d" n
+    | Blueprints_only n -> sf "blueprints_only:%d" n
   in
   let args =
     ["switch"; "history"; "to"; hist; "--data-dir"; data_dir evm_node]
