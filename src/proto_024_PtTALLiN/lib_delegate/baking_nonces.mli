@@ -68,14 +68,20 @@ val register_nonce :
 
 (** [start_revelation_worker cctxt config chain_id constants] starts the
     continuous process of monitoring block proposals to determine when nonces
-    should be revealed. The internal state is created from [cctxt], [config],
-    [chain_id] and [constants].
+    should be revealed. The internal state is created from [cctxt],
+    [~extra_nodes], [config], [chain_id] and [constants].
 
     The function returns a canceller to stop the worker and a callback function
-    to push new block proposals for processing. *)
+    to push new block proposals for processing. The callback takes a [cctxt] to
+    identify which node the proposal came from, and the [proposal] itself.
+
+    Nonce revelations will be injected to all nodes ([cctxt] and [~extra_nodes])
+    in parallel. *)
 val start_revelation_worker :
   Protocol_client_context.full ->
   Baking_configuration.nonce_config ->
   Chain_id.t ->
   Constants.t ->
-  (Lwt_canceler.t * (Baking_state_types.proposal -> unit)) Lwt.t
+  (Lwt_canceler.t
+  * (Protocol_client_context.full -> Baking_state_types.proposal -> unit))
+  Lwt.t
