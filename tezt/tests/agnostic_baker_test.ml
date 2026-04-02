@@ -459,6 +459,164 @@ let test_cli =
   and* () = Agnostic_baker.raw ~arguments baker in
   unit
 
+let test_operation_worker_crash_shuts_down_baker_single_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shuts down when node crashes"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "single_node"; "crash"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* _ = Node.wait_for_level node 1 in
+
+  let baker =
+    Agnostic_baker.create ~keep_alive:true ~remote_mode:true node client
+  in
+  let baker_process = Agnostic_baker.spawn_run baker in
+
+  Log.info "Baking initial blocks to verify baker is operational" ;
+  let* _ = Node.wait_for_level node 5 in
+
+  let* () = Node.terminate node in
+  Log.info "✓ Node terminated" ;
+
+  (* The baker should retry the monitor_operations RPC 10 times with exponential
+     backoff (1s, 2s, 4s, 8s, 10s, 10s, 10s, 10s, 10s, 10s) = 75 seconds total.
+     After 75 seconds of retries, it should shut down with exit code 111.
+     We use Lwt.pick to race between the expected error and a timeout. *)
+  Log.info
+    "Waiting for baker to shut down after ~75s of retries (10 attempts with \
+     exponential backoff)" ;
+  let* () =
+    Lwt.pick
+      [
+        Process.check_error
+          ~exit_code:111
+          ~msg:(rex ".*Node unreachable via the monitor_operations.*")
+          baker_process;
+        (let* () = Lwt_unix.sleep 90.0 in
+         Test.fail
+           "Baker did not shut down within 90 seconds. Expected shutdown after \
+            ~75s of retries.");
+      ]
+  in
+  Log.info
+    "✓ Baker shut down with exit code 111 and expected error: 'Node \
+     unreachable via the monitor_operations RPC. Unable to monitor quorum. \
+     Shutting down baker...'" ;
+  unit
+
+let test_operation_worker_crash_shuts_down_baker_multi_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker does not shut down when operation_worker crashes"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"]
+    ~supports:Protocol.(From_protocol (number Alpha))
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Setting up two nodes connected via P2P (in archive mode)" ;
+  (* Setup: 2 nodes sharing the same chain via P2P, both in archive mode *)
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~nodes_args:
+        [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:
+        [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+      `Client
+      ()
+  in
+
+  (* Set up P2P trust relationships (required for Private_mode) *)
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+
+  (* Connect the nodes *)
+  let* () = Client.Admin.connect_address client1 ~peer:node2 in
+
+  (* Wait for both nodes to sync to level 1 *)
+  let* _ = Node.wait_for_level node1 1 in
+  let* _ = Node.wait_for_level node2 1 in
+  Log.info "✓ Two nodes set up, connected via P2P, and synced" ;
+
+  Log.info "Creating baker connected to both nodes using --extra-node" ;
+  let baker =
+    Agnostic_baker.create
+      ~remote_mode:true
+      ~extra_nodes:[Node.as_rpc_endpoint node2]
+      node1
+      client1
+  in
+
+  (* Start baker and wait for ready *)
+  Log.info "Starting baker with --extra-node" ;
+  let baker_process = Agnostic_baker.spawn_run baker in
+
+  (* Bake a few blocks to ensure everything is working *)
+  Log.info "Baking initial blocks to verify baker is operational" ;
+  let* _ = Node.wait_for_level node1 5 in
+  let* _ = Node.wait_for_level node2 5 in
+
+  (* Crash node1 (the primary node) *)
+  Log.info "Crashing node1 (primary node)" ;
+  let* () = Node.terminate node1 in
+  Log.info "✓ Node1 terminated" ;
+
+  (* The baker should retry the monitor_operations RPC 10 times with exponential
+     backoff (1s, 2s, 4s, 8s, 10s, 10s, 10s, 10s, 10s, 10s) = 75 seconds total.
+     After 75 seconds of retries, it should shut down with exit code 111.
+     We use Lwt.pick to race between the expected error and a timeout. *)
+  Log.info
+    "Waiting for baker to shut down after ~75s of retries (10 attempts with \
+     exponential backoff)" ;
+  let* () =
+    Lwt.pick
+      [
+        (let* () = Process.check_error baker_process in
+         Test.fail "Baker wasn't expected to crash.");
+        Lwt_unix.sleep 90.0;
+      ]
+  in
+  Log.info "✓ Baker did not shutdown shut down" ;
+
+  let* () =
+    Node.run
+      node1
+      [Synchronisation_threshold 0; Connections 1; History_mode Archive]
+  in
+  let* () = Node.wait_for_ready node1 in
+  let* () = Client.Admin.trust_address client2 ~peer:node1 in
+  let* () = Client.Admin.trust_address client1 ~peer:node2 in
+  let* () = Client.Admin.connect_address client2 ~peer:node1 in
+
+  (* Wait until the node1 is bootstrapped. *)
+  let* () = Client.bootstrapped client1 in
+  let* () = Lwt_unix.sleep 30. in
+
+  (* Kill node2, if we continue to bake more blocks, it's a proof that node1 has
+     been reconnected. We cannot wait on baker events because we spawned the
+     process. *)
+  let* level_before_kill = Node.get_level node2 in
+  let* () = Node.terminate node2 in
+  Log.info "Wait for baker to produce blocks via node1" ;
+  let* _ = Node.wait_for_level node1 (level_before_kill + 5) in
+
+  unit
+
 let test_multi_node_connection_recovery =
   Protocol.register_test
     ~__FILE__
@@ -1058,6 +1216,8 @@ let test_multi_node_nonce_revelation_injection =
 let register ~protocols =
   test_keep_alive protocols ;
   test_cli protocols ;
+  test_operation_worker_crash_shuts_down_baker_multi_node protocols ;
+  test_operation_worker_crash_shuts_down_baker_single_node protocols ;
   test_multi_node_connection_recovery protocols ;
   test_multi_node_dal_worker_connection_recovery protocols ;
   test_multi_node_nonce_connection_recovery protocols ;
