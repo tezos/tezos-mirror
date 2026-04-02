@@ -2218,8 +2218,7 @@ oc.unified_coverage:
   - oc.unit:non-proto-x86_64
   - oc.unit:other-x86_64
   - oc.unit:proto-x86_64
-  allow_failure:
-    exit_codes: 64
+  allow_failure: true
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

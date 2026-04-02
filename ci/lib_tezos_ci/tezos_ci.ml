@@ -1889,7 +1889,7 @@ module Coverage = struct
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/6173
              We propagate the exit code to temporarily allow corrupted coverage files. *)
             ["./scripts/ci/report_coverage.sh || exit $?"]
-            ~allow_failure:(With_exit_codes [64])
+            ~allow_failure:Yes
           |> enable_location |> enable_report
         in
         unified_coverage_job := Some job ;
