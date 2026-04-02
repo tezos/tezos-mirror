@@ -152,6 +152,23 @@ val delete_unused_addresses :
   unit ->
   unit Lwt.t
 
+(** [create_firewall_rule ~name ~network ~ports ~source_ranges ~priority ()]
+    creates a GCP firewall rule allowing TCP traffic on [ports] from
+    [source_ranges]. Used to open Netdata proxy ports ([Env.netdata_proxy_base_port]+) on the
+    orchestrator when auth is enabled. *)
+val create_firewall_rule :
+  name:string ->
+  network:string ->
+  ports:int list ->
+  source_ranges:string list ->
+  priority:int ->
+  unit ->
+  unit Lwt.t
+
+(** [delete_firewall_rule ~name ()] deletes the named firewall rule.
+    Does not fail if the rule does not exist. *)
+val delete_firewall_rule : name:string -> unit -> unit Lwt.t
+
 module DNS : sig
   (** [create_zone ~domain ~zone ()] creates a [~zone] associated with
       [~domain]. *)

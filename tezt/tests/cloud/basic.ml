@@ -79,10 +79,13 @@ let run_detached () =
   Log.info "OK" ;
   unit
 
-(** Check that a URL returns the expected HTTP status code. *)
-let check_http_status ~url ~expected =
+(** Check that a URL returns the expected HTTP status code.
+    [extra_args] are passed to curl before the URL (e.g. ["-u"; "admin:secret"]). *)
+let check_http_status ?(extra_args = []) ~url ~expected () =
   let* output =
-    Curl.get_raw ~args:["-o"; "/dev/null"; "-w"; "%{http_code}"] url
+    Curl.get_raw
+      ~args:(extra_args @ ["-o"; "/dev/null"; "-w"; "%{http_code}"])
+      url
     |> Runnable.run
   in
   let status = String.trim output in
@@ -105,41 +108,48 @@ let string_mem ~sub s =
   in
   sublen <= slen && check 0
 
-let check_core_services t =
-  (* Default ports used by monitoring services in --localhost mode.
-     These are the values from cli.ml defaults. *)
-  let website_port = 8080 in
-  let prometheus_port = 9090 in
+let check_core_services ~extra_args ~expected t =
+  let website_port = Tezt_cloud_cli.website_port in
+  let prometheus_port = Tezt_cloud_cli.prometheus_port in
   let grafana_port = 3000 in
   (* 1. Website health *)
   let* () =
     check_http_status
+      ~extra_args
       ~url:(sf "http://localhost:%d/" website_port)
-      ~expected:"200"
+      ~expected
+      ()
   in
   Log.info "Website is healthy" ;
   (* 2. Prometheus health *)
   let* () =
     check_http_status
+      ~extra_args
       ~url:(sf "http://localhost:%d/-/ready" prometheus_port)
-      ~expected:"200"
+      ~expected
+      ()
   in
   Log.info "Prometheus is healthy" ;
   (* 3. Grafana health *)
   let* () =
     check_http_status
+      ~extra_args
       ~url:(sf "http://localhost:%d/api/health" grafana_port)
-      ~expected:"200"
+      ~expected
+      ()
   in
   Log.info "Grafana is healthy" ;
-  (* 4. Push a metric and verify it appears in /metrics *)
-  Cloud.push_metric t ~name:"tezt_monitoring_test" 1.0 ;
-  let* metrics =
-    Curl.get_raw (sf "http://localhost:%d/metrics" website_port) |> Runnable.run
-  in
-  if not (string_mem ~sub:"tezt_monitoring_test" metrics) then
-    Test.fail "Pushed metric not found in /metrics endpoint" ;
-  Lwt.return_unit
+  (* 4. Check /metrics endpoint *)
+  let metrics_url = sf "http://localhost:%d/metrics" website_port in
+  let* () = check_http_status ~extra_args ~url:metrics_url ~expected () in
+  (* When we can read the body, also verify that pushed metrics appear. *)
+  if expected = "200" then (
+    Cloud.push_metric t ~name:"tezt_monitoring_test" 1.0 ;
+    let* metrics = Curl.get_raw ~args:extra_args metrics_url |> Runnable.run in
+    if not (string_mem ~sub:"tezt_monitoring_test" metrics) then
+      Test.fail "Pushed metric not found in /metrics endpoint" ;
+    Lwt.return_unit)
+  else Lwt.return_unit
 
 let monitoring () =
   Cloud.register
@@ -148,32 +158,74 @@ let monitoring () =
     ~tags:["monitoring"; "health"]
     ~title:"Health check for monitoring services"
   @@ fun t ->
-  let* () = check_core_services t in
+  let* () = check_core_services ~extra_args:[] ~expected:"200" t in
   Log.report "All monitoring services healthy" ;
   unit
 
-let monitoring_full () =
+let monitoring_full ~expected ~with_auth () =
   Cloud.register
     ~vms:(fun () -> return [Agent.Configuration.make ()])
     ~__FILE__
     ~tags:["monitoring_full"; "health"]
-    ~title:"Full health check for all monitoring services"
+    ~title:
+      (Format.sprintf
+         "Full health check for all monitoring services (expected_code:%s%s)"
+         expected
+         (if with_auth then ", with auth" else ""))
   @@ fun t ->
-  let* () = check_core_services t in
-  (* OTel health *)
-  let* () = check_http_status ~url:"http://localhost:13133" ~expected:"200" in
-  Log.info "OTel collector is healthy" ;
-  (* Jaeger UI *)
-  let* () = check_http_status ~url:"http://localhost:16686/" ~expected:"200" in
-  Log.info "Jaeger UI is healthy" ;
-  (* Netdata on the agent *)
-  let agents = Cloud.agents t in
-  let agent = List.hd agents in
-  let host = Runner.address (Agent.runner agent) in
+  let extra_args = if with_auth then ["-u"; "admin:secret"] else [] in
+  let* () = check_core_services ~extra_args ~expected t in
+  (* OTel health — port 13133 is a data-ingestion endpoint, not proxied
+     by nginx, so it always returns 200 regardless of auth. *)
   let* () =
-    check_http_status ~url:(sf "http://%s:19999/" host) ~expected:"200"
+    check_http_status ~url:"http://localhost:13133" ~expected:"200" ()
   in
-  Log.info "Netdata is healthy" ;
+  Log.info "OTel collector is healthy" ;
+  (* Jaeger UI — proxied by nginx when auth is enabled *)
+  let* () =
+    check_http_status ~extra_args ~url:"http://localhost:16686/" ~expected ()
+  in
+  Log.info "Jaeger UI is healthy" ;
+  (* Netdata on the agent.
+     - On localhost: Netdata runs inside the agent container and is not
+       exposed on the host. The nginx proxy cannot reach it either -> skip.
+     - Without auth on GCP: Netdata is directly accessible on agent-ip:19999.
+     - With auth on GCP/ssh-host: Netdata is proxied through nginx on the
+       orchestrator (port [Env.netdata_proxy_base_port]+). We check via the proxy — both the
+       "401 without creds" and "200 with creds" variants go through nginx. *)
+  let auth_enabled = with_auth || expected = "401" in
+  let* () =
+    if Tezt_cloud_cli.localhost then (
+      Log.info "Skipping Netdata check (localhost mode, not exposed on host)" ;
+      Lwt.return_unit)
+    else if auth_enabled then (
+      (* Netdata is behind nginx on the orchestrator. We only check the
+         first agent — if the proxy works for one, the mechanism
+         (add_service + reload) is validated for all. *)
+      let netdata_port = Netdata.proxy_base_port in
+      let* () =
+        check_http_status
+          ~extra_args
+          ~url:(sf "http://localhost:%d/" netdata_port)
+          ~expected
+          ()
+      in
+      Log.info "Netdata is healthy (via nginx proxy on port %d)" netdata_port ;
+      Lwt.return_unit)
+    else
+      let agents = Cloud.agents t in
+      let agent = List.hd agents in
+      let host = Runner.address (Agent.runner agent) in
+      let* () =
+        check_http_status
+          ~extra_args
+          ~url:(sf "http://%s:19999/" host)
+          ~expected
+          ()
+      in
+      Log.info "Netdata is healthy" ;
+      Lwt.return_unit
+  in
   Log.report "All monitoring services healthy (full)" ;
   unit
 
@@ -267,25 +319,17 @@ let nginx () =
         check_http_status
           ~url:(sf "http://localhost:%d/" proxy_port)
           ~expected:"401"
+          ()
       in
       Log.info "Without auth: got 401 as expected" ;
       (* Test 2: With auth -> 200 *)
-      let* output =
-        Curl.get_raw
-          ~args:
-            [
-              "-o";
-              "/dev/null";
-              "-w";
-              "%{http_code}";
-              "-u";
-              sf "%s:%s" username password;
-            ]
-          (sf "http://localhost:%d/" proxy_port)
-        |> Runnable.run
+      let* () =
+        check_http_status
+          ~extra_args:["-u"; sf "%s:%s" username password]
+          ~url:(sf "http://localhost:%d/" proxy_port)
+          ~expected:"200"
+          ()
       in
-      let status = String.trim output in
-      if status <> "200" then Test.fail "With auth: expected 200, got %s" status ;
       Log.info "With auth: got 200 as expected" ;
       (* Test 3: Add a second service dynamically *)
       let proxy_port_2 = 28081 in
@@ -302,30 +346,21 @@ let nginx () =
         check_http_status
           ~url:(sf "http://localhost:%d/" proxy_port_2)
           ~expected:"401"
+          ()
       in
       Log.info "Dynamic service: got 401 without auth" ;
       (* Verify original port still works *)
-      let* output =
-        Curl.get_raw
-          ~args:
-            [
-              "-o";
-              "/dev/null";
-              "-w";
-              "%{http_code}";
-              "-u";
-              sf "%s:%s" username password;
-            ]
-          (sf "http://localhost:%d/" proxy_port)
-        |> Runnable.run
+      let* () =
+        check_http_status
+          ~extra_args:["-u"; sf "%s:%s" username password]
+          ~url:(sf "http://localhost:%d/" proxy_port)
+          ~expected:"200"
+          ()
       in
-      let status = String.trim output in
-      if status <> "200" then
-        Test.fail "Original port after add_service: expected 200, got %s" status ;
       Log.info "Original port still works after add_service" ;
       (* Test 4: Config generation — add a third service, then verify
-         /tmp/nginx/default.conf contains 3 server{} blocks with correct
-         ports and proxy targets. *)
+     /tmp/nginx/default.conf contains 3 server{} blocks with correct
+     ports and proxy targets. *)
       let proxy_port_3 = 28082 in
       let* () =
         Nginx.add_service
@@ -374,5 +409,10 @@ let register () =
   run_vm () ;
   run_detached () ;
   monitoring () ;
-  monitoring_full () ;
+  (* This test passes only if authentication is off. *)
+  monitoring_full ~expected:"200" ~with_auth:false () ;
+  (* This test passes only if authentication is on. *)
+  monitoring_full ~expected:"401" ~with_auth:false () ;
+  (* This test passes only if authentication is on and username:password are admin:secret. *)
+  monitoring_full ~expected:"200" ~with_auth:true () ;
   nginx ()

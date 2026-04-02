@@ -339,3 +339,7 @@ module Gcloud : sig
     val add_subdomain : zone:string -> name:string -> value:string -> unit Lwt.t
   end
 end
+
+module Netdata : sig
+  val proxy_base_port : int
+end

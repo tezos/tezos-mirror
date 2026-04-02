@@ -86,6 +86,11 @@ val keep_alive : bool
 (** Equivalent to [Cli.vms]. *)
 val vms : int option
 
+(** Base port for Netdata reverse-proxy endpoints on the orchestrator.
+    Agent [i] is proxied on port [netdata_proxy_base_port + i].
+    Hardcoded to 20001. *)
+val netdata_proxy_base_port : int
+
 (** Equivalent to [Cli.vm_base_port]. *)
 val vm_base_port : int
 
@@ -198,7 +203,11 @@ val wait_process :
 (** [run_command ?cmd_wrapper cmd args] can wrap the command given by [cmd] and [args] with
     a [Gcloud] wrapper, depending on the value of [?cmd_wrapper]. *)
 val run_command :
-  ?cmd_wrapper:Gcloud.cmd_wrapper -> string -> string list -> Process.t
+  ?runner:Runner.t ->
+  ?cmd_wrapper:Gcloud.cmd_wrapper ->
+  string ->
+  string list ->
+  Process.t
 
 (** [dns_domains ()] returns a list of fully qualified domain names (FQDNs) based on current
     configuration (given by [Cli.dns_domains]) and [mode] of operation. *)

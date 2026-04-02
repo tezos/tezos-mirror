@@ -431,3 +431,7 @@ end
 
 module Nginx = Nginx
 module Gcloud = Gcloud
+
+module Netdata = struct
+  let proxy_base_port = Env.netdata_proxy_base_port
+end

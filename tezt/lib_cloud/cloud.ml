@@ -349,7 +349,36 @@ let orchestrator ?(alerts = []) ?(tasks = []) deployement f =
           |> add_if Env.open_telemetry 16686 jaeger_port
         in
         let* nginx = Nginx.run ~username ~password ~services () in
-        Lwt.return_some nginx
+        (* Add one nginx proxy entry per agent for Netdata (port 20001+).
+           This lets users access each agent's Netdata through the
+           authenticated orchestrator.
+           NOTE: in GCP multi-VM mode, Netdata on agent VMs still listens
+           on 0.0.0.0:19999 and remains accessible without auth via the
+           agent's public IP. Closing port 19999 on agents would require
+           per-VM firewall rules (target tags), which is not worth the
+           complexity. For --ssh-host deployments (single machine), all
+           services are on localhost and fully protected by nginx. *)
+        let* () =
+          (* Netdata proxy is available in all modes except pure localhost
+             (Local_orchestrator_local_agents) where Netdata runs inside
+             agent containers that are not accessible from the host.
+             In proxy mode (Remote_orchestrator_local_agents), agents are
+             also containers but they use --network=host on the proxy VM,
+             so Netdata is reachable on localhost:19999 of the proxy VM. *)
+          let netdata_proxyable =
+            Env.monitoring && Env.mode <> `Local_orchestrator_local_agents
+          in
+          if netdata_proxyable then
+            Lwt_list.iteri_s
+              (fun i agent ->
+                let listen_port = Env.netdata_proxy_base_port + i in
+                let host = agent |> Agent.runner |> Runner.address in
+                let proxy_target = sf "http://%s:19999" host in
+                Nginx.add_service nginx Nginx.{listen_port; proxy_target})
+              agents
+          else Lwt.return_unit
+        in
+        Lwt.return (Some nginx)
   in
   let t =
     {
@@ -644,6 +673,37 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
     Process.spawn ?runner "chmod" ["+x"; remote_script] |> Process.check
   in
 
+  (* Open Netdata proxy ports on the GCP firewall of the proxy VM.
+     The orchestrator on the proxy VM will listen on ports [Env.netdata_proxy_base_port]+ to proxy
+     Netdata from each agent, but gcloud is not available on the proxy VM
+     so we create the rule from the local machine (here).
+     Only needed in GCP proxy mode (Remote_orchestrator_remote_agents).
+     In ssh-host mode there is no GCP VPC. *)
+  let needs_gcp_firewall =
+    Env.monitoring && Env.mode = `Remote_orchestrator_remote_agents
+  in
+  let netdata_proxy_ports =
+    if needs_gcp_firewall then
+      let n_agents = List.length agents in
+      List.init n_agents (fun i -> Env.netdata_proxy_base_port + i)
+    else []
+  in
+  let proxy_workspace = sf "%s-proxy" Env.tezt_cloud in
+  let rule_name = sf "%s-netdata" proxy_workspace in
+  let* () =
+    match netdata_proxy_ports with
+    | [] -> Lwt.return_unit
+    | ports ->
+        let network = sf "%s-vpc" proxy_workspace in
+        Gcloud.create_firewall_rule
+          ~name:rule_name
+          ~network
+          ~ports
+          ~source_ranges:["0.0.0.0/0"]
+          ~priority:1000
+          ()
+  in
+
   let process =
     (* We execute a command in a screen session that will start the orchestrator. *)
     Agent.docker_run_command
@@ -670,6 +730,12 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
     match status with
     | WEXITED 0 -> Lwt.return_unit
     | _ -> Test.fail "Proxy scenario has failed"
+  in
+  (* Delete the Netdata proxy firewall rule now that the scenario is done *)
+  let* () =
+    match netdata_proxy_ports with
+    | [] -> Lwt.return_unit
+    | _ -> Gcloud.delete_firewall_rule ~name:rule_name ()
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 

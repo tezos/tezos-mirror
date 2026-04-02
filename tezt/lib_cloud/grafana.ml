@@ -17,27 +17,50 @@ type t = {
 let generate_password () = "saucisse"
 
 let generate_admin_api_key ~port password =
-  let cmd = "curl" in
-  let args =
-    [
-      "-X";
-      "POST";
-      "-H";
-      "Content-Type: application/json";
-      "-d";
-      "\n\
-      \  {\n\
-      \        \"name\": \"admin_api_key\",\n\
-      \        \"role\": \"Admin\"\n\
-      \      }";
-      "-u";
-      Format.asprintf "admin:%s" password;
-      sf "http://localhost:%d/api/auth/keys" port;
-    ]
+  (* Step 1: Create a service account *)
+  let* sa_output =
+    Process.run_and_read_stdout
+      "curl"
+      [
+        "-s";
+        "-X";
+        "POST";
+        "-H";
+        "Content-Type: application/json";
+        "-d";
+        {|{"name":"tezt-cloud","role":"Admin"}|};
+        "-u";
+        Format.asprintf "admin:%s" password;
+        sf "http://localhost:%d/api/serviceaccounts" port;
+      ]
   in
-  let* output = Process.run_and_read_stdout cmd args in
-  let json = JSON.parse ~origin:"Grafana.generate_admin_api_key" output in
-  let key = JSON.(json |-> "key" |> as_string) in
+  let sa_json =
+    JSON.parse
+      ~origin:"Grafana.generate_admin_api_key:service_account"
+      sa_output
+  in
+  let sa_id = JSON.(sa_json |-> "id" |> as_int) in
+  (* Step 2: Create a token for the service account *)
+  let* token_output =
+    Process.run_and_read_stdout
+      "curl"
+      [
+        "-s";
+        "-X";
+        "POST";
+        "-H";
+        "Content-Type: application/json";
+        "-d";
+        {|{"name":"admin_token"}|};
+        "-u";
+        Format.asprintf "admin:%s" password;
+        sf "http://localhost:%d/api/serviceaccounts/%d/tokens" port sa_id;
+      ]
+  in
+  let token_json =
+    JSON.parse ~origin:"Grafana.generate_admin_api_key:token" token_output
+  in
+  let key = JSON.(token_json |-> "key" |> as_string) in
   Lwt.return key
 
 let configuration ~port admin_api_key : config =
@@ -107,8 +130,7 @@ let run ?(port = 3000) ?(interface = "0.0.0.0") ?(sources = [default_source])
         (generate_password (), "true")
   in
   Log.info "Grafana admin password: %s" password ;
-  (* This is the last version supporting api keys *)
-  let grafana_docker_tag = "grafana/grafana:11.2.3" in
+  let grafana_docker_tag = "grafana/grafana:latest" in
   let args =
     [
       "run";
