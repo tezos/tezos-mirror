@@ -1226,6 +1226,30 @@ let expected_attestation dal_parameters attested_slots =
   List.iter (fun i -> arr.(i) <- true) attested_slots ;
   arr
 
+let get_validated_dal_attestations_in_mempool node for_level =
+  let* mempool_json =
+    Node.RPC.call node
+    @@ RPC.get_chain_mempool_pending_operations
+         ~version:"2"
+         ~validated:true
+         ~branch_delayed:false
+         ~branch_refused:false
+         ~refused:false
+         ~outdated:false
+         ~validation_passes:[0]
+         ()
+  in
+  let validated = JSON.(mempool_json |-> "validated" |> as_list) in
+  List.filter
+    (fun op ->
+      let contents = JSON.(op |-> "contents" |> geti 0) in
+      let level = JSON.(contents |-> "level" |> as_int) in
+      level = for_level
+      && JSON.(contents |-> "kind" |> as_string) |> fun kind ->
+         String.equal kind "attestation_with_dal")
+    validated
+  |> return
+
 (* --- Slot publication helpers --- *)
 
 let generate_dummy_slot slot_size =
@@ -1379,6 +1403,75 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
     ?force
     ?error
     client
+
+(** For each level in the range [from_level, to_level]:
+    1. Publishes a dummy slot with content derived from the level and slot index
+    2. Stores the slot in the DAL node
+    3. Bakes a new block to include the published slot on L1
+    4. Waits for the node to reach the baked level
+
+    The [delegates] parameter is used to specify which delegates should
+    participate in baking. *)
+let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
+    cryptobox node client dal_node =
+  let num_bakers = Array.length Account.Bootstrap.keys in
+  let publish source ~index message =
+    let* _op_hash =
+      publish_dummy_slot ~source ~index ~message cryptobox client
+    in
+    unit
+  in
+  let publish_and_store =
+    let slot_idx =
+      match slots with
+      | Some s ->
+          let num_slots = List.length s in
+          fun level -> List.nth s (slot_idx parameters level mod num_slots)
+      | None -> slot_idx parameters
+    in
+    fun level ->
+      let source = Account.Bootstrap.keys.(level mod num_bakers) in
+      let index = slot_idx level in
+      let slot_content =
+        Format.asprintf "content at level %d index %d" level index
+      in
+      let* predecessor = Node.wait_for_level node (pred level) in
+      if predecessor >= level then
+        Test.fail
+          "Tried to publish a slot header at level %d but the predecessor \
+           level is %d"
+          level
+          predecessor ;
+      let* () = publish source ~index slot_content in
+      (* Storing the slot is required as the producer/operator does not store
+         anything. *)
+      let* _commitment, _proof =
+        let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+        Helpers.(
+          store_slot dal_node ~slot_index:index
+          @@ make_slot ~slot_size slot_content)
+      in
+      Log.info "Slot with %d index (normally) published at level %d" index level ;
+      return (level, index)
+  in
+  Log.info
+    "Publish (inject and bake) a slot header at each level from %d to %d."
+    from_level
+    to_level ;
+  let rec iter acc level =
+    if level > to_level then return acc
+    else
+      let* level, index = publish_and_store level in
+      let* () =
+        bake_for
+          ?delegates
+          ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node)
+          client
+      in
+      let* _ = Node.wait_for_level node level in
+      iter ((level, index) :: acc) (level + 1)
+  in
+  iter [] from_level
 
 (* Produce a slot, store it in the DAL node, and then (try to) publish the same
    commitment for each level between [from] and [into]. *)
