@@ -242,7 +242,7 @@ module Accountability : sig
     attested_level:Raw_level_repr.t ->
     attested_slots ->
     int Raw_level_repr.Map.t ->
-    t
+    t tzresult
 
   (** [attestation_status t ~threshold ~number_of_shards ~published_level
       ~slot_index] returns the current attestation status of a slot; a slot is

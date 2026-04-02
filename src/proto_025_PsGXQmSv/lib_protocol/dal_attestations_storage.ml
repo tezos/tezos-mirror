@@ -9,9 +9,10 @@ open Raw_context
 
 let record_number_of_attested_shards ctxt ~delegate ~attested_level attestation
     committee_level_to_shard_count =
+  let open Result_syntax in
   let c = (constants ctxt).dal in
   let slot_accountability = Dal.slot_accountability ctxt in
-  let slot_accountability =
+  let+ slot_accountability =
     Dal_attestations_repr.Accountability.record_number_of_attested_shards
       slot_accountability
       ~number_of_slots:c.number_of_slots

@@ -108,13 +108,12 @@ let apply_attestations ctxt ~delegate ~attested_level attestations ~tb_slot
       (fun ctxt ->
         Dal.Attestations.record_attestation ctxt ~tb_slot attestations)
   in
-  return
-    (Dal.Attestations.record_number_of_attested_shards
-       ctxt
-       ~delegate
-       ~attested_level
-       attestations
-       committee_level_to_shard_count)
+  Dal.Attestations.record_number_of_attested_shards
+    ctxt
+    ~delegate
+    ~attested_level
+    attestations
+    committee_level_to_shard_count
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager
