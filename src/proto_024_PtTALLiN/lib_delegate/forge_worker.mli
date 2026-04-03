@@ -75,6 +75,8 @@ module Internal_for_tests : sig
     val create : Baking_state_types.Delegate.t -> t
   end
 
+  type delegate_highwatermarks
+
   (** Internal types module. *)
   module Types : sig
     type state = {
@@ -82,6 +84,7 @@ module Internal_for_tests : sig
         Delegate_signing_queue.t Baking_state_types.Key_id.Table.t;
       baking_state : global_state;
       forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
+      delegate_highwatermarks : delegate_highwatermarks;
     }
   end
 
