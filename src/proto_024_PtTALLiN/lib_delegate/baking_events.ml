@@ -855,12 +855,23 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_forge_block =
+  let failed_to_prepare_block =
     declare_2
       ~section
-      ~name:"failed_to_forge_block"
+      ~name:"failed_to_prepare_block"
       ~level:Error
-      ~msg:"failed to forge block for {delegate} -- {trace}"
+      ~msg:"failed to prepare block for {delegate} -- {trace}"
+      ~pp1:Delegate.pp
+      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let failed_to_sign_block =
+    declare_2
+      ~section
+      ~name:"failed_to_sign_block"
+      ~level:Error
+      ~msg:"failed to sign block for {delegate} -- {trace}"
       ~pp1:Delegate.pp
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Error_monad.pp_print_trace
