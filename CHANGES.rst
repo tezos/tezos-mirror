@@ -133,6 +133,11 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Fixed ``l1_monitor_finalized`` being ignored when set in the configuration
+  file, and fixed the ``/global/monitor_finalized_blocks`` streaming RPC not
+  working when ``--l1-monitor-finalized`` was used. (MRs :gl:`!20239`,
+  :gl:`!20256`)
+
 - Fixed inbox divergence when DAL attestation lags produce published levels
   before the rollup's genesis level. Errors fetching DAL attested slots messages
   are now propagated instead of silently returning an empty list. (MR
@@ -164,6 +169,12 @@ Smart Rollup node
   default instead of falling back to the slow OCaml interpreter. Use
   ``--slow-vm-fallback`` to opt in to the previous behavior. (MR :gl:`!21069`)
 
+- Fixed Wasmer host function errors (e.g. during ``reveal_preimage``) being lost
+  across the OCaml-Wasmer boundary. Exceptions are now passed through a
+  side-channel instead of Wasmer traps, which also fixes crashes (SIGILL) on
+  macOS ARM64 caused by unreliable Cranelift panic unwinding. (MRs
+  :gl:`!21082`, :gl:`!21125`)
+
 - Store the PVM state hash and status during block evaluation and serve RPCs
   directly from the store, avoiding expensive context checkouts. This includes
   a migration of the SQL database. (MR :gl:`!21016`)
@@ -179,9 +190,44 @@ Smart Rollup node
   connects to an L1 node that is behind on the same chain. Previously this could
   cause the daemon to catch up very slowly. (MR :gl:`!21323`)
 
+- Refactored PVM state handling to use mutable state, avoiding redundant copies
+  of the PVM state during block evaluation. This is particularly beneficial for
+  RISC-V rollups where the PVM state is large. (MRs :gl:`!20158`, :gl:`!20186`,
+  :gl:`!20214`, :gl:`!20403`, :gl:`!20409`, :gl:`!20465`, :gl:`!21183`)
+
 - Added ``--commit-on`` option to control how frequently the rollup node commits
   PVM context to disk, reducing I/O overhead for PVMs with expensive
   serialization such as RISC-V. (MR :gl:`!19902`)
+
+- Fixed DAL-related refutation games: handle invalid page IDs with a dedicated
+  proof variant, support changing DAL attestation lag across protocol migrations,
+  hardened page import when published levels are far in the future relative
+  to the import level, and use publication-time DAL parameters when importing
+  pages. (MRs :gl:`!19533`, :gl:`!19977`, :gl:`!20051`, :gl:`!20402`)
+
+- Optimized refutation game state caching by sharing immutable state copies
+  across tick caches and avoiding expensive context checkouts between blocks.
+  For RISC-V rollups, cached dissection states are now snapshotted to disk
+  instead of kept in memory, reducing live PVM states from ~131 to ~4 during
+  games. (MRs :gl:`!20996`, :gl:`!21156`)
+
+- The rollup node now reads DAL slot attestation status directly from L1 instead
+  of relying on the DAL node, which only updates after block finalization. (MRs
+  :gl:`!19532`, :gl:`!20326`)
+
+- The rollup node now retries fetching DAL slot status for a few seconds when
+  the status is not yet final, instead of immediately returning an error that
+  could crash the node. (MR :gl:`!19919`)
+
+- Added Prometheus metrics for RISC-V PVM live states (immutable and mutable),
+  exposed at the ``/metrics`` endpoint as
+  ``octez_sc_rollup_node_riscv_states``. (MR :gl:`!20688`)
+
+- Added OpenTelemetry tracing for RPCs between the rollup node and the DAL
+  node. (MR :gl:`!19801`)
+
+- Fixed ``injection_ttl`` configuration being ignored by the injector, which
+  always used the default of 120 L1 blocks. (MR :gl:`!21193`)
 
 Smart Rollup WASM Debugger
 --------------------------
