@@ -1215,8 +1215,32 @@ mod multisig_tests {
         Micheline::seq_arr_uncarbonated(arena(), xs)
     }
 
+    /// Run `f` on a thread with a 4 MiB stack.
+    ///
+    /// The interpreter's main loop (`interpret_one`) has a single very large
+    /// `match` over every Michelson instruction; with `Result`-returning paths
+    /// added throughout, monomorphization further inflates the per-frame size.
+    /// The multisig fixtures below recurse deeply enough that the default
+    /// 2 MiB test thread stack overflows even though the corresponding scripts
+    /// run fine in production (which uses larger stacks). Splitting and boxing
+    /// the per-instruction handlers to shrink the frame would be a large
+    /// refactor; this helper localises the workaround to the tests.
+    /// TODO: https://gitlab.com/tezos/tezos/-/issues/8136
+    fn with_big_stack<T>(f: impl FnOnce() -> T + Send + 'static) -> T
+    where
+        T: Send + 'static,
+    {
+        std::thread::Builder::new()
+            .stack_size(4 * 1024 * 1024)
+            .spawn(f)
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
     #[test]
     fn multisig_transfer() {
+        with_big_stack(|| {
         let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = BigUint::from(1u32);
@@ -1289,10 +1313,12 @@ mod multisig_tests {
                 )
             ))
         );
+        })
     }
 
     #[test]
     fn multisig_set_delegate() {
+        with_big_stack(|| {
         let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = BigUint::from(1u32);
@@ -1361,10 +1387,12 @@ mod multisig_tests {
                 )
             ))
         );
+        })
     }
 
     #[test]
     fn invalid_signature() {
+        with_big_stack(|| {
         let temp = Arena::new();
         let mut ctx = make_ctx();
         let threshold = 1;
@@ -1405,6 +1433,7 @@ mod multisig_tests {
                 InterpretError::FailedWith(T::Unit, TV::Unit)
             ))
         );
+        })
     }
 
     // The interpretation result contains an iterator of operations,
