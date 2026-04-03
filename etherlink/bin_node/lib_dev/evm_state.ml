@@ -374,16 +374,19 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
   Octez_telemetry.Trace.add_attrs (fun () ->
       Telemetry.Attributes.
         [Transaction.hash (Hash hash); Block.number block_in_progress.number]) ;
+  let tezosx = Storage_version.tezosx_single_tx ~storage_version in
   let tx, read_receipt =
     match tx with
     | Broadcast.Delayed tx ->
-        encode ~tezos_x_tag:1 (Evm_events.Delayed_transaction.to_rlp tx)
+        if tezosx then
+          encode ~tezos_x_tag:1 (Evm_events.Delayed_transaction.to_rlp tx)
+        else (Evm_events.Delayed_transaction.to_rlp tx, true)
     | Broadcast.Common (Evm tx) ->
         let inner = encode_inner ~inner_tag:1 hash tx in
-        encode ~tezos_x_tag:1 inner
+        if tezosx then encode ~tezos_x_tag:1 inner else (inner, true)
     | Broadcast.Common (Michelson op) ->
         let inner = encode_inner ~inner_tag:1 hash op in
-        encode ~tezos_x_tag:0 inner
+        if tezosx then encode ~tezos_x_tag:0 inner else (inner, false)
   in
   let rlp =
     Rlp.List

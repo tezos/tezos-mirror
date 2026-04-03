@@ -13768,6 +13768,82 @@ let test_durable_storage_consistency =
   in
   unit
 
+let test_tezosx_single_tx_execution_input () =
+  register_sandbox_with_observer
+    ~fail_on_divergence:false
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+    ~__FILE__
+    ~tags:["observer"; "single_tx"; "tezosx"; "version_gate"]
+    ~title:
+      "TezosX SingleTxExecutionInput is correctly encoded and decoded after V52"
+  @@ fun {sandbox; observer} ->
+  (* 1. Produce initial block so the system is ready *)
+  let* _ = produce_block sandbox
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  (* 2. Read storage version and verify it is >= 52 (TezosX gate active) *)
+  let*@ storage_version_opt =
+    Rpc.state_value observer (Durable_storage_path.storage_version Latest)
+  in
+  let storage_version =
+    match storage_version_opt with
+    | None -> Test.fail ~__LOC__ "No storage version found in durable storage"
+    | Some hex ->
+        (* Storage version is stored as u64 little-endian *)
+        let bytes = Hex.to_bytes (`Hex hex) in
+        Bytes.get_int64_le bytes 0 |> Int64.to_int
+  in
+  Log.info "Storage version: %d" storage_version ;
+  Check.(
+    (storage_version >= 52)
+      int
+      ~error_msg:
+        "Storage version should be >= 52 for TezosX SingleTxExecutionInput \
+         gate, got %L") ;
+  (* 3. Send a first transaction to the observer to initialize IC
+     (instant confirmations must process at least one tx to become ready) *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:(Wei.of_eth_int 1)
+      ~gas:21000
+      ~gas_price:1_000_000_000
+      ~address:receiver.address
+      ()
+  in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+  (* 4. Craft a second transaction and execute it via single_tx_execution.
+     This exercises the full TezosX encoding/decoding pipeline:
+     - EVM node encodes SingleTxExecutionInput with TezosX envelope
+       (because storage_version >= 52)
+     - Kernel decodes SingleTxExecutionInput with TezosX envelope
+       (because storage_version >= V52) *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:receiver.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:(Wei.of_eth_int 1)
+      ~gas:21000
+      ~gas_price:1_000_000_000
+      ~address:sender.address
+      ()
+  in
+  let execution_done_promise =
+    Evm_node.wait_for_single_tx_execution_done observer
+  in
+  let* () = Evm_node.execute_single_transaction observer ~raw_tx in
+  let* _tx_hash = execution_done_promise in
+  Log.info
+    "Single transaction executed successfully with TezosX envelope format" ;
+  unit
+
 let get_deposit_nonce_from_latest_block evm_node =
   let*@ block =
     Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" evm_node
@@ -16401,4 +16477,5 @@ let () =
   test_evm_events_cleanup () ;
   test_locked_tx_queue_timestamp () ;
   test_next_block_info_ic_reset () ;
-  test_eip7702_stale_auth_is_skipped [Alpha]
+  test_eip7702_stale_auth_is_skipped [Alpha] ;
+  test_tezosx_single_tx_execution_input ()
