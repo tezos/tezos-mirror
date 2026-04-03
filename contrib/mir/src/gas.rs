@@ -975,7 +975,7 @@ mod test {
     fn gas_consumption() {
         let mut gas = Gas::new(100);
         gas.consume(30).unwrap();
-        assert_eq!(gas.milligas(), 70)
+        assert_eq!(gas.milligas(), Some(70))
     }
 
     #[test]
@@ -985,12 +985,13 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "Access to gas after exhaustion")]
-    fn gas_exhaustion_panic() {
+    fn gas_exhaustion_no_panic() {
         let mut gas = Gas::new(100);
         assert_eq!(gas.consume(1000), Err(OutOfGas));
+        assert_eq!(gas.milligas(), None);
 
-        let _ = gas.consume(1000); // panics
+        // Consuming after exhaustion returns OutOfGas without panicking.
+        assert_eq!(gas.consume(1000), Err(OutOfGas));
     }
 
     #[test]

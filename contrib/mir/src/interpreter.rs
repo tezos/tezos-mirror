@@ -2065,7 +2065,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Sub(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -2181,7 +2181,10 @@ mod interpreter_tests {
         let mut stack = stk![V::Mutez(2i64.pow(62)), V::Mutez(20)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut ctx, &mut stack).is_ok());
-        assert_eq!(ctx.gas().milligas(), Gas::default().milligas() - 20);
+        assert_eq!(
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 20
+        );
         assert_eq!(stack, stk![V::Mutez(2i64.pow(62) + 20)]);
         assert_eq!(
             interpret_one(
@@ -2598,7 +2601,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
         }
 
         #[test]
@@ -2681,7 +2684,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&Abs, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
         }
         test(0, 0u32);
         test(10, 10u32);
@@ -2697,7 +2700,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&IsNat, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
         }
         test(0, Some(0u32));
         test(10, Some(10u32));
@@ -3038,8 +3041,8 @@ mod interpreter_tests {
             assert_eq!(input_stack, expected_stack);
 
             assert_eq!(
-                ctx.gas().milligas(),
-                Gas::default().milligas()
+                ctx.gas().milligas().unwrap(),
+                Gas::default().milligas().unwrap()
                     - expected_map_gas_cost
                     - interpret_cost::PUSH * collection_length
                     - interpret_cost::SOME * collection_length
@@ -3238,8 +3241,10 @@ mod interpreter_tests {
         assert!(interpret(&[Unit], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::Unit]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::UNIT - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::UNIT
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3264,8 +3269,10 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3281,8 +3288,10 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::new_option(Some(V::int(-5)))]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3304,8 +3313,8 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::PUSH
                 - interpret_cost::CAR
                 - interpret_cost::INTERPRET_RET
@@ -3330,8 +3339,8 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::PUSH
                 - interpret_cost::CDR
                 - interpret_cost::INTERPRET_RET
@@ -3357,7 +3366,7 @@ mod interpreter_tests {
                 V::new_pair(V::Bool(false), V::new_pair(V::nat(42), V::Unit))
             ]
         );
-        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap())
     }
 
     #[test]
@@ -3372,7 +3381,7 @@ mod interpreter_tests {
                 V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
             )]
         );
-        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap())
     }
 
     #[test]
@@ -3398,7 +3407,7 @@ mod interpreter_tests {
                 V::Bool(false)
             ],
         );
-        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap())
     }
 
     #[test]
@@ -3413,7 +3422,7 @@ mod interpreter_tests {
             stack,
             stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)],
         );
-        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap())
     }
 
     #[test]
@@ -3439,8 +3448,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(42)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::IF_NONE - interpret_cost::INTERPRET_RET * 2
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::IF_NONE
+                - interpret_cost::INTERPRET_RET * 2
         );
     }
 
@@ -3453,8 +3464,8 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(5)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::IF_NONE
                 - interpret_cost::PUSH
                 - interpret_cost::INTERPRET_RET * 2
@@ -3469,8 +3480,8 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::IF_CONS
                 - interpret_cost::SWAP
                 - interpret_cost::DROP
@@ -3486,8 +3497,8 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::IF_CONS
                 - interpret_cost::PUSH
                 - interpret_cost::INTERPRET_RET * 2
@@ -3502,8 +3513,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::IF_LEFT - interpret_cost::INTERPRET_RET * 2
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::IF_LEFT
+                - interpret_cost::INTERPRET_RET * 2
         );
     }
 
@@ -3515,8 +3528,8 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::IF_LEFT
                 - interpret_cost::DROP
                 - interpret_cost::PUSH
@@ -3531,8 +3544,10 @@ mod interpreter_tests {
         assert!(interpret(&[ISome], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_option(Some(V::int(5)))]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::SOME
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3543,8 +3558,10 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::None], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_option(None)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::NONE - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::NONE
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3559,7 +3576,7 @@ mod interpreter_tests {
                 let mut ctx = Ctx::default();
                 assert!(interpret(&[Compare], &mut ctx, &mut stack).is_ok());
                 assert_eq!(stack, stk!$res);
-                assert_eq!(ctx.gas().milligas(), Gas::default().milligas() - expected_cost);
+                assert_eq!(ctx.gas().milligas().unwrap(), Gas::default().milligas().unwrap() - expected_cost);
             };
         }
         test!([V::int(5), V::int(6)], [V::int(1)]);
@@ -3588,8 +3605,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Amount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(100500)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::INTERPRET_RET - interpret_cost::AMOUNT,
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::INTERPRET_RET
+                - interpret_cost::AMOUNT,
         )
     }
 
@@ -3610,8 +3629,10 @@ mod interpreter_tests {
             stk![V::List(vec![V::int(1), V::int(2), V::int(3),].into())]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3622,8 +3643,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Nil], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::List(MichelsonList::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::NIL
+                - interpret_cost::INTERPRET_RET,
         )
     }
 
@@ -3634,8 +3657,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Cons], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::List(vec![V::int(123), V::int(321)].into())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::CONS - interpret_cost::INTERPRET_RET,
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::CONS
+                - interpret_cost::INTERPRET_RET,
         )
     }
 
@@ -3653,8 +3678,10 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Map(map)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::PUSH
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3675,8 +3702,8 @@ mod interpreter_tests {
             stk![V::new_option(Some(V::String("foo".to_owned())))]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_get(&V::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -3723,8 +3750,9 @@ mod interpreter_tests {
             )))]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::map_get(&TypedValue::int(1), 1).unwrap()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::map_get(&TypedValue::int(1), 1).unwrap()
         );
     }
 
@@ -3742,8 +3770,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Option(None)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_get(&V::int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -3863,8 +3891,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -3908,8 +3936,9 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::map_mem(&TypedValue::int(1), 0).unwrap()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::map_mem(&TypedValue::int(1), 0).unwrap()
         );
     }
 
@@ -3939,8 +3968,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::set_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -3965,8 +3994,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[EmptySet], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::EMPTY_SET
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3977,8 +4008,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[EmptyMap], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::EMPTY_MAP - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::EMPTY_MAP
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -3995,8 +4028,8 @@ mod interpreter_tests {
             stk![TypedValue::BigMap(BigMap::empty(Type::Int, Type::Unit))]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::EMPTY_BIG_MAP
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap() - interpret_cost::EMPTY_BIG_MAP
         );
     }
 
@@ -4015,8 +4048,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(rc_set([TypedValue::int(1)])),]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4037,8 +4070,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4059,8 +4092,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(set)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4080,8 +4113,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4105,8 +4138,8 @@ mod interpreter_tests {
             stk![V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_update(&V::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4130,8 +4163,8 @@ mod interpreter_tests {
             stk![V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4148,8 +4181,8 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Map(BTreeMap::new())]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
                 - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
         );
@@ -4165,8 +4198,10 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::SIZE_STRING - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::SIZE_STRING
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -4192,8 +4227,10 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::SIZE_LIST - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::SIZE_LIST
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -4249,8 +4286,9 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 0).unwrap()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::map_get_and_update(&V::int(1), 0).unwrap()
         );
     }
 
@@ -4279,8 +4317,9 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
         );
     }
 
@@ -4305,8 +4344,9 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
         );
     }
 
@@ -4355,7 +4395,7 @@ mod interpreter_tests {
                     value_type: Type::String,
                 })]
             );
-            assert!(ctx.gas().milligas() < Gas::default().milligas());
+            assert!(ctx.gas().milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         // insert
@@ -4448,7 +4488,7 @@ mod interpreter_tests {
                     TypedValue::new_option(old_value),
                 ]
             );
-            assert!(ctx.gas().milligas() < Gas::default().milligas());
+            assert!(ctx.gas().milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         // insert
@@ -4707,12 +4747,12 @@ mod interpreter_tests {
         let chain_id = super::ChainId::from_base58_check("NetXynUjJNZm7wi").unwrap();
         let ctx = &mut Ctx::default();
         ctx.chain_id = chain_id.clone();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         let mut stk = Stack::new();
         assert_eq!(interpret(&[Instruction::ChainId], ctx, &mut stk), Ok(()));
         assert_eq!(stk, stk![V::ChainId(chain_id)]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
         );
     }
@@ -4759,14 +4799,14 @@ mod interpreter_tests {
         ];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[TransferTokens], ctx, stk), Ok(()));
         assert_eq!(
             stk,
             &stk![V::new_operation(Operation::TransferTokens(tt), 101)]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::TRANSFER_TOKENS + interpret_cost::INTERPRET_RET
         );
     }
@@ -4780,14 +4820,14 @@ mod interpreter_tests {
         let stk = &mut stk![V::new_option(Some(V::KeyHash(sd.0.clone().unwrap())))];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[I::SetDelegate], ctx, stk), Ok(()));
         assert_eq!(
             stk,
             &stk![V::new_operation(Operation::SetDelegate(sd), 101)]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::SET_DELEGATE + interpret_cost::INTERPRET_RET
         );
     }
@@ -4958,8 +4998,10 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Address], ctx, stk), Ok(()));
         assert_eq!(stk, &stk![V::Address(address)]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::ADDRESS - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::ADDRESS
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -5014,8 +5056,10 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::Left], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_or(or::Or::Left(V::nat(10)))]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::LEFT - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::LEFT
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -5026,8 +5070,10 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::Right], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_or(or::Or::Right(V::nat(10)))]);
         assert_eq!(
-            ctx.gas().milligas(),
-            Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET
+            ctx.gas().milligas().unwrap(),
+            Gas::default().milligas().unwrap()
+                - interpret_cost::RIGHT
+                - interpret_cost::INTERPRET_RET
         );
     }
 
@@ -5042,14 +5088,14 @@ mod interpreter_tests {
             content: V::Unit,
         });
 
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(
             interpret(&[Ticket(Type::Unit)], &mut ctx, &mut stack),
             Ok(())
         );
         assert_eq!(stack, stk![V::new_option(Some(expected_ticket))]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::TICKET + interpret_cost::INTERPRET_RET
         );
     }
@@ -5067,7 +5113,7 @@ mod interpreter_tests {
         };
         let ticket_val = V::new_ticket(ticket.clone());
         let mut stack = stk![ticket_val.clone()];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[ReadTicket], &mut ctx, &mut stack), Ok(()));
         let ticketer_address = super::Address {
             hash: ticket.ticketer,
@@ -5084,7 +5130,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::READ_TICKET + interpret_cost::INTERPRET_RET
         );
     }
@@ -5188,8 +5234,8 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            ctx.gas().milligas(),
-            Ctx::default().gas.milligas() - interpret_cost::HASH_KEY
+            ctx.gas().milligas().unwrap(),
+            Ctx::default().gas.milligas().unwrap() - interpret_cost::HASH_KEY
         );
     }
 
@@ -5331,7 +5377,7 @@ mod interpreter_tests {
         let ticket_val = V::new_ticket(ticket.clone());
         let mut stack = stk![V::new_pair(V::nat(20), V::nat(80)), ticket_val.clone(),];
 
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[SplitTicket], &mut ctx, &mut stack), Ok(()));
 
         let ticket_exp_left = Ticket {
@@ -5351,7 +5397,7 @@ mod interpreter_tests {
             ))),]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::split_ticket(&ticket_exp_left.amount, &ticket_exp_right.amount)
                 .unwrap()
                 + interpret_cost::INTERPRET_RET
@@ -5392,10 +5438,10 @@ mod interpreter_tests {
         };
         let ticket_right = V::new_ticket(ticket_right_.clone());
         let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[JoinTickets], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::join_tickets(&ticket, &ticket_right_).unwrap()
                 + interpret_cost::INTERPRET_RET
         );
@@ -5501,11 +5547,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.balance = 70;
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[Balance], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(70),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::BALANCE + interpret_cost::INTERPRET_RET
         );
     }
@@ -5529,11 +5575,11 @@ mod interpreter_tests {
                 ctx.set_known_contracts([(address.hash, HashMap::from_iter(Vec::from(e)))]);
             }
 
-            let start_milligas = ctx.gas().milligas();
+            let start_milligas = ctx.gas().milligas().unwrap();
             assert_eq!(interpret(&[instr], &mut ctx, &mut start_stack), Ok(()));
             assert_eq!(start_stack, stack_expect);
             if let Some(exp_gas) = opt_exp_gas {
-                assert_eq!(start_milligas - ctx.gas().milligas(), exp_gas);
+                assert_eq!(start_milligas - ctx.gas().milligas().unwrap(), exp_gas);
             }
         }
 
@@ -5739,11 +5785,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.level = 70u32.into();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[Level], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::LEVEL + interpret_cost::INTERPRET_RET
         );
     }
@@ -5753,11 +5799,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.min_block_time = 70u32.into();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[MinBlockTime], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::MIN_BLOCK_TIME + interpret_cost::INTERPRET_RET
         );
     }
@@ -5768,11 +5814,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.self_address = addr.hash.clone();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[SelfAddress], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::SELF_ADDRESS + interpret_cost::INTERPRET_RET
         );
     }
@@ -5783,11 +5829,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.sender = addr.hash.clone();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[Sender], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::SENDER + interpret_cost::INTERPRET_RET
         );
     }
@@ -5798,7 +5844,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.source = addr.clone();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[Source], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
             stack,
@@ -5808,7 +5854,7 @@ mod interpreter_tests {
             })]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::SOURCE + interpret_cost::INTERPRET_RET
         );
     }
@@ -5818,11 +5864,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.now = 7000i32.into();
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[Now], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::timestamp(7000),]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
         );
     }
@@ -5832,7 +5878,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         let mut stack = stk![V::KeyHash(key_hash)];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[ImplicitAccount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
             stack,
@@ -5841,7 +5887,7 @@ mod interpreter_tests {
             ),]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
         );
     }
@@ -5858,11 +5904,11 @@ mod interpreter_tests {
             (key_hash_2.clone(), 50u32.into()),
         ]);
         let mut stack = stk![TypedValue::KeyHash(key_hash_2.clone())];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(50)]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
         );
 
@@ -5870,11 +5916,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = stk![TypedValue::KeyHash(key_hash_3)];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(0)]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
         );
     }
@@ -5886,11 +5932,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = Stack::new();
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(interpret(&[TotalVotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(80)]);
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::TOTAL_VOTING_POWER + interpret_cost::INTERPRET_RET
         );
     }
@@ -5903,7 +5949,7 @@ mod interpreter_tests {
         ctx.set_operation_counter(100);
 
         let mut stack = stk![TypedValue::nat(20)];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(
             interpret(
                 &[Instruction::Emit {
@@ -5927,7 +5973,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::EMIT + interpret_cost::INTERPRET_RET
         );
 
@@ -5937,7 +5983,7 @@ mod interpreter_tests {
         use crate::parser::test_helpers::parse;
 
         let mut stack = stk![TypedValue::nat(20)];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         let emit_type_mich = parse("pair (int %f1) (int %f2)").unwrap();
         assert_eq!(
             interpret(
@@ -5962,7 +6008,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::EMIT + interpret_cost::INTERPRET_RET
         );
     }
@@ -5983,7 +6029,7 @@ mod interpreter_tests {
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&PairingCheck, ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Bool(true)]);
-        assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+        assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
     }
 
     mod mul {
@@ -6001,7 +6047,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Mul(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         #[cfg(feature = "bls")]
@@ -6203,7 +6249,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&EDiv(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -6539,7 +6585,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Neg(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         #[cfg(feature = "bls")]
@@ -6614,7 +6660,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsl(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -6675,7 +6721,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsr(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -6745,7 +6791,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&SubMutez, ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![V::new_option(res.map(V::Mutez))]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
+            assert!(Ctx::default().gas.milligas().unwrap() > ctx.gas().milligas().unwrap());
         }
         test(0, 0, Some(0));
         test(0, 1, None);
@@ -6781,7 +6827,7 @@ mod interpreter_tests {
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::new_option(Some(V::int(-987654321)))]);
-        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
+        assert!(ctx.gas().milligas().unwrap() < Ctx::default().gas.milligas().unwrap());
     }
 
     #[test]
@@ -6831,7 +6877,7 @@ mod interpreter_tests {
             TypedValue::Mutez(100),
             TypedValue::new_option(None)
         ];
-        let start_milligas = ctx.gas().milligas();
+        let start_milligas = ctx.gas().milligas().unwrap();
         assert_eq!(
             interpret(
                 &[CreateContract(Rc::new(cs), &cs_mich)],
@@ -6848,7 +6894,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            start_milligas - ctx.gas().milligas(),
+            start_milligas - ctx.gas().milligas().unwrap(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
         );
     }
