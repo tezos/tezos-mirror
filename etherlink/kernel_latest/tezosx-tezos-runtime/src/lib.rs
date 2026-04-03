@@ -182,6 +182,7 @@ where
 
     *consumed_milligas = gas
         .get_and_reset_milligas_consumed()
+        .map_err(|_| TezosXRuntimeError::OutOfGas)?
         .0
         .clone()
         .try_into()

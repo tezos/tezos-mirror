@@ -38,13 +38,10 @@ impl Gas {
     }
 
     /// Try to consume the specified milligas `cost`. If not enough gas left,
-    /// return [OutOfGas], and mark gas as exhausted.
-    ///
-    /// # Panics
-    ///
-    /// If gas was previously exhausted.
+    /// or gas was previously exhausted, return [OutOfGas] and mark gas as
+    /// exhausted.
     pub fn consume(&mut self, cost: u32) -> Result<(), OutOfGas> {
-        self.milligas_amount = self.milligas().checked_sub(cost);
+        self.milligas_amount = self.milligas_amount.and_then(|m| m.checked_sub(cost));
         if self.milligas_amount.is_none() {
             Err(OutOfGas)
         } else {
@@ -52,14 +49,9 @@ impl Gas {
         }
     }
 
-    /// Get the remaining milligas amount.
-    ///
-    /// # Panics
-    ///
-    /// If gas was previously exhausted.
-    pub fn milligas(&self) -> u32 {
+    /// Get the remaining milligas amount, or `None` if gas was exhausted.
+    pub fn milligas(&self) -> Option<u32> {
         self.milligas_amount
-            .expect("Access to gas after exhaustion")
     }
 }
 

@@ -108,17 +108,15 @@ impl TezlinkOperationGas {
         })
     }
 
-    /// Resets the internal limit to the current remaining milligas.
-    fn start_internal(&mut self) {
-        self.limit = self.remaining.milligas();
-    }
-
     /// Returns the milligas consumed since the last reset and resets the
     /// baseline for the next measurement.
     ///
     /// The consumed amount is `limit - remaining`. After reading it, the
     /// internal `limit` is reset to `remaining` so that the next call only
     /// measures gas spent by the following operation.
+    ///
+    /// Returns [`OutOfGas`](mir::gas::OutOfGas) if gas has been exhausted
+    /// (the internal limit is still reset to 0 before returning the error).
     ///
     /// # Example
     ///
@@ -132,13 +130,23 @@ impl TezlinkOperationGas {
     /// // Simulate some gas consumption here
     /// // gas.remaining.consume(...);
     ///
-    /// let consumed = gas.get_and_reset_milligas_consumed();
-    /// println!("Operation consumed {:?} milligas", consumed);
+    /// match gas.get_and_reset_milligas_consumed() {
+    ///     Ok(consumed) => println!("Operation consumed {:?} milligas", consumed),
+    ///     Err(_) => println!("Gas exhausted"),
+    /// }
     /// ```
-    pub fn get_and_reset_milligas_consumed(&mut self) -> Narith {
-        let consumed = self.limit - self.remaining.milligas();
-        self.start_internal();
-        Narith::from(consumed as u64)
+    pub fn get_and_reset_milligas_consumed(&mut self) -> Result<Narith, gas::OutOfGas> {
+        match self.remaining.milligas() {
+            Some(remaining) => {
+                let consumed = self.limit - remaining;
+                self.limit = remaining;
+                Ok(Narith::from(consumed as u64))
+            }
+            None => {
+                self.limit = 0;
+                Err(gas::OutOfGas)
+            }
+        }
     }
 
     /// Consumes the provided cost from the operation gas tracker.
