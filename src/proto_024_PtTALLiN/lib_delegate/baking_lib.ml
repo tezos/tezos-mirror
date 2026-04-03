@@ -218,11 +218,21 @@ let bake_at_next_level state =
   let*! state, action = State_transitions.step state event in
   match action with
   | Prepare_block {block_to_bake} ->
-      let* prepared_block =
-        Baking_actions.prepare_block
+      let* unsigned_block, seed_nonce, injection_level, liquidity_baking_vote =
+        Baking_actions.prepare_unsigned_block
           state.automaton_state
           state.global_state
           block_to_bake
+      in
+      let* prepared_block =
+        Baking_actions.sign_unsigned_block_and_register_seed_nonce
+          unsigned_block
+          state.automaton_state
+          state.global_state
+          block_to_bake
+          seed_nonce
+          injection_level
+          liquidity_baking_vote
       in
       let*! () = sleep_until_block_timestamp prepared_block in
       let* new_state =
@@ -331,11 +341,21 @@ let propose_at_next_level ~minimal_timestamp state =
         force_apply;
       }
     in
-    let* prepared_block =
-      Baking_actions.prepare_block
+    let* unsigned_block, seed_nonce, injection_level, liquidity_baking_vote =
+      Baking_actions.prepare_unsigned_block
         state.automaton_state
         state.global_state
         block_to_bake
+    in
+    let* prepared_block =
+      Baking_actions.sign_unsigned_block_and_register_seed_nonce
+        unsigned_block
+        state.automaton_state
+        state.global_state
+        block_to_bake
+        seed_nonce
+        injection_level
+        liquidity_baking_vote
     in
     let*! () = sleep_until_block_timestamp prepared_block in
     let* state =
@@ -472,11 +492,25 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                     let* state =
                       match action with
                       | Prepare_block {block_to_bake} ->
-                          let* prepared_block =
-                            Baking_actions.prepare_block
+                          let* ( unsigned_block,
+                                 seed_nonce,
+                                 injection_level,
+                                 liquidity_baking_vote ) =
+                            Baking_actions.prepare_unsigned_block
                               state.automaton_state
                               state.global_state
                               block_to_bake
+                          in
+                          let* prepared_block =
+                            Baking_actions
+                            .sign_unsigned_block_and_register_seed_nonce
+                              unsigned_block
+                              state.automaton_state
+                              state.global_state
+                              block_to_bake
+                              seed_nonce
+                              injection_level
+                              liquidity_baking_vote
                           in
                           let*! () =
                             sleep_until_block_timestamp prepared_block
@@ -610,24 +644,37 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
           let* signed_block =
             match action with
             | Prepare_block {block_to_bake} ->
-                let* signed_block =
-                  Baking_actions.prepare_block
+                let* ( unsigned_block,
+                       seed_nonce,
+                       injection_level,
+                       liquidity_baking_vote ) =
+                  Baking_actions.prepare_unsigned_block
                     state.automaton_state
                     state.global_state
                     block_to_bake
                 in
-                let*! () = sleep_until_block_timestamp signed_block in
+                let* prepared_block =
+                  Baking_actions.sign_unsigned_block_and_register_seed_nonce
+                    unsigned_block
+                    state.automaton_state
+                    state.global_state
+                    block_to_bake
+                    seed_nonce
+                    injection_level
+                    liquidity_baking_vote
+                in
+                let*! () = sleep_until_block_timestamp prepared_block in
                 let* _state =
                   do_action
                     ( state,
                       Inject_block
                         {
-                          prepared_block = signed_block;
+                          prepared_block;
                           force_injection = force;
                           asynchronous = false;
                         } )
                 in
-                return signed_block
+                return prepared_block
             | _ -> assert false
           in
           let*! () =
@@ -781,11 +828,21 @@ let rec baking_minimal_timestamp ~count state
       force_apply;
     }
   in
-  let* prepared_block =
-    Baking_actions.prepare_block
+  let* unsigned_block, seed_nonce, injection_level, liquidity_baking_vote =
+    Baking_actions.prepare_unsigned_block
       state.automaton_state
       state.global_state
       block_to_bake
+  in
+  let* prepared_block =
+    Baking_actions.sign_unsigned_block_and_register_seed_nonce
+      unsigned_block
+      state.automaton_state
+      state.global_state
+      block_to_bake
+      seed_nonce
+      injection_level
+      liquidity_baking_vote
   in
   let*! () = sleep_until_block_timestamp prepared_block in
   let* new_state =

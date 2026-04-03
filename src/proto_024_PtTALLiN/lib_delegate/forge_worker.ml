@@ -285,28 +285,59 @@ let handle_forge_block (state : Types.state) automaton_state
       block_to_bake.delegate
   in
   let block_highwatermark = delegate_hwms.blocks in
-  if High_watermark.check block_highwatermark level round then (
-    let queue = get_or_create_queue state block_to_bake.delegate in
-    High_watermark.push block_highwatermark level round ;
-    let task () =
-      let* prepared_block =
-        Baking_actions.prepare_block
-          automaton_state
-          state.baking_state
-          block_to_bake
-      in
-      automaton_state.push_forge_event (Block_ready prepared_block) ;
-      return_unit
-    in
-    Delegate_signing_queue.push_task
-      ~on_error:(fun err ->
-        let open Lwt_syntax in
-        let* () =
-          Events.(emit failed_to_forge_block (block_to_bake.delegate, err))
+  if High_watermark.check block_highwatermark level round then
+    (* [prepare_unsigned_block] is potentially slow (e.g. if the node's context
+       cache is cold). We run it in the background so that [on_request] returns
+       immediately and the worker can keep processing other requests (e.g.
+       attestations from other automatons). Once preparation completes, the
+       signing task is pushed to the delegate's signing queue. *)
+    Lwt.async (fun () ->
+        let*! result =
+          protect (fun () ->
+              Baking_actions.prepare_unsigned_block
+                automaton_state
+                state.baking_state
+                block_to_bake)
         in
-        Lwt.return_unit)
-      task
-      queue)
+        match result with
+        | Error err ->
+            Events.(emit failed_to_prepare_block (block_to_bake.delegate, err))
+        | Ok (unsigned_block, seed_nonce, injection_level, liquidity_baking_vote)
+          ->
+            let task () =
+              (* Check the high watermark again since a block may have been signed
+                 in the meantime *)
+              if High_watermark.check block_highwatermark level round then (
+                (* Push the high watermark only if the task to sign has been
+                   executed. The push is made before signing to ensure that only
+                   one signing attempt is performed regardless of the signer's
+                   response. *)
+                High_watermark.push block_highwatermark level round ;
+                let* signed_block =
+                  Baking_actions.sign_unsigned_block_and_register_seed_nonce
+                    unsigned_block
+                    automaton_state
+                    state.baking_state
+                    block_to_bake
+                    seed_nonce
+                    injection_level
+                    liquidity_baking_vote
+                in
+                automaton_state.push_forge_event (Block_ready signed_block) ;
+                return_unit)
+              else return_unit
+            in
+            let queue = get_or_create_queue state block_to_bake.delegate in
+            Delegate_signing_queue.push_task
+              ~on_error:(fun err ->
+                let*! () =
+                  Events.(
+                    emit failed_to_sign_block (block_to_bake.delegate, err))
+                in
+                Lwt.return_unit)
+              task
+              queue ;
+            Lwt.return_unit)
 
 let handle_forge_consensus_votes (state : Types.state) automaton_state
     (unsigned_consensus_votes : unsigned_consensus_vote_batch) =

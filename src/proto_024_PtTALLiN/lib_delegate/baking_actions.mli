@@ -73,7 +73,7 @@ val pp_action : Format.formatter -> action -> unit
 
 (** {2 Functions used by the baker} *)
 
-(** [prepare_block automaton_state global_state block_to_bake]
+(** [prepare_unsigned_block automaton_state global_state block_to_bake]
     prepares a block by:
     - inferring the block timestamp
 
@@ -87,15 +87,30 @@ val pp_action : Format.formatter -> action -> unit
     per_block_vote_file
 
     - calling [Block_forge.forge] to forge the block
-
-    - signing the block header
-
-    - registering the seed nonce if needed
 *)
-val prepare_block :
+val prepare_unsigned_block :
   automaton_state ->
   global_state ->
   block_to_bake ->
+  (Block_forge.unsigned_block
+  * (Nonce_hash.t * Nonce.t) option
+  * Level.t
+  * Per_block_votes.per_block_vote)
+  tzresult
+  Lwt.t
+
+(** [sign_unsigned_block unsigned_block automaton_state global_state block_to_bake
+    seed_nonce injection_level liquidity_baking_vote ] will sign the block header
+    and register the seed nonce if needed
+ *)
+val sign_unsigned_block_and_register_seed_nonce :
+  Block_forge.unsigned_block ->
+  automaton_state ->
+  global_state ->
+  block_to_bake ->
+  ('a * Nonce.t) option ->
+  Level.t ->
+  Per_block_votes_repr.per_block_vote ->
   prepared_block tzresult Lwt.t
 
 (** [authorized_consensus_votes automaton_state global_state unsigned_consensus_vote_batch]

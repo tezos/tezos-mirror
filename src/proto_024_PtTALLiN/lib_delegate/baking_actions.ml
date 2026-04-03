@@ -294,7 +294,7 @@ let sign_block_header (cctxt : Protocol_client_context.full) round_duration
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let prepare_block (automaton_state : automaton_state)
+let prepare_unsigned_block (automaton_state : automaton_state)
     (global_state : global_state) (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
@@ -422,7 +422,7 @@ let prepare_block (automaton_state : automaton_state)
   let*! () =
     Events.(emit forging_block (level, round, delegate, force_apply))
   in
-  let* {unsigned_block_header; operations; manager_operations_infos} =
+  let* unsigned_block =
     Utils.event_on_stalling_promise
       ~initial_delay:(round_duration /. 2.)
       ~event:(fun sum -> Events.(emit stalling_forge_block (level, round, sum)))
@@ -445,6 +445,21 @@ let prepare_block (automaton_state : automaton_state)
           global_state.constants.parametric
         [@profiler.record_s {verbosity = Info} "forge block"])
   in
+  return (unsigned_block, seed_nonce_opt, injection_level, liquidity_baking_vote)
+
+let sign_unsigned_block_and_register_seed_nonce
+    Block_forge.{unsigned_block_header; operations; manager_operations_infos}
+    automaton_state global_state block_to_bake seed_nonce_opt
+    (injection_level : Level.t) liquidity_baking_vote =
+  let cctxt = automaton_state.cctxt in
+  let {predecessor; round; delegate; _} = block_to_bake in
+  let level = Int32.succ predecessor.shell.level in
+  let chain_id = global_state.chain_id in
+  let round_duration =
+    Round.round_duration global_state.round_durations round
+    |> Period.to_seconds |> Int64.to_float
+  in
+  let open Lwt_result_syntax in
   let*! () = Events.(emit signing_block (level, round, delegate)) in
   let* signed_block_header =
     (sign_block_header
