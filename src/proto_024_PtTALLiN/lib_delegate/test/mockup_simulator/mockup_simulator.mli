@@ -277,6 +277,7 @@ val get_bootstrap_accounts :
     to test baker components like the forge worker. *)
 type baker_test_env = {
   cctxt : Protocol_client_context.full;
+  hooks : Faked_services.hooks;
   delegates : Baking_state_types.Key.t list;
   global_state : Baking_state.global_state;
   automaton_state : Baking_state.automaton_state;
@@ -301,3 +302,25 @@ val create_baker_test_env :
 (** Create a batch_content for consensus vote testing. *)
 val create_batch_content :
   block_info:Baking_state_types.block_info -> Baking_state.batch_content
+
+(** {2 Multi-Node Forge Worker Test Infrastructure} *)
+
+(** [wrap_hooks_with_delay ~delay hooks] wraps [hooks] so that the RPCs
+    used by [prepare_unsigned_block] ([rpc_context_callback],
+    [resulting_context_hash], [live_blocks]) sleep for [delay] seconds
+    before delegating to the original implementation.
+
+    Returns the wrapped hooks and a promise that resolves once the last
+    delayed RPC ([live_blocks]) has completed, signalling that the slow
+    node's block preparation is done. *)
+val wrap_hooks_with_delay :
+  delay:float -> Faked_services.hooks -> Faked_services.hooks * unit Lwt.t
+
+(** [create_cctxt ~hooks env] creates a fresh [Protocol_client_context.full]
+    from [hooks], with all delegates from [env] registered in its wallet.
+    Use the returned [cctxt] with [Baking_automaton.create_automaton_state]
+    to build an automaton that simulates an additional node. *)
+val create_cctxt :
+  hooks:Faked_services.hooks ->
+  baker_test_env ->
+  Protocol_client_context.full tzresult Lwt.t
