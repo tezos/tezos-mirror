@@ -113,21 +113,12 @@ impl TezlinkOperationGas {
         self.limit = self.remaining.milligas();
     }
 
-    /// Calculates the amount of milligas consumed by the current operation and resets the gas tracker.
+    /// Returns the milligas consumed since the last reset and resets the
+    /// baseline for the next measurement.
     ///
-    /// This method computes the difference between the initial gas limit and the remaining gas,
-    /// representing the total milligas consumed during the operation. After calculating the
-    /// consumed amount, it automatically restarts the gas tracking with the remaining gas as
-    /// the new limit for subsequent operations.
-    ///
-    /// # Returns
-    ///
-    /// The number of milligas consumed by the operation as a [`Narith`].
-    ///
-    /// # Side Effects
-    ///
-    /// This method mutates the internal state by calling [`start_internal`](Self::start_internal), which:
-    /// - Reinitializes the gas tracker with the new limit
+    /// The consumed amount is `limit - remaining`. After reading it, the
+    /// internal `limit` is reset to `remaining` so that the next call only
+    /// measures gas spent by the following operation.
     ///
     /// # Example
     ///
@@ -141,10 +132,10 @@ impl TezlinkOperationGas {
     /// // Simulate some gas consumption here
     /// // gas.remaining.consume(...);
     ///
-    /// let consumed = gas.milligas_consumed_by_operation();
+    /// let consumed = gas.get_and_reset_milligas_consumed();
     /// println!("Operation consumed {:?} milligas", consumed);
     /// ```
-    pub fn milligas_consumed_by_operation(&mut self) -> Narith {
+    pub fn get_and_reset_milligas_consumed(&mut self) -> Narith {
         let consumed = self.limit - self.remaining.milligas();
         self.start_internal();
         Narith::from(consumed as u64)

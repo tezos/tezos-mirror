@@ -181,7 +181,7 @@ where
     .map_err(|e| TezosXRuntimeError::Custom(e.to_string()));
 
     *consumed_milligas = gas
-        .milligas_consumed_by_operation()
+        .get_and_reset_milligas_consumed()
         .0
         .clone()
         .try_into()
