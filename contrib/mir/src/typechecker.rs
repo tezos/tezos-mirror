@@ -3039,7 +3039,7 @@ mod typecheck_tests {
             Ok(Dup(Some(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3052,7 +3052,7 @@ mod typecheck_tests {
             Ok(Dup(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3065,7 +3065,10 @@ mod typecheck_tests {
             Ok(Swap)
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3078,7 +3081,7 @@ mod typecheck_tests {
             Ok(Abs)
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3110,7 +3113,7 @@ mod typecheck_tests {
             Ok(IsNat)
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3144,7 +3147,7 @@ mod typecheck_tests {
                 Ok(Instruction::Int(overload)),
             );
             assert_eq!(stack, expected_stack);
-            assert!(gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -3194,7 +3197,7 @@ mod typecheck_tests {
                 Ok(Instruction::Nat),
             );
             assert_eq!(stack, expected_stack);
-            assert!(gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         #[test]
@@ -3229,7 +3232,7 @@ mod typecheck_tests {
                 Ok(Instruction::Bytes(overload)),
             );
             assert_eq!(stack, expected_stack);
-            assert!(gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         macro_rules! test {
@@ -3275,7 +3278,10 @@ mod typecheck_tests {
             Ok(Drop(None))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3288,7 +3294,10 @@ mod typecheck_tests {
             Ok(Drop(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440 - 2 * 50);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440 - 2 * 50
+        );
     }
 
     #[test]
@@ -3301,7 +3310,7 @@ mod typecheck_tests {
             Ok(Push(TypedValue::int(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3314,7 +3323,7 @@ mod typecheck_tests {
             Ok(Dip(Some(1), vec![Push(TypedValue::nat(6))]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     mod sub_mutez {
@@ -3330,7 +3339,7 @@ mod typecheck_tests {
                 Ok(SubMutez)
             );
             assert_eq!(stack, expected_stack);
-            assert!(gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
         }
 
         #[test]
@@ -3363,7 +3372,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::IntInt))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3376,7 +3388,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::NatNat))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3389,7 +3404,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::MutezMutez))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3434,7 +3452,10 @@ mod typecheck_tests {
             Ok(And(overloads::And::IntNat))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3549,7 +3570,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::Bls12381Fr))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3562,7 +3586,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::Bls12381G1))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3575,7 +3602,10 @@ mod typecheck_tests {
             Ok(Add(overloads::Add::Bls12381G2))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(
+            gas.milligas().unwrap(),
+            Gas::default().milligas().unwrap() - 440
+        );
     }
 
     #[test]
@@ -3592,7 +3622,7 @@ mod typecheck_tests {
             Ok(Loop(vec![Push(TypedValue::Bool(true))]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -3650,7 +3680,7 @@ mod typecheck_tests {
             ]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
     }
 
     #[test]
@@ -5836,7 +5866,7 @@ mod typecheck_tests {
                             Ok($instr)
                         );
                         assert_eq!(stack, expected_stack);
-                        assert!(gas.milligas() < Gas::default().milligas());
+                        assert!(gas.milligas().unwrap() < Gas::default().milligas().unwrap());
                     }
 
                     #[test]
@@ -8897,7 +8927,7 @@ mod typecheck_tests {
         assert_eq!(stack, tc_stk![Type::Nat]);
         let nat_size = Type::Nat.size_for_gas();
         assert_eq!(
-            Gas::default().milligas() - gas.milligas(),
+            Gas::default().milligas().unwrap() - gas.milligas().unwrap(),
             tc_cost::INSTR_STEP
                 + tc_cost::PARSE_TYPE_STEP
                 + tc_cost::ty_eq(nat_size, nat_size).unwrap()
@@ -8962,7 +8992,7 @@ mod typecheck_tests {
         );
         assert_eq!(stack, tc_stk![]);
         assert_eq!(
-            Gas::default().milligas() - gas.milligas(),
+            Gas::default().milligas().unwrap() - gas.milligas().unwrap(),
             tc_cost::INSTR_STEP
         );
     }

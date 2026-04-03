@@ -524,7 +524,7 @@ where
     // Remaining milligas is the gas budget for the cross-runtime call, in Tezos
     // milligas. `inject_context_headers` converts to the target runtime's units
     // on the way out.
-    let gas_limit = ctx.gas().milligas() as u64;
+    let gas_limit = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
     Ok(CrossRuntimeContext {
         gas_limit,
         timestamp: bigint_to_u256(&ctx.now())?,

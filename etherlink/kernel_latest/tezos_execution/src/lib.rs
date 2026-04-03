@@ -103,7 +103,10 @@ where
     log!(tc_ctx.host, Debug, "Reveal operation succeed");
 
     Ok(RevealSuccess {
-        consumed_milligas: tc_ctx.operation_gas.milligas_consumed_by_operation(),
+        consumed_milligas: tc_ctx
+            .operation_gas
+            .get_and_reset_milligas_consumed()
+            .map_err(|_| RevealError::OutOfGas)?,
     })
 }
 
@@ -428,8 +431,10 @@ where
                 } else {
                     // Same semantics as OCaml:
                     // Gas.consumed ~since:ctxt_before_op ~until:ctxt
-                    let consumed_milligas =
-                        tc_ctx.operation_gas.milligas_consumed_by_operation();
+                    let consumed_milligas = tc_ctx
+                        .operation_gas
+                        .get_and_reset_milligas_consumed()
+                        .map_err(|_| TransferError::OutOfGas)?;
                     ContentResult::Applied(EventSuccess { consumed_milligas })
                 };
                 InternalOperationSum::Event(InternalContentWithMetadata {
@@ -522,7 +527,10 @@ where
                 // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
                 // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
                 allocated_destination_contract: false,
-                consumed_milligas: tc_ctx.operation_gas.milligas_consumed_by_operation(),
+                consumed_milligas: tc_ctx
+                    .operation_gas
+                    .get_and_reset_milligas_consumed()
+                    .map_err(|_| TransferError::OutOfGas)?,
                 ..receipt
             })
         }
@@ -563,8 +571,11 @@ where
             // In L1, the receipt of an operation only shows its own gas
             // consumption, i.e. it does not include that of its internal
             // operations.
-            let consumed_milligas =
-                ctx.tc_ctx.operation_gas.milligas_consumed_by_operation();
+            let consumed_milligas = ctx
+                .tc_ctx
+                .operation_gas
+                .get_and_reset_milligas_consumed()
+                .map_err(|_| TransferError::OutOfGas)?;
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
             execute_internal_operations(
@@ -885,7 +896,10 @@ where
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
-        consumed_milligas: ctx.operation_gas.milligas_consumed_by_operation(),
+        consumed_milligas: ctx
+            .operation_gas
+            .get_and_reset_milligas_consumed()
+            .map_err(|_| OriginationError::OutOfGas)?,
         // TODO https://linear.app/tezos/issue/L2-325/fix-storage-size-and-paid-diff-at-origination
         // These are probably not the right values for storage_size and
         // paid_storage_size_diff, but having something different than 0

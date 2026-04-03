@@ -106,6 +106,8 @@ pub enum RevealError {
     UnretrievableManager,
     #[error("Failed to write manager.")]
     FailedToWriteManager,
+    #[error("Gas exhaustion")]
+    OutOfGas,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
@@ -193,6 +195,8 @@ pub enum OriginationError {
     MirTypecheckingError(String),
     #[error("Failed because of micheline decoding {0}")]
     MichelineDecodeError(String),
+    #[error("Gas exhaustion")]
+    OutOfGas,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {

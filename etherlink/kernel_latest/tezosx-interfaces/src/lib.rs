@@ -68,6 +68,8 @@ pub enum TezosXRuntimeError {
     /// Indicates a gateway bug; propagates as Err and reverts the blueprint.
     #[error("Header error: {0}")]
     HeaderError(String),
+    #[error("Gas exhaustion")]
+    OutOfGas,
 }
 pub trait Registry {
     fn generate_alias<Host>(

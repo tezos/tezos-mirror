@@ -108,26 +108,15 @@ impl TezlinkOperationGas {
         })
     }
 
-    /// Resets the internal limit to the current remaining milligas.
-    fn start_internal(&mut self) {
-        self.limit = self.remaining.milligas();
-    }
-
-    /// Calculates the amount of milligas consumed by the current operation and resets the gas tracker.
+    /// Returns the milligas consumed since the last reset and resets the
+    /// baseline for the next measurement.
     ///
-    /// This method computes the difference between the initial gas limit and the remaining gas,
-    /// representing the total milligas consumed during the operation. After calculating the
-    /// consumed amount, it automatically restarts the gas tracking with the remaining gas as
-    /// the new limit for subsequent operations.
+    /// The consumed amount is `limit - remaining`. After reading it, the
+    /// internal `limit` is reset to `remaining` so that the next call only
+    /// measures gas spent by the following operation.
     ///
-    /// # Returns
-    ///
-    /// The number of milligas consumed by the operation as a [`Narith`].
-    ///
-    /// # Side Effects
-    ///
-    /// This method mutates the internal state by calling [`start_internal`](Self::start_internal), which:
-    /// - Reinitializes the gas tracker with the new limit
+    /// Returns [`OutOfGas`](mir::gas::OutOfGas) if gas has been exhausted
+    /// (the internal limit is still reset to 0 before returning the error).
     ///
     /// # Example
     ///
@@ -141,13 +130,23 @@ impl TezlinkOperationGas {
     /// // Simulate some gas consumption here
     /// // gas.remaining.consume(...);
     ///
-    /// let consumed = gas.milligas_consumed_by_operation();
-    /// println!("Operation consumed {:?} milligas", consumed);
+    /// match gas.get_and_reset_milligas_consumed() {
+    ///     Ok(consumed) => println!("Operation consumed {:?} milligas", consumed),
+    ///     Err(_) => println!("Gas exhausted"),
+    /// }
     /// ```
-    pub fn milligas_consumed_by_operation(&mut self) -> Narith {
-        let consumed = self.limit - self.remaining.milligas();
-        self.start_internal();
-        Narith::from(consumed as u64)
+    pub fn get_and_reset_milligas_consumed(&mut self) -> Result<Narith, gas::OutOfGas> {
+        match self.remaining.milligas() {
+            Some(remaining) => {
+                let consumed = self.limit - remaining;
+                self.limit = remaining;
+                Ok(Narith::from(consumed as u64))
+            }
+            None => {
+                self.limit = 0;
+                Err(gas::OutOfGas)
+            }
+        }
     }
 
     /// Consumes the provided cost from the operation gas tracker.

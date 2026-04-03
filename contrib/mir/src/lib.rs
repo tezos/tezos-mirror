@@ -163,9 +163,9 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
-        let initial_milligas = ctx.gas.milligas();
+        let initial_milligas = ctx.gas.milligas().unwrap();
         let r = f(ctx);
-        let gas_diff = initial_milligas - ctx.gas.milligas();
+        let gas_diff = initial_milligas - ctx.gas.milligas().unwrap();
         println!("Gas consumed: {}.{:0>3}", gas_diff / 1000, gas_diff % 1000);
         r
     }
@@ -207,7 +207,10 @@ mod tests {
         report_gas(&mut ctx, |ctx| {
             assert!(ast.interpret(ctx, &temp, &mut istack).is_ok());
         });
-        assert_eq!(Gas::default().milligas() - ctx.gas.milligas(), 1287);
+        assert_eq!(
+            Gas::default().milligas().unwrap() - ctx.gas.milligas().unwrap(),
+            1287
+        );
     }
 
     #[test]
@@ -259,13 +262,13 @@ mod tests {
     fn typecheck_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut ctx = Ctx::default();
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas.milligas().unwrap();
         report_gas(&mut ctx, |ctx| {
             assert!(ast
                 .typecheck_instruction(ctx.gas(), None, &[parse("nat").unwrap()])
                 .is_ok());
         });
-        assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
+        assert_eq!(start_milligas - ctx.gas.milligas().unwrap(), 12680);
     }
 
     #[test]
