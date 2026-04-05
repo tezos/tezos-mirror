@@ -2770,7 +2770,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args16
+       (args17
           (config_key_arg
              ~name:"dal_publishers_whitelist"
              ~placeholder:"tz1...,tz2...,...")
@@ -2792,7 +2792,8 @@ let make_kernel_config_command =
           michelson_runtime_chain_id_arg
           (config_key_arg
              ~name:"michelson_to_evm_gas_multiplier"
-             ~placeholder:"10")))
+             ~placeholder:"10")
+          (config_key_flag ~name:"enable_michelson_gas_refund")))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2838,7 +2839,8 @@ let make_kernel_config_command =
              tez_bootstrap_accounts,
              tez_bootstrap_contracts,
              michelson_runtime_chain_id,
-             michelson_to_evm_gas_multiplier ) )
+             michelson_to_evm_gas_multiplier,
+             enable_michelson_gas_refund ) )
          output
          ()
        ->
@@ -2875,6 +2877,7 @@ let make_kernel_config_command =
         ?dal_publishers_whitelist
         ?disable_legacy_dal_signals
         ?enable_multichain
+        ?enable_michelson_gas_refund
         ?set_account_code
         ?max_delayed_inbox_blueprint_length
         ?enable_fast_withdrawal
