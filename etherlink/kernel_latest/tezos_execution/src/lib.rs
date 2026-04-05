@@ -1624,7 +1624,7 @@ mod tests {
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        context, validate_and_apply_operation, OperationError,
+        context, validate_and_apply_operation, OperationError, ProcessedOperation,
     };
     use crate::{get_required_da_fees, TcCtx};
     use crate::{make_default_ctx, COST_PER_BYTES};
@@ -2163,7 +2163,7 @@ mod tests {
 
         // Applying the operation
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2177,6 +2177,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         // Reveal operation should fail
         let expected_receipt = vec![OperationWithMetadata {
@@ -2231,7 +2232,7 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2245,6 +2246,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -2339,7 +2341,7 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2353,6 +2355,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -2417,7 +2420,7 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2431,6 +2434,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -2499,7 +2503,7 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2513,6 +2517,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -2595,7 +2600,7 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2609,6 +2614,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -2728,7 +2734,8 @@ mod tests {
             None,
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
-        .remove(0);
+        .remove(0)
+        .operation_with_metadata;
         assert_eq!(
             res,
             OperationWithMetadata {
@@ -2855,7 +2862,7 @@ mod tests {
             },
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2869,6 +2876,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let storage = Some(storage_value.clone());
 
@@ -2974,7 +2982,7 @@ mod tests {
             },
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -2988,6 +2996,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -3058,7 +3067,7 @@ mod tests {
             },
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -3072,6 +3081,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -3127,7 +3137,7 @@ mod tests {
             },
         );
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -3141,6 +3151,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let expected_receipt = vec![OperationWithMetadata {
             content: operation.content[0].clone(),
@@ -3213,18 +3224,20 @@ mod tests {
             vec![reveal_content, transfer_content_1, transfer_content_2],
         );
 
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &ctx,
-            OperationHash::default(),
-            batch.clone(),
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .unwrap();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &ctx,
+                OperationHash::default(),
+                batch.clone(),
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .unwrap(),
+        );
 
         let expected_receipts = zip_operations(
             batch,
@@ -3497,18 +3510,20 @@ mod tests {
             vec![reveal_content, succ_transfer, fail_transfer],
         );
 
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context::TezlinkContext::init_context(),
-            OperationHash::default(),
-            batch,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .unwrap();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                batch,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .unwrap(),
+        );
 
         println!("{receipts:?}");
 
@@ -3614,7 +3629,7 @@ mod tests {
         let origination_storage_fee: u64 =
             ((code.len() as u64) + (storage.len() as u64)) * COST_PER_BYTES;
 
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -3628,6 +3643,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         let mut origination_nonce = OriginationNonce::default();
         let expected_kt1 = origination_nonce.generate_kt1();
@@ -3838,19 +3854,21 @@ mod tests {
             ],
         );
         let context = context::TezlinkContext::init_context();
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
         assert_eq!(
             receipts.len(),
@@ -4004,7 +4022,7 @@ mod tests {
             },
         );
 
-        let _receipt = validate_and_apply_operation(
+        let _processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -4070,7 +4088,7 @@ mod tests {
             },
         );
 
-        let _receipt = validate_and_apply_operation(
+        let _processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -4140,7 +4158,7 @@ mod tests {
             },
         );
 
-        let _receipt = validate_and_apply_operation(
+        let _processed = validate_and_apply_operation(
             &mut host,
             &MockRegistry,
             &mut TezosXJournal::default(),
@@ -4221,19 +4239,21 @@ mod tests {
                 },
             })],
         );
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation.clone(),
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation.clone(),
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
         assert_eq!(
             receipts.len(),
@@ -4420,19 +4440,21 @@ mod tests {
                 },
             })],
         );
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation.clone(),
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation.clone(),
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
         assert_eq!(
             receipts.len(),
@@ -4649,18 +4671,20 @@ mod tests {
             ],
         );
 
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &ctx,
-            OperationHash::default(),
-            batch.clone(),
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .unwrap();
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &ctx,
+                OperationHash::default(),
+                batch.clone(),
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .unwrap(),
+        );
 
         let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
         let expected_kt1_1 = orignation_nonce.generate_kt1();
@@ -4928,19 +4952,21 @@ mod tests {
             src.clone(),
             vec![OperationContent::Origination(origination_content)],
         );
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts.len(), 1, "There should be one receipt");
@@ -5006,19 +5032,21 @@ mod tests {
             Contract::Implicit(dst.pkh),
             Parameters::default(),
         );
-        let receipts1 = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts1 = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts1.len(), 1, "There should be one receipt");
@@ -5050,19 +5078,21 @@ mod tests {
                 value: Micheline::from(()).encode(),
             },
         );
-        let receipts2 = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts2 = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts2.len(), 1, "There should be one receipt");
@@ -5095,19 +5125,21 @@ mod tests {
                 value: Micheline::from(src.clone().pkh.to_b58check()).encode(),
             },
         );
-        let receipts3 = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts3 = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts3.len(), 1, "There should be one receipt");
@@ -5148,19 +5180,21 @@ mod tests {
                 value: Micheline::from(kt1_addr.to_b58check()).encode(),
             },
         );
-        let receipts4 = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts4 = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts4.len(), 1, "There should be one receipt");
@@ -5244,19 +5278,21 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts.len(), 1, "There should be one receipt");
@@ -5339,19 +5375,21 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert_eq!(receipts.len(), 1, "There should be one receipt");
@@ -5447,19 +5485,21 @@ mod tests {
             },
         );
 
-        let receipts = validate_and_apply_operation(
-            ctx.host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            ctx.context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                ctx.host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                ctx.context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         BigMapTransfer {
@@ -5747,19 +5787,21 @@ mod tests {
             Parameters::default(),
         );
 
-        let receipts = validate_and_apply_operation(
-            ctx.host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            &context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                ctx.host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         assert!(receipts.len() == 1);
@@ -5995,19 +6037,21 @@ mod tests {
 
         // After that call, the storage of the receiver should be 'False'
         // as the big_map passed in argument doesn't have the key "d"
-        let receipts = validate_and_apply_operation(
-            ctx.host,
-            &MockRegistry,
-            &mut TezosXJournal::default(),
-            ctx.context,
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                ctx.host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                ctx.context,
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            ),
         );
 
         for r in receipts {
@@ -6062,7 +6106,7 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &registry,
             &mut TezosXJournal::default(),
@@ -6076,6 +6120,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         // Verify the operation succeeded
         assert_eq!(receipt.len(), 1, "There should be one receipt");
@@ -6350,18 +6395,20 @@ mod tests {
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::default();
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &registry,
-            &mut journal,
-            &context::TezlinkContext::init_context(),
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect("validate_and_apply_operation should not fail");
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &registry,
+                &mut journal,
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect("validate_and_apply_operation should not fail"),
+        );
 
         assert_eq!(receipts.len(), 1);
         assert!(
@@ -6426,18 +6473,20 @@ mod tests {
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
         let mut journal = TezosXJournal::default();
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &registry,
-            &mut journal,
-            &context::TezlinkContext::init_context(),
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect("validate_and_apply_operation should not fail");
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &registry,
+                &mut journal,
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect("validate_and_apply_operation should not fail"),
+        );
 
         assert_eq!(receipts.len(), 1);
         assert!(
@@ -6528,18 +6577,20 @@ mod tests {
         );
 
         let mut journal = TezosXJournal::default();
-        let receipts = validate_and_apply_operation(
-            &mut host,
-            &RevertRegistry,
-            &mut journal,
-            &context::TezlinkContext::init_context(),
-            OperationHash::default(),
-            operation,
-            &block_ctx!(),
-            false,
-            None,
-        )
-        .expect("validate_and_apply_operation should not fail at the protocol level");
+        let receipts = ProcessedOperation::into_receipts(
+            validate_and_apply_operation(
+                &mut host,
+                &RevertRegistry,
+                &mut journal,
+                &context::TezlinkContext::init_context(),
+                OperationHash::default(),
+                operation,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect("validate_and_apply_operation should not fail at the protocol level"),
+        );
 
         assert_eq!(receipts.len(), 1);
         assert!(
@@ -6621,7 +6672,7 @@ mod tests {
 
         // Use MockRegistry that tracks serve calls
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let receipt = validate_and_apply_operation(
+        let processed = validate_and_apply_operation(
             &mut host,
             &registry,
             &mut TezosXJournal::default(),
@@ -6635,6 +6686,7 @@ mod tests {
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
+        let receipt = ProcessedOperation::into_receipts(processed);
 
         // Verify the operation succeeded
         assert_eq!(receipt.len(), 1, "There should be one receipt");
