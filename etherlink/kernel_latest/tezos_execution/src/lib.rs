@@ -60,7 +60,8 @@ use crate::mir_ctx::{
 /// Result of applying a single operation within a batch.
 ///
 /// Wraps the serializable [`OperationWithMetadata`] together with
-/// runtime-computed gas that is NOT part of the binary encoding.
+/// the amount of gas that was consumed during the execution of the operation.
+/// This struct is internal, it is never serialized nor deserialized.
 #[derive(Debug, PartialEq)]
 pub struct ProcessedOperation {
     pub operation_with_metadata: OperationWithMetadata,
@@ -1162,7 +1163,7 @@ pub fn validate_and_apply_operation<Host, C: Context>(
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
     required_fees: Option<u64>,
-) -> Result<Vec<OperationWithMetadata>, OperationError>
+) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1,
 {
@@ -1228,7 +1229,7 @@ where
         journal.evm.clear();
     }
 
-    Ok(ProcessedOperation::into_receipts(processed_ops))
+    Ok(processed_ops)
 }
 
 fn apply_batch<Host, C: Context>(

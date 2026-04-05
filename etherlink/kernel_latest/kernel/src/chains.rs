@@ -51,6 +51,7 @@ use tezos_execution::{
     context::{self, Context as _, TezlinkContext},
     get_required_da_fees,
     mir_ctx::BlockCtx,
+    ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -967,7 +968,7 @@ where
                 skip_signature_check,
                 fees,
             ) {
-                Ok(receipt) => receipt,
+                Ok(result) => result,
                 Err(OperationError::Validation(err)) => {
                     log!(Error, "Found an invalid operation, dropping it: {:?}", err);
                     return Ok(crate::apply::ExecutionResult::Invalid);
@@ -977,13 +978,15 @@ where
                 }
             };
 
+            let operations = ProcessedOperation::into_receipts(processed_operations);
+
             // Add the applied operation in the block in progress
             let applied_operation = AppliedOperation {
                 hash,
                 branch,
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {
-                        operations: processed_operations,
+                        operations,
                         signature,
                     },
                 ),
@@ -1328,7 +1331,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // because it doesn't know the fees yet (that's what simulation computes).
         // The OCaml node-side prevalidation also skips fees during simulation.
         let mut tezosx_journal = TezosXJournal::default();
-        let operations = tezos_execution::validate_and_apply_operation(
+        let processed_operations = tezos_execution::validate_and_apply_operation(
             host,
             registry,
             &mut tezosx_journal,
@@ -1339,6 +1342,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             skip_signature_check,
             None,
         )?;
+        let operations = ProcessedOperation::into_receipts(processed_operations);
         let result = AppliedOperation {
             hash,
             branch,
