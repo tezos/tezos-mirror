@@ -14,11 +14,20 @@ use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
-/// Container used to track the gas left during the execution of an operation (including internal operations)
+/// Tracks gas consumption during the execution of a single manager
+/// operation, including all its internal sub-operations.
 pub struct TezlinkOperationGas {
-    /// Maximum gas the current operation could consume, in milligas
-    limit: u32,
-    /// Gas remaining for the current operation, in milligas
+    /// The gas budget set at construction, in milligas. **Never modified.**
+    /// Used by [`total_milligas_consumed`](Self::total_milligas_consumed) to
+    /// compute the total gas consumed since the start of the operation.
+    initial_limit: u32,
+    /// A movable baseline, in milligas, used by
+    /// [`get_and_reset_milligas_consumed`](Self::get_and_reset_milligas_consumed)
+    /// to measure gas consumed by individual sub-steps (e.g. a single internal
+    /// transfer). Reset to `remaining` after each measurement.
+    current_limit: u32,
+    /// The actual gas left for the current operation, only decreased by
+    /// [`consume`](Self::consume). Never artificially reset.
     pub remaining: gas::Gas,
 }
 
@@ -80,7 +89,8 @@ impl TezlinkOperationGas {
             .map_err(GasLimitError::CannotConvertToU32)?;
 
         Ok(Self {
-            limit,
+            initial_limit: limit,
+            current_limit: limit,
             remaining: gas::Gas::new(limit),
         })
     }
@@ -103,7 +113,8 @@ impl TezlinkOperationGas {
             ));
         }
         Ok(Self {
-            limit,
+            initial_limit: limit,
+            current_limit: limit,
             remaining: gas::Gas::new(limit),
         })
     }
@@ -111,12 +122,15 @@ impl TezlinkOperationGas {
     /// Returns the milligas consumed since the last reset and resets the
     /// baseline for the next measurement.
     ///
-    /// The consumed amount is `limit - remaining`. After reading it, the
-    /// internal `limit` is reset to `remaining` so that the next call only
-    /// measures gas spent by the following operation.
+    /// The consumed amount is `current_limit - remaining`. After reading it,
+    /// `current_limit` is reset to `remaining` so that the next call only
+    /// measures gas spent by the following sub-operation.
     ///
     /// Returns [`OutOfGas`](mir::gas::OutOfGas) if gas has been exhausted
-    /// (the internal limit is still reset to 0 before returning the error).
+    /// (`current_limit` is still reset to 0 before returning the error).
+    ///
+    /// See [`total_milligas_consumed`](Self::total_milligas_consumed) for the
+    /// cumulative total across all resets.
     ///
     /// # Example
     ///
@@ -128,7 +142,7 @@ impl TezlinkOperationGas {
     /// let mut gas = TezlinkOperationGas::start(&limit).unwrap();
     ///
     /// // Simulate some gas consumption here
-    /// // gas.remaining.consume(...);
+    /// // gas.consume(...);
     ///
     /// match gas.get_and_reset_milligas_consumed() {
     ///     Ok(consumed) => println!("Operation consumed {:?} milligas", consumed),
@@ -138,14 +152,31 @@ impl TezlinkOperationGas {
     pub fn get_and_reset_milligas_consumed(&mut self) -> Result<Narith, gas::OutOfGas> {
         match self.remaining.milligas() {
             Some(remaining) => {
-                let consumed = self.limit - remaining;
-                self.limit = remaining;
+                let consumed = self.current_limit - remaining;
+                self.current_limit = remaining;
                 Ok(Narith::from(consumed as u64))
             }
             None => {
-                self.limit = 0;
+                self.current_limit = 0;
                 Err(gas::OutOfGas)
             }
+        }
+    }
+
+    /// Returns the total milligas consumed since this tracker was created.
+    ///
+    /// Unlike [`get_and_reset_milligas_consumed`](Self::get_and_reset_milligas_consumed), this is immune
+    /// to baseline resets performed by
+    /// [`get_and_reset_milligas_consumed`](Self::get_and_reset_milligas_consumed).
+    ///
+    /// If gas has been exhausted, returns `initial_limit` (all gas was consumed).
+    ///
+    /// Cannot overflow: both `initial_limit` and `remaining` are `u32`,
+    /// and `remaining <= initial_limit` is maintained by [`consume`](Self::consume).
+    pub fn total_milligas_consumed(&self) -> u32 {
+        match self.remaining.milligas() {
+            Some(remaining) => self.initial_limit - remaining,
+            None => self.initial_limit,
         }
     }
 
@@ -170,7 +201,8 @@ impl Default for TezlinkOperationGas {
     /// Constructs [Gas] with [MAX_LIMIT] gas remaining.
     fn default() -> Self {
         Self {
-            limit: Self::MAX_LIMIT,
+            initial_limit: Self::MAX_LIMIT,
+            current_limit: Self::MAX_LIMIT,
             remaining: gas::Gas::new(Self::MAX_LIMIT),
         }
     }
