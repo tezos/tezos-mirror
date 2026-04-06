@@ -497,6 +497,8 @@ where
                 op: applied_operation,
                 etherlink_withdrawals: vec![],
                 cross_runtime_effects: vec![],
+                // Deposits bypass the Michelson interpreter — no gas consumed.
+                consumed_milligas: 0,
             }))
         }
         DepositReceiver::Tezos(Contract::Originated(kt1)) => Err(

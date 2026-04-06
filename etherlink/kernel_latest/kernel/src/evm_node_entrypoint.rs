@@ -344,7 +344,11 @@ where
     }
 
     let applied_operation = match execution_result {
-        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos { op, .. }) => op,
+        ExecutionResult::Valid(RuntimeExecutionInfo::Tezos {
+            op,
+            cross_runtime_effects: _,
+            consumed_milligas: _,
+        }) => op,
         ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
             log!(
                 Error,

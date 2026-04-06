@@ -265,6 +265,8 @@ pub enum RuntimeTransactionResult {
         op: AppliedOperation,
         etherlink_withdrawals: Vec<Withdrawal>,
         cross_runtime_effects: Vec<CrossRuntimeEffect>,
+        /// Total milligas consumed by the batch (from gas tracker).
+        consumed_milligas: u64,
     },
 }
 
@@ -959,6 +961,9 @@ pub enum RuntimeExecutionInfo {
     Tezos {
         op: AppliedOperation,
         cross_runtime_effects: Vec<CrossRuntimeEffect>,
+        /// Total milligas consumed by the batch, computed from the gas
+        /// tracker (correct for all outcomes including Failed).
+        consumed_milligas: u64,
     },
 }
 
@@ -1076,11 +1081,13 @@ where
             op,
             etherlink_withdrawals,
             cross_runtime_effects,
+            consumed_milligas,
         } => {
             push_withdrawals_to_outbox(host, outbox_queue, etherlink_withdrawals)?;
             Ok(RuntimeExecutionInfo::Tezos {
                 op,
                 cross_runtime_effects,
+                consumed_milligas,
             })
         }
     }
@@ -1209,6 +1216,9 @@ where
                         "Delayed Tezos operation status: SUCCESS - {:?}",
                         processed_operations
                     );
+                    let consumed_milligas = ProcessedOperation::total_consumed_milligas(
+                        &processed_operations,
+                    );
                     let operations =
                         ProcessedOperation::into_receipts(processed_operations);
                     let operation_and_receipt = AppliedOperation {
@@ -1236,6 +1246,7 @@ where
                             op: operation_and_receipt,
                             etherlink_withdrawals,
                             cross_runtime_effects,
+                            consumed_milligas,
                         },
                     ))
                 }

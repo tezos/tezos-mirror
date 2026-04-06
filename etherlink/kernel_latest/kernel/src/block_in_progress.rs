@@ -441,6 +441,7 @@ impl BlockInProgress {
             RuntimeExecutionInfo::Tezos {
                 op: operation_and_receipt,
                 cross_runtime_effects,
+                ..
             } => {
                 let OperationDataAndMetadata::OperationWithMetadata(batch) =
                     &operation_and_receipt.op_and_receipt;
