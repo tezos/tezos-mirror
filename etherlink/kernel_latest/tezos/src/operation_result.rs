@@ -7,8 +7,7 @@
 use crate::lazy_storage_diff::LazyStorageDiffList;
 use crate::operation::{
     ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
-    ManagerOperationField, OperationContent, OriginationContent, RevealContent,
-    TransferContent,
+    OperationContent, OriginationContent, RevealContent, TransferContent,
 };
 use mir::ast::Entrypoint;
 use mir::gas;
@@ -579,22 +578,6 @@ pub struct BacktrackedResult<M: OperationKind> {
 }
 
 impl<M: OperationKind> ContentResult<M> {
-    pub fn consumed_milligas(&self) -> Narith {
-        match self {
-            ContentResult::Applied(success) => success.consumed_milligas().clone(),
-            ContentResult::BackTracked(bt) => bt.result.consumed_milligas().clone(),
-            // `Failed` is charged the full `gas_limit` by
-            // `OperationWithMetadata::consumed_milligas`, which has access to
-            // the operation content. At this level we don't know the
-            // `gas_limit`, so we return 0 and let the wrapper override it.
-            ContentResult::Failed(_) | ContentResult::Skipped => Narith::from(0u64),
-        }
-    }
-
-    pub fn is_failed(&self) -> bool {
-        matches!(self, ContentResult::Failed(_))
-    }
-
     pub fn backtrack_if_applied(&mut self) {
         if let ContentResult::Applied(_) = self {
             // Lowkey optimisation: takes the ownership of the content result by replacing
@@ -872,36 +855,6 @@ pub struct OperationBatchWithMetadata {
 pub struct OperationWithMetadata {
     pub content: ManagerOperationContent,
     pub receipt: OperationResultSum,
-}
-
-impl OperationWithMetadata {
-    pub fn consumed_milligas(&self) -> Narith {
-        // For `Failed` results, charge the full `gas_limit` (converted from
-        // gas to milligas) to the gas backlog. Otherwise an attacker could
-        // spam failing operations without ever bumping the gas price.
-        let failed = match &self.receipt {
-            OperationResultSum::Reveal(op_result) => op_result.result.is_failed(),
-            OperationResultSum::Transfer(op_result) => op_result.result.is_failed(),
-            OperationResultSum::Origination(op_result) => op_result.result.is_failed(),
-        };
-        if failed {
-            let gas_limit = self
-                .content
-                .gas_limit()
-                .map(|g| g.0.clone())
-                .unwrap_or_else(|_| 0u64.into());
-            return Narith(gas_limit * 1000u64);
-        }
-        match &self.receipt {
-            OperationResultSum::Reveal(op_result) => op_result.result.consumed_milligas(),
-            OperationResultSum::Transfer(op_result) => {
-                op_result.result.consumed_milligas()
-            }
-            OperationResultSum::Origination(op_result) => {
-                op_result.result.consumed_milligas()
-            }
-        }
-    }
 }
 
 impl NomReader<'_> for OperationWithMetadata {
