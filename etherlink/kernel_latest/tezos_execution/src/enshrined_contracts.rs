@@ -135,7 +135,8 @@ where
                         "Expected string for default entrypoint".into(),
                     ));
                 };
-                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])
+                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])?;
+                Ok(())
             } else if entrypoint.as_str() == "call_evm" {
                 let (dest, method_sig, abi_params, _callback) =
                     extract_call_params(typed)?;
@@ -143,7 +144,8 @@ where
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
-                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
+                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)?;
+                Ok(())
             } else if entrypoint.as_str() == "call" {
                 let (mut request, _callback) = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
@@ -199,7 +201,8 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
-            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)
+            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)?;
+            Ok(())
         }
     }
 }
@@ -660,7 +663,7 @@ fn tezosx_cross_runtime_call<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     dest: &str,
     data: &[u8],
-) -> Result<(), TransferError>
+) -> Result<Vec<u8>, TransferError>
 where
     Host: StorageV1 + Logging,
 {
@@ -699,7 +702,7 @@ where
         account
             .set_balance(host, &0u64.into())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-        Ok(())
+        Ok(response.into_body())
     } else {
         Err(TransferError::GatewayError(format!(
             "Cross-runtime call failed with status {}: {}",
