@@ -7,6 +7,7 @@
 //! Mock runtime state & state transitions
 
 use crypto::hash::SmartRollupHash;
+use std::collections::HashMap;
 use tezos_smart_rollup_core::{
     MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
@@ -31,10 +32,14 @@ pub(crate) struct NextInput {
 /// The mock `HostState` used by the *mock runtime*, contains the *store* and *debug_log*.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct HostState {
-    /// Key-value store of runtime state.
+    /// Durable key-value store (the irmin tree).
     pub store: InMemoryStore,
     pub metadata: RollupMetadata,
     pub dal_parameters: RollupDalParameters,
+    // Side-state: not part of durable storage.
+    pub(crate) preimages: HashMap<[u8; PREIMAGE_HASH_SIZE], Vec<u8>>,
+    pub(crate) outbox: HashMap<u32, Vec<Vec<u8>>>,
+    pub(crate) dal_slots: HashMap<(i32, u8), Vec<u8>>,
     // Inbox metadata
     pub(crate) curr_level: u32,
     pub(crate) curr_input_id: usize,
@@ -64,6 +69,9 @@ impl Default for HostState {
             store,
             metadata,
             dal_parameters,
+            preimages: HashMap::new(),
+            outbox: HashMap::new(),
+            dal_slots: HashMap::new(),
             curr_level: crate::NAIROBI_ACTIVATION_LEVEL,
             curr_input_id: 0,
             input: vec![],
@@ -85,8 +93,9 @@ impl HostState {
             return Err(Error::InputOutputTooLarge);
         }
 
-        if self.store.0.outbox_at(self.curr_level).len() < MAX_OUTPUTS_PER_LEVEL {
-            self.store.0.outbox_insert(self.curr_level, output);
+        let outbox_len = self.outbox.get(&self.curr_level).map_or(0, |o| o.len());
+        if outbox_len < MAX_OUTPUTS_PER_LEVEL {
+            self.outbox.entry(self.curr_level).or_default().push(output);
             Ok(())
         } else {
             Err(Error::FullOutbox)
@@ -127,7 +136,7 @@ impl HostState {
         hash: &[u8; PREIMAGE_HASH_SIZE],
         max_bytes: usize,
     ) -> &[u8] {
-        let preimage = self.store.0.retrieve_preimage(hash);
+        let preimage: &[u8] = self.preimages.get(hash).expect("Cannot retrieve preimage");
         if preimage.len() < max_bytes {
             preimage
         } else {
@@ -136,7 +145,10 @@ impl HostState {
     }
 
     pub(crate) fn set_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
-        self.store.0.add_preimage(preimage)
+        let hash = tezos_smart_rollup_encoding::dac::pages::make_preimage_hash(&preimage)
+            .unwrap();
+        self.preimages.insert(hash, preimage);
+        hash
     }
 
     pub(crate) fn get_metadata(&self) -> &RollupMetadata {
@@ -157,7 +169,7 @@ impl HostState {
         published_level: i32,
         slot_index: u8,
     ) -> Option<&Vec<u8>> {
-        self.store.0.retrieve_dal_slot(published_level, slot_index)
+        self.dal_slots.get(&(published_level, slot_index))
     }
 
     pub(crate) fn set_dal_slot(
@@ -166,7 +178,7 @@ impl HostState {
         slot_index: u8,
         data: Vec<u8>,
     ) {
-        self.store.0.set_dal_slot(published_level, slot_index, data)
+        self.dal_slots.insert((published_level, slot_index), data);
     }
 }
 

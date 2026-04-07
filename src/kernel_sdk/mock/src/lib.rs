@@ -274,7 +274,12 @@ impl MockHost {
 
     /// Show the outbox at the given level
     pub fn outbox_at(&self, level: u32) -> Vec<Vec<u8>> {
-        self.state.borrow().store.0.outbox_at(level).to_vec()
+        self.state
+            .borrow()
+            .outbox
+            .get(&level)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Whether execution using this host should quit.

@@ -4,18 +4,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Mock runtime store - the container for host state.
+//! Mock runtime store - the durable key-value tree.
 use std::collections::HashMap;
 use std::rc::Rc;
-use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 
+/// The durable key-value tree backed by irmin in the real PVM.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct Store {
     pub(crate) durable: Rc<Node>,
-    preimages: HashMap<[u8; PREIMAGE_HASH_SIZE], Vec<u8>>,
-    dal_slots: HashMap<(i32, u8), Vec<u8>>,
-    outbox: HashMap<u32, Vec<Vec<u8>>>,
-    inbox: HashMap<u32, Vec<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -51,18 +47,6 @@ impl std::fmt::Display for Node {
 }
 
 impl Store {
-    pub fn outbox_at(&self, level: u32) -> &[Vec<u8>] {
-        self.outbox.get(&level).map(|o| o.as_ref()).unwrap_or(&[])
-    }
-
-    pub fn outbox_insert(&mut self, level: u32, message: Vec<u8>) {
-        if let Some(l) = self.outbox.get_mut(&level) {
-            l.push(message);
-        } else {
-            self.outbox.insert(level, vec![message]);
-        }
-    }
-
     pub fn node_from_path(&self, path: &str) -> Option<&Rc<Node>> {
         let steps = path_steps(path);
         let mut node = &self.durable;
@@ -171,34 +155,6 @@ impl Store {
         self.node_from_path(path)
             .map(|n| n.value.is_some())
             .unwrap_or(false)
-    }
-
-    pub fn add_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
-        let hash_with_prefix =
-            tezos_smart_rollup_encoding::dac::pages::make_preimage_hash(&preimage)
-                .unwrap();
-
-        self.preimages.insert(hash_with_prefix, preimage);
-        hash_with_prefix
-    }
-
-    pub fn retrieve_preimage(&self, hash: &[u8; PREIMAGE_HASH_SIZE]) -> &[u8] {
-        self.preimages
-            .get(hash)
-            .expect("Cannot retrieve preimage")
-            .as_ref()
-    }
-
-    pub fn retrieve_dal_slot(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-    ) -> Option<&Vec<u8>> {
-        self.dal_slots.get(&(published_level, slot_index))
-    }
-
-    pub fn set_dal_slot(&mut self, published_level: i32, slot_index: u8, data: Vec<u8>) {
-        self.dal_slots.insert((published_level, slot_index), data);
     }
 }
 
