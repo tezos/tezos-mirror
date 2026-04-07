@@ -126,6 +126,14 @@ impl FromStr for Name {
     }
 }
 
+#[derive(Debug)]
+pub enum KeySpaceWriteError {
+    /// Attempted to write more than the maximum allowed bytes at a given key.
+    ValueSizeExceeded,
+    /// The write offset exceeds the current length of the stored value.
+    InvalidOffset,
+}
+
 /// A key space in the durable storage.
 ///
 /// A `KeySpace` is a flat key-value store. Instances are created via
@@ -140,11 +148,20 @@ pub trait KeySpace {
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize>;
 
     /// Write the given value to the key.
-    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>);
+    fn set(
+        &mut self,
+        key: &Key,
+        value: impl AsRef<[u8]>,
+    ) -> Result<(), KeySpaceWriteError>;
 
     /// Write data to the value at the given key starting at the given offset.
     /// Returns the number of bytes written.
-    fn write(&self, key: &Key, offset: usize, data: impl AsRef<[u8]>) -> usize;
+    fn write(
+        &mut self,
+        key: &Key,
+        offset: usize,
+        data: impl AsRef<[u8]>,
+    ) -> Result<usize, KeySpaceWriteError>;
 
     /// Retrieve the length of the value associated with the key.
     /// Returns `None` if the key does not exist.
