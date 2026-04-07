@@ -11,6 +11,11 @@ let to_string = function Tezos -> "tezos"
 
 let feature_flag = function Tezos -> "/evm/feature_flags/enable_tezos_runtime"
 
+let target_sunrise_level = function
+  | Tezos -> "/evm/michelson_runtime/target_sunrise_level"
+
+let sunrise_level = function Tezos -> "/evm/michelson_runtime/sunrise_level"
+
 let tag t = to_string t ^ "_runtime"
 
 let mem r with_runtimes = List.mem r @@ Option.value ~default:[] with_runtimes
