@@ -196,16 +196,16 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.8.3"
+version = "1.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
+checksum = "4d2d5991425dfd0785aed03aedcf0b321d61975c9b5b3689c774a2610ae0b51e"
 dependencies = [
  "arrayref",
  "arrayvec",
  "cc",
  "cfg-if",
  "constant_time_eq",
- "cpufeatures 0.2.17",
+ "cpufeatures 0.3.0",
 ]
 
 [[package]]
@@ -224,6 +224,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd35008169921d80bc60d3d0ab416eecb028c4cd653352907921d95084790be"
+dependencies = [
+ "hybrid-array",
 ]
 
 [[package]]
@@ -388,6 +397,12 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
+
+[[package]]
+name = "const-oid"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "constant_time_eq"
@@ -639,6 +654,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77727bb15fa921304124b128af125e7e3b968275d1b108b379190264f4423710"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "crypto-mac"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -709,7 +733,7 @@ version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f55bf8e7b65898637379c1b74eb1551107c8294ed26d855ceb9fd1a09cfc9bc0"
 dependencies = [
- "const-oid",
+ "const-oid 0.9.6",
  "zeroize",
 ]
 
@@ -761,7 +785,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
- "crypto-common",
+ "crypto-common 0.1.6",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
+dependencies = [
+ "block-buffer 0.12.0",
+ "const-oid 0.10.2",
+ "crypto-common 0.2.1",
 ]
 
 [[package]]
@@ -1068,6 +1103,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hybrid-array"
+version = "0.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3944cf8cf766b40e2a1a333ee5e9b563f854d5fa49d6a8ca2764e97c6eddb214"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
 name = "id-arena"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1320,9 +1364,9 @@ checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 
 [[package]]
 name = "memmap2"
-version = "0.9.9"
+version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
+checksum = "714098028fe011992e1c3962653c96b2d578c4b4bce9036e15ff220319b1e0e3"
 dependencies = [
  "libc",
 ]
@@ -1391,9 +1435,9 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1207a7e20ad57b847bbddc6776b968420d38292bbfe2089accff5e19e82454c"
+checksum = "5d0bca838442ec211fa11de3a8b0e0e8f3a4522575b5c4c06ed722e005036f26"
 dependencies = [
  "num_enum_derive",
  "rustversion",
@@ -1401,9 +1445,9 @@ dependencies = [
 
 [[package]]
 name = "num_enum_derive"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff32365de1b6743cb203b710788263c44a03de03802daf96092f2da4fe6ba4d7"
+checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1465,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f436502a5ffe46ef06d3e9901012429b150c1346"
+source = "git+https://github.com/tezos/riscv-pvm.git#a7746e8bbd674cd5d2b69bf6f59aef4693c1a232"
 dependencies = [
  "arbitrary-int 2.1.1",
  "bincode",
@@ -1488,7 +1532,7 @@ dependencies = [
  "perfect-derive",
  "rangemap",
  "rustc_apfloat",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "sha3",
  "strum 0.28.0",
  "tezos-smart-rollup-constants",
@@ -1533,7 +1577,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-data"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f436502a5ffe46ef06d3e9901012429b150c1346"
+source = "git+https://github.com/tezos/riscv-pvm.git#a7746e8bbd674cd5d2b69bf6f59aef4693c1a232"
 dependencies = [
  "bincode",
  "blake3",
@@ -1551,7 +1595,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-durable-storage"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f436502a5ffe46ef06d3e9901012429b150c1346"
+source = "git+https://github.com/tezos/riscv-pvm.git#a7746e8bbd674cd5d2b69bf6f59aef4693c1a232"
 dependencies = [
  "bincode",
  "bytes",
@@ -2136,6 +2180,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.2",
+]
+
+[[package]]
 name = "sha3"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2325,9 +2380,9 @@ checksum = "e502f78cdbb8ba4718f566c418c52bc729126ffd16baee5baa718cf25dd5a69a"
 
 [[package]]
 name = "tempfile"
-version = "3.26.0"
+version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
  "getrandom 0.4.1",
@@ -2339,7 +2394,7 @@ dependencies = [
 [[package]]
 name = "tezos-protocol"
 version = "0.1.0"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "hex",
  "nom",
@@ -2351,7 +2406,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "rustc_version",
 ]
@@ -2359,12 +2414,12 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 
 [[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
@@ -2373,7 +2428,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-encoding"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "hex",
  "nom",
@@ -2393,7 +2448,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
@@ -2404,7 +2459,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-mock"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -2417,7 +2472,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "clap",
  "hex",
@@ -2433,7 +2488,7 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "anyhow",
  "bs58",
@@ -2458,7 +2513,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -2475,7 +2530,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#ae9835c7d394f899ce5503ab6e10b8b6e882ab0e"
+source = "git+https://gitlab.com/tezos/tezos.git#a8d5e626482d6d7d314185ba07449b14bd7cf24f"
 dependencies = [
  "lazy_static",
  "once_cell",
