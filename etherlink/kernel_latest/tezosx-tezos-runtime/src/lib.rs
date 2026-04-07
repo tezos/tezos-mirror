@@ -201,15 +201,32 @@ impl RuntimeInterface for TezosRuntime {
         _journal: &mut TezosXJournal,
         native_address: &str,
         _context: CrossRuntimeContext,
-    ) -> Result<String, TezosXRuntimeError>
+        gas_remaining: u64,
+    ) -> Result<(String, u64), TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
+        // Gas costs in milligas, charged incrementally so we fail early.
+        let mut remaining = gas_remaining;
+        let mut consume = |cost: u64| -> Result<(), TezosXRuntimeError> {
+            remaining = remaining.checked_sub(cost).ok_or_else(|| {
+                TezosXRuntimeError::Custom(
+                    "Out of gas during alias generation".to_string(),
+                )
+            })?;
+            Ok(())
+        };
+
+        // BLAKE2b-160 hash: 430 + (size/8 + size) milligas
+        consume(477)?;
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
 
+        // Context load + account lookup
+        consume(2_100)?; // cold storage read
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let account = context.originated_from_kt1(&kt1)?;
 
+        // Decode forwarder code
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to decode forwarder code from hex: {e}"
@@ -217,17 +234,21 @@ impl RuntimeInterface for TezosRuntime {
         })?;
         let storage = alias_forwarder::forwarder_storage(native_address);
 
+        // Contract init: code + storage writes
+        consume(100_000)?; // manager_operation overhead + origination
         account.init(host, &code, &storage).map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to initialize alias forwarder contract: {e}"
             ))
         })?;
 
+        // Balance write
+        consume(2_560)?; // storage write
         account.set_balance(host, &0u64.into()).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to set alias balance: {e}"))
         })?;
 
-        Ok(kt1.to_base58_check())
+        Ok((kt1.to_base58_check(), remaining))
     }
 
     /// Execute a cross-runtime call where the sender's balance was already
@@ -433,7 +454,8 @@ mod tests {
             _native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<String, TezosXRuntimeError>
+            _gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
@@ -486,13 +508,15 @@ mod tests {
                 &mut journal,
                 "0x1234567890abcdef1234567890abcdef12345678",
                 test_context(),
+                1_000_000,
             )
             .expect("generate_alias should succeed");
 
         // The alias should be a valid KT1 base58check string
         assert!(
-            alias.starts_with("KT1"),
-            "Alias should be a KT1 address: {alias}"
+            alias.0.starts_with("KT1"),
+            "Alias should be a KT1 address: {}",
+            alias.0
         );
     }
 
@@ -510,6 +534,7 @@ mod tests {
                 &mut journal,
                 evm_address,
                 test_context(),
+                1_000_000,
             )
             .expect("generate_alias should succeed");
 
@@ -545,6 +570,7 @@ mod tests {
                 &mut journal,
                 evm_address,
                 test_context(),
+                1_000_000,
             )
             .expect("generate_alias should succeed");
 
@@ -572,6 +598,7 @@ mod tests {
                 &mut journal,
                 evm_address,
                 test_context(),
+                1_000_000,
             )
             .expect("generate_alias should succeed");
 
@@ -596,6 +623,7 @@ mod tests {
                 &mut journal,
                 evm_address,
                 test_context(),
+                1_000_000,
             )
             .unwrap();
         let alias2 = runtime
@@ -605,10 +633,11 @@ mod tests {
                 &mut journal,
                 evm_address,
                 test_context(),
+                1_000_000,
             )
             .unwrap();
 
-        assert_eq!(alias1, alias2);
+        assert_eq!(alias1.0, alias2.0);
     }
 
     #[test]
@@ -624,6 +653,7 @@ mod tests {
                 &mut journal,
                 "0x1111111111111111111111111111111111111111",
                 test_context(),
+                1_000_000,
             )
             .unwrap();
         let alias2 = runtime
@@ -633,9 +663,10 @@ mod tests {
                 &mut journal,
                 "0x2222222222222222222222222222222222222222",
                 test_context(),
+                1_000_000,
             )
             .unwrap();
 
-        assert_ne!(alias1, alias2);
+        assert_ne!(alias1.0, alias2.0);
     }
 }

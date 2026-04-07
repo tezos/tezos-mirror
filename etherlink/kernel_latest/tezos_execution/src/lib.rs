@@ -1456,14 +1456,15 @@ pub(crate) mod test_utils {
             native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<String, TezosXRuntimeError>
+            gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
             self.generate_alias_calls
                 .borrow_mut()
                 .push((native_address.to_string(), runtime_id));
-            Ok(self.generated_alias.clone())
+            Ok((self.generated_alias.clone(), gas_remaining))
         }
 
         fn address_from_string(
@@ -1521,11 +1522,12 @@ pub(crate) mod test_utils {
             _native_address: &str,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<String, TezosXRuntimeError>
+            gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
-            Ok(self.generated_alias.clone())
+            Ok((self.generated_alias.clone(), gas_remaining))
         }
 
         fn address_from_string(
@@ -1625,7 +1627,8 @@ mod tests {
             _native_address: &str,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
-        ) -> Result<String, TezosXRuntimeError>
+            _gas_remaining: u64,
+        ) -> Result<(String, u64), TezosXRuntimeError>
         where
             Host: StorageV1 + Logging,
         {
@@ -6446,11 +6449,12 @@ mod tests {
                 _native_address: &str,
                 _runtime_id: RuntimeId,
                 _context: CrossRuntimeContext,
-            ) -> Result<String, TezosXRuntimeError>
+                gas_remaining: u64,
+            ) -> Result<(String, u64), TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
-                Ok("KT1_mock_revert".to_string())
+                Ok(("KT1_mock_revert".to_string(), gas_remaining))
             }
 
             fn address_from_string(

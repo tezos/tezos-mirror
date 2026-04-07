@@ -280,7 +280,7 @@ let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
     JSON, forges and sends the call operation. *)
 let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
     ~client ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
-    ?(entrypoint = "default") ?(amount = 0) () =
+    ?(entrypoint = "default") ?(amount = 0) ?(gas_limit = 100_000) () =
   let* arg = Client.convert_data_to_json ~data:arg_data client in
   let* call_op =
     Operation.Manager.(
@@ -289,7 +289,7 @@ let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
           make
             ~fee:1000
             ~counter
-            ~gas_limit:10000
+            ~gas_limit
             ~storage_limit:1000
             ~source
             (call ~dest ~arg ~entrypoint ~amount ());
@@ -345,13 +345,13 @@ let assert_evm_balance_zero ~address sequencer =
     a block, asserts the receipt status matches [expected_status] (default
     [true]), and returns the receipt. *)
 let craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
-    ~abi_signature ~arguments ?(expected_status = true) () =
+    ~abi_signature ~arguments ?(expected_status = true) ?(gas = 3_000_000) () =
   let* raw_tx =
     Cast.craft_tx
       ~source_private_key:sender.Eth_account.private_key
       ~chain_id:1337
       ~nonce
-      ~gas:300_000
+      ~gas
       ~gas_price:1_000_000_000
       ~value
       ~address

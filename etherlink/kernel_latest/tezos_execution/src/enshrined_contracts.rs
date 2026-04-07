@@ -358,7 +358,7 @@ fn inject_context_headers_raw(
 fn inject_context_headers<'a, Host>(
     headers: &mut http::HeaderMap,
     target_host: Option<&str>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasOperationGas),
     journal: &mut TezosXJournal,
     registry: &impl Registry,
 ) -> Result<(), TransferError>
@@ -384,25 +384,76 @@ where
                 .map_err(|_| TransferError::GatewayError("Negative timestamp".into()))
         })?;
     let context = cross_runtime_ctx_from_ctx(ctx)?;
-    let tezos_gas_limit = context.gas_limit;
-    let sender_alias =
-        get_or_create_alias(ctx.host(), journal, &sender, context.clone(), registry)?;
-    let source_alias =
-        get_or_create_alias(ctx.host(), journal, &source, context, registry)?;
-    // Convert gas from Tezos milligas to the target runtime's units.
-    // Unknown host is a user error (bad URL); overflow is unlikely but
-    // possible for very large gas limits. Both are gateway errors.
+
+    // Alias gas is accounted in two phases:
+    //
+    // Phase 1 (upfront): charge ALIAS_CACHE_HIT_MILLIGAS for the durable
+    //   storage lookup. This is always paid, whether the alias exists or not.
+    //
+    // Phase 2 (generation): if the alias does not exist, get_or_create_alias
+    //   forwards the remaining gas (converted to EVM units) to the EVM
+    //   runtime's generate_alias, which consumes gas internally. The consumed
+    //   EVM gas is returned, converted back to milligas, and charged.
+    //   On cache hit, phase 2 costs nothing (consumed = 0).
+
+    // --- sender alias ---
+    ctx.operation_gas()
+        .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)?;
+    let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+    // Convert remaining milligas to EVM gas: this caps the budget that
+    // get_or_create_alias may spend on alias generation.
+    let evm_budget =
+        convert_gas(RuntimeId::Tezos, RuntimeId::Ethereum, remaining_milligas)
+            .ok_or(TransferError::OutOfGas)?;
+    let (sender_alias, sender_evm_consumed) = get_or_create_alias(
+        ctx.host(),
+        journal,
+        &sender,
+        context.clone(),
+        registry,
+        evm_budget,
+    )?;
+    let sender_milligas =
+        convert_gas(RuntimeId::Ethereum, RuntimeId::Tezos, sender_evm_consumed)
+            .ok_or(TransferError::OutOfGas)?;
+    ctx.operation_gas()
+        .cast_and_consume_milligas(sender_milligas)
+        .map_err(|_| TransferError::OutOfGas)?;
+
+    // --- source alias (same two-phase pattern) ---
+    ctx.operation_gas()
+        .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)?;
+    let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+    let evm_budget =
+        convert_gas(RuntimeId::Tezos, RuntimeId::Ethereum, remaining_milligas)
+            .ok_or(TransferError::OutOfGas)?;
+    let (source_alias, source_evm_consumed) =
+        get_or_create_alias(ctx.host(), journal, &source, context, registry, evm_budget)?;
+    let source_milligas =
+        convert_gas(RuntimeId::Ethereum, RuntimeId::Tezos, source_evm_consumed)
+            .ok_or(TransferError::OutOfGas)?;
+    ctx.operation_gas()
+        .cast_and_consume_milligas(source_milligas)
+        .map_err(|_| TransferError::OutOfGas)?;
+    // Convert remaining Tezos milligas to the target runtime's units.
+    // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
+    // forwarded limit reflects gas already consumed by alias resolution.
     let target_runtime = target_host.and_then(RuntimeId::from_host).ok_or_else(|| {
         TransferError::GatewayError(
             "http_call: unknown or missing target runtime in URL host".into(),
         )
     })?;
-    let gas_limit = convert_gas(RuntimeId::Tezos, target_runtime, tezos_gas_limit)
-        .ok_or_else(|| {
-            TransferError::GatewayError(
-                "http_call: Tezos gas limit overflows target runtime units".into(),
-            )
-        })?;
+    let remaining_after_aliases =
+        ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+    let gas_limit =
+        convert_gas(RuntimeId::Tezos, target_runtime, remaining_after_aliases)
+            .ok_or_else(|| {
+                TransferError::GatewayError(
+                    "http_call: Tezos gas limit overflows target runtime units".into(),
+                )
+            })?;
     inject_context_headers_raw(
         headers,
         &sender_alias,
@@ -491,28 +542,45 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
-/// Look up the Ethereum alias for `address`. If none exists, generate one via
-/// `registry`, persist it, and return it.
+/// Look up the Ethereum alias for `address`. If none exists, generate one
+/// via `registry`, passing `gas_remaining` (EVM gas) as budget.
+///
+/// Returns `(alias, generation_gas_consumed)` where the gas is in EVM gas
+/// units (0 on cache hit).
 fn get_or_create_alias<Host>(
     host: &mut Host,
     journal: &mut TezosXJournal,
     address: &AddressHash,
     context: CrossRuntimeContext,
     registry: &impl Registry,
-) -> Result<String, TransferError>
+    gas_remaining_evm: u64,
+) -> Result<(String, u64), TransferError>
 where
     Host: StorageV1 + Logging,
 {
     if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
-        return Ok(alias);
+        return Ok((alias, 0));
     }
     let address_b58 = address.to_base58_check();
-    let alias_str = registry
-        .generate_alias(host, journal, &address_b58, RuntimeId::Ethereum, context)
+    let (alias_str, evm_gas_remaining_after) = registry
+        .generate_alias(
+            host,
+            journal,
+            &address_b58,
+            RuntimeId::Ethereum,
+            context,
+            gas_remaining_evm,
+        )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
+    let consumed = gas_remaining_evm - evm_gas_remaining_after;
     store_alias(host, address, RuntimeId::Ethereum, &alias_str)?;
-    Ok(alias_str)
+    Ok((alias_str, consumed))
 }
+
+// Alias gas costs in Tezos milligas.
+// Cache hit: durable storage read, equivalent to cold SLOAD (2,100 EVM gas
+// * 100 milligas/gas).
+pub(crate) const ALIAS_CACHE_HIT_MILLIGAS: u64 = 210_000;
 
 /// Build a `CrossRuntimeContext` from the current execution context.
 fn cross_runtime_ctx_from_ctx<'a, Host>(
@@ -535,7 +603,7 @@ where
 fn tezosx_cross_runtime_call<'a, Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     dest: &str,
     data: &[u8],
 ) -> Result<(), TransferError>
@@ -694,7 +762,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezosx_interfaces::RuntimeId;
 
-    use crate::enshrined_contracts::*;
+    use super::*;
     use crate::mir_ctx::mock::MockCtx;
     use crate::test_utils::{MockRegistry, MockRegistryWithStatus};
 
@@ -840,6 +908,80 @@ mod tests {
         // serve should have been called twice
         let serve_calls = registry.serve_calls.borrow();
         assert_eq!(serve_calls.len(), 2);
+    }
+
+    #[test]
+    fn test_alias_generation_consumes_gas() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 500i64;
+
+        let mut journal = TezosXJournal::default();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+
+        let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
+        let result =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result.is_ok());
+        let gas_after = ctx.operation_gas().remaining.milligas().unwrap();
+
+        // Gas should have been consumed for alias generation (2 aliases).
+        // Each new alias costs EVM_ALIAS_GENERATION_MILLIGAS.
+        assert!(gas_before > gas_after);
+        let consumed = u64::from(gas_before - gas_after);
+        // At minimum, 2 alias resolutions were charged
+        assert!(
+            consumed >= 2 * ALIAS_CACHE_HIT_MILLIGAS,
+            "Expected at least {} milligas consumed for 2 alias generations, got {}",
+            2 * ALIAS_CACHE_HIT_MILLIGAS,
+            consumed
+        );
+    }
+
+    #[test]
+    fn test_alias_cache_hit_consumes_less_gas() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 500i64;
+
+        let mut journal = TezosXJournal::default();
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+
+        // First call: aliases are generated (expensive)
+        let result1 =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result1.is_ok());
+        let gas_after_first = ctx.operation_gas().remaining.milligas().unwrap();
+
+        // Second call: aliases are cached (cheaper)
+        let result2 =
+            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        assert!(result2.is_ok());
+        let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
+
+        let second_call_cost = u64::from(gas_after_first - gas_after_second);
+        // Second call should cost at most 2 * ALIAS_CACHE_HIT_MILLIGAS for aliases
+        // (plus some overhead for context headers, etc.)
+        assert!(
+            second_call_cost <= 2 * ALIAS_CACHE_HIT_MILLIGAS,
+            "Second call consumed {} milligas, expected at most {} (2x cache hit cost)",
+            second_call_cost,
+            2 * ALIAS_CACHE_HIT_MILLIGAS
+        );
     }
 
     /// Helper to build a Micheline call value:

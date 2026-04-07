@@ -35,19 +35,28 @@ impl Registry for RegistryImpl {
         native_address: &str,
         runtime_id: tezosx_interfaces::RuntimeId,
         context: tezosx_interfaces::CrossRuntimeContext,
-    ) -> Result<String, tezosx_interfaces::TezosXRuntimeError>
+        gas_remaining: u64,
+    ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
     where
         Host: StorageV1 + Logging,
     {
         match runtime_id {
-            tezosx_interfaces::RuntimeId::Tezos => {
-                self.tezos
-                    .generate_alias(self, host, journal, native_address, context)
-            }
-            tezosx_interfaces::RuntimeId::Ethereum => {
-                self.ethereum
-                    .generate_alias(self, host, journal, native_address, context)
-            }
+            tezosx_interfaces::RuntimeId::Tezos => self.tezos.generate_alias(
+                self,
+                host,
+                journal,
+                native_address,
+                context,
+                gas_remaining,
+            ),
+            tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.generate_alias(
+                self,
+                host,
+                journal,
+                native_address,
+                context,
+                gas_remaining,
+            ),
         }
     }
 

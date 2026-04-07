@@ -665,7 +665,8 @@ mod test {
                 native_address: &str,
                 runtime_id: RuntimeId,
                 context: CrossRuntimeContext,
-            ) -> Result<String, TezosXRuntimeError>
+                gas_remaining: u64,
+            ) -> Result<(String, u64), TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
@@ -676,6 +677,7 @@ mod test {
                         journal,
                         native_address,
                         context,
+                        gas_remaining,
                     ),
                     RuntimeId::Ethereum => self.ethereum.generate_alias(
                         self,
@@ -683,6 +685,7 @@ mod test {
                         journal,
                         native_address,
                         context,
+                        gas_remaining,
                     ),
                 }
             }
@@ -751,7 +754,8 @@ mod test {
                 _journal: &mut TezosXJournal,
                 native_address: &str,
                 _context: CrossRuntimeContext,
-            ) -> Result<String, TezosXRuntimeError>
+                gas_remaining: u64,
+            ) -> Result<(String, u64), TezosXRuntimeError>
             where
                 Host: StorageV1 + Logging,
             {
@@ -759,7 +763,7 @@ mod test {
                 use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
                 let kt1 =
                     ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
-                Ok(kt1.to_base58_check())
+                Ok((kt1.to_base58_check(), gas_remaining))
             }
 
             fn serve<Host>(
@@ -972,13 +976,14 @@ mod test {
                 &destination.to_string(),
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
+                1_000_000,
             )
             .unwrap();
         store_alias(
             &mut host,
             &destination,
             tezosx_interfaces::RuntimeId::Tezos,
-            &alias,
+            &alias.0,
         )
         .unwrap();
 
@@ -1055,13 +1060,14 @@ mod test {
                 &destination.to_string(),
                 tezosx_interfaces::RuntimeId::Tezos,
                 test_alias_creation_context(),
+                1_000_000,
             )
             .unwrap();
         store_alias(
             &mut host,
             &destination,
             tezosx_interfaces::RuntimeId::Tezos,
-            &alias,
+            &alias.0,
         )
         .unwrap();
         let value_sent = U256::from(5000000000000u64);
@@ -1078,7 +1084,7 @@ mod test {
             .unwrap();
 
         // Create a mock implicit address string for the test (hex-encoded for URL safety)
-        let implicit_address = alias.strip_prefix("0x").unwrap_or(&alias).to_string();
+        let implicit_address = alias.0.strip_prefix("0x").unwrap_or(&alias.0).to_string();
 
         let calldata = RuntimeGatewayCalls::transfer(transferCall {
             implicitAddress: implicit_address.clone(),
@@ -3030,8 +3036,10 @@ mod test {
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
+                1_000_000,
             )
             .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
         let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
         let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 
@@ -3113,8 +3121,10 @@ mod test {
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
+                1_000_000,
             )
             .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
 
         // Verify the alias was created at the expected address
         // (case-insensitive: generate_alias returns lowercase, Address::to_string uses EIP-55 checksum)
@@ -3165,8 +3175,10 @@ mod test {
                 native_address,
                 tezosx_interfaces::RuntimeId::Ethereum,
                 test_alias_creation_context(),
+                1_000_000,
             )
             .expect("Failed to generate alias");
+        let alias_bytes = alias_bytes.0;
         let alias_hex = alias_bytes.strip_prefix("0x").unwrap_or(&alias_bytes);
         let alias = Address::from_slice(&hex::decode(alias_hex).unwrap());
 

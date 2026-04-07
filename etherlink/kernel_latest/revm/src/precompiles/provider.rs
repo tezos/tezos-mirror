@@ -26,7 +26,7 @@ use crate::{
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
         },
         global_counter::global_counter_precompile,
-        guard::revert,
+        guard::{out_of_gas, revert},
         runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
@@ -108,6 +108,7 @@ impl EtherlinkPrecompiles {
             Err(CustomPrecompileError::Revert(reason)) => {
                 revert(reason, Gas::new_spent(inputs.gas_limit))
             }
+            Err(CustomPrecompileError::OutOfGas(gas)) => out_of_gas(gas.spent()),
             Err(CustomPrecompileError::RevertKeepGas(reason, gas)) => revert(reason, gas),
             Err(CustomPrecompileError::Abort(runtime)) => {
                 return Err(Error::Runtime(runtime))
