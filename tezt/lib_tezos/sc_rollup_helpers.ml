@@ -83,8 +83,11 @@ module Installer_kernel_config = struct
     | Reveal {hash; to_} -> sf {|- reveal: %s
   to: %s
 |} hash to_
-    | Set {value; to_} -> sf {|- set:
-    value: %s
+    | Set {value; to_} ->
+        (* Quote the value so that empty strings are preserved as "" in YAML
+         rather than being interpreted as null. *)
+        sf {|- set:
+    value: "%s"
     to: %s
 |} value to_
 
