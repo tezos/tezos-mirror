@@ -1423,6 +1423,8 @@ module Action = struct
 
   let config_init = mk_config_action Config.Init.action
 
+  let config_reset = mk_config_action Config.Reset.action
+
   let config_update = mk_config_action Config.Update.action
 
   let debug_print_store_schemas = Debug.Print.Store.Schemas.action
