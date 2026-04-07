@@ -187,13 +187,16 @@ where
 }
 
 /// Extract (destination, method_signature, abi_parameters) from a typed
-/// Pair(String, Pair(String, Bytes)) value.
+/// Pair(String, Pair(String, Pair(Bytes, Option(Contract(Bytes))))) value.
+///
+/// The optional callback contract is accepted but ignored.
 fn extract_call_params(
     typed: TypedValue<'_>,
 ) -> Result<(String, String, Vec<u8>), TransferError> {
     let TypedValue::Pair(dest_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
-            "call: expected pair (destination, (method_sig, abi_params))".into(),
+            "call: expected pair (destination, (method_sig, (abi_params, callback)))"
+                .into(),
         ));
     };
     let TypedValue::String(dest) = unwrap_rc(dest_rc) else {
@@ -201,9 +204,9 @@ fn extract_call_params(
             "call: expected string for destination".into(),
         ));
     };
-    let TypedValue::Pair(sig_rc, params_rc) = unwrap_rc(inner_rc) else {
+    let TypedValue::Pair(sig_rc, inner2_rc) = unwrap_rc(inner_rc) else {
         return Err(TransferError::GatewayError(
-            "call: expected pair (method_sig, abi_params)".into(),
+            "call: expected pair (method_sig, (abi_params, callback))".into(),
         ));
     };
     let TypedValue::String(method_sig) = unwrap_rc(sig_rc) else {
@@ -211,24 +214,32 @@ fn extract_call_params(
             "call: expected string for method signature".into(),
         ));
     };
+    let TypedValue::Pair(params_rc, _callback_rc) = unwrap_rc(inner2_rc) else {
+        return Err(TransferError::GatewayError(
+            "call: expected pair (abi_params, callback)".into(),
+        ));
+    };
     let TypedValue::Bytes(abi_params) = unwrap_rc(params_rc) else {
         return Err(TransferError::GatewayError(
             "call: expected bytes for ABI parameters".into(),
         ));
     };
+    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
     Ok((dest, method_sig, abi_params))
 }
 
 /// Build an `http::Request<Vec<u8>>` from a typed
-/// Pair(String, Pair(List(Pair(String, String)), Pair(Bytes, Nat))) value.
+/// Pair(String, Pair(List(Pair(String, String)), Pair(Bytes, Pair(Nat, Option(Contract(Bytes)))))) value.
 ///
 /// Method mapping: 0 = GET, 1 = POST. Other values default to POST.
+/// The optional callback contract is accepted but ignored.
 fn extract_http_call_request(
     typed: TypedValue<'_>,
 ) -> Result<http::Request<Vec<u8>>, TransferError> {
     let TypedValue::Pair(url_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
-            "http_call: expected pair (url, (headers, (body, method)))".into(),
+            "http_call: expected pair (url, (headers, (body, (method, callback))))"
+                .into(),
         ));
     };
     let TypedValue::String(url) = unwrap_rc(url_rc) else {
@@ -238,7 +249,7 @@ fn extract_http_call_request(
     };
     let TypedValue::Pair(headers_rc, body_method_rc) = unwrap_rc(inner_rc) else {
         return Err(TransferError::GatewayError(
-            "http_call: expected pair (headers, (body, method))".into(),
+            "http_call: expected pair (headers, (body, (method, callback)))".into(),
         ));
     };
     let TypedValue::List(headers_list) = unwrap_rc(headers_rc) else {
@@ -267,9 +278,9 @@ fn extract_http_call_request(
             Ok((name, val))
         })
         .collect::<Result<_, _>>()?;
-    let TypedValue::Pair(body_rc, method_rc) = unwrap_rc(body_method_rc) else {
+    let TypedValue::Pair(body_rc, method_callback_rc) = unwrap_rc(body_method_rc) else {
         return Err(TransferError::GatewayError(
-            "http_call: expected pair (body, method)".into(),
+            "http_call: expected pair (body, (method, callback))".into(),
         ));
     };
     let TypedValue::Bytes(body) = unwrap_rc(body_rc) else {
@@ -277,11 +288,17 @@ fn extract_http_call_request(
             "http_call: expected bytes for body".into(),
         ));
     };
+    let TypedValue::Pair(method_rc, _callback_rc) = unwrap_rc(method_callback_rc) else {
+        return Err(TransferError::GatewayError(
+            "http_call: expected pair (method, callback)".into(),
+        ));
+    };
     let TypedValue::Nat(method) = unwrap_rc(method_rc) else {
         return Err(TransferError::GatewayError(
             "http_call: expected nat for method".into(),
         ));
     };
+    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
     build_http_request(&url, &headers, &body, method)
 }
 
@@ -714,21 +731,36 @@ pub(crate) fn get_enshrined_contract_entrypoint(
             let mut entrypoints = HashMap::new();
             // default %default: string (destination address for simple transfers)
             entrypoints.insert(Entrypoint::default(), Type::String);
-            // %call_evm: pair string (pair string bytes)
-            //   (destination, (method_signature, abi_parameters))
+            // %call_evm: pair string (pair string (pair bytes (option (contract bytes))))
+            //   (destination, (method_signature, (abi_parameters, callback)))
             entrypoints.insert(
                 Entrypoint::try_from("call_evm").ok()?,
-                Type::new_pair(Type::String, Type::new_pair(Type::String, Type::Bytes)),
+                Type::new_pair(
+                    Type::String,
+                    Type::new_pair(
+                        Type::String,
+                        Type::new_pair(
+                            Type::Bytes,
+                            Type::new_option(Type::new_contract(Type::Bytes)),
+                        ),
+                    ),
+                ),
             );
-            // %call: pair string (pair (list (pair string string)) (pair bytes nat))
-            //   (url, (headers, (body, method)))
+            // %call: pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))
+            //   (url, (headers, (body, (method, callback))))
             entrypoints.insert(
                 Entrypoint::try_from("call").ok()?,
                 Type::new_pair(
                     Type::String,
                     Type::new_pair(
                         Type::List(Rc::new(Type::new_pair(Type::String, Type::String))),
-                        Type::new_pair(Type::Bytes, Type::Nat),
+                        Type::new_pair(
+                            Type::Bytes,
+                            Type::new_pair(
+                                Type::Nat,
+                                Type::new_option(Type::new_contract(Type::Bytes)),
+                            ),
+                        ),
                     ),
                 ),
             );
@@ -1005,13 +1037,16 @@ mod tests {
             })
             .collect();
         let headers_seq = Micheline::Seq(arena.alloc_extend(header_pairs));
-        let body_method = Micheline::prim2(
+        let method_callback = Micheline::prim2(
             arena,
             Prim::Pair,
-            body.to_vec().into(),
             num_bigint::BigInt::from(method).into(),
+            Micheline::prim0(Prim::None),
         );
-        let inner_pair = Micheline::prim2(arena, Prim::Pair, headers_seq, body_method);
+        let body_method_callback =
+            Micheline::prim2(arena, Prim::Pair, body.to_vec().into(), method_callback);
+        let inner_pair =
+            Micheline::prim2(arena, Prim::Pair, headers_seq, body_method_callback);
         Micheline::prim2(arena, Prim::Pair, url.to_string().into(), inner_pair)
     }
 

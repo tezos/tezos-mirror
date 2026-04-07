@@ -1410,7 +1410,7 @@ let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
           Client.convert_data_to_json
             ~data:
               (sf
-                 {|Pair "%s" (Pair "%s" 0x%s)|}
+                 {|Pair "%s" (Pair "%s" (Pair 0x%s None))|}
                  evm_destination
                  fn_sig
                  calldata)
@@ -1896,7 +1896,7 @@ let test_cross_runtime_call_from_michelson_to_evm =
       ~dest:gateway_address
       ~arg_data:
         (sf
-           {|Pair "%s" (Pair "store(uint256)" 0x%s)|}
+           {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
            contract_address
            abi_encoded_uint256_42)
       ~entrypoint:"call_evm"
@@ -2146,7 +2146,7 @@ let test_michelson_gateway_evm_revert =
           ~dest:gateway_address
           ~arg_data:
             (sf
-               {|Pair "%s" (Pair "store(uint256)" 0x%s)|}
+               {|Pair "%s" (Pair "store(uint256)" (Pair 0x%s None))|}
                reverter_address
                abi_encoded_uint256_42)
           ~entrypoint:"call_evm"
@@ -2977,7 +2977,7 @@ let test_call_from_michelson_to_evm ~runtime () =
       ~entrypoint:"call"
       ~arg:
         (sf
-           {|Pair "http://ethereum/%s" (Pair {} (Pair 0x%s 1))|}
+           {|Pair "http://ethereum/%s" (Pair {} (Pair 0x%s (Pair 1 None)))|}
            contract_address
            body_hex)
       tez_client
@@ -3088,8 +3088,8 @@ let test_entrypoints_enshrined () =
   Regression.capture (JSON.encode ep_json) ;
 
   (* The gateway exposes three entrypoints: %default (string),
-     %call (pair string (pair string bytes)), and
-     %call_evm (pair string (pair (list (pair string string)) (pair bytes nat))). *)
+     %call_evm (pair string (pair string (pair bytes (option (contract bytes))))), and
+     %call (pair string (pair (list (pair string string)) (pair bytes (pair nat (option (contract bytes)))))). *)
   let entrypoints = JSON.(ep_json |-> "entrypoints") in
   let assert_ep name expected_prim =
     let prim = JSON.(entrypoints |-> name |-> "prim" |> as_string) in

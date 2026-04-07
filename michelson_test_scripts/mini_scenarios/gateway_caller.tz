@@ -10,9 +10,21 @@ code {
        CDR;
        DUP;
        UNPAIR;
-       CONTRACT %call_evm (pair string (pair string bytes));
+       CONTRACT %call_evm (pair string (pair string (pair bytes (option (contract bytes)))));
        ASSERT_SOME;
+       # Rebuild parameter: wrap inner (string, bytes) into (string, (bytes, None))
        SWAP;
+       UNPAIR; # dest : (pair string bytes) : (contract ...) : storage
+       SWAP;
+       UNPAIR; # method_sig : abi_params : dest : (contract ...) : storage
+       SWAP;
+       NONE (contract bytes);
+       SWAP;
+       PAIR;   # (pair abi_params None) : method_sig : dest : (contract ...) : storage
+       SWAP;
+       PAIR;   # (pair method_sig (pair abi_params None)) : dest : (contract ...) : storage
+       SWAP;
+       PAIR;   # (pair dest (pair method_sig (pair abi_params None))) : (contract ...) : storage
        AMOUNT;
        SWAP;
        TRANSFER_TOKENS;
