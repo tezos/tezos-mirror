@@ -819,11 +819,11 @@ pub fn octez_riscv_get_outbox_for_level(
     state: SafePointer<State>,
     level: RawLevel,
 ) -> LinkedList<Output> {
-    // TODO: RV-918: return Iterator for get_outbox_messages to avoid double allocation
-    let outbox_messages = state
-        .apply_ro(|state| NodePvm::get_outbox_messages(state, level.0.into()))
-        .unwrap_or_default();
-    outbox_messages.into_iter().map(|o| o.into()).collect()
+    state.apply_ro(|state| {
+        NodePvm::get_outbox_messages(state, level.0.into())
+            .map(|iter| iter.map(Output::from).collect())
+            .unwrap_or_default()
+    })
 }
 
 #[ocaml::func]
@@ -832,11 +832,11 @@ pub fn octez_riscv_mut_get_outbox_for_level(
     state: SafePointer<MutState>,
     level: RawLevel,
 ) -> LinkedList<Output> {
-    // TODO: RV-918: return Iterator for get_outbox_messages to avoid double allocation
-    let outbox_messages = state
-        .apply_ro(|state| NodePvm::get_outbox_messages(state, level.0.into()))
-        .unwrap_or_default();
-    outbox_messages.into_iter().map(|o| o.into()).collect()
+    state.apply_ro(|state| {
+        NodePvm::get_outbox_messages(state, level.0.into())
+            .map(|iter| iter.map(Output::from).collect())
+            .unwrap_or_default()
+    })
 }
 
 #[ocaml::func]
