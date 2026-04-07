@@ -24,6 +24,7 @@ use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::metadata::RollupMetadata;
+use tezos_smart_rollup_host::storage::CoreStorage;
 
 use state::HostState;
 use std::cell::RefCell;
@@ -74,6 +75,14 @@ impl Default for MockHost {
         );
 
         Self::with_address(&address)
+    }
+}
+
+impl CoreStorage for MockHost {
+    type Storage = InMemoryStore;
+
+    unsafe fn new_storage(&mut self) -> Self::Storage {
+        self.as_mut().store.clone()
     }
 }
 
@@ -150,7 +159,11 @@ impl MockHost {
         // `run_level` API.
         let reboots = MAXIMUM_REBOOTS_PER_INPUT;
         let bytes = reboots.to_le_bytes().to_vec();
-        state.store.0.set_value(REBOOT_COUNTER_KEY, bytes);
+        state
+            .store
+            .0
+            .borrow_mut()
+            .set_value(REBOOT_COUNTER_KEY, bytes);
 
         state.curr_level = NAIROBI_ACTIVATION_LEVEL;
 
@@ -227,10 +240,18 @@ impl MockHost {
 
         loop {
             let bytes = reboots.to_le_bytes().to_vec();
-            self.as_mut().store.0.set_value(REBOOT_COUNTER_KEY, bytes);
+            self.as_mut()
+                .store
+                .0
+                .borrow_mut()
+                .set_value(REBOOT_COUNTER_KEY, bytes);
 
             kernel_run(self);
-            self.as_mut().store.0.node_delete(TOO_MANY_REBOOT_FLAG_KEY);
+            self.as_mut()
+                .store
+                .0
+                .borrow_mut()
+                .node_delete(TOO_MANY_REBOOT_FLAG_KEY);
 
             reboots -= 1;
 
@@ -238,11 +259,16 @@ impl MockHost {
                 .as_mut()
                 .store
                 .0
+                .borrow()
                 .maybe_get_value(REBOOT_FLAG_KEY)
                 .is_some();
 
             if reboot_requested {
-                self.as_mut().store.0.node_delete(REBOOT_FLAG_KEY);
+                self.as_mut()
+                    .store
+                    .0
+                    .borrow_mut()
+                    .node_delete(REBOOT_FLAG_KEY);
 
                 if reboots > 0 {
                     continue;
@@ -251,6 +277,7 @@ impl MockHost {
                 self.as_mut()
                     .store
                     .0
+                    .borrow_mut()
                     .set_value(TOO_MANY_REBOOT_FLAG_KEY, vec![]);
             }
             break;
@@ -365,5 +392,43 @@ fn info_for_level(level: i32) -> inbox::InfoPerLevel {
     inbox::InfoPerLevel {
         predecessor: crypto::hash::BlockHash::from(hash),
         predecessor_timestamp: Timestamp::from(timestamp),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tezos_smart_rollup_host::storage::StorageV1;
+
+    #[test]
+    fn new_storage_shares_durable_store() {
+        let mut host = MockHost::default();
+
+        let store_a = unsafe { host.new_storage() };
+        let store_b = unsafe { host.new_storage() };
+
+        // Write through store_a.
+        store_a
+            .handle_store_write(b"/shared/key", 0, b"hello")
+            .unwrap();
+
+        // store_b sees the write — they share the same durable tree.
+        let value = store_b.handle_store_read(b"/shared/key", 0, 1024).unwrap();
+        assert_eq!(value, b"hello");
+    }
+
+    #[test]
+    fn new_storage_works_with_storage_v1() {
+        let mut host = MockHost::default();
+
+        let mut store = unsafe { host.new_storage() };
+
+        use tezos_smart_rollup_host::path::RefPath;
+        let path = RefPath::assert_from(b"/test/val");
+
+        StorageV1::store_write_all(&mut store, &path, b"data").unwrap();
+
+        let read_back = StorageV1::store_read_all(&store, &path).unwrap();
+        assert_eq!(read_back, b"data");
     }
 }
