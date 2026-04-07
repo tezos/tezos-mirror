@@ -46,6 +46,7 @@ let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
   let open Lwt.Syntax in
   let* version = Wasm_vm.get_wasm_version pvm_state in
   (* Execute! *)
+  let durable = Wasm_pvm_state.Internal_state.durable_of pvm_state.storage in
   let* durable =
     Exec.compute
       ~hooks
@@ -53,7 +54,7 @@ let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
       ~version
       ~reveal_builtins
       ~write_debug
-      pvm_state.durable
+      durable
       pvm_state.buffers
   in
   (* The WASM PVM does several maintenance operations at the end of
@@ -64,7 +65,13 @@ let compute_fast ~wasm_entrypoint ~hooks ~reveal_builtins ~write_debug pvm_state
   let ticks = pvm_state.max_nb_ticks in
   let current_tick = Z.(pred @@ add pvm_state.last_top_level_call ticks) in
   let pvm_state =
-    {pvm_state with durable; current_tick; tick_state = Padding}
+    {
+      pvm_state with
+      storage =
+        Wasm_pvm_state.Internal_state.update_durable pvm_state.storage durable;
+      current_tick;
+      tick_state = Padding;
+    }
   in
   (* Here, we don't reuse the [write_debug] argument, because we are
      in the [Padding] stage of the WASM PVM execution, so there is no

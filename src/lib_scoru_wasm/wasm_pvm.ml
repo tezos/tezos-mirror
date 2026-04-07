@@ -33,7 +33,8 @@ module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
 
   let initial_state version empty_state =
     let open Lwt.Syntax in
-    let* durable = S.Encoding_runner.decode_durable_storage empty_state in
+    let* storage = S.Encoding_runner.decode_storage empty_state in
+    let durable = durable_of storage in
     let version_str =
       Data_encoding.Binary.to_string_exn Wasm_pvm_state.version_encoding version
     in
@@ -44,22 +45,25 @@ module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
         Constants.version_key
         version_str
     in
-    S.Encoding_runner.encode_durable_storage durable empty_state
+    let storage = update_durable storage durable in
+    S.Encoding_runner.encode_storage storage empty_state
 
   let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period
       ~outbox_message_limit bs state =
     let open Lwt_syntax in
-    let* durable = S.Encoding_runner.decode_durable_storage state in
+    let* storage = S.Encoding_runner.decode_storage state in
+    let durable = durable_of storage in
     let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot" in
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm" in
     let* durable = Durable.set_value_exn durable reboot_flag_key "" in
     let* durable = Durable.set_value_exn durable kernel_key bs in
+    let storage = update_durable storage durable in
     let pvm : pvm_state =
       {
         last_input_info = None;
         current_tick = Z.zero;
         reboot_counter = Z.succ Constants.maximum_reboots_per_input;
-        durable;
+        storage;
         buffers = default_buffers outbox_validity_period outbox_message_limit ();
         tick_state = Collect;
         last_top_level_call = Z.zero;
@@ -152,8 +156,12 @@ module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
       let open Lwt_syntax in
       let* pvm_state = S.Encoding_runner.decode state in
       let key = Durable.key_of_string_exn key in
-      let* durable = Durable.set_value_exn pvm_state.durable key value in
-      let pvm_state = {pvm_state with durable} in
+      let* durable =
+        Durable.set_value_exn (durable_of pvm_state.storage) key value
+      in
+      let pvm_state =
+        {pvm_state with storage = update_durable pvm_state.storage durable}
+      in
       S.Encoding_runner.encode pvm_state state
 
     let set_pvm_version ~(version : Wasm_pvm_state.version) state =
@@ -162,13 +170,15 @@ module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
       let* durable =
         Durable.set_value_exn
           ~edit_readonly:true
-          pvm_state.durable
+          (durable_of pvm_state.storage)
           Constants.version_key
           (Data_encoding.Binary.to_string_exn
              Wasm_pvm_state.version_encoding
              version)
       in
-      let pvm_state = {pvm_state with durable} in
+      let pvm_state =
+        {pvm_state with storage = update_durable pvm_state.storage durable}
+      in
       let pvm_state = Wasm_vm.Unsafe.apply_migration version pvm_state in
       S.Encoding_runner.encode pvm_state state
   end

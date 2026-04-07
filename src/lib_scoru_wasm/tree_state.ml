@@ -127,7 +127,11 @@ let pvm_state_encoding =
               ~default:(Z.succ maximum_reboots_per_input)
               (* One is used to read the inbox *)
               reboot_counter;
-          durable;
+          (* [storage] is not fully stored in the Irmin tree: only [durable]
+             is persisted. On decode it is always [Irmin_only { durable }].
+             The caller is responsible for upgrading to [Dual] after
+             inspecting the decoded [version] field. *)
+          storage = Irmin_only {durable};
           buffers =
             (*`Gather_floppies` uses `get_info`, that decodes the state of the
             PVM, which at the start of the rollup doesn't exist. *)
@@ -147,7 +151,7 @@ let pvm_state_encoding =
            last_input_info;
            current_tick;
            reboot_counter;
-           durable;
+           storage;
            buffers;
            tick_state;
            last_top_level_call;
@@ -159,7 +163,7 @@ let pvm_state_encoding =
       ( last_input_info,
         current_tick,
         Some reboot_counter,
-        durable,
+        Wasm_pvm_state.Internal_state.durable_of storage,
         Some buffers,
         tick_state,
         last_top_level_call,
@@ -216,6 +220,17 @@ module Make (T : Tezos_tree_encoding.TREE) :
 
     let decode_durable_storage state =
       Tree_encoding_runner.decode durable_storage_encoding state
+
+    let encode_storage storage state =
+      let durable = Wasm_pvm_state.Internal_state.durable_of storage in
+      Tree_encoding_runner.encode durable_storage_encoding durable state
+
+    let decode_storage state =
+      let open Lwt.Syntax in
+      let+ durable =
+        Tree_encoding_runner.decode durable_storage_encoding state
+      in
+      Irmin_only {durable}
 
     let decode_buffers state =
       Tree_encoding_runner.decode

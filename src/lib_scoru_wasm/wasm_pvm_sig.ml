@@ -37,6 +37,12 @@ module type STATE = sig
 
     val decode_durable_storage : state -> Durable.t Lwt.t
 
+    val encode_storage :
+      Wasm_pvm_state.Internal_state.pvm_storage -> state -> state Lwt.t
+
+    val decode_storage :
+      state -> Wasm_pvm_state.Internal_state.pvm_storage Lwt.t
+
     val decode_buffers :
       state -> Tezos_webassembly_interpreter.Eval.buffers option Lwt.t
   end

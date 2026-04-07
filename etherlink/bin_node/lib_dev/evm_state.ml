@@ -617,8 +617,13 @@ let delete ~kind evm_state path =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
   let* pvm_state = Pvm.Kernel.decode evm_state in
-  let* durable = Tezos_scoru_wasm.Durable.delete ~kind pvm_state.durable key in
-  Pvm.Kernel.encode {pvm_state with durable} evm_state
+  let open Tezos_scoru_wasm.Wasm_pvm_state.Internal_state in
+  let* durable =
+    Tezos_scoru_wasm.Durable.delete ~kind (durable_of pvm_state.storage) key
+  in
+  Pvm.Kernel.encode
+    {pvm_state with storage = update_durable pvm_state.storage durable}
+    evm_state
 
 let clear_delayed_inbox evm_state =
   delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
