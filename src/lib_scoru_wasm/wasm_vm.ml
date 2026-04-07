@@ -90,9 +90,11 @@ let has_upgrade_error_flag durable =
   let+ error = Durable.(find_value durable Constants.upgrade_error_flag_key) in
   Option.is_some error
 
-let get_wasm_version {durable; _} =
+let get_wasm_version {storage; _} =
   let open Lwt_syntax in
-  let* cbv = Durable.find_value_exn durable Constants.version_key in
+  let* cbv =
+    Durable.find_value_exn (durable_of storage) Constants.version_key
+  in
   let+ bytes = Tezos_lazy_containers.Chunked_byte_vector.to_bytes cbv in
   Data_encoding.Binary.of_bytes_exn Wasm_pvm_state.version_encoding bytes
 
@@ -142,9 +144,9 @@ let patch_flags_on_eval_successful durable =
   in
   durable
 
-let mark_for_reboot {reboot_counter; durable; _} =
+let mark_for_reboot {reboot_counter; storage; _} =
   let open Lwt_syntax in
-  let+ has_reboot_flag = has_reboot_flag durable in
+  let+ has_reboot_flag = has_reboot_flag (durable_of storage) in
   if has_reboot_flag then
     if Z.Compare.(reboot_counter <= Z.zero) then `Forcing_yield else `Reboot
   else `Yielding
@@ -179,11 +181,12 @@ let save_fallback_kernel durable =
   else Lwt.return durable
 
 let unsafe_next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
-    host_funcs ({buffers; durable; tick_state; _} as pvm_state) =
+    host_funcs ({buffers; storage; tick_state; _} as pvm_state) =
   let open Lwt_syntax in
-  let return ?(status = Running) ?(durable = durable) state =
-    Lwt.return (durable, state, status)
+  let return ?(status = Running) ?(storage = storage) state =
+    Lwt.return (storage, state, status)
   in
+  let durable = durable_of storage in
   match tick_state with
   | Stuck ((Decode_error _ | Init_error _ | Link_error _) as e) ->
       let cause =
@@ -209,7 +212,7 @@ let unsafe_next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
             0L
             ""
         in
-        return ~durable Padding
+        return ~storage:(update_durable storage durable) Padding
       else return ~status:Failing (Stuck (No_fallback_kernel cause))
   | Stuck e -> return ~status:Failing (Stuck e)
   | Snapshot -> return (initial_boot_state ())
@@ -306,7 +309,9 @@ let unsafe_next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
           (* Set kernel - now known to be valid - as fallback kernel,
              if it is not already *)
           let* durable = save_fallback_kernel durable in
-          return ~durable (Eval {config; module_reg})
+          return
+            ~storage:(update_durable storage durable)
+            (Eval {config; module_reg})
       | _ ->
           (* We require a function with the name [main] to be exported
              rather than any other structure. *)
@@ -341,11 +346,11 @@ let unsafe_next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
           0L
           ""
       in
-      return ~durable Padding
+      return ~storage:(update_durable storage durable) Padding
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
       let* durable = patch_flags_on_eval_successful durable in
-      return ~durable Padding
+      return ~storage:(update_durable storage durable) Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in
@@ -353,7 +358,8 @@ let unsafe_next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
         Wasm.Eval.step ~host_funcs ~durable:store module_reg config buffers
       in
       let durable' = Durable.of_storage ~default:durable store' in
-      return ~durable:durable' (Eval {config; module_reg})
+      let storage = update_durable storage durable' in
+      return ~storage (Eval {config; module_reg})
 
 let exn_to_stuck pvm_state exn =
   let error = Wasm_pvm_errors.extract_interpreter_error exn in
@@ -384,7 +390,7 @@ let next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
         pvm_state)
     (fun exn ->
       let+ tick_state = exn_to_stuck pvm_state exn in
-      (pvm_state.durable, tick_state, Failing))
+      (pvm_state.storage, tick_state, Failing))
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
   | Forcing_yield | Yielding | Reboot -> Z.succ current_tick
@@ -480,7 +486,7 @@ let compute_step_with_host_functions ~wasm_entrypoint ~version ~stack_size_limit
     registry pvm_state =
   let open Lwt_syntax in
   (* Calculate the next tick state. *)
-  let* durable, tick_state, status =
+  let* storage, tick_state, status =
     next_tick_state
       ~wasm_entrypoint
       ~version
@@ -491,7 +497,7 @@ let compute_step_with_host_functions ~wasm_entrypoint ~version ~stack_size_limit
   let current_tick = Z.succ pvm_state.current_tick in
   let last_top_level_call = next_last_top_level_call pvm_state status in
   let reboot_counter = next_reboot_counter pvm_state status in
-  let* durable = patch_too_many_reboot_flag durable status in
+  let* durable = patch_too_many_reboot_flag (durable_of storage) status in
   let* durable = patch_reboot_flag durable status in
   let* durable = patch_reboot_counter durable reboot_counter status in
   let () = clean_up_input_buffer pvm_state.buffers status in
@@ -499,7 +505,7 @@ let compute_step_with_host_functions ~wasm_entrypoint ~version ~stack_size_limit
     {
       pvm_state with
       tick_state;
-      durable;
+      storage = update_durable storage durable;
       current_tick;
       last_top_level_call;
       reboot_counter;
@@ -721,9 +727,9 @@ let set_input_step input_info message pvm_state =
   let open Wasm_pvm_state in
   let {inbox_level; message_counter} = input_info in
   let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
-  let return ?(pvm_state = pvm_state) ?(durable = pvm_state.durable) tick_state
+  let return ?(pvm_state = pvm_state) ?(storage = pvm_state.storage) tick_state
       =
-    Lwt.return {pvm_state with durable; tick_state}
+    Lwt.return {pvm_state with storage; tick_state}
   in
   let return_stuck state_name =
     return
@@ -746,7 +752,7 @@ let set_input_step input_info message pvm_state =
             let* durable =
               Durable.set_value_exn
                 ~edit_readonly:true
-                pvm_state.durable
+                (durable_of pvm_state.storage)
                 Constants.version_key
                 (Data_encoding.Binary.to_string_exn
                    Wasm_pvm_state.version_encoding
@@ -755,7 +761,10 @@ let set_input_step input_info message pvm_state =
             let pvm_state =
               apply_migration (version_for_protocol proto) pvm_state
             in
-            return ~pvm_state ~durable Collect
+            return
+              ~pvm_state
+              ~storage:(update_durable pvm_state.storage durable)
+              Collect
         | Internal Start_of_level ->
             update_output_buffer pvm_state raw_level ;
             return Collect
