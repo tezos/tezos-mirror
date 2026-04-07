@@ -908,7 +908,7 @@ DO UPDATE SET value = excluded.value
     (* See {Note cast} *)
     let tezosx_select_tez_block_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(tez_block AS BLOB) FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT CAST(tez_block AS BLOB) FROM blocks WHERE level = ? AND tez_block IS NOT NULL|eos}
 
     (* See {Note cast} *)
     let select_with_hash =
@@ -921,7 +921,7 @@ DO UPDATE SET value = excluded.value
 
     let select_tez_hash_of_number =
       (level ->? block_hash) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT tez_hash FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT tez_hash FROM blocks WHERE level = ? AND tez_hash IS NOT NULL|eos}
 
     let select_number_of_hash =
       (block_hash ->? level) ~name:__FUNCTION__ ~table
