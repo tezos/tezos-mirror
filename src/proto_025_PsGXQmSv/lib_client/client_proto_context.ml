@@ -1624,5 +1624,5 @@ let dal_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
-let get_clst_contract_hash (rpc : #rpc_context) ~chain ~block =
-  Alpha_services.Contract.clst_contract_hash rpc (chain, block)
+let get_stez_contract_hash (rpc : #rpc_context) ~chain ~block =
+  Alpha_services.Contract.stez_contract_hash rpc (chain, block)
