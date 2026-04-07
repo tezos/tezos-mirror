@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 24.2 (12fefe61)"
+    "version": "Octez 24.3 (8f64dace)"
   },
   "paths": {
     "/health": {
@@ -2644,6 +2644,28 @@
                                 ]
                               }
                             },
+                            "trap_slot_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "slot_level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "slot_index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "slot_level",
+                                  "slot_index"
+                                ]
+                              }
+                            },
                             "no_shards_attestation_levels": {
                               "type": "array",
                               "items": {
@@ -2655,6 +2677,7 @@
                           },
                           "required": [
                             "slot_ids",
+                            "trap_slot_ids",
                             "no_shards_attestation_levels"
                           ]
                         }

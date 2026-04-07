@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol tallinn RPC",
     "description": "The RPC API for protocol tallinn served by the Octez node.",
-    "version": "Octez 24.2 (12fefe61)"
+    "version": "Octez 24.3 (8f64dace)"
   },
   "paths": {
     "/": {
@@ -11538,7 +11538,7 @@
     },
     "/helpers/scripts/run_code": {
       "post": {
-        "description": "Run a Michelson script in the current context",
+        "description": "Run a Michelson script in the current context. The gas used is bounded by the protocol's hard gas limit per operation.",
         "requestBody": {
           "content": {
             "application/json": {
