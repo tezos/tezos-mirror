@@ -143,6 +143,9 @@ module Kernel_version : METHOD with type input = unit and type output = string
 module Kernel_root_hash :
   METHOD with type input = unit and type output = string option
 
+module Michelson_activation_level :
+  METHOD with type input = unit and type output = int64 option
+
 module Network_id : METHOD with type input = unit and type output = string
 
 module Chain_id :

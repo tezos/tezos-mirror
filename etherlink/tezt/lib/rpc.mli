@@ -316,6 +316,12 @@ val tez_kernelVersion :
 val tez_kernelRootHash :
   ?websocket:Websocket.t -> Evm_node.t -> (string option, error) result Lwt.t
 
+(** [tez_getMichelsonActivationLevel evm_node] calls
+    [tez_getMichelsonActivationLevel]. Returns the EVM block level at which the
+    Michelson runtime was activated, or [None] if it has not been activated. *)
+val tez_getMichelsonActivationLevel :
+  ?websocket:Websocket.t -> Evm_node.t -> (int64 option, error) result Lwt.t
+
 (** [call ~to_ ~data ?block evm_node] call [eth_call] with [to] and
     [data] as argument. [block] defaults to [Latest]. *)
 val call :

@@ -1649,6 +1649,12 @@ let dispatch_request (type f) ~websocket
               rpc_ok kernel_root_hash
             in
             build ~f module_ parameters
+        | Michelson_activation_level.Method ->
+            let f (_ : unit option) =
+              let* level = Evm_ro_context.michelson_activation_level ro_ctxt in
+              rpc_ok level
+            in
+            build ~f module_ parameters
         | Rpc_encodings.Sequencer.Method ->
             let f block_param =
               let block =

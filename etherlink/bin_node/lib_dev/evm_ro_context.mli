@@ -59,6 +59,10 @@ val chain_id : t -> L2_types.chain_id tzresult Lwt.t
     Michelson runtime defined by the rollup. *)
 val michelson_runtime_chain_id : t -> L2_types.chain_id tzresult Lwt.t
 
+(** [michelson_activation_level ctxt] returns the EVM block level at which the
+    Michelson runtime was activated, or [None] if it has not been activated. *)
+val michelson_activation_level : t -> int64 option tzresult Lwt.t
+
 (** [current_block_number_durable ctxt ~root] returns the current block
     number of the L2 chain prefixed by [root] from durable storage. *)
 val current_block_number_durable :
