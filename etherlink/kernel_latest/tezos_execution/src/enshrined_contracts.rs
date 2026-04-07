@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::Type;
-use mir::ast::{AddressHash, BinWriter, ByteReprTrait, TypedValue};
+use mir::ast::{Address, AddressHash, BinWriter, ByteReprTrait, TypedValue};
 use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
@@ -87,7 +87,12 @@ pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
 }
 
-/// Unwrap an `Rc<TypedValue>`, consuming it if possible to avoid cloning.
+/// Extract the inner [`TypedValue`] from an `Rc`.
+///
+/// [`TypedValue`] wraps recursive positions (e.g. `Pair`, `Option`) in `Rc`
+/// to keep the enum sized. This helper moves the value out without copying
+/// when the reference count is 1 (the common case for freshly typechecked
+/// values), and falls back to cloning if the `Rc` is shared.
 fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
     Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
 }
@@ -132,14 +137,15 @@ where
                 };
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])
             } else if entrypoint.as_str() == "call_evm" {
-                let (dest, method_sig, abi_params) = extract_call_params(typed)?;
+                let (dest, method_sig, abi_params, _callback) =
+                    extract_call_params(typed)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
             } else if entrypoint.as_str() == "call" {
-                let mut request = extract_http_call_request(typed)?;
+                let (mut request, _callback) = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
                 inject_context_headers(
                     request.headers_mut(),
@@ -198,13 +204,32 @@ where
     }
 }
 
-/// Extract (destination, method_signature, abi_parameters) from a typed
+/// Extract an `Option<Address>` from a typechecked `option (contract bytes)` value.
+fn extract_callback(
+    typed: TypedValue<'_>,
+    entrypoint_name: &str,
+) -> Result<Option<Address>, TransferError> {
+    match typed {
+        TypedValue::Option(Some(rc)) => {
+            let TypedValue::Contract(addr) = unwrap_rc(rc) else {
+                return Err(TransferError::GatewayError(format!(
+                    "{entrypoint_name}: expected contract in callback option"
+                )));
+            };
+            Ok(Some(addr))
+        }
+        TypedValue::Option(None) => Ok(None),
+        _ => Err(TransferError::GatewayError(format!(
+            "{entrypoint_name}: expected option for callback"
+        ))),
+    }
+}
+
+/// Extract (destination, method_signature, abi_parameters, callback) from a typed
 /// Pair(String, Pair(String, Pair(Bytes, Option(Contract(Bytes))))) value.
-///
-/// The optional callback contract is accepted but ignored.
 fn extract_call_params(
     typed: TypedValue<'_>,
-) -> Result<(String, String, Vec<u8>), TransferError> {
+) -> Result<(String, String, Vec<u8>, Option<Address>), TransferError> {
     let TypedValue::Pair(dest_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
             "call: expected pair (destination, (method_sig, (abi_params, callback)))"
@@ -226,7 +251,7 @@ fn extract_call_params(
             "call: expected string for method signature".into(),
         ));
     };
-    let TypedValue::Pair(params_rc, _callback_rc) = unwrap_rc(inner2_rc) else {
+    let TypedValue::Pair(params_rc, callback_rc) = unwrap_rc(inner2_rc) else {
         return Err(TransferError::GatewayError(
             "call: expected pair (abi_params, callback)".into(),
         ));
@@ -236,18 +261,17 @@ fn extract_call_params(
             "call: expected bytes for ABI parameters".into(),
         ));
     };
-    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
-    Ok((dest, method_sig, abi_params))
+    let callback = extract_callback(unwrap_rc(callback_rc), "call_evm")?;
+    Ok((dest, method_sig, abi_params, callback))
 }
 
-/// Build an `http::Request<Vec<u8>>` from a typed
+/// Build an `http::Request<Vec<u8>>` and optional callback from a typed
 /// Pair(String, Pair(List(Pair(String, String)), Pair(Bytes, Pair(Nat, Option(Contract(Bytes)))))) value.
 ///
 /// Method mapping: 0 = GET, 1 = POST. Other values default to POST.
-/// The optional callback contract is accepted but ignored.
 fn extract_http_call_request(
     typed: TypedValue<'_>,
-) -> Result<http::Request<Vec<u8>>, TransferError> {
+) -> Result<(http::Request<Vec<u8>>, Option<Address>), TransferError> {
     let TypedValue::Pair(url_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
             "http_call: expected pair (url, (headers, (body, (method, callback))))"
@@ -300,7 +324,7 @@ fn extract_http_call_request(
             "http_call: expected bytes for body".into(),
         ));
     };
-    let TypedValue::Pair(method_rc, _callback_rc) = unwrap_rc(method_callback_rc) else {
+    let TypedValue::Pair(method_rc, callback_rc) = unwrap_rc(method_callback_rc) else {
         return Err(TransferError::GatewayError(
             "http_call: expected pair (method, callback)".into(),
         ));
@@ -310,8 +334,9 @@ fn extract_http_call_request(
             "http_call: expected nat for method".into(),
         ));
     };
-    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
-    build_http_request(&url, &headers, &body, method)
+    let callback = extract_callback(unwrap_rc(callback_rc), "call")?;
+    let request = build_http_request(&url, &headers, &body, method)?;
+    Ok((request, callback))
 }
 
 /// Build an `http::Request<Vec<u8>>` from extracted parameters.
@@ -1094,7 +1119,7 @@ mod tests {
         );
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
         assert_eq!(
@@ -1111,7 +1136,7 @@ mod tests {
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc");
         assert_eq!(request.method(), http::Method::GET);
         assert!(request.headers().is_empty());
@@ -1133,7 +1158,7 @@ mod tests {
         );
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         // Unknown method defaults to POST
         assert_eq!(request.method(), http::Method::POST);
         assert_eq!(
@@ -1574,7 +1599,7 @@ mod tests {
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::GET);
     }
 
@@ -1585,7 +1610,7 @@ mod tests {
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 1);
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
 
@@ -1596,7 +1621,7 @@ mod tests {
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 99);
         let mut host = MockKernelHost::default();
         let typed = typecheck_call(&value, &mut host).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let (request, _callback) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
 
