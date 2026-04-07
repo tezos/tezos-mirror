@@ -105,7 +105,34 @@ let job_script_docker_verify_image =
     ~__POS__
     ~description:"Verify the signature of the Docker image."
     ~stage:Test
-    ~only_if_changed:["build.Dockerfile"; "Dockerfile"]
+    ~only_if_changed:
+      [
+        "build.Dockerfile";
+        "Dockerfile";
+        (* Scripts that are directly called by this job. *)
+        "scripts/ci/docker_initialize.sh";
+        "scripts/ci/docker_verify_signature.sh";
+        (* Scripts that are called by [docker_initialize.sh]. *)
+        "scripts/ci/docker_wait_for_daemon.sh";
+        "scripts/ci/docker_check_version.sh";
+        "scripts/ci/docker_registry_auth.sh";
+        (* Scripts that are called by [docker_registry_auth.sh]. *)
+        "scripts/ci/docker_image_names.sh";
+        (* Scripts that are called by [docker_image_names.sh]. *)
+        "scripts/ci/docker_registry.inc.sh";
+        (* Scripts that are called by the Docker build jobs that this job depends on. *)
+        "scripts/ci/docker_release.sh";
+        (* Scripts that are called by [docker_release.sh]. *)
+        "scripts/create_docker_image.sh";
+        "scripts/ci/docker_smoke_test.sh";
+        "scripts/ci/docker_push_all.sh";
+        "scripts/ci/docker_sign.sh";
+        (* TODO: since the Docker build jobs already call [docker_verify_signature.sh],
+           why have a job dedicated to running [docker_verify_signature.sh]? *)
+        "scripts/ci/docker_verify_signature.sh";
+        (* Scripts that are called by [create_docker_image.sh]. *)
+        "scripts/version.sh";
+      ]
     ~needs:
       [
         ( Job,

@@ -5837,6 +5837,19 @@ oc.docker:arm64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - scripts/ci/docker_check_version.sh
+    - scripts/ci/docker_image_names.sh
+    - scripts/ci/docker_initialize.sh
+    - scripts/ci/docker_push_all.sh
+    - scripts/ci/docker_registry.inc.sh
+    - scripts/ci/docker_registry_auth.sh
+    - scripts/ci/docker_release.sh
+    - scripts/ci/docker_sign.sh
+    - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_signature.sh
+    - scripts/ci/docker_wait_for_daemon.sh
+    - scripts/create_docker_image.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - oc.docker:ci:arm64
@@ -5879,6 +5892,19 @@ oc.script.docker_verify_image_arm64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - scripts/ci/docker_check_version.sh
+    - scripts/ci/docker_image_names.sh
+    - scripts/ci/docker_initialize.sh
+    - scripts/ci/docker_push_all.sh
+    - scripts/ci/docker_registry.inc.sh
+    - scripts/ci/docker_registry_auth.sh
+    - scripts/ci/docker_release.sh
+    - scripts/ci/docker_sign.sh
+    - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_signature.sh
+    - scripts/ci/docker_wait_for_daemon.sh
+    - scripts/create_docker_image.sh
+    - scripts/version.sh
     when: manual
     allow_failure: true
   needs:
@@ -5911,6 +5937,19 @@ oc.docker:amd64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - scripts/ci/docker_check_version.sh
+    - scripts/ci/docker_image_names.sh
+    - scripts/ci/docker_initialize.sh
+    - scripts/ci/docker_push_all.sh
+    - scripts/ci/docker_registry.inc.sh
+    - scripts/ci/docker_registry_auth.sh
+    - scripts/ci/docker_release.sh
+    - scripts/ci/docker_sign.sh
+    - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_signature.sh
+    - scripts/ci/docker_wait_for_daemon.sh
+    - scripts/create_docker_image.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
@@ -5955,6 +5994,19 @@ oc.script.docker_verify_image_amd64:
   - changes:
     - Dockerfile
     - build.Dockerfile
+    - scripts/ci/docker_check_version.sh
+    - scripts/ci/docker_image_names.sh
+    - scripts/ci/docker_initialize.sh
+    - scripts/ci/docker_push_all.sh
+    - scripts/ci/docker_registry.inc.sh
+    - scripts/ci/docker_registry_auth.sh
+    - scripts/ci/docker_release.sh
+    - scripts/ci/docker_sign.sh
+    - scripts/ci/docker_smoke_test.sh
+    - scripts/ci/docker_verify_signature.sh
+    - scripts/ci/docker_wait_for_daemon.sh
+    - scripts/create_docker_image.sh
+    - scripts/version.sh
     when: manual
     allow_failure: true
   needs:
