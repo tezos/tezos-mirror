@@ -114,14 +114,14 @@ let bls_mode_raw t client : Hex.t Lwt.t =
   t.raw <- Some (`Hex inject_bytes) ;
   return (`Hex sign_bytes)
 
-(* Same hash module as [src/proto_alpha/lib_protocol/dal_attestation_repr.ml] *)
+(* Same hash module as [src/proto_alpha/lib_protocol/dal_attestations_repr.ml] *)
 module HashModule =
   Tezos_crypto.Blake2B.Make
     (Tezos_crypto.Base58)
     (struct
-      let name = "Dal attestation hash"
+      let name = "Dal attestations hash"
 
-      let title = "Dal attestation hash"
+      let title = "Dal attestations hash"
 
       let b58check_prefix = "\056\012\165" (* dba(53) *)
 

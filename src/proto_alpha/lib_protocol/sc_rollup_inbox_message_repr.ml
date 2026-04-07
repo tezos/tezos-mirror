@@ -139,8 +139,7 @@ let internal_inbox_message_encoding =
            (req "page_size" uint16)
            (req
               "slots_by_publisher"
-              (Signature.Public_key_hash.Map.encoding
-                 Dal_attestation_repr.encoding)))
+              (Signature.Public_key_hash.Map.encoding Bitset.encoding)))
         (function
           | Dal_attested_slots
               {
@@ -151,11 +150,15 @@ let internal_inbox_message_encoding =
                 slots_by_publisher;
               } ->
               (* Convert list to bitset for compact encoding *)
+              let add t idx =
+                let i = Dal_slot_index_repr.to_int idx in
+                match Bitset.add t i with
+                | Error _ -> (* unreachable, as [i] is positive *) assert false
+                | Ok v -> v
+              in
               let slots_by_publisher =
                 Signature.Public_key_hash.Map.map
-                  (List.fold_left
-                     Dal_attestation_repr.commit
-                     Dal_attestation_repr.empty)
+                  (List.fold_left add Bitset.empty)
                   slots_by_publisher
               in
               Some
@@ -181,11 +184,16 @@ let internal_inbox_message_encoding =
                 let rec collect acc i =
                   if Compare.Int.(i >= number_of_slots) then List.rev acc
                   else
-                    match Dal_slot_index_repr.of_int_opt ~number_of_slots i with
-                    | None -> List.rev acc
-                    | Some idx ->
-                        if Dal_attestation_repr.is_attested bitset idx then
-                          collect (idx :: acc) (i + 1)
+                    match Bitset.mem bitset i with
+                    | Error _ ->
+                        (* unreachable, as [i] is positive *) assert false
+                    | Ok attested ->
+                        if attested then
+                          match
+                            Dal_slot_index_repr.of_int_opt ~number_of_slots i
+                          with
+                          | None -> (* unreachable *) assert false
+                          | Some idx -> collect (idx :: acc) (i + 1)
                         else collect acc (i + 1)
                 in
                 collect [] 0)

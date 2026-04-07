@@ -969,13 +969,6 @@ module Protocol_activation_level :
 (** Tenderbake *)
 
 module Tenderbake : sig
-  (* TODO: #8065: delete in V
-     Use {!Protocol_activation_level} instead. *)
-  module First_level_of_protocol :
-    Single_data_storage
-      with type t := Raw_context.t
-       and type value = Raw_level_repr.t
-
   (** [Attestation_branch] stores a single value composed of the
       grandparent hash and the predecessor's payload (computed with
       the grandparent hash) used to verify the validity of

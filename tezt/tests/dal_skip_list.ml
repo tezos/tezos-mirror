@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* DAL skip-list RPC tests. *)
+(* DAL skip-list-related tests. *)
 
 open Dal_helpers
 module Dal = Dal_common
@@ -74,28 +74,15 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
   let* new_proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
-  let new_dal_params =
+  let new_dal_parameters =
     Dal.Parameters.from_protocol_parameters new_proto_params
   in
-  let new_lag = new_dal_params.attestation_lag in
-  let new_attestation_lags =
-    JSON.(
-      new_proto_params |-> "dal_parametric" |-> "attestation_lags" |> as_list
-      |> List.map as_int)
-  in
+  let new_lag = new_dal_parameters.attestation_lag in
   if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
-
-  let new_dal_parameters =
-    {
-      dal_parameters with
-      attestation_lag = new_lag;
-      attestation_lags = new_attestation_lags;
-    }
-  in
-
-  let new_number_of_slots = new_dal_params.number_of_slots in
+  let new_number_of_slots = new_dal_parameters.number_of_slots in
   if new_number_of_slots <> number_of_slots then
     Log.info "new number_of_slots = %d" new_number_of_slots ;
+
   let last_attested_level = last_confirmed_published_level + new_lag in
   (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
@@ -198,8 +185,11 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
           let expected_published_level =
             if level = 1 then (* the "level" of genesis *) 0
             else if Protocol.number migrate_to < 025 then level - applied_lag
-            else if expected_published || level <= migration_level then
-              level - applied_lag
+            else if
+              expected_published
+              || (Protocol.number migrate_from < 025 && level <= migration_level)
+              || (Protocol.number migrate_to < 025 && level > migration_level)
+            then level - applied_lag
             else level
           in
           Check.(
@@ -364,11 +354,36 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
         else if level < lag then 0
         else common_tail ()
       in
+      let expected_num_cells =
+        if Protocol.number migrate_from < 025 then expected_num_cells
+        else if level < 2 then 0
+        else if level < 2 + lag then
+          (* in 025 the first [lag] levels (after protocol activation) are not
+             attested ... *)
+          number_of_slots - 1
+        else if level = 2 + lag then
+          (* ... so at the first level at which DAL attestations are not
+             ignored, the protocol attests all published slots in the
+             attestation window *)
+          lag - 1 + number_of_slots - 1
+        else if level = migration_level + 1 then
+          (* no attestation operation for the migration level ... *)
+          number_of_slots - 1
+        else if level = migration_level + 2 then
+          (* ... so at the next level, the protocol attests one more slot than
+             it usually does *)
+          number_of_slots + 1
+        else number_of_slots
+      in
       Check.(
         (num_cells = expected_num_cells)
           int
           ~__LOC__
-          ~error_msg:"Unexpected number of cells: got %L, expected %R") ;
+          ~error_msg:
+            (let msg =
+               sf "Unexpected number of cells for attested level %d: " level
+             in
+             msg ^ ": got %L, expected %R")) ;
       let* () =
         Lwt_list.iter_s
           (fun hash_cell_tuple ->
@@ -383,6 +398,12 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
      returned" ;
   let* () = call_cells_of_level 1 in
 
+  let attested =
+    Array.make (last_confirmed_published_level - starting_level) false
+  in
+  let index_in_attested published_level =
+    published_level - starting_level - 1
+  in
   let rec call_get_metadata attested_level =
     if attested_level > last_attested_level then unit
     else
@@ -394,74 +415,72 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
         if attested_level <= migration_level then (migrate_from, dal_parameters)
         else (migrate_to, new_dal_parameters)
       in
-      let* attested =
-        match metadata.dal_attestation with
-        | None ->
-            Test.fail
-              "At attested level %d, unexpected missing slot attestability \
-               information"
-              attested_level
-        | Some str ->
-            let* decoded =
-              Dal.Slot_availability.decode
-                protocol
-                (Node.as_rpc_endpoint node)
-                params_to_use
-                str
-            in
-            return
-              (List.mapi
-                 (fun lag_index attestation_lag ->
-                   let published_level = attested_level - attestation_lag in
-                   if
-                     published_level > starting_level
-                     && published_level <= last_confirmed_published_level
-                   then
-                     let vec = decoded.(lag_index) in
-                     Array.length vec > slot_index && vec.(slot_index)
-                   else false)
-                 params_to_use.attestation_lags
-              |> List.exists Fun.id)
-      in
+      match metadata.dal_attestation with
+      | None ->
+          Test.fail
+            "At attested level %d, unexpected missing slot attestability \
+             information"
+            attested_level
+      | Some str ->
+          let* decoded =
+            Dal.Slot_availability.decode
+              protocol
+              (Node.as_rpc_endpoint node)
+              params_to_use
+              str
+          in
+          List.iteri
+            (fun lag_index attestation_lag ->
+              let published_level = attested_level - attestation_lag in
+              if
+                published_level > starting_level
+                && published_level <= last_confirmed_published_level
+              then (
+                let is_attested =
+                  Array.length decoded.(lag_index) > slot_index
+                  && decoded.(lag_index).(slot_index)
+                in
+                Log.info
+                  "For attested_level = %d, slot at published level %d is \
+                   attested? %b"
+                  attested_level
+                  published_level
+                  is_attested ;
+                if is_attested then (
+                  let idx = index_in_attested published_level in
+                  (* A slot is not declared attested twice. *)
+                  assert (attested.(idx) = false) ;
+                  attested.(idx) <- is_attested)))
+            params_to_use.attestation_lags ;
+          call_get_metadata (attested_level + 1)
+  in
+  let* () = call_get_metadata (starting_level + 1) in
+  let rec check_attested published_level =
+    if published_level > last_confirmed_published_level then unit
+    else (
+      (* We should a published slot at each level. *)
+      assert (Map_int.mem published_level commitments) ;
       (* Checks if a [level] is in the migration transition gap *)
-      let in_migration_gap level lag =
-        level > migration_level && level <= migration_level + lag
-      in
-      (* Checks if a slot at [published_level] would be attested at
-           a smaller lag before reaching the current attested_level *)
-      let already_attested_at_smaller_lag published_level current_lag =
-        List.exists
-          (fun smaller_lag ->
-            smaller_lag < current_lag
-            && not (in_migration_gap (published_level + smaller_lag) new_lag))
-          params_to_use.attestation_lags
+      let in_migration_gap published_level lag =
+        published_level + lag > migration_level
+        && published_level <= migration_level
       in
       let expected_attested =
-        if in_migration_gap attested_level new_lag then false
-        else
-          List.exists
-            (fun attestation_lag ->
-              let published_level = attested_level - attestation_lag in
-              published_level > starting_level
-              && published_level <= last_confirmed_published_level
-              && Map_int.mem published_level commitments
-              && not
-                   (already_attested_at_smaller_lag
-                      published_level
-                      attestation_lag))
-            params_to_use.attestation_lags
+        not
+          (in_migration_gap published_level lag
+          && Protocol.number migrate_from < 025)
       in
       Check.(
-        (attested = expected_attested)
+        (attested.(index_in_attested published_level) = expected_attested)
           bool
           ~__LOC__
           ~error_msg:
-            (let msg = sf "Attested at level %d: " attested_level in
+            (let msg = sf "Slot at published level %d: " published_level in
              msg ^ "got %L, expected %R")) ;
-      call_get_metadata (attested_level + 1)
+      check_attested (published_level + 1))
   in
   Log.info "Check slot availability information" ;
-  let* () = call_get_metadata (2 + lag) in
+  let* () = check_attested (starting_level + 1) in
 
   let rec call_get_commitment level =
     if level > last_confirmed_published_level then unit
@@ -494,12 +513,16 @@ let main_scenario ~__FILE__ ?(migration_level = 1) ~slot_index
     if level >= max_level then unit
     else
       let expected_status =
-        if level <= migration_level - lag then Dal_RPC.Attested lag
-        else if level == migration_level + 1 - lag then Dal_RPC.Unattested
-        else if new_lag <> lag && level <= migration_level then
-          Dal_RPC.Unattested
+        if Protocol.number migrate_from < 025 then
+          if level <= migration_level - lag then Dal_RPC.Attested lag
+          else if level == migration_level + 1 - lag then Dal_RPC.Unattested
+          else if new_lag <> lag && level <= migration_level then
+            Dal_RPC.Unattested
+          else if level <= last_confirmed_published_level then
+            Dal_RPC.Attested new_lag
+          else Dal_RPC.Unpublished
         else if level <= last_confirmed_published_level then
-          Dal_RPC.Attested new_lag
+          Dal_RPC.Attested (min lag new_lag)
         else Dal_RPC.Unpublished
       in
       let* () =
@@ -581,9 +604,8 @@ let test_skip_list_rpcs_with_migration ~__FILE__ ~migrate_from ~migrate_to
 let register ~__FILE__ ~protocols = test_skip_list_rpcs ~__FILE__ protocols
 
 let register_migration ~__FILE__ ~migrate_from ~migrate_to =
-  if not (migrate_from = Protocol.U025 && migrate_to = Protocol.Alpha) then
-    test_skip_list_rpcs_with_migration
-      ~__FILE__
-      ~migration_level:11
-      ~migrate_from
-      ~migrate_to
+  test_skip_list_rpcs_with_migration
+    ~__FILE__
+    ~migration_level:11
+    ~migrate_from
+    ~migrate_to

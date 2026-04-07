@@ -148,10 +148,6 @@ module Dal = struct
     include Dal_attestations_storage
   end
 
-  module Attestation = struct
-    include Dal_attestation_repr
-  end
-
   module Slot_availability = Dal_attestations_repr.Slot_availability
 
   type slot_id = Dal_slot_repr.Header.id = {
