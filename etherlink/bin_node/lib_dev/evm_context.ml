@@ -1222,29 +1222,44 @@ module State = struct
 
     (* TezosX: if the Tezos runtime is active, retrieve the Tezos block
        produced alongside the primary EVM block so we can store both in a
-       single INSERT. *)
+       single INSERT. Only attempt to fetch the Tezos block once the sunrise
+       level has been reached (i.e. the runtime started producing Tezos
+       blocks). *)
     let* tezosx_tez_block =
       let* runtimes =
         Durable_storage.list_runtimes (read_from_state evm_state)
       in
       if List.mem ~equal:( = ) Tezosx.Tezos runtimes then
-        let* tez_block =
-          Evm_state.retrieve_block_at_root
-            ~chain_family:Michelson
-            ~root:Durable_storage_path.tezosx_tezos_blocks_root
-            evm_state
+        let* sunrise_level =
+          Durable_storage.michelson_runtime_sunrise_level
+            (read_from_state evm_state)
         in
-        match tez_block with
-        | Some (Tez block) -> return_some block
-        | _ ->
-            if
-              Storage_version.tezosx_tezos_blocks
-                ~storage_version:ctxt.session.storage_version
-            then
-              failwith
-                "Expected to find a Tezos block alongside the EVM block, but \
-                 none was found."
-            else return_none
+        let past_sunrise =
+          match sunrise_level with
+          | None -> false
+          | Some (Ethereum_types.Qty sunrise) ->
+              let (Ethereum_types.Qty level) = block_number in
+              Z.compare level sunrise >= 0
+        in
+        if past_sunrise then
+          let* tez_block =
+            Evm_state.retrieve_block_at_root
+              ~chain_family:Michelson
+              ~root:Durable_storage_path.tezosx_tezos_blocks_root
+              evm_state
+          in
+          match tez_block with
+          | Some (Tez block) -> return_some block
+          | _ ->
+              if
+                Storage_version.tezosx_tezos_blocks
+                  ~storage_version:ctxt.session.storage_version
+              then
+                failwith
+                  "Expected to find a Tezos block alongside the EVM block, but \
+                   none was found."
+              else return_none
+        else return_none
       else return_none
     in
 
