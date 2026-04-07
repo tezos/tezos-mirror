@@ -3332,6 +3332,10 @@ let test_kernel_upgrade_activates_michelson_runtime =
     = "TezosX Tezos block 16 not found")
       string)
     ~error_msg:"Block 16 in the future should not be found, got %L" ;
+  (* Check that tez_getMichelsonActivationLevel returns the activation level. *)
+  let*@ activation_level = Rpc.tez_getMichelsonActivationLevel observer in
+  Check.((activation_level = Some 6L) (option int64))
+    ~error_msg:"Expected tez_getMichelsonActivationLevel to return %R, got %L" ;
   unit
 
 let test_sequencer_and_kernel_upgrade_via_kernel_admin =
