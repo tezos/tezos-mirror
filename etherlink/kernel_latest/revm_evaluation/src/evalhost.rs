@@ -208,11 +208,7 @@ impl WasmHost for EvalHost {
 
 impl SdkRuntime for EvalHost {}
 
-impl Logging for EvalHost {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
-    }
-}
+impl Logging for EvalHost {}
 
 // This is a blank implementation on purpose, as this is not useful for the
 // evaluation

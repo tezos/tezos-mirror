@@ -51,7 +51,6 @@ pub trait IsEvmNode {
 //    runtime.
 pub struct KernelHost<R, Host: BorrowMut<R> + Borrow<R>> {
     pub host: Host,
-    pub logs_verbosity: Level,
     pub execution_gas_used: u64,
     pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
@@ -281,7 +280,6 @@ where
     pub fn to_ref_host(&mut self) -> KernelHost<R, &mut Host> {
         KernelHost {
             host: &mut self.host,
-            logs_verbosity: self.logs_verbosity,
             execution_gas_used: self.execution_gas_used,
             is_evm_node: self.is_evm_node,
             _pd: PhantomData,
@@ -289,11 +287,7 @@ where
     }
 }
 
-impl<R, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {
-    fn verbosity(&self) -> Level {
-        self.logs_verbosity
-    }
-}
+impl<R, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {}
 
 pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
     match host.store_read(&VERBOSITY_PATH, 0, 1) {
@@ -333,10 +327,11 @@ impl<R, Host: BorrowMut<R> + Borrow<R>> IsEvmNode for KernelHost<R, Host> {
 impl<R: StorageV1, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host> {
     pub fn init(host: Host) -> Self {
         let logs_verbosity = read_logs_verbosity(host.borrow());
+        tezos_evm_logging::set_global_verbosity(logs_verbosity);
+
         let is_evm_node = evm_node_flag(host.borrow());
         Self {
             host,
-            logs_verbosity,
             execution_gas_used: 0,
             is_evm_node,
             _pd: PhantomData,
@@ -349,7 +344,6 @@ impl Default for MockKernelHost {
     fn default() -> Self {
         Self {
             host: MockHost::default(),
-            logs_verbosity: Level::default(),
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,
@@ -362,7 +356,6 @@ impl MockKernelHost {
         let host = MockHost::with_address(&address);
         KernelHost {
             host,
-            logs_verbosity: Level::default(),
             execution_gas_used: 0,
             is_evm_node: false,
             _pd: PhantomData,

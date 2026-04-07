@@ -141,11 +141,7 @@ impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Logging> Logging for SafeStorage<&mut Host> {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
-    }
-}
+impl<Host: Logging> Logging for SafeStorage<&mut Host> {}
 
 impl<Host: StorageV1> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
