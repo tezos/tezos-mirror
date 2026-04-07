@@ -1,4 +1,4 @@
-Version 24.2
+Version 24.3
 ============
 
 Changes
@@ -30,6 +30,11 @@ Octez v24.2
 Octez v24.2 fixes two minor bugs in Octez node. Notably, it addresses an issue where the node can, in some scenarios, stop processing new blocks after a peer disconnects, hence being unable to follow the chain unless restarted.
 
 If you deploy Octez v24.1 (or earlier) infrastructure, and notice your octez-node to be falling behind, we recommend upgrading to v24.2 at your earliest convenience.
+
+Octez v24.3
+~~~~~~~~~~~
+
+Octez v24.3 fixes a protocol vulnerability and strengthens defensive protections on the peer-to-peer (P2P) layer. User funds remain safe.
 
 .. _protocol_support_v24:
 
@@ -104,18 +109,19 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v24.2
+  git checkout octez-v24.3
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v24.2`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v24.3`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 24.3 <../CHANGES.html#version-24-3>`_
 - `Version 24.2 <../CHANGES.html#version-24-2>`_
 - `Version 24.1 <../CHANGES.html#version-24-1>`_
 - `Version 24.0 <../CHANGES.html#version-24-0>`_
