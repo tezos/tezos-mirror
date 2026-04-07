@@ -1102,6 +1102,7 @@ pub(crate) mod mock {
         pub operation_group_hash: OperationHash,
         pub operation_gas: crate::gas::TezlinkOperationGas,
         pub contract_account: TezlinkOriginatedAccount,
+        pub operation_counter: u128,
     }
 
     impl<'a, Host: StorageV1> MockCtx<'a, Host> {
@@ -1114,6 +1115,7 @@ pub(crate) mod mock {
                 now: 0.into(),
                 operation_group_hash: OperationHash::from([0u8; 32]),
                 operation_gas: crate::gas::TezlinkOperationGas::default(),
+                operation_counter: 0,
                 contract_account: TezlinkOriginatedAccount {
                     path: RefPath::assert_from(b"/mock").into(),
                     kt1: ContractKt1Hash::from([0u8; 20]),
@@ -1220,7 +1222,8 @@ pub(crate) mod mock {
         }
 
         fn operation_counter(&mut self) -> u128 {
-            0
+            self.operation_counter += 1;
+            self.operation_counter
         }
 
         fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
