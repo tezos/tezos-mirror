@@ -1553,46 +1553,46 @@ val get_abaab_activation_level :
 val get_chain_block_context_destination_index :
   ?chain:string -> ?block:string -> string -> int option t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/contract_hash]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/stez/contract_hash]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_clst_contract_hash :
+val get_chain_block_context_stez_contract_hash :
   ?chain:string -> ?block:string -> unit -> string t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/total_supply]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/stez/total_supply]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_clst_total_supply :
+val get_chain_block_context_stez_total_supply :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/total_amount_of_tez]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/stez/total_amount_of_tez]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_clst_total_amount_of_tez :
+val get_chain_block_context_stez_total_amount_of_tez :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/exchange_rate]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/stez/exchange_rate]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_clst_exchange_rate :
+val get_chain_block_context_stez_exchange_rate :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/clst_balance]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/stez_balance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_contract_clst_balance :
+val get_chain_block_context_contract_stez_balance :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/clst_ticket_balance]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/stez_ticket_balance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_contract_clst_ticket_balance :
+val get_chain_block_context_contract_stez_ticket_balance :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/main/blocks/head/context/raw/json/contracts/address_registry/next]

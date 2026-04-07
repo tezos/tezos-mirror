@@ -3464,18 +3464,18 @@ val signing_delay_env_var : string
 
 val fixed_seed_env_var : string
 
-(** Run [octez-client clst deposit <amount> for <source>]. *)
-val clst_deposit :
+(** Run [octez-client stez deposit <amount> for <source>]. *)
+val stez_deposit :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
 
-(** Same as [clst_deposit], but do not wait for the process to exit. *)
-val spawn_clst_deposit :
+(** Same as [stez_deposit], but do not wait for the process to exit. *)
+val spawn_stez_deposit :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t
 
-(** Run [octez-client clst redeem <amount> for <source>]. *)
-val clst_redeem :
+(** Run [octez-client stez redeem <amount> for <source>]. *)
+val stez_redeem :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
 
-(** Same as [clst_redeem], but do not wait for the process to exit. *)
-val spawn_clst_redeem :
+(** Same as [stez_redeem], but do not wait for the process to exit. *)
+val spawn_stez_redeem :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t

@@ -2121,35 +2121,35 @@ let get_chain_block_context_destination_index ?(chain = "main")
     ]
   @@ JSON.as_int_opt
 
-let get_chain_block_context_clst_contract_hash ?(chain = "main")
+let get_chain_block_context_stez_contract_hash ?(chain = "main")
     ?(block = "head") () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "clst"; "contract_hash"]
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "contract_hash"]
     JSON.as_string
 
-let get_chain_block_context_clst_total_supply ?(chain = "main")
+let get_chain_block_context_stez_total_supply ?(chain = "main")
     ?(block = "head") () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "clst"; "total_supply"]
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "total_supply"]
     Fun.id
 
-let get_chain_block_context_clst_total_amount_of_tez ?(chain = "main")
+let get_chain_block_context_stez_total_amount_of_tez ?(chain = "main")
     ?(block = "head") () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "clst"; "total_amount_of_tez"]
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "total_amount_of_tez"]
     Fun.id
 
-let get_chain_block_context_clst_exchange_rate ?(chain = "main")
+let get_chain_block_context_stez_exchange_rate ?(chain = "main")
     ?(block = "head") () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "clst"; "exchange_rate"]
+    ["chains"; chain; "blocks"; block; "context"; "stez"; "exchange_rate"]
     Fun.id
 
-let get_chain_block_context_contract_clst_balance ?(chain = "main")
+let get_chain_block_context_contract_stez_balance ?(chain = "main")
     ?(block = "head") ~id () =
   make
     GET
@@ -2161,11 +2161,11 @@ let get_chain_block_context_contract_clst_balance ?(chain = "main")
       "context";
       "contracts";
       id;
-      "clst_balance";
+      "stez_balance";
     ]
     Fun.id
 
-let get_chain_block_context_contract_clst_ticket_balance ?(chain = "main")
+let get_chain_block_context_contract_stez_ticket_balance ?(chain = "main")
     ?(block = "head") ~id () =
   make
     GET
@@ -2177,7 +2177,7 @@ let get_chain_block_context_contract_clst_ticket_balance ?(chain = "main")
       "context";
       "contracts";
       id;
-      "clst_ticket_balance";
+      "stez_ticket_balance";
     ]
     Fun.id
 

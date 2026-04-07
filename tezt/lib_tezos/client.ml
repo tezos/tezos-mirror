@@ -4914,18 +4914,18 @@ let signing_delay_env_var = "TEZOS_SIGN_DELAY_I_KNOW_WHAT_I_AM_DOING"
 
 let fixed_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"
 
-let spawn_clst_deposit ?(wait = "none") ?burn_cap amount ~src client =
+let spawn_stez_deposit ?(wait = "none") ?burn_cap amount ~src client =
   spawn_command client
-  @@ ["--wait"; wait; "clst"; "deposit"; Tez.to_string amount; "for"; src]
+  @@ ["--wait"; wait; "stez"; "deposit"; Tez.to_string amount; "for"; src]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
 
-let clst_deposit ?wait ?burn_cap amount ~src client =
-  spawn_clst_deposit ?wait ?burn_cap amount ~src client |> Process.check
+let stez_deposit ?wait ?burn_cap amount ~src client =
+  spawn_stez_deposit ?wait ?burn_cap amount ~src client |> Process.check
 
-let spawn_clst_redeem ?(wait = "none") ?burn_cap amount ~src client =
+let spawn_stez_redeem ?(wait = "none") ?burn_cap amount ~src client =
   spawn_command client
-  @@ ["--wait"; wait; "clst"; "redeem"; Tez.to_string amount; "for"; src]
+  @@ ["--wait"; wait; "stez"; "redeem"; Tez.to_string amount; "for"; src]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
 
-let clst_redeem ?wait ?burn_cap amount ~src client =
-  spawn_clst_redeem ?wait ?burn_cap amount ~src client |> Process.check
+let stez_redeem ?wait ?burn_cap amount ~src client =
+  spawn_stez_redeem ?wait ?burn_cap amount ~src client |> Process.check
