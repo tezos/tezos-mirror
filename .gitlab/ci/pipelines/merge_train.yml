@@ -252,12 +252,18 @@ images.debian:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - script-inputs/active_protocol_versions_without_number
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
     - scripts/ci/octez-packages-version.sh
     - scripts/ci/systemd-entrypoint.service
     - scripts/ci/systemd-entrypoint.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/packaging/homebrew_install.sh
@@ -304,12 +310,18 @@ images.ubuntu:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - script-inputs/active_protocol_versions_without_number
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
     - scripts/ci/octez-packages-version.sh
     - scripts/ci/systemd-entrypoint.service
     - scripts/ci/systemd-entrypoint.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/packaging/tests/tests-common.inc.sh
@@ -519,8 +531,14 @@ images.debian-build:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/version.sh
@@ -569,8 +587,14 @@ images.debian-build.merge:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/version.sh
@@ -614,8 +638,14 @@ images.ubuntu-build:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/version.sh
@@ -664,8 +694,14 @@ images.ubuntu-build.merge:
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
+    - opam/virtual/dream-httpaf.opam.locked
+    - opam/virtual/dream.opam.locked
+    - opam/virtual/octez-deps.opam.locked
+    - opam/virtual/release-tools-deps.opam.locked
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
+    - scripts/install_build_deps.rust.sh
+    - scripts/install_build_deps.sh
     - scripts/kiss-fetch.sh
     - scripts/kiss-logs.sh
     - scripts/version.sh

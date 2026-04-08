@@ -91,12 +91,19 @@ module Files = struct
   let debian_build =
     [
       "images/base-images/Dockerfile.debian-build";
-      (* scripts in Dockerfile *)
+      (* files copied in Dockerfile except Makefile as many changes to
+         it should be irrelevant to debian packages *)
       "images/scripts/install_sccache_static.sh";
       "images/scripts/install_opam_static.sh";
       "scripts/kiss-fetch.sh";
       "scripts/kiss-logs.sh";
       "scripts/version.sh";
+      "scripts/install_build_deps.sh";
+      "scripts/install_build_deps.rust.sh";
+      "opam/virtual/octez-deps.opam.locked";
+      "opam/virtual/release-tools-deps.opam.locked";
+      "opam/virtual/dream-httpaf.opam.locked";
+      "opam/virtual/dream.opam.locked";
     ]
     @ build_script
 
