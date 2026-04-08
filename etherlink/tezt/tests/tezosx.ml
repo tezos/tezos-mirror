@@ -26,11 +26,12 @@ let runtime_tags = List.map Tezosx_runtime.tag
 
 module Setup = struct
   let register_sandbox_test ?uses_client ~title ~tags ~with_runtimes
-      ?tez_bootstrap_accounts =
+      ?tez_bootstrap_accounts ?chain_id =
     Test_helpers.register_sandbox
       ~__FILE__
       ?uses_client
       ?tez_bootstrap_accounts
+      ?chain_id
       ~kernel:Latest
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
@@ -3504,6 +3505,121 @@ let test_tez_transfer =
 
   unit
 
+(** The Michelson runtime chain ID is derived from the EVM chain ID via
+    Blake2B-256 (first 4 bytes).  This test checks that the Michelson
+    runtime exposes the expected derived chain ID, acting as a
+    non-regression test for the derivation function.
+
+    Derivation: Blake2B-256(chain_id as U256 little-endian), take first
+    4 bytes, encode as Tezos Chain_id (base58check with Net prefix).
+
+    Reference values:
+    - EVM 1337  (test default) -> NetXUSADs17gHCN
+    - EVM 42793 (Etherlink mainnet) -> NetXohUVN5QWR4f *)
+let test_michelson_runtime_chain_id_derivation ~evm_chain_id ~expected_chain_id
+    () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~chain_id:evm_chain_id
+    ~title:
+      (sf
+         "Michelson runtime chain ID derivation (EVM chain ID %d)"
+         evm_chain_id)
+    ~tags:["chain_id"; "michelson"; "derivation"]
+    ~with_runtimes:[Tezos]
+  @@ fun sequencer ->
+  let* client = tezos_client sequencer in
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* chain_id =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_chain_id ()
+  in
+  Check.(
+    (chain_id = expected_chain_id)
+      string
+      ~error_msg:
+        (sf
+           "Expected Michelson runtime chain_id %%R (derived from EVM chain_id \
+            %d) but got %%L"
+           evm_chain_id)) ;
+  unit
+
+let test_michelson_chain_id_in_crac ~runtime () =
+  Setup.register_sandbox_test
+    ~uses_client:true
+    ~title:"CHAIN_ID instruction returns correct value in CRAC"
+    ~tags:["chain_id"; "michelson"; "crac"]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~with_runtimes:[runtime]
+  @@ fun sequencer ->
+  (* Step 1: Get the expected chain_id from the tezlink RPC *)
+  let* tez_client = tezos_client sequencer in
+  let* expected_b58_chain_id =
+    let endpoint =
+      Client.(
+        Foreign_endpoint
+          Endpoint.
+            {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+    in
+    Client.RPC.call ~endpoint tez_client @@ RPC.get_chain_chain_id ()
+  in
+  (* Step 2: Originate chain_id_store.tz via tezlink *)
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "chain_id_store"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"chain_id_store"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"None"
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Step 3: Call via the EVM gateway precompile (CRAC).
+     Micheline binary encoding of Unit: 0x03 (Prim, no args) 0x0b (Unit). *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let url = sf "http://tezos/%s/default" kt1_address in
+  let micheline_unit = "0x030b" in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_unit; "1"]
+      ()
+  in
+  (* Step 4: Read storage and verify chain_id matches the RPC value.
+     The RPC returns Micheline JSON: {"prim":"Some","args":[{"bytes":"..."}]}
+     Convert the hex bytes to a b58check chain_id for comparison. *)
+  let* storage_json = account_str_rpc sequencer kt1_address "storage" in
+  let stored_hex =
+    JSON.(storage_json |-> "args" |=> 0 |-> "bytes" |> as_string)
+  in
+  let stored_chain_id =
+    Hex.to_bytes (`Hex stored_hex)
+    |> Tezos_crypto.Hashed.Chain_id.of_bytes_exn
+    |> Tezos_crypto.Hashed.Chain_id.to_b58check
+  in
+  Check.(
+    (stored_chain_id = expected_b58_chain_id)
+      string
+      ~error_msg:
+        "Expected CHAIN_ID instruction to return %R but contract storage \
+         contains %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3550,4 +3666,13 @@ let () =
   test_cross_runtime_michelson_sender_is_alias [Alpha] ;
   test_alias_forwarder_forwards_to_evm [Alpha] ;
   test_alias_forwarder_created_by_evm_cross_runtime_call [Alpha] ;
-  test_tez_transfer [Alpha]
+  test_tez_transfer [Alpha] ;
+  test_michelson_runtime_chain_id_derivation
+    ~evm_chain_id:1337
+    ~expected_chain_id:"NetXUSADs17gHCN"
+    () ;
+  test_michelson_runtime_chain_id_derivation
+    ~evm_chain_id:42793
+    ~expected_chain_id:"NetXohUVN5QWR4f"
+    () ;
+  test_michelson_chain_id_in_crac ~runtime:Tezos ()

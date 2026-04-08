@@ -589,7 +589,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ?history_mode
     ?patch_config ?websockets ?(kernel = Kernel.Latest) ?evm_version
-    ?sequencer_pool_address
+    ?sequencer_pool_address ?chain_id
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
@@ -624,6 +624,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ~tez_bootstrap_accounts
       ?evm_version
       ?with_runtimes
+      ?chain_id
       ?kernel_compat:(Kernel.name_of kernel)
       ?sequencer_pool_address
       ?sequencer:
@@ -771,7 +772,7 @@ let produce_block_and_wait_for ?timestamp ~sequencer n =
 let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
     ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    ?sequencer_keys ?(regression = false) ?with_runtimes body =
+    ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id body =
   let register =
     if regression then Regression.register ?file:None
     else Test.register ?seed:None
@@ -807,6 +808,7 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
       ?sequencer_keys
       ?tez_bootstrap_accounts
       ?with_runtimes
+      ?chain_id
       ()
   in
   body sequencer

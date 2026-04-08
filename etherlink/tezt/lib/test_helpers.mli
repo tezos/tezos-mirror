@@ -310,6 +310,7 @@ val init_sequencer_sandbox :
   ?kernel:Kernel.t ->
   ?evm_version:Evm_version.t ->
   ?sequencer_pool_address:string ->
+  ?chain_id:int ->
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->
@@ -387,6 +388,7 @@ val register_sandbox :
   ?sequencer_keys:Account.key list ->
   ?regression:bool ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?chain_id:int ->
   (Evm_node.t -> unit Lwt.t) ->
   unit
 
