@@ -255,36 +255,6 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: ""
 
-oc.install_bin_debian_bookworm_systemd:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
-    images/packages/debian-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
-    PREFIX: ""
-    DISTRIBUTION: debian
-    RELEASE: bookworm
-
 oc.lintian_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
   stage: publishing_tests
@@ -462,6 +432,36 @@ oc.upgrade_bin_debian_bookworm-systemd:
   script:
   - ./scripts/ci/docker_initialize.sh
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.install_bin_debian_bookworm_systemd:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
