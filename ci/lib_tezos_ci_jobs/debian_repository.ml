@@ -238,18 +238,7 @@ let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
 
-let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
-    ?allow_failure ?before_script script =
-  job
-    ?allow_failure
-    ~__POS__
-    ~name
-    ~image
-    ~dependencies
-    ~variables
-    ~stage:Stages.publishing_tests
-    ?before_script
-    script
+let job_install_bin = job ~stage:Stages.publishing_tests
 
 let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
     ?allow_failure script =
