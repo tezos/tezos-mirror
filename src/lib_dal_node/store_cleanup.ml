@@ -63,27 +63,20 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
      because the first level the DAL node should process should be a final
      one. *)
   let target_level head_level = Int32.(sub head_level 3l) in
-  let first_level_for_skip_list_storage period level =
-    (* Note that behind this first level we do not have the plugin. *)
-    Int32.(sub level (of_int period))
-  in
-  let should_store_skip_list_cells ~head_level =
-    let profile_ctxt = Node_context.get_profile_ctxt ctxt in
-    let period =
-      Profile_manager.get_storage_period
-        profile_ctxt
-        proto_parameters
-        ~head_level
-        ~first_seen_level
-      + History_check.skip_list_offset proto_parameters
-    in
-    let first_level = first_level_for_skip_list_storage period head_level in
-    fun ~level -> level >= first_level
-  in
   let rec do_clean_up last_processed_level head_level =
     let last_level = target_level head_level in
-    let should_store_skip_list_cells =
-      should_store_skip_list_cells ~head_level
+    let first_skip_list_level =
+      let profile_ctxt = Node_context.get_profile_ctxt ctxt in
+      let period =
+        Profile_manager.get_storage_period
+          profile_ctxt
+          proto_parameters
+          ~head_level
+          ~first_seen_level
+        + History_check.skip_list_offset proto_parameters
+      in
+      (* Note that behind this first level we do not have the plugin. *)
+      Int32.(sub head_level (of_int period))
     in
     let rec clean_up_at_level level =
       if level > last_level then return_unit
@@ -92,8 +85,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
           Block_handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
-          if should_store_skip_list_cells ~level then
-            store_skip_list_cells ~level
+          if level >= first_skip_list_level then store_skip_list_cells ~level
           else return_unit
         in
         let* () =
