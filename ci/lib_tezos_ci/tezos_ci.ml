@@ -1587,7 +1587,9 @@ module Images = struct
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines
-     *)
+
+       NB: some images may use a different commit hash. Do check for
+       each image specifically to be certain. *)
     let common_version = "master-be43e621"
 
     let debian_version = common_version
