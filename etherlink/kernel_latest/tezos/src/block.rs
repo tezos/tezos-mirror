@@ -14,7 +14,7 @@ use tezos_enc::{BinError, BinWriter};
 use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Timestamp;
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct AppliedOperation {
     // OperationHash are 32 bytes long
     pub hash: OperationHash,
