@@ -443,6 +443,28 @@ let job_install_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
+let job_upgrade_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
+    pipeline_type =
+  job_install_systemd_bin
+    ~__POS__
+    ~name:"oc.upgrade_bin_debian_bookworm-systemd"
+    ~dependencies:
+      (Dependent
+         [
+           Job (job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type);
+         ])
+    ~variables:
+      (make_debian_variables
+         "debian"
+         "systemd"
+         "bookworm"
+         Tezos_ci.Images.Base_images.debian_version)
+    [
+      "./scripts/ci/systemd-packages-test.sh \
+       scripts/packaging/tests/deb/upgrade-systemd-test.sh \
+       images/packages/debian-systemd-tests.Dockerfile";
+    ]
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
@@ -480,29 +502,10 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~limit_dune_build_jobs
         ~manual
         pipeline_type;
-      job_install_systemd_bin
-        ~__POS__
-        ~name:"oc.upgrade_bin_debian_bookworm-systemd"
-        ~dependencies:
-          (Dependent
-             [
-               Job
-                 (job_apt_repo_debian
-                    ~limit_dune_build_jobs
-                    ~manual
-                    pipeline_type);
-             ])
-        ~variables:
-          (make_debian_variables
-             "debian"
-             "systemd"
-             "bookworm"
-             Tezos_ci.Images.Base_images.debian_version)
-        [
-          "./scripts/ci/systemd-packages-test.sh \
-           scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-           images/packages/debian-systemd-tests.Dockerfile";
-        ];
+      job_upgrade_bin_debian_bookworm_systemd
+        ~limit_dune_build_jobs
+        ~manual
+        pipeline_type;
     ]
   in
   let debian_jobs =
