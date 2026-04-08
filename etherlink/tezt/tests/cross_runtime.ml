@@ -3080,7 +3080,7 @@ let test_crac_gas_model_alias_caching =
 (** Fetch Tezlink block manager operations (pass 3) as a JSON list.
     Uses [/operations] (all 4 passes) and extracts index 3 (manager ops).
     [block] is a block identifier (level number or ["head"]). *)
-let _fetch_michelson_manager_ops ~block sequencer =
+let fetch_michelson_manager_ops ~block sequencer =
   let michelson_base = Evm_node.endpoint sequencer ^ "/tezlink" in
   let path = sf "/chains/main/blocks/%s/operations" block in
   let* res =
@@ -3091,7 +3091,7 @@ let _fetch_michelson_manager_ops ~block sequencer =
   return JSON.(all_passes |=> 3)
 
 (** Return the current Michelson runtime head level as a string. *)
-let _michelson_head_level sequencer =
+let michelson_head_level sequencer =
   let michelson_base = Evm_node.endpoint sequencer ^ "/tezlink" in
   let* res =
     Curl.get_raw
@@ -3105,13 +3105,13 @@ let _michelson_head_level sequencer =
 (** Fetch manager operations from the most recent non-empty Tezlink block.
     bake_until_sync may advance the head past the block containing the
     CRAC receipt, so we scan backwards from [head]. *)
-let _fetch_recent_michelson_manager_ops sequencer =
-  let* head = _michelson_head_level sequencer in
+let fetch_recent_michelson_manager_ops sequencer =
+  let* head = michelson_head_level sequencer in
   let rec find_ops level =
     if level < 1 then return (JSON.parse ~origin:"empty" "[]")
     else
       let* ops =
-        _fetch_michelson_manager_ops ~block:(string_of_int level) sequencer
+        fetch_michelson_manager_ops ~block:(string_of_int level) sequencer
       in
       let op_list = JSON.(ops |> as_list) in
       if op_list <> [] then return ops else find_ops (level - 1)
@@ -3120,7 +3120,7 @@ let _fetch_recent_michelson_manager_ops sequencer =
 
 (** Null implicit address — source of all synthetic Michelson operations
     (both CRAC and non-CRAC). *)
-let _handler_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+let handler_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 (** Enshrined Michelson gateway contract — called by Michelson contracts
     to initiate outgoing CRACs to EVM. *)
@@ -3186,7 +3186,7 @@ let _check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
     Checks source = handler, destination = [expected_destination],
     status = [expected_status], and all synthetic fields = 0.
     Returns the list of internal_operation_results from metadata. *)
-let _check_crac_top_level ~prefix ~expected_destination ~expected_status top =
+let check_crac_top_level ~prefix ~expected_destination ~expected_status top =
   let kind = JSON.(top |-> "kind" |> as_string) in
   Log.info ~prefix "top-level kind = %s" kind ;
   Check.(
@@ -3196,7 +3196,7 @@ let _check_crac_top_level ~prefix ~expected_destination ~expected_status top =
   let source = JSON.(top |-> "source" |> as_string) in
   Log.info "%s: top-level source = %s" prefix source ;
   Check.(
-    (source = _handler_address)
+    (source = handler_address)
       string
       ~error_msg:"Expected top-level source = Handler_M (%R), got %L") ;
   let destination = JSON.(top |-> "destination" |> as_string) in
@@ -3241,13 +3241,13 @@ let _check_crac_top_level ~prefix ~expected_destination ~expected_status top =
     payload = expected_crac_id.  When [expected_status] is provided,
     also checks the event result status (omit for failed CRACs where
     the event may be backtracked). *)
-let _check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
+let check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
   Check.(
     (JSON.(iop |-> "kind" |> as_string) = "event")
       string
       ~error_msg:(sf "%s: Expected event kind %%R, got %%L" prefix)) ;
   Check.(
-    (JSON.(iop |-> "source" |> as_string) = _handler_address)
+    (JSON.(iop |-> "source" |> as_string) = handler_address)
       string
       ~error_msg:
         (sf "%s: Expected event source = handler (%%R), got %%L" prefix)) ;
@@ -3270,7 +3270,7 @@ let _check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
   | None -> ()
 
 (** Verify that [iop] is a valid internal transaction with the given fields. *)
-let _check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
+let check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
     ~expected_destination ~expected_entrypoint ~expected_status iop =
   Check.(
     (JSON.(iop |-> "kind" |> as_string) = "transaction")
@@ -3297,6 +3297,344 @@ let _check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
     (JSON.(iop |-> "result" |-> "status" |> as_string) = expected_status)
       string
       ~error_msg:(sf "%s: Expected status %%R, got %%L" prefix))
+
+(* ── Receipt tests ────────────────────────────────────────────── *)
+
+(* CRAC receipt structure test — single EVM→TEZ crossing.
+ *
+ *  Per the RFC the Michelson runtime block contains a manager operation with:
+ *   - Top-level: handler → alias(E_0), synthetic fields = 0, applied
+ *   - Internal #0 (event): gateway emits "crac" tag with CRAC-ID payload
+ *   - Internal #1 (transaction): alias(E_1) → tez_runner, applied
+ *   - Further internal ops from Michelson contract execution
+ *
+ *     EVM[evm_runner] |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]
+ *)
+let test_crac_evm_to_tez_receipt =
+  register_crac_runner_test
+    ~title:"CRAC: EVM->TEZ receipt matches RFC structure"
+    ~tags:["crac_receipt"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-E2T" in
+  let* tez_runner = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_runner_kt1)) = tez_runner in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let* _ = EvmRunner.call_run evm_runner in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 manager operation, got %L") ;
+  let first_op = JSON.(ops |=> 0) in
+  let contents = JSON.(first_op |-> "contents" |> as_list) in
+  Check.((List.length contents = 1) int ~error_msg:"Expected 1 content, got %L") ;
+  let top = JSON.(first_op |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  (* RFC Example 2: 3 internal ops — event, alias→tez_runner, self-call *)
+  Check.(
+    (List.length internals = 3)
+      int
+      ~error_msg:"Expected 3 internal operations, got %L") ;
+  (* ── Internal #0: CRAC event ────────────────────────────────── *)
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  (* ── Internal #1: alias(E_1) → tez_runner (%run) ───────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:1
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_runner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: tez_runner → tez_runner (%_incrementWitness) ─ *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:2
+    ~expected_source:tez_runner_kt1
+    ~expected_destination:tez_runner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  unit
+
+(* Two EVM→TEZ CRACs from the SAME EVM transaction (RFC Example 5).
+ *
+ *  Per the RFC, the Michelson runtime block should have ONE manager operation
+ *  with at least TWO internal transactions (one per gateway call, plus
+ *  additional ops from Michelson execution) and ONE CRAC event (first).
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[bridge_1] ~CRAC~> TEZ[tez_1]
+ *     |-> EVM[bridge_2] ~CRAC~> TEZ[tez_2]
+ *)
+let test_crac_receipt_two_independent =
+  register_crac_runner_test
+    ~title:"CRAC: two EVM->TEZ from same tx produce one Michelson op"
+    ~tags:["crac_receipt"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-2IND" in
+  let* tez_1 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_1_kt1)) = tez_1 in
+  let* tez_2 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_2_kt1)) = tez_2 in
+  let* bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_1 in
+  let (`Evm_runner bridge_1_addr) = bridge_1 in
+  let* bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_2 in
+  let (`Evm_runner bridge_2_addr) = bridge_2 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(bridge_1, false); (bridge_2, false)]
+      ()
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_1_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_1_addr sequencer
+  in
+  let*@ bridge_2_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_2_addr sequencer
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_1 in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  (* RFC Example 5: 5 internal ops — event, then two pairs of
+     alias(bridge) → tez_runner (%run) + tez_runner → tez_runner
+     (%_incrementWitness), in execution order (tez_1 before tez_2). *)
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  Check.(
+    (List.length internals = 5)
+      int
+      ~error_msg:"Expected 5 internal operations (RFC Example 5), got %L") ;
+  (* ── Internal #0: CRAC event ────────────────────────────────── *)
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  (* ── Internal #1: alias(bridge_1) → tez_1 (%run) ──────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:1
+    ~expected_source:bridge_1_alias
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  (* ── Internal #2: tez_1 → tez_1 (%_incrementWitness) ──────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:2
+    ~expected_source:tez_1_kt1
+    ~expected_destination:tez_1_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(bridge_2) → tez_2 (%run) ──────────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
+    ~expected_source:bridge_2_alias
+    ~expected_destination:tez_2_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_2 → tez_2 (%_incrementWitness) ──────── *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:4
+    ~expected_source:tez_2_kt1
+    ~expected_destination:tez_2_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 4) ;
+  unit
+
+(* Two truly independent EVM→TEZ CRACs from SEPARATE EVM transactions
+ * in the same block (RFC Example 6).
+ *
+ *  Each EVM transaction gets a different tx_index → different CRAC-ID.
+ *  The Michelson runtime block should have TWO manager operations, each with its
+ *  own CRAC event and a different CRAC-ID.
+ *
+ *   EVM tx 0: EVM[runner_1] → EVM[bridge_1] ~CRAC~> TEZ[tez_1]  (CRAC-ID "1-0")
+ *   EVM tx 1: EVM[runner_2] → EVM[bridge_2] ~CRAC~> TEZ[tez_2]  (CRAC-ID "1-1")
+ *)
+let test_crac_receipt_separate_tx_two_cracs =
+  register_crac_runner_test
+    ~title:
+      "CRAC: two separate EVM txs produce two Michelson ops with different \
+       CRAC-IDs"
+    ~tags:["crac_receipt"; "crac_id"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-SEP" in
+  (* Deploy infrastructure via the wrapper (each deploy produces a block). *)
+  let* tez_1 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_1_kt1)) = tez_1 in
+  let* tez_2 = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_2_kt1)) = tez_2 in
+  let* bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_1 in
+  let (`Evm_runner bridge_1_addr) = bridge_1 in
+  let* bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_2 in
+  let (`Evm_runner bridge_2_addr) = bridge_2 in
+  let* runner_1 =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(bridge_1, false)] ()
+  in
+  let (`Evm_runner runner_1_addr) = runner_1 in
+  let* runner_2 =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(bridge_2, false)] ()
+  in
+  let (`Evm_runner runner_2_addr) = runner_2 in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_1_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_1_addr sequencer
+  in
+  let*@ bridge_2_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_2_addr sequencer
+  in
+  (* Send both run() transactions to the mempool without producing a
+     block, then produce one block so both land with different tx_index. *)
+  let* raw_tx_1 =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:(evm_nonce ())
+      ~gas:300_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:runner_1_addr
+      ~signature:"run()"
+      ~arguments:[]
+      ()
+  in
+  let*@ _tx_hash_1 = Rpc.send_raw_transaction ~raw_tx:raw_tx_1 sequencer in
+  let* raw_tx_2 =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:(evm_nonce ())
+      ~gas:300_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:runner_2_addr
+      ~signature:"run()"
+      ~arguments:[]
+      ()
+  in
+  let*@ _tx_hash_2 = Rpc.send_raw_transaction ~raw_tx:raw_tx_2 sequencer in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* Verify both Tez contracts were called *)
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_1 in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_2 in
+  (* Fetch Michelson runtime manager operations *)
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  Check.(
+    (List.length op_list = 2) int ~error_msg:"Expected 2 operations, got %L") ;
+  (* Verify each operation has correct CRAC structure:
+     event + bridge_alias → tez (%run) + tez → tez (%_incrementWitness) *)
+  let check_op ~prefix ~expected_destination ~expected_bridge_alias
+      ~expected_dest ~expected_crac_id ~nonce_offset op =
+    let top = JSON.(op |-> "contents" |=> 0) in
+    let internals =
+      check_crac_top_level
+        ~prefix
+        ~expected_destination
+        ~expected_status:"applied"
+        top
+    in
+    Check.(
+      (List.length internals = 3)
+        int
+        ~error_msg:(sf "%s: expected 3 internal operations, got %%L" prefix)) ;
+    check_crac_event
+      ~prefix
+      ~expected_crac_id
+      ~expected_status:"applied"
+      (List.nth internals 0) ;
+    (* Internal operation nonces are block-global (L1 semantics):
+       event gets nonce_offset, first tx gets nonce_offset+1, etc. *)
+    check_crac_internal_transaction
+      ~prefix
+      ~expected_nonce:(nonce_offset + 1)
+      ~expected_source:expected_bridge_alias
+      ~expected_destination:expected_dest
+      ~expected_entrypoint:"run"
+      ~expected_status:"applied"
+      (List.nth internals 1) ;
+    check_crac_internal_transaction
+      ~prefix
+      ~expected_nonce:(nonce_offset + 2)
+      ~expected_source:expected_dest
+      ~expected_destination:expected_dest
+      ~expected_entrypoint:"_incrementWitness"
+      ~expected_status:"applied"
+      (List.nth internals 2)
+  in
+  (* First operation: nonces 0,1,2 (event=0, run=1, _incrementWitness=2) *)
+  check_op
+    ~prefix:(prefix ^ "#0")
+    ~expected_destination:sender_alias
+    ~expected_bridge_alias:bridge_1_alias
+    ~expected_dest:tez_1_kt1
+    ~expected_crac_id:"1-0"
+    ~nonce_offset:0
+    JSON.(ops |=> 0) ;
+  (* Second operation: nonces continue at 3,4,5 (block-global counter) *)
+  check_op
+    ~prefix:(prefix ^ "#1")
+    ~expected_destination:sender_alias
+    ~expected_bridge_alias:bridge_2_alias
+    ~expected_dest:tez_2_kt1
+    ~expected_crac_id:"1-1"
+    ~nonce_offset:3
+    JSON.(ops |=> 1) ;
+  unit
 
 let () =
   test_crac_evm_to_tez [Alpha] ;
@@ -3349,4 +3687,7 @@ let () =
   test_crac_tez_catch_5_crossing_chain_revert [Alpha] ;
   test_crac_chained_tez_calls_behind_crac [Alpha] ;
   test_crac_nested_catches_with_multiple_reverts [Alpha] ;
-  test_crac_gas_model_alias_caching [Alpha]
+  test_crac_gas_model_alias_caching [Alpha] ;
+  test_crac_evm_to_tez_receipt [Alpha] ;
+  test_crac_receipt_two_independent [Alpha] ;
+  test_crac_receipt_separate_tx_two_cracs [Alpha]
