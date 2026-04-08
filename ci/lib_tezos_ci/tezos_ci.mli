@@ -572,8 +572,6 @@ module Images : sig
 
   val trivy : Image.t
 
-  val jsonnet : Image.t
-
   module CI : sig
     val job_docker_ci :
       Runner.Arch.t -> ?storage:Runner.Storage.t -> unit -> tezos_job
