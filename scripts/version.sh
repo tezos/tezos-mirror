@@ -100,5 +100,3 @@ export ci_image_name="${GCP_REGISTRY}/tezos/tezos/ci"
 export ci_image_name_protected="${GCP_PROTECTED_REGISTRY}/tezos/tezos/ci"
 
 export rust_toolchain_image_name="${GCP_REGISTRY}/tezos/tezos/rust-toolchain"
-
-export jsonnet_image_name="${GCP_REGISTRY}/tezos/tezos/jsonnet"

@@ -118,7 +118,6 @@ trigger:octez_monitoring:
     variables:
     - ci_image_name
     - ci_image_name_protected
-    - jsonnet_image_name
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/octez_monitoring.yml
