@@ -919,20 +919,10 @@ pub fn octez_riscv_test_output_info(output_info: OutputInfo) -> OutputInfo {
     output_info
 }
 
-// TODO: RV-922: Remove redundant type check tests when E2E testing
-// is complete
 /// Test endpoint to check argument passing between OCaml and Rust.
 #[doc(hidden)]
 #[ocaml::func]
 #[ocaml::sig("output -> output")]
 pub fn octez_riscv_test_output(output: Output) -> Output {
     output
-}
-
-/// Test endpoint to check argument passing between OCaml and Rust.
-#[doc(hidden)]
-#[ocaml::func]
-#[ocaml::sig("output list -> output list")]
-pub fn octez_riscv_test_output_list(outputs: LinkedList<Output>) -> LinkedList<Output> {
-    outputs
 }

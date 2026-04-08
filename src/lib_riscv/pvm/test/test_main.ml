@@ -62,7 +62,6 @@ let tests =
         ("Input Request type", `Quick, Test_rust_bindings.test_input_request);
         ("Output Info type", `Quick, Test_rust_bindings.test_output_info);
         ("Output type", `Quick, Test_rust_bindings.test_output);
-        ("Output list type", `Quick, Test_rust_bindings.test_output_list);
       ] );
   ]
 
