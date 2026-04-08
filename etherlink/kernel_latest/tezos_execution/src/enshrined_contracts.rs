@@ -161,6 +161,22 @@ where
                     .cast_and_consume_milligas(consumed_milligas)
                     .map_err(|_| TransferError::OutOfGas)?;
                 Ok(())
+            } else if entrypoint.as_str() == "collect_result" {
+                // %collect_result allows a Michelson adapter to deposit
+                // a result payload into the current CRAC frame so the
+                // kernel can return it as the HTTP response body to
+                // the EVM gateway, giving EVM callers a synchronous
+                // return value.
+                //
+                // For now we accept the bytes but discard them.
+                // Storing the value in the CRAC frame is handled in a
+                // follow-up issue.
+                let TypedValue::Bytes(_payload) = typed else {
+                    return Err(TransferError::GatewayError(
+                        "Expected bytes for collect_result entrypoint".into(),
+                    ));
+                };
+                Ok(())
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
@@ -764,6 +780,12 @@ pub(crate) fn get_enshrined_contract_entrypoint(
                     ),
                 ),
             );
+            // %collect_result: bytes
+            //   Raw bytes payload to return to the EVM caller via the
+            //   current CRAC frame.  Actual storage in the frame is
+            //   handled in a follow-up issue; for now we accept and
+            //   discard the value.
+            entrypoints.insert(Entrypoint::try_from("collect_result").ok()?, Type::Bytes);
             Some(entrypoints)
         }
         EnshrinedContracts::ERC20Wrapper => {
@@ -1656,5 +1678,90 @@ mod tests {
             err.to_string().contains("Invalid parameters"),
             "error should mention invalid parameters: {err}"
         );
+    }
+
+    // --- %collect_result entrypoint ---
+
+    #[test]
+    fn test_gateway_has_collect_result_entrypoint() {
+        let entrypoints =
+            get_enshrined_contract_entrypoint(EnshrinedContracts::TezosXGateway).unwrap();
+        let ep = Entrypoint::try_from("collect_result").unwrap();
+        assert!(entrypoints.contains_key(&ep));
+        assert_eq!(entrypoints[&ep], Type::Bytes);
+    }
+
+    #[test]
+    fn test_collect_result_typechecks_bytes() {
+        let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
+        let result = typecheck_entrypoint_value(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            &value,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_collect_result_rejects_non_bytes() {
+        let value = Micheline::String("not bytes".to_string());
+        let result = typecheck_entrypoint_value(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            &value,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_collect_result_execute_succeeds() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+
+        let mut journal = TezosXJournal::default();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let value = Micheline::Bytes(vec![0xCA, 0xFE]);
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            value,
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_ok());
+        // No serve calls should have been made — this is a no-op for now
+        assert!(registry.serve_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_collect_result_execute_empty_bytes() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+
+        let mut journal = TezosXJournal::default();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let value = Micheline::Bytes(vec![]);
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            value,
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_ok());
     }
 }
