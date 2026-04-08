@@ -6385,7 +6385,12 @@ mod tests {
                 &arena,
                 mir::lexer::Prim::Pair,
                 Micheline::String("store(uint256)".to_string()),
-                Micheline::Bytes(vec![0u8; 32]),
+                Micheline::prim2(
+                    &arena,
+                    mir::lexer::Prim::Pair,
+                    Micheline::Bytes(vec![0u8; 32]),
+                    Micheline::prim0(mir::lexer::Prim::None),
+                ),
             ),
         );
 

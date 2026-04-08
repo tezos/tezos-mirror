@@ -29,16 +29,19 @@ code
         DUP ; CDR ;
         # destination : storage
         DIP { PUSH @gateway address "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw" ;
-              CONTRACT %call_evm (pair string (pair string bytes)) ;
+              CONTRACT %call_evm (pair string (pair string (pair bytes (option (contract bytes))))) ;
               ASSERT_SOME } ;
         # destination : (contract %call_evm ...) : storage
+        NONE (contract bytes) ;
         PUSH bytes 0x ;
+        PAIR ;
+        # (pair 0x None) : destination : (contract ...) : storage
         PUSH string "run()" ;
         PAIR ;
-        # (pair "run()" 0x) : destination : (contract ...) : storage
+        # (pair "run()" (pair 0x None)) : destination : (contract ...) : storage
         SWAP ;
         PAIR ;
-        # Pair destination (Pair "run()" 0x) : (contract ...) : storage
+        # Pair destination (Pair "run()" (Pair 0x None)) : (contract ...) : storage
         AMOUNT ; SWAP ;
         # param : amount : (contract ...) : storage
         TRANSFER_TOKENS ;
