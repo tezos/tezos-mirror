@@ -647,10 +647,11 @@ mod tests {
             &EnshrinedContracts::TezosXGateway.address_hash_bytes(),
         );
         let decoded = decode_result(&result).expect("gateway has entrypoints");
-        assert_eq!(decoded.len(), 3);
+        assert_eq!(decoded.len(), 4);
         assert!(decoded.contains_key("default"));
         assert!(decoded.contains_key("call"));
         assert!(decoded.contains_key("call_evm"));
+        assert!(decoded.contains_key("collect_result"));
     }
 
     #[test]

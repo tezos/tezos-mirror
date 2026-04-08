@@ -1,5 +1,11 @@
 {
   "entrypoints": {
+    "default": {
+      "prim": "string"
+    },
+    "collect_result": {
+      "prim": "bytes"
+    },
     "call": {
       "prim": "pair",
       "args": [
@@ -69,9 +75,6 @@
           ]
         }
       ]
-    },
-    "default": {
-      "prim": "string"
     }
   }
 }
