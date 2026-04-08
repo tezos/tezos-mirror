@@ -169,38 +169,39 @@ let job_build_data_packages ~manual : tezos_job =
       "./scripts/ci/build-debian-packages.sh zcash";
     ]
 
+(* These jobs build the packages in a matrix using the
+   build dependencies images *)
+let job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type :
+    tezos_job =
+  make_job_build_packages
+    ~__POS__
+    ~name:"oc.build-debian"
+    ~distribution:"debian"
+    ~dependencies:(Dependent [])
+    ~script:"./scripts/ci/build-debian-packages.sh binaries"
+    ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
+    ~limit_dune_build_jobs
+    ~manual
+    ()
+
+let job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type :
+    tezos_job =
+  make_job_build_packages
+    ~__POS__
+    ~name:"oc.build-ubuntu"
+    ~distribution:"ubuntu"
+    ~dependencies:(Dependent [])
+    ~script:"./scripts/ci/build-debian-packages.sh binaries"
+    ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
+    ~limit_dune_build_jobs
+    ~manual
+    ()
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  (* These jobs build the packages in a matrix using the
-     build dependencies images *)
-  let job_build_debian_package : tezos_job =
-    make_job_build_packages
-      ~__POS__
-      ~name:"oc.build-debian"
-      ~distribution:"debian"
-      ~dependencies:(Dependent [])
-      ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
-      ~limit_dune_build_jobs
-      ~manual
-      ()
-  in
-  let job_build_ubuntu_package : tezos_job =
-    make_job_build_packages
-      ~__POS__
-      ~name:"oc.build-ubuntu"
-      ~distribution:"ubuntu"
-      ~dependencies:(Dependent [])
-      ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
-      ~limit_dune_build_jobs
-      ~manual
-      ()
-  in
-
   (* These jobs create the apt repository for the packages *)
   let job_apt_repo_debian =
     make_job_apt_repo
@@ -210,7 +211,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~dependencies:
         (Dependent
            [
-             Artifacts job_build_debian_package;
+             Artifacts
+               (job_build_debian_package
+                  ~limit_dune_build_jobs
+                  ~manual
+                  pipeline_type);
              Artifacts (job_build_data_packages ~manual);
            ])
       ~variables:(Common.Packaging.archs_variables pipeline_type)
@@ -226,7 +231,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~dependencies:
         (Dependent
            [
-             Artifacts job_build_ubuntu_package;
+             Artifacts
+               (job_build_ubuntu_package
+                  ~limit_dune_build_jobs
+                  ~manual
+                  pipeline_type);
              Artifacts (job_build_data_packages ~manual);
            ])
       ~variables:(Common.Packaging.archs_variables pipeline_type)
@@ -287,7 +296,15 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_lintian
         ~__POS__
         ~name:"oc.lintian_ubuntu"
-        ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
+        ~dependencies:
+          (Dependent
+             [
+               Artifacts
+                 (job_build_ubuntu_package
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~image:Images.Base_images.ubuntu_24_04
         ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"];
       job_install_bin
@@ -356,7 +373,15 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_lintian
         ~__POS__
         ~name:"oc.lintian_debian"
-        ~dependencies:(Dependent [Artifacts job_build_debian_package])
+        ~dependencies:
+          (Dependent
+             [
+               Artifacts
+                 (job_build_debian_package
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~image:Images.Base_images.debian_bookworm
         ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
@@ -400,12 +425,17 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   in
   let debian_jobs =
     [
-      job_build_debian_package;
+      job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type;
       job_build_data_packages ~manual;
       job_apt_repo_debian;
     ]
   in
-  let ubuntu_jobs = [job_build_ubuntu_package; job_apt_repo_ubuntu] in
+  let ubuntu_jobs =
+    [
+      job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type;
+      job_apt_repo_ubuntu;
+    ]
+  in
   match pipeline_type with
   | Partial -> debian_jobs @ test_debian_packages_jobs
   | Full ->
