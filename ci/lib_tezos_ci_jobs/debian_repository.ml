@@ -263,49 +263,68 @@ let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
     ~stage:Stages.publishing_tests
     script
 
+let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
+    ?allow_failure script =
+  job
+    ?allow_failure
+    ~__POS__
+    ~name
+    ~image
+    ~dependencies
+    ~stage:Stages.publishing_tests
+    ~variables
+    ~before_script:
+      (Common.Helpers.before_script
+         ~source_version:true
+         [
+           "export DEBIAN_FRONTEND=noninteractive";
+           "apt-get update";
+           "apt-get install lintian parallel -y";
+         ])
+    script
+
+let job_lintian_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
+  job_lintian
+    ~__POS__
+    ~name:"oc.lintian_ubuntu"
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts
+             (job_build_ubuntu_package
+                ~limit_dune_build_jobs
+                ~manual
+                pipeline_type);
+         ])
+    ~image:Images.Base_images.ubuntu_24_04
+    ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"]
+
+let job_lintian_debian ~limit_dune_build_jobs ~manual pipeline_type =
+  job_lintian
+    ~__POS__
+    ~name:"oc.lintian_debian"
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts
+             (job_build_debian_package
+                ~limit_dune_build_jobs
+                ~manual
+                pipeline_type);
+         ])
+    ~image:Images.Base_images.debian_bookworm
+    ["./scripts/ci/lintian_debian_packages.sh debian bookworm"]
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
-      ?allow_failure script =
-    job
-      ?allow_failure
-      ~__POS__
-      ~name
-      ~image
-      ~dependencies
-      ~stage:Stages.publishing_tests
-      ~variables
-      ~before_script:
-        (Common.Helpers.before_script
-           ~source_version:true
-           [
-             "export DEBIAN_FRONTEND=noninteractive";
-             "apt-get update";
-             "apt-get install lintian parallel -y";
-           ])
-      script
-  in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
        are built and tested in the scheduled pipelines*)
     [
-      job_lintian
-        ~__POS__
-        ~name:"oc.lintian_ubuntu"
-        ~dependencies:
-          (Dependent
-             [
-               Artifacts
-                 (job_build_ubuntu_package
-                    ~limit_dune_build_jobs
-                    ~manual
-                    pipeline_type);
-             ])
-        ~image:Images.Base_images.ubuntu_24_04
-        ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"];
+      job_lintian_ubuntu ~limit_dune_build_jobs ~manual pipeline_type;
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_22_04"
@@ -409,20 +428,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   in
   let test_debian_packages_jobs =
     [
-      job_lintian
-        ~__POS__
-        ~name:"oc.lintian_debian"
-        ~dependencies:
-          (Dependent
-             [
-               Artifacts
-                 (job_build_debian_package
-                    ~limit_dune_build_jobs
-                    ~manual
-                    pipeline_type);
-             ])
-        ~image:Images.Base_images.debian_bookworm
-        ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
+      job_lintian_debian ~limit_dune_build_jobs ~manual pipeline_type;
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
