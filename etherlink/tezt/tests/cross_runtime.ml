@@ -4040,6 +4040,337 @@ let test_crac_receipt_evm_tez_evm_tez =
   in
   unit
 
+(* CRAC revert receipt — RFC Example 4.
+ *
+ *  When the TEZ callee reverts, the Michelson block should still contain
+ *  a manager operation with status "failed" and internal operations
+ *  (including the CRAC event as first internal op).
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_reverter] → REVERT
+ *)
+let test_crac_receipt_evm_to_tez_revert =
+  register_crac_runner_test
+    ~title:"CRAC: EVM->TEZ revert produces failed receipt"
+    ~tags:["crac_receipt"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-REV" in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_kt1)) = tez_reverter in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let* _ = EvmRunner.call_run ~expected_status:false evm_main in
+  (* Counters stay at 0 — execution was reverted *)
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:0 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  (* ── Michelson runtime side: failed receipt ──────────────────── *)
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let first_op = JSON.(ops |=> 0) in
+  let contents = JSON.(first_op |-> "contents" |> as_list) in
+  Check.((List.length contents = 1) int ~error_msg:"Expected 1 content, got %L") ;
+  let top = JSON.(first_op |-> "contents" |=> 0) in
+  (* RFC §"Incoming CRAC with backtracking": failed CRAC should carry
+     internal operations with backtracked / failed / skipped statuses
+     so indexers can see what was attempted before the failure. *)
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"failed"
+      top
+  in
+  (* 3 internal ops: CRAC event + alias→reverter call + reverter's
+     internal _revert call (RFC Example 4: all sub-calls are shown) *)
+  Check.(
+    (List.length internals = 3)
+      int
+      ~error_msg:"Expected 3 internal operations, got %L") ;
+  (* ── Internal #0: CRAC event (always emitted, even on failure;
+     status is "backtracked" because the downstream transfer
+     failed — matching real Tezos protocol backtracking semantics) ── *)
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected_status:"backtracked"
+    (List.nth internals 0) ;
+  (* ── Internal #1: alias(E_bridge) → tez_reverter (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:1
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"failed"
+    (List.nth internals 1) ;
+  (* ── Internal #2: tez_reverter → tez_reverter (%_revert) — failed
+     The reverter contract's internal call that triggers the failure. *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:2
+    ~expected_source:tez_reverter_kt1
+    ~expected_destination:tez_reverter_kt1
+    ~expected_entrypoint:"_revert"
+    ~expected_status:"failed"
+    (List.nth internals 2) ;
+  unit
+
+(* CRAC at tx_index > 0: inject a dummy ETH transfer into the mempool
+ * before the CRAC tx, so both land in the same block and the CRAC tx
+ * gets tx_index = 1 → CRAC-ID = "1-1".
+ *
+ *   [dummy ETH transfer]  (tx_index 0)
+ *   EVM[evm_runner] |-> EVM[evm_bridge] ~CRAC~> TEZ[tez_runner]  (tx_index 1)
+ *)
+let test_crac_receipt_evm_not_first_tx =
+  register_crac_runner_test
+    ~title:"CRAC: EVM->TEZ CRAC-ID reflects tx_index > 0"
+    ~tags:["crac_receipt"; "crac_id"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-IDX" in
+  let* tez_runner = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_runner_kt1)) = tez_runner in
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner in
+  let (`Evm_runner evm_bridge_addr) = evm_bridge in
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ evm_bridge_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress evm_bridge_addr sequencer
+  in
+  (* Inject a dummy ETH transfer into the mempool (no block produced).
+     We use bootstrap_accounts.(1) as sender to avoid nonce conflicts
+     with the main sender (bootstrap_accounts.(0)). *)
+  let dummy_sender = Eth_account.bootstrap_accounts.(1) in
+  let* raw_dummy =
+    Cast.craft_tx
+      ~source_private_key:dummy_sender.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:21_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:dummy_sender.address
+      ()
+  in
+  let*@ _dummy_hash = Rpc.send_raw_transaction ~raw_tx:raw_dummy sequencer in
+  (* Now call_run which sends the CRAC tx and produces a block.
+     Both the dummy and CRAC tx land in the same block. *)
+  let* _ = EvmRunner.call_run evm_runner in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  (* Verify the CRAC-ID has tx_index > 0 *)
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Check.(
+    (List.length op_list = 1) int ~error_msg:"Expected 1 Michelson op, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  (* Same structure as simple EVM→TEZ: 3 internal ops *)
+  Check.(
+    (List.length internals = 3)
+      int
+      ~error_msg:"Expected 3 internal operations, got %L") ;
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-1"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:1
+    ~expected_source:evm_bridge_alias
+    ~expected_destination:tez_runner_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"applied"
+    (List.nth internals 1) ;
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:2
+    ~expected_source:tez_runner_kt1
+    ~expected_destination:tez_runner_kt1
+    ~expected_entrypoint:"_incrementWitness"
+    ~expected_status:"applied"
+    (List.nth internals 2) ;
+  unit
+
+(* TEZ→EVM CRAC at tx_index > 0: inject a dummy Michelson transfer and
+ * the CRAC call into the same block via the Tezlink RPC, so the
+ * dummy occupies Michelson tx_index 0 and the CRAC gets tx_index 1 →
+ * CRAC-ID = "0-1".
+ *
+ * The kernel computes the fake EVM transaction hash as:
+ *   keccak256("CRAC-TX" || block_number_be256 || crac_id_string)
+ * Since there is no "crac" event on the Michelson runtime side for TEZ-originated
+ * CRACs (origin_runtime = 0), we verify the CRAC-ID by matching the
+ * fake transaction hash in the EVM block.
+ *
+ *   TEZ[dummy transfer]   (Michelson tx_index 0)
+ *   TEZ[tez_runner] |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_runner]  (Michelson tx_index 1)
+ *)
+let test_crac_receipt_tez_not_first_tx =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ->EVM CRAC-ID reflects tx_index > 0"
+    ~tags:["crac_receipt"; "crac_id"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-TIDX" in
+  let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  (* Create a Tezlink client for direct L2 Michelson injection. *)
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+  (* Inject a dummy Michelson transfer into the mempool (no block produced).
+     Per the RFC, CRAC-ID tx_index is per-runtime, so this dummy
+     Michelson tx occupies tx_index 0 in the Michelson block. *)
+  let* dummy_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter:(tez_counter ())
+            ~gas_limit:100_000
+            ~storage_limit:1000
+            ~source
+            (transfer ~amount:0 ());
+        ])
+      client
+  in
+  let* _dummy_hash = Operation.inject ~dont_wait:true dummy_op client_tezlink in
+  (* Inject the CRAC call into the mempool (no block produced yet). *)
+  let (`Tez_runner (_, dest)) = tez_runner in
+  let* arg = Client.convert_data_to_json ~data:"Unit" client in
+  let* crac_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter:(tez_counter ())
+            ~gas_limit:100_000
+            ~storage_limit:1000
+            ~source
+            (call ~dest ~arg ~entrypoint:"run" ~amount:0 ());
+        ])
+      client
+  in
+  let* _crac_hash = Operation.inject ~dont_wait:true crac_op client_tezlink in
+  (* Produce one block containing both Michelson transactions. *)
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  (* Verify the fake CRAC tx hash matches CRAC-ID "0-1". *)
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-1" block ;
+  unit
+
+(* Mixed block: one EVM tx (tx_index 0) followed by one TezosDelayed
+ * that CRACs into EVM (tx_index 1 globally, but michelson_index 0).
+ *
+ * Verifies that the CRAC-ID for the Tezos-originated CRAC uses the
+ * per-runtime Michelson index (0), not the global EVM index (1).
+ *
+ *   EVM[dummy self-transfer]   (EVM tx_index 0)
+ *   TEZ[tez_runner] |-> TEZ[tez_bridge] ~CRAC~> EVM[evm_inner]
+ *       (Michelson tx_index 0 → CRAC-ID "0-0")
+ *)
+let test_crac_receipt_evm_then_tez_same_block =
+  register_crac_runner_test
+    ~title:
+      "CRAC: EVM tx before TEZ->EVM in same block — CRAC-ID uses \
+       michelson_index"
+    ~tags:["crac_receipt"; "crac_id"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-MIX" in
+  (* Deploy TEZ→EVM CRAC chain *)
+  let* evm_inner = EvmMultiRunCaller.deploy_and_init () in
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_inner in
+  let* tez_runner = TezMultiRunCaller.originate ~callees:[tez_bridge] () in
+  (* Step 1: Craft a dummy EVM self-transfer and send to mempool
+     (no block produced yet).  Use bootstrap_accounts.(1) to avoid
+     nonce conflicts with the main sender. *)
+  let dummy_sender = Eth_account.bootstrap_accounts.(1) in
+  let* raw_dummy =
+    Cast.craft_tx
+      ~source_private_key:dummy_sender.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas:21_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:dummy_sender.address
+      ()
+  in
+  let*@ _dummy_hash = Rpc.send_raw_transaction ~raw_tx:raw_dummy sequencer in
+  (* Step 2: Inject the TEZ→EVM CRAC call via the Tezlink RPC
+     (no block produced yet). *)
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+  let (`Tez_runner (_, tez_runner_dest)) = tez_runner in
+  let* arg = Client.convert_data_to_json ~data:"Unit" client in
+  let* crac_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter:(tez_counter ())
+            ~gas_limit:100_000
+            ~storage_limit:1000
+            ~source
+            (call ~dest:tez_runner_dest ~arg ~entrypoint:"run" ~amount:0 ());
+        ])
+      client
+  in
+  let* _crac_hash = Operation.inject ~dont_wait:true crac_op client_tezlink in
+  (* Step 3: Produce one block containing both transactions. *)
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_inner in
+  (* Step 4: Verify the fake CRAC tx hash matches CRAC-ID "0-0".
+     The Tezos operation is the FIRST (and only) Michelson operation
+     in the block, so michelson_index = 0 → CRAC-ID "0-0".
+     The global EVM index of this transaction is 1 (after the dummy
+     EVM tx at index 0), but the CRAC-ID must use the per-runtime index.
+     The block contains 2 transactions: the dummy EVM tx and the fake CRAC tx. *)
+  let* block =
+    check_evm_block_tx_count ~prefix ~expected_tx_count:2 sequencer
+  in
+  check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -4097,4 +4428,8 @@ let () =
   test_crac_receipt_separate_tx_two_cracs [Alpha] ;
   test_crac_receipt_evm_tez_evm [Alpha] ;
   test_crac_receipt_tez_evm_tez [Alpha] ;
-  test_crac_receipt_evm_tez_evm_tez [Alpha]
+  test_crac_receipt_evm_tez_evm_tez [Alpha] ;
+  test_crac_receipt_evm_to_tez_revert [Alpha] ;
+  test_crac_receipt_evm_not_first_tx [Alpha] ;
+  test_crac_receipt_tez_not_first_tx [Alpha] ;
+  test_crac_receipt_evm_then_tez_same_block [Alpha]
