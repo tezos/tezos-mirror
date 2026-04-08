@@ -3126,6 +3126,62 @@ let _handler_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
     to initiate outgoing CRACs to EVM. *)
 let _gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
 
+(** Fetch the latest EVM block, verify it has [expected_tx_count] transactions,
+    and return the block.  Uses [prefix] for log messages. *)
+let _check_evm_block_tx_count ~prefix ~expected_tx_count sequencer =
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_count =
+    match block.transactions with
+    | Block.Hash txs -> List.length txs
+    | Block.Full txs -> List.length txs
+    | Block.Empty -> 0
+  in
+  Log.info "%s: EVM block %ld has %d tx(s)" prefix block.number tx_count ;
+  Check.(
+    (tx_count = expected_tx_count)
+      int
+      ~error_msg:"Expected %R EVM transaction(s), got %L") ;
+  return block
+
+(** Compute the expected fake CRAC transaction hash for a given [crac_id]
+    and [block_number], then verify it is present in the block's tx hashes.
+    The kernel computes: hash = keccak256("CRAC-TX" || block_number_be256 || crac_id). *)
+let _check_fake_crac_tx_hash ~prefix ~expected_crac_id (block : Block.t) =
+  let block_number_be256 =
+    let buf = Bytes.make 32 '\000' in
+    Bytes.set_int64_be buf 24 (Int64.of_int32 block.number) ;
+    buf
+  in
+  let expected_hash_bytes =
+    Tezos_crypto.Hacl.Hash.Keccak_256.digest
+      (Bytes.cat
+         (Bytes.cat (Bytes.of_string "CRAC-TX") block_number_be256)
+         (Bytes.of_string expected_crac_id))
+  in
+  let expected_hash = "0x" ^ (Hex.of_bytes expected_hash_bytes |> Hex.show) in
+  Log.info
+    "%s: expected fake tx hash for CRAC-ID %s = %s"
+    prefix
+    expected_crac_id
+    expected_hash ;
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hs -> List.map String.lowercase_ascii hs
+    | Block.Full txs ->
+        List.map
+          (fun (tx : Transaction.transaction_object) ->
+            String.lowercase_ascii tx.hash)
+          txs
+    | Block.Empty -> []
+  in
+  Check.is_true
+    (List.mem expected_hash tx_hashes)
+    ~error_msg:
+      (sf
+         "%s: Expected fake CRAC tx hash (CRAC-ID %s) in EVM block tx hashes"
+         prefix
+         expected_crac_id)
+
 (** Verify that [top] is a valid CRAC top-level content item per the RFC.
     Checks source = handler, destination = [expected_destination],
     status = [expected_status], and all synthetic fields = 0.
