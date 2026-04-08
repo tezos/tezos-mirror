@@ -60,7 +60,7 @@ let clean_up_store ctxt ~from_level ~to_level proto_parameters =
    [target_level] is the level at which we connect the P2P and switch to
    processing blocks in sync with the L1. [target_level] is set to [head_level -
    3]. It also inserts skip list cells if needed in the period [head_level -
-   storage_level].
+   storage_period].
 
    FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
    We don't call [may_add_plugin], so there is a chance the plugin changes
