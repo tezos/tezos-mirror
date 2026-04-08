@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::storage::StorageV1;
-use tezos_tezlink::operation_result::TransferError;
+use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
 use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
     gas::convert as convert_gas, CrossRuntimeContext, Registry, RuntimeId,
@@ -281,7 +281,40 @@ fn extract_callback(
     }
 }
 
-/// Extract (destination, method_signature, abi_parameters, callback) from a typed
+/// Drain re-entrant CRAC receipts that accumulated since `watermark`.
+///
+/// After each internal operation that may have triggered a cross-runtime
+/// call (e.g. a gateway call that re-entered Michelson), this function
+/// drains the CRAC receipts that were pushed since the watermark and
+/// collects their non-Event internal operation results, preserving
+/// execution order (RFC Example 8).
+pub(crate) fn drain_reentrant_crac_ops(
+    journal: &mut TezosXJournal,
+    watermark: usize,
+) -> Vec<InternalOperationSum> {
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    let receipts: Vec<_> = journal
+        .michelson
+        .pending_crac_receipts
+        .drain(watermark..)
+        .collect();
+    let mut ops = Vec::new();
+    for receipt in receipts {
+        let OperationDataAndMetadata::OperationWithMetadata(batch) =
+            receipt.op_and_receipt;
+        for op in batch.operations {
+            if let OperationResultSum::Transfer(result) = op.receipt {
+                ops.extend(
+                    result
+                        .internal_operation_results
+                        .into_iter()
+                        .filter(|iop| !matches!(iop, InternalOperationSum::Event(_))),
+                );
+            }
+        }
+    }
+    ops
+}
 /// Pair(String, Pair(String, Pair(Bytes, Option(Contract(Bytes))))) value.
 fn extract_call_params(
     typed: TypedValue<'_>,

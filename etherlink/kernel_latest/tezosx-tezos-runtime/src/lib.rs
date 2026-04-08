@@ -168,6 +168,8 @@ where
     };
     let parser = mir::parser::Parser::new();
 
+    // TODO: thread block-global nonce counter from the caller.
+    let mut nonce_counter: u16 = 0;
     let result = cross_runtime_transfer(
         &mut tc_ctx,
         &mut operation_ctx,
@@ -178,9 +180,10 @@ where
         &parsed.destination,
         &parameters,
         &parser,
+        &mut nonce_counter,
     )
-    .map(|s| s.into())
-    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()));
+    .map(|s| s.target.into())
+    .map_err(|e| TezosXRuntimeError::Custom(format!("{:?}", e.error)));
 
     *consumed_milligas = gas
         .get_and_reset_milligas_consumed()

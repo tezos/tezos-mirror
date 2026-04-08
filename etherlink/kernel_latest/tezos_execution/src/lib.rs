@@ -275,6 +275,7 @@ fn execute_internal_operations<'a, Host, C: Context>(
     sender_account: &C::OriginatedAccountType,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    nonce_counter: &mut u16,
 ) -> Result<(), ApplyOperationError>
 where
     Host: StorageV1,
@@ -291,11 +292,12 @@ where
             Debug,
             "Executing internal operation {operation:?} with counter {counter:?}"
         );
-        let nonce = counter
-            .try_into()
-            .map_err(|err: std::num::TryFromIntError| {
-                ApplyOperationError::InternalOperationNonceOverflow(err.to_string())
-            })?;
+        // Assign operation-local nonces; block-sequential nonces are
+        // assigned at block finalization by renumber_nonces().
+        let nonce = *nonce_counter;
+        *nonce_counter = nonce_counter.saturating_add(1);
+        let receipts_before = all_internal_receipts.len();
+        let crac_receipts_before = journal.michelson.pending_crac_receipts.len();
         let internal_receipt = match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
@@ -326,7 +328,6 @@ where
                         result: ContentResult::Skipped,
                     })
                 } else {
-                    let receipts_before = all_internal_receipts.len();
                     let receipt = transfer(
                         tc_ctx,
                         operation_ctx,
@@ -340,6 +341,7 @@ where
                         parser,
                         all_internal_receipts,
                         false,
+                        nonce_counter,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -479,7 +481,21 @@ where
             }
         };
         log!(Debug, "Internal operation executed successfully");
-        all_internal_receipts.push(internal_receipt);
+        // Insert the parent receipt BEFORE its children so the flat
+        // list follows DFS order: parent op, then its sub-ops.
+        // `receipts_before` was captured before `transfer()` added the
+        // child receipts, so inserting at that index puts the parent
+        // receipt in the correct position.
+        all_internal_receipts.insert(receipts_before, internal_receipt);
+        // Drain any re-entrant CRAC ops that accumulated during this
+        // operation's execution (e.g. a gateway call that re-entered
+        // Michelson).  Placing the drain here — right after the gateway
+        // receipt — preserves execution order (RFC Example 8).
+        let reentrant_ops = crate::enshrined_contracts::drain_reentrant_crac_ops(
+            journal,
+            crac_receipts_before,
+        );
+        all_internal_receipts.extend(reentrant_ops);
     }
     if let Some(index) = failed {
         log!(
@@ -513,6 +529,7 @@ fn transfer<'a, Host, C: Context>(
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     skip_sender_debit: bool,
+    nonce_counter: &mut u16,
 ) -> Result<TransferSuccess, TransferError>
 where
     Host: StorageV1,
@@ -589,9 +606,10 @@ where
                 exec_ctx,
                 operation_ctx,
             };
-            let (internal_operations, new_storage) = execute_smart_contract(
+            let exec_result = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx, registry, journal,
             )?;
+            let new_storage = exec_result.storage;
             dest_account
                 .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
@@ -611,14 +629,18 @@ where
                 ctx.operation_ctx,
                 registry,
                 journal,
-                internal_operations,
+                exec_result.internal_operations,
                 &dest_account,
                 parser,
                 all_internal_receipts,
+                nonce_counter,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
+            // Append any pre-built internal operations (e.g. from
+            // enshrined gateway contracts).
+            all_internal_receipts.extend(exec_result.prebuilt_receipts);
             log!(Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: if new_storage.is_empty() {
@@ -684,6 +706,7 @@ fn transfer_external<'a, Host, C: Context>(
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
+    nonce_counter: &mut u16,
 ) -> Result<TransferTarget, TransferError>
 where
     Host: StorageV1,
@@ -708,12 +731,39 @@ where
         parser,
         all_internal_receipts,
         false, // external operations always debit the sender
+        nonce_counter,
     )
     .map(Into::into)
 }
 
 fn gw<E: ToString>(e: E) -> TransferError {
     TransferError::GatewayError(e.to_string())
+}
+
+/// Result of a cross-runtime transfer, carrying both the transfer
+/// outcome and any internal operation receipts produced during
+/// Michelson execution (e.g. sub-transfers, originations, events).
+pub struct CrossRuntimeTransferResult {
+    pub target: TransferTarget,
+    pub internal_receipts: Vec<InternalOperationSum>,
+}
+
+/// Error from [`cross_runtime_transfer`], carrying both the transfer
+/// error and any partial internal operation receipts that were
+/// collected before the failure (RFC Example 4: backtracked / failed /
+/// skipped statuses).
+pub struct CracTransferError {
+    pub error: TransferError,
+    pub internal_receipts: Vec<InternalOperationSum>,
+}
+
+impl From<TransferError> for CracTransferError {
+    fn from(error: TransferError) -> Self {
+        Self {
+            error,
+            internal_receipts: vec![],
+        }
+    }
 }
 
 /// Execute a cross-runtime transfer with automatic rollback on failure.
@@ -734,18 +784,20 @@ pub fn cross_runtime_transfer<'a, Host, C: Context>(
     dest: &Contract,
     parameters: &Parameters,
     parser: &'a Parser<'a>,
-) -> Result<TransferTarget, TransferError>
+    nonce_counter: &mut u16,
+) -> Result<CrossRuntimeTransferResult, CracTransferError>
 where
     Host: StorageV1,
 {
     let entrypoint = &parameters.entrypoint;
-    let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value)
+        .map_err(|e| CracTransferError::from(TransferError::from(e)))?;
 
     let world_state = tc_ctx.context.path();
     let checkpoint_index = journal
         .michelson
         .checkpoint(tc_ctx.host, &world_state)
-        .map_err(gw)?;
+        .map_err(|e| CracTransferError::from(gw(e)))?;
 
     let mut internal_receipts = Vec::new();
     match transfer(
@@ -761,6 +813,7 @@ where
         parser,
         &mut internal_receipts,
         true, // skip_sender_debit: the calling runtime already debited the sender
+        nonce_counter,
     ) {
         Ok(success) => {
             // transfer() returns Ok even when internal operations FAILWITH,
@@ -776,25 +829,37 @@ where
                 journal
                     .michelson
                     .checkpoint_commit(tc_ctx.host, checkpoint_index)
-                    .map_err(gw)?;
-                Ok(success.into())
+                    .map_err(|e| CracTransferError::from(gw(e)))?;
+                Ok(CrossRuntimeTransferResult {
+                    target: success.into(),
+                    internal_receipts,
+                })
             } else {
                 // revert: restore the snapshot
                 journal
                     .michelson
                     .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
-                    .map_err(gw)?;
-                Err(TransferError::FailedToExecuteInternalOperation(
-                    "internal operation failed during cross-runtime call".into(),
-                ))
+                    .map_err(|e| CracTransferError::from(gw(e)))?;
+                // Return the internal receipts so the failed CRAC
+                // receipt can include backtracked/failed/skipped ops
+                // (RFC Example 4).
+                Err(CracTransferError {
+                    error: TransferError::FailedToExecuteInternalOperation(
+                        "internal operation failed during cross-runtime call".into(),
+                    ),
+                    internal_receipts,
+                })
             }
         }
         Err(e) => {
             journal
                 .michelson
                 .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
-                .map_err(gw)?;
-            Err(e)
+                .map_err(|e| CracTransferError::from(gw(e)))?;
+            Err(CracTransferError {
+                error: e,
+                internal_receipts,
+            })
         }
     }
 }
@@ -1105,6 +1170,15 @@ where
     }
 }
 
+/// Result of executing a smart contract: an iterator of MIR internal
+/// operations, the new storage, and any pre-built receipt-level internal
+/// operations (e.g. CRAC events from enshrined contracts).
+struct ExecutionResult<'a, I: Iterator<Item = OperationInfo<'a>>> {
+    internal_operations: InternalOperationIterator<'a, I>,
+    storage: Vec<u8>,
+    prebuilt_receipts: Vec<InternalOperationSum>,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn execute_smart_contract<'a, Host>(
     code: account_storage::Code,
@@ -1115,7 +1189,7 @@ fn execute_smart_contract<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError>
+) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, TransferError>
 where
     Host: StorageV1,
 {
@@ -1125,16 +1199,23 @@ where
             let (iter, storage) = execute_smart_contract_originated(
                 code, storage, entrypoint, value, parser, ctx,
             )?;
-            Ok((InternalOperationIterator::Active(iter), storage))
+            Ok(ExecutionResult {
+                internal_operations: InternalOperationIterator::Active(iter),
+                storage,
+                prebuilt_receipts: vec![],
+            })
         }
         Code::Enshrined(contract) => {
             let ops = enshrined_contracts::execute_enshrined_contract(
                 contract, entrypoint, value, ctx, registry, journal,
             )?;
-            Ok((
-                InternalOperationIterator::Enshrined(ops.into_iter()),
-                vec![],
-            ))
+            Ok(ExecutionResult {
+                internal_operations: InternalOperationIterator::Enshrined(
+                    ops.into_iter(),
+                ),
+                storage: vec![],
+                prebuilt_receipts: vec![],
+            })
         }
     }
 }
@@ -1199,6 +1280,9 @@ where
     safe_host.promote_trace()?;
     safe_host.start()?;
 
+    // Each operation uses 0-based nonces; block-sequential nonces are
+    // assigned at block finalization by renumber_nonces().
+    let mut nonce_counter: u16 = 0;
     let mut origination_nonce = OriginationNonce::initial(hash);
     let (processed_ops, applied) = apply_batch(
         &mut safe_host,
@@ -1208,6 +1292,7 @@ where
         &mut origination_nonce,
         validation_info,
         block_ctx,
+        &mut nonce_counter,
     );
 
     if applied {
@@ -1234,6 +1319,7 @@ where
     Ok(processed_ops)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_batch<Host, C: Context>(
     host: &mut Host,
     registry: &impl Registry,
@@ -1242,6 +1328,7 @@ fn apply_batch<Host, C: Context>(
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
     block_ctx: &BlockCtx,
+    nonce_counter: &mut u16,
 ) -> (Vec<ProcessedOperation>, bool)
 where
     Host: StorageV1,
@@ -1283,6 +1370,7 @@ where
                 validated_operation,
                 &mut next_temporary_id,
                 block_ctx,
+                nonce_counter,
             )
         };
 
@@ -1339,6 +1427,7 @@ fn apply_operation<Host, C: Context>(
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
+    nonce_counter: &mut u16,
 ) -> ProcessedOperation
 where
     Host: StorageV1,
@@ -1387,6 +1476,7 @@ where
                 parameters,
                 &mut internal_operations_receipts,
                 &parser,
+                nonce_counter,
             );
             log_on_operation_failure("Transfer", &transfer_result);
             OperationResultSum::Transfer(produce_operation_result(
@@ -2782,7 +2872,7 @@ mod tests {
                                 },
                             },
                             sender: Contract::Originated(desthash.clone()),
-                            nonce: 1,
+                            nonce: 0,
                             result: ContentResult::Applied(TransferTarget::ToContrat(
                                 TransferSuccess {
                                     storage: None,
@@ -4344,7 +4434,7 @@ mod tests {
                     lazy_storage_diff: None,
                 }),
                 sender: Contract::Originated(contract_chapo_hash.clone()),
-                nonce: 1
+                nonce: 0
             }),
             "Internal origination should match the expected structure"
         );
@@ -4536,7 +4626,7 @@ mod tests {
                     lazy_storage_diff: None,
                 }),
                 sender: Contract::Originated(contract_chapo_hash.clone()),
-                nonce: 3
+                nonce: 0
             }),
             "Internal origination should match the expected structure"
         );
@@ -4589,7 +4679,7 @@ mod tests {
                     lazy_storage_diff: None,
                 }),
                 sender: Contract::Originated(contract_chapo_hash),
-                nonce: 2
+                nonce: 1
             }),
             "Internal origination should match the expected structure"
         );
@@ -6108,10 +6198,11 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
+        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
         let processed = validate_and_apply_operation(
             &mut host,
             &registry,
-            &mut TezosXJournal::default(),
+            &mut journal,
             &context::TezlinkContext::init_context(),
             OperationHash::default(),
             operation,
@@ -6396,7 +6487,7 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
@@ -6474,7 +6565,7 @@ mod tests {
         );
 
         let registry = crate::test_utils::MockRegistry::new("KT1_mock_alias".to_string());
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(tezosx_journal::CracId::new(1, 0));
         let receipts = ProcessedOperation::into_receipts(
             validate_and_apply_operation(
                 &mut host,
