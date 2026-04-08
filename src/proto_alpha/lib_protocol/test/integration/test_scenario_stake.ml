@@ -403,6 +403,54 @@ let change_delegate_to_self =
       |+ Tag "don't finalize" --> Empty)
   --> stake "staker" Half --> unstake "staker" Half --> stake "staker" Half
 
+(** Test changing delegates without any prior stake.
+
+    When a staker is delegated to [delegate1] but has never staked,
+    switching to [delegate2] must NOT create any unstake request
+    (because [request_unstake] short-circuits on zero actual stake in
+    [staking.ml]).
+    As a consequence there are no unfinalizable unstake requests for a
+    different delegate, and the staker must be able to stake with
+    [delegate2] immediately---in the same cycle as the delegation change---
+    without hitting
+    [Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate].
+
+    This contrasts with the [change_delegate] test above, where prior
+    stake forces a wait of [unstake_wait] cycles before staking with
+    the new delegate.*)
+let change_delegate_without_prior_stake =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  init_constants ()
+  --> begin_test ["delegate1"; "delegate2"]
+  --> set_delegate_params "delegate1" init_params
+  --> set_delegate_params "delegate2" init_params
+  --> add_account_with_funds
+        "staker"
+        ~funder:"delegate1"
+        (Amount (Tez.of_mutez 2_000_000_000_000L))
+  (* Delegate to delegate1 but do NOT stake. *)
+  --> set_delegate "staker" (Some "delegate1")
+  --> wait_delegate_parameters_activation
+  (* Switch to delegate2.  Since nothing was staked with delegate1,
+     request_unstake returns early (tez_to_unstake = 0) and no unstake
+     request record is written to storage. *)
+  --> set_delegate "staker" (Some "delegate2")
+  (* The key assertion: staking with delegate2 must succeed immediately.
+     There must be no [Cannot_stake_with_unfinalizable_unstake_requests_to_another_delegate]
+     error because no unstake request was created for delegate1. *)
+  --> stake "staker" Half
+  (* No unstaked-frozen balance should exist — nothing was auto-unstaked
+     from delegate1 when we changed delegates. *)
+  --> check_balance_field "staker" `Unstaked_frozen_total Tez.zero
+  (* Verify the stake is live with delegate2: unstake everything and
+     complete the full roundtrip to confirm normal operation. *)
+  --> unstake "staker" All
+  --> wait_n_cycles_f unstake_wait
+  --> finalize "staker"
+  --> check_balance_field "staker" `Staked Tez.zero
+
 (* Test changing delegates while having staked funds. *)
 let change_delegate =
   let init_params =
@@ -990,6 +1038,8 @@ let tests =
        ("Test stake unstake every cycle", odd_behavior);
        ("Test change delegate", change_delegate);
        ("Test change delegate to self", change_delegate_to_self);
+       ( "Test change delegate without prior stake",
+         change_delegate_without_prior_stake );
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
