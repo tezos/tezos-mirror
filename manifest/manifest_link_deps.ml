@@ -6,9 +6,18 @@
 (*****************************************************************************)
 
 module LinkTypes = struct
-  type rust_dep = Rustzcash | Wasmer | Riscv_pvm | Etherlink_wasm_runtime
+  type rust_dep =
+    | Rustzcash
+    | Wasmer
+    | Riscv_pvm
+    | Etherlink_wasm_runtime
+    | Nds_on_disk
 
-  type archive = Rustzcash_deps | Rust_deps | Etherlink_wasm_runtime
+  type archive =
+    | Rustzcash_deps
+    | Rust_deps
+    | Etherlink_wasm_runtime
+    | Rollup_node_rust_deps
 
   (* A sum type was chosen to signal currently only rust deps are supported. *)
   type t = RustDep of rust_dep
@@ -20,6 +29,7 @@ module LinkTypes = struct
     | "src/rustzcash_deps" -> Some Rustzcash_deps
     | "src/rust_deps" -> Some Rust_deps
     | "etherlink/lib_wasm_runtime" -> Some Etherlink_wasm_runtime
+    | "src/rollup_node_rust_deps" -> Some Rollup_node_rust_deps
     | _ -> None
 
   let id link_dep =
@@ -29,7 +39,8 @@ module LinkTypes = struct
         | Rustzcash -> 1
         | Wasmer -> 2
         | Riscv_pvm -> 3
-        | Etherlink_wasm_runtime -> 4)
+        | Etherlink_wasm_runtime -> 4
+        | Nds_on_disk -> 5)
 
   let compare lhs rhs = Int.compare (id lhs) (id rhs)
 end

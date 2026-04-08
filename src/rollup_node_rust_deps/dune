@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_rollup_node_rust_deps)
+ (public_name octez-rollup-node-rust-deps)
+ (instrumentation (backend bisect_ppx))
+ (foreign_archives octez_rollup_node_rust_deps)
+ (c_library_flags (-lc++)))
+
+(dirs :standard .cargo (not target))
+
+(rule
+ (targets liboctez_rollup_node_rust_deps.a dlloctez_rollup_node_rust_deps.so)
+ (deps
+  (file build.sh)
+  (file Cargo.toml)
+  (file Cargo.lock)
+  (file ../../rust-toolchain)
+  (source_tree .cargo)
+  (source_tree src)
+  (source_tree ../riscv)
+  (source_tree ../rustzcash_deps)
+  (source_tree ../rust_deps/wasmer-3.3.0)
+  (source_tree ../rust_deps/rust_igd_next)
+  (source_tree ../rust_deps/rust_tezos_context)
+  (source_tree ../kernel_sdk)
+  (source_tree ../../sdk/rust))
+ (action (no-infer (system ./build.sh))))
