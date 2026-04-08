@@ -130,6 +130,14 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
           ~to_level:last_level
       else return_unit
     in
+    (* Save progress only after both the clean-up and the skip-list catch-up
+       have completed, so that on a crash the skip-list cells are refetched
+       rather than permanently skipped. *)
+    let* () =
+      let store = Node_context.get_store ctxt in
+      let last_processed_level_store = Store.last_processed_level store in
+      Store.Last_processed_level.save last_processed_level_store last_level
+    in
     (* As this iteration may be slow, the head level might have advanced in the
        meanwhile. *)
     let* header =
@@ -218,6 +226,9 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
           ~from_level:start_level
           ~to_level:last_level_for_cleaning
     in
+    (* Save progress only after both the clean-up and the skip-list catch-up
+       have completed, so that on a crash the skip-list cells are refetched
+       rather than permanently skipped. *)
     let store = Node_context.get_store ctxt in
     let last_processed_level_store = Store.last_processed_level store in
     let* () =
