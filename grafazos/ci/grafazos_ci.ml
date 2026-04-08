@@ -16,7 +16,7 @@ let job_build =
   CI.job
     "build"
     ~__POS__
-    ~image:Tezos_ci.Images.jsonnet
+    ~image:Tezos_ci.Images.Base_images.debian_jsonnet_trixie
     ~stage
     ~description:"Build the Grafazos dashboards."
     ~artifacts:
