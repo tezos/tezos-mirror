@@ -9,20 +9,18 @@
 //! caller; absent or malformed headers produce a `HeaderError`.
 
 pub use tezosx_interfaces::{
-    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER,
-    X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
+    X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_data_encoding::types::Narith;
-use tezos_smart_rollup::types::{PublicKeyHash, Timestamp};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezosx_interfaces::headers::{
-    parse_tez_to_mutez, require_i64, require_str, require_u32, require_u64,
+    parse_str, parse_tez_to_mutez, require_i64, require_str, require_u32, require_u64,
 };
 use tezosx_interfaces::TezosXRuntimeError;
-
-use crate::NULL_PKH;
 
 /// Values contained in the `X-Tezos-*` request headers, in their Tezos runtime
 /// types. Used in parsing and inserting.
@@ -38,9 +36,13 @@ pub struct MichelsonHeaders {
     pub block_number: BlockNumber,
     /// Sender KT1 contract address (for Michelson `SENDER`).
     pub sender: ContractKt1Hash,
-    /// Source implicit account address (for Michelson `SOURCE`).
-    /// `None` if the header is absent.
-    pub source: Option<PublicKeyHash>,
+    /// CRAC origin KT1 contract address parsed from `X-Tezos-Source`.
+    /// Used for CRAC receipt construction (alias of E_0).
+    pub crac_origin_contract: Option<ContractKt1Hash>,
+    /// Propagated CRAC-ID string from an incoming cross-runtime call.
+    /// Kept as a raw string; verified by `journal.verify_crac_id()`.
+    /// `None` if the header is absent (non-CRAC request).
+    pub crac_id: Option<String>,
 }
 
 /// Parse `X-Tezos-*` headers from `headers`.
@@ -50,6 +52,17 @@ pub struct MichelsonHeaders {
 pub fn parse_request_headers(
     headers: &http::HeaderMap,
 ) -> Result<MichelsonHeaders, TezosXRuntimeError> {
+    // Parse X-Tezos-Source as a KT1 if present (for CRAC receipt construction).
+    // The EVM gateway sends the source alias as a KT1 string. If the value
+    // is a tz1/tz2/tz3 (non-CRAC case), the KT1 parse will fail and we
+    // set crac_origin_contract to None.
+    let source_str = parse_str(headers, X_TEZOS_SOURCE)?;
+    let crac_origin_contract = source_str
+        .as_deref()
+        .and_then(|s| ContractKt1Hash::from_b58check(s).ok());
+
+    let crac_id = parse_str(headers, X_TEZOS_CRAC_ID)?;
+
     Ok(MichelsonHeaders {
         amount: Narith(
             parse_tez_to_mutez(&require_str(headers, X_TEZOS_AMOUNT)?)?.into(),
@@ -58,16 +71,8 @@ pub fn parse_request_headers(
         timestamp: Timestamp::from(require_i64(headers, X_TEZOS_TIMESTAMP)?),
         block_number: BlockNumber::from(require_u32(headers, X_TEZOS_BLOCK_NUMBER)?),
         sender: require_kt1(headers, X_TEZOS_SENDER)?,
-        // FIXME: We use the Tezos null address as source because the alias of
-        // the 0x EVM source account is a KT1, and Michelson doesn't allow KT1
-        // as a source. If the original call was emitted from Michelson (i.e. it
-        // hit EVM before re-entering the Michelson runtime), we might want to
-        // retrieve the original tz source in the future.
-        source: Some(PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
-            TezosXRuntimeError::ConversionError(format!(
-                "Failed to parse null address: {e}"
-            ))
-        })?),
+        crac_origin_contract,
+        crac_id,
     })
 }
 
@@ -111,21 +116,35 @@ mod tests {
         assert_eq!(parsed.timestamp, Timestamp::from(1_000_000_i64));
         assert_eq!(parsed.block_number, BlockNumber::from(1u32));
         assert_eq!(parsed.sender, ContractKt1Hash::from_b58check(KT1).unwrap());
-        assert_eq!(
-            parsed.source,
-            Some(PublicKeyHash::from_b58check(NULL_PKH).unwrap())
+        assert!(
+            parsed.crac_origin_contract.is_none(),
+            "no source → no CRAC origin contract"
         );
+        assert!(parsed.crac_id.is_none(), "no source → no CRAC-ID");
     }
 
     #[test]
-    fn source_optional() {
+    fn source_optional_tz1() {
+        // tz1 source (non-CRAC): source_contract and crac_id should be None
         let mut hdrs = required_headers();
         hdrs.push((X_TEZOS_SOURCE, TZ1));
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
+        assert!(parsed.crac_origin_contract.is_none());
+        assert!(parsed.crac_id.is_none());
+    }
+
+    #[test]
+    fn source_kt1_with_crac_id() {
+        // KT1 source (CRAC): crac_origin_contract and crac_id should be set
+        let mut hdrs: Vec<(&str, &str)> = required_headers();
+        hdrs.push((X_TEZOS_SOURCE, KT1));
+        hdrs.push((X_TEZOS_CRAC_ID, "0-5"));
+        let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
         assert_eq!(
-            parsed.source,
-            Some(PublicKeyHash::from_b58check(TZ1).unwrap())
+            parsed.crac_origin_contract,
+            Some(ContractKt1Hash::from_b58check(KT1).unwrap())
         );
+        assert_eq!(parsed.crac_id, Some("0-5".to_string()));
     }
 
     #[test]
@@ -136,6 +155,8 @@ mod tests {
             (X_TEZOS_AMOUNT, "1");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
         assert_eq!(parsed.amount, Narith(1_000_000u64.into()));
+        assert!(parsed.crac_origin_contract.is_none());
+        assert!(parsed.crac_id.is_none());
     }
 
     #[test]
@@ -146,6 +167,8 @@ mod tests {
             (X_TEZOS_AMOUNT, "1.5");
         let parsed = parse_request_headers(&headers_from(&hdrs)).unwrap();
         assert_eq!(parsed.amount, Narith(1_500_000u64.into()));
+        assert!(parsed.crac_origin_contract.is_none());
+        assert!(parsed.crac_id.is_none());
     }
 
     #[test]

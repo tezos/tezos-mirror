@@ -132,8 +132,8 @@ where
         TezosXRuntimeError::Custom(format!("Failed to fetch sender account: {e:?}"))
     })?;
 
-    let source_pkh = hdrs.source.ok_or_else(|| {
-        TezosXRuntimeError::HeaderError("X-Tezos-Source header missing".into())
+    let source_pkh = PublicKeyHash::from_b58check(NULL_PKH).map_err(|e| {
+        TezosXRuntimeError::ConversionError(format!("Failed to parse null address: {e}"))
     })?;
     let source_account =
         context
