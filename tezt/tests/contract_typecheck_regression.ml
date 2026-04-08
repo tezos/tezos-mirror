@@ -44,7 +44,7 @@ let test_typecheck_contract protocol scripts =
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "Tc scripts")
-    ~tags:[team; "client"; "michelson"; "typechecking"]
+    ~tags:[team; "client"; "michelson"; "typechecking"; Tag.add_new_script]
     ~uses:(fun _protocol -> [Constant.michelson_test_scripts])
     ~uses_node:false
     (fun _protocol ->
