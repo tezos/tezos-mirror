@@ -82,11 +82,7 @@ let clean_up_store ctxt ~from_level ~to_level proto_parameters =
    FIXME: https://gitlab.com/tezos/tezos/-/issues/7429
    We don't call [may_add_plugin], so there is a chance the plugin changes
    and we don't detect it if this code starts running just before the migration
-   level, and the head changes meanwhile to be above the migration level.
-
-   TODO: https://gitlab.com/tezos/tezos/-/issues/7779
-   Improve the runtime of this function. It may be better to do the clean-up and
-   the "catch-up" (that is, updating of the skip list store) separately. *)
+   level, and the head changes meanwhile to be above the migration level. *)
 let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     ~last_processed_level ~first_seen_level head_level proto_parameters =
   let open Lwt_result_syntax in
