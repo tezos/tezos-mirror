@@ -1598,4 +1598,238 @@ mod tests {
             "Transaction should have been accepted through delayed inbox"
         );
     }
+
+    /// Build a dummy CRAC receipt with the given internal operations.
+    fn dummy_crac_receipt(
+        internals: Vec<tezos_tezlink::operation_result::InternalOperationSum>,
+    ) -> tezos_tezlink::block::AppliedOperation {
+        use tezos_crypto_rs::hash::{BlockHash, OperationHash, UnknownSignature};
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation::{
+            ManagerOperation, ManagerOperationContent, Parameters, TransferContent,
+        };
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata,
+            OperationResult, OperationResultSum, OperationWithMetadata, TransferSuccess,
+            TransferTarget,
+        };
+        let signature = UnknownSignature::try_from([0u8; 64].as_slice()).unwrap();
+        let source = tezos_smart_rollup::types::PublicKeyHash::from_b58check(
+            "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU",
+        )
+        .unwrap();
+        let destination = tezos_protocol::contract::Contract::Originated(
+            tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
+                "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+            )
+            .unwrap(),
+        );
+        tezos_tezlink::block::AppliedOperation {
+            hash: OperationHash::default(),
+            branch: BlockHash::default(),
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transaction(ManagerOperation {
+                            source,
+                            fee: Narith(0u64.into()),
+                            counter: Narith(0u64.into()),
+                            gas_limit: Narith(0u64.into()),
+                            storage_limit: Narith(0u64.into()),
+                            operation: TransferContent {
+                                amount: Narith(0u64.into()),
+                                destination,
+                                parameters: Parameters {
+                                    entrypoint: mir::ast::Entrypoint::default(),
+                                    value: vec![],
+                                },
+                            },
+                        }),
+                        receipt: OperationResultSum::Transfer(OperationResult {
+                            balance_updates: vec![],
+                            result: ContentResult::Applied(TransferTarget::from(
+                                TransferSuccess::default(),
+                            )),
+                            internal_operation_results: internals,
+                        }),
+                    }],
+                    signature,
+                },
+            ),
+        }
+    }
+
+    fn make_transfer(
+        nonce: u16,
+        amount: u64,
+    ) -> tezos_tezlink::operation_result::InternalOperationSum {
+        use tezos_crypto_rs::hash::ContractKt1Hash;
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation::{Parameters, TransferContent};
+        use tezos_tezlink::operation_result::{
+            ContentResult, InternalContentWithMetadata, InternalOperationSum,
+            TransferSuccess, TransferTarget,
+        };
+        InternalOperationSum::Transfer(InternalContentWithMetadata {
+            sender: tezos_protocol::contract::Contract::Originated(
+                ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+            ),
+            nonce,
+            content: TransferContent {
+                amount: Narith(amount.into()),
+                destination: tezos_protocol::contract::Contract::Originated(
+                    ContractKt1Hash::from_base58_check(
+                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                    )
+                    .unwrap(),
+                ),
+                parameters: Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value: vec![],
+                },
+            },
+            result: ContentResult::Applied(TransferTarget::from(
+                TransferSuccess::default(),
+            )),
+        })
+    }
+
+    fn make_crac_event(
+        nonce: u16,
+    ) -> tezos_tezlink::operation_result::InternalOperationSum {
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation_result::{
+            ContentResult, EventContent, EventSuccess, InternalContentWithMetadata,
+            InternalOperationSum, MichelineExpr,
+        };
+        InternalOperationSum::Event(InternalContentWithMetadata {
+            sender: tezos_protocol::contract::Contract::Originated(
+                tezos_crypto_rs::hash::ContractKt1Hash::from_base58_check(
+                    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                )
+                .unwrap(),
+            ),
+            nonce,
+            content: EventContent {
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked("crac".into())),
+                payload: Some(MichelineExpr(vec![
+                    0x01, 0x00, 0x00, 0x00, 0x03, 0x31, 0x2d, 0x30,
+                ])),
+                ty: MichelineExpr(vec![0x03, 0x68]),
+            },
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: Narith(0u64.into()),
+            }),
+        })
+    }
+
+    fn extract_nonces(receipt: &tezos_tezlink::block::AppliedOperation) -> Vec<u16> {
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        let Some(op) = batch.operations.first() else {
+            return vec![];
+        };
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            return vec![];
+        };
+        result
+            .internal_operation_results
+            .iter()
+            .map(|iop| match iop {
+                InternalOperationSum::Transfer(m) => m.nonce,
+                InternalOperationSum::Origination(m) => m.nonce,
+                InternalOperationSum::Event(m) => m.nonce,
+            })
+            .collect()
+    }
+
+    fn extract_amounts(receipt: &tezos_tezlink::block::AppliedOperation) -> Vec<u64> {
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        let Some(op) = batch.operations.first() else {
+            return vec![];
+        };
+        let OperationResultSum::Transfer(ref result) = op.receipt else {
+            return vec![];
+        };
+        result
+            .internal_operation_results
+            .iter()
+            .filter_map(|iop| match iop {
+                InternalOperationSum::Transfer(m) => {
+                    Some(m.content.amount.0.clone().try_into().unwrap())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Merging two CRAC receipts preserves block-global nonces.
+    ///
+    /// Receipt 1: [Event("crac", nonce=0), Transfer(M_1, nonce=1, amount=100)]
+    /// Receipt 2: [Event("crac", nonce=2), Transfer(M_2, nonce=3, amount=200)]
+    /// Expected:  [Event("crac", nonce=0), Transfer(M_1, nonce=1), Transfer(M_2, nonce=3)]
+    ///
+    /// The duplicate event (nonce=2) is dropped.  Nonces are block-global
+    /// (assigned at creation time, matching L1 semantics) so no renumbering.
+    #[test]
+    fn test_merge_crac_internals_preserves_nonces() {
+        let receipt_1 =
+            dummy_crac_receipt(vec![make_crac_event(0), make_transfer(1, 100)]);
+        let receipt_2 =
+            dummy_crac_receipt(vec![make_crac_event(2), make_transfer(3, 200)]);
+
+        let mut receipts = vec![receipt_1, receipt_2];
+        let rest = receipts.split_off(1);
+        let target = &mut receipts[0];
+        for other in rest {
+            super::merge_crac_internals(target, other);
+        }
+
+        // Nonces are preserved from creation time (block-global counter).
+        // Event nonce=2 from receipt_2 is dropped (duplicate), so: 0, 1, 3.
+        assert_eq!(
+            extract_nonces(target),
+            vec![0, 1, 3],
+            "nonces must be preserved from creation time"
+        );
+
+        // Transfer ordering: M_1 (100), then M_2 (200)
+        assert_eq!(
+            extract_amounts(target),
+            vec![100, 200],
+            "transfers must be in receipt order"
+        );
+
+        // First op is the single CRAC event (duplicate filtered)
+        use tezos_tezlink::operation_result::{
+            InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            target.op_and_receipt;
+        let OperationResultSum::Transfer(ref result) = batch.operations[0].receipt else {
+            panic!("expected Transfer receipt");
+        };
+        assert_eq!(
+            result.internal_operation_results.len(),
+            3,
+            "1 event + 2 transfers"
+        );
+        assert!(
+            matches!(
+                result.internal_operation_results[0],
+                InternalOperationSum::Event(_)
+            ),
+            "first internal op must be the CRAC event"
+        );
+    }
 }
