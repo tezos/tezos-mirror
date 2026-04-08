@@ -137,6 +137,26 @@ fn charge_crac_gas(
 /// Resolve sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss.
 ///
+/// Return the original EVM source (E_0) for CRAC receipt construction.
+///
+/// On the first gateway call in a transaction, `tx().caller()` is the
+/// EOA and we store it.  On re-entrant calls (EVM → TEZ → EVM → …) the
+/// `tx().caller()` would be the alias of a Michelson contract, so we
+/// use the stored value instead.
+fn resolve_original_source<'j, CTX, Host, R>(context: &mut CTX) -> Address
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let source = context
+        .journal()
+        .original_evm_source()
+        .unwrap_or_else(|| context.tx().caller());
+    context.journal_mut().set_original_evm_source(source);
+    source
+}
+
 /// Returns `Ok(Some((sender_alias, source_alias)))` on success, or
 /// `Ok(None)` when the caller runs out of gas.
 fn resolve_aliases<'j, CTX, Host, R>(
@@ -264,9 +284,9 @@ where
                     ))
                 })?;
 
-            let tx_caller = context.tx().caller();
+            let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
                     Some(aliases) => aliases,
                     None => return Ok(out_of_gas(inputs.gas_limit)),
                 };
@@ -353,9 +373,9 @@ where
                     ))
                 })?;
 
-            let tx_caller = context.tx().caller();
+            let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
                     Some(aliases) => aliases,
                     None => return Ok(out_of_gas(inputs.gas_limit)),
                 };
@@ -426,10 +446,10 @@ where
                 &mut gas,
             )?;
 
-            let tx_caller = context.tx().caller();
+            let source = resolve_original_source(context);
             let amount = inputs.value.get();
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, tx_caller)? {
+                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
                     Some(aliases) => aliases,
                     None => return Ok(out_of_gas(inputs.gas_limit)),
                 };
