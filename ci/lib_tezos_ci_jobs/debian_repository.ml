@@ -238,8 +238,6 @@ let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
 
-let job_install_bin = job ~stage:Stages.publishing_tests
-
 let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
     ?allow_failure script =
   job_docker_authenticated
@@ -304,9 +302,10 @@ let job_lintian_debian ~limit_dune_build_jobs ~manual pipeline_type =
     ["./scripts/ci/lintian_debian_packages.sh debian bookworm"]
 
 let job_install_bin_ubuntu_22_04 ~limit_dune_build_jobs ~manual pipeline_type =
-  job_install_bin
+  job
     ~__POS__
     ~name:"oc.install_bin_ubuntu_22_04"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -317,9 +316,10 @@ let job_install_bin_ubuntu_22_04 ~limit_dune_build_jobs ~manual pipeline_type =
     ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"]
 
 let job_install_bin_ubuntu_24_04 ~limit_dune_build_jobs ~manual pipeline_type =
-  job_install_bin
+  job
     ~__POS__
     ~name:"oc.install_bin_ubuntu_24_04"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -397,9 +397,10 @@ let job_upgrade_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
 
 let job_install_bin_debian_bookworm ~limit_dune_build_jobs ~manual pipeline_type
     =
-  job_install_bin
+  job
     ~__POS__
     ~name:"oc.install_bin_debian_bookworm"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
