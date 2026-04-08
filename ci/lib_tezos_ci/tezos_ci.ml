@@ -1596,6 +1596,11 @@ module Images = struct
 
     let debian_trixie = make_img "debian:trixie" debian_version
 
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+    let debian_jsonnet_trixie =
+      make_img "debian-jsonnet:trixie" "master-d70f7d37"
+
     let debian_unstable = make_img "debian:unstable" debian_version
 
     let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version

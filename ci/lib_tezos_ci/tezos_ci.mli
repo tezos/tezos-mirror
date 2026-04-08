@@ -619,6 +619,8 @@ module Images : sig
 
     val debian_trixie : Image.t
 
+    val debian_jsonnet_trixie : Image.t
+
     val ubuntu_22_04 : Image.t
 
     val ubuntu_24_04 : Image.t
