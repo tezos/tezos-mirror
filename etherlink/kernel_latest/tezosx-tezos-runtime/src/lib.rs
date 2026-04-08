@@ -7,9 +7,16 @@ use mir::ast::big_map::BigMapId;
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
-    blake2b, hash::ChainId, hash::ContractKt1Hash, hash::OperationHash,
+    blake2b,
+    hash::{BlockHash, ChainId, ContractKt1Hash, OperationHash, UnknownSignature},
 };
-use tezos_data_encoding::{enc::BinWriter, types::Zarith};
+// UnknownSignature has a private constructor; use try_from to build one.
+#[allow(dead_code)]
+const ZERO_SIGNATURE: [u8; 64] = [0u8; 64];
+use tezos_data_encoding::{
+    enc::BinWriter,
+    types::{Narith, Zarith},
+};
 use tezos_execution::{
     account_storage::{TezlinkAccount, TezosOriginatedAccount},
     context::Context,
@@ -24,7 +31,17 @@ use tezos_smart_rollup_host::storage::StorageV1;
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
 // to be moved to a shared crate.
-use tezos_tezlink::{operation::Parameters, operation_result::TransferSuccess};
+use tezos_tezlink::{
+    block::AppliedOperation,
+    operation::{ManagerOperation, ManagerOperationContent, Parameters, TransferContent},
+    operation_result::{
+        ApplyOperationError, ApplyOperationErrors, BacktrackedResult, ContentResult,
+        EventContent, EventSuccess, InternalContentWithMetadata, InternalOperationSum,
+        OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
+        OperationResultSum, OperationWithMetadata, TransferError, TransferSuccess,
+        TransferTarget,
+    },
+};
 use tezosx_interfaces::{
     CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
     X_TEZOS_GAS_CONSUMED,
@@ -87,6 +104,227 @@ fn build_response(
         .header(X_TEZOS_GAS_CONSUMED, &gas_header)
         .body(body)
         .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to build response: {e}")))
+}
+
+/// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
+///
+/// The RFC (CRAC Derived Block Contents) specifies the receipt structure:
+///
+/// **Top-level**: handler (tz1) → source_alias (alias(E_0)), Applied
+///   - **Internal op #0** (if CRAC event): CRAC event with CRAC-ID
+///   - **Internal op #1**: sender_alias (alias(E_1)) → target, Applied(transfer result)
+///   - **Internal ops 2..N**: further ops from Michelson execution
+///
+/// `source_contract` is alias(E_0) — the alias of the EVM tx originator
+/// (from `X-Tezos-Source`). It is the destination of the top-level op.
+///
+/// `sender_contract` is alias(E_1) — the alias of the immediate EVM caller
+/// (from `X-Tezos-Sender`). It is the sender of the internal op.
+///
+/// Returns the `AppliedOperation` that the block builder will store
+/// in the Michelson runtime block.
+#[allow(clippy::too_many_arguments, dead_code)]
+fn build_crac_receipt(
+    null_pkh: &PublicKeyHash,
+    source_contract: &Contract,
+    sender_contract: &Contract,
+    amount: &Narith,
+    destination: &Contract,
+    parameters: &Parameters,
+    target: TransferTarget,
+    internal_receipts: Vec<InternalOperationSum>,
+    crac_id: Option<&str>,
+) -> Result<AppliedOperation, TezosXRuntimeError> {
+    // Combine: [CRAC event, alias(E_1)→target, ...further internal ops]
+    // Per RFC, the CRAC event is always the first internal operation (#0).
+    let mut all_internal = Vec::new();
+
+    if let Some(id) = crac_id {
+        use mir::{
+            ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
+        };
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
+        let payload = Micheline::from(id.to_string()).encode();
+        all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                payload: Some(payload.into()),
+                ty: ty.into(),
+            },
+            sender: Contract::Implicit(null_pkh.clone()),
+            nonce: 0,
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: Narith(0u64.into()),
+            }),
+        }));
+    }
+
+    // The transfer nonce starts after the event (if present).
+    let transfer_nonce = u16::try_from(all_internal.len()).unwrap_or(u16::MAX);
+    let transfer_internal = InternalOperationSum::Transfer(InternalContentWithMetadata {
+        sender: sender_contract.clone(),
+        nonce: transfer_nonce,
+        content: TransferContent {
+            amount: amount.clone(),
+            destination: destination.clone(),
+            parameters: parameters.clone(),
+        },
+        result: ContentResult::Applied(target),
+    });
+    all_internal.push(transfer_internal);
+    all_internal.extend(internal_receipts);
+
+    // Top-level result: handler → alias(E_0) (applied, with all internals nested).
+    // TransferSuccess::default() is intentional — this is a synthetic wrapper;
+    // actual consumed_milligas, storage_size, etc. are in the internal ops.
+    let top_level_result = OperationResult {
+        balance_updates: vec![],
+        result: ContentResult::Applied(TransferTarget::from(TransferSuccess::default())),
+        internal_operation_results: all_internal,
+    };
+
+    let signature =
+        UnknownSignature::try_from(ZERO_SIGNATURE.as_slice()).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to build zero signature: {e}"))
+        })?;
+
+    let op_data =
+        OperationDataAndMetadata::OperationWithMetadata(OperationBatchWithMetadata {
+            operations: vec![OperationWithMetadata {
+                content: ManagerOperationContent::Transaction(ManagerOperation {
+                    source: null_pkh.clone(),
+                    fee: Narith(0u64.into()),
+                    counter: Narith(0u64.into()),
+                    gas_limit: Narith(0u64.into()),
+                    storage_limit: Narith(0u64.into()),
+                    operation: TransferContent {
+                        // The top-level op is a synthetic container
+                        // (handler → alias(E_0)); real amount is on the
+                        // internal op, so we zero it like fee/gas_limit.
+                        amount: Narith(0u64.into()),
+                        destination: source_contract.clone(),
+                        // Only the internal op carries the real target
+                        // parameters.
+                        parameters: Parameters::default(),
+                    },
+                }),
+                receipt: OperationResultSum::Transfer(top_level_result),
+            }],
+            signature,
+        });
+
+    Ok(AppliedOperation {
+        hash: OperationHash::default(),
+        branch: BlockHash::default(),
+        op_and_receipt: op_data,
+    })
+}
+
+/// Build a failed CRAC receipt (RFC Example 4).
+///
+/// When `cross_runtime_transfer` fails, we still need a receipt in the
+/// Michelson block so indexers see the failed CRAC.  The top-level
+/// operation has `status: failed` and carries any partial internal
+/// operations (with backtracked / failed / skipped statuses) so
+/// indexers can see what was attempted.
+#[allow(clippy::too_many_arguments, dead_code)]
+fn build_failed_crac_receipt(
+    null_pkh: &PublicKeyHash,
+    source_contract: &Contract,
+    sender_contract: &Contract,
+    amount: &Narith,
+    destination: &Contract,
+    parameters: &Parameters,
+    error: TransferError,
+    internal_receipts: Vec<InternalOperationSum>,
+    crac_id: Option<&str>,
+) -> Result<AppliedOperation, TezosXRuntimeError> {
+    // Per RFC, the CRAC event is always first, even on failure.
+    // Since the downstream transfer failed, the event is backtracked
+    // (matching Tezos protocol semantics where all applied internal ops
+    // preceding a failure are backtracked).
+    let mut all_internal = Vec::new();
+    if let Some(id) = crac_id {
+        use mir::{
+            ast::annotations::NO_ANNS, ast::micheline::Micheline, ast::Entrypoint, lexer,
+        };
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
+        let payload = Micheline::from(id.to_string()).encode();
+        all_internal.push(InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(Entrypoint::from_string_unchecked("crac".into())),
+                payload: Some(payload.into()),
+                ty: ty.into(),
+            },
+            sender: Contract::Implicit(null_pkh.clone()),
+            nonce: 0,
+            result: ContentResult::BackTracked(BacktrackedResult {
+                errors: None,
+                result: EventSuccess {
+                    consumed_milligas: Narith(0u64.into()),
+                },
+            }),
+        }));
+    }
+
+    // Per RFC, include the failed transfer (alias(E_1) → target) so
+    // indexers can see which contract call was attempted.
+    let transfer_nonce = u16::try_from(all_internal.len()).unwrap_or(u16::MAX);
+    all_internal.push(InternalOperationSum::Transfer(
+        InternalContentWithMetadata {
+            sender: sender_contract.clone(),
+            nonce: transfer_nonce,
+            content: TransferContent {
+                amount: amount.clone(),
+                destination: destination.clone(),
+                parameters: parameters.clone(),
+            },
+            result: ContentResult::Failed(ApplyOperationErrors::from(
+                ApplyOperationError::Transfer(error.clone()),
+            )),
+        },
+    ));
+    // Internal receipts already have block-global nonces from execution.
+    all_internal.extend(internal_receipts);
+
+    let top_level_result = OperationResult {
+        balance_updates: vec![],
+        result: ContentResult::Failed(ApplyOperationErrors::from(
+            ApplyOperationError::Transfer(error),
+        )),
+        internal_operation_results: all_internal,
+    };
+
+    let signature =
+        UnknownSignature::try_from(ZERO_SIGNATURE.as_slice()).map_err(|e| {
+            TezosXRuntimeError::Custom(format!("Failed to build zero signature: {e}"))
+        })?;
+
+    let op_data =
+        OperationDataAndMetadata::OperationWithMetadata(OperationBatchWithMetadata {
+            operations: vec![OperationWithMetadata {
+                content: ManagerOperationContent::Transaction(ManagerOperation {
+                    source: null_pkh.clone(),
+                    fee: Narith(0u64.into()),
+                    counter: Narith(0u64.into()),
+                    gas_limit: Narith(0u64.into()),
+                    storage_limit: Narith(0u64.into()),
+                    operation: TransferContent {
+                        amount: Narith(0u64.into()),
+                        destination: source_contract.clone(),
+                        parameters: Parameters::default(),
+                    },
+                }),
+                receipt: OperationResultSum::Transfer(top_level_result),
+            }],
+            signature,
+        });
+
+    Ok(AppliedOperation {
+        hash: OperationHash::default(),
+        branch: BlockHash::default(),
+        op_and_receipt: op_data,
+    })
 }
 
 /// Execute a cross-runtime request: parse the URL, extract parameters,
