@@ -7,7 +7,8 @@
 use crate::lazy_storage_diff::LazyStorageDiffList;
 use crate::operation::{
     ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
-    OperationContent, OriginationContent, RevealContent, TransferContent,
+    ManagerOperationField, OperationContent, OriginationContent, RevealContent,
+    TransferContent,
 };
 use mir::ast::Entrypoint;
 use mir::gas;
@@ -582,12 +583,16 @@ impl<M: OperationKind> ContentResult<M> {
         match self {
             ContentResult::Applied(success) => success.consumed_milligas().clone(),
             ContentResult::BackTracked(bt) => bt.result.consumed_milligas().clone(),
-            ContentResult::Failed(_) | ContentResult::Skipped => {
-                // TODO: L2-1034
-                // Handle `Failed` seperatly from `Skipped`.
-                Narith::from(0u64)
-            }
+            // `Failed` is charged the full `gas_limit` by
+            // `OperationWithMetadata::consumed_milligas`, which has access to
+            // the operation content. At this level we don't know the
+            // `gas_limit`, so we return 0 and let the wrapper override it.
+            ContentResult::Failed(_) | ContentResult::Skipped => Narith::from(0u64),
         }
+    }
+
+    pub fn is_failed(&self) -> bool {
+        matches!(self, ContentResult::Failed(_))
     }
 
     pub fn backtrack_if_applied(&mut self) {
@@ -858,6 +863,22 @@ pub struct OperationWithMetadata {
 
 impl OperationWithMetadata {
     pub fn consumed_milligas(&self) -> Narith {
+        // For `Failed` results, charge the full `gas_limit` (converted from
+        // gas to milligas) to the gas backlog. Otherwise an attacker could
+        // spam failing operations without ever bumping the gas price.
+        let failed = match &self.receipt {
+            OperationResultSum::Reveal(op_result) => op_result.result.is_failed(),
+            OperationResultSum::Transfer(op_result) => op_result.result.is_failed(),
+            OperationResultSum::Origination(op_result) => op_result.result.is_failed(),
+        };
+        if failed {
+            let gas_limit = self
+                .content
+                .gas_limit()
+                .map(|g| g.0.clone())
+                .unwrap_or_else(|_| 0u64.into());
+            return Narith(gas_limit * 1000u64);
+        }
         match &self.receipt {
             OperationResultSum::Reveal(op_result) => op_result.result.consumed_milligas(),
             OperationResultSum::Transfer(op_result) => {
