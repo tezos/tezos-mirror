@@ -238,37 +238,36 @@ let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
 
+(* These test the installability of the old packages *)
+let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
+    ?allow_failure ?before_script script =
+  job
+    ?allow_failure
+    ~__POS__
+    ~name
+    ~image
+    ~dependencies
+    ~variables
+    ~stage:Stages.publishing_tests
+    ?before_script
+    script
+
+let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
+    ?allow_failure script =
+  job_docker_authenticated
+    ?allow_failure
+    ~__POS__
+    ~name
+    ~dependencies
+    ~variables
+    ~stage:Stages.publishing_tests
+    script
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  (* These test the installability of the old packages *)
-  let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
-      ?allow_failure ?before_script script =
-    job
-      ?allow_failure
-      ~__POS__
-      ~name
-      ~image
-      ~dependencies
-      ~variables
-      ~stage:Stages.publishing_tests
-      ?before_script
-      script
-  in
-  let job_install_systemd_bin ~__POS__ ~name ~dependencies ?(variables = [])
-      ?allow_failure script =
-    job_docker_authenticated
-      ?allow_failure
-      ~__POS__
-      ~name
-      ~dependencies
-      ~variables
-      ~stage:Stages.publishing_tests
-      script
-  in
-
   let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
       ?allow_failure script =
     job
