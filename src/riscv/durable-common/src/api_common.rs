@@ -300,7 +300,7 @@ where
         let key = Key::try_from(key)?;
         let db = registry.database_mut(db_index)?;
 
-        db.delete(key)
+        Ok(db.delete(key)?)
     })?;
 
     split_ds_errors(res)
