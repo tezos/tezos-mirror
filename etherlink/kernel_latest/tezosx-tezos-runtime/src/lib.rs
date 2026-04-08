@@ -67,7 +67,10 @@ fn build_response(
 ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
     let gas_header = consumed_milligas.to_string();
     let (status, body) = match result {
-        Ok(response) => (StatusCode::OK, response.storage.unwrap_or_default()),
+        Ok(response) => (
+            StatusCode::OK,
+            response.storage.map(|s| s.0).unwrap_or_default(),
+        ),
         Err(TezosXRuntimeError::BadRequest(msg)) => {
             (StatusCode::BAD_REQUEST, msg.into_bytes())
         }
@@ -361,7 +364,7 @@ mod tests {
         milligas: u64,
     ) -> TransferSuccess {
         TransferSuccess {
-            storage,
+            storage: storage.map(Into::into),
             balance_updates: vec![],
             ticket_receipt: vec![],
             originated_contracts: vec![],

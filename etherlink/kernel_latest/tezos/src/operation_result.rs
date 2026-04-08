@@ -482,8 +482,7 @@ pub struct AddressRegistry {
 
 #[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct TransferSuccess {
-    #[encoding(option, bytes)]
-    pub storage: Option<Vec<u8>>,
+    pub storage: Option<MichelineExpr>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     #[encoding(dynamic, bytes)]
@@ -677,11 +676,17 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
 //
 // See: `Event` case in `internal_operation_contents` type and `event_case` value
 // in `src/proto_alpha/lib_protocol/apply_internal_results.ml`.
+pub use mir::serializer::MichelineExpr;
+
+/// Event internal operation content.
+///
+/// Binary layout (matching OCaml `event_case` in `apply_internal_results.ml`):
+///   [type: MichelineExpr] [tag: optional(Entrypoint)] [payload: optional(MichelineExpr)]
 #[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct EventContent {
-    pub ty: Vec<u8>,
+    pub ty: MichelineExpr,
     pub tag: Option<Entrypoint>,
-    pub payload: Option<Vec<u8>>,
+    pub payload: Option<MichelineExpr>,
 }
 
 #[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
@@ -738,6 +743,13 @@ impl InternalOperationSum {
             InternalOperationSum::Event(op_res) => {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
+        }
+    }
+    pub fn set_nonce(&mut self, nonce: u16) {
+        match self {
+            Self::Transfer(inner) => inner.nonce = nonce,
+            Self::Origination(inner) => inner.nonce = nonce,
+            Self::Event(inner) => inner.nonce = nonce,
         }
     }
 }
@@ -1236,8 +1248,8 @@ mod tests {
         let operation = InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
                 tag: Some(Entrypoint::from_string_unchecked("add".into())),
-                payload: Some(payload),
-                ty,
+                payload: Some(payload.into()),
+                ty: ty.into(),
             },
             sender: Contract::from_b58check("KT1SHrxmgUojs2hwe4hguExy6BqteeG1rDHi")
                 .unwrap(),
@@ -1277,7 +1289,9 @@ mod tests {
             result: ContentResult::BackTracked(BacktrackedResult {
                 errors: None,
                 result: TransferTarget::ToContrat(TransferSuccess {
-                    storage: Some(hex::decode("010000000568656c6c6f").unwrap()),
+                    storage: Some(MichelineExpr(
+                        hex::decode("010000000568656c6c6f").unwrap(),
+                    )),
                     lazy_storage_diff: None,
                     balance_updates: vec![
                         BalanceUpdate {

@@ -449,14 +449,16 @@ where
                 let payload = Some(
                     value
                         .into_micheline_optimized_legacy(&parser.arena)
-                        .encode(),
+                        .encode()
+                        .into(),
                 );
                 let ty = match arg_ty {
                     mir::ast::Or::Left(typ) => {
                         typ.into_micheline_optimized_legacy(&parser.arena).encode()
                     }
                     mir::ast::Or::Right(mic) => mic.encode(),
-                };
+                }
+                .into();
                 let result = if failed.is_some() {
                     ContentResult::Skipped
                 } else {
@@ -622,7 +624,7 @@ where
                 storage: if new_storage.is_empty() {
                     None
                 } else {
-                    Some(new_storage)
+                    Some(new_storage.into())
                 },
                 lazy_storage_diff,
                 consumed_milligas,
@@ -2757,7 +2759,7 @@ mod tests {
                     ],
                     result: ContentResult::Applied(TransferTarget::ToContrat(
                         TransferSuccess {
-                            storage: Some(storage.encode()),
+                            storage: Some(storage.encode().into()),
                             lazy_storage_diff: None,
                             balance_updates: vec![],
                             ticket_receipt: vec![],
@@ -2897,7 +2899,7 @@ mod tests {
                 ],
                 result: ContentResult::Applied(TransferTarget::ToContrat(
                     TransferSuccess {
-                        storage,
+                        storage: storage.map(Into::into),
                         lazy_storage_diff: None,
                         balance_updates: vec![
                             BalanceUpdate {
