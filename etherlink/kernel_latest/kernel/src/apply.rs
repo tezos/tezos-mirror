@@ -254,6 +254,8 @@ where
 pub struct EthereumTransactionResult {
     pub caller: H160,
     pub execution_outcome: ExecutionOutcome,
+    /// CRAC receipts for Michelson operations triggered during this EVM tx.
+    pub crac_receipts: Vec<AppliedOperation>,
 }
 
 /// Enum distinguishing between Ethereum and Tezos transaction results.
@@ -300,6 +302,135 @@ pub fn extract_cross_runtime_effects(
     }
 
     effects
+}
+
+/// Drain pending CRAC receipts from the journal, merging multiple
+/// CRACs from the same EVM transaction into a single manager operation.
+///
+/// Per RFC Example 5 (two successive gateway calls), multiple CRACs
+/// within one EVM transaction produce a single top-level Michelson
+/// operation with all internal transactions merged and one CRAC event.
+///
+/// The Michelson runtime stores one [`AppliedOperation`] per
+/// `execute_request` call.  This function merges them: the first
+/// operation keeps its top-level structure and all subsequent
+/// operations' internal transactions (excluding duplicate CRAC events)
+/// are appended to it.
+pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
+    let mut result = Vec::new();
+
+    // Failed receipts are not subject to revert and are always included.
+    result.append(&mut journal.michelson.failed_crac_receipts);
+
+    // Merge successful receipts (may be empty if EVM tx reverted).
+    let receipts = std::mem::take(&mut journal.michelson.pending_crac_receipts);
+    if receipts.len() == 1 {
+        result.extend(receipts);
+    } else if receipts.len() > 1 {
+        // Merge all receipts into the first one.  Receipts are pushed in
+        // execution order (first gateway call first), so using the first
+        // as the merge target preserves the order of internal operations
+        // in the final merged receipt (RFC Example 5).
+        let mut iter = receipts.into_iter();
+        let Some(mut merged) = iter.next() else {
+            return result;
+        };
+        for other in iter {
+            merge_crac_internals(&mut merged, other);
+        }
+        result.push(merged);
+    }
+
+    result
+}
+
+/// Assign block-sequential nonces to all internal operations across
+/// all applied operations, matching Tezos L1 semantics where nonces
+/// are shared across all operations in a block and never reset.
+///
+/// Called once at block finalization so that individual operations can
+/// use 0-based local nonces during execution.
+pub fn renumber_nonces(operations: &mut [AppliedOperation]) {
+    use tezos_tezlink::operation_result::{OperationDataAndMetadata, OperationResultSum};
+    let mut counter: u16 = 0;
+    for op in operations.iter_mut() {
+        let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+            op.op_and_receipt;
+        for op_with_meta in batch.operations.iter_mut() {
+            let internals = match &mut op_with_meta.receipt {
+                OperationResultSum::Transfer(ref mut result) => {
+                    &mut result.internal_operation_results
+                }
+                OperationResultSum::Origination(ref mut result) => {
+                    &mut result.internal_operation_results
+                }
+                OperationResultSum::Reveal(_) => continue,
+            };
+            for iop in internals.iter_mut() {
+                iop.set_nonce(counter);
+                counter = counter.saturating_add(1);
+            }
+        }
+    }
+}
+
+/// Merge `other`'s internal operations into `target`.
+/// The CRAC event stays as the first internal operation in `target`.
+/// Non-event operations from `other` are appended after `target`'s
+/// existing operations.  If `target` has no CRAC event but `other` does,
+/// the event is prepended.  Duplicate events are dropped.
+/// Nonces are left as-is; renumber_nonces() fixes them at block finalization.
+fn merge_crac_internals(target: &mut AppliedOperation, other: AppliedOperation) {
+    use tezos_tezlink::operation_result::{
+        InternalOperationSum, OperationDataAndMetadata, OperationResultSum,
+    };
+    // Partition `other`'s internals into non-events and events.
+    let (other_transfers, other_events): (Vec<_>, Vec<_>) = match other.op_and_receipt {
+        OperationDataAndMetadata::OperationWithMetadata(batch) => batch
+            .operations
+            .into_iter()
+            .flat_map(|op| match op.receipt {
+                OperationResultSum::Transfer(result) => result.internal_operation_results,
+                _ => vec![],
+            })
+            .partition(|iop| !matches!(iop, InternalOperationSum::Event(_))),
+    };
+    // Append to `target`'s internal operations, before the CRAC event.
+    // CRAC receipts are built by build_crac_receipt which guarantees exactly
+    // one operation (a Transfer).  Assert this so violations are caught early.
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        target.op_and_receipt;
+    {
+        debug_assert!(
+            !batch.operations.is_empty(),
+            "CRAC receipt must have at least one operation"
+        );
+        if let Some(op) = batch.operations.first_mut() {
+            debug_assert!(
+                matches!(op.receipt, OperationResultSum::Transfer(_)),
+                "CRAC receipt operation must be a Transfer"
+            );
+            if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+                let has_event = result
+                    .internal_operation_results
+                    .iter()
+                    .any(|iop| matches!(iop, InternalOperationSum::Event(_)));
+                if !has_event && !other_events.is_empty() {
+                    // Target has no event — prepend other's event,
+                    // then re-append existing operations.
+                    let existing = std::mem::take(&mut result.internal_operation_results);
+                    result
+                        .internal_operation_results
+                        .extend(other_events.into_iter().take(1));
+                    result.internal_operation_results.extend(existing);
+                }
+                // Append other's transfers after existing operations,
+                // preserving execution order.  Duplicate events from
+                // `other` are dropped.
+                result.internal_operation_results.extend(other_transfers);
+            }
+        }
+    }
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -525,10 +656,15 @@ where
         }
     };
 
+    // Drain any CRAC receipts produced by EVM→Michelson calls during
+    // this transaction so they can be included in the Michelson runtime block.
+    let crac_receipts = drain_pending_crac_receipts(&mut journal);
+
     let transaction_result =
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
             caller,
             execution_outcome,
+            crac_receipts,
         });
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -772,6 +908,7 @@ where
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
             caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
             execution_outcome,
+            crac_receipts: vec![],
         });
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -784,6 +921,8 @@ pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
 pub struct EthereumExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub tx_object: TransactionObject,
+    /// CRAC receipts for Michelson operations triggered during this EVM tx.
+    pub pending_crac_receipts: Vec<AppliedOperation>,
 }
 
 /// Side effect from a cross-runtime call that needs to be registered
@@ -881,6 +1020,7 @@ where
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
             caller,
             mut execution_outcome,
+            crac_receipts,
         }) => {
             let to = transaction.to()?;
 
@@ -929,6 +1069,7 @@ where
             Ok(RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
                 receipt_info,
                 tx_object,
+                pending_crac_receipts: crac_receipts,
             }))
         }
         RuntimeTransactionResult::Tezos {
@@ -953,6 +1094,7 @@ pub fn apply_transaction<Host>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: Transaction,
+    crac_id: CracId,
     index: u32,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -966,14 +1108,6 @@ where
         revm::primitives::B256::from_slice(&transaction.tx_hash),
         tracer_input,
     );
-    let origin_runtime = match &transaction.content {
-        TransactionContent::Ethereum(_)
-        | TransactionContent::EthereumDelayed(_)
-        | TransactionContent::Deposit(_)
-        | TransactionContent::FaDeposit(_) => 1, // Ethereum
-        TransactionContent::TezosDelayed(_) => 0, // Tezos
-    };
-    let crac_id = CracId::new(origin_runtime, index);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,

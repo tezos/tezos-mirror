@@ -686,20 +686,34 @@ impl ChainConfigTrait for EvmChainConfig {
         Host: StorageV1,
     {
         match transaction {
-            TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
-                host,
-                registry,
-                outbox_queue,
-                &block_constants.evm_runtime_block_constants,
-                *transaction,
-                index,
-                sequencer_pool_address,
-                tracer_input,
-                &self.spec_id,
-                &self.limits,
-            ),
+            TezosXTransaction::Ethereum(transaction) => {
+                let (origin_runtime, id) = match &transaction.content {
+                    TransactionContent::Ethereum(_)
+                    | TransactionContent::EthereumDelayed(_)
+                    | TransactionContent::Deposit(_)
+                    | TransactionContent::FaDeposit(_) => (1, index), // Ethereum
+                    TransactionContent::TezosDelayed(_) => {
+                        (0, block_in_progress.michelson_index)
+                    } // Tezos
+                };
+                let crac_id = tezosx_journal::CracId::new(origin_runtime, id);
+                crate::apply::apply_transaction(
+                    host,
+                    registry,
+                    outbox_queue,
+                    &block_constants.evm_runtime_block_constants,
+                    *transaction,
+                    crac_id,
+                    index,
+                    sequencer_pool_address,
+                    tracer_input,
+                    &self.spec_id,
+                    &self.limits,
+                )
+            }
             TezosXTransaction::Tezos(operation) => {
-                let crac_id = tezosx_journal::CracId::new(0, index);
+                let crac_id =
+                    tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
                 apply_tezos_operation(
                     &self.michelson_chain_config.chain_id,
@@ -1180,7 +1194,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
         transaction: TezosXTransaction,
-        index: u32,
+        _index: u32,
         sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
         skip_signature_check: bool,
@@ -1194,7 +1208,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
             }
             TezosXTransaction::Tezos(operation) => {
-                let crac_id = tezosx_journal::CracId::new(0, index);
+                let crac_id =
+                    tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
                 apply_tezos_operation(
                     &self.chain_id,
@@ -1217,7 +1232,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn finalize_and_store<Host>(
         &self,
         host: &mut Host,
-        block_in_progress: BlockInProgress,
+        mut block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
         chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
@@ -1244,7 +1259,13 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 .len()
         );
 
-        // Create a Tezos block from the block in progress
+        // Assign block-sequential nonces to all internal operations.
+        // Each operation uses 0-based local nonces during execution;
+        // this final pass makes them L1-compliant (sequential across
+        // the entire block).
+        crate::apply::renumber_nonces(
+            &mut block_in_progress.cumulative_tezos_operation_receipts.list,
+        );
         let tezblock = TezBlock::new(
             chain_header.next_protocol,
             TARGET_TEZOS_PROTOCOL,
