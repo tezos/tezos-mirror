@@ -197,52 +197,52 @@ let job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type :
     ~manual
     ()
 
+(* These jobs create the apt repository for the packages *)
+let job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type =
+  make_job_apt_repo
+    ~__POS__
+    ~name:"apt_repo_debian"
+    ~prefix:""
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts
+             (job_build_debian_package
+                ~limit_dune_build_jobs
+                ~manual
+                pipeline_type);
+           Artifacts (job_build_data_packages ~manual);
+         ])
+    ~variables:(Common.Packaging.archs_variables pipeline_type)
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~image:Images.Base_images.debian_trixie
+    ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
+
+let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
+  make_job_apt_repo
+    ~__POS__
+    ~name:"apt_repo_ubuntu"
+    ~prefix:""
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts
+             (job_build_ubuntu_package
+                ~limit_dune_build_jobs
+                ~manual
+                pipeline_type);
+           Artifacts (job_build_data_packages ~manual);
+         ])
+    ~variables:(Common.Packaging.archs_variables pipeline_type)
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~image:Images.Base_images.ubuntu_24_04
+    ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  (* These jobs create the apt repository for the packages *)
-  let job_apt_repo_debian =
-    make_job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_debian"
-      ~prefix:""
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts
-               (job_build_debian_package
-                  ~limit_dune_build_jobs
-                  ~manual
-                  pipeline_type);
-             Artifacts (job_build_data_packages ~manual);
-           ])
-      ~variables:(Common.Packaging.archs_variables pipeline_type)
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.Base_images.debian_trixie
-      ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
-  in
-  let job_apt_repo_ubuntu =
-    make_job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_ubuntu"
-      ~prefix:""
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts
-               (job_build_ubuntu_package
-                  ~limit_dune_build_jobs
-                  ~manual
-                  pipeline_type);
-             Artifacts (job_build_data_packages ~manual);
-           ])
-      ~variables:(Common.Packaging.archs_variables pipeline_type)
-      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.Base_images.ubuntu_24_04
-      ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
-  in
   (* These test the installability of the old packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
       ?allow_failure ?before_script script =
@@ -310,21 +310,45 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_22_04"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_ubuntu
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:[("PREFIX", "")]
         ~image:Images.Base_images.ubuntu_22_04
         ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_24_04"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_ubuntu
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:[("PREFIX", "")]
         ~image:Images.Base_images.ubuntu_24_04
         ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_24_04_systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_ubuntu
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -339,7 +363,15 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_22_04_systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_ubuntu
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -354,7 +386,15 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_24_04_systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_ubuntu
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:
           (make_debian_variables
              "ubuntu"
@@ -387,14 +427,30 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
-        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_debian
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:[("PREFIX", "")]
         ~image:Images.Base_images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_debian
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:
           (make_debian_variables
              "debian"
@@ -409,7 +465,15 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm-systemd"
-        ~dependencies:(Dependent [Job job_apt_repo_debian])
+        ~dependencies:
+          (Dependent
+             [
+               Job
+                 (job_apt_repo_debian
+                    ~limit_dune_build_jobs
+                    ~manual
+                    pipeline_type);
+             ])
         ~variables:
           (make_debian_variables
              "debian"
@@ -427,13 +491,13 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     [
       job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type;
       job_build_data_packages ~manual;
-      job_apt_repo_debian;
+      job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type;
     ]
   in
   let ubuntu_jobs =
     [
       job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type;
-      job_apt_repo_ubuntu;
+      job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type;
     ]
   in
   match pipeline_type with
