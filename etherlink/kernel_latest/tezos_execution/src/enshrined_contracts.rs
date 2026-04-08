@@ -21,12 +21,11 @@ use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::{InternalOperationSum, TransferError};
-use tezosx_interfaces::headers::format_tez_from_mutez;
 use tezosx_interfaces::{
-    gas::convert as convert_gas, CrossRuntimeContext, Registry, RuntimeId,
-    ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT, X_TEZOS_BLOCK_NUMBER,
-    X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT, X_TEZOS_SENDER, X_TEZOS_SOURCE,
-    X_TEZOS_TIMESTAMP,
+    gas::convert as convert_gas, headers::format_tez_from_mutez, CrossRuntimeContext,
+    Registry, RuntimeId, ERR_FORBIDDEN_TEZOS_HEADER, X_TEZOS_AMOUNT,
+    X_TEZOS_BLOCK_NUMBER, X_TEZOS_CRAC_ID, X_TEZOS_GAS_CONSUMED, X_TEZOS_GAS_LIMIT,
+    X_TEZOS_SENDER, X_TEZOS_SOURCE, X_TEZOS_TIMESTAMP,
 };
 use tezosx_journal::TezosXJournal;
 
@@ -315,6 +314,8 @@ pub(crate) fn drain_reentrant_crac_ops(
     }
     ops
 }
+
+/// Extract (destination, method_signature, abi_parameters, callback) from a typed
 /// Pair(String, Pair(String, Pair(Bytes, Option(Contract(Bytes))))) value.
 fn extract_call_params(
     typed: TypedValue<'_>,
@@ -464,6 +465,7 @@ fn build_http_request(
 /// `amount_mutez` is in mutez (10^-6 TEZ). It is formatted as a canonical
 /// TEZ decimal string in the header (see L2-969).
 /// `timestamp` is a Unix timestamp in seconds (must be non-negative).
+#[allow(clippy::too_many_arguments)]
 fn inject_context_headers_raw(
     headers: &mut http::HeaderMap,
     sender_alias: &str,
@@ -472,6 +474,7 @@ fn inject_context_headers_raw(
     gas_limit: u64,
     timestamp: u64,
     block_number: u32,
+    crac_id: &str,
 ) -> Result<(), TransferError> {
     let parse_value = |v: &str| -> Result<http::HeaderValue, TransferError> {
         v.parse().map_err(|e| {
@@ -490,6 +493,7 @@ fn inject_context_headers_raw(
         X_TEZOS_BLOCK_NUMBER,
         parse_value(&format!("{block_number}"))?,
     );
+    headers.insert(X_TEZOS_CRAC_ID, parse_value(crac_id)?);
     Ok(())
 }
 
@@ -605,6 +609,7 @@ where
         gas_limit,
         timestamp_u64,
         block_number_u32,
+        &journal.crac_id().to_string(),
     )
 }
 
@@ -919,12 +924,14 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 
 #[cfg(test)]
 mod tests {
-    use mir::ast::AddressHash;
+    use mir::ast::{AddressHash, Micheline};
     use mir::lexer::Prim;
     use num_bigint::BigInt;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::RuntimeId;
+    use tezosx_journal::TezosXJournal;
 
     use super::*;
     use crate::mir_ctx::mock::MockCtx;
@@ -932,6 +939,37 @@ mod tests {
 
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
     const ERC20_WRAPPER_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb";
+
+    use tezosx_journal::CracId;
+
+    /// Build a CRAC event internal operation (test helper).
+    fn make_crac_event(
+        gateway_kt1: &ContractKt1Hash,
+        crac_id: &CracId,
+    ) -> InternalOperationSum {
+        use mir::ast::annotations::NO_ANNS;
+        use mir::lexer;
+        use tezos_protocol::contract::Contract;
+        use tezos_tezlink::operation_result::{
+            EventContent, EventSuccess, InternalContentWithMetadata,
+        };
+
+        let ty = Micheline::App(lexer::Prim::string, &[], NO_ANNS).encode();
+        let payload = Micheline::from(crac_id.to_string()).encode();
+
+        InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(mir::ast::Entrypoint::from_string_unchecked("crac".into())),
+                payload: Some(payload.into()),
+                ty: ty.into(),
+            },
+            sender: Contract::Originated(gateway_kt1.clone()),
+            nonce: 0,
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: tezos_data_encoding::types::Narith(0u64.into()),
+            }),
+        })
+    }
 
     #[test]
     fn test_gateway() {
@@ -976,7 +1014,7 @@ mod tests {
         calldata.extend_from_slice(&selector);
         calldata.extend_from_slice(&abi_params);
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &calldata);
@@ -1017,7 +1055,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000u64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount as i64);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1052,7 +1090,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 1000i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First transfer creates aliases (sender + source)
@@ -1272,6 +1310,7 @@ mod tests {
     #[test]
     fn test_inject_context_headers_raw_sets_values() {
         let mut headers = http::HeaderMap::new();
+        let crac_id = CracId::new(0, 5).to_string();
         inject_context_headers_raw(
             &mut headers,
             "sender_alias",
@@ -1280,6 +1319,7 @@ mod tests {
             1000,
             1700000000u64,
             5,
+            &crac_id,
         )
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "sender_alias");
@@ -1288,6 +1328,7 @@ mod tests {
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "1000");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "1700000000");
         assert_eq!(headers.get("X-Tezos-Block-Number").unwrap(), "5");
+        assert_eq!(headers.get("X-Tezos-Crac-Id").unwrap(), "0-5");
     }
 
     #[test]
@@ -1297,6 +1338,7 @@ mod tests {
             http::header::HeaderName::from_static("x-tezos-sender"),
             "old-value".parse().unwrap(),
         );
+        let crac_id = CracId::new(0, 0).to_string();
         inject_context_headers_raw(
             &mut headers,
             "new_alias",
@@ -1305,6 +1347,7 @@ mod tests {
             0,
             0u64,
             0,
+            &crac_id,
         )
         .unwrap();
         assert_eq!(headers.get("X-Tezos-Sender").unwrap(), "new_alias");
@@ -1362,7 +1405,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 0i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1386,7 +1429,7 @@ mod tests {
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = -1i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1395,6 +1438,111 @@ mod tests {
         assert!(
             err.to_string().contains("Negative amount"),
             "error should mention negative amount: {err}"
+        );
+    }
+
+    // ── CRAC ID and event tests ─────────────────────────────────────────
+
+    /// Outgoing CRAC via default entrypoint: the gateway dispatches the
+    /// call to the EVM runtime.  CRAC events are emitted by the incoming
+    /// receipt builder, not by the gateway itself.
+    #[test]
+    fn test_outgoing_crac_via_default_entrypoint() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = "KT1_mock_alias".to_string();
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 100_000_000i64; // 100 tez in mutez
+
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+
+        let entrypoint = Entrypoint::default();
+        let value = Micheline::String(dest.to_string());
+
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &entrypoint,
+            value,
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(
+            result.is_ok(),
+            "execute_enshrined_contract failed: {result:?}"
+        );
+
+        // Gateway does not emit CRAC events itself; they are produced
+        // by the incoming receipt builder on the receiving runtime.
+        let internal_ops = result.unwrap();
+        assert!(
+            internal_ops.is_empty(),
+            "gateway should not emit internal ops"
+        );
+    }
+
+    /// Outgoing CRAC via "call_evm" entrypoint: same behavior — the
+    /// gateway dispatches the call without emitting events.
+    #[test]
+    fn test_outgoing_crac_via_call_evm_entrypoint() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = "KT1_mock_alias".to_string();
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let amount = 50_000_000i64;
+
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+
+        let arena = typed_arena::Arena::new();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let method_sig = "transfer(address,uint256)";
+        let abi_params: Vec<u8> = vec![0xAA; 64];
+
+        let value = Micheline::prim2(
+            &arena,
+            Prim::Pair,
+            Micheline::String(dest.to_string()),
+            Micheline::prim2(
+                &arena,
+                Prim::Pair,
+                Micheline::String(method_sig.to_string()),
+                Micheline::prim2(
+                    &arena,
+                    Prim::Pair,
+                    Micheline::Bytes(abi_params),
+                    Micheline::prim0(Prim::None),
+                ),
+            ),
+        );
+
+        let entrypoint = Entrypoint::try_from("call_evm").unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &entrypoint,
+            value,
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_ok(), "call_evm entrypoint failed: {result:?}");
+
+        let internal_ops = result.unwrap();
+        assert!(
+            internal_ops.is_empty(),
+            "gateway should not emit internal ops"
         );
     }
 
@@ -1414,8 +1562,7 @@ mod tests {
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
         let amount = 100i64;
-
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1443,7 +1590,7 @@ mod tests {
         .unwrap();
         let dest = "0x1234567890123456789012345678901234567890";
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, 0);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1531,8 +1678,18 @@ mod tests {
     #[test]
     fn test_inject_context_headers_raw_zero_amount() {
         let mut headers = http::HeaderMap::new();
-        inject_context_headers_raw(&mut headers, "sender", "source", 0u64, 0, 0u64, 0)
-            .unwrap();
+        let crac_id = CracId::new(0, 0).to_string();
+        inject_context_headers_raw(
+            &mut headers,
+            "sender",
+            "source",
+            0u64,
+            0,
+            0u64,
+            0,
+            &crac_id,
+        )
+        .unwrap();
         assert_eq!(headers.get("X-Tezos-Amount").unwrap(), "0");
         assert_eq!(headers.get("X-Tezos-Gas-Limit").unwrap(), "0");
         assert_eq!(headers.get("X-Tezos-Timestamp").unwrap(), "0");
@@ -1542,6 +1699,7 @@ mod tests {
     #[test]
     fn test_inject_context_headers_raw_max_values() {
         let mut headers = http::HeaderMap::new();
+        let crac_id = CracId::new(0, 0).to_string();
         inject_context_headers_raw(
             &mut headers,
             "sender",
@@ -1550,6 +1708,7 @@ mod tests {
             u64::MAX,
             u64::MAX,
             u32::MAX,
+            &crac_id,
         )
         .unwrap();
         // u64::MAX mutez is a very large TEZ amount
@@ -1733,7 +1892,7 @@ mod tests {
         // 1_000_000 mutez = 1 TEZ
         let amount = 1_000_000i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1757,7 +1916,7 @@ mod tests {
         // 1 mutez = 0.000001 TEZ
         let amount = 1i64;
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
         let result =
             tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
@@ -1865,7 +2024,7 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::Bytes(vec![0xCA, 0xFE]);
         let result = execute_enshrined_contract(
@@ -1892,7 +2051,7 @@ mod tests {
         ])
         .unwrap();
 
-        let mut journal = TezosXJournal::default();
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::Bytes(vec![]);
         let result = execute_enshrined_contract(
@@ -2004,5 +2163,109 @@ mod tests {
         let typed = TypedValue::String("not an option".into());
         let result = extract_callback(typed, "test");
         assert!(result.is_err());
+    }
+
+    /// Multiple gateway calls within the same tx share the same CRAC ID
+    /// because the CRAC-ID is determined by the top-level transaction.
+    #[test]
+    fn test_same_tx_gateway_calls_share_crac_id() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = "KT1_mock_alias".to_string();
+        let registry = MockRegistry::new(generated_alias);
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+
+        let crac_id = CracId::new(1, 0);
+        let mut journal = TezosXJournal::new(crac_id);
+        let entrypoint = Entrypoint::default();
+
+        // Two gateway calls in the same tx
+        let mut ctx1 = MockCtx::new(&mut host, source.clone(), 10_000_000);
+        let dest_a = "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &entrypoint,
+            Micheline::String(dest_a.to_string()),
+            &mut ctx1,
+            &registry,
+            &mut journal,
+        )
+        .unwrap();
+
+        let mut ctx2 = MockCtx::new(&mut host, source, 10_000_000);
+        let dest_b = "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+        execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &entrypoint,
+            Micheline::String(dest_b.to_string()),
+            &mut ctx2,
+            &registry,
+            &mut journal,
+        )
+        .unwrap();
+
+        // Both calls share the same journal CRAC-ID
+        assert_eq!(
+            *journal.crac_id(),
+            crac_id,
+            "journal CRAC-ID must remain unchanged across gateway calls"
+        );
+    }
+
+    /// Verify that the journal carries the CRAC ID set at construction.
+    #[test]
+    fn test_journal_carries_crac_id() {
+        let id = CracId::new(1, 5);
+        let journal = TezosXJournal::new(id);
+        assert_eq!(*journal.crac_id(), id);
+    }
+
+    /// RFC Example 4: Backtracking.
+    /// When a CRAC fails, applied events should be transformed to backtracked.
+    #[test]
+    fn test_crac_event_backtracking() {
+        let gateway_kt1 = ContractKt1Hash::try_from_bytes(&GATEWAY_ADDRESS).unwrap();
+        let crac_id = CracId::new(0, 10);
+        let mut event = make_crac_event(&gateway_kt1, &crac_id);
+
+        // Initially applied
+        assert!(event.is_applied());
+
+        // Transform to backtracked (simulates failure in a later internal op)
+        event.transform_result_backtrack();
+
+        // Should no longer be applied
+        assert!(!event.is_applied());
+    }
+
+    /// Verify CRAC event payload encodes the CRAC ID as "runtime_id-tx_index".
+    #[test]
+    fn test_crac_event_payload_format() {
+        let gateway_kt1 = ContractKt1Hash::try_from_bytes(&GATEWAY_ADDRESS).unwrap();
+        let crac_id = CracId::new(0, 3);
+        let event = make_crac_event(&gateway_kt1, &crac_id);
+
+        let InternalOperationSum::Event(ref e) = event else {
+            panic!("expected Event");
+        };
+
+        // The payload is Micheline-encoded. Decode it to verify the string.
+        let payload_bytes = e.content.payload.as_ref().unwrap();
+        let parser = mir::parser::Parser::new();
+        let decoded = Micheline::decode_raw(&parser.arena, &payload_bytes.0).unwrap();
+
+        match decoded {
+            Micheline::String(s) => {
+                assert_eq!(
+                    s, "0-3",
+                    "payload should be CRAC ID in runtime_id-tx_index format"
+                );
+            }
+            other => panic!("expected Micheline::String, got {other:?}"),
+        }
     }
 }
