@@ -238,9 +238,6 @@ let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
 
-let job_install_systemd_bin =
-  job_docker_authenticated ~stage:Stages.publishing_tests
-
 let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
     ?allow_failure script =
   job
@@ -323,9 +320,10 @@ let job_install_bin_ubuntu_24_04 ~limit_dune_build_jobs ~manual pipeline_type =
 
 let job_install_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
     pipeline_type =
-  job_install_systemd_bin
+  job_docker_authenticated
     ~__POS__
     ~name:"oc.install_bin_ubuntu_24_04_systemd"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -345,9 +343,10 @@ let job_install_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
 
 let job_upgrade_bin_ubuntu_22_04_systemd ~limit_dune_build_jobs ~manual
     pipeline_type =
-  job_install_systemd_bin
+  job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_ubuntu_22_04_systemd"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -367,9 +366,10 @@ let job_upgrade_bin_ubuntu_22_04_systemd ~limit_dune_build_jobs ~manual
 
 let job_upgrade_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
     pipeline_type =
-  job_install_systemd_bin
+  job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_ubuntu_24_04_systemd"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -404,9 +404,10 @@ let job_install_bin_debian_bookworm ~limit_dune_build_jobs ~manual pipeline_type
 
 let job_install_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
     pipeline_type =
-  job_install_systemd_bin
+  job_docker_authenticated
     ~__POS__
     ~name:"oc.install_bin_debian_bookworm_systemd"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
@@ -426,9 +427,10 @@ let job_install_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
 
 let job_upgrade_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
     pipeline_type =
-  job_install_systemd_bin
+  job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_debian_bookworm-systemd"
+    ~stage:Stages.publishing_tests
     ~dependencies:
       (Dependent
          [
