@@ -509,6 +509,12 @@ let crac_http_call =
     ~label:"crac_http_call"
     ~contract:"CracHttpCall"
 
+let store_and_return =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/store_and_return.sol")
+    ~label:"store_and_return"
+    ~contract:"StoreAndReturn"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
