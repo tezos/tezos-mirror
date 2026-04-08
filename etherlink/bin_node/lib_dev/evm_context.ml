@@ -467,7 +467,7 @@ module State = struct
     let* history_mode = Evm_store.Metadata.get_history_mode conn in
     match history_mode with
     | Archive -> return_none
-    | Rolling gc_param | Full gc_param | Blueprints_only gc_param ->
+    | Rolling gc_param | Full gc_param | Seed gc_param ->
         let split =
           match ctxt.session.last_split_block with
           | None -> true
@@ -1912,28 +1912,26 @@ module State = struct
     let open Configuration in
     match (h1, h2) with
     | Archive, Archive -> `No_switch
-    | Rolling gc, Rolling gc'
-    | Full gc, Full gc'
-    | Blueprints_only gc, Blueprints_only gc'
+    | (Rolling gc, Rolling gc' | Full gc, Full gc' | Seed gc, Seed gc')
       when gc.number_of_chunks = gc'.number_of_chunks ->
         `No_switch
     (* Keep this match explicit *)
     | Rolling _, Full _
     | Rolling _, Archive
-    | Rolling _, Blueprints_only _
+    | Rolling _, Seed _
     | Full _, Archive
-    | Blueprints_only _, Archive
-    | Blueprints_only _, Full _ ->
+    | Seed _, Archive
+    | Seed _, Full _ ->
         `Cannot_switch
     | Rolling _, Rolling _
     | Full _, Full _
     | Full _, Rolling _
-    | Full _, Blueprints_only _
-    | Blueprints_only _, Blueprints_only _
-    | Blueprints_only _, Rolling _
+    | Full _, Seed _
+    | Seed _, Seed _
+    | Seed _, Rolling _
     | Archive, Rolling _
     | Archive, Full _
-    | Archive, Blueprints_only _ ->
+    | Archive, Seed _ ->
         `Needs_switch
 
   let check_history_mode ?(switch = false) ~store_history_mode ~history_mode ()
@@ -2279,8 +2277,7 @@ module State = struct
 
     let* last_split_block =
       match history_mode with
-      | Rolling _ | Full _ | Blueprints_only _ ->
-          Evm_store.Irmin_chunks.latest conn
+      | Rolling _ | Full _ | Seed _ -> Evm_store.Irmin_chunks.latest conn
       | Archive -> return_none
     in
 

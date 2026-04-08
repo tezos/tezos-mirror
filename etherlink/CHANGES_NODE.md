@@ -6,7 +6,7 @@
 
 ### Configuration changes
 
-- Added a new `Blueprints_only` history mode (`--history blueprints_only:<days>`).
+- Added a new `Seed` history mode (`--history seed:<days>`).
   In this mode, the node retains only blueprints with their associated events
   (deposits, kernel upgrades, sequencer upgrades). Blocks, transactions, and
   context are pruned by the GC. Intended for nodes that only need to serve
@@ -46,7 +46,7 @@ meaning it is possible to downgrade to previous version).
 
 ### RPCs changes
 
-- `eth_estimateGas` RPC takes into account the authorization 
+- `eth_estimateGas` RPC takes into account the authorization
   lists and access lists fields in the gas estimation. (!21388)
 - Fix `eth_sendRawTransaction` leaving the node in a degraded state if
   ill-formed type-4 transactions are submitted. (!21387)

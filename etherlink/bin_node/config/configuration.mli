@@ -76,7 +76,7 @@ type history_mode =
   | Full of garbage_collector_parameters
       (** Keep all blocks and transactions. Keep operations and states for a period defined by
               {!type-garbage_collector_parameters}. *)
-  | Blueprints_only of garbage_collector_parameters
+  | Seed of garbage_collector_parameters
       (** Keep all blueprints. Prune blocks, transactions, and states for a period
           defined by {!type-garbage_collector_parameters}. Intended for nodes
           that only need to serve blueprints with events to consumers. *)

@@ -56,14 +56,14 @@ type history_mode =
   | Archive
   | Rolling of garbage_collector_parameters
   | Full of garbage_collector_parameters
-  | Blueprints_only of garbage_collector_parameters
+  | Seed of garbage_collector_parameters
 
 let history_mode_partial_eq h1 h2 =
   match (h1, h2) with
   | Archive, Archive -> true
   | Rolling _, Rolling _ -> true
   | Full _, Full _ -> true
-  | Blueprints_only _, Blueprints_only _ -> true
+  | Seed _, Seed _ -> true
   | _ -> false
 
 type rpc_server = Resto | Dream
@@ -303,10 +303,9 @@ let history_mode_of_string_opt str =
       let* days = int_of_string_opt days in
       if days > 0 then return (Full (gc_param_from_retention_period ~days))
       else None
-  | ["blueprints_only"; days] ->
+  | ["seed"; days] ->
       let* days = int_of_string_opt days in
-      if days > 0 then
-        return (Blueprints_only (gc_param_from_retention_period ~days))
+      if days > 0 then return (Seed (gc_param_from_retention_period ~days))
       else None
   | _ -> None
 
@@ -314,14 +313,13 @@ let string_of_history_mode_debug = function
   | Archive -> "archive"
   | Rolling gc -> Format.sprintf "rolling:%d" gc.number_of_chunks
   | Full gc -> Format.sprintf "full:%d" gc.number_of_chunks
-  | Blueprints_only gc ->
-      Format.sprintf "blueprints_only:%d" gc.number_of_chunks
+  | Seed gc -> Format.sprintf "seed:%d" gc.number_of_chunks
 
 let string_of_history_mode_info = function
   | Archive -> "Archive"
   | Rolling _ -> "Rolling"
   | Full _ -> "Full"
-  | Blueprints_only _ -> "Blueprints_only"
+  | Seed _ -> "Seed"
 
 let pp_history_mode_debug fmt h =
   Format.pp_print_string fmt @@ string_of_history_mode_debug h
@@ -903,21 +901,18 @@ let history_mode_schema =
   Data_encoding.(
     Json.schema
     @@ string_enum
-         [
-           ("archive", ());
-           ("full:n", ());
-           ("rolling:n", ());
-           ("blueprints_only:n", ());
-         ])
+         [("archive", ()); ("full:n", ()); ("rolling:n", ()); ("seed:n", ())])
 
 let history_mode_encoding =
   let open Data_encoding in
   def
     "history_mode"
     ~description:
-      "Compact notation for the history mode. Can be `archive`, `full:N`, \
-       `rolling:N` or `blueprints_only:N` with `N` being the number of days to \
-       use as the retention period"
+      "History mode. `archive`: keeps all data indefinitely. `full:N`: prunes \
+       Irmin context older than N days, keeps all SQL data. `rolling:N`: \
+       prunes everything older than N days. `seed:N`: minimal mode for \
+       sequencers — prunes context, blocks and transactions older than N days, \
+       keeps only blueprints and their events."
   @@ conv_with_guard
        ~schema:history_mode_schema
        string_of_history_mode_debug
@@ -1759,7 +1754,9 @@ let encoding ?network () : t Data_encoding.t =
                 false)
              (opt
                 "history"
-                ~description:"History mode of the EVM node"
+                ~description:
+                  "History mode of the EVM node (archive, full:N, rolling:N, \
+                   or seed:N)"
                 history_mode_encoding)
              (dft
                 "db"
