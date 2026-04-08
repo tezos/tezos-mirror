@@ -39,7 +39,6 @@ use tezos_ethereum::transaction::{
     TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -397,7 +396,7 @@ impl BlockInProgress {
         michelson_to_evm_gas_multiplier: u64,
     ) -> Result<(), anyhow::Error>
     where
-        Host: WithGas + Logging,
+        Host: WithGas,
     {
         match execution_info {
             RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
@@ -419,7 +418,7 @@ impl BlockInProgress {
                 let receipt = self.make_receipt(receipt_info);
                 let receipt_bloom_size: u64 =
                     tick_model::bloom_size(&receipt.logs).try_into()?;
-                log!(host, Benchmarking, "bloom size: {}", receipt_bloom_size);
+                log!(Benchmarking, "bloom size: {}", receipt_bloom_size);
                 // extend BIP's logs bloom
                 self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
@@ -505,7 +504,7 @@ impl BlockInProgress {
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root();

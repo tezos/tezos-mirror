@@ -11,7 +11,6 @@ use revm::{
     primitives::Address,
 };
 
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -67,7 +66,7 @@ impl EtherlinkPrecompiles {
         inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, Error>
     where
-        Host: StorageV1 + Logging + 'j,
+        Host: StorageV1 + 'j,
         R: Registry + 'j,
         CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
     {
@@ -121,7 +120,7 @@ impl EtherlinkPrecompiles {
 
 impl<'j, CTX, Host, R> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    Host: StorageV1 + Logging + 'j,
+    Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {

@@ -13,7 +13,6 @@ use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -70,9 +69,9 @@ pub fn reveal_storage<Host>(
     sequencer: Option<PublicKey>,
     admin: Option<ContractKt1Hash>,
 ) where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
-    log!(host, Info, "Starting the reveal dump");
+    log!(Info, "Starting the reveal dump");
 
     let config_bytes = host
         .store_read_all(&CONFIG_PATH)
@@ -85,7 +84,7 @@ pub fn reveal_storage<Host>(
 
     for (index, Set { to, value }) in sets.0.iter().enumerate() {
         if index % 50_000 == 0 {
-            log!(host, Info, "{}/{}", index, length)
+            log!(Info, "{}/{}", index, length)
         };
         host.store_write_all(to, value)
             .expect("Failed to write value");
@@ -109,11 +108,11 @@ pub fn reveal_storage<Host>(
         host.store_write(&ADMIN, bytes, 0).unwrap();
     }
 
-    log!(host, Info, "Done revealing");
+    log!(Info, "Done revealing");
 
     let chain_id = read_chain_id(host).unwrap_or(U256::from(CHAIN_ID));
     let chain_config = fetch_chain_configuration(host, chain_id);
     let configuration = fetch_configuration(host);
-    log!(host, Info, "Chain Configuration {}", chain_config);
-    log!(host, Info, "Configuration {}", configuration);
+    log!(Info, "Chain Configuration {}", chain_config);
+    log!(Info, "Configuration {}", configuration);
 }

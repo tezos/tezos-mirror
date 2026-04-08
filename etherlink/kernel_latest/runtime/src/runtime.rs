@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::extensions::WithGas;
-use tezos_evm_logging::{tracing::instrument, Level, Logging};
+use tezos_evm_logging::{tracing::instrument, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -286,8 +286,6 @@ where
         }
     }
 }
-
-impl<R, Host: BorrowMut<R> + Borrow<R>> Logging for KernelHost<R, Host> {}
 
 pub fn read_logs_verbosity(host: &impl StorageV1) -> Level {
     match host.store_read(&VERBOSITY_PATH, 0, 1) {

@@ -44,7 +44,7 @@ use tezos_ethereum::{
     transaction::TransactionHash,
     wei::{eth_from_mutez, mutez_from_wei},
 };
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
 
 use tezos_execution::{
@@ -369,9 +369,8 @@ pub trait ChainConfigTrait: Debug {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
     fn transaction_from_bytes(
-        host: &mut impl Logging,
         bytes: &[u8],
         blueprint_version: u8,
     ) -> anyhow::Result<TezosXTransaction>;
@@ -402,7 +401,7 @@ pub trait ChainConfigTrait: Debug {
         skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
     fn finalize_and_store<Host>(
         &self,
         host: &mut Host,
@@ -411,14 +410,14 @@ pub trait ChainConfigTrait: Debug {
         chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
     fn start_simulation_mode<Host>(
         &self,
         host: &mut Host,
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost + Logging;
+        Host: StorageV1 + WasmHost;
 }
 
 fn ethereum_transaction_from_bytes(
@@ -586,7 +585,6 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn transaction_from_bytes(
-        host: &mut impl Logging,
         bytes: &[u8],
         blueprint_version: u8,
     ) -> anyhow::Result<TezosXTransaction> {
@@ -616,17 +614,13 @@ impl ChainConfigTrait for EvmChainConfig {
                         Ok(TezosXTransaction::Ethereum(Box::new(tx)))
                     }
                     Err(message) => {
-                        log!(host, Error, "Unknown runtime id tag: {tag}, {message}");
+                        log!(Error, "Unknown runtime id tag: {tag}, {message}");
                         Err(DecoderError::Custom("Unknown runtime id").into())
                     }
                 }
             }
             _ => {
-                log!(
-                    host,
-                    Error,
-                    "Unknown blueprint version: {blueprint_version:?}"
-                );
+                log!(Error, "Unknown blueprint version: {blueprint_version:?}");
                 Err(DecoderError::Custom("Unknown blueprint version").into())
             }
         }
@@ -639,7 +633,7 @@ impl ChainConfigTrait for EvmChainConfig {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
@@ -688,7 +682,7 @@ impl ChainConfigTrait for EvmChainConfig {
         skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         match transaction {
             TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
@@ -732,7 +726,7 @@ impl ChainConfigTrait for EvmChainConfig {
         _chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         block_in_progress.finalize_and_store(
             host,
@@ -747,7 +741,7 @@ impl ChainConfigTrait for EvmChainConfig {
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost + Logging,
+        Host: StorageV1 + WasmHost,
     {
         start_simulation_mode(host, registry, &self.spec_id)
     }
@@ -831,7 +825,7 @@ fn credit_da_fees<Host>(
     da_fees_mutez: u64,
 ) -> Result<(), anyhow::Error>
 where
-    Host: Logging + StorageV1,
+    Host: StorageV1,
 {
     if let Some(sequencer_pool_address) = sequencer_pool_address {
         let da_fees_wei = eth_from_mutez(da_fees_mutez);
@@ -859,10 +853,7 @@ enum CreditDaFees {
 }
 
 impl CreditDaFees {
-    fn apply<Host: Logging + StorageV1>(
-        self,
-        host: &mut Host,
-    ) -> Result<(), anyhow::Error> {
+    fn apply<Host: StorageV1>(self, host: &mut Host) -> Result<(), anyhow::Error> {
         match self {
             CreditDaFees::Skip => Ok(()),
             CreditDaFees::Execute {
@@ -933,7 +924,7 @@ pub fn apply_tezos_operation<Host>(
     external_journal: &mut TezosXJournal,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let context = &block_constants.context;
 
@@ -978,12 +969,7 @@ where
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
-                    log!(
-                        host,
-                        Error,
-                        "Found an invalid operation, dropping it: {:?}",
-                        err
-                    );
+                    log!(Error, "Found an invalid operation, dropping it: {:?}", err);
                     return Ok(crate::apply::ExecutionResult::Invalid);
                 }
                 Err(OperationError::RuntimeError(err)) => {
@@ -1028,7 +1014,7 @@ where
             ))
         }
         TezlinkContent::Deposit(deposit) => {
-            log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
+            log!(Debug, "Execute Tezlink deposit: {deposit:?}");
 
             let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
 
@@ -1125,7 +1111,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
         // the logic to retrieve delayed_inbox items.
@@ -1167,7 +1153,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
     }
 
     fn transaction_from_bytes(
-        _host: &mut impl Logging,
         bytes: &[u8],
         _version: u8,
     ) -> anyhow::Result<TezosXTransaction> {
@@ -1199,7 +1184,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         skip_fees_check: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         match transaction {
             TezosXTransaction::Ethereum(_transaction) => {
@@ -1234,7 +1219,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         // After a protocol upgrade, the first block has
         // chain_header.next_protocol != TARGET_TEZOS_PROTOCOL (it still
@@ -1278,7 +1263,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         registry: &impl Registry,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + WasmHost + Logging,
+        Host: StorageV1 + WasmHost,
     {
         fn read_inbox_message(
             host: &mut impl WasmHost,
@@ -1324,9 +1309,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 .map_err(|_| crate::error::Error::InvalidConversion)?
         };
         let hash = operation.hash()?;
-        log!(
-            host,
-            Debug,
+        log!(Debug,
             "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
             operation_bytes.len()
         );
@@ -1367,12 +1350,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             ),
         };
 
-        log!(
-            host,
-            Debug,
-            "Tezlink simulation finished, result: {:?}",
-            result
-        );
+        log!(Debug, "Tezlink simulation finished, result: {:?}", result);
         host.store_write_all(&TEZLINK_SIMULATION_RESULT_PATH, &result.to_bytes()?)?;
         Ok(())
     }

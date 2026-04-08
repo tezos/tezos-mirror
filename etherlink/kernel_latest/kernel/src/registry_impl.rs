@@ -20,7 +20,6 @@ impl RegistryImpl {
 
 use primitive_types::U256;
 use tezos_crypto_rs::hash::ChainId;
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_ethereum_runtime::EthereumRuntime;
 use tezosx_interfaces::{Registry, RuntimeInterface};
@@ -38,7 +37,7 @@ impl Registry for RegistryImpl {
         gas_remaining: u64,
     ) -> Result<(String, u64), tezosx_interfaces::TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         match runtime_id {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.generate_alias(
@@ -82,7 +81,7 @@ impl Registry for RegistryImpl {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         journal.record_request(&request);
         let result = match request.uri().host() {

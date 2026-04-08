@@ -9,7 +9,7 @@ use tezos_ethereum::{
     block::EthBlock,
     transaction::{TransactionObject, TransactionReceipt},
 };
-use tezos_evm_logging::{log, Level::Info, Logging};
+use tezos_evm_logging::{log, Level::Info};
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_host::path::{concat, Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -68,14 +68,13 @@ pub fn store_current<Host>(
     block: &L2Block,
 ) -> Result<(), crate::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     store_current_number(host, root, block.number())?;
     write_h256_be(host, &path::current_hash(root)?, block.hash())?;
     update_block_indexes(host, root, block)?;
     host.store_write_all(&path::current_block(root)?, &block.to_bytes())?;
     log!(
-        host,
         Info,
         "Storing block {} at {} containing {} transaction(s) for {} gas used.",
         block.number(),
@@ -241,7 +240,7 @@ pub mod internal_for_tests {
         tx_hash: &TransactionHash,
     ) -> Result<TransactionStatus, Error>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let receipt = read_transaction_receipt(host, tx_hash)?;
         Ok(receipt.status)

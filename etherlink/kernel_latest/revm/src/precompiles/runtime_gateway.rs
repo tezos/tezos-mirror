@@ -28,7 +28,6 @@ use crate::{
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -147,7 +146,7 @@ fn resolve_aliases<'j, CTX, Host, R>(
     source: Address,
 ) -> Result<Option<(String, String)>, CustomPrecompileError>
 where
-    Host: StorageV1 + Logging + 'j,
+    Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
@@ -230,7 +229,7 @@ pub(crate) fn runtime_gateway_precompile<'j, CTX, Host, R>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    Host: StorageV1 + Logging + 'j,
+    Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {

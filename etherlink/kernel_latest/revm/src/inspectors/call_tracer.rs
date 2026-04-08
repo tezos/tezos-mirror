@@ -30,7 +30,7 @@ use tezos_ethereum::{
     rlp_helpers::{check_list, decode_field, decode_option, next},
     Log as RlpLog,
 };
-use tezos_evm_logging::{log, Level::Debug, Logging};
+use tezos_evm_logging::{log, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -122,7 +122,7 @@ impl Encodable for CallTrace {
 
 impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for CallTracer
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool {
@@ -259,7 +259,7 @@ impl CallTracer {
         output: &Bytes,
         instruction_result: &InstructionResult,
     ) where
-        Host: StorageV1 + Logging + 'a,
+        Host: StorageV1 + 'a,
         R: Registry + 'a,
         CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     {
@@ -286,11 +286,7 @@ impl CallTracer {
             let traces = std::mem::take(&mut self.pending_traces);
             flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
                 .inspect_err(|err| {
-                    log!(
-                        context.db_mut().host,
-                        Debug,
-                        "Flushing call traces failed with: {err:?}"
-                    );
+                    log!(Debug, "Flushing call traces failed with: {err:?}");
                 })
                 .ok();
         }
@@ -299,7 +295,7 @@ impl CallTracer {
 
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for CallTracer
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,

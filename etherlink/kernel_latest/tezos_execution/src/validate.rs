@@ -6,7 +6,7 @@ use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -30,7 +30,6 @@ use crate::{
 /// successor of the stored counter. If not, it returns the appropriate
 /// error.
 fn check_and_increment_counter(
-    host: &impl Logging,
     account_counter: &mut Narith,
     operation_counter: &Narith,
 ) -> Result<(), ValidityError> {
@@ -38,7 +37,6 @@ fn check_and_increment_counter(
     let expected_counter = Narith(&account_counter.0 + 1_u64);
     if &expected_counter == operation_counter {
         log!(
-            host,
             Debug,
             "Validation: OK - Operation has the expected counter {:?}.",
             expected_counter
@@ -52,14 +50,12 @@ fn check_and_increment_counter(
     };
     if error.expected > error.found {
         log!(
-            host,
             tezos_evm_logging::Level::Debug,
             "Invalid operation: Source counter is in the past"
         );
         Err(ValidityError::CounterInThePast(error))
     } else {
         log!(
-            host,
             tezos_evm_logging::Level::Debug,
             "Invalid operation: Source counter is in the future"
         );
@@ -164,7 +160,6 @@ fn validate_source<Host: StorageV1, C: Context>(
 }
 
 fn validate_individual_operation(
-    host: &impl Logging,
     content: ManagerOperation<OperationContent>,
     account_pkh: &PublicKeyHash,
     account_balance: &mut Narith,
@@ -172,12 +167,11 @@ fn validate_individual_operation(
     mut gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
     gas.consume(crate::gas::Cost::manager_operation())?;
-    check_and_increment_counter(host, account_counter, &content.counter)?;
+    check_and_increment_counter(account_counter, &content.counter)?;
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_storage_limit = 60000_u64;
     check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
     log!(
-        host,
         Debug,
         "Validation: OK - the storage_limit {:?} does not exceed the {:?} threshold.",
         &content.storage_limit,
@@ -191,9 +185,7 @@ fn validate_individual_operation(
         .ok_or(ValidityError::CantPayFees(content.fee.clone()))?
         .into();
 
-    log!(
-        host,
-        Debug,
+    log!(Debug,
         "Validation: OK - the source can pay {:?} in fees, being left with a new balance of {:?}.",
         &content.fee,
         account_balance
@@ -255,7 +247,7 @@ pub fn execute_validation<Host, C: Context>(
     required_fees: Option<u64>,
 ) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
@@ -275,11 +267,10 @@ where
         &pk,
         &mut validation_gas,
     ) {
-        Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
+        Ok(true) => log!(Debug, "Validation: OK - Signature is valid."),
         _ => {
             if skip_signature_check {
                 log!(
-                    host,
                     Debug,
                     "Validation: Signature is invalid but signature check is disabled."
                 )
@@ -307,7 +298,6 @@ where
     // Charge the gas for the validation on the first operation of the batch
     let gas_charged_operation = unvalidated_operation.remove(0);
     validated_operations.push(validate_individual_operation(
-        host,
         gas_charged_operation,
         source_account.pkh(),
         &mut source_balance,
@@ -318,7 +308,6 @@ where
         let operation_gas = TezlinkOperationGas::start(&content.gas_limit)
             .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
         let validated_operation = validate_individual_operation(
-            host,
             content,
             source_account.pkh(),
             &mut source_balance,
@@ -339,7 +328,6 @@ where
             });
         if total_fees < Narith(required_fees.into()) {
             log!(
-                host,
                 Error,
                 "Insufficient fees: batch provides {:?} mutez but needs {:?} mutez",
                 total_fees,

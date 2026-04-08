@@ -33,7 +33,7 @@ use revm::{
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
 use tezos_evm_logging::{
-    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, Logging, OTelAttrValue,
+    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
 };
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
@@ -217,7 +217,7 @@ fn get_inspector_from<'a, Host, R>(
     spec_id: SpecId,
 ) -> Box<dyn EtherlinkInspector<'a, Host, R>>
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
 {
     match tracer_input {
@@ -258,7 +258,7 @@ fn build_evm_inspector_context<
     is_simulation: bool,
 ) -> EvmInspection<'a, Host, INSP, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -300,7 +300,7 @@ fn build_evm_context<'a, Host, R: Registry>(
     is_simulation: bool,
 ) -> EvmContext<'a, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
@@ -333,7 +333,7 @@ fn execute_transaction<'a, Host, R: Registry>(
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
 ) -> Result<ExecutionResult, EVMError<Error>>
 where
-    Host: Logging + StorageV1,
+    Host: StorageV1,
 {
     let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
         if transaction_hash.is_some() && cfg!(feature = "tracing") {
@@ -377,7 +377,7 @@ pub fn run_transaction<'a, Host, R: Registry>(
     mut origin: TransactionOrigin,
 ) -> Result<ExecutionOutcome, EVMError<Error>>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
@@ -608,7 +608,6 @@ mod test {
         use alloy_sol_types::sol;
         use primitive_types::U256 as PU256;
         use revm::primitives::hardfork::SpecId;
-        use tezos_evm_logging::Logging;
         use tezos_smart_rollup_host::{
             path::{concat, OwnedPath, RefPath},
             storage::StorageV1,
@@ -668,7 +667,7 @@ mod test {
                 gas_remaining: u64,
             ) -> Result<(String, u64), TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 match runtime_id {
                     RuntimeId::Tezos => self.mock_tezos.generate_alias(
@@ -710,7 +709,7 @@ mod test {
                 request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 match request.uri().host() {
                     Some("tezos") | Some("stub") => {
@@ -757,7 +756,7 @@ mod test {
                 gas_remaining: u64,
             ) -> Result<(String, u64), TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 // Deterministic mock: compute a KT1 from native_address bytes
                 use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
@@ -774,7 +773,7 @@ mod test {
                 request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 // Parse the destination address from the URL path
                 let path = request.uri().path();

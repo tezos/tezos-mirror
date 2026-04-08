@@ -20,7 +20,7 @@ use crate::storage::read_last_info_per_level_timestamp;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -38,7 +38,7 @@ pub fn fetch_proxy_blueprints<Host>(
     chain_configuration: &EvmChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
         host,
@@ -66,7 +66,7 @@ fn fetch_delayed_transactions<Host>(
     delayed_inbox: &mut DelayedInbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     let timestamp = read_last_info_per_level_timestamp(host)?;
     // Number and minimal timestamp for the first forced blueprint
@@ -81,7 +81,6 @@ where
 
     while let Some(timed_out) = delayed_inbox.next_delayed_inbox_blueprint(host)? {
         log!(
-            host,
             Info,
             "Creating blueprint from timed out delayed transactions of length {}",
             timed_out.len()
@@ -101,12 +100,7 @@ where
 
         // Clean existing blueprints
         if offset == 0 {
-            log!(
-                host,
-                Info,
-                "Deleting all blueprints following flush at {}",
-                level
-            );
+            log!(Info, "Deleting all blueprints following flush at {}", level);
             clear_all_blueprints(host)?;
         }
 
@@ -137,7 +131,7 @@ fn fetch_sequencer_blueprints<Host, ChainConfig: ChainConfigTrait>(
     chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match read_sequencer_inbox(
         host,
@@ -152,7 +146,7 @@ where
         chain_configuration,
     )? {
         StageOneStatus::Done => {
-            log!(host, Debug, "Stage one done, rebooting");
+            log!(Debug, "Stage one done, rebooting");
             // Check if there are timed-out transactions in the delayed inbox
             let timed_out = delayed_inbox.first_has_timed_out(host)?;
             if timed_out {
@@ -177,7 +171,7 @@ pub fn fetch_blueprints<Host>(
     config: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     match (chain_config, &mut config.mode) {
         (
@@ -259,7 +253,6 @@ mod tests {
     use rlp::Encodable;
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::types::Bytes;
-    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
@@ -429,7 +422,7 @@ mod tests {
         }
     }
 
-    fn delayed_inbox_is_empty<Host: StorageV1 + Logging>(
+    fn delayed_inbox_is_empty<Host: StorageV1>(
         conf: &Configuration,
         host: &mut Host,
     ) -> bool {

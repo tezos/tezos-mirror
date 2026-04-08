@@ -21,7 +21,7 @@ use crate::{
 use primitive_types::U256;
 use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -169,7 +169,7 @@ fn fetch_tezos_contracts(host: &mut impl StorageV1) -> TezosContracts {
 
 pub fn fetch_evm_limits<Host>(host: &mut Host) -> EvmLimits
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let maximum_gas_limit =
         read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
@@ -197,7 +197,7 @@ where
 
 fn fetch_evm_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let config = fetch_pure_evm_config(host, chain_id);
     ChainConfig::Evm(Box::new(config))
@@ -218,7 +218,7 @@ fn fetch_michelson_runtime_chain_id(host: &mut impl StorageV1) -> ChainId {
 
 pub fn fetch_pure_evm_config<Host>(host: &mut Host, chain_id: U256) -> EvmChainConfig
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
@@ -240,13 +240,12 @@ fn fetch_michelson_chain_configuration(
     ChainConfig::new_michelson_config(chain_id)
 }
 
-fn try_chain_id_from_u256(host: &impl Logging, chain_id: U256) -> Option<ChainId> {
+fn try_chain_id_from_u256(chain_id: U256) -> Option<ChainId> {
     // Tezos-compatible chain ids have only 4 bytes.
     let chain_id_low_bytes = chain_id.low_u32();
 
     if chain_id != chain_id_low_bytes.into() {
         log!(
-            host,
             Error,
             "Configured chain family is Michelson but chain id does not fit on 4 bytes."
         );
@@ -256,9 +255,7 @@ fn try_chain_id_from_u256(host: &impl Logging, chain_id: U256) -> Option<ChainId
     match ChainId::try_from_bytes(&chain_id_low_bytes.to_le_bytes()) {
         Err(_) => {
             // This is unexpected, any u32 should be decodable as a chain id
-            log!(
-                host,
-                Error,
+            log!(Error,
                 "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed."
             );
             None
@@ -269,17 +266,17 @@ fn try_chain_id_from_u256(host: &impl Logging, chain_id: U256) -> Option<ChainId
 
 pub fn fetch_chain_configuration<Host>(host: &mut Host, chain_id: U256) -> ChainConfig
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // if the info is not in durable storage, we must not fail, but treat it as EVM
     let chain_family = read_chain_family(host, chain_id).unwrap_or_default();
     match chain_family {
         ChainFamily::Evm => fetch_evm_chain_configuration(host, chain_id),
         ChainFamily::Michelson => {
-            if let Some(chain_id) = try_chain_id_from_u256(host, chain_id) {
+            if let Some(chain_id) = try_chain_id_from_u256(chain_id) {
                 fetch_michelson_chain_configuration(host, chain_id)
             } else {
-                log!(host, Error, "Falling back to EVM chain family.");
+                log!(Error, "Falling back to EVM chain family.");
                 fetch_evm_chain_configuration(host, chain_id)
             }
         }
@@ -288,7 +285,7 @@ where
 
 pub fn fetch_configuration<Host>(host: &mut Host) -> Configuration
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     let tezos_contracts = fetch_tezos_contracts(host);
     let maximum_allowed_ticks =
@@ -327,7 +324,7 @@ where
                     enable_fa_bridge,
                 },
                 Err(err) => {
-                    log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
+                    log!(Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
                     Configuration::default()
                 }
             }

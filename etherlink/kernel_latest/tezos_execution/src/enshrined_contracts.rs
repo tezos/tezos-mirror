@@ -19,7 +19,6 @@ use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::headers::format_tez_from_mutez;
@@ -128,7 +127,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     journal: &mut TezosXJournal,
 ) -> Result<Vec<OperationInfo<'a>>, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
@@ -474,7 +473,7 @@ fn inject_context_headers<'a, Host>(
     registry: &impl Registry,
 ) -> Result<(), TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let sender = ctx.sender();
     let source = AddressHash::from(ctx.source());
@@ -667,7 +666,7 @@ fn get_or_create_alias<Host>(
     gas_remaining_evm: u64,
 ) -> Result<(String, u64), TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
         return Ok((alias, 0));
@@ -698,7 +697,7 @@ fn cross_runtime_ctx_from_ctx<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
 ) -> Result<CrossRuntimeContext, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Remaining milligas is the gas budget for the cross-runtime call, in Tezos
     // milligas. `inject_context_headers` converts to the target runtime's units
@@ -719,7 +718,7 @@ fn tezosx_cross_runtime_call<'a, Host>(
     data: &[u8],
 ) -> Result<Vec<u8>, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()));

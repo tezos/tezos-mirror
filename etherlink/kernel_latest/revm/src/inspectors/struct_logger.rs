@@ -24,7 +24,7 @@ use revm::{
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
-use tezos_evm_logging::{log, tracing::instrument, Level::Debug, Logging};
+use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -142,12 +142,10 @@ impl StructLog {
 
     pub fn store<Host>(&self, host: &mut Host, transaction_hash: &Option<B256>)
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         store_struct_log(host, self, transaction_hash)
-            .inspect_err(|err| {
-                log!(host, Debug, "Storing call trace failed with: {err:?}")
-            })
+            .inspect_err(|err| log!(Debug, "Storing call trace failed with: {err:?}"))
             .ok();
     }
 }
@@ -202,7 +200,7 @@ impl StructLogger {
         transaction_hash: Option<B256>,
     ) -> Result<(), Error>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         store_trace_failed(host, is_success, &transaction_hash)?;
         store_trace_gas(host, gas_used, &transaction_hash)?;
@@ -215,7 +213,7 @@ impl StructLogger {
 
 impl<'a, Host, R> EtherlinkInspector<'a, Host, R> for StructLogger
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool {
@@ -229,7 +227,7 @@ where
 
 impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
     CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<

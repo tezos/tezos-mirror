@@ -99,8 +99,7 @@ pub fn get_verbosity_level() -> Level {
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
-    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {{
-        let _ = $host;
+    ($level: expr, $fmt: expr $(, $arg:expr)*)  => {{
         if $crate::get_verbosity_level() >= $level {
             let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
             $crate::debug_str!(&msg);
@@ -223,5 +222,3 @@ pub mod tracing {
         }};
     }
 }
-
-pub trait Logging {}

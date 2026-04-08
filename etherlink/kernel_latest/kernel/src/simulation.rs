@@ -35,7 +35,6 @@ use tezos_ethereum::rlp_helpers::{
     decode_timestamp, next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
 
 use tezos_smart_rollup::types::Timestamp;
@@ -392,7 +391,7 @@ impl Evaluation {
         Error,
     >
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
@@ -670,9 +669,9 @@ pub fn start_simulation_mode<Host>(
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + WasmHost + Logging,
+    Host: StorageV1 + WasmHost,
 {
-    log!(host, Debug, "Starting simulation mode ");
+    log!(Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
@@ -771,7 +770,7 @@ mod tests {
 
     fn create_contract<Host>(host: &mut Host) -> H160
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));

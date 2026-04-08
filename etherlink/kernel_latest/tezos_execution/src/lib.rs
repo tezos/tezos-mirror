@@ -22,7 +22,7 @@ use std::vec::IntoIter;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
@@ -73,9 +73,9 @@ fn reveal<Host, C: Context>(
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
-    log!(tc_ctx.host, Debug, "Applying a reveal operation");
+    log!(Debug, "Applying a reveal operation");
     let manager = source_account
         .manager(tc_ctx.host)
         .map_err(|_| RevealError::UnretrievableManager)?;
@@ -101,7 +101,7 @@ where
         .set_manager_public_key(tc_ctx.host, public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
 
-    log!(tc_ctx.host, Debug, "Reveal operation succeed");
+    log!(Debug, "Reveal operation succeed");
 
     Ok(RevealSuccess {
         consumed_milligas: tc_ctx
@@ -126,7 +126,7 @@ fn transfer_tez<Host>(
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let balance_updates =
         compute_balance_updates(giver_account, receiver_account, amount)
@@ -238,7 +238,7 @@ fn execute_internal_operations<'a, Host, C: Context>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<(), ApplyOperationError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
@@ -249,7 +249,6 @@ where
             .consume(Cost::manager_operation())
             .map_err(|_| TransferError::OutOfGas)?;
         log!(
-            tc_ctx.host,
             Debug,
             "Executing internal operation {operation:?} with counter {counter:?}"
         );
@@ -325,11 +324,7 @@ where
                             }
                             Err(err) => {
                                 failed = Some(index);
-                                log!(
-                                    tc_ctx.host,
-                                    Error,
-                                    "Internal transfer failed: {err:?}"
-                                );
+                                log!(Error, "Internal transfer failed: {err:?}");
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -387,11 +382,7 @@ where
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
                                 failed = Some(index);
-                                log!(
-                                    tc_ctx.host,
-                                    Error,
-                                    "Internal origination failed: {err:?}"
-                                );
+                                log!(Error, "Internal origination failed: {err:?}");
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -446,16 +437,11 @@ where
                 })
             }
         };
-        log!(
-            tc_ctx.host,
-            Debug,
-            "Internal operation executed successfully"
-        );
+        log!(Debug, "Internal operation executed successfully");
         all_internal_receipts.push(internal_receipt);
     }
     if let Some(index) = failed {
         log!(
-            tc_ctx.host,
             Debug,
             "Internal operation execution failed at index {index}"
         );
@@ -488,7 +474,7 @@ fn transfer<'a, Host, C: Context>(
     skip_sender_debit: bool,
 ) -> Result<TransferSuccess, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -592,7 +578,7 @@ where
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
-            log!(ctx.host(), Debug, "Transfer operation succeeded");
+            log!(Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: if new_storage.is_empty() {
                     None
@@ -659,11 +645,9 @@ fn transfer_external<'a, Host, C: Context>(
     parser: &'a Parser<'a>,
 ) -> Result<TransferTarget, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
-    log!(
-        tc_ctx.host,
-        Debug,
+    log!(Debug,
         "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
         operation_ctx.source.contract()
     );
@@ -711,7 +695,7 @@ pub fn cross_runtime_transfer<'a, Host, C: Context>(
     parser: &'a Parser<'a>,
 ) -> Result<TransferTarget, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let entrypoint = &parameters.entrypoint;
     let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
@@ -834,7 +818,7 @@ fn originate_contract<'a, Host, C: Context>(
     script_storage: TypedValue<'a>,
 ) -> Result<OriginationSuccess, OriginationError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // If the origination is internal the big map are handled by the first transfer
     // The big_maps vector will be filled only if the origination is "external"
@@ -974,7 +958,7 @@ fn apply_balance_changes<Host>(
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let giver_balance = giver_account
         .balance(host)
@@ -1001,9 +985,7 @@ where
         .set_balance(host, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
 
-    log!(
-        host,
-        Debug,
+    log!(Debug,
         "Transfer: OK - the new balance of the giver is {new_giver_balance:?} and the new balance of the receiver is {new_receiver_balance:?}"
     );
 
@@ -1094,7 +1076,7 @@ fn execute_smart_contract<'a, Host>(
     journal: &mut TezosXJournal,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match code {
         Code::Code(code) => {
@@ -1144,7 +1126,7 @@ pub fn validate_and_apply_operation<Host, C: Context>(
     required_fees: Option<u64>,
 ) -> Result<Vec<OperationWithMetadata>, OperationError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut safe_host = SafeStorage {
         host,
@@ -1153,7 +1135,7 @@ where
 
     safe_host.start()?;
 
-    log!(safe_host, Debug, "Verifying that the batch is valid");
+    log!(Debug, "Verifying that the batch is valid");
 
     let validation_info = match validate::execute_validation(
         &mut safe_host,
@@ -1164,17 +1146,13 @@ where
     ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
-            log!(
-                safe_host,
-                Debug,
-                "Reverting the changes because the batch is invalid."
-            );
+            log!(Debug, "Reverting the changes because the batch is invalid.");
             safe_host.revert()?;
             return Err(OperationError::Validation(validity_err));
         }
     };
 
-    log!(safe_host, Debug, "Batch is valid!");
+    log!(Debug, "Batch is valid!");
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
@@ -1193,7 +1171,6 @@ where
 
     if applied {
         log!(
-            safe_host,
             Debug,
             "Committing the changes because the batch was successfully applied."
         );
@@ -1201,11 +1178,10 @@ where
         safe_host.promote_trace()?;
     } else {
         log!(
-            safe_host,
             Debug,
             "Reverting the changes because some operation failed."
         );
-        log!(safe_host, Debug, "Receipts: {receipts:#?}");
+        log!(Debug, "Receipts: {receipts:#?}");
         safe_host.revert()?;
         // Clear the in-memory EVM journal: safe_host.revert() only rolls
         // back Tezos durable storage but cannot affect the in-memory REVM
@@ -1227,7 +1203,7 @@ fn apply_batch<Host, C: Context>(
     block_ctx: &BlockCtx,
 ) -> (Vec<OperationWithMetadata>, bool)
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let validate::ValidatedBatch {
         source_account,
@@ -1238,14 +1214,12 @@ where
     let mut next_temporary_id = BigMapId { value: (-1).into() };
     for (index, validated_operation) in validated_operations.into_iter().enumerate() {
         log!(
-            host,
             Debug,
             "Applying operation #{index} in the batch with counter {:?}.",
             validated_operation.content.counter
         );
         let receipt = if first_failure.is_some() {
             log!(
-                host,
                 Debug,
                 "Skipping this operation because we already failed on {first_failure:?}."
             );
@@ -1279,7 +1253,6 @@ where
 
     if let Err(lazy_storage_err) = cleared {
         log!(
-            host,
             Error,
             "Cleaning the temporary big_map in the storage failed: {lazy_storage_err}"
         )
@@ -1308,7 +1281,7 @@ fn apply_operation<Host, C: Context>(
     block_ctx: &BlockCtx,
 ) -> OperationWithMetadata
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut internal_operations_receipts = Vec::new();
     let mut gas = validated_operation.gas;
@@ -1325,7 +1298,7 @@ where
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
 
             if reveal_result.is_err() {
-                log!(host, Error, "Reveal failed because of: {reveal_result:?}");
+                log!(Error, "Reveal failed because of: {reveal_result:?}");
             }
 
             let manager_result = produce_operation_result(
@@ -1364,11 +1337,7 @@ where
             );
 
             if transfer_result.is_err() {
-                log!(
-                    host,
-                    Error,
-                    "Transfer failed because of: {transfer_result:?}"
-                );
+                log!(Error, "Transfer failed because of: {transfer_result:?}");
             }
 
             let manager_result = produce_operation_result(
@@ -1404,7 +1373,6 @@ where
 
             if origination_result.is_err() {
                 log!(
-                    host,
                     Error,
                     "Origination failed because of: {origination_result:?}"
                 );
@@ -1428,7 +1396,6 @@ where
 #[allow(clippy::type_complexity)]
 pub(crate) mod test_utils {
     use std::cell::RefCell;
-    use tezos_evm_logging::Logging;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
         CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
@@ -1464,7 +1431,7 @@ pub(crate) mod test_utils {
             gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             self.generate_alias_calls
                 .borrow_mut()
@@ -1487,7 +1454,7 @@ pub(crate) mod test_utils {
             request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             self.serve_calls.borrow_mut().push(request);
             Ok(http::Response::builder().status(200).body(vec![]).unwrap())
@@ -1530,7 +1497,7 @@ pub(crate) mod test_utils {
             gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             Ok((self.generated_alias.clone(), gas_remaining))
         }
@@ -1550,7 +1517,7 @@ pub(crate) mod test_utils {
             request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             self.serve_calls.borrow_mut().push(request);
             Ok(http::Response::builder()
@@ -1585,7 +1552,6 @@ mod tests {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
-    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
@@ -1635,7 +1601,7 @@ mod tests {
             _gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }
@@ -1655,7 +1621,7 @@ mod tests {
             _request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             unimplemented!("not needed for this test")
         }
@@ -5391,7 +5357,7 @@ mod tests {
         init_receiver: &str,
     ) -> BigMapTransfer
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
@@ -6462,7 +6428,7 @@ mod tests {
                 gas_remaining: u64,
             ) -> Result<(String, u64), TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 Ok(("KT1_mock_revert".to_string(), gas_remaining))
             }
@@ -6482,7 +6448,7 @@ mod tests {
                 _request: http::Request<Vec<u8>>,
             ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
             where
-                Host: StorageV1 + Logging,
+                Host: StorageV1,
             {
                 Ok(http::Response::builder()
                     .status(http::StatusCode::INTERNAL_SERVER_ERROR)

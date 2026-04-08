@@ -17,7 +17,7 @@ use tezos_ethereum::{
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
 };
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
@@ -202,7 +202,7 @@ impl Decodable for DelayedInboxItem {
 impl DelayedInbox {
     pub fn new<Host>(host: &mut Host) -> Result<Self>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let linked_list = LinkedList::new(&DELAYED_INBOX_PATH, host)?;
         Ok(Self(linked_list))
@@ -216,7 +216,7 @@ impl DelayedInbox {
         level: u32,
     ) -> Result<()>
     where
-        Host: StorageV1 + Logging + IsEvmNode,
+        Host: StorageV1 + IsEvmNode,
     {
         match tx {
             TezosXTransaction::Ethereum(tx) => {
@@ -238,7 +238,6 @@ impl DelayedInbox {
 
                 self.0.push(host, &Hash(tx_hash), &item)?;
                 log!(
-                    host,
                     Info,
                     "Saved transaction {} in the delayed inbox",
                     hex::encode(tx_hash)
@@ -307,7 +306,7 @@ impl DelayedInbox {
         min_levels: u32,
     ) -> Result<Option<(Hash, DelayedTransaction)>>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let to_pop = self.0.first_with_id(host)?.and_then(
             |(
@@ -322,7 +321,6 @@ impl DelayedInbox {
                     && current_level - level >= min_levels
                 {
                     log!(
-                        host,
                         Info,
                         "Delayed transaction {} timed out",
                         hex::encode(tx_hash)
@@ -358,7 +356,7 @@ impl DelayedInbox {
     /// Returns whether the oldest tx in the delayed inbox has timed out.
     pub fn first_has_timed_out<Host>(&mut self, host: &mut Host) -> Result<bool>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let now = read_last_info_per_level_timestamp(host)?;
         let timeout = storage::delayed_inbox_timeout(host)?;
@@ -405,10 +403,9 @@ impl DelayedInbox {
     /// after the call.
     pub fn delete<Host>(&mut self, host: &mut Host, tx_hash: Hash) -> Result<()>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         log!(
-            host,
             Info,
             "Removing transaction {} from the delayed inbox",
             hex::encode(tx_hash)
