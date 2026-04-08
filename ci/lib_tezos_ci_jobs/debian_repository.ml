@@ -57,8 +57,8 @@ let build_dependency_image =
          "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-%s"
          Tezos_ci.Images.Base_images.debian_version)
 
-let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
-    ~matrix ~distribution ~script ~dependencies ?(manual = false) () =
+let make_job_build_packages ~__POS__ ~name ~matrix ~distribution ~script
+    ~dependencies ?(manual = false) () =
   job
     ~__POS__
     ~name
@@ -66,10 +66,7 @@ let make_job_build_packages ~__POS__ ?(limit_dune_build_jobs = false) ~name
     ~stage:Stages.build
     ?rules:
       (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
-    ~variables:
-      (("DISTRIBUTION", distribution)
-      :: (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-      )
+    ~variables:[("DISTRIBUTION", distribution); ("DUNE_BUILD_JOBS", "-j 12")]
     ~parallel:(Matrix matrix)
     ~dependencies
     ~tag:Dynamic
@@ -171,8 +168,7 @@ let job_build_data_packages ~manual : tezos_job =
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
-let job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type :
-    tezos_job =
+let job_build_debian_package ~manual pipeline_type : tezos_job =
   make_job_build_packages
     ~__POS__
     ~name:"oc.build-debian"
@@ -180,12 +176,10 @@ let job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type :
     ~dependencies:(Dependent [])
     ~script:"./scripts/ci/build-debian-packages.sh binaries"
     ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
-    ~limit_dune_build_jobs
     ~manual
     ()
 
-let job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type :
-    tezos_job =
+let job_build_ubuntu_package ~manual pipeline_type : tezos_job =
   make_job_build_packages
     ~__POS__
     ~name:"oc.build-ubuntu"
@@ -193,12 +187,11 @@ let job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type :
     ~dependencies:(Dependent [])
     ~script:"./scripts/ci/build-debian-packages.sh binaries"
     ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
-    ~limit_dune_build_jobs
     ~manual
     ()
 
 (* These jobs create the apt repository for the packages *)
-let job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type =
+let job_apt_repo_debian ~manual pipeline_type =
   make_job_apt_repo
     ~__POS__
     ~name:"apt_repo_debian"
@@ -206,11 +199,7 @@ let job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type =
     ~dependencies:
       (Dependent
          [
-           Artifacts
-             (job_build_debian_package
-                ~limit_dune_build_jobs
-                ~manual
-                pipeline_type);
+           Artifacts (job_build_debian_package ~manual pipeline_type);
            Artifacts (job_build_data_packages ~manual);
          ])
     ~variables:(Common.Packaging.archs_variables pipeline_type)
@@ -218,7 +207,7 @@ let job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type =
     ~image:Images.Base_images.debian_trixie
     ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
 
-let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
+let job_apt_repo_ubuntu ~manual pipeline_type =
   make_job_apt_repo
     ~__POS__
     ~name:"apt_repo_ubuntu"
@@ -226,11 +215,7 @@ let job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
     ~dependencies:
       (Dependent
          [
-           Artifacts
-             (job_build_ubuntu_package
-                ~limit_dune_build_jobs
-                ~manual
-                pipeline_type);
+           Artifacts (job_build_ubuntu_package ~manual pipeline_type);
            Artifacts (job_build_data_packages ~manual);
          ])
     ~variables:(Common.Packaging.archs_variables pipeline_type)
@@ -258,77 +243,50 @@ let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
          ])
     script
 
-let job_lintian_ubuntu ~limit_dune_build_jobs ~manual pipeline_type =
+let job_lintian_ubuntu ~manual pipeline_type =
   job_lintian
     ~__POS__
     ~name:"oc.lintian_ubuntu"
     ~dependencies:
-      (Dependent
-         [
-           Artifacts
-             (job_build_ubuntu_package
-                ~limit_dune_build_jobs
-                ~manual
-                pipeline_type);
-         ])
+      (Dependent [Artifacts (job_build_ubuntu_package ~manual pipeline_type)])
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"]
 
-let job_lintian_debian ~limit_dune_build_jobs ~manual pipeline_type =
+let job_lintian_debian ~manual pipeline_type =
   job_lintian
     ~__POS__
     ~name:"oc.lintian_debian"
     ~dependencies:
-      (Dependent
-         [
-           Artifacts
-             (job_build_debian_package
-                ~limit_dune_build_jobs
-                ~manual
-                pipeline_type);
-         ])
+      (Dependent [Artifacts (job_build_debian_package ~manual pipeline_type)])
     ~image:Images.Base_images.debian_bookworm
     ["./scripts/ci/lintian_debian_packages.sh debian bookworm"]
 
-let job_install_bin_ubuntu_22_04 ~limit_dune_build_jobs ~manual pipeline_type =
+let job_install_bin_ubuntu_22_04 ~manual pipeline_type =
   job
     ~__POS__
     ~name:"oc.install_bin_ubuntu_22_04"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_22_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"]
 
-let job_install_bin_ubuntu_24_04 ~limit_dune_build_jobs ~manual pipeline_type =
+let job_install_bin_ubuntu_24_04 ~manual pipeline_type =
   job
     ~__POS__
     ~name:"oc.install_bin_ubuntu_24_04"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_24_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"]
 
-let job_install_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
-    pipeline_type =
+let job_install_bin_ubuntu_24_04_systemd ~manual pipeline_type =
   job_docker_authenticated
     ~__POS__
     ~name:"oc.install_bin_ubuntu_24_04_systemd"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
     ~variables:
       (make_debian_variables
          "ubuntu"
@@ -341,17 +299,12 @@ let job_install_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_upgrade_bin_ubuntu_22_04_systemd ~limit_dune_build_jobs ~manual
-    pipeline_type =
+let job_upgrade_bin_ubuntu_22_04_systemd ~manual pipeline_type =
   job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_ubuntu_22_04_systemd"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
     ~variables:
       (make_debian_variables
          "ubuntu"
@@ -364,17 +317,12 @@ let job_upgrade_bin_ubuntu_22_04_systemd ~limit_dune_build_jobs ~manual
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_upgrade_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
-    pipeline_type =
+let job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type =
   job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_ubuntu_24_04_systemd"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
     ~variables:
       (make_debian_variables
          "ubuntu"
@@ -387,32 +335,22 @@ let job_upgrade_bin_ubuntu_24_04_systemd ~limit_dune_build_jobs ~manual
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_install_bin_debian_bookworm ~limit_dune_build_jobs ~manual pipeline_type
-    =
+let job_install_bin_debian_bookworm ~manual pipeline_type =
   job
     ~__POS__
     ~name:"oc.install_bin_debian_bookworm"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_debian ~manual pipeline_type)])
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.debian_bookworm
     ["./docs/introduction/install-bin-deb.sh debian bookworm"]
 
-let job_install_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
-    pipeline_type =
+let job_install_bin_debian_bookworm_systemd ~manual pipeline_type =
   job_docker_authenticated
     ~__POS__
     ~name:"oc.install_bin_debian_bookworm_systemd"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_debian ~manual pipeline_type)])
     ~variables:
       (make_debian_variables
          "debian"
@@ -425,17 +363,12 @@ let job_install_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_upgrade_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
-    pipeline_type =
+let job_upgrade_bin_debian_bookworm_systemd ~manual pipeline_type =
   job_docker_authenticated
     ~__POS__
     ~name:"oc.upgrade_bin_debian_bookworm-systemd"
     ~stage:Stages.publishing_tests
-    ~dependencies:
-      (Dependent
-         [
-           Job (job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type);
-         ])
+    ~dependencies:(Dependent [Job (job_apt_repo_debian ~manual pipeline_type)])
     ~variables:
       (make_debian_variables
          "debian"
@@ -452,56 +385,38 @@ let job_upgrade_bin_debian_bookworm_systemd ~limit_dune_build_jobs ~manual
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
+let jobs ?(manual = false) pipeline_type =
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
        are built and tested in the scheduled pipelines*)
     [
-      job_lintian_ubuntu ~limit_dune_build_jobs ~manual pipeline_type;
-      job_install_bin_ubuntu_22_04 ~limit_dune_build_jobs ~manual pipeline_type;
-      job_install_bin_ubuntu_24_04 ~limit_dune_build_jobs ~manual pipeline_type;
-      job_install_bin_ubuntu_24_04_systemd
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
-      job_upgrade_bin_ubuntu_22_04_systemd
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
-      job_upgrade_bin_ubuntu_24_04_systemd
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
+      job_lintian_ubuntu ~manual pipeline_type;
+      job_install_bin_ubuntu_22_04 ~manual pipeline_type;
+      job_install_bin_ubuntu_24_04 ~manual pipeline_type;
+      job_install_bin_ubuntu_24_04_systemd ~manual pipeline_type;
+      job_upgrade_bin_ubuntu_22_04_systemd ~manual pipeline_type;
+      job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type;
     ]
   in
   let test_debian_packages_jobs =
     [
-      job_lintian_debian ~limit_dune_build_jobs ~manual pipeline_type;
-      job_install_bin_debian_bookworm
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
-      job_install_bin_debian_bookworm_systemd
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
-      job_upgrade_bin_debian_bookworm_systemd
-        ~limit_dune_build_jobs
-        ~manual
-        pipeline_type;
+      job_lintian_debian ~manual pipeline_type;
+      job_install_bin_debian_bookworm ~manual pipeline_type;
+      job_install_bin_debian_bookworm_systemd ~manual pipeline_type;
+      job_upgrade_bin_debian_bookworm_systemd ~manual pipeline_type;
     ]
   in
   let debian_jobs =
     [
-      job_build_debian_package ~limit_dune_build_jobs ~manual pipeline_type;
+      job_build_debian_package ~manual pipeline_type;
       job_build_data_packages ~manual;
-      job_apt_repo_debian ~limit_dune_build_jobs ~manual pipeline_type;
+      job_apt_repo_debian ~manual pipeline_type;
     ]
   in
   let ubuntu_jobs =
     [
-      job_build_ubuntu_package ~limit_dune_build_jobs ~manual pipeline_type;
-      job_apt_repo_ubuntu ~limit_dune_build_jobs ~manual pipeline_type;
+      job_build_ubuntu_package ~manual pipeline_type;
+      job_apt_repo_ubuntu ~manual pipeline_type;
     ]
   in
   match pipeline_type with
