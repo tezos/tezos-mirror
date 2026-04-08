@@ -75,6 +75,20 @@ impl<'a> Micheline<'a> {
         Ok(res)
     }
 
+    /// Decode exactly one Micheline expression from the start of `bytes`,
+    /// returning it together with the number of bytes consumed.
+    ///
+    /// Unlike [`decode_raw`], this does NOT error on trailing bytes.
+    pub fn decode_raw_prefix(
+        arena: &'a Arena<Micheline<'a>>,
+        bytes: &[u8],
+    ) -> Result<(Micheline<'a>, usize), DecodeError> {
+        let mut it: BytesIt = bytes.into();
+        let res = decode_micheline(arena, &mut it)?;
+        let consumed = bytes.len() - it.0.len();
+        Ok((res, consumed))
+    }
+
     /// Decode data that was previously `PACK`ed. Checks for `0x05` tag as the
     /// first byte and strips it.
     pub fn decode_packed(
