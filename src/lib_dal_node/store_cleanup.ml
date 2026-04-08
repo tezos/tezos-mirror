@@ -40,6 +40,18 @@ let store_skip_list_cells ctxt cctxt ~level =
     ~attested_level:level
     (module Plugin : Dal_plugin.T)
 
+(* Fetches skip-list cells from L1 and stores them locally for levels in the
+   range [from_level, to_level]. *)
+let store_skip_list_cells_for_levels ctxt cctxt ~from_level ~to_level =
+  let open Lwt_result_syntax in
+  let rec loop level =
+    if level > to_level then return_unit
+    else
+      let* () = store_skip_list_cells ctxt cctxt ~level in
+      loop (Int32.succ level)
+  in
+  loop from_level
+
 (* This function removes old data starting from [last_processed_level -
    storage_period] to [target_level - storage_period], where [storage_period] is
    the period for which the DAL node stores data related to attested slots and
@@ -88,11 +100,6 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
           Block_handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
-          if level >= first_skip_list_level then
-            store_skip_list_cells ctxt cctxt ~level
-          else return_unit
-        in
-        let* () =
           Store.Last_processed_level.save last_processed_level_store level
         in
         let*! () =
@@ -102,8 +109,20 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
         in
         clean_up_at_level (Int32.succ level)
     in
-    (* Clean up from [last_processed_level] to [last_level]. *)
-    let* () = clean_up_at_level (Int32.succ last_processed_level) in
+    let next_level_to_process = Int32.succ last_processed_level in
+    let* () = clean_up_at_level next_level_to_process in
+    let skip_list_from =
+      Int32.max next_level_to_process first_skip_list_level
+    in
+    let* () =
+      if skip_list_from <= last_level then
+        store_skip_list_cells_for_levels
+          ctxt
+          cctxt
+          ~from_level:skip_list_from
+          ~to_level:last_level
+      else return_unit
+    in
     (* As this iteration may be slow, the head level might have advanced in the
        meanwhile. *)
     let* header =
@@ -169,23 +188,10 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
     Int32.(min new_last_processed_level highest_level_with_data_for_cleaning)
   in
   let rec cleanup level =
-    if level > last_level_for_cleaning then
-      let store = Node_context.get_store ctxt in
-      let last_processed_level_store = Store.last_processed_level store in
-      let* () =
-        Store.Last_processed_level.save
-          last_processed_level_store
-          new_last_processed_level
-      in
-      let*! () = Event.emit_end_catchup () in
-      return_unit
+    if level > last_level_for_cleaning then return_unit
     else
       let* () =
         Block_handler.remove_old_level_stored_data proto_parameters ctxt level
-      in
-      let* () =
-        if Node_context.is_bootstrap_node ctxt then return_unit
-        else store_skip_list_cells ctxt cctxt ~level
       in
       L1_crawler_status.catching_up_or_synced_status
         ~head_level
@@ -200,7 +206,26 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
     let*! () =
       Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
     in
-    cleanup start_level
+    let* () = cleanup start_level in
+    (* Catch up skip-list cells (unless bootstrap node). *)
+    let* () =
+      if Node_context.is_bootstrap_node ctxt then return_unit
+      else
+        store_skip_list_cells_for_levels
+          ctxt
+          cctxt
+          ~from_level:start_level
+          ~to_level:last_level_for_cleaning
+    in
+    let store = Node_context.get_store ctxt in
+    let last_processed_level_store = Store.last_processed_level store in
+    let* () =
+      Store.Last_processed_level.save
+        last_processed_level_store
+        new_last_processed_level
+    in
+    let*! () = Event.emit_end_catchup () in
+    return_unit
   else return_unit
 
 let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
