@@ -23,6 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Fetches skip-list cells from L1 and stores them locally for a given
+   [level]. *)
+let store_skip_list_cells ctxt cctxt ~level =
+  let open Lwt_result_syntax in
+  let*? (module Plugin) =
+    Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
+  in
+  let*? dal_constants =
+    Node_context.get_proto_parameters ctxt ~level:(`Level level)
+  in
+  Block_handler.fetch_and_store_skip_list_cells
+    ctxt
+    cctxt
+    dal_constants
+    ~attested_level:level
+    (module Plugin : Dal_plugin.T)
+
 (* This function removes old data starting from [last_processed_level -
    storage_period] to [target_level - storage_period], where [storage_period] is
    the period for which the DAL node stores data related to attested slots and
@@ -42,20 +59,6 @@
 let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     ~last_processed_level ~first_seen_level head_level proto_parameters =
   let open Lwt_result_syntax in
-  let store_skip_list_cells ~level =
-    let*? (module Plugin) =
-      Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
-    in
-    let*? dal_constants =
-      Node_context.get_proto_parameters ctxt ~level:(`Level level)
-    in
-    Block_handler.fetch_and_store_skip_list_cells
-      ctxt
-      cctxt
-      dal_constants
-      ~attested_level:level
-      (module Plugin : Dal_plugin.T)
-  in
   let store = Node_context.get_store ctxt in
   let last_processed_level_store = Store.last_processed_level store in
   (* [target_level] identifies the level wrt to head level at which we want to
@@ -85,7 +88,8 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
           Block_handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
-          if level >= first_skip_list_level then store_skip_list_cells ~level
+          if level >= first_skip_list_level then
+            store_skip_list_cells ctxt cctxt ~level
           else return_unit
         in
         let* () =
@@ -130,20 +134,6 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
 let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
     ~last_processed_level head_level proto_parameters =
   let open Lwt_result_syntax in
-  let store_skip_list_cells ~level =
-    let*? (module Plugin) =
-      Node_context.get_plugin_for_level ctxt ~level:(Int32.pred level)
-    in
-    let*? dal_constants =
-      Node_context.get_proto_parameters ctxt ~level:(`Level level)
-    in
-    Block_handler.fetch_and_store_skip_list_cells
-      ctxt
-      cctxt
-      dal_constants
-      ~attested_level:level
-      (module Plugin : Dal_plugin.T)
-  in
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let storage_period =
     Profile_manager.get_attested_data_default_store_period
@@ -195,7 +185,7 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
       in
       let* () =
         if Node_context.is_bootstrap_node ctxt then return_unit
-        else store_skip_list_cells ~level
+        else store_skip_list_cells ctxt cctxt ~level
       in
       L1_crawler_status.catching_up_or_synced_status
         ~head_level
