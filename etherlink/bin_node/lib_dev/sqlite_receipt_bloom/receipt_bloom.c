@@ -227,6 +227,15 @@ static void receipt_contains_bloom_filter(
            "receipt_contains_bloom_filter: not enough data in receipt"
        );
 
+    // A zero-length logs_bloom means the receipt has no logs (all-zero bloom).
+    // Only an all-zero filter can match — check the filter for any set bit.
+    if (logs_bloom_len == 0) {
+        for (int i = 0; i < 256; i++) {
+            if (bloom[i] != 0) SQLITE_RETURN_FALSE(ctx);
+        }
+        SQLITE_RETURN_TRUE(ctx);
+    }
+
     const unsigned char *logs_bloom = p;
 
     // Need at least 514 hex characters for 0x + 256 bytes
