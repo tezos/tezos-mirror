@@ -52,6 +52,25 @@ let store_skip_list_cells_for_levels ctxt cctxt ~from_level ~to_level =
   in
   loop from_level
 
+(* Removes outdated slot/shard data and skip-list cells for levels in the range
+   [from_level, to_level]. *)
+let clean_up_store ctxt ~from_level ~to_level proto_parameters =
+  let open Lwt_result_syntax in
+  let rec loop level =
+    if level > to_level then return_unit
+    else
+      let* () =
+        Block_handler.remove_old_level_stored_data proto_parameters ctxt level
+      in
+      let*! () =
+        if Int32.to_int level mod 1000 = 0 then
+          Event.emit_catching_up ~current_level:level
+        else Lwt.return_unit
+      in
+      loop (Int32.succ level)
+  in
+  loop from_level
+
 (* This function removes old data starting from [last_processed_level -
    storage_period] to [target_level - storage_period], where [storage_period] is
    the period for which the DAL node stores data related to attested slots and
@@ -71,8 +90,6 @@ let store_skip_list_cells_for_levels ctxt cctxt ~from_level ~to_level =
 let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     ~last_processed_level ~first_seen_level head_level proto_parameters =
   let open Lwt_result_syntax in
-  let store = Node_context.get_store ctxt in
-  let last_processed_level_store = Store.last_processed_level store in
   (* [target_level] identifies the level wrt to head level at which we want to
      start the P2P and process blocks as usual. It's set to [head_level - 3]
      because the first level the DAL node should process should be a final
@@ -93,24 +110,14 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
       (* Note that behind this first level we do not have the plugin. *)
       Int32.(sub head_level (of_int period))
     in
-    let rec clean_up_at_level level =
-      if level > last_level then return_unit
-      else
-        let* () =
-          Block_handler.remove_old_level_stored_data proto_parameters ctxt level
-        in
-        let* () =
-          Store.Last_processed_level.save last_processed_level_store level
-        in
-        let*! () =
-          if Int32.to_int level mod 1000 = 0 then
-            Event.emit_catching_up ~current_level:level
-          else Lwt.return_unit
-        in
-        clean_up_at_level (Int32.succ level)
-    in
     let next_level_to_process = Int32.succ last_processed_level in
-    let* () = clean_up_at_level next_level_to_process in
+    let* () =
+      clean_up_store
+        ctxt
+        ~from_level:next_level_to_process
+        ~to_level:last_level
+        proto_parameters
+    in
     let skip_list_from =
       Int32.max next_level_to_process first_skip_list_level
     in
@@ -187,26 +194,20 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
     in
     Int32.(min new_last_processed_level highest_level_with_data_for_cleaning)
   in
-  let rec cleanup level =
-    if level > last_level_for_cleaning then return_unit
-    else
-      let* () =
-        Block_handler.remove_old_level_stored_data proto_parameters ctxt level
-      in
-      L1_crawler_status.catching_up_or_synced_status
-        ~head_level
-        ~last_processed_level:level
-      |> Node_context.set_l1_crawler_status ctxt ;
-      cleanup @@ Int32.succ level
-  in
   let start_level = Int32.succ last_processed_level in
   let end_level = last_level_for_cleaning in
   let levels_to_clean_up = Int32.(succ @@ sub end_level start_level) in
-  if levels_to_clean_up > 0l then
+  if levels_to_clean_up > 0l then (
     let*! () =
       Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
     in
-    let* () = cleanup start_level in
+    let* () =
+      clean_up_store
+        ctxt
+        ~from_level:start_level
+        ~to_level:last_level_for_cleaning
+        proto_parameters
+    in
     (* Catch up skip-list cells (unless bootstrap node). *)
     let* () =
       if Node_context.is_bootstrap_node ctxt then return_unit
@@ -224,8 +225,12 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt cctxt
         last_processed_level_store
         new_last_processed_level
     in
+    L1_crawler_status.catching_up_or_synced_status
+      ~head_level
+      ~last_processed_level:last_level_for_cleaning
+    |> Node_context.set_l1_crawler_status ctxt ;
     let*! () = Event.emit_end_catchup () in
-    return_unit
+    return_unit)
   else return_unit
 
 let clean_up_store_and_catch_up ctxt cctxt ~last_processed_level
