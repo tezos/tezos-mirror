@@ -20,7 +20,10 @@ use crate::{
 };
 use primitive_types::U256;
 use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
-use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
+use tezos_crypto_rs::{
+    blake2b,
+    hash::{ChainId, ContractKt1Hash, HashTrait},
+};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -203,15 +206,29 @@ where
     ChainConfig::Evm(Box::new(config))
 }
 
-fn fetch_michelson_runtime_chain_id(host: &mut impl StorageV1) -> ChainId {
+/// Derive the Michelson runtime chain ID from the EVM chain ID by
+/// hashing the EVM chain ID bytes with Blake2B-256 and taking the
+/// first 4 bytes.  This follows the same pattern as Tezos L1's
+/// `Chain_id.of_block_hash` (hash + truncate to 4 bytes).
+fn derive_michelson_chain_id(evm_chain_id: U256) -> ChainId {
+    let mut evm_chain_id_bytes = [0u8; 32];
+    evm_chain_id.to_little_endian(&mut evm_chain_id_bytes);
+    let hash = blake2b::digest_256(&evm_chain_id_bytes);
+    ChainId::from(<[u8; 4]>::try_from(&hash[..4]).unwrap())
+}
+
+fn fetch_michelson_runtime_chain_id(
+    host: &mut impl StorageV1,
+    evm_chain_id: U256,
+) -> ChainId {
     let chain_id_res = read_michelson_runtime_chain_id(host);
     match chain_id_res {
         Ok(Some(chain_id)) => chain_id,
         Ok(None) | Err(_) => {
-            // Reading the chain id of the Michelson runtime has failed, fallback on default chain id
-            let default_chain_id = ChainId::from([0; 4]);
-            let _ = store_michelson_runtime_chain_id(host, &default_chain_id);
-            default_chain_id
+            // Chain id not in storage yet: derive from the EVM chain id and persist.
+            let chain_id = derive_michelson_chain_id(evm_chain_id);
+            let _ = store_michelson_runtime_chain_id(host, &chain_id);
+            chain_id
         }
     }
 }
@@ -223,7 +240,7 @@ where
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host);
+    let michelson_runtime_chain_id = fetch_michelson_runtime_chain_id(host, chain_id);
     EvmChainConfig::create_config(
         chain_id,
         limits,
