@@ -538,6 +538,18 @@ module CracRunnerWrapper = struct
   module type S = sig
     val sequencer : Evm_node.t
 
+    val sc_rollup_node : Sc_rollup_node.t
+
+    val client : Client.t
+
+    val sender : Eth_account.t
+
+    val source : Account.key
+
+    val evm_nonce : unit -> int
+
+    val tez_counter : unit -> int
+
     module EvmRunner : sig
       val call_run :
         ?expected_status:bool ->
@@ -621,6 +633,18 @@ module CracRunnerWrapper = struct
     in
     let module Helper = struct
       let sequencer = sequencer
+
+      let sc_rollup_node = sc_rollup_node
+
+      let client = client
+
+      let sender = sender
+
+      let source = source
+
+      let evm_nonce = evm_nonce
+
+      let tez_counter = tez_counter
 
       module EvmRunner = struct
         let call_run ?expected_status ?(value = Wei.zero) ?access_list
@@ -3050,6 +3074,173 @@ let test_crac_gas_model_alias_caching =
       ~error_msg:
         "Gas difference (%L) should be >= %R (2x alias generation surcharge)") ;
   unit
+
+(* ── Receipt test helpers ──────────────────────────────────────── *)
+
+(** Fetch Tezlink block manager operations (pass 3) as a JSON list.
+    Uses [/operations] (all 4 passes) and extracts index 3 (manager ops).
+    [block] is a block identifier (level number or ["head"]). *)
+let _fetch_michelson_manager_ops ~block sequencer =
+  let michelson_base = Evm_node.endpoint sequencer ^ "/tezlink" in
+  let path = sf "/chains/main/blocks/%s/operations" block in
+  let* res =
+    Curl.get_raw ~name:"curl#michelson-ops" (michelson_base ^ path)
+    |> Runnable.run
+  in
+  let all_passes = JSON.parse ~origin:"michelson_operations" res in
+  return JSON.(all_passes |=> 3)
+
+(** Return the current Michelson runtime head level as a string. *)
+let _michelson_head_level sequencer =
+  let michelson_base = Evm_node.endpoint sequencer ^ "/tezlink" in
+  let* res =
+    Curl.get_raw
+      ~name:"curl#michelson-head"
+      (michelson_base ^ "/chains/main/blocks/head/header")
+    |> Runnable.run
+  in
+  let head = JSON.parse ~origin:"michelson_header" res in
+  return JSON.(head |-> "level" |> as_int)
+
+(** Fetch manager operations from the most recent non-empty Tezlink block.
+    bake_until_sync may advance the head past the block containing the
+    CRAC receipt, so we scan backwards from [head]. *)
+let _fetch_recent_michelson_manager_ops sequencer =
+  let* head = _michelson_head_level sequencer in
+  let rec find_ops level =
+    if level < 1 then return (JSON.parse ~origin:"empty" "[]")
+    else
+      let* ops =
+        _fetch_michelson_manager_ops ~block:(string_of_int level) sequencer
+      in
+      let op_list = JSON.(ops |> as_list) in
+      if op_list <> [] then return ops else find_ops (level - 1)
+  in
+  find_ops head
+
+(** Null implicit address — source of all synthetic Michelson operations
+    (both CRAC and non-CRAC). *)
+let _handler_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+
+(** Enshrined Michelson gateway contract — called by Michelson contracts
+    to initiate outgoing CRACs to EVM. *)
+let _gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
+
+(** Verify that [top] is a valid CRAC top-level content item per the RFC.
+    Checks source = handler, destination = [expected_destination],
+    status = [expected_status], and all synthetic fields = 0.
+    Returns the list of internal_operation_results from metadata. *)
+let _check_crac_top_level ~prefix ~expected_destination ~expected_status top =
+  let kind = JSON.(top |-> "kind" |> as_string) in
+  Log.info ~prefix "top-level kind = %s" kind ;
+  Check.(
+    (kind = "transaction")
+      string
+      ~error_msg:"Expected top-level kind %R, got %L") ;
+  let source = JSON.(top |-> "source" |> as_string) in
+  Log.info "%s: top-level source = %s" prefix source ;
+  Check.(
+    (source = _handler_address)
+      string
+      ~error_msg:"Expected top-level source = Handler_M (%R), got %L") ;
+  let destination = JSON.(top |-> "destination" |> as_string) in
+  Log.info "%s: top-level destination (alias E_0) = %s" prefix destination ;
+  Check.(
+    (destination = expected_destination)
+      string
+      ~error_msg:"Expected top-level destination %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "amount" |> as_string) = "0")
+      string
+      ~error_msg:"Expected amount %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "fee" |> as_string) = "0")
+      string
+      ~error_msg:"Expected fee %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "counter" |> as_string) = "0")
+      string
+      ~error_msg:"Expected counter %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "gas_limit" |> as_string) = "0")
+      string
+      ~error_msg:"Expected gas_limit %R, got %L") ;
+  Check.(
+    (JSON.(top |-> "storage_limit" |> as_string) = "0")
+      string
+      ~error_msg:"Expected storage_limit %R, got %L") ;
+  let metadata = JSON.(top |-> "metadata") in
+  let top_status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Log.info "%s: top-level status = %s" prefix top_status ;
+  Check.(
+    (top_status = expected_status)
+      string
+      ~error_msg:"Expected top-level status %R, got %L") ;
+  JSON.(metadata |-> "internal_operation_results" |> as_list)
+
+(** Verify that [iop] is a valid CRAC event with the given [expected_crac_id].
+    Checks kind = "event", source = handler, tag = "crac",
+    payload = expected_crac_id.  When [expected_status] is provided,
+    also checks the event result status (omit for failed CRACs where
+    the event may be backtracked). *)
+let _check_crac_event ~prefix ~expected_crac_id ?expected_status iop =
+  Check.(
+    (JSON.(iop |-> "kind" |> as_string) = "event")
+      string
+      ~error_msg:(sf "%s: Expected event kind %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "source" |> as_string) = _handler_address)
+      string
+      ~error_msg:
+        (sf "%s: Expected event source = handler (%%R), got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "tag" |> as_string) = "crac")
+      string
+      ~error_msg:(sf "%s: Expected event tag %%R, got %%L" prefix)) ;
+  let payload = JSON.(iop |-> "payload" |-> "string" |> as_string) in
+  Log.info "%s: CRAC-ID = %s" prefix payload ;
+  Check.(
+    (payload = expected_crac_id)
+      string
+      ~error_msg:(sf "%s: Expected CRAC-ID %%R, got %%L" prefix)) ;
+  match expected_status with
+  | Some s ->
+      Check.(
+        (JSON.(iop |-> "result" |-> "status" |> as_string) = s)
+          string
+          ~error_msg:(sf "%s: Expected event status %%R, got %%L" prefix))
+  | None -> ()
+
+(** Verify that [iop] is a valid internal transaction with the given fields. *)
+let _check_crac_internal_transaction ~prefix ~expected_nonce ~expected_source
+    ~expected_destination ~expected_entrypoint ~expected_status iop =
+  Check.(
+    (JSON.(iop |-> "kind" |> as_string) = "transaction")
+      string
+      ~error_msg:(sf "%s: Expected kind %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "source" |> as_string) = expected_source)
+      string
+      ~error_msg:(sf "%s: Expected source %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "nonce" |> as_int) = expected_nonce)
+      int
+      ~error_msg:(sf "%s: Expected nonce %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "destination" |> as_string) = expected_destination)
+      string
+      ~error_msg:(sf "%s: Expected destination %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "parameters" |-> "entrypoint" |> as_string)
+    = expected_entrypoint)
+      string
+      ~error_msg:(sf "%s: Expected entrypoint %%R, got %%L" prefix)) ;
+  Check.(
+    (JSON.(iop |-> "result" |-> "status" |> as_string) = expected_status)
+      string
+      ~error_msg:(sf "%s: Expected status %%R, got %%L" prefix))
 
 let () =
   test_crac_evm_to_tez [Alpha] ;
