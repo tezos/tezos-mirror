@@ -425,6 +425,9 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit

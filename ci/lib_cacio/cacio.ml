@@ -842,6 +842,9 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -879,6 +882,8 @@ let get_jobs pipeline =
   | Master ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | Packaging_revision_test ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Debian_partial ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | _ -> convert_jobs ~with_condition:false jobs
 
