@@ -1746,11 +1746,6 @@ module Images = struct
     let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
     Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
 
-  (** The jsonnet image (static tag [master]) *)
-  let jsonnet_master =
-    let image_path = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master" in
-    Image.mk_external ~image_path
-
   module CI = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
