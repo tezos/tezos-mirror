@@ -600,6 +600,134 @@ let test_out_of_window_failure () =
   in
   Assert.error ~loc:__LOC__ (Environment.wrap_tzresult decoded) (fun _ -> true)
 
+(** Build a non-decodable attestation bitset that passes the size check.
+
+    Given [number_of_lags] and [number_of_slots], we build a bitset where:
+    - The prefix says only lag 0 is attested
+    - Lag 0 has [max_chunks + 1] non-last chunks, exceeding the limit
+
+    max_chunks = ceil(number_of_slots / 7), so with an extra chunk the decode
+    fails while the total size stays within expected_max_size_in_bits. *)
+let make_non_decodable_attestation ~number_of_lags ~number_of_slots =
+  let open Result_syntax in
+  (* max_chunks per lag = ceil(number_of_slots / 7) *)
+  let max_chunks = (number_of_slots + 6) / 7 in
+  let nb_bad_chunks = max_chunks + 1 in
+  (* The bitset layout is:
+       Prefix (number_of_lags bits): 1 0 0 ... 0
+         (only lag 0 is marked as attested)
+       Then (max_chunks + 1) chunks of 8 bits each for lag 0:
+         Chunk i: is_last=0, slots=0000010  (bit 5 set, i.e. slot 5)
+       Since none of the chunks has is_last=1 and there are more chunks
+       than max_chunks = ceil(number_of_slots / 7), decode will reject
+       the bitset.
+       Total occupied size: number_of_lags + (max_chunks + 1) * 8 bits,
+       which is still <= expected_max_size_in_bits. *)
+  let z_repr =
+    let chunk_bit_positions =
+      List.map
+        (fun chunk_idx ->
+          let chunk_start = number_of_lags + (chunk_idx * 8) in
+          (* is_last = 0, set slot bit at position 5 within the chunk *)
+          chunk_start + 5)
+        (0 -- (nb_bad_chunks - 1))
+    in
+    List.fold_left
+      (fun acc pos -> Z.(logor acc (shift_left one pos)))
+      Z.one (* prefix: only bit 0 set *)
+      chunk_bit_positions
+  in
+  (* Sanity check: size is within bounds *)
+  let* bitset = Environment.Bitset.from_z z_repr in
+  let size = Environment.Bitset.occupied_size_in_bits bitset in
+  let max_size =
+    Dal_attestations_repr.expected_max_size_in_bits
+      ~number_of_slots
+      ~number_of_lags
+  in
+  assert (Compare.Int.(size <= max_size)) ;
+  return z_repr
+
+(** Test that a DAL attestation with correct size but non-decodable content
+    is rejected by [Dal_apply.validate_attestations] (validation) and by
+    [Accountability.record_number_of_attested_shards] (application). *)
+let test_non_decodable_correct_size () =
+  let open Lwt_result_syntax in
+  (* 1. Test through Dal_apply.validate_attestations using a real context *)
+  let* b, _contract = Context.init1 () in
+  let* inc = Incremental.begin_construction b in
+  let ctxt = Incremental.alpha_ctxt inc in
+  let ctxt_number_of_slots = Alpha_context.Constants.dal_number_of_slots ctxt in
+  let ctxt_number_of_lags = Alpha_context.Constants.dal_number_of_lags ctxt in
+  let*? t =
+    Environment.wrap_tzresult
+    @@
+    let open Result_syntax in
+    let* z_repr =
+      make_non_decodable_attestation
+        ~number_of_lags:ctxt_number_of_lags
+        ~number_of_slots:ctxt_number_of_slots
+    in
+    Alpha_context.Dal.Attestations.Internal_for_tests.of_z z_repr
+  in
+  let consensus_key =
+    let open Account in
+    Alpha_context.Consensus_key.
+      {
+        delegate = dummy_account.pkh;
+        consensus_pk = dummy_account.pk;
+        consensus_pkh = dummy_account.pkh;
+        companion_pk = None;
+        companion_pkh = None;
+      }
+  in
+  let attestation_level = Alpha_context.Level.current ctxt in
+  let validate_result =
+    Dal_apply.validate_attestations
+      ctxt
+      ~attestation_level:attestation_level.level
+      consensus_key
+      t
+  in
+  let* () =
+    Assert.error
+      ~loc:__LOC__
+      (Environment.wrap_tzresult validate_result)
+      (fun _ -> true)
+  in
+  (* 2. Test through Accountability.record_number_of_attested_shards
+     (called by Dal_apply.apply_attestations) *)
+  let*? t2 =
+    Environment.wrap_tzresult
+    @@
+    let open Result_syntax in
+    let* z_repr =
+      make_non_decodable_attestation ~number_of_lags ~number_of_slots
+    in
+    Dal_attestations_repr.Internal_for_tests.of_z z_repr
+  in
+  let accountability =
+    Dal_attestations_repr.Accountability.init ~number_of_slots ~number_of_lags
+  in
+  let delegate = Signature.Public_key_hash.zero in
+  let attested_level = Raw_level_repr.of_int32_exn 100l in
+  let result =
+    Dal_attestations_repr.Accountability.record_number_of_attested_shards
+      accountability
+      ~number_of_slots
+      ~attestation_lag:1
+      ~lags:[1]
+      ~delegate
+      ~attested_level
+      t2
+      Raw_level_repr.Map.empty
+  in
+  Assert.error ~loc:__LOC__ (Environment.wrap_tzresult result) (function
+    | Environment.Ecoproto_error
+        (Dal_attestations_repr.Dal_invalid_attestation_bitset _) ->
+        true
+    | _ -> false)
+
 (** Test that decode accepts a bitset whose highest set bit is the very last
     bit of the last chunk. This exercises the boundary of the trailing-bits
     check: slot 6 at lag 0 lands at bit 7 of chunk 0 (position 11), which is
@@ -639,6 +767,10 @@ let tests =
     Tztest.tztest "size calculation" `Quick test_size_calculation;
     Tztest.tztest "complex pattern" `Quick test_complex_pattern;
     Tztest.tztest "out of window failure" `Quick test_out_of_window_failure;
+    Tztest.tztest
+      "non-decodable attestation with correct size"
+      `Quick
+      test_non_decodable_correct_size;
     Tztest.tztest
       "decode last bit of chunk"
       `Quick

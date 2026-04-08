@@ -76,6 +76,8 @@ v}
 
 type t = private Bitset.t
 
+type error += Dal_invalid_attestation_bitset of Bitset.t
+
 (** The size of the encoding is not bounded. However, the size of a DAL
     attestations bitset is checked during validation of an attestation; and
     there is a bound on the size of a generic operation. *)
