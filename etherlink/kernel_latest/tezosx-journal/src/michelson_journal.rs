@@ -7,16 +7,60 @@ use tezos_smart_rollup_host::{
     runtime::RuntimeError,
     storage::StorageV1,
 };
+use tezos_tezlink::block::AppliedOperation;
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
+struct ExternalCheckpoint {
+    /// Index into `snapshots` at the time the checkpoint was created.
+    snapshot_watermark: usize,
+    /// Length of `pending_crac_receipts` at the time the checkpoint was
+    /// created.  On revert, receipts are truncated back to this count.
+    receipt_count: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct MichelsonJournal {
     snapshots: Vec<OwnedPath>,
-    external_checkpoints: Vec<usize>,
+    external_checkpoints: Vec<ExternalCheckpoint>,
+    /// Successful CRAC receipts (EVM → Michelson).  Subject to revert:
+    /// truncated by `revert_frame` when the calling EVM frame reverts.
+    pub pending_crac_receipts: Vec<AppliedOperation>,
+    /// Failed CRAC receipts.  NOT subject to revert: a failed CRAC is
+    /// recorded even when the EVM transaction reverts entirely, so that
+    /// the Michelson block shows the attempt with `status: failed`.
+    pub failed_crac_receipts: Vec<AppliedOperation>,
+    /// Whether the next incoming CRAC should emit a CRAC-ID event.
+    /// Set to `false` when Michelson originates a CRAC or emits a
+    /// CRAC-ID event.  Stays `false` for the lifetime of the journal
+    /// (one transaction); a fresh journal is created per transaction.
+    should_emit_crac_id: bool,
+}
+
+impl Default for MichelsonJournal {
+    fn default() -> Self {
+        Self {
+            snapshots: Vec::new(),
+            external_checkpoints: Vec::new(),
+            pending_crac_receipts: Vec::new(),
+            failed_crac_receipts: Vec::new(),
+            should_emit_crac_id: true,
+        }
+    }
 }
 
 impl MichelsonJournal {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn should_emit_crac_id(&self) -> bool {
+        self.should_emit_crac_id
+    }
+
+    /// Suppress CRAC-ID event emission (Michelson is originating a
+    /// CRAC or has already emitted the event for this chain).
+    pub fn suppress_crac_id(&mut self) {
+        self.should_emit_crac_id = false;
     }
 }
 
@@ -28,9 +72,13 @@ pub fn indexed_path<T: Path>(depth: usize, path: &T) -> Result<OwnedPath, Runtim
 
 impl MichelsonJournal {
     // Called by an external journal on checkpoint creation.
-    // Records the current snapshot count as the lower boundary for this call frame.
+    // Records the current snapshot count and receipt count as the
+    // lower boundary for this call frame.
     pub fn push_external_checkpoint(&mut self) {
-        self.external_checkpoints.push(self.snapshots.len());
+        self.external_checkpoints.push(ExternalCheckpoint {
+            snapshot_watermark: self.snapshots.len(),
+            receipt_count: self.pending_crac_receipts.len(),
+        });
     }
 
     // Called by EVM journal on checkpoint commit.
@@ -38,15 +86,22 @@ impl MichelsonJournal {
     // Pops the current frame's watermark. If a parent EVM frame exists,
     // leaves the snapshot at watermark for the parent's potential revert.
     // If this is the outermost frame, deletes it too.
+    // Receipts are kept (commit preserves them).
     pub fn commit_frame<Host>(&mut self, host: &mut Host) -> Result<(), RuntimeError>
     where
         Host: StorageV1,
     {
-        let watermark = self.external_checkpoints.pop().unwrap_or(0);
+        let checkpoint = self
+            .external_checkpoints
+            .pop()
+            .unwrap_or(ExternalCheckpoint {
+                snapshot_watermark: 0,
+                receipt_count: 0,
+            });
         let drain_from = if self.external_checkpoints.is_empty() {
-            watermark
+            checkpoint.snapshot_watermark
         } else {
-            (watermark + 1).min(self.snapshots.len())
+            (checkpoint.snapshot_watermark + 1).min(self.snapshots.len())
         };
         for snapshot in self.snapshots.drain(drain_from..) {
             host.store_delete(&snapshot)?;
@@ -56,8 +111,9 @@ impl MichelsonJournal {
 
     // Called by EVM journal on checkpoint revert.
     //
-    // Pops the current frame's watermark and reverts durable storage to the
-    // state captured at the start of this call frame.
+    // Pops the current frame's watermark, reverts durable storage to the
+    // state captured at the start of this call frame, and drops any
+    // CRAC receipts pushed since the checkpoint.
     pub fn revert_frame<Host>(
         &mut self,
         host: &mut Host,
@@ -66,11 +122,20 @@ impl MichelsonJournal {
     where
         Host: StorageV1,
     {
-        let watermark = self.external_checkpoints.pop().unwrap_or(0);
-        if watermark >= self.snapshots.len() {
+        let checkpoint = self
+            .external_checkpoints
+            .pop()
+            .unwrap_or(ExternalCheckpoint {
+                snapshot_watermark: 0,
+                receipt_count: 0,
+            });
+        // Drop CRAC receipts pushed during this frame.
+        self.pending_crac_receipts
+            .truncate(checkpoint.receipt_count);
+        if checkpoint.snapshot_watermark >= self.snapshots.len() {
             return Ok(());
         }
-        for snapshot in self.snapshots.drain(watermark + 1..) {
+        for snapshot in self.snapshots.drain(checkpoint.snapshot_watermark + 1..) {
             host.store_delete(&snapshot)?;
         }
         if let Some(snapshot) = self.snapshots.pop() {
@@ -852,5 +917,122 @@ mod tests {
         journal.commit_frame(&mut host).unwrap();
         assert!(!has_snap(&host, 0, &world));
         assert_eq!(read_data(&host, &world), b"v0");
+    }
+
+    /// Build a distinguishable dummy receipt whose top-level destination
+    /// amount encodes `id` so we can tell receipts apart.
+    fn dummy_receipt(id: u64) -> AppliedOperation {
+        use tezos_crypto_rs::hash::{
+            BlockHash, HashTrait, OperationHash, UnknownSignature,
+        };
+        use tezos_data_encoding::types::Narith;
+        use tezos_tezlink::operation::{
+            ManagerOperation, ManagerOperationContent, TransferContent,
+        };
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata,
+            OperationResult, OperationResultSum, OperationWithMetadata, TransferSuccess,
+            TransferTarget,
+        };
+        let signature = UnknownSignature::try_from([0u8; 64].as_slice()).unwrap();
+        let top = OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::from(
+                TransferSuccess::default(),
+            )),
+            internal_operation_results: vec![],
+        };
+        let source = tezos_smart_rollup::types::PublicKeyHash::from_b58check(
+            "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU",
+        )
+        .unwrap();
+        AppliedOperation {
+            hash: OperationHash::default(),
+            branch: BlockHash::default(),
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transaction(ManagerOperation {
+                            source,
+                            fee: Narith(0u64.into()),
+                            counter: Narith(0u64.into()),
+                            gas_limit: Narith(0u64.into()),
+                            storage_limit: Narith(0u64.into()),
+                            operation: TransferContent {
+                                amount: Narith(id.into()),
+                                destination: tezos_protocol::contract::Contract::Originated(
+                                    tezos_crypto_rs::hash::ContractKt1Hash::from_b58check(
+                                        "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+                                    )
+                                    .unwrap(),
+                                ),
+                                parameters: tezos_tezlink::operation::Parameters {
+                                    entrypoint: mir::ast::Entrypoint::default(),
+                                    value: vec![],
+                                },
+                            },
+                        }),
+                        receipt: OperationResultSum::Transfer(top),
+                    }],
+                    signature,
+                },
+            ),
+        }
+    }
+
+    /// Extract the amount from a dummy receipt (used as an identifier).
+    fn receipt_id(receipt: &AppliedOperation) -> u64 {
+        use tezos_tezlink::operation::ManagerOperationContent;
+        use tezos_tezlink::operation_result::OperationDataAndMetadata;
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        let ManagerOperationContent::Transaction(ref mgr) = batch.operations[0].content
+        else {
+            panic!("expected Transaction content");
+        };
+        mgr.operation.amount.0.clone().try_into().unwrap()
+    }
+
+    // Revert drops CRAC receipts pushed during the reverted frame.
+    //
+    //   EVM(A) checkpoint → push receipt 0
+    //     EVM(B) checkpoint → push receipt 1
+    //     B reverts → receipt 1 dropped
+    //   push receipt 2
+    //   A commits → receipts = [0, 2]
+    #[test]
+    fn test_revert_frame_drops_receipts() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new();
+        write_data(&mut host, &world, b"v0");
+
+        // A checkpoint
+        journal.push_external_checkpoint();
+        let _idx_a = journal.checkpoint(&mut host, &world).unwrap();
+        journal.pending_crac_receipts.push(dummy_receipt(0));
+
+        // B checkpoint
+        journal.push_external_checkpoint();
+        journal.pending_crac_receipts.push(dummy_receipt(1));
+        assert_eq!(journal.pending_crac_receipts.len(), 2);
+
+        // B reverts — receipt 1 should be dropped, receipt 0 kept
+        journal.revert_frame(&mut host, &world).unwrap();
+        assert_eq!(journal.pending_crac_receipts.len(), 1);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
+
+        // Push another receipt after revert
+        journal.pending_crac_receipts.push(dummy_receipt(2));
+        assert_eq!(journal.pending_crac_receipts.len(), 2);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[1]), 2);
+
+        // A commits — both receipts preserved
+        journal.checkpoint_commit(&mut host, 0).unwrap();
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.pending_crac_receipts.len(), 2);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[1]), 2);
     }
 }
