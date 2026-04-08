@@ -150,31 +150,30 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~variables
     script
 
+(* data packages. we build them once *)
+let job_build_data_packages ~manual : tezos_job =
+  job
+    ~__POS__
+    ~name:"oc.build-data_packages"
+    ~image:build_dependency_image
+    ~stage:Stages.build
+    ?rules:
+      (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
+    ~variables:
+      [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
+    ~dependencies:(Dependent [])
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [
+      "export CARGO_NET_OFFLINE=false";
+      "./scripts/ci/build-debian-packages.sh zcash";
+    ]
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
-  (* data packages. we build them once *)
-  let job_build_data_packages : tezos_job =
-    job
-      ~__POS__
-      ~name:"oc.build-data_packages"
-      ~image:build_dependency_image
-      ~stage:Stages.build
-      ?rules:
-        (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
-         else None)
-      ~variables:
-        [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
-      ~dependencies:(Dependent [])
-      ~tag:Dynamic
-      ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-      [
-        "export CARGO_NET_OFFLINE=false";
-        "./scripts/ci/build-debian-packages.sh zcash";
-      ]
-  in
   (* These jobs build the packages in a matrix using the
      build dependencies images *)
   let job_build_debian_package : tezos_job =
@@ -212,7 +211,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         (Dependent
            [
              Artifacts job_build_debian_package;
-             Artifacts job_build_data_packages;
+             Artifacts (job_build_data_packages ~manual);
            ])
       ~variables:(Common.Packaging.archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
@@ -228,7 +227,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         (Dependent
            [
              Artifacts job_build_ubuntu_package;
-             Artifacts job_build_data_packages;
+             Artifacts (job_build_data_packages ~manual);
            ])
       ~variables:(Common.Packaging.archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
@@ -400,7 +399,11 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
     ]
   in
   let debian_jobs =
-    [job_build_debian_package; job_build_data_packages; job_apt_repo_debian]
+    [
+      job_build_debian_package;
+      job_build_data_packages ~manual;
+      job_apt_repo_debian;
+    ]
   in
   let ubuntu_jobs = [job_build_ubuntu_package; job_apt_repo_ubuntu] in
   match pipeline_type with
