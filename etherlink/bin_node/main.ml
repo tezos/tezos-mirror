@@ -362,15 +362,20 @@ module Params = struct
     | Some mode -> return mode
     | None ->
         failwith
-          "Invalid history mode. Must be either archive, rolling:n or full:n \
-           where n is the number of days to retain history."
+          "Invalid history mode. Must be archive, full:N, rolling:N or seed:N \
+           where N is the retention period in days."
 
   let history next =
     Tezos_clic.param
       ~name:"history"
       ~desc:
-        "History mode, either archive, rolling:n or full:n where n is the \
-         number of days of history to retain."
+        "History mode for the EVM node. `archive`: keeps all data \
+         indefinitely. `full:N`: prunes Irmin context older than N days, keeps \
+         all SQL data (blocks, transactions, blueprints). `rolling:N`: prunes \
+         everything older than N days (context, blocks, transactions, \
+         blueprints). `seed:N`: minimal mode for sequencers — prunes context, \
+         blocks and transactions older than N days, keeps only blueprints and \
+         their events."
       history_param
       next
 
@@ -3499,7 +3504,7 @@ let pp_snapshot_history fmt history_info =
         "@,History mode:    %s@,First level:     %a"
         (match history_mode with
         | Archive -> "Archive"
-        | Rolling gc | Full gc | Blueprints_only gc ->
+        | Rolling gc | Full gc | Seed gc ->
             let hist_span =
               Ptime.Span.of_int_s
                 (gc.split_frequency_in_seconds * gc.number_of_chunks)

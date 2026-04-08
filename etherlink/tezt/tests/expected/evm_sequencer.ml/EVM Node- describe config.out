@@ -300,7 +300,9 @@
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e., the `latest` block
        parameter becomes a synonym for `finalized`. */,
-  "history"?: $history_mode /* History mode of the EVM node */,
+  "history"?:
+    $history_mode
+    /* History mode of the EVM node (archive, full:N, rolling:N, or seed:N) */,
   "db"?:
     { /* Database connection configuration */
       "pool_size"?:
@@ -404,9 +406,11 @@ $bignum:
      Decimal representation of a big number */
   string
 $history_mode:
-  /* Compact notation for the history mode. Can be `archive`, `full:N`, `rolling:N` or
-     `blueprints_only:N` with `N` being the number of days to use as the retention period */
-  "archive" | "full:n" | "rolling:n" | "blueprints_only:n"
+  /* History mode. `archive`: keeps all data indefinitely. `full:N`: prunes Irmin context
+     older than N days, keeps all SQL data. `rolling:N`: prunes everything older than N days.
+     `seed:N`: minimal mode for sequencers — prunes context, blocks and transactions older
+     than N days, keeps only blueprints and their events. */
+  "archive" | "full:n" | "rolling:n" | "seed:n"
 $int64:
   /* 64 bit integers
      Decimal representation of 64 bit integers */

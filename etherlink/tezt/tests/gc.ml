@@ -314,13 +314,13 @@ let start_fresh_observer sequencer =
     ~extra_arguments:["--dont-track-rollup-node"]
     ()
 
-let test_blueprints_only_history_mode_gc () =
+let test_seed_history_mode_gc () =
   let retention_period = 3 in
   register
     ~genesis_timestamp
-    ~history_mode:(Blueprints_only retention_period)
-    ~title:"Blueprints_only history mode: GC runs and blueprints remain"
-    ~tags:["blueprints_only"; "history_mode"; "gc"]
+    ~history_mode:(Seed retention_period)
+    ~title:"Seed history mode: GC runs and blueprints remain"
+    ~tags:["seed"; "history_mode"; "gc"]
   @@ fun sequencer ->
   let blocks_to_produce = retention_period + 1 in
   let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
@@ -338,14 +338,14 @@ let test_blueprints_only_history_mode_gc () =
     ~error_msg:"Block 0 should have been pruned" ;
   unit
 
-let test_switch_to_blueprints_only_mode () =
+let test_switch_to_seed_mode () =
   let retention_period = 2 in
   let blocks_before_switch = 3 in
   register
     ~genesis_timestamp
-    ~title:"Switch to blueprints_only history mode"
+    ~title:"Switch to seed history mode"
     ~history_mode:Archive
-    ~tags:["blueprints_only"; "history_mode"; "switch"]
+    ~tags:["seed"; "history_mode"; "switch"]
   @@ fun sequencer ->
   let* _ =
     fold blocks_before_switch () (fun i () ->
@@ -353,22 +353,20 @@ let test_switch_to_blueprints_only_mode () =
         unit)
   in
   let* () = Evm_node.terminate sequencer in
-  let*! () =
-    Evm_node.switch_history_mode sequencer (Blueprints_only retention_period)
-  in
+  let*! () = Evm_node.switch_history_mode sequencer (Seed retention_period) in
   let wait_for_blueprint =
     Evm_node.wait_for_start_history_mode
-      ~history_mode:(Format.sprintf "blueprints_only:%d" retention_period)
+      ~history_mode:(Format.sprintf "seed:%d" retention_period)
       sequencer
   in
   let* () = Evm_node.run sequencer and* _ = wait_for_blueprint in
   unit
 
-let test_blueprints_only_history_mode_invalid_switch () =
+let test_seed_history_mode_invalid_switch () =
   register
-    ~history_mode:(Blueprints_only 2)
-    ~title:"Blueprints_only history mode: invalid switch"
-    ~tags:["blueprints_only"; "history_mode"; "switch"]
+    ~history_mode:(Seed 2)
+    ~title:"Seed history mode: invalid switch"
+    ~tags:["seed"; "history_mode"; "switch"]
   @@ fun sequencer ->
   let* () = Evm_node.terminate sequencer in
   let {Runnable.value = process; _} =
@@ -381,26 +379,26 @@ let test_blueprints_only_history_mode_invalid_switch () =
   in
   unit
 
-let test_switch_blueprints_only_to_rolling () =
+let test_switch_seed_to_rolling () =
   let retention_period = 3 in
   let blocks_before_switch = retention_period + 1 in
   register
     ~genesis_timestamp
-    ~history_mode:(Blueprints_only retention_period)
-    ~title:"Switch from blueprints_only to rolling"
-    ~tags:["blueprints_only"; "history_mode"; "switch"; "rolling"]
+    ~history_mode:(Seed retention_period)
+    ~title:"Switch from seed to rolling"
+    ~tags:["seed"; "history_mode"; "switch"; "rolling"]
   @@ fun sequencer ->
-  (* Produce blocks and trigger GC in blueprints_only mode *)
+  (* Produce blocks and trigger GC in seed mode *)
   let wait_for_gc = Evm_node.wait_for_gc_finished sequencer in
   let* _ =
     fold blocks_before_switch () (fun i () ->
         let*@ _ = Rpc.produce_block ~timestamp:(get_timestamp i) sequencer in
         unit)
   and* _ = wait_for_gc in
-  (* In blueprints_only mode: block 0 is pruned but blueprints survive *)
+  (* In seed mode: block 0 is pruned but blueprints survive *)
   let*@? err = Rpc.get_block_by_number ~block:"0" sequencer in
   Check.(err.message =~ rex "Block 0 not found")
-    ~error_msg:"Block 0 should have been pruned in blueprints_only mode" ;
+    ~error_msg:"Block 0 should have been pruned in seed mode" ;
   let* _ = get_blueprint sequencer (Int64.of_int 1) in
   (* Switch to rolling mode *)
   let* () = Evm_node.terminate sequencer in
@@ -441,15 +439,15 @@ let test_switch_blueprints_only_to_rolling () =
       ~error_msg:"Expected earliest block to be %R after rolling GC, got %L") ;
   unit
 
-let test_blueprints_only_history_mode_gc_with_deposit =
+let test_seed_history_mode_gc_with_deposit =
   let retention_period = 3 in
   register_all
     ~__FILE__
     ~kernels:[Kernel.Latest]
-    ~tags:["blueprints_only"; "history_mode"; "gc"; "deposit"]
-    ~title:"Blueprints_only history mode: blueprints with deposits survive GC"
+    ~tags:["seed"; "history_mode"; "gc"; "deposit"]
+    ~title:"Seed history mode: blueprints with deposits survive GC"
     ~time_between_blocks:Nothing
-    ~history_mode:(Blueprints_only retention_period)
+    ~history_mode:(Seed retention_period)
     ~use_dal:Register_without_feature
     ~use_multichain:Register_without_feature
   @@
@@ -520,8 +518,8 @@ let () =
   test_switch_history_mode_shorter_retention_period () ;
   test_invalid_switch_history_mode () ;
   test_full_history_mode_gc () ;
-  test_blueprints_only_history_mode_gc () ;
-  test_switch_to_blueprints_only_mode () ;
-  test_blueprints_only_history_mode_invalid_switch () ;
-  test_switch_blueprints_only_to_rolling () ;
-  test_blueprints_only_history_mode_gc_with_deposit Protocol.[Alpha]
+  test_seed_history_mode_gc () ;
+  test_switch_to_seed_mode () ;
+  test_seed_history_mode_invalid_switch () ;
+  test_switch_seed_to_rolling () ;
+  test_seed_history_mode_gc_with_deposit Protocol.[Alpha]
