@@ -7,7 +7,7 @@
 
 open Gitlab_ci.Base
 
-type stage = Build | Test | Publish
+type stage = Build | Test | Publish | Test_publication
 
 (* Should actually be equivalent to [Stdlib.compare]
    if stages are defined in the right order.
@@ -19,17 +19,21 @@ type stage = Build | Test | Publish
 let compare_stages a b =
   match (a, b) with
   | Build, Build -> 0
-  | Build, (Test | Publish) -> -1
+  | Build, (Test | Publish | Test_publication) -> -1
   | Test, Build -> 1
   | Test, Test -> 0
-  | Test, Publish -> -1
+  | Test, (Publish | Test_publication) -> -1
   | Publish, (Build | Test) -> 1
   | Publish, Publish -> 0
+  | Publish, Test_publication -> -1
+  | Test_publication, (Build | Test | Publish) -> 1
+  | Test_publication, Test_publication -> 0
 
 let show_stage = function
   | Build -> "build"
   | Test -> "test"
   | Publish -> "publish"
+  | Test_publication -> "publishing_tests"
 
 type need = Job | Artifacts
 
@@ -508,6 +512,7 @@ let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
       Tezos_ci.Stages.sanity
   | Test, _ -> Tezos_ci.Stages.test
   | Publish, _ -> Tezos_ci.Stages.publish
+  | Test_publication, _ -> Tezos_ci.Stages.publishing_tests
 
 type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
@@ -625,14 +630,14 @@ let convert_graph ?(interruptible_pipeline = true)
               let interruptible_stage =
                 match stage with
                 | Build | Test -> true
-                | Publish -> interruptible_publish
+                | Publish | Test_publication -> interruptible_publish
               in
               let retry : Gitlab_ci.Types.retry option =
                 match retry with
                 | Some _ -> retry
                 | None -> (
                     match stage with
-                    | Build | Test -> None
+                    | Build | Test | Test_publication -> None
                     | Publish -> Some {max = 0; when_ = []})
               in
               let dev_infra =
