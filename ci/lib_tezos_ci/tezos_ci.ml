@@ -1643,29 +1643,6 @@ module Images = struct
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
 
-  let client_libs_dependencies =
-    let image_builder_amd64 =
-      job_docker_authenticated
-        ~__POS__
-        ~stage
-        ~name:"oc.docker:client-libs-dependencies"
-        ~description:"Build internal client-libs-dependencies images"
-          (* This image is not built for external use. *)
-        ~ci_docker_hub:false
-          (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
-        ~skip_docker_initialization:true
-        ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
-        ~artifacts:
-          (artifacts
-             ~reports:
-               (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
-             [])
-    in
-    let image_path =
-      "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
-    in
-    Image.mk_internal ~image_builder_amd64 ~image_path ()
-
   (** The rust toolchain image *)
   let rust_toolchain =
     (* The job that builds the rust_toolchain image.
