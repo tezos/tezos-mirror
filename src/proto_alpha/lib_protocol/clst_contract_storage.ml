@@ -119,6 +119,26 @@ let decrement_total_supply storage removed_amount =
   | None -> error Total_supply_underflow
   | Some total_supply -> ok {storage with total_supply}
 
+let exchange_rate_from_storage ctxt ~total_supply =
+  let open Lwt_result_syntax in
+  let* total_amount_of_tez = Clst.total_amount_of_tez ctxt in
+  let total_amount_of_tez = Tez.to_mutez total_amount_of_tez in
+  let total_supply = Script_int.to_zint total_supply in
+  let rate =
+    if Compare.Int64.equal total_amount_of_tez 0L || Z.equal total_supply Z.zero
+    then
+      (* This follows Invariant 1 from Staking_pseudotokens_storage: when there
+         are no tokens, the rate is 1. *)
+      Q.one
+    else Q.div (Q.of_int64 total_amount_of_tez) (Q.of_bigint total_supply)
+  in
+  return rate
+
+let exchange_rate ctxt =
+  let open Lwt_result_syntax in
+  let* total_supply, _ = get_total_supply ctxt in
+  exchange_rate_from_storage ctxt ~total_supply
+
 let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
   let clst_contract = Contract.Originated clst_contract_hash in
   Token.transfer ctxt (`Contract clst_contract) `CLST_deposits amount
