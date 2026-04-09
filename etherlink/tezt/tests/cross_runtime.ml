@@ -725,6 +725,18 @@ module CracRunnerWrapper = struct
     module TezGasBurner : sig
       val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
+
+    (** Deploy EVM runner + TEZ bridge + TEZ runner in one call. *)
+    val setup_crac_pipeline : unit -> (evm_runner * tez_runner) Lwt.t
+
+    (** Inject a TEZ→EVM CRAC via the Tezlink RPC without producing a
+        block.  The CRAC calls the [run] entrypoint on [tez_runner]. *)
+    val inject_crac_no_block : tez_runner -> unit Lwt.t
+
+    (** Send a simple EVM transfer via [send_raw_transaction] without
+        producing a block.  Returns the tx hash. *)
+    val send_evm_transfer_no_block :
+      ?value:Wei.t -> address:string -> unit -> string Lwt.t
   end
 
   (** Builds a {!S} module from the given test setup.  [nonce] and
@@ -766,6 +778,10 @@ module CracRunnerWrapper = struct
       let sender = sender
 
       let source = source
+
+      let sc_rollup_address = sc_rollup_address
+
+      let l1_contracts = l1_contracts
 
       let evm_nonce = evm_nonce
 
@@ -1006,6 +1022,60 @@ module CracRunnerWrapper = struct
           in
           return (`Tez_runner (runner_hex, runner))
       end
+
+      let setup_crac_pipeline () =
+        let* evm_runner = EvmMultiRunCaller.deploy_and_init () in
+        let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_runner in
+        let* tez_runner =
+          TezMultiRunCaller.originate ~callees:[tez_bridge] ()
+        in
+        return (evm_runner, tez_runner)
+
+      let inject_crac_no_block (`Tez_runner (_, dest)) =
+        let tezlink_endpoint =
+          Client.(
+            Foreign_endpoint
+              Endpoint.
+                {
+                  (Evm_node.rpc_endpoint_record sequencer) with
+                  path = "/tezlink";
+                })
+        in
+        let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+        let* arg = Client.convert_data_to_json ~data:"Unit" client in
+        let* crac_op =
+          Operation.Manager.(
+            operation
+              [
+                make
+                  ~fee:1000
+                  ~counter:(tez_counter ())
+                  ~gas_limit:100_000
+                  ~storage_limit:1000
+                  ~source
+                  (call ~dest ~arg ~entrypoint:"run" ~amount:0 ());
+              ])
+            client
+        in
+        let* _crac_hash =
+          Operation.inject ~dont_wait:true crac_op client_tezlink
+        in
+        unit
+
+      let send_evm_transfer_no_block ?(value = Wei.zero) ~address () =
+        let* raw_tx =
+          Cast.craft_tx
+            ~source_private_key:sender.Eth_account.private_key
+            ~chain_id:1337
+            ~nonce:(evm_nonce ())
+            ~gas:21_000
+            ~gas_price:1_000_000_000
+            ~value
+            ~address
+            ()
+        in
+        let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+        return tx_hash
     end in
     (module Helper)
 end
@@ -1595,6 +1665,200 @@ let test_crac_tez_to_evm_fake_tx_unique_hash_across_blocks =
   let* () = TezRunner.call_run ~gas_limit:200_000 tez_runner in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:2 evm_runner in
   Log.debug ~prefix "Both CRAC fake transactions stored successfully" ;
+  unit
+
+(** debug_traceTransaction on a CRAC fake transaction (TEZ→EVM).
+ *
+ *  Sets up a TEZ→EVM CRAC, fetches the fake tx hash from the EVM block,
+ *  and calls debug_traceTransaction with both callTracer and structLogger.
+ *  Verifies that the kernel produces a valid trace during Blueprint replay.
+ *)
+let test_crac_debug_trace_transaction =
+  register_crac_runner_test
+    ~title:"CRAC: debug_traceTransaction on TEZ->EVM fake tx"
+    ~tags:["crac_tx"; "trace"; "crac_trace"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "TRACE-CRAC" in
+  Log.debug ~prefix "Setup CRAC pipeline" ;
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  Log.debug ~prefix "Call TEZ runner (triggers CRAC into EVM)" ;
+  let* () = TezRunner.call_run tez_runner in
+  Log.debug ~prefix "Verify CRAC completed" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  Log.debug ~prefix "Fetch latest EVM block to get the CRAC fake tx hash" ;
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let crac_tx_hash =
+    match block.transactions with
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected at least one tx hash in EVM block"
+  in
+  Log.info "CRAC fake tx hash: %s" crac_tx_hash ;
+  (* Test 1: callTracer *)
+  Log.debug ~prefix "debug_traceTransaction with callTracer" ;
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash:crac_tx_hash
+      ~tracer:"callTracer"
+      sequencer
+  in
+  (match trace_result with
+  | Ok t ->
+      (* The trace should have a "type" field (top-level call type) *)
+      let type_ = JSON.(t |-> "type" |> as_string) in
+      Check.(
+        (type_ = "CALL")
+          string
+          ~error_msg:"Expected CALL type for CRAC trace, got %L")
+  | Error err ->
+      Test.fail
+        "debug_traceTransaction (callTracer) failed on CRAC fake tx: %s"
+        err.Rpc.message) ;
+  (* Test 2: structLogger (default tracer) *)
+  Log.debug ~prefix "debug_traceTransaction with structLogger" ;
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash:crac_tx_hash
+      ~tracer:"structLogger"
+      sequencer
+  in
+  (match trace_result with
+  | Ok t ->
+      (* structLogger output should have a structLogs array *)
+      let struct_logs = JSON.(t |-> "structLogs" |> as_list) in
+      Log.info "structLogger produced %d opcode logs" (List.length struct_logs) ;
+      (* Verify structLogger fields for CRAC fake tx *)
+      let failed = JSON.(t |-> "failed" |> as_bool) in
+      Check.(
+        (failed = false)
+          bool
+          ~error_msg:"Expected failed=false for successful CRAC tx, got %L") ;
+      let gas = JSON.(t |-> "gas" |> as_int) in
+      Check.((gas > 0) int ~error_msg:"Expected positive gas value, got %L") ;
+      let return_value = JSON.(t |-> "returnValue" |> as_string) in
+      Check.(
+        (return_value = "0x")
+          string
+          ~error_msg:"Expected empty returnValue (0x) for CRAC fake tx, got %L")
+  | Error err ->
+      Test.fail
+        "debug_traceTransaction (structLogger) failed on CRAC fake tx: %s"
+        err.Rpc.message) ;
+  unit
+
+(** debug_traceBlockByNumber on a mixed block containing BOTH a normal
+ *  EVM transaction AND a CRAC fake tx.
+ *
+ *  Sends a dummy EVM self-transfer and a TEZ→EVM CRAC into the same
+ *  block via the Tezlink RPC, then calls debug_traceBlockByNumber and
+ *  verifies that traces are returned for both transactions.
+ *)
+let test_crac_debug_trace_block =
+  register_crac_runner_test
+    ~title:"CRAC: debug_traceBlockByNumber on mixed block"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "block"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "TRACE-BLK" in
+  Log.debug ~prefix "Setup CRAC pipeline" ;
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  (* Step 1: Send a dummy EVM self-transfer to the mempool (no block). *)
+  Log.debug ~prefix "Send dummy EVM tx to mempool" ;
+  let* _dummy_hash =
+    send_evm_transfer_no_block ~address:sender.Eth_account.address ()
+  in
+  (* Step 2: Inject TEZ→EVM CRAC via Tezlink RPC (no block). *)
+  Log.debug ~prefix "Inject CRAC via Tezlink RPC" ;
+  let* () = inject_crac_no_block tez_runner in
+  (* Step 3: Produce one block containing both transactions. *)
+  Log.debug ~prefix "Produce mixed block" ;
+  let*@ _block_number = Rpc.produce_block sequencer in
+  Log.debug ~prefix "Verify CRAC completed" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  Log.debug ~prefix "Fetch latest EVM block" ;
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hashes -> hashes
+    | _ -> Test.fail "Expected tx hashes in EVM block"
+  in
+  let tx_count = List.length tx_hashes in
+  Log.info "EVM block contains %d transaction(s)" tx_count ;
+  Check.(
+    (tx_count = 2)
+      int
+      ~error_msg:"Expected 2 transactions (1 normal + 1 CRAC) but got %L") ;
+  Log.debug ~prefix "debug_traceBlockByNumber with callTracer" ;
+  let*@ trace_results =
+    Rpc.trace_block ~block:(Number (Int32.to_int block.number)) sequencer
+  in
+  Check.(
+    (List.length trace_results = tx_count)
+      int
+      ~error_msg:"Expected %R traces but got %L") ;
+  (* Verify each trace has a txHash and a CALL result *)
+  List.iter
+    (fun t ->
+      let tx_hash = JSON.(t |-> "txHash" |> as_string) in
+      Check.(
+        (String.length tx_hash = 66)
+          int
+          ~error_msg:"Expected a 66-char tx hash but got length %L") ;
+      let type_ = JSON.(t |-> "result" |-> "type" |> as_string) in
+      Check.(
+        (type_ = "CALL")
+          string
+          ~error_msg:"Expected CALL type in trace result, got %L"))
+    trace_results ;
+  Log.info
+    "Block trace returned %d traces matching %d transactions"
+    (List.length trace_results)
+    tx_count ;
+  unit
+
+(** debug_traceTransaction on a normal EVM tx in a block that also
+ *  contains a CRAC fake tx.  Ensures that CRAC presence does not break
+ *  tracing of regular transactions in the same block.
+ *)
+let test_crac_debug_trace_normal_tx_in_crac_block =
+  register_crac_runner_test
+    ~title:"CRAC: debug_traceTransaction on normal tx in CRAC block"
+    ~tags:["crac_tx"; "trace"; "crac_trace"; "regression"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "TRACE-REG" in
+  Log.debug ~prefix "Setup CRAC pipeline" ;
+  let* evm_runner, tez_runner = setup_crac_pipeline () in
+  (* Step 1: Send a normal EVM transfer to the mempool (no block). *)
+  Log.debug ~prefix "Send normal EVM transfer to mempool" ;
+  let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
+  let* normal_tx_hash = send_evm_transfer_no_block ~value:Wei.one ~address () in
+  (* Step 2: Inject TEZ→EVM CRAC via Tezlink RPC (no block). *)
+  Log.debug ~prefix "Inject CRAC via Tezlink RPC" ;
+  let* () = inject_crac_no_block tez_runner in
+  (* Step 3: Produce one block containing both transactions. *)
+  Log.debug ~prefix "Produce mixed block" ;
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner in
+  Log.debug ~prefix "debug_traceTransaction on the normal tx" ;
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash:normal_tx_hash
+      ~tracer:"callTracer"
+      sequencer
+  in
+  (match trace_result with
+  | Ok t ->
+      let type_ = JSON.(t |-> "type" |> as_string) in
+      Check.(
+        (type_ = "CALL")
+          string
+          ~error_msg:"Expected CALL type for normal tx trace, got %L") ;
+      Log.info "Normal tx trace OK in mixed CRAC block"
+  | Error err ->
+      Test.fail
+        "debug_traceTransaction failed on normal tx in CRAC block: %s"
+        err.Rpc.message) ;
   unit
 
 (** EVM journal is preserved across CrossRuntime boundaries: TEZ revert must
@@ -5394,4 +5658,7 @@ let () =
   test_crac_receipt_tez_mixed_calls_with_crac [Alpha] ;
   test_crac_http_call_success [Alpha] ;
   test_crac_http_call_catch_revert [Alpha] ;
-  test_crac_http_call_catch_oog [Alpha]
+  test_crac_http_call_catch_oog [Alpha] ;
+  test_crac_debug_trace_transaction [Alpha] ;
+  test_crac_debug_trace_block [Alpha] ;
+  test_crac_debug_trace_normal_tx_in_crac_block [Alpha]
