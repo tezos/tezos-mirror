@@ -112,9 +112,7 @@ let changeset_debian_packages =
         "scripts/packaging/build-deb-local.sh";
         "scripts/packaging/Release.conf";
         "scripts/packaging/octez/debian/*";
-        "debian-deps-build.Dockerfile";
         "scripts/ci/build-debian-packages_current.sh";
-        "scripts/ci/build-packages-dependencies.sh";
         "scripts/ci/build-debian-packages.sh";
         "scripts/ci/prepare-apt-repo.sh";
         "scripts/ci/create_debian_repo.sh";
