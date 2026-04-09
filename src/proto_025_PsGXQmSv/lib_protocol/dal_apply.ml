@@ -48,6 +48,9 @@ let validate_attestations ctxt ~attestation_level consensus_key attestations =
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
+  let* _decoded =
+    Dal.Attestations.decode attestations ~number_of_slots ~number_of_lags
+  in
   let attested_level = Raw_level.succ attestation_level in
   let attestation_lags = Constants.dal_attestation_lags ctxt in
   let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
@@ -105,13 +108,12 @@ let apply_attestations ctxt ~delegate ~attested_level attestations ~tb_slot
       (fun ctxt ->
         Dal.Attestations.record_attestation ctxt ~tb_slot attestations)
   in
-  return
-    (Dal.Attestations.record_number_of_attested_shards
-       ctxt
-       ~delegate
-       ~attested_level
-       attestations
-       committee_level_to_shard_count)
+  Dal.Attestations.record_number_of_attested_shards
+    ctxt
+    ~delegate
+    ~attested_level
+    attestations
+    committee_level_to_shard_count
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager

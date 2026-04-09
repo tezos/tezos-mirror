@@ -455,6 +455,7 @@ module Accountability = struct
   let record_number_of_attested_shards t ~number_of_slots ~attestation_lag ~lags
       ~delegate ~attested_level delegate_attested_slots
       committee_level_to_shard_count =
+    let open Result_syntax in
     let update published_level_map ~published_level ~slot_index
         number_of_delegate_shards =
       PublishedLevelMap.update
@@ -503,52 +504,52 @@ module Accountability = struct
         published_level_map
     in
     let number_of_lags = List.length lags in
-    let published_level_map =
-      List.fold_left_i
-        (fun lag_index published_level_map lag ->
-          let published_level_opt = Raw_level_repr.sub attested_level lag in
-          match published_level_opt with
-          | None -> published_level_map
-          | Some published_level ->
-              let committee_level =
-                Raw_level_repr.add published_level (attestation_lag - 1)
-              in
-              let published_level_map =
-                List.fold_left
-                  (fun published_level_map slot_index ->
-                    let attested =
-                      is_attested
-                        delegate_attested_slots
-                        ~number_of_slots
-                        ~number_of_lags
-                        ~lag_index
-                        slot_index
-                    in
-                    let number_of_delegate_shards =
-                      match
-                        Raw_level_repr.Map.find
-                          committee_level
-                          committee_level_to_shard_count
-                      with
-                      | None -> 0
-                      | Some v -> v
-                    in
-                    if attested && Compare.Int.(number_of_delegate_shards > 0)
-                    then
-                      update
-                        published_level_map
-                        ~published_level
-                        ~slot_index
-                        number_of_delegate_shards
-                    else published_level_map)
-                  published_level_map
-                  (Dal_slot_index_repr.all_slots ~number_of_slots)
-              in
-              published_level_map)
-        t.shard_attestations
-        lags
+    let* decoded_lags =
+      decode delegate_attested_slots ~number_of_slots ~number_of_lags
     in
-    {t with shard_attestations = published_level_map}
+    let published_level_map =
+      List.fold_left
+        (fun published_level_map {lag_index; slot_indices} ->
+          match List.nth lags lag_index with
+          | None -> published_level_map
+          | Some lag -> (
+              match Raw_level_repr.sub attested_level lag with
+              | None -> published_level_map
+              | Some published_level ->
+                  let committee_level =
+                    Raw_level_repr.add published_level (attestation_lag - 1)
+                  in
+                  let number_of_delegate_shards =
+                    match
+                      Raw_level_repr.Map.find
+                        committee_level
+                        committee_level_to_shard_count
+                    with
+                    | None -> 0
+                    | Some v -> v
+                  in
+                  if Compare.Int.(number_of_delegate_shards > 0) then
+                    List.fold_left
+                      (fun published_level_map slot_idx ->
+                        match
+                          Dal_slot_index_repr.of_int_opt
+                            ~number_of_slots
+                            slot_idx
+                        with
+                        | None -> published_level_map
+                        | Some slot_index ->
+                            update
+                              published_level_map
+                              ~published_level
+                              ~slot_index
+                              number_of_delegate_shards)
+                      published_level_map
+                      slot_indices
+                  else published_level_map))
+        t.shard_attestations
+        decoded_lags
+    in
+    return {t with shard_attestations = published_level_map}
 
   (* Given a slot encoded as [number_of_shards] shards and for which
      [number_of_attested_shards] are attested by the bakers. The slot is

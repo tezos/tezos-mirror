@@ -3032,7 +3032,7 @@ module Dal : sig
       attested_level:Raw_level.t ->
       t ->
       int Raw_level.Map.t ->
-      context
+      context tzresult
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 

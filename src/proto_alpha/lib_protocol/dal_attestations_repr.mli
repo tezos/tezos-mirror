@@ -76,6 +76,8 @@ v}
 
 type t = private Bitset.t
 
+type error += Dal_invalid_attestation_bitset of Bitset.t
+
 (** The size of the encoding is not bounded. However, the size of a DAL
     attestations bitset is checked during validation of an attestation; and
     there is a bound on the size of a generic operation. *)
@@ -242,7 +244,7 @@ module Accountability : sig
     attested_level:Raw_level_repr.t ->
     attested_slots ->
     int Raw_level_repr.Map.t ->
-    t
+    t tzresult
 
   (** [attestation_status t ~threshold ~number_of_shards ~published_level
       ~slot_index] returns the current attestation status of a slot; a slot is
