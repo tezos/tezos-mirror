@@ -296,7 +296,9 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
   in
   let stake_ratio =
-    Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+    if Q.(q_total_supply = zero) then Q.zero (* Impossible case *)
+    else
+      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
   in
   (* Once computed here, the minimum is final. *)
   let issuance_ratio_min =
