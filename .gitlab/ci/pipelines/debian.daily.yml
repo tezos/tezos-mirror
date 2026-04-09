@@ -207,32 +207,6 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - oc.build-debian
-  dependencies:
-  - oc.build-debian
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt-get update
-  - apt-get install lintian parallel -y
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables: {}
-
 oc.lintian_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
   stage: publishing_tests
@@ -474,3 +448,28 @@ oc.install_bin_ubuntu_22_04:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     PREFIX: ""
+
+oc.lintian_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.build-debian
+  dependencies:
+  - oc.build-debian
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - export DEBIAN_FRONTEND=noninteractive
+  - apt-get update
+  - apt-get install lintian parallel -y
+  - ./scripts/ci/lintian_debian_packages.sh debian bookworm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
