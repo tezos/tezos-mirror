@@ -172,7 +172,7 @@ where
                         "Expected bytes for collect_result entrypoint".into(),
                     ));
                 };
-                Ok(())
+                Ok(vec![])
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
