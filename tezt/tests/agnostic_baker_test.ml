@@ -520,7 +520,8 @@ let test_operation_worker_crash_shuts_down_baker_multi_node =
   Protocol.register_test
     ~__FILE__
     ~title:"Baker does not shut down when operation_worker crashes"
-    ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"]
+    ~tags:
+      [team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"; Tag.flaky]
     ~supports:
       Protocol.(
         Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])

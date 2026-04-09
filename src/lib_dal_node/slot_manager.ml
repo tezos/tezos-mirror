@@ -160,13 +160,13 @@ let () =
     ~id:"dal.node.No_commitment_found_for_slot_id"
     ~title:"No commitment found on L1 for slot id"
     ~description:
-      "No commitment found (in memory or in the skip-list) for the given slot \
-       id."
+      "No commitment found (neither in memory, nor in the skip-list, nor in \
+       the L1 context) for the given slot id."
     ~pp:(fun ppf (published_level, slot_index) ->
       Format.fprintf
         ppf
-        "No commitment found (in memory or in the skip-list) at level %ld and \
-         index %d."
+        "No commitment found (neither in memory, nor in the skip-list, nor in \
+         the L1 context) at level %ld and index %d."
         published_level
         slot_index)
     Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
@@ -498,7 +498,8 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
-    Returns [None] if the cell is not found in the store. *)
+   Returns [None] if the cell is found but contains an unpublished slot.
+   Raises [Not_found] if no matching cell is found in the store. *)
 let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
@@ -507,7 +508,7 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
       slot_id
   in
   match cell_bytes_opt with
-  | None -> return_none
+  | None -> raise Not_found
   | Some (cell_bytes, attestation_lag) ->
       let*? (module Plugin : Dal_plugin.T) =
         let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
@@ -518,89 +519,96 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
         cell_bytes
       |> Plugin.Skip_list.slot_header_of_cell |> return
 
-(* Retrieve the slot header for [slot_id] by accessing the skip list cells
-   produced during [attested_level] and stored in in the L1 context).
+(* Retrieve the slot header for [slot_id] from the L1 skip list.
 
-   Steps:
-   - Retrieve the skip list cells for [attested_level] using the plugin from L1.
-   - Locate the one matching the [slot_index] of [slot_id].
-   - Extract and return the slot header via the plugin. *)
-let _try_get_slot_header_from_L1_skip_list ctxt slot_id =
+   For each [lag] in [attestation_lags], fetch the skip list at
+   [slot_level + lag] and look for a cell matching both [slot_index] and [lag]
+   (the lag check is required with dynamic lags to avoid matching a cell from a
+   different published level).
+
+   Returns [None] if a matching cell is found but it contains an unpublished
+   slot. Returns an error if no matching cell is found after all lags are
+   exhausted. *)
+let try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
-  let*? (module Plugin : Dal_plugin.T), dal_constants =
+  let*? _plugin_slot, dal_constants_slot =
     Node_context.get_plugin_and_parameters_for_level ctxt ~level:slot_level
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     The attested level is wrong around migration!
-     Example: If [M] is the migration level, for [slot_level = M-2],
-     [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
-     [attested_level = M+6], but at this level skip-list cells for
-     [slot_level = M+1] are found in the L1 context.  *)
-  let attested_level =
-    Int32.(add slot_level (of_int dal_constants.Types.attestation_lag))
+  let attestation_lags = dal_constants_slot.Types.attestation_lags in
+  let pred_published_level = Int32.pred slot_level in
+  let pred_publication_level_dal_constants =
+    lazy
+      (Lwt.return
+      @@ Node_context.get_proto_parameters
+           ctxt
+           ~level:(`Level pred_published_level))
   in
-  let* cells_of_level =
-    let pred_published_level = Int32.pred slot_level in
-    Plugin.Skip_list.cells_of_level
-      ~attested_level
-      (Node_context.get_tezos_node_cctxt ctxt)
-      ~dal_constants
-      ~pred_publication_level_dal_constants:
-        (lazy
-          (Lwt.return
-          @@ Node_context.get_proto_parameters
-               ctxt
-               ~level:(`Level pred_published_level)))
+  let rec find_in_lags = function
+    | [] -> tzfail (Exn Not_found)
+    | lag :: rest -> (
+        let attested_level = Int32.(add slot_level (of_int lag)) in
+        match
+          Node_context.get_plugin_and_parameters_for_level
+            ctxt
+            ~level:attested_level
+        with
+        | Error _ -> find_in_lags rest (* plugin not yet known; skip *)
+        | Ok (plugin_attested, dal_constants) -> (
+            let (module Plugin : Dal_plugin.T) = plugin_attested in
+            let* cells =
+              Plugin.Skip_list.cells_of_level
+                ~attested_level
+                (Node_context.get_tezos_node_cctxt ctxt)
+                ~dal_constants
+                ~pred_publication_level_dal_constants
+            in
+            match
+              List.find_opt
+                (fun (_hash, _cell, cell_slot_index, cell_lag) ->
+                  cell_slot_index = slot_index && cell_lag = lag)
+                cells
+            with
+            | None -> find_in_lags rest
+            | Some (_hash, cell, _slot_index, _cell_lag) ->
+                Plugin.Skip_list.slot_header_of_cell cell |> return))
   in
-  match
-    List.find_all
-      (fun (_hash, _cell, cell_slot_index, _cell_attestation_lag) ->
-        cell_slot_index = slot_index)
-      cells_of_level
-  with
-  | [(_cell_hash, cell, _slot_index, _cell_attestation_lag)] ->
-      Plugin.Skip_list.slot_header_of_cell cell |> return
-  | _ ->
-      (* This should not happen (unless the slot index is not valid). In fact,
-         the skip list delta for a level contains exactly [number_of_slots]
-         items: one per slot index. *)
-      let number_of_slots = dal_constants.number_of_slots in
-      if slot_index < 0 || slot_index >= number_of_slots then
-        tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
-      else (* Should not be reachable *)
-        assert false
+  find_in_lags attestation_lags
 
 (* Attempt to retrieve the commitment hash associated with the published slot
    header identified by [slot_id].
 
    Retrieval order:
     1. Attempt to get the header from the local SQLite skip list.
-    2. ~~If not found, fall back to fetching it from the L1 skip list context.~~
+    2. If not found locally (empty skip list, or data pruned), fall back to
+       fetching it from the L1 node's context via
+       [try_get_slot_header_from_L1_skip_list].
 
-    Returns [Some commitment] if found and matches the [slot_id], [None]
-    otherwise. Performs assertions to ensure the returned slot header matches
-    the requested [slot_id]. *)
+    Returns [Some commitment] if a commitment was published for [slot_id],
+    [None] if the slot was confirmed unpublished by either local or L1 data,
+    or an error if the lookup itself failed or there is no skip-list data
+    available to answer the query. *)
 let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
-  let*! published_slot_header_opt =
-    try_get_slot_header_from_indexed_skip_list ctxt slot_id
-  in
-  match published_slot_header_opt with
-  | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
-      (* These invariants are expected to hold by design. *)
-      assert (Int32.equal published_level slot_id.slot_level) ;
-      assert (Int.equal slot_index slot_id.slot_index) ;
-      return_some commitment
-  | Ok None ->
-      (* The function(s) above succeeded, but nothing was found as "published". *)
-      return_none
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-     If the header was not found, or there was an error, then normally we would
-     try to get it from the L1 context, using
-     [_try_get_slot_header_from_L1_skip_list ctxt slot_id]. See the FIXME there
-     to see why we don't use it. *)
-  | Error error -> tzfail error
+  Lwt.catch
+    (fun () ->
+      let+ slot_header_opt =
+        try_get_slot_header_from_indexed_skip_list ctxt slot_id
+      in
+      Option.map
+        (fun Dal_plugin.{published_level; slot_index; commitment} ->
+          (* These invariants are expected to hold by design. *)
+          assert (Int32.equal published_level slot_id.slot_level) ;
+          assert (Int.equal slot_index slot_id.slot_index) ;
+          commitment)
+        slot_header_opt)
+    (fun exn ->
+      match exn with
+      | Not_found ->
+          try_get_slot_header_from_L1_skip_list ctxt slot_id
+          |> Lwt_result.map
+             @@ Option.map (fun Dal_plugin.{commitment; _} -> commitment)
+      | exn -> Lwt.reraise exn)
 
 (* This function attempts to retrieve the commitment associated to a (published)
    slot whose id is given in [slot_id]. For that, we check in various places:
@@ -608,18 +616,20 @@ let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
 let get_commitment_from_slot_id ctxt slot_id =
   let open Lwt_result_syntax in
   match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
-  | Some res -> return res
+  | Some commitment -> return commitment
   | None -> (
       let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
-      | Ok (Some res) -> return res
+      | Ok (Some commitment) -> return commitment
       | Ok None -> tzfail @@ No_commitment_found_for_slot_id slot_id
       | Error error ->
+          (* Both lookups failed with an error (e.g. the L1 node does not have
+             the requested level in its history). *)
           let*! () =
             Event.emit_failed_to_retrieve_commitment_of_slot_id
               ~published_level:slot_id.slot_level
               ~slot_index:slot_id.slot_index
-              ~error
+              ~error:[error]
           in
           Unable_to_fetch_the_commitment_of_slot_id slot_id |> tzfail)
 
@@ -636,8 +646,8 @@ let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
       let* expected_commitment_hash =
         (if config.trust_slots_backup_uris then return_none
          else
-           let+ res = get_commitment_from_slot_id ctxt slot_id in
-           Option.some res)
+           let+ commitment = get_commitment_from_slot_id ctxt slot_id in
+           Some commitment)
         |> Errors.other_lwt_result
       in
       let* slot_opt =
