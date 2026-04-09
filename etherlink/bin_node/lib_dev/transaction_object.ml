@@ -1022,12 +1022,10 @@ let reconstruct_from_transactions_list transactions
   let open Result_syntax in
   match List.assoc ~equal:( = ) obj.hash transactions with
   | None ->
-      (* This should not happen *)
-      error_with
-        "Cannot reconstruct %a: cannot find the raw transaction in the \
-         blueprint"
-        Ethereum_types.pp_hash
-        obj.hash
+      (* The transaction is not in the blueprint.  This happens for CRAC
+         fake transactions which are kernel side effects, not submitted
+         transactions.  Return the stored object as-is. *)
+      return (from_store_transaction_object obj)
   | Some None ->
       (* It is a delayed transaction, there is nothing we can do except
          returning the potentially incorrect transaction object *)
