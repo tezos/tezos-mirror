@@ -4253,7 +4253,6 @@ oc.misc_checks:
   - gcp
   rules:
   - changes:
-    - client-libs/**/*
     - contrib/**/*
     - devtools/**/*
     - docs/**/*
