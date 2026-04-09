@@ -260,18 +260,6 @@ let voting_weight
   let+ all = Tez_repr.(frozen +? delegated) in
   Tez_repr.to_mutez all
 
-let apply_slashing ~percentage
-    {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
-    =
-  let remaining_percentage = Percentage.neg percentage in
-  let own_frozen =
-    Tez_repr.mul_percentage ~rounding:`Down own_frozen remaining_percentage
-  in
-  let staked_frozen =
-    Tez_repr.mul_percentage ~rounding:`Down staked_frozen remaining_percentage
-  in
-  {own_frozen; staked_frozen; delegated; min_delegated_in_cycle; stez_frozen}
-
 let own_frozen
     {
       own_frozen;
@@ -311,6 +299,18 @@ let total_frozen
       stez_frozen = _;
     } =
   Tez_repr.(own_frozen +? staked_frozen)
+
+let total_frozen_with_stez
+    ({
+       own_frozen = _;
+       staked_frozen = _;
+       delegated = _;
+       min_delegated_in_cycle = _;
+       stez_frozen;
+     } as fsbr) =
+  let open Result_syntax in
+  let* total_frozen = total_frozen fsbr in
+  Tez_repr.(total_frozen +? stez_frozen)
 
 let current_delegated
     {
@@ -501,17 +501,23 @@ let allowed_staked_frozen ~adaptive_issuance_global_limit_of_staking_over_baking
       Tez_repr.min staked_frozen max_allowed_staked_frozen
   | Error _max_allowed_staked_frozen_overflows -> staked_frozen
 
-let own_ratio ~adaptive_issuance_global_limit_of_staking_over_baking
+type ratios = {
+  baker_over_all_frozen : Int64.t * Int64.t;
+  staker_over_external_frozen : Int64.t * Int64.t;
+}
+
+let distribution_ratios ~adaptive_issuance_global_limit_of_staking_over_baking
     ~delegate_limit_of_staking_over_baking_millionth
     ({
        own_frozen;
        staked_frozen;
        delegated = _;
        min_delegated_in_cycle = _;
-       stez_frozen = _;
+       stez_frozen;
      } as t) =
-  if Tez_repr.(own_frozen = zero && staked_frozen = zero) then (1L, 1L)
-  else if Tez_repr.(own_frozen = zero) then (0L, 1L)
+  if Tez_repr.(own_frozen = zero && staked_frozen = zero && stez_frozen = zero)
+  then
+    {baker_over_all_frozen = (1L, 1L); staker_over_external_frozen = (1L, 1L)}
   else
     let allowed_staked_frozen =
       allowed_staked_frozen
@@ -519,11 +525,21 @@ let own_ratio ~adaptive_issuance_global_limit_of_staking_over_baking
         ~delegate_limit_of_staking_over_baking_millionth
         t
     in
-    if Tez_repr.(allowed_staked_frozen = zero) then (1L, 1L)
-    else
-      let own_frozen = Tez_repr.to_mutez own_frozen in
-      let allowed_staked_frozen = Tez_repr.to_mutez allowed_staked_frozen in
-      (own_frozen, Int64.add own_frozen allowed_staked_frozen)
+    let own_frozen = Tez_repr.to_mutez own_frozen in
+    let stez_frozen = Tez_repr.to_mutez stez_frozen in
+    let allowed_staked_frozen = Tez_repr.to_mutez allowed_staked_frozen in
+    let total_other_staked = Int64.add allowed_staked_frozen stez_frozen in
+    let baker_over_all_frozen =
+      if Compare.Int64.(total_other_staked = 0L) then (1L, 1L)
+      else if Compare.Int64.(own_frozen = 0L) then (0L, 1L)
+      else (own_frozen, Int64.add own_frozen total_other_staked)
+    in
+    let staker_over_external_frozen =
+      if Compare.Int64.(stez_frozen = 0L) then (1L, 1L)
+      else if Compare.Int64.(allowed_staked_frozen = 0L) then (0L, 1L)
+      else (allowed_staked_frozen, total_other_staked)
+    in
+    {baker_over_all_frozen; staker_over_external_frozen}
 
 let has_minimal_frozen_stake ~minimal_frozen_stake full_staking_balance =
   let own_frozen = own_frozen full_staking_balance in
