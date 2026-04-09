@@ -4,8 +4,6 @@
 
 use mir::ast::Type;
 use mir::ast::{AddressHash, BinWriter, ByteReprTrait, TypedValue};
-use mir::context::PushableTypecheckingContext;
-use mir::gas::Gas;
 use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
@@ -95,12 +93,12 @@ fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
 }
 
 /// Typecheck a Micheline value against the expected type for the given
-/// enshrined contract entrypoint. Returns the typed value, or an error
-/// if the entrypoint is unknown or the value doesn't match the type.
+/// enshrined contract entrypoint.
 fn typecheck_entrypoint_value<'a>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: &Micheline<'a>,
+    ctx: &mut impl CtxTrait<'a>,
 ) -> Result<TypedValue<'a>, TransferError> {
     let entrypoints = get_enshrined_contract_entrypoint(contract).ok_or_else(|| {
         TransferError::GatewayError("Failed to build entrypoint map".into())
@@ -108,9 +106,7 @@ fn typecheck_entrypoint_value<'a>(
     let ty = entrypoints.get(entrypoint).ok_or_else(|| {
         TransferError::GatewayError(format!("Unknown entrypoint: {entrypoint}"))
     })?;
-    let mut gas = Gas::default();
-    let mut tc_ctx = PushableTypecheckingContext { gas: &mut gas };
-    typecheck_value(value, &mut tc_ctx, ty)
+    typecheck_value(value, ctx, ty)
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
@@ -125,7 +121,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
 where
     Host: StorageV1 + Logging,
 {
-    let typed = typecheck_entrypoint_value(contract, entrypoint, &value)?;
+    let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
         EnshrinedContracts::TezosXGateway => {
             if entrypoint.is_default() {
@@ -1072,14 +1068,17 @@ mod tests {
         Micheline::prim2(arena, Prim::Pair, url.to_string().into(), inner_pair)
     }
 
-    /// Typecheck a Micheline call value into a TypedValue.
     fn typecheck_call<'a>(
         value: &Micheline<'a>,
+        host: &'a mut MockKernelHost,
     ) -> Result<TypedValue<'a>, TransferError> {
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(host, source, 0);
         typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("call").unwrap(),
             value,
+            &mut ctx,
         )
     }
 
@@ -1093,7 +1092,8 @@ mod tests {
             &[0x01, 0x02],
             1,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
@@ -1109,7 +1109,8 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc");
         assert_eq!(request.method(), http::Method::GET);
@@ -1130,7 +1131,8 @@ mod tests {
             &[0xDE, 0xAD],
             42,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         // Unknown method defaults to POST
         assert_eq!(request.method(), http::Method::POST);
@@ -1144,8 +1146,9 @@ mod tests {
 
     #[test]
     fn test_http_call_malformed_parameters() {
+        let mut host = MockKernelHost::default();
         let result =
-            typecheck_call(&Micheline::String("not a valid http_call".to_string()));
+            typecheck_call(&Micheline::String("not a valid http_call".to_string()), &mut host);
         assert!(result.is_err());
     }
 
@@ -1200,7 +1203,8 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1220,7 +1224,8 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
@@ -1567,7 +1572,8 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::GET);
     }
@@ -1577,7 +1583,8 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 1);
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
@@ -1587,7 +1594,8 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 99);
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let request = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
@@ -1649,11 +1657,15 @@ mod tests {
 
     #[test]
     fn test_typecheck_unknown_entrypoint_returns_error() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::String("hello".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("nonexistent").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1665,12 +1677,16 @@ mod tests {
 
     #[test]
     fn test_typecheck_wrong_type_for_default_entrypoint() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         // Default entrypoint expects a string, not bytes
         let value = Micheline::Bytes(vec![0x01, 0x02]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::default(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1693,22 +1709,30 @@ mod tests {
 
     #[test]
     fn test_collect_result_typechecks_bytes() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_collect_result_rejects_non_bytes() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::String("not bytes".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
     }
