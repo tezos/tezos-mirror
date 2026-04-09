@@ -2079,26 +2079,6 @@ function update_tezt_tests() {
 
 }
 
-# MISC COMMIT 01: Update kaitai structs
-#
-# MODE: all modes; snapshot also removes source files
-# MODIFIES: client-libs/kaitai-struct-files/files/
-#
-# DESCRIPTION:
-#   Regenerates kaitai struct files for the new protocol.
-#   Snapshot: also removes source protocol kaitai files.
-#
-# CREATES: 0-1 commits — "kaitai: update structs" (conditional)
-function misc_commit_01_update_kaitai_structs() {
-  log_blue "Update kaitai structs"
-  make check-kaitai-struct-files || log_blue "updated kaitai files"
-  make kaitai-struct-files-update
-  if [[ ${is_snapshot} == true ]]; then
-    rm -rf "client-libs/kaitai-struct-files/files/${protocol_source}*"
-  fi
-  commit_if_changes "kaitai: update structs"
-}
-
 # MISC COMMIT 02: Update testnet_experiment_tools
 #
 # MODE: snapshot (replace), stabilise/copy (add)
@@ -2193,7 +2173,6 @@ function misc_updates() {
 
   # Misc. updates
 
-  misc_commit_01_update_kaitai_structs
   misc_commit_02_update_testnet_experiment_tools
   misc_commit_03_update_linter
   misc_commit_04_run_linting
@@ -2719,14 +2698,6 @@ function remove_from_tezt_tests() {
 }
 
 function misc_removals() {
-
-  log_blue "Update kaitai structs"
-  make check-kaitai-struct-files || log_blue "updated kaitai files"
-  make kaitai-struct-files-update
-  if [[ ${is_snapshot} == true ]]; then
-    rm -rf "client-libs/kaitai-struct-files/files/${protocol_source}*"
-  fi
-  commit_if_changes "kaitai: update structs"
 
   #if deleting a protocol in stabilisation
   if [[ ${source_label} == "${protocol_source}" ]]; then
@@ -3376,13 +3347,6 @@ function hash() {
       dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
       commit_if_changes "tezt: reset weeklynet regression test"
     fi
-  fi
-
-  if [[ "${is_snapshot}" == true ]]; then
-    log_blue "Update kaitai structs"
-    make check-kaitai-struct-files || log_blue "updated kaitai files"
-    make kaitai-struct-files-update
-    commit_if_changes "kaitai: update structs"
   fi
 
   update_files devtools/testnet_experiment_tools/testnet_experiment_tools.ml
