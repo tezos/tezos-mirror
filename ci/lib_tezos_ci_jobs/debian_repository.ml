@@ -12,6 +12,7 @@
    packages. *)
 
 open Tezos_ci
+module CI = Cacio.Shared
 
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
@@ -363,23 +364,43 @@ let job_install_bin_debian_bookworm_systemd ~manual pipeline_type =
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_upgrade_bin_debian_bookworm_systemd ~manual pipeline_type =
-  job_docker_authenticated
+(* Note: this job is in the publish stage because it depends on a job
+   that is in the publish stage, but it is a test.
+   Ideally we would build the images in the build stage, test them in the test stage,
+   and only then publish them in the publish stage. *)
+let job_upgrade_bin_debian_bookworm_systemd =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.upgrade_bin_debian_bookworm-systemd"
     ~__POS__
-    ~name:"oc.upgrade_bin_debian_bookworm-systemd"
-    ~stage:Stages.publishing_tests
-    ~dependencies:(Dependent [Job (job_apt_repo_debian ~manual pipeline_type)])
+    ~stage:Test_publication
+    ~description:"Check that Debian packages that use systemd can be upgraded."
+    ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
+    ~image:Images_external.docker
     ~variables:
-      (make_debian_variables
-         "debian"
-         "systemd"
-         "bookworm"
-         Tezos_ci.Images.Base_images.debian_version)
+      ([("DOCKER_VERSION", Docker.version)]
+      @ make_debian_variables
+          "debian"
+          "systemd"
+          "bookworm"
+          Tezos_ci.Images.Base_images.debian_version)
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     [
+      "./scripts/ci/docker_initialize.sh";
       "./scripts/ci/systemd-packages-test.sh \
        scripts/packaging/tests/deb/upgrade-systemd-test.sh \
        images/packages/debian-systemd-tests.Dockerfile";
     ]
+
+let () =
+  Cacio.register_jobs
+    Debian_partial
+    [(Auto, job_upgrade_bin_debian_bookworm_systemd false Partial)] ;
+  Cacio.register_jobs
+    Debian_daily
+    [(Auto, job_upgrade_bin_debian_bookworm_systemd false Full)] ;
+  ()
 
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
@@ -403,7 +424,6 @@ let jobs ?(manual = false) pipeline_type =
       job_lintian_debian ~manual pipeline_type;
       job_install_bin_debian_bookworm ~manual pipeline_type;
       job_install_bin_debian_bookworm_systemd ~manual pipeline_type;
-      job_upgrade_bin_debian_bookworm_systemd ~manual pipeline_type;
     ]
   in
   let debian_jobs =

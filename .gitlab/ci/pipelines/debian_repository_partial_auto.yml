@@ -226,12 +226,13 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
     images/packages/debian-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
