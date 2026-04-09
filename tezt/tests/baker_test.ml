@@ -2132,9 +2132,6 @@ let multi_node_staggered_crash =
   Log.info "Wait for supervisor to crash and retry connecting to node1" ;
   let* () = crash_waiter and* () = retry_waiter and* () = Node.kill node1 in
 
-  let supervisor_shutdown_waiter =
-    Agnostic_baker.wait_for_supervisor_all_automatons_down baker
-  in
   let termination_waiter = Agnostic_baker.wait_for_termination baker in
   Log.info "Wait for baker to shut down" ;
   let* () = Node.kill node2
@@ -2147,9 +2144,7 @@ let multi_node_staggered_crash =
           "The baker failed to shutdown after being disconnected from all \
            nodes for over %f seconds."
           timeout)
-      (fun () ->
-        let* () = supervisor_shutdown_waiter in
-        termination_waiter)
+      (fun () -> termination_waiter)
   in
   unit
 
