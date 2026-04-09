@@ -1300,7 +1300,6 @@ oc.build_x86_64-extra-dev:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
     - docs/**/*
     - dune
@@ -1400,7 +1399,6 @@ oc.build_x86_64-released:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - data-encoding/**/*
     - docs/**/*
     - dune
@@ -3297,7 +3295,6 @@ documentation.manuals:
   - changes:
     - '**/*.rst'
     - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
     - data-encoding/**/*.ml*
     - docs/**/*
     - dune
@@ -3352,7 +3349,6 @@ documentation.docgen:
   - changes:
     - '**/*.rst'
     - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
     - data-encoding/**/*.ml*
     - docs/**/*
     - dune
@@ -3559,7 +3555,6 @@ documentation.odoc:
   - changes:
     - '**/*.rst'
     - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
     - data-encoding/**/*.ml*
     - docs/**/*
     - dune
@@ -3625,7 +3620,6 @@ documentation.build_all:
   - changes:
     - '**/*.rst'
     - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
     - data-encoding/**/*.ml*
     - docs/**/*
     - dune
@@ -3682,7 +3676,6 @@ documentation.linkcheck:
   - changes:
     - '**/*.rst'
     - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
     - data-encoding/**/*.ml*
     - docs/**/*
     - dune
