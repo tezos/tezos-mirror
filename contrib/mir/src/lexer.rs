@@ -172,12 +172,12 @@ pub enum Noun {
 pub(crate) fn ann_from_str(value: &str) -> Result<Annotation, LexerError> {
     match value {
         s @ ("@%" | "@%%" | "%@") => Ok(Annotation::Special(Cow::Borrowed(s))),
-        "" => Err(LexerError::InvalidAnnotation),
+        "" => Err(LexerError::InvalidAnnotation(String::new())),
         s => match s.as_bytes()[0] {
             b'@' => Ok(Annotation::Variable(Cow::Borrowed(&s[1..]))),
             b'%' => Ok(Annotation::Field(Cow::Borrowed(&s[1..]))),
             b':' => Ok(Annotation::Type(Cow::Borrowed(&s[1..]))),
-            _ => Err(LexerError::InvalidAnnotation),
+            _ => Err(LexerError::InvalidAnnotation(s.to_string())),
         },
     }
 }
