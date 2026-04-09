@@ -193,7 +193,7 @@ let compute_reward_coeff_ratio_without_bonus =
   fun ~stake_ratio ~issuance_ratio_max ~issuance_ratio_min ->
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
     let f =
-      Q.inv inv_f
+      if Q.(inv_f = zero) then issuance_ratio_max else Q.inv inv_f
       (* f = 1/1600 * (1/x)^2 = yearly issuance rate *)
     in
     (* f is truncated so that 0.05% <= f <= 5% *)
