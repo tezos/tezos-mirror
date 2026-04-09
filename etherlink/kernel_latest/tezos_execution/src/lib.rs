@@ -18,6 +18,7 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use std::collections::{BTreeMap, HashMap};
+use std::vec::IntoIter;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
@@ -1055,26 +1056,28 @@ fn execute_smart_contract_originated<'a>(
 /// without the overhead of dynamic dispatch (`Box<dyn Iterator>`). The `Box` solution
 /// was tried, but it involved propagating lifetimes in other modules far and wide.
 ///
-/// - `Active(I)`: Wraps the complex iterator chain produced by the logic.
-/// - `Empty`: Represents a no-op state without requiring a heap allocation.
+/// - `Active(I)`: Wraps the complex iterator chain produced by originated contracts.
+/// - `Enshrined(IntoIter)`: Holds a vec of operations returned by enshrined contracts.
+///
+/// The lifetime `'a` is the MIR arena lifetime (see `Parser<'a>` and `TypedValue<'a>`).
 ///
 /// The change is very local, as the enum doesn't need to be propagated to the
 /// rest of the code, it's hidden behind an opaque type.
-enum InternalOperationIterator<I> {
+enum InternalOperationIterator<'a, I> {
     Active(I),
-    Empty,
+    Enshrined(IntoIter<OperationInfo<'a>>),
 }
 
-impl<'a, I> Iterator for InternalOperationIterator<I>
+impl<'a, I> Iterator for InternalOperationIterator<'a, I>
 where
     I: Iterator<Item = OperationInfo<'a>>,
 {
-    type Item = I::Item;
+    type Item = OperationInfo<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Active(iter) => iter.next(),
-            Self::Empty => None,
+            Self::Enshrined(iter) => iter.next(),
         }
     }
 }
@@ -1102,11 +1105,13 @@ where
             Ok((InternalOperationIterator::Active(iter), storage))
         }
         Code::Enshrined(contract) => {
-            // TODO POC
-            enshrined_contracts::execute_enshrined_contract(
+            let ops = enshrined_contracts::execute_enshrined_contract(
                 contract, entrypoint, value, ctx, registry, journal,
             )?;
-            Ok((InternalOperationIterator::<_>::Empty, vec![]))
+            Ok((
+                InternalOperationIterator::Enshrined(ops.into_iter()),
+                vec![],
+            ))
         }
     }
 }

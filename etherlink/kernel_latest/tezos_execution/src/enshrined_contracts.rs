@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::Type;
-use mir::ast::{AddressHash, BinWriter, ByteReprTrait, TypedValue};
-use mir::context::PushableTypecheckingContext;
-use mir::gas::Gas;
+use mir::ast::{
+    Address, AddressHash, BinWriter, ByteReprTrait, Operation, OperationInfo,
+    TransferTokens, TypedValue,
+};
 use mir::typechecker::typecheck_value;
 use mir::{
     ast::{Entrypoint, Micheline},
@@ -89,7 +90,12 @@ pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
 }
 
-/// Unwrap an `Rc<TypedValue>`, consuming it if possible to avoid cloning.
+/// Extract the inner [`TypedValue`] from an `Rc`.
+///
+/// [`TypedValue`] wraps recursive positions (e.g. `Pair`, `Option`) in `Rc`
+/// to keep the enum sized. This helper moves the value out without copying
+/// when the reference count is 1 (the common case for freshly typechecked
+/// values), and falls back to cloning if the `Rc` is shared.
 fn unwrap_rc(rc: Rc<TypedValue<'_>>) -> TypedValue<'_> {
     Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
 }
@@ -101,6 +107,7 @@ fn typecheck_entrypoint_value<'a>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: &Micheline<'a>,
+    ctx: &mut impl CtxTrait<'a>,
 ) -> Result<TypedValue<'a>, TransferError> {
     let entrypoints = get_enshrined_contract_entrypoint(contract).ok_or_else(|| {
         TransferError::GatewayError("Failed to build entrypoint map".into())
@@ -108,9 +115,7 @@ fn typecheck_entrypoint_value<'a>(
     let ty = entrypoints.get(entrypoint).ok_or_else(|| {
         TransferError::GatewayError(format!("Unknown entrypoint: {entrypoint}"))
     })?;
-    let mut gas = Gas::default();
-    let mut tc_ctx = PushableTypecheckingContext { gas: &mut gas };
-    typecheck_value(value, &mut tc_ctx, ty)
+    typecheck_value(value, ctx, ty)
         .map_err(|e| TransferError::GatewayError(format!("Invalid parameters: {e}")))
 }
 
@@ -121,11 +126,11 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-) -> Result<(), TransferError>
+) -> Result<Vec<OperationInfo<'a>>, TransferError>
 where
     Host: StorageV1 + Logging,
 {
-    let typed = typecheck_entrypoint_value(contract, entrypoint, &value)?;
+    let typed = typecheck_entrypoint_value(contract, entrypoint, &value, ctx)?;
     match contract {
         EnshrinedContracts::TezosXGateway => {
             if entrypoint.is_default() {
@@ -134,16 +139,25 @@ where
                         "Expected string for default entrypoint".into(),
                     ));
                 };
-                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])
+                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])?;
+                Ok(vec![])
             } else if entrypoint.as_str() == "call_evm" {
-                let (dest, method_sig, abi_params) = extract_call_params(typed)?;
+                let (dest, method_sig, abi_params, callback) =
+                    extract_call_params(typed)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
-                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)
+                let response_body =
+                    tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)?;
+                match callback {
+                    Some(destination) => {
+                        dispatch_callback(ctx, destination, response_body)
+                    }
+                    None => Ok(vec![]),
+                }
             } else if entrypoint.as_str() == "call" {
-                let mut request = extract_http_call_request(typed)?;
+                let (mut request, callback) = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
                 inject_context_headers(
                     request.headers_mut(),
@@ -160,7 +174,19 @@ where
                 ctx.operation_gas()
                     .cast_and_consume_milligas(consumed_milligas)
                     .map_err(|_| TransferError::OutOfGas)?;
-                Ok(())
+                if !response.status().is_success() {
+                    return Err(TransferError::GatewayError(format!(
+                        "Cross-runtime call failed with status {}: {}",
+                        response.status(),
+                        String::from_utf8_lossy(response.body())
+                    )));
+                }
+                match callback {
+                    Some(destination) => {
+                        dispatch_callback(ctx, destination, response.into_body())
+                    }
+                    None => Ok(vec![]),
+                }
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result allows a Michelson adapter to deposit
                 // a result payload into the current CRAC frame so the
@@ -176,7 +202,7 @@ where
                         "Expected bytes for collect_result entrypoint".into(),
                     ));
                 };
-                Ok(())
+                Ok(vec![])
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
@@ -197,18 +223,70 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
-            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)
+            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)?;
+            Ok(vec![])
         }
     }
 }
 
-/// Extract (destination, method_signature, abi_parameters) from a typed
+// Callback dispatch gas costs in milligas (estimated, not benchmarked):
+// ~100 for Micheline Bytes payload assembly + ~120 for TRANSFER_TOKENS
+// operation allocation. The `contract bytes` typing cost is NOT included —
+// it is paid when the operation executes.
+// TODO: L2-1187 validate with benchmarks before mainnet.
+const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
+
+/// Deduct gas and return a `TRANSFER_TOKENS` operation that sends
+/// `response_body` as `bytes` to the callback contract.
+fn dispatch_callback<'a>(
+    ctx: &mut (impl CtxTrait<'a> + HasOperationGas),
+    destination: Address,
+    response_body: Vec<u8>,
+) -> Result<Vec<OperationInfo<'a>>, TransferError> {
+    ctx.operation_gas()
+        .cast_and_consume_milligas(CALLBACK_DISPATCH_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)?;
+    let counter = ctx.operation_counter();
+    Ok(vec![OperationInfo {
+        operation: Operation::TransferTokens(TransferTokens {
+            param: TypedValue::Bytes(response_body),
+            destination_address: destination,
+            // The callback only delivers the response body.
+            // Any value transfers from the EVM side happen as
+            // separate operations mediated by the EVM alias
+            // and the EVM gateway.
+            amount: 0,
+        }),
+        counter,
+    }])
+}
+
+/// Extract an `Option<Address>` from a typechecked `option (contract bytes)` value.
+fn extract_callback(
+    typed: TypedValue<'_>,
+    entrypoint_name: &str,
+) -> Result<Option<Address>, TransferError> {
+    match typed {
+        TypedValue::Option(Some(rc)) => {
+            let TypedValue::Contract(addr) = unwrap_rc(rc) else {
+                return Err(TransferError::GatewayError(format!(
+                    "{entrypoint_name}: expected contract in callback option"
+                )));
+            };
+            Ok(Some(addr))
+        }
+        TypedValue::Option(None) => Ok(None),
+        _ => Err(TransferError::GatewayError(format!(
+            "{entrypoint_name}: expected option for callback"
+        ))),
+    }
+}
+
+/// Extract (destination, method_signature, abi_parameters, callback) from a typed
 /// Pair(String, Pair(String, Pair(Bytes, Option(Contract(Bytes))))) value.
-///
-/// The optional callback contract is accepted but ignored.
 fn extract_call_params(
     typed: TypedValue<'_>,
-) -> Result<(String, String, Vec<u8>), TransferError> {
+) -> Result<(String, String, Vec<u8>, Option<Address>), TransferError> {
     let TypedValue::Pair(dest_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
             "call: expected pair (destination, (method_sig, (abi_params, callback)))"
@@ -230,7 +308,7 @@ fn extract_call_params(
             "call: expected string for method signature".into(),
         ));
     };
-    let TypedValue::Pair(params_rc, _callback_rc) = unwrap_rc(inner2_rc) else {
+    let TypedValue::Pair(params_rc, callback_rc) = unwrap_rc(inner2_rc) else {
         return Err(TransferError::GatewayError(
             "call: expected pair (abi_params, callback)".into(),
         ));
@@ -240,18 +318,17 @@ fn extract_call_params(
             "call: expected bytes for ABI parameters".into(),
         ));
     };
-    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
-    Ok((dest, method_sig, abi_params))
+    let callback = extract_callback(unwrap_rc(callback_rc), "call_evm")?;
+    Ok((dest, method_sig, abi_params, callback))
 }
 
-/// Build an `http::Request<Vec<u8>>` from a typed
+/// Build an `http::Request<Vec<u8>>` and optional callback from a typed
 /// Pair(String, Pair(List(Pair(String, String)), Pair(Bytes, Pair(Nat, Option(Contract(Bytes)))))) value.
 ///
 /// Method mapping: 0 = GET, 1 = POST. Other values default to POST.
-/// The optional callback contract is accepted but ignored.
 fn extract_http_call_request(
     typed: TypedValue<'_>,
-) -> Result<http::Request<Vec<u8>>, TransferError> {
+) -> Result<(http::Request<Vec<u8>>, Option<Address>), TransferError> {
     let TypedValue::Pair(url_rc, inner_rc) = typed else {
         return Err(TransferError::GatewayError(
             "http_call: expected pair (url, (headers, (body, (method, callback))))"
@@ -304,7 +381,7 @@ fn extract_http_call_request(
             "http_call: expected bytes for body".into(),
         ));
     };
-    let TypedValue::Pair(method_rc, _callback_rc) = unwrap_rc(method_callback_rc) else {
+    let TypedValue::Pair(method_rc, callback_rc) = unwrap_rc(method_callback_rc) else {
         return Err(TransferError::GatewayError(
             "http_call: expected pair (method, callback)".into(),
         ));
@@ -314,8 +391,9 @@ fn extract_http_call_request(
             "http_call: expected nat for method".into(),
         ));
     };
-    // _callback_rc is Option(Contract(Bytes)) — accepted but ignored
-    build_http_request(&url, &headers, &body, method)
+    let callback = extract_callback(unwrap_rc(callback_rc), "call")?;
+    let request = build_http_request(&url, &headers, &body, method)?;
+    Ok((request, callback))
 }
 
 /// Build an `http::Request<Vec<u8>>` from extracted parameters.
@@ -639,7 +717,7 @@ fn tezosx_cross_runtime_call<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     dest: &str,
     data: &[u8],
-) -> Result<(), TransferError>
+) -> Result<Vec<u8>, TransferError>
 where
     Host: StorageV1 + Logging,
 {
@@ -678,7 +756,7 @@ where
         account
             .set_balance(host, &0u64.into())
             .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-        Ok(())
+        Ok(response.into_body())
     } else {
         Err(TransferError::GatewayError(format!(
             "Cross-runtime call failed with status {}: {}",
@@ -1075,11 +1153,15 @@ mod tests {
     /// Typecheck a Micheline call value into a TypedValue.
     fn typecheck_call<'a>(
         value: &Micheline<'a>,
+        host: &'a mut MockKernelHost,
     ) -> Result<TypedValue<'a>, TransferError> {
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(host, source, 0);
         typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("call").unwrap(),
             value,
+            &mut ctx,
         )
     }
 
@@ -1093,8 +1175,9 @@ mod tests {
             &[0x01, 0x02],
             1,
         );
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc/transfer");
         assert_eq!(request.method(), http::Method::POST);
         assert_eq!(
@@ -1109,8 +1192,9 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.uri(), "http://michelson/KT1abc");
         assert_eq!(request.method(), http::Method::GET);
         assert!(request.headers().is_empty());
@@ -1130,8 +1214,9 @@ mod tests {
             &[0xDE, 0xAD],
             42,
         );
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         // Unknown method defaults to POST
         assert_eq!(request.method(), http::Method::POST);
         assert_eq!(
@@ -1144,8 +1229,11 @@ mod tests {
 
     #[test]
     fn test_http_call_malformed_parameters() {
-        let result =
-            typecheck_call(&Micheline::String("not a valid http_call".to_string()));
+        let mut host = MockKernelHost::default();
+        let result = typecheck_call(
+            &Micheline::String("not a valid http_call".to_string()),
+            &mut host,
+        );
         assert!(result.is_err());
     }
 
@@ -1200,7 +1288,8 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1220,7 +1309,8 @@ mod tests {
             &[],
             0,
         );
-        let typed = typecheck_call(&value).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
         let result = extract_http_call_request(typed);
         assert!(result.is_err());
     }
@@ -1567,8 +1657,9 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 0);
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::GET);
     }
 
@@ -1577,8 +1668,9 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 1);
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
 
@@ -1587,8 +1679,9 @@ mod tests {
         let arena = typed_arena::Arena::new();
         let value =
             build_http_call_micheline(&arena, "http://michelson/KT1abc", &[], &[], 99);
-        let typed = typecheck_call(&value).unwrap();
-        let request = extract_http_call_request(typed).unwrap();
+        let mut host = MockKernelHost::default();
+        let typed = typecheck_call(&value, &mut host).unwrap();
+        let (request, _) = extract_http_call_request(typed).unwrap();
         assert_eq!(request.method(), http::Method::POST);
     }
 
@@ -1649,11 +1742,15 @@ mod tests {
 
     #[test]
     fn test_typecheck_unknown_entrypoint_returns_error() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::String("hello".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("nonexistent").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1665,12 +1762,16 @@ mod tests {
 
     #[test]
     fn test_typecheck_wrong_type_for_default_entrypoint() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         // Default entrypoint expects a string, not bytes
         let value = Micheline::Bytes(vec![0x01, 0x02]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::default(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1693,22 +1794,30 @@ mod tests {
 
     #[test]
     fn test_collect_result_typechecks_bytes() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_collect_result_rejects_non_bytes() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
         let value = Micheline::String("not bytes".to_string());
         let result = typecheck_entrypoint_value(
             EnshrinedContracts::TezosXGateway,
             &Entrypoint::try_from("collect_result").unwrap(),
             &value,
+            &mut ctx,
         );
         assert!(result.is_err());
     }
@@ -1763,5 +1872,105 @@ mod tests {
             &mut journal,
         );
         assert!(result.is_ok());
+    }
+
+    fn make_test_address() -> Address {
+        Address {
+            hash: AddressHash::from_bytes(&[
+                0x01, 0x29, 0x58, 0x93, 0x60, 0xad, 0xf1, 0x56, 0x94, 0xac, 0x33, 0x0d,
+                0xe5, 0x9f, 0x46, 0x44, 0x15, 0xb5, 0xf7, 0xea, 0x69, 0x00,
+            ])
+            .unwrap(),
+            entrypoint: Entrypoint::default(),
+        }
+    }
+
+    #[test]
+    fn test_dispatch_callback() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        let destination = make_test_address();
+        let body = vec![0xDE, 0xAD];
+        let ops = dispatch_callback(&mut ctx, destination.clone(), body.clone()).unwrap();
+        assert_eq!(ops.len(), 1);
+        let op = &ops[0];
+        assert_eq!(
+            op.counter, 1,
+            "counter should come from operation_counter(), expecting 1 operation but got {}", op.counter
+        );
+        match &op.operation {
+            Operation::TransferTokens(tt) => {
+                assert_eq!(tt.param, TypedValue::Bytes(body));
+                assert_eq!(tt.destination_address, destination);
+                assert_eq!(tt.amount, 0);
+            }
+            other => panic!("expected TransferTokens, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_dispatch_callback_out_of_gas() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        // Drain almost all gas so there isn't enough for the callback
+        let remaining = ctx.operation_gas().remaining.milligas().unwrap();
+        let to_consume = remaining - 1;
+        ctx.operation_gas().remaining.consume(to_consume).unwrap();
+
+        let destination = make_test_address();
+        let result = dispatch_callback(&mut ctx, destination, vec![]);
+        assert!(matches!(result, Err(TransferError::OutOfGas)));
+    }
+
+    #[test]
+    fn test_dispatch_callback_counter_increments() {
+        let mut host = MockKernelHost::default();
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        // Simulate prior internal operations having consumed counters
+        let _ = ctx.operation_counter(); // 1
+        let _ = ctx.operation_counter(); // 2
+        let destination = make_test_address();
+        let ops = dispatch_callback(&mut ctx, destination, vec![]).unwrap();
+        assert_eq!(
+            ops[0].counter, 3,
+            "counter should follow previously consumed values"
+        );
+    }
+
+    #[test]
+    fn test_extract_callback_some() {
+        let addr = make_test_address();
+        let typed = TypedValue::new_option(Some(TypedValue::Contract(addr.clone())));
+        let result = extract_callback(typed, "test").unwrap();
+        assert_eq!(result, Some(addr));
+    }
+
+    #[test]
+    fn test_extract_callback_none() {
+        let typed = TypedValue::Option(None);
+        let result = extract_callback(typed, "test").unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_callback_wrong_type() {
+        let typed = TypedValue::String("not an option".into());
+        let result = extract_callback(typed, "test");
+        assert!(result.is_err());
     }
 }
