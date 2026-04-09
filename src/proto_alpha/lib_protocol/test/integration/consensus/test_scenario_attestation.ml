@@ -488,13 +488,14 @@ let test_include_valid_dal_content =
         [0; 1; 2; 3; 6; 7; 9] (* many slots across 2 chunks *);
       ]
   in
+  let ceil_div a b = (a + b - 1) / b in
   (* Assemble a full attestation bitset from lag data and a prefix.
      [make_attestation ~prefix lag_data_list]. *)
   let make_attestation ~prefix lag_data_list =
     let _offset, result =
       List.fold_left
         (fun (offset, acc) lag_data ->
-          let nbits = Z.numbits lag_data in
+          let nbits = 8 * ceil_div (Z.numbits lag_data) 8 in
           (offset + nbits, Z.(logor acc (shift_left lag_data offset))))
         (number_of_lags, Z.of_int prefix)
         lag_data_list

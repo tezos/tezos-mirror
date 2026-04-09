@@ -211,6 +211,7 @@ let update_key ?proof_signer ?force_no_signer ~kind ~ck_name src =
 let test_init_with_cks_for_bootstraps =
   let check_finalized_every_block = [(fun _ -> check_all_cks)] in
   init_constants ()
+  --> set S.Dal.attestation_lags [1; 2; 3; 4; 5]
   --> begin_test
         ~check_finalized_every_block
         ~force_attest_all:true
@@ -229,7 +230,7 @@ let test_init_with_cks_for_bootstraps =
   (* With some DAL, to test the companion key *)
   --> exec_state (fun (_block, state) ->
           Lwt_result.return {state with State.force_attest_all = false})
-  --> attest_aggreg_with ~delegates_with_dal:[("with_both_tz4", Z.of_int 7)] []
+  --> attest_aggreg_with ~delegates_with_dal:[("with_both_tz4", Z.of_int 97)] []
   --> next_block
 
 let test_simple_register_consensus_and_companion_keys =
