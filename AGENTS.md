@@ -27,7 +27,6 @@ devtools/                 # Developer tools
 scripts/                  # Build and CI scripts
 opam/                     # OCaml package definitions
 manifest/                 # Package manifest generation
-client-libs/              # Client libraries
 vendors/                  # Vendored dependencies
 ```
 
