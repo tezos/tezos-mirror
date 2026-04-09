@@ -936,8 +936,8 @@ val clst_redeem :
   int64 ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_finalize_redeem ctxt src] returns a finalize redeem
-    operation on the CLST contract. *)
+(** [clst_finalize_redeem ctxt sender redeemer] returns a finalize redeem
+    operation on the CLST contract for the given [redeemer]. *)
 val clst_finalize_redeem :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -945,7 +945,8 @@ val clst_finalize_redeem :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  Contract.t ->
+  sender:Contract.t ->
+  redeemer:Signature.Public_key_hash.t ->
   Operation.packed tzresult Lwt.t
 
 (** [clst_approve ctxt sender batch] increases or decreases allowances

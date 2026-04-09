@@ -36,7 +36,7 @@ module CLST_types : sig
 
   type redeem = nat
 
-  type finalize_redeem = unit
+  type finalize_redeem = Signature.public_key_hash
 
   type staker_entrypoints = ((deposit, redeem) or_, finalize_redeem) or_
 

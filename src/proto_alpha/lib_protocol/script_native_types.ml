@@ -51,6 +51,9 @@ module Helpers = struct
 
   let bytes_ty = {untyped = prim Script.T_bytes []; typed = Ty_ex_c bytes_t}
 
+  let key_hash_ty =
+    {untyped = prim Script.T_key_hash []; typed = Ty_ex_c key_hash_t}
+
   let map_ty (type key value) (ty_key : key comparable_ty)
       (unty_key : Script.node)
       ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
@@ -236,7 +239,7 @@ module CLST_types = struct
 
   type redeem = nat
 
-  type finalize_redeem = unit
+  type finalize_redeem = Signature.public_key_hash
 
   type staker_entrypoints = ((deposit, redeem) or_, finalize_redeem) or_
 
@@ -412,7 +415,7 @@ module CLST_types = struct
 
   let finalize_redeem_type :
       (finalize_redeem ty_node * finalize_redeem entrypoints_node) tzresult =
-    make_entrypoint_leaf "finalize_redeem" unit_ty
+    make_entrypoint_leaf "finalize_redeem" key_hash_ty
 
   let delegate_parameters_type : delegate_parameters ty_node tzresult =
     pair_ty
