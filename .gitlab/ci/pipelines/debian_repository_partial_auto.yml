@@ -114,7 +114,7 @@ apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -122,13 +122,14 @@ apt_repo_debian:
   - oc.build-debian
   - oc.build-data_packages
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
   - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

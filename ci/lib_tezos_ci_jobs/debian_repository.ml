@@ -125,29 +125,6 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
-(* Push .deb artifacts to storagecloud apt repository. *)
-let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
-    ?dependencies ~prefix ~variables ?retry ~image script : tezos_job =
-  let variables =
-    variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]
-  in
-  job
-    ?rules
-    ?dependencies
-    ~__POS__
-    ~stage
-    ~name
-    ~id_tokens:Tezos_ci.id_tokens
-    ~image
-    ~tag:Gcp_not_interruptible
-    ?retry
-    ~before_script:
-      (Common.Helpers.before_script
-         ~source_version:true
-         ["apt-get install -y --update apt-utils debsigs"])
-    ~variables
-    script
-
 (* data packages. we build them once *)
 let job_build_data_packages ~manual : tezos_job =
   job
@@ -191,22 +168,30 @@ let job_build_ubuntu_package ~manual pipeline_type : tezos_job =
     ~manual
     ()
 
-(* These jobs create the apt repository for the packages *)
-let job_apt_repo_debian ~manual pipeline_type =
-  make_job_apt_repo
+let job_apt_repo_debian =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "apt_repo_debian"
     ~__POS__
-    ~name:"apt_repo_debian"
-    ~prefix:""
-    ~dependencies:
-      (Dependent
-         [
-           Artifacts (job_build_debian_package ~manual pipeline_type);
-           Artifacts (job_build_data_packages ~manual);
-         ])
-    ~variables:(Common.Packaging.archs_variables pipeline_type)
+    ~stage:Publish
+    ~description:"Create the apt repository for Debian packages and sign it."
+    ~needs_legacy:
+      [
+        (Artifacts, job_build_debian_package ~manual pipeline_type);
+        (Artifacts, job_build_data_packages ~manual);
+      ]
+    ~variables:
+      (Common.Packaging.archs_variables pipeline_type
+      @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~image:Images.Base_images.debian_trixie
-    ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
+    ~id_tokens:Tezos_ci.id_tokens
+    [
+      ". ./scripts/version.sh";
+      "apt-get install -y --update apt-utils debsigs";
+      "./scripts/ci/create_debian_repo.sh debian bookworm trixie";
+    ]
 
 let job_apt_repo_ubuntu =
   Cacio.parameterize @@ fun manual ->
@@ -378,7 +363,7 @@ let job_install_bin_debian_bookworm =
     ~__POS__
     ~description:"Check that Debian packages can be installed."
     ~stage:Test_publication
-    ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.debian_bookworm
     ["./docs/introduction/install-bin-deb.sh debian bookworm"]
@@ -392,7 +377,7 @@ let job_install_bin_debian_bookworm_systemd =
     ~stage:Test_publication
     ~description:
       "Check the installation process in a systemd enabled Docker image."
-    ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -421,7 +406,7 @@ let job_upgrade_bin_debian_bookworm_systemd =
     ~__POS__
     ~stage:Test_publication
     ~description:"Check the upgrade process in a systemd enabled Docker image."
-    ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -444,6 +429,7 @@ let () =
   Cacio.register_jobs
     Debian_partial
     [
+      (Auto, job_apt_repo_debian false Partial);
       (Auto, job_lintian_debian false Partial);
       (Auto, job_install_bin_debian_bookworm false Partial);
       (Auto, job_install_bin_debian_bookworm_systemd false Partial);
@@ -452,6 +438,7 @@ let () =
   Cacio.register_jobs
     Debian_daily
     [
+      (Auto, job_apt_repo_debian false Full);
       (Auto, job_apt_repo_ubuntu false Full);
       (Auto, job_lintian_ubuntu false Full);
       (Auto, job_lintian_debian false Full);
@@ -475,7 +462,6 @@ let jobs ?(manual = false) pipeline_type =
     [
       job_build_debian_package ~manual pipeline_type;
       job_build_data_packages ~manual;
-      job_apt_repo_debian ~manual pipeline_type;
     ]
   in
   let ubuntu_jobs = [job_build_ubuntu_package ~manual pipeline_type] in
