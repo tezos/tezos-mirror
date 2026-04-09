@@ -272,12 +272,15 @@ let job_install_bin_ubuntu_22_04 ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_22_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"]
 
-let job_install_bin_ubuntu_24_04 ~manual pipeline_type =
-  job
+let job_install_bin_ubuntu_24_04 =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.install_bin_ubuntu_24_04"
     ~__POS__
-    ~name:"oc.install_bin_ubuntu_24_04"
-    ~stage:Stages.publishing_tests
-    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
+    ~stage:Test_publication
+    ~description:"Check that Debian packages can be installed."
+    ~needs_legacy:[(Job, job_apt_repo_ubuntu ~manual pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_24_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"]
@@ -436,6 +439,7 @@ let () =
   Cacio.register_jobs
     Debian_daily
     [
+      (Auto, job_install_bin_ubuntu_24_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04_systemd false Full);
       (Auto, job_upgrade_bin_ubuntu_22_04_systemd false Full);
       (Auto, job_upgrade_bin_ubuntu_24_04_systemd false Full);
@@ -456,7 +460,6 @@ let jobs ?(manual = false) pipeline_type =
     [
       job_lintian_ubuntu ~manual pipeline_type;
       job_install_bin_ubuntu_22_04 ~manual pipeline_type;
-      job_install_bin_ubuntu_24_04 ~manual pipeline_type;
     ]
   in
   let test_debian_packages_jobs = [job_lintian_debian ~manual pipeline_type] in
