@@ -829,6 +829,71 @@ let () =
   return_unit
 
 let () =
+  register_test ~title:"Finalize redeem with sender different from redeemer"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (staker, sender) =
+    Context.init2
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* staker deposits 100_000_000 mutez *)
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) staker amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* staker redeems 30_000_000 mutez *)
+  let redeemed_amount_mutez = 30_000_000L in
+  let redeemed_amount = Tez.of_mutez_exn redeemed_amount_mutez in
+  let* redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) staker redeemed_amount_mutez
+  in
+  let* b = Block.bake ~operation:redeem_tx b in
+
+  (* wait for the redemption request to be finalizable *)
+  let finalization_delay =
+    b.constants.consensus_rights_delay + Protocol.Constants_repr.slashing_delay
+    + 1
+  in
+  let* b = Block.bake_until_n_cycle_end finalization_delay b in
+
+  (* sender finalizes the redemption request of staker *)
+  let* staker_balance_before = Context.Contract.balance (B b) staker in
+  let* sender_balance_before = Context.Contract.balance (B b) sender in
+  let staker_pkh =
+    match staker with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
+  let* finalize_tx =
+    Op.clst_finalize_redeem
+      ~fee:Tez.zero
+      (Context.B b)
+      ~sender
+      ~redeemer:staker_pkh
+  in
+  let* b = Block.bake b ~operation:finalize_tx in
+
+  (* staker's spendable balance is increased by the redeemed amount *)
+  let* staker_balance_after = Context.Contract.balance (B b) staker in
+  let*?@ expected_staker_balance =
+    Tez.(staker_balance_before +? redeemed_amount)
+  in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ expected_staker_balance staker_balance_after
+  in
+  (* sender's spendable balance is not changed *)
+  let* sender_balance_after = Context.Contract.balance (B b) sender in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ sender_balance_before sender_balance_after
+  in
+  return_unit
+
+let () =
   register_test ~title:"Test redeemed balance with non finalizable requests"
   @@ fun () ->
   let open Lwt_result_wrap_syntax in
