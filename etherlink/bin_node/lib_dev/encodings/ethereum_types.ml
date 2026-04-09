@@ -105,6 +105,11 @@ end
 
 let quantity_of_z z = Qty z
 
+(* This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS]
+   defined in the kernel, if changed it must be guarded with a
+   storage version. *)
+let default_minimum_base_fee_per_gas = Z.of_int 1_000_000_000
+
 let quantity_encoding =
   Data_encoding.conv
     (fun (Qty q) -> Helpers.z_to_hexa q)
@@ -685,7 +690,7 @@ let block_from_rlp_v0 bytes =
         transactions;
         (* Post merge: always empty. *)
         uncles = [];
-        baseFeePerGas = None;
+        baseFeePerGas = Some (Qty default_minimum_base_fee_per_gas);
         prevRandao = None;
         withdrawals = None;
         withdrawalsRoot = None;

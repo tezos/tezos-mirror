@@ -7,8 +7,7 @@
 (*****************************************************************************)
 
 (** Default minimum base fee per gas, set to 1 Gwei.
-    This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
-    the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
+    Alias for {!Ethereum_types.default_minimum_base_fee_per_gas}. *)
 val default_minimum_base_fee_per_gas : Z.t
 
 (** [gas_used_for_da_fees ~da_fee_per_byte ~base_fee_per_gas ?access_list

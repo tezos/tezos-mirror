@@ -24,6 +24,14 @@
 
 ### Execution changes
 
+- Fixed v0 block headers missing `baseFeePerGas`, which caused failures
+  when computing execution gas. The default 1 Gwei value is now set
+  when decoding v0 blocks, matching the kernel behavior. v0 blocks only
+  existed at the very beginning of Etherlink, so this is only observable
+  when fetching the first blocks of the chain. As a consequence,
+  `eth_feeHistory` now reports 1 Gwei (instead of 0) for those blocks.
+  (!21553)
+
 ### Storage changes
 
 - Read the `enable_multichain` and `enable_tezos_runtime` feature flags

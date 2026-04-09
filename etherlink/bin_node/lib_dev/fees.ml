@@ -6,9 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
-   the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
-let default_minimum_base_fee_per_gas = Z.of_int 1_000_000_000
+let default_minimum_base_fee_per_gas =
+  Ethereum_types.default_minimum_base_fee_per_gas
 
 (*
 
