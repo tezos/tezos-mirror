@@ -443,7 +443,19 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
   let open Lwt_result_syntax in
   let* delegate_balances = get_delegate_balances ctxt ~delegate in
   if Tez_repr.(delegate_balances.frozen_deposits_staked_tez = zero) then
-    return (ctxt, Tez_repr.zero, [])
+    let* delegator_balances =
+      get_delegator_balances ctxt ~delegator ~delegate_balances
+    in
+    if Staking_pseudotoken_repr.(delegator_balances.pseudotoken_balance = zero)
+    then return (ctxt, Tez_repr.zero, [])
+    else
+      let+ ctxt, balance_updates =
+        burn_pseudotokens
+          ctxt
+          delegator_balances
+          delegator_balances.pseudotoken_balance
+      in
+      (ctxt, Tez_repr.zero, balance_updates)
   else
     let* delegator_balances =
       get_delegator_balances ctxt ~delegator ~delegate_balances
