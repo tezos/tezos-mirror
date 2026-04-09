@@ -107,8 +107,6 @@ let () = Documentation_ci.register ()
 
 let () = Etherlink_ci.register ()
 
-let () = Client_libs_ci.register ()
-
 let () = Tezos_ci_jobs.Sanity.register ()
 
 let () = Tezos_ci_jobs.Build.register ()
