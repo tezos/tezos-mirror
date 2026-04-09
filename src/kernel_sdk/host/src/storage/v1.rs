@@ -35,7 +35,7 @@ pub trait StorageV1 {
     ///
     /// The total bytes read is returned.
     /// If the returned value `n` is `n < buffer.len()`, then only the first `n`
-    /// bytes of the buffer will have been written too.
+    /// bytes of the buffer will have been written to.
     fn store_read_slice<T: Path>(
         &self,
         path: &T,
@@ -133,31 +133,13 @@ impl<Host: SmartRollupCore> StorageV1 for Host {
         from_offset: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>, RuntimeError> {
-        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+        let mut buffer = alloc::vec![0; max_bytes];
 
-        let mut buffer = Vec::with_capacity(max_bytes);
+        let size = self
+            .store_read_slice(path, from_offset, &mut buffer)
+            .map_err(check_path_has_value(self, path))?;
 
-        unsafe {
-            #![allow(clippy::uninit_vec)]
-            // SAFETY:
-            // Setting length here gives access, from safe rust, to
-            // uninitialised bytes.
-            //
-            // This is safe as these bytes will not be read by `store_read_slice`.
-            // Rather, store_read_slice writes to the (part) of the slice, and
-            // returns the total bytes written.
-            buffer.set_len(usize::min(MAX_FILE_CHUNK_SIZE, max_bytes));
-
-            let size = self
-                .store_read_slice(path, from_offset, &mut buffer)
-                .map_err(check_path_has_value(self, path))?;
-
-            // SAFETY:
-            // We ensure that we set the length of the vector to the
-            // total bytes written - ie so that only the bytes that are now
-            // initialised, are accessible.
-            buffer.set_len(size);
-        }
+        buffer.truncate(size);
 
         Ok(buffer)
     }
@@ -165,23 +147,71 @@ impl<Host: SmartRollupCore> StorageV1 for Host {
     fn store_read_slice<T: Path>(
         &self,
         path: &T,
-        from_offset: usize,
-        buffer: &mut [u8],
+        mut from_offset: usize,
+        mut buffer: &mut [u8],
     ) -> Result<usize, RuntimeError> {
-        let result = unsafe {
-            self.store_read(
-                path.as_ptr(),
-                path.size(),
-                from_offset,
-                buffer.as_mut_ptr(),
-                buffer.len(),
-            )
-        };
+        use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 
-        match Error::wrap(result) {
-            Ok(i) => Ok(i),
-            Err(e) => Err(RuntimeError::HostErr(e)),
+        // Some old parts of kernels use `store_read(0, 0)` instead of `store_value_size`.
+        // We still issue the host function for empty buffers as otherwise this call
+        // succeeds when the path is not set in storage
+        if buffer.is_empty() {
+            // SAFETY: path and buffer all point to valid, initialised parts of memory
+            let result = unsafe {
+                self.store_read(
+                    path.as_ptr(),
+                    path.size(),
+                    from_offset,
+                    buffer.as_mut_ptr(),
+                    buffer.len(),
+                )
+            };
+
+            return Error::wrap(result).map_err(RuntimeError::HostErr);
         }
+
+        let mut read = 0;
+
+        while !buffer.is_empty() {
+            let max_bytes = usize::min(MAX_FILE_CHUNK_SIZE, buffer.len());
+
+            let (to_write, rest) = buffer.split_at_mut(max_bytes);
+            buffer = rest;
+
+            // SAFETY: path and to_write all point to valid, initialised parts of memory
+            let result = unsafe {
+                self.store_read(
+                    path.as_ptr(),
+                    path.size(),
+                    from_offset,
+                    to_write.as_mut_ptr(),
+                    to_write.len(),
+                )
+            };
+
+            match Error::wrap(result) {
+                Ok(read_bytes) => {
+                    read += read_bytes;
+                    from_offset = from_offset.saturating_add(read_bytes);
+
+                    if read_bytes < to_write.len() {
+                        // finished reading value
+                        break;
+                    }
+                }
+                Err(Error::StoreInvalidAccess) if read > 0 => {
+                    // we successfully read some of the value, and have now started
+                    // reading off the end of it
+
+                    // this only happens if the value was an exact multiple of
+                    // MAX_FILE_CHUNK_SIZE in length
+                    break;
+                }
+                Err(e) => return Err(RuntimeError::HostErr(e)),
+            }
+        }
+
+        Ok(read)
     }
 
     #[cfg(feature = "alloc")]

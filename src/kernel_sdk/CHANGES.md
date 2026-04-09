@@ -55,6 +55,9 @@
 - Storage, DAC and Outbox utilities have been restricted to only use relevant required traits, rather than `Runtime` directly.
   For the most part, this will be backwards compatible - though the specific traits _may_ have to be brought into scope rather than
   just relying on a `Runtime` import.
+- StorageV1 `store_read` / `store_read_slice` now support reading more than `MAX_FILE_CHUNK_SIZE` in one go.
+- fixed InMemoryStore `store_read` to match out-of-bounds check of
+  irmin durable storage.
 
 ### Installer client/kernel
 
