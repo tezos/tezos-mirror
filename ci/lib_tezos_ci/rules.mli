@@ -188,6 +188,13 @@ val schedule_documentation : If.t
     [TZ_SCHEDULE_KIND] set to [DOCKER_FRESH_IMAGE_BUILD]. *)
 val schedule_docker_build : If.t
 
+(** A rule that is true for scheduled pipelines that publish a dated master
+    Docker image to Docker Hub, tagged [master-YYYYMMDD].
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [schedule_docker_master_snapshot]. *)
+val schedule_docker_master_snapshot : If.t
+
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t
 

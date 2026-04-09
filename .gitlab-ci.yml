@@ -208,6 +208,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_test_release
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "schedule_docker_master_snapshot"
+    variables:
+      PIPELINE_TYPE: schedule_docker_master_snapshot
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
     variables:
       PIPELINE_TYPE: schedule_docker_build_pipeline
@@ -459,6 +463,10 @@ include:
 - local: .gitlab/ci/pipelines/schedule_test_release.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_docker_master_snapshot.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "schedule_docker_master_snapshot"
     when: always
 - local: .gitlab/ci/pipelines/schedule_docker_build_pipeline.yml
   rules:
