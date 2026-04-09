@@ -224,34 +224,23 @@ let job_apt_repo_ubuntu ~manual pipeline_type =
     ~image:Images.Base_images.ubuntu_24_04
     ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
 
-let job_lintian ~__POS__ ~name ~dependencies ?(variables = []) ~image
-    ?allow_failure script =
-  job
-    ?allow_failure
+let job_lintian_ubuntu =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.lintian_ubuntu"
     ~__POS__
-    ~name
-    ~image
-    ~dependencies
-    ~stage:Stages.publishing_tests
-    ~variables
-    ~before_script:
-      (Common.Helpers.before_script
-         ~source_version:true
-         [
-           "export DEBIAN_FRONTEND=noninteractive";
-           "apt-get update";
-           "apt-get install lintian parallel -y";
-         ])
-    script
-
-let job_lintian_ubuntu ~manual pipeline_type =
-  job_lintian
-    ~__POS__
-    ~name:"oc.lintian_ubuntu"
-    ~dependencies:
-      (Dependent [Artifacts (job_build_ubuntu_package ~manual pipeline_type)])
+    ~stage:Test_publication
+    ~description:"Run lintian on Debian packages."
+    ~needs_legacy:[(Artifacts, job_build_ubuntu_package ~manual pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
-    ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"]
+    [
+      ". ./scripts/version.sh";
+      "export DEBIAN_FRONTEND=noninteractive";
+      "apt-get update";
+      "apt-get install lintian parallel -y";
+      "./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04";
+    ]
 
 let job_lintian_debian =
   Cacio.parameterize @@ fun manual ->
@@ -441,6 +430,8 @@ let job_upgrade_bin_debian_bookworm_systemd =
     ]
 
 let () =
+  (* In merge pipelines we tests only Debian.
+     Ubuntu packages are built and tested in the scheduled pipelines. *)
   Cacio.register_jobs
     Debian_partial
     [
@@ -452,6 +443,7 @@ let () =
   Cacio.register_jobs
     Debian_daily
     [
+      (Auto, job_lintian_ubuntu false Full);
       (Auto, job_lintian_debian false Full);
       (Auto, job_install_bin_ubuntu_22_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04 false Full);
@@ -469,11 +461,6 @@ let () =
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(manual = false) pipeline_type =
-  let test_ubuntu_packages_jobs =
-    (* in merge pipelines we tests only debian. ubuntu packages
-       are built and tested in the scheduled pipelines*)
-    [job_lintian_ubuntu ~manual pipeline_type]
-  in
   let debian_jobs =
     [
       job_build_debian_package ~manual pipeline_type;
@@ -489,7 +476,7 @@ let jobs ?(manual = false) pipeline_type =
   in
   match pipeline_type with
   | Partial -> debian_jobs
-  | Full -> debian_jobs @ ubuntu_jobs @ test_ubuntu_packages_jobs
+  | Full -> debian_jobs @ ubuntu_jobs
   | Release -> debian_jobs @ ubuntu_jobs
 
 let register ~auto ~description pipeline_type =
