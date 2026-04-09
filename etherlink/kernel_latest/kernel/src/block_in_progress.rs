@@ -27,6 +27,11 @@ use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
+use revm_etherlink::inspectors::call_tracer::CallTrace;
+use revm_etherlink::inspectors::storage::{
+    flush_call_traces, store_return_value, store_trace_failed, store_trace_gas,
+};
+use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::precompiles::constants::TEZOSX_CALLER_H160;
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 use rlp::{Decodable, DecoderError, Encodable};
@@ -399,9 +404,10 @@ impl BlockInProgress {
         execution_info: RuntimeExecutionInfo,
         host: &mut Host,
         michelson_to_evm_gas_multiplier: u64,
+        tracer_input: Option<TracerInput>,
     ) -> Result<(), anyhow::Error>
     where
-        Host: WithGas,
+        Host: WithGas + StorageV1,
     {
         match execution_info {
             RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
@@ -453,7 +459,11 @@ impl BlockInProgress {
                 for effect in cross_runtime_effects {
                     match effect {
                         CrossRuntimeEffect::Evm(evm_effect) => {
-                            self.register_crac_evm_transaction(evm_effect)?;
+                            self.register_crac_evm_transaction(
+                                host,
+                                evm_effect,
+                                tracer_input,
+                            )?;
                         }
                     }
                 }
@@ -637,10 +647,16 @@ impl BlockInProgress {
     /// execution data. This transaction appears in the EVM block as if
     /// it were a regular transaction, carrying all logs emitted during
     /// cross-runtime calls from a foreign runtime.
-    fn register_crac_evm_transaction(
+    fn register_crac_evm_transaction<Host>(
         &mut self,
+        host: &mut Host,
         effect: EvmCracEffect,
-    ) -> Result<(), anyhow::Error> {
+        tracer_input: Option<TracerInput>,
+    ) -> Result<(), anyhow::Error>
+    where
+        Host: StorageV1,
+    {
+        use revm::primitives::B256;
         use sha3::{Digest, Keccak256};
 
         // Compute deterministic tx hash from block number and CRAC-ID.
@@ -677,6 +693,88 @@ impl BlockInProgress {
 
         let logs_bloom = TransactionReceipt::logs_to_bloom(&logs);
         self.logs_bloom.accrue_bloom(&logs_bloom);
+
+        // If a tracer is active and targets this CRAC fake tx hash
+        // (or traces all txs in the block), write a synthetic trace to
+        // durable storage.
+        //
+        // Returns Some(trace_hash) when tracing is needed (inner Option
+        // is None for block-level tracing, Some(h) for per-tx tracing),
+        // or None when no tracing should happen.
+        let target_hash = match &tracer_input {
+            Some(TracerInput::CallTracer(input)) => Some(input.transaction_hash),
+            Some(TracerInput::StructLogger(input)) => Some(input.transaction_hash),
+            None => None,
+        };
+        let trace_target = match target_hash {
+            Some(None) => Some(None),
+            Some(Some(h)) if h == B256::from_slice(&hash_bytes) => Some(Some(h)),
+            Some(Some(_)) => None,
+            None => None,
+        };
+        if let Some(trace_hash) = trace_target {
+            let gas_used_u64 = gas_used.as_u64();
+            match &tracer_input {
+                Some(TracerInput::CallTracer(input)) => {
+                    let alloy_from =
+                        revm::primitives::Address::from_slice(from.as_bytes());
+                    let alloy_to = to.map(|addr| {
+                        revm::primitives::Address::from_slice(addr.as_bytes())
+                    });
+                    let alloy_value = revm::primitives::U256::from_limbs(effect.amount.0);
+                    let mut trace = CallTrace::new_minimal_trace(
+                        b"CALL".to_vec(),
+                        alloy_from,
+                        alloy_value,
+                        Vec::new(), // CRAC fake txs have empty input
+                        0,          // depth 0 = top-level call
+                    );
+                    trace.add_to(alloy_to);
+                    trace.add_gas(Some(gas_used_u64));
+                    trace.add_gas_used(gas_used_u64);
+                    trace.add_output(Some(Vec::new()));
+                    if input.config.with_logs {
+                        trace.add_logs(Some(effect.logs.clone()));
+                    }
+                    if let Err(e) = flush_call_traces(host, &[trace], &trace_hash) {
+                        log!(Debug, "Failed to flush call traces for CRAC tx: {:?}", e);
+                    }
+                }
+                Some(TracerInput::StructLogger(_)) => {
+                    // Write minimal StructLogger output (gas, failed,
+                    // return_value) with no opcode logs -- CRAC fake
+                    // txs have no EVM opcodes to trace.
+                    macro_rules! log_store_err {
+                        ($op:expr, $result:expr) => {
+                            if let Err(e) = $result {
+                                log!(Debug, "Failed to {} for CRAC tx: {:?}", $op, e);
+                            }
+                        };
+                    }
+                    log_store_err!(
+                        "store trace gas",
+                        store_trace_gas(host, gas_used_u64, &trace_hash)
+                    );
+                    // CRAC txs that reach this point are always
+                    // successful (failures are not registered).
+                    // Note: the parameter is `is_success`, not `failed`.
+                    log_store_err!(
+                        "store trace failed",
+                        store_trace_failed(host, true, &trace_hash)
+                    );
+                    log_store_err!(
+                        "store return value",
+                        store_return_value(host, &[], &trace_hash)
+                    );
+                }
+                None => {}
+            }
+            log!(
+                Debug,
+                "Wrote synthetic trace for CRAC fake tx {}",
+                hex::encode(hash_bytes)
+            );
+        }
 
         let receipt = TransactionReceipt {
             hash: hash_bytes,
