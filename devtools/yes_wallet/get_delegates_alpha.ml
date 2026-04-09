@@ -59,7 +59,10 @@ module Get_delegates = struct
     open Alpha_context.Contract
 
     let get_manager_key context public_key_hash =
-      Alpha_context.Contract.get_manager_key context public_key_hash
+      (* FIXME-PA *)
+      Alpha_context.Contract.get_manager_key
+        context
+        (Implicit_account_repr.Forbidden.of_pkh public_key_hash)
       |> Lwt.map Environment.wrap_tzresult
 
     let fold = For_RPC.fold ~order:`Undefined
@@ -102,37 +105,55 @@ module Get_delegates = struct
   module Delegate = struct
     open Alpha_context.Delegate
 
-    let fold ctxt ~order ~init ~f = fold ctxt ~order ~init ~f
+    let fold ctxt ~order ~init ~f =
+      fold ctxt ~order ~init ~f:(fun pkh acc ->
+          (* FIXME-PA *)
+          f (Implicit_account_repr.Forbidden.to_pkh pkh) acc)
 
     let pubkey ctxt pkh =
-      Alpha_context.Contract.get_manager_key ctxt pkh
+      (* FIXME-PA *)
+      Alpha_context.Contract.get_manager_key
+        ctxt
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
       |> Lwt.map Environment.wrap_tzresult
 
     let staking_balance ctxt pkh =
-      For_RPC.staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      (* FIXME-PA *)
+      For_RPC.staking_balance ctxt (Implicit_account_repr.Forbidden.of_pkh pkh)
+      |> Lwt.map Environment.wrap_tzresult
 
     let current_frozen_deposits ctxt pkh =
-      current_frozen_deposits ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      (* FIXME-PA *)
+      current_frozen_deposits ctxt (Implicit_account_repr.Forbidden.of_pkh pkh)
+      |> Lwt.map Environment.wrap_tzresult
 
     let unstaked_frozen_deposits ctxt pkh =
       Alpha_context.Unstaked_frozen_deposits.balance
         ctxt
-        pkh
+        (* FIXME-PA *)
+        (Implicit_account_repr.Forbidden.of_pkh pkh)
         Alpha_context.Level.(current ctxt).cycle
       |> Lwt.map Environment.wrap_tzresult
 
     let deactivated ctxt pkh =
-      deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      (* FIXME-PA *)
+      deactivated ctxt (Implicit_account_repr.Forbidden.of_pkh pkh)
+      |> Lwt.map Environment.wrap_tzresult
 
     let consensus_keys ctxt pkh :
         (Signature.public_key * Signature.public_key list) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* {consensus_pk; _} =
-        Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
+        (* FIXME-PA *)
+        Alpha_context.Delegate.Consensus_key.active_pubkey
+          ctxt
+          (Implicit_account_repr.Forbidden.of_pkh pkh)
         |> Lwt.map Environment.wrap_tzresult
       in
       let* pending_updates =
-        Alpha_context.Delegate.Consensus_key.pending_updates ctxt pkh
+        Alpha_context.Delegate.Consensus_key.pending_updates
+          ctxt
+          (Implicit_account_repr.Forbidden.of_pkh pkh)
         |> Lwt.map Environment.wrap_tzresult
         |> Lwt_result.map (List.map (fun (_, _, pk) -> pk))
       in
@@ -141,11 +162,16 @@ module Get_delegates = struct
     let companion_keys ctxt pkh =
       let open Lwt_result_syntax in
       let* {companion_pk; _} =
-        Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
+        (* FIXME-PA *)
+        Alpha_context.Delegate.Consensus_key.active_pubkey
+          ctxt
+          (Implicit_account_repr.Forbidden.of_pkh pkh)
         |> Lwt.map Environment.wrap_tzresult
       in
       let* pending_updates =
-        Alpha_context.Delegate.Consensus_key.pending_companion_updates ctxt pkh
+        Alpha_context.Delegate.Consensus_key.pending_companion_updates
+          ctxt
+          (Implicit_account_repr.Forbidden.of_pkh pkh)
         |> Lwt.map Environment.wrap_tzresult
         |> Lwt_result.map (List.map (fun (_, _, pk) -> pk))
       in

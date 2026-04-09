@@ -100,7 +100,7 @@ let try_copy ~replace source target =
     else Error (File_not_found source)
 
 let convert_wallet ~replace wallet_dir target_dir =
-  let pkh_filename = "public_key_hashs" in
+  let pkh_filename = "Implicit_account_repr.ts" in
   let pk_filename = "public_keys" in
   let sk_filename = "secret_keys" in
   if not (Sys.file_exists wallet_dir) then
@@ -144,7 +144,9 @@ let convert_wallet ~replace wallet_dir target_dir =
         pk_source
 
 let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
-  let pkh_filename = Filename.concat yes_wallet_dir "public_key_hashs" in
+  let pkh_filename =
+    Filename.concat yes_wallet_dir "Implicit_account_repr.ts"
+  in
   let pk_filename = Filename.concat yes_wallet_dir "public_keys" in
   let sk_filename = Filename.concat yes_wallet_dir "secret_keys" in
   if not (Sys.file_exists yes_wallet_dir) then Unix.mkdir yes_wallet_dir 0o750 ;

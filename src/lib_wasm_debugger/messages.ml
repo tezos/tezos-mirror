@@ -73,13 +73,17 @@ let input_encoding default_sender default_source default_destination :
               Sc_rollup.Inbox_message.(
                 Internal (Transfer {payload; sender; source; destination})) ->
               let source =
-                Tezos_crypto.Signature.Of_V3.public_key_hash source
+                (* FIXME-PA *)
+                Tezos_crypto.Signature.Of_V3.public_key_hash
+                  (Implicit_account_repr.Forbidden.to_pkh source)
               in
               Some (payload, sender, source, destination)
           | _ -> None)
         (fun (payload, sender, source, destination) ->
           let source =
-            Signature.V3.Of_V_latest.get_public_key_hash_exn source
+            (* FIXME-PA *)
+            Implicit_account_repr.Forbidden.of_pkh
+              (Signature.V3.Of_V_latest.get_public_key_hash_exn source)
           in
           `Inbox_message
             (Internal (Transfer {payload; sender; source; destination})));
@@ -176,7 +180,7 @@ let pp_input ppf bytes =
           Format.fprintf
             ppf
             "%a -> [%a]"
-            Environment.Signature.Public_key_hash.pp
+            Implicit_account_repr.pp
             pkh
             pp_slot_indexes
             slots
@@ -192,8 +196,7 @@ let pp_input ppf bytes =
           Raw_level.pp
           published_level
           pp_slots_by_publisher
-          (Environment.Signature.Public_key_hash.Map.bindings
-             slots_by_publisher)
+          (Implicit_account_repr.Map.bindings slots_by_publisher)
     | External msg -> Format.fprintf ppf "%a" Hex.pp (Hex.of_string msg)
   in
   match

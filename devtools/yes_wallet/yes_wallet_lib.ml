@@ -91,7 +91,7 @@ let ck_json (alias, pkh, _pk, ck) =
         dict
           [
             ("name", string alias);
-            ("public_key_hash", string pkh);
+            ("Implicit_account_repr.t", string pkh);
             ("consensus_public_key_hash", string cpkh);
             ("consensus_public_key", string cpk);
           ])
@@ -174,7 +174,7 @@ let load_alias_file chn =
    If [write_consensus_keys] is true, the consensus key mapping file will be
    written, even if it is an empty list. *)
 let write_yes_wallet dest alias_pkh_pk_ck_list =
-  let pkh_filename = Filename.concat dest "public_key_hashs" in
+  let pkh_filename = Filename.concat dest "Implicit_account_repr.ts" in
   let pk_filename = Filename.concat dest "public_keys" in
   let sk_filename = Filename.concat dest "secret_keys" in
   let ck_filename = Filename.concat dest "consensus_keys_mapping" in
