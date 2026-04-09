@@ -318,19 +318,26 @@ let job_upgrade_bin_ubuntu_22_04_systemd ~manual pipeline_type =
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type =
-  job_docker_authenticated
+let job_upgrade_bin_ubuntu_24_04_systemd =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.upgrade_bin_ubuntu_24_04_systemd"
     ~__POS__
-    ~name:"oc.upgrade_bin_ubuntu_24_04_systemd"
-    ~stage:Stages.publishing_tests
-    ~dependencies:(Dependent [Job (job_apt_repo_ubuntu ~manual pipeline_type)])
+    ~stage:Test_publication
+    ~description:"Check that Debian packages that use systemd can be upgraded."
+    ~needs_legacy:[(Job, job_apt_repo_ubuntu ~manual pipeline_type)]
+    ~image:Images_external.docker
     ~variables:
-      (make_debian_variables
-         "ubuntu"
-         "systemd"
-         "24.04"
-         Tezos_ci.Images.Base_images.debian_version)
+      ([("DOCKER_VERSION", Docker.version)]
+      @ make_debian_variables
+          "ubuntu"
+          "systemd"
+          "24.04"
+          Tezos_ci.Images.Base_images.debian_version)
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     [
+      "./scripts/ci/docker_initialize.sh";
       "./scripts/ci/systemd-packages-test.sh \
        scripts/packaging/tests/deb/upgrade-systemd-test.sh \
        images/packages/debian-systemd-tests.Dockerfile";
@@ -415,6 +422,7 @@ let () =
   Cacio.register_jobs
     Debian_daily
     [
+      (Auto, job_upgrade_bin_ubuntu_24_04_systemd false Full);
       (Auto, job_install_bin_debian_bookworm false Full);
       (Auto, job_install_bin_debian_bookworm_systemd false Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd false Full);
@@ -435,7 +443,6 @@ let jobs ?(manual = false) pipeline_type =
       job_install_bin_ubuntu_24_04 ~manual pipeline_type;
       job_install_bin_ubuntu_24_04_systemd ~manual pipeline_type;
       job_upgrade_bin_ubuntu_22_04_systemd ~manual pipeline_type;
-      job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type;
     ]
   in
   let test_debian_packages_jobs = [job_lintian_debian ~manual pipeline_type] in
