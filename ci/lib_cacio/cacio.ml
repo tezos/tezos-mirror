@@ -627,10 +627,30 @@ let convert_graph ?(interruptible_pipeline = true)
                 in
                 Condition.encode ?when_ ?allow_failure condition
               in
-              let interruptible_stage =
+              let interruptible, interruptible_runner =
                 match stage with
-                | Build | Test -> true
-                | Publish | Test_publication -> interruptible_publish
+                | Build | Test ->
+                    (* Build and test jobs are canceled if another pipeline starts.
+                         This can be overridden by [interruptible_pipeline].
+                         The runner itself can always be preempted, to reduce costs. *)
+                    if interruptible_pipeline then (true, None)
+                    else (false, None)
+                | Publish ->
+                    (* Publish jobs are not canceled if another pipeline starts.
+                         This is to avoid partial publications.
+                         This can be overridden by [interruptible_publish].
+                         The runner can be preempted only if the job is interruptible,
+                         for the same reason (avoiding partial publications). *)
+                    if interruptible_publish then (true, None)
+                    else (false, Some false)
+                | Test_publication ->
+                    (* Tests that are performed after publish jobs are not canceled
+                         if another pipeline starts, because we do want to check
+                         that published artifacts are working.
+                         However, this is not a strong enough requirement for us
+                         to justify the increased costs,
+                         so the runners can still be preempted. *)
+                    if interruptible_publish then (true, None) else (false, None)
               in
               let retry : Gitlab_ci.Types.retry option =
                 match retry with
@@ -675,13 +695,8 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?rules
                 ?services
                 ?id_tokens
-                ~interruptible:(interruptible_stage && interruptible_pipeline)
-                ?interruptible_runner:
-                  (if interruptible_stage then
-                     (* Can be interruptible, or not. *)
-                     None
-                   else (* Cannot be interruptible. *)
-                     Some false)
+                ~interruptible
+                ?interruptible_runner
                 ?retry
                 ?timeout
                 ?variables
