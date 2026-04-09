@@ -68,16 +68,7 @@ let changeset_octez =
 (** Only if documentation has changed *)
 
 let octez_docs_base_folders =
-  [
-    "src";
-    "tezt";
-    "brassaia";
-    "irmin";
-    "client-libs";
-    "etherlink";
-    "data-encoding";
-    "vendors";
-  ]
+  ["src"; "tezt"; "brassaia"; "irmin"; "etherlink"; "data-encoding"; "vendors"]
 
 let changeset_octez_docs =
   Changeset.(
@@ -165,7 +156,6 @@ let changeset_lint_files =
           "scripts/**/*";
           "docs/**/*";
           "contrib/**/*";
-          "client-libs/**/*";
           "etherlink/**/*";
         ])
 
