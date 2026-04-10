@@ -327,20 +327,45 @@ val load_last_finalized_processed_level : t -> int option Lwt.t
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
-(** [snapshot_export dal_node ?endpoint ?min_published_level
+(** [snapshot_export dal_node ?compress ?endpoint ?min_published_level
     ?max_published_level ?slots output_file] exports a snapshot of the DAL
     node's store to [output_file].
+    If [compress] is [true], the snapshot is exported as a compressed tar
+    archive instead of a plain data directory (default: [false]).
     If [endpoint] is provided, it overrides the endpoint in the config file.
     [min_published_level] and [max_published_level] are optional level ranges
     to export, and [slots] the optional list of slots to export. *)
 val snapshot_export :
   t ->
+  ?compress:bool ->
   ?endpoint:Endpoint.t ->
   ?min_published_level:int32 ->
   ?max_published_level:int32 ->
   ?slots:int list ->
   string ->
   unit Lwt.t
+
+(** Same as [snapshot_export] but returns the process without waiting for it. *)
+val spawn_snapshot_export :
+  t ->
+  ?compress:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  Process.t
+
+(** Same as [snapshot_import] but returns the process without waiting for it. *)
+val spawn_snapshot_import :
+  t ->
+  ?no_check:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  ?slots:int list ->
+  string ->
+  Process.t
 
 (** [snapshot_import dal_node ?endpoint ?min_published_level
     ?max_published_level ?slots input_file] imports a snapshot into the DAL

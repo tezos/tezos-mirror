@@ -598,7 +598,7 @@ let debug_print_store_schemas ?path ?hooks () =
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
-let snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
+let spawn_snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
     ?max_published_level ?slots output_file =
   let data_dir = data_dir dal_node in
   let endpoint_args =
@@ -632,10 +632,32 @@ let snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
       Uses.path Constant.octez_agnostic_baker
     else Uses.path Constant.octez_dal_node
   in
-  let process = Process.spawn path args in
-  Process.check process
+  Process.spawn path args
 
-let snapshot_export = snapshot_aux "export" ~extra:[]
+let snapshot_aux cmd dal_node ?extra ?endpoint ?min_published_level
+    ?max_published_level ?slots output_file =
+  Process.check
+    (spawn_snapshot_aux
+       cmd
+       dal_node
+       ?extra
+       ?endpoint
+       ?min_published_level
+       ?max_published_level
+       ?slots
+       output_file)
+
+let spawn_snapshot_export t ?(compress = false) =
+  let extra = if compress then ["--compress"] else [] in
+  spawn_snapshot_aux "export" t ~extra
+
+let snapshot_export t ?(compress = false) =
+  let extra = if compress then ["--compress"] else [] in
+  snapshot_aux "export" t ~extra
+
+let spawn_snapshot_import t ?(no_check = false) =
+  let no_check_args = if no_check then ["--no-check"] else [] in
+  spawn_snapshot_aux ~extra:no_check_args "import" t
 
 let snapshot_import t ?(no_check = false) =
   let no_check_args = if no_check then ["--no-check"] else [] in
