@@ -131,10 +131,10 @@ This sequence of operations was run:
   "[BLOCK_HASH]"
 >>>>8: http://[HOST]:[PORT]/tezlink/chains/main/chain_id
 <<<<8: 200 OK
-  "NetXH12Aer3be93"
+  "NetXUSADs17gHCN"
 >>>>9: http://[HOST]:[PORT]/tezlink/chains/main/chain_id
 <<<<9: 200 OK
-  "NetXH12Aer3be93"
+  "NetXUSADs17gHCN"
 >>>>10: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head/helpers/scripts/simulate_operation
   { "operation":
       { "branch": "[BLOCK_HASH]",
@@ -142,7 +142,7 @@ This sequence of operations was run:
           [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]",
               "fee": "0", "counter": "1", "gas_limit": "1040000", "storage_limit": "60000",
               "amount": "1000000", "destination": "[PUBLIC_KEY_HASH]" } ] },
-    "chain_id": "NetXH12Aer3be93" }
+    "chain_id": "NetXUSADs17gHCN" }
 <<<<10: 200 OK
   { "contents":
       [ { "kind": "transaction", "source": "[PUBLIC_KEY_HASH]", 
@@ -164,7 +164,7 @@ This sequence of operations was run:
   "[BLOCK_HASH]"
 >>>>12: http://[HOST]:[PORT]/tezlink/chains/main/chain_id
 <<<<12: 200 OK
-  "NetXH12Aer3be93"
+  "NetXUSADs17gHCN"
 >>>>13: http://[HOST]:[PORT]/tezlink/chains/main/blocks/head/helpers/preapply/operations?version=1
   [ { "protocol": "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu",
       "branch": "[BLOCK_HASH]",

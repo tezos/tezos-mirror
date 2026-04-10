@@ -7,7 +7,7 @@ use mir::ast::big_map::BigMapId;
 use primitive_types::U256;
 use std::collections::BTreeMap;
 use tezos_crypto_rs::{
-    blake2b, hash::ChainId, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
+    blake2b, hash::ChainId, hash::ContractKt1Hash, hash::OperationHash,
 };
 use tezos_data_encoding::{enc::BinWriter, types::Zarith};
 use tezos_execution::{
@@ -96,6 +96,7 @@ fn build_response(
 /// return type so that early `?` returns keep their ergonomics, since
 /// this result is used as-is to build the http reponse.
 fn execute_request<Host>(
+    chain_id: &ChainId,
     registry: &impl Registry,
     host: &mut Host,
     journal: &mut TezosXJournal,
@@ -152,7 +153,6 @@ where
         big_map_diff: BTreeMap::new(),
         next_temporary_id: &mut next_temp_id,
     };
-    let chain_id = ChainId::try_from_bytes(&[0u8; 4]).unwrap();
     let mut nonce = OriginationNonce::initial(OperationHash::default());
     let mut counter = 0u128;
     let mut operation_ctx = OperationCtx {
@@ -161,7 +161,7 @@ where
         counter: &mut counter,
         level: &hdrs.block_number,
         now: &hdrs.timestamp,
-        chain_id: &chain_id,
+        chain_id,
     };
     let parser = mir::parser::Parser::new();
 
@@ -268,8 +268,14 @@ impl RuntimeInterface for TezosRuntime {
         // actual value (early setup error), the caller sees full gas
         // consumption rather than a free call.
         let mut consumed_milligas = u64::MAX;
-        let result =
-            execute_request(registry, host, journal, request, &mut consumed_milligas);
+        let result = execute_request(
+            &self.0,
+            registry,
+            host,
+            journal,
+            request,
+            &mut consumed_milligas,
+        );
         build_response(result, consumed_milligas)
     }
 
@@ -491,7 +497,7 @@ mod tests {
     }
 
     fn test_runtime() -> TezosRuntime {
-        TezosRuntime::new(ChainId::try_from_bytes(&[0u8; 4]).unwrap())
+        TezosRuntime::new(ChainId::default())
     }
 
     #[test]
