@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 50.
+Its storage version is 53.
 
 ### Features
 
@@ -30,6 +30,9 @@ Its storage version is 50.
 
 ### Internal
 
+- Migrate governance, DAL, blueprints, delayed inbox, chain configurations and
+  kernel events from `/evm/...` to `/base/...`. Storage version bumped to V53.
+  (!21565)
 - Migrate the sequencer key and sequencer upgrade paths to the world state.
   The sequencer key moves from `/evm/sequencer` to `/evm/world_state/sequencer`
   and the sequencer upgrade from `/evm/sequencer_upgrade` to
