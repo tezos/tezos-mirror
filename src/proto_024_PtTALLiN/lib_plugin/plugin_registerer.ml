@@ -8,7 +8,11 @@
 
 module Validation = struct
   include Registerer.Registered
-  module Plugin = Plugin.Mempool
+
+  module Plugin = struct
+    include Plugin.Mempool
+    include Plugin.Block_validation
+  end
 end
 
 module RPC = struct

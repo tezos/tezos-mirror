@@ -162,6 +162,23 @@ module type T = sig
       head:Block_header.shell_header ->
       ctxt tzresult Lwt.t
 
+    (** Fast, plugin-managed state threaded through block validation.
+
+        This state is maintained purely on the shell side while iterating over
+        the operations of a received block. *)
+    type block_validation_state
+
+    val init_block_validation_state : validation_state -> block_validation_state
+
+    (** Perform fast contextual checks on an operation before
+        [validate_operation] during block validation.
+
+        The returned state is threaded to the next operation in the block. *)
+    val check_block_operation :
+      block_validation_state ->
+      operation ->
+      block_validation_state tzresult Lwt.t
+
     (** Return the sources from the operation *)
     val sources_from_operation :
       ctxt -> operation -> Signature.public_key_hash list Lwt.t
