@@ -193,7 +193,7 @@ let compute_reward_coeff_ratio_without_bonus =
   fun ~stake_ratio ~issuance_ratio_max ~issuance_ratio_min ->
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
     let f =
-      Q.inv inv_f
+      if Q.(inv_f = zero) then issuance_ratio_max else Q.inv inv_f
       (* f = 1/1600 * (1/x)^2 = yearly issuance rate *)
     in
     (* f is truncated so that 0.05% <= f <= 5% *)
@@ -296,7 +296,9 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
     Tez_repr.to_mutez total_frozen_stake |> Q.of_int64
   in
   let stake_ratio =
-    Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
+    if Q.(q_total_supply = zero) then Q.zero (* Impossible case *)
+    else
+      Q.div q_total_frozen_stake q_total_supply (* = portion of frozen stake *)
   in
   (* Once computed here, the minimum is final. *)
   let issuance_ratio_min =
