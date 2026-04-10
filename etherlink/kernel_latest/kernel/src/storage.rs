@@ -89,6 +89,7 @@ pub enum StorageVersion {
     V50,
     V51,
     V52,
+    V53,
 }
 
 impl From<StorageVersion> for u64 {
@@ -103,26 +104,26 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V52;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V53;
 
-pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
+pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
 
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/storage_version");
 pub const LEGACY_STORAGE_VERSION_PATH: RefPath =
     RefPath::assert_from(b"/evm/storage_version");
 
-const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/base/kernel_version");
 
-pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
+pub const ADMIN: RefPath = RefPath::assert_from(b"/base/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");
-pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/base/kernel_governance");
 pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
-    RefPath::assert_from(b"/evm/kernel_security_governance");
-pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
+    RefPath::assert_from(b"/base/kernel_security_governance");
+pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/base/delayed_bridge");
 
 pub const MAXIMUM_ALLOWED_TICKS: RefPath =
-    RefPath::assert_from(b"/evm/maximum_allowed_ticks");
+    RefPath::assert_from(b"/base/maximum_allowed_ticks");
 
 pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
     RefPath::assert_from(b"/evm/maximum_gas_per_transaction");
@@ -131,7 +132,7 @@ pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
 const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
+const EVENTS: RefPath = RefPath::assert_from(b"/base/rollup_events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
     RefPath::assert_from(b"/evm/world_state/transactions_receipts");
@@ -167,7 +168,7 @@ pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
 
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
-    RefPath::assert_from(b"/evm/chain_configurations");
+    RefPath::assert_from(b"/base/chain_configurations");
 
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
@@ -187,13 +188,13 @@ pub const SEQUENCER_POOL_PATH: RefPath =
     RefPath::assert_from(b"/evm/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
-const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/evm/l1_level");
+const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/base/l1_level");
 
 const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/evm/info_per_level/timestamp");
+    RefPath::assert_from(b"/base/info_per_level/timestamp");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
 pub const SIMULATION_HTTP_TRACES: RefPath =
@@ -201,18 +202,18 @@ pub const SIMULATION_HTTP_TRACES: RefPath =
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
-    RefPath::assert_from(b"/evm/delayed_inbox_timeout");
+    RefPath::assert_from(b"/base/delayed_inbox_timeout");
 
 // Path to the number of l1 levels that need to pass for a
 // delayed tx to be timed out.
 const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
-    RefPath::assert_from(b"/evm/delayed_inbox_min_levels");
+    RefPath::assert_from(b"/base/delayed_inbox_min_levels");
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 
-pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
+pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/base/keep_rollup_events");
 
 // Path to the DAL feature flag. If there is nothing at this path, DAL
 // is not used.
@@ -226,13 +227,13 @@ pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/disable_legacy_dal_signals");
 
 // Path to the DAL slot indices to use.
-pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/evm/dal_slots");
+pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/base/dal_slots");
 
 // Path to the whitelist of authorized DAL publishers (public key hashes).
 // These are the keys authorized to publish DAL slots that the kernel will accept.
 // NOTE: Empty whitelist means reject all publishers (therefore all slots).
 pub const DAL_PUBLISHERS_WHITELIST: RefPath =
-    RefPath::assert_from(b"/evm/dal_publishers_whitelist");
+    RefPath::assert_from(b"/base/dal_publishers_whitelist");
 
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
@@ -242,7 +243,7 @@ pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
-    RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
+    RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds");
 
 pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
     let raw_chain_id_path: Vec<u8> = format!("/{chain_id}").into();

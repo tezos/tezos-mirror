@@ -37,8 +37,8 @@ use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 use tezos_storage::read_optional_rlp;
 
-const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
-pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
+const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/base/kernel_upgrade");
+pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/base/kernel_root_hash");
 use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_PATH;
 use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
 

@@ -20,11 +20,10 @@ use crate::migration::legacy::{
     WITHDRAWAL_ADDRESS,
 };
 use crate::storage::{
-    clear_events, read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
+    read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
     read_storage_version, store_backlog, store_dal_slots, store_storage_version,
-    tweak_dal_activation, StorageVersion, DELAYED_BRIDGE, ENABLE_FA_BRIDGE,
-    EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, KEEP_EVENTS, KERNEL_GOVERNANCE,
-    KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
+    tweak_dal_activation, StorageVersion, ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS,
+    EVM_TRANSACTIONS_RECEIPTS, SEQUENCER_GOVERNANCE,
 };
 use crate::transaction::{Transaction, TransactionContent};
 use primitive_types::{H160, H256, U256};
@@ -34,6 +33,7 @@ use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_ethereum::block::EthBlock;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::{evm_node_flag, IsEvmNode};
+use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -299,6 +299,31 @@ mod legacy {
         let block_from_bytes = EthBlock::from_bytes(bytes)?;
         Ok(block_from_bytes)
     }
+
+    pub const KERNEL_GOVERNANCE: RefPath =
+        RefPath::assert_from(b"/evm/kernel_governance");
+
+    pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
+        RefPath::assert_from(b"/evm/kernel_security_governance");
+
+    pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
+
+    pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
+
+    const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
+
+    pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
+    where
+        Host: StorageV1,
+    {
+        if host.store_has(&KEEP_EVENTS)?.is_some() {
+            host.store_delete(&KEEP_EVENTS)?;
+            Ok(())
+        } else {
+            let index = IndexableStorage::new(&EVENTS)?;
+            index.clear(host).map_err(Into::into)
+        }
+    }
 }
 
 fn migrate_to<Host>(
@@ -401,13 +426,13 @@ where
         StorageVersion::V21 => {
             if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
                 host.store_write_all(
-                    &DELAYED_BRIDGE,
+                    &legacy::DELAYED_BRIDGE,
                     b"KT1Vocor3bL5ZSgsYH9ztt42LNhqFK64soR4",
                 )?;
                 Ok(MigrationStatus::Done)
             } else if is_etherlink_network(host, TESTNET_CHAIN_ID)? {
                 host.store_write_all(
-                    &DELAYED_BRIDGE,
+                    &legacy::DELAYED_BRIDGE,
                     b"KT1X1M4ywyz9cHvUgBLTUUdz3GTiYJhPcyPh",
                 )?;
                 Ok(MigrationStatus::Done)
@@ -461,9 +486,9 @@ where
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1UvCsnXpLAssgeJmrbQ6qr3eFkYXxsTG9U";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -545,9 +570,9 @@ where
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -576,9 +601,9 @@ where
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -678,8 +703,8 @@ where
             // Re-inject locked FA deposit 0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38,
             // affected by the regression introduced by Farfadet
             if is_etherlink_network(host, MAINNET_CHAIN_ID)? && !evm_node_flag(host) {
-                clear_events(host)?;
-                host.store_write(&KEEP_EVENTS, &[], 0)?;
+                legacy::clear_events(host)?;
+                host.store_write(&legacy::KEEP_EVENTS, &[], 0)?;
                 let mut delayed_inbox = DelayedInbox::new(host)?;
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
@@ -761,9 +786,9 @@ where
                 const SEQUENCER_GOVERNANCE_KT: &[u8] =
                     b"KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn";
 
-                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(&legacy::KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
                 host.store_write_all(
-                    &KERNEL_SECURITY_GOVERNANCE,
+                    &legacy::KERNEL_SECURITY_GOVERNANCE,
                     SECURITY_GOVERNANCE_KT,
                 )?;
                 host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
@@ -835,6 +860,76 @@ where
         StorageVersion::V52 => {
             // Starting version 52, the EVM node uses the TezosX
             // envelope format (List [runtime_id, inner_transaction]).
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V53 => {
+            // Phase 2 of the durable storage reorganization: move
+            // governance / sequencing / config paths from /evm/ to
+            // /base/.
+            //
+            // Move paths from /evm/ to /base/. /base/blueprints is kept as
+            // a pure blueprint subtree (no config scalars nested inside),
+            // so that a future wholesale delete of /base/blueprints (e.g.
+            // Irmin slim-commit) can safely discard it.
+            let moves: &[(&[u8], &[u8])] = &[
+                (b"/evm/blueprints", b"/base/blueprints"),
+                (
+                    b"/evm/max_blueprint_lookahead_in_seconds",
+                    b"/base/max_blueprint_lookahead_in_seconds",
+                ),
+                (
+                    b"/evm/max_delayed_inbox_blueprint_length",
+                    b"/base/max_delayed_inbox_blueprint_length",
+                ),
+                (b"/evm/kernel_version", b"/base/kernel_version"),
+                (b"/evm/kernel_root_hash", b"/base/kernel_root_hash"),
+                (b"/evm/kernel_upgrade", b"/base/kernel_upgrade"),
+                (b"/evm/logging_verbosity", b"/base/logging_verbosity"),
+                (b"/evm/l1_level", b"/base/l1_level"),
+                (b"/evm/messages", b"/base/messages"),
+                (b"/evm/admin", b"/base/admin"),
+                (b"/evm/kernel_governance", b"/base/kernel_governance"),
+                (
+                    b"/evm/kernel_security_governance",
+                    b"/base/kernel_security_governance",
+                ),
+                (b"/evm/delayed_bridge", b"/base/delayed_bridge"),
+                (b"/evm/remove_whitelist", b"/base/remove_whitelist"),
+                (
+                    b"/evm/maximum_allowed_ticks",
+                    b"/base/maximum_allowed_ticks",
+                ),
+                (b"/evm/dal_slots", b"/base/dal_slots"),
+                (
+                    b"/evm/dal_publishers_whitelist",
+                    b"/base/dal_publishers_whitelist",
+                ),
+                (
+                    b"/evm/delayed_inbox_timeout",
+                    b"/base/delayed_inbox_timeout",
+                ),
+                (
+                    b"/evm/delayed_inbox_min_levels",
+                    b"/base/delayed_inbox_min_levels",
+                ),
+                (b"/evm/current_block_header", b"/base/current_block_header"),
+                // Subtrees
+                (b"/evm/delayed-inbox", b"/base/delayed-inbox"),
+                (b"/evm/info_per_level", b"/base/info_per_level"),
+                (b"/evm/chain_configurations", b"/base/chain_configurations"),
+                // Renamed: events -> rollup_events
+                (b"/evm/events", b"/base/rollup_events"),
+                (b"/evm/keep_events", b"/base/keep_rollup_events"),
+            ];
+            for (old, new) in moves {
+                allow_path_not_found(
+                    host.store_move(
+                        &RefPath::assert_from(old),
+                        &RefPath::assert_from(new),
+                    ),
+                )?;
+            }
+
             Ok(MigrationStatus::Done)
         }
     }
