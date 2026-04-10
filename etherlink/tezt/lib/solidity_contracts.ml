@@ -503,6 +503,12 @@ let cross_runtime_run_tez =
     ~label:"cross_runtime_run_tez"
     ~contract:"CrossRuntimeRunTez"
 
+let crac_http_call =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_http_call.sol")
+    ~label:"crac_http_call"
+    ~contract:"CracHttpCall"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
