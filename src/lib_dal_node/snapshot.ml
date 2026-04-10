@@ -291,8 +291,23 @@ let init_export_context ~frozen_only ~src_root_dir ~config_file ~endpoint
   let* first_seen_level =
     read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
   in
+  (* min_published_level: max of first_seen_level and requested min *)
+  let min_published_level =
+    match min_published_level with
+    | None -> first_seen_level
+    | Some requested -> max first_seen_level requested
+  in
+  (* Use the effective min level so that init_cryptoboxes only registers
+     cryptoboxes for protocols relevant to the exported level range.
+     Without this, a node started long ago (with a very old first_seen_level)
+     would attempt to look up DAL plugins for pre-DAL protocols. *)
   let* () =
-    init_cryptoboxes ~cctxt ~header ~config ~first_seen_level proto_plugins
+    init_cryptoboxes
+      ~cctxt
+      ~header
+      ~config
+      ~first_seen_level:min_published_level
+      proto_plugins
   in
   let* chain_id =
     read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
@@ -307,12 +322,6 @@ let init_export_context ~frozen_only ~src_root_dir ~config_file ~endpoint
   in
   let* last_processed_level =
     read_from_store ~root_dir:src_root_dir (module Store.Last_processed_level)
-  in
-  (* min_published_level: max of first_seen_level and requested min *)
-  let min_published_level =
-    match min_published_level with
-    | None -> first_seen_level
-    | Some requested -> max first_seen_level requested
   in
   (* The DAL node stops validating shards published at a level older than
      last_processed_level - (slack + attestation_lag), which means that data
