@@ -15,7 +15,7 @@
 //! - Valid [`Name`]: `/evm/world_state`, `/kernel`
 //! - Valid [`Key`]: `/my_key`, `/a/b/c`
 
-use tezos_smart_rollup_host::path::{validate_path, Path, PATH_MAX_SIZE, PATH_SEPARATOR};
+use tezos_smart_rollup_host::path::{validate_path, Path, PATH_MAX_SIZE};
 
 use super::{Key, Name};
 use crate::{KeyError, NameError};
@@ -54,25 +54,6 @@ impl Key {
 }
 
 impl Name {
-    /// Returns `true` if `self` overlaps with `other` in path terms.
-    ///
-    /// Two names overlap if one is equal to or a path-prefix of the other.
-    /// For example, `/evm/world_state` overlaps with `/evm/world_state/eth_accounts`
-    /// (and vice versa), but `/evm/world` does not overlap with `/evm/world_state`.
-    #[allow(dead_code)]
-    pub(crate) fn overlaps(&self, other: &Name) -> bool {
-        let a = self.0.as_bytes();
-        let b = other.0.as_bytes();
-
-        let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
-
-        // `short` is a path-prefix of `long` if `long` starts with `short`
-        // AND the next byte (if any) is a separator, ensuring we don't match
-        // partial step names (e.g. `/evm` must not overlap with `/evmstuff`).
-        long.starts_with(short)
-            && (long.len() == short.len() || long[short.len()] == PATH_SEPARATOR)
-    }
-
     /// Validate that this name is a valid irmin path.
     ///
     /// Must start with `/`, must not end with `/`, must not contain `//`,
@@ -133,50 +114,6 @@ mod tests {
             .chain(std::iter::repeat_n('a', MAX_KEYSPACE_NAME_SIZE))
             .collect();
         assert!(matches!(Name::from_str(&name), Err(NameError::NameTooLong)));
-    }
-
-    #[test]
-    fn overlaps_identical() {
-        let a = Name::from_str("/evm").unwrap();
-        let b = Name::from_str("/evm").unwrap();
-        assert!(a.overlaps(&b));
-    }
-
-    #[test]
-    fn overlaps_prefix_shorter_first() {
-        let a = Name::from_str("/evm").unwrap();
-        let b = Name::from_str("/evm/world_state").unwrap();
-        assert!(a.overlaps(&b));
-    }
-
-    #[test]
-    fn overlaps_prefix_longer_first() {
-        let a = Name::from_str("/evm/world_state").unwrap();
-        let b = Name::from_str("/evm").unwrap();
-        assert!(a.overlaps(&b));
-    }
-
-    #[test]
-    fn no_overlap_different_paths() {
-        let a = Name::from_str("/evm/world").unwrap();
-        let b = Name::from_str("/evm/world_state").unwrap();
-        assert!(!a.overlaps(&b));
-    }
-
-    #[test]
-    fn no_overlap_partial_step_name() {
-        // `/evm` must not be considered a prefix of `/evmstuff`
-        let a = Name::from_str("/evm").unwrap();
-        let b = Name::from_str("/evmstuff").unwrap();
-        assert!(!a.overlaps(&b));
-    }
-
-    #[test]
-    fn overlaps_deep_nesting() {
-        let a = Name::from_str("/a/b").unwrap();
-        let b = Name::from_str("/a/b/c/d").unwrap();
-        assert!(a.overlaps(&b));
-        assert!(b.overlaps(&a));
     }
 
     #[test]
