@@ -572,10 +572,6 @@ module Images : sig
 
   val trivy : Image.t
 
-  val jsonnet : Image.t
-
-  val jsonnet_master : Image.t
-
   module CI : sig
     val job_docker_ci :
       Runner.Arch.t -> ?storage:Runner.Storage.t -> unit -> tezos_job
@@ -618,6 +614,8 @@ module Images : sig
     val debian_bookworm : Image.t
 
     val debian_trixie : Image.t
+
+    val debian_jsonnet_trixie : Image.t
 
     val ubuntu_22_04 : Image.t
 

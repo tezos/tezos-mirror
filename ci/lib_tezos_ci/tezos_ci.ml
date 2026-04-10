@@ -1587,7 +1587,9 @@ module Images = struct
     (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2420224301
        May have been refreshed. Cf. latest base_image.daily pipeline of the commit:
        https://gitlab.com/tezos/tezos/-/commit/be43e621/pipelines
-     *)
+
+       NB: some images may use a different commit hash. Do check for
+       each image specifically to be certain. *)
     let common_version = "master-be43e621"
 
     let debian_version = common_version
@@ -1595,6 +1597,11 @@ module Images = struct
     let debian_bookworm = make_img "debian:bookworm" debian_version
 
     let debian_trixie = make_img "debian:trixie" debian_version
+
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2439598666
+       after https://gitlab.com/tezos/tezos/-/merge_requests/21554 was merged *)
+    let debian_jsonnet_trixie =
+      make_img "debian-jsonnet:trixie" "master-d70f7d37"
 
     let debian_unstable = make_img "debian:unstable" debian_version
 
@@ -1724,27 +1731,6 @@ module Images = struct
       ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
-
-  (** The jsonnet image *)
-  let jsonnet =
-    let image_builder arch =
-      job_docker_authenticated
-        ~__POS__
-        ~arch
-        ~stage
-        ~name:("oc.docker:jsonnet:" ^ Runner.Arch.show_uniform arch)
-        ~ci_docker_hub:false
-        ~artifacts:
-          (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
-        ["./scripts/ci/docker_jsonnet_build.sh"]
-    in
-    let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
-    Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
-
-  (** The jsonnet image (static tag [master]) *)
-  let jsonnet_master =
-    let image_path = "${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master" in
-    Image.mk_external ~image_path
 
   module CI = struct
     (* The job that builds the CI images.

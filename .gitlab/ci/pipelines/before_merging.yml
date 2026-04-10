@@ -36,32 +36,6 @@ oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-oc.docker:jsonnet:amd64:
-  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_jsonnet_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: jsonnet_image_tag.env
-
 oc.docker:client-libs-dependencies:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
@@ -1772,7 +1746,7 @@ oc.semgrep:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_jsonnet:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/jsonnet:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d70f7d37
   stage: sanity
   tags:
   - gcp
@@ -3699,7 +3673,7 @@ client-libs.kaitai_e2e_checks:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.build:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-jsonnet:trixie-master-d70f7d37
   stage: test
   tags:
   - gcp
@@ -3708,10 +3682,8 @@ grafazos.build:
     - grafazos/**/*
     when: on_success
   needs:
-  - oc.docker:jsonnet:amd64
   - trigger
-  dependencies:
-  - oc.docker:jsonnet:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: true
   before_script:

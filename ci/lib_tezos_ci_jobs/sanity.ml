@@ -138,7 +138,7 @@ let job_check_jsonnet =
   CI.job
     "check_jsonnet"
     ~__POS__
-    ~image:Tezos_ci.Images.jsonnet_master
+    ~image:Tezos_ci.Images.Base_images.debian_jsonnet_trixie
     ~description:"Check jsonnet format and lint."
     ~stage:Test
     ~only_if_changed:["**/*.jsonnet"]

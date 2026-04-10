@@ -36,7 +36,7 @@ let monitoring_child_pipeline =
        ~description:"Octez monitoring jobs"
        ~inherit_:
          (Gitlab_ci.Types.Variable_list
-            ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
+            ["ci_image_name"; "ci_image_name_protected"])
        ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_jobs Octez_monitoring))
 
 let job_docker = Docker.job_docker `released
