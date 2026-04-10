@@ -865,41 +865,45 @@ let block_number_generic ~sc_rollup_node mode () =
   in
   return (Int32.to_int lvl)
 
-let rollup_node_kernel_root_hash ~sc_rollup_node =
+let rollup_node_kernel_root_hash ?(kernel = Kernel.Latest) ~sc_rollup_node () =
   Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:Durable_storage_path.kernel_root_hash
+       ~key:(Durable_storage_path.kernel_root_hash kernel)
        ()
 
-let get_kernel_root_hash ~sc_rollup_node mode =
+let get_kernel_root_hash ?kernel ~sc_rollup_node mode =
   match mode with
   | Sequencer {evm_node} ->
       let*@! root_hash = Rpc.tez_kernelRootHash evm_node in
       return root_hash
   | Proxy -> (
-      let* root_hash_opt = rollup_node_kernel_root_hash ~sc_rollup_node in
+      let* root_hash_opt =
+        rollup_node_kernel_root_hash ?kernel ~sc_rollup_node ()
+      in
       match root_hash_opt with
       | Some root_hash -> return root_hash
       | None -> Test.fail ~__LOC__ "missing kernel root hash in the rollup node"
       )
 
-let rollup_node_kernel_version ~sc_rollup_node =
+let rollup_node_kernel_version ?(kernel = Kernel.Latest) ~sc_rollup_node () =
   Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
   @@ Sc_rollup_rpc.get_global_block_durable_state_value
        ~pvm_kind
        ~operation:Sc_rollup_rpc.Value
-       ~key:Durable_storage_path.kernel_version
+       ~key:(Durable_storage_path.kernel_version kernel)
        ()
 
-let get_kernel_version ~sc_rollup_node mode =
+let get_kernel_version ?kernel ~sc_rollup_node mode =
   match mode with
   | Sequencer {evm_node} ->
       let*@ root_hash = Rpc.tez_kernelVersion evm_node in
       return root_hash
   | Proxy -> (
-      let* version_opt = rollup_node_kernel_version ~sc_rollup_node in
+      let* version_opt =
+        rollup_node_kernel_version ?kernel ~sc_rollup_node ()
+      in
       match version_opt with
       | Some version -> return (Hex.to_string (`Hex version))
       | None -> Test.fail ~__LOC__ "missing kernel version in the rollup node")
@@ -1708,7 +1712,7 @@ let ensure_current_block_header_integrity evm_setup =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:"/evm/current_block_header"
+         ~key:"/base/current_block_header"
          ()
   in
   let block_header =
@@ -2416,13 +2420,13 @@ let test_preinitialized_evm_kernel =
     ~title:"Creates a kernel with an initialized administrator key"
     ~admin
     ~time_between_blocks:Nothing
-  @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; l1_contracts; _} ->
+  @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; l1_contracts; kernel; _} ->
   let* found_administrator_key_hex =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:Durable_storage_path.admin
+         ~key:(Durable_storage_path.admin kernel)
          ()
   in
   let found_administrator_key =
@@ -4319,7 +4323,7 @@ let test_kernel_root_hash_originate_absent =
   let* {sc_rollup_node; _}, _mode =
     setup_evm_kernel ~admin:None ~setup_kernel_root_hash:false protocol
   in
-  let* kernel_root_hash_opt = rollup_node_kernel_root_hash ~sc_rollup_node in
+  let* kernel_root_hash_opt = rollup_node_kernel_root_hash ~sc_rollup_node () in
   Assert.is_none ~loc:__LOC__ kernel_root_hash_opt ;
   unit
 
@@ -5401,7 +5405,7 @@ let test_mainnet_kernel =
   let* {sc_rollup_node; _}, mode =
     setup_evm_kernel ~kernel:Mainnet ~admin:None protocol
   in
-  let* version = get_kernel_version ~sc_rollup_node mode in
+  let* version = get_kernel_version ~kernel:Mainnet ~sc_rollup_node mode in
   Check.((version = Constant.WASM.mainnet_commit) string)
     ~error_msg:"The mainnet kernel has version %L but constant says %R" ;
   unit
@@ -6460,7 +6464,9 @@ let test_rpc_state_value_and_subkeys =
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let*@! kernel_version = Rpc.state_value evm_node "/evm/kernel_root_hash" in
+  let*@! kernel_version =
+    Rpc.state_value evm_node (Durable_storage_path.kernel_root_hash kernel)
+  in
   Check.(
     (kernel_version = evm_setup.kernel_root_hash)
       string

@@ -382,7 +382,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
   in
   return output
 
-let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
+let generate_l2_kernel_config ?kernel_compat (l2_setup : Evm_node.l2_setup)
+    client =
   let l2_config =
     Temp.file (Format.sprintf "l2-%d-config.yaml" l2_setup.l2_chain_id)
   in
@@ -417,6 +418,7 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
   in
   let*! () =
     Evm_node.make_l2_kernel_installer_config
+      ?kernel_compat
       ~chain_id:l2_setup.l2_chain_id
       ~chain_family:l2_setup.l2_chain_family
       ?eth_bootstrap_accounts:l2_setup.eth_bootstrap_accounts
@@ -440,7 +442,9 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ~sequencer ~preimages_dir ?evm_version ~kernel ~client protocol () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs =
-    Lwt_list.map_s (fun s -> generate_l2_kernel_config s client) l2_setups
+    Lwt_list.map_s
+      (fun s -> generate_l2_kernel_config ?kernel_compat s client)
+      l2_setups
   in
   let rollup_config = Temp.file "rollup-config.yaml" in
   (* To keep backwards compatibility, we also write to the current durable storage

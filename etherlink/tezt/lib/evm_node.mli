@@ -796,6 +796,7 @@ val wait_termination : t -> unit Lwt.t
 (** [make_l2_kernel_installer_config ~output ()] creates the config needed for
     an l2 chain in a multichain kernel *)
 val make_l2_kernel_installer_config :
+  ?kernel_compat:string ->
   ?chain_id:int ->
   ?chain_family:string ->
   ?eth_bootstrap_balance:Wei.t ->

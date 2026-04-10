@@ -39,13 +39,19 @@ let evm rst = sf "/evm%s" rst
 
 let world_state rst = evm (sf "/world_state%s" rst)
 
-let delayed_inbox = evm "/delayed-inbox"
+let delayed_inbox = function
+  | Kernel.Latest -> base "/delayed-inbox"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed-inbox"
 
 let kernel rst = sf "/kernel%s" rst
 
-let kernel_root_hash = evm "/kernel_root_hash"
+let kernel_root_hash = function
+  | Kernel.Latest -> base "/kernel_root_hash"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_root_hash"
 
-let kernel_version = evm "/kernel_version"
+let kernel_version = function
+  | Kernel.Latest -> base "/kernel_version"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_version"
 
 let indexes = world_state "/indexes"
 
@@ -67,11 +73,18 @@ let storage addr ?key () =
     (eth_account addr)
     (match key with None -> "" | Some key -> "/" ^ key)
 
-let admin = evm "/admin"
+let admin = function
+  | Kernel.Latest -> base "/admin"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/admin"
 
-let kernel_governance = evm "/kernel_governance"
+let kernel_governance = function
+  | Kernel.Latest -> base "/kernel_governance"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/kernel_governance"
 
-let kernel_security_governance = evm "/kernel_security_governance"
+let kernel_security_governance = function
+  | Kernel.Latest -> base "/kernel_security_governance"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/kernel_security_governance"
 
 let sequencer_governance = evm "/sequencer_governance"
 
@@ -83,19 +96,27 @@ let sequencer = function
 
 let sequencer_pool_address = evm "/sequencer_pool_address"
 
-let dal_publishers_whitelist = evm "/dal_publishers_whitelist"
+let dal_publishers_whitelist = function
+  | Kernel.Latest -> base "/dal_publishers_whitelist"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/dal_publishers_whitelist"
 
 let kernel_boot_wasm = kernel "/boot.wasm"
 
-let delayed_bridge_path = evm "/delayed_bridge"
+let delayed_bridge_path = function
+  | Kernel.Latest -> base "/delayed_bridge"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_bridge"
 
 let da_fee_per_byte_path = world_state "/fees/da_fee_per_byte"
 
 let minimum_base_fee_per_gas = world_state "/fees/minimum_base_fee_per_gas"
 
-let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
+let delayed_inbox_timeout = function
+  | Kernel.Latest -> base "/delayed_inbox_timeout"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_inbox_timeout"
 
-let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
+let delayed_inbox_min_levels = function
+  | Kernel.Latest -> base "/delayed_inbox_min_levels"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet -> evm "/delayed_inbox_min_levels"
 
 let reveal_config = function
   | Kernel.Latest -> base "/__tmp/reveal_config"
