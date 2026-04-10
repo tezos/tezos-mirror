@@ -24,6 +24,10 @@ val increase_deposit_only_call_from_token :
 val decrease_deposit_only_call_from_token :
   Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
+(** [get_deposits_balance ctxt] returns the current total amount of tez in the
+    CLST deposits. *)
+val get_deposits_balance : Raw_context.t -> Tez_repr.t tzresult Lwt.t
+
 (** [increase_redeemed_frozen_deposit_only_call_from_token ctxt cycle
     amount] increases the [amount] of [tez] redeemed for the given
     [cycle]. *)

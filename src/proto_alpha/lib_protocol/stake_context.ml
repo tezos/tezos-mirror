@@ -29,6 +29,7 @@ let apply_limits ctxt staking_parameters staking_balance =
   let cycle_eras = Raw_context.cycle_eras ctxt in
   let own_frozen = Full_staking_balance_repr.own_frozen staking_balance in
   let staked_frozen = Full_staking_balance_repr.staked_frozen staking_balance in
+  let stez_frozen = Full_staking_balance_repr.stez_frozen staking_balance in
   let allowed_staked_frozen =
     Full_staking_balance_repr.allowed_staked_frozen
       ~adaptive_issuance_global_limit_of_staking_over_baking:
@@ -68,7 +69,8 @@ let apply_limits ctxt staking_parameters staking_balance =
     in
     Tez_repr.(delegated /? edge_of_staking_over_delegation)
   in
-  let+ frozen = Tez_repr.(own_frozen +? allowed_staked_frozen) in
+  let* frozen = Tez_repr.(own_frozen +? allowed_staked_frozen) in
+  let+ frozen = Tez_repr.(frozen +? stez_frozen) in
   Stake_repr.make ~frozen ~weighted_delegated
 
 let optimal_frozen_wrt_delegated_without_ai ctxt full_staking_balance =

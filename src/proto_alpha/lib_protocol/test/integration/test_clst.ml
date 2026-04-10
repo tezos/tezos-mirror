@@ -2621,3 +2621,539 @@ let () =
     check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:8_000_000L b dst2
   in
   return_unit
+
+(* --- Stake allocation tests --- *)
+
+let pkh_of_contract = function
+  | Contract.Implicit pkh -> pkh
+  | Contract.Originated _ -> assert false
+
+let clst_allocated_tez ctxt delegate_pkh =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
+  let*@ staking_balance =
+    Stake_storage.get_full_staking_balance raw_ctxt delegate_pkh
+  in
+  let amount = Full_staking_balance_repr.stez_frozen staking_balance in
+  (* Convert Tez_repr.t to Alpha_context.Tez.t via mutez *)
+  return (Tez.of_mutez_exn (Tez_repr.to_mutez amount))
+
+let delegate_own_frozen ctxt delegate_pkh =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
+  let*@ staking_balance =
+    Stake_storage.get_full_staking_balance raw_ctxt delegate_pkh
+  in
+  let amount = Full_staking_balance_repr.own_frozen staking_balance in
+  return (Tez.of_mutez_exn (Tez_repr.to_mutez amount))
+
+let setup_delegate_with_clst_deposit
+    ?(limit_of_staking_over_baking = Q.of_int 5)
+    ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
+    ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l)
+    ?adaptive_issuance ~deposit_mutez () =
+  let open Lwt_result_wrap_syntax in
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ?adaptive_issuance
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh = pkh_of_contract delegate in
+  (* Allow external staking — use Op.transaction directly with
+     ~force_reveal:true because bootstrap accounts may be unrevealed. *)
+  let limit_of_staking_over_baking_millionth =
+    Q.mul limit_of_staking_over_baking (Q.of_int 1_000_000) |> Q.to_bigint
+  in
+  let edge_of_baking_over_staking_billionth = Z.of_int 1_000_000_000 in
+  let* op =
+    Op.set_delegate_parameters
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      delegate
+      ~limit_of_staking_over_baking_millionth
+      ~edge_of_baking_over_staking_billionth
+  in
+  let* b = Block.bake ~operation:op b in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Register the delegate with CLST *)
+  let* b, parameters =
+    register_delegate_and_bake
+      ~edge_of_clst_staking_over_baking_millionth
+      ~ratio_of_clst_staking_over_direct_staking_billionth
+      b
+      delegate
+  in
+  (* Fund an account and deposit to CLST *)
+  let* sender, b =
+    create_funded_account ~funder:delegate ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  return (b, delegate, delegate_pkh, activation_cycle)
+
+let () =
+  register_test ~title:"Test basic stake allocation" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  (* Bake up to activation cycle: parameters are activated, rebalance will
+     happen at the end of this cycle. *)
+  let* b = Block.bake_until_cycle activation_cycle b in
+  (* Record state BEFORE the first rebalance *)
+  let* total_before = total_amount_of_tez (B b) in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ (Tez.of_mutez_exn deposit_mutez) total_before
+  in
+  let* alloc_before = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_before in
+  let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
+  (* Bake until activation cycle — triggers first rebalance *)
+  let* b = Block.bake_until_cycle_end b in
+  (* Check: total_amount_of_tez is preserved (pure accounting) *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* Check: CLST allocated some tez to the delegate *)
+  let* alloc_after = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_after > zero) in
+  (* Check: baking power increased after CLST allocation *)
+  let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
+  let expected_power_after =
+    Int64.add power_before (Tez.to_mutez alloc_after)
+  in
+  let* () =
+    Assert.is_true
+      ~loc:__LOC__
+      Compare.Int64.(power_after = expected_power_after)
+  in
+  (* Bake another cycle: recomputation should yield same result *)
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after_2 = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after_2 in
+  (* Allocation should be the same (idempotent) *)
+  let* alloc_after_2 = clst_allocated_tez (B b) delegate_pkh in
+  Assert.equal_tez ~loc:__LOC__ alloc_after alloc_after_2
+
+let () =
+  register_test ~title:"Test allocation when limit of direct staking is zero"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  (* limit_of_staking_over_baking = 0 means no direct external staking.
+     However, CLST allocation uses the global limit, so the delegate should
+     still receive an allocation. *)
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~limit_of_staking_over_baking:Q.zero
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* total_before = total_amount_of_tez (B b) in
+  let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
+  (* Bake past activation — rebalance runs using global limit *)
+  let* b = Block.bake_until_cycle_end b in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* CLST allocation is non-zero (global limit allows it) *)
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
+  let expected_power_after = Int64.add power_before (Tez.to_mutez alloc) in
+  Assert.is_true ~loc:__LOC__ Compare.Int64.(power_after = expected_power_after)
+
+let () =
+  register_test ~title:"Test allocation is capped" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Use a small CLST ratio (0.1%) so the ratio cap is much smaller than the
+     global-limit cap and also smaller than the deposit. *)
+  let ratio = 1_000_000l in
+  let deposit_mutez = 10_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  (* Bootstrap accounts have 200_000 own frozen. With a ratio cap of 0.1% and
+     the global limit to 9, the cap is 200_000 * 9 * 0.001 = 1800. *)
+  let expected_cap =
+    Tez.of_mutez 1_800_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  (* Bake past activation — rebalance runs with cap < deposit *)
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  (* Allocation matches the exact computed cap *)
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test ratio cap includes global limit" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* With ratio = 20% and global_limit = 9, the ratio cap is
+     own_frozen * 9 * 0.2 = 1.8 * own_frozen = 360k tez.
+     We deposit more than own_frozen to ensure the ratio cap is the binding
+     constraint, and verify the allocation exceeds own_frozen * ratio (which
+     would be the result if global_limit were not included). *)
+  let ratio = 200_000_000l in
+  let deposit_mutez = 1_000_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let expected_cap =
+    Tez.of_mutez 360_000_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test deallocation after unregistration" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  (* Bake until activation: the allocation will happen at the end of this
+     cycle. *)
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* Check the allocation worked *)
+  let* alloc_with_clst = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_with_clst > zero) in
+  let* total_with_clst = total_amount_of_tez (B b) in
+  (* Unregister the delegate from CLST *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let* b = Block.bake ~operation:unregister_tx b in
+  let* unregister_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Unregister]
+  in
+  let unregister_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) unregister_activation_cycle
+  in
+  (* Bake until unregistration activates: rebalance will remove the allocated
+     stake at the end of this cycle. *)
+  let* b = Block.bake_until_cycle unregister_activation_cycle b in
+  (* Check that the allocation is not removed until the end of the activation
+     cycle. *)
+  let* alloc_at_unregistration_activation =
+    clst_allocated_tez (B b) delegate_pkh
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      alloc_with_clst
+      alloc_at_unregistration_activation
+  in
+  let* b = Block.bake_until_cycle_end b in
+  (* CLST allocation should be zero (immediately cleared, no unfreezing) *)
+  let* alloc_after = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_after in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  Assert.equal_tez ~loc:__LOC__ total_with_clst total_after
+
+let () =
+  register_test ~title:"Test allocation across multiple delegates" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let adaptive_issuance =
+    {
+      Default_parameters.constants_test.adaptive_issuance with
+      global_limit_of_staking_over_baking = 2;
+    }
+  in
+  let* b, (d1, d2, d3) =
+    Context.init3
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ~adaptive_issuance
+      ()
+  in
+  let delegates = [d1; d2; d3] in
+  (* Set staking parameters for all delegates *)
+  let* b =
+    List.fold_left_es
+      (fun b d ->
+        let* op =
+          Op.set_delegate_parameters
+            ~force_reveal:true
+            ~limit_of_staking_over_baking_millionth:(Z.of_int 5_000_000)
+            ~edge_of_baking_over_staking_billionth:(Z.of_int 1_000_000_000)
+            ~fee:Tez.zero
+            (B b)
+            d
+        in
+        Block.bake ~operation:op b)
+      b
+      delegates
+  in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Register all delegates with CLST (ratio = 20%) *)
+  let clst_ratio = 200_000_000l in
+  let clst_fee = 50_000l in
+  let* b, clst_params =
+    register_delegate_and_bake
+      ~edge_of_clst_staking_over_baking_millionth:clst_fee
+      ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
+      b
+      d1
+  in
+  let* b =
+    List.fold_left_es
+      (fun b d ->
+        let* b, _params =
+          register_delegate_and_bake
+            ~edge_of_clst_staking_over_baking_millionth:clst_fee
+            ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
+            b
+            d
+        in
+        return b)
+      b
+      [d2; d3]
+  in
+  (* Deposit an amount that exceeds 2 caps but not 3.
+     With the global-limit formula: cap = min(own_frozen * ratio, own_frozen *
+     global_limit - staked_frozen).  Each delegate has ~200k tez own_frozen.
+     ratio = 20%, global_limit = 2.  The ratio bound dominates:
+     cap ~ 200k * 2 * 0.2 = 80k tez per delegate.
+     Deposit 250k tez: enough for 2.5 caps — first two get full cap (80k),
+     last one gets the remainder (40k). *)
+  let deposit_mutez = 200_000_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:d1 ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* total_before = total_amount_of_tez (B b) in
+  let pkhs = List.map pkh_of_contract delegates in
+  (* Bake until CLST params activate *)
+  let first_pkh = pkh_of_contract d1 in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      first_pkh
+      [Clst_delegates_parameters_repr.Update clst_params]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* Check: total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* Collect allocations sorted by pkh order (same as greedy order) *)
+  let pkhs_sorted = List.sort Signature.Public_key_hash.compare pkhs in
+  let* allocs =
+    List.map_es (fun pkh -> clst_allocated_tez (B b) pkh) pkhs_sorted
+  in
+  let* () =
+    List.iter_es
+      (fun alloc -> Assert.is_true ~loc:__LOC__ Tez.(alloc > zero))
+      allocs
+  in
+  (* All delegates have the same cap (same ratio, similar own_frozen, no
+     direct stakers).  The first two should get equal amounts (full cap),
+     and the last gets the remainder from the pool.  Verify exact sum. *)
+  let first_alloc, second_alloc, last_alloc =
+    match allocs with
+    | [first; second; last] -> (first, second, last)
+    | _ -> Test.fail ~loc:__LOC__ "Expected exactly 3 allocations"
+  in
+  (* First two delegates get equal amounts (full cap) *)
+  let* () = Assert.equal_tez ~loc:__LOC__ first_alloc second_alloc in
+  (* Sum of all allocations equals the deposit *)
+  let total_alloc_mutez =
+    Int64.add
+      (Int64.add (Tez.to_mutez first_alloc) (Tez.to_mutez second_alloc))
+      (Tez.to_mutez last_alloc)
+  in
+  let* () = Assert.equal_int64 ~loc:__LOC__ deposit_mutez total_alloc_mutez in
+  (* The last delegate received strictly less (pool exhausted before cap) *)
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(last_alloc < first_alloc) in
+  (* Exact difference: last_alloc = deposit - 2 * first_alloc *)
+  let expected_last_mutez =
+    Int64.sub deposit_mutez (Int64.mul 2L (Tez.to_mutez first_alloc))
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    (Tez.of_mutez_exn expected_last_mutez)
+    last_alloc
+
+let () =
+  register_test ~title:"Test no allocation when delegate is overstaked"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Set global_limit_of_staking_over_baking = 1 so that a single external
+     staker with balance >= own_frozen makes the delegate overstaked.
+     With global_limit = 1: cap = own_frozen * 1 - staked_frozen.
+     When staked_frozen >= own_frozen, global_cap <= 0 → no CLST. *)
+  let adaptive_issuance =
+    {
+      Default_parameters.constants_test.adaptive_issuance with
+      global_limit_of_staking_over_baking = 1;
+    }
+  in
+  let* b, delegate =
+    Context.init1
+      ~adaptive_issuance
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh = pkh_of_contract delegate in
+  (* Set delegate parameters to allow external staking (limit = 1) *)
+  let* op =
+    Op.set_delegate_parameters
+      ~force_reveal:true
+      ~limit_of_staking_over_baking_millionth:(Z.of_int 1_000_000)
+      ~edge_of_baking_over_staking_billionth:(Z.of_int 1_000_000_000)
+      ~fee:Tez.zero
+      (B b)
+      delegate
+  in
+  let* b = Block.bake ~operation:op b in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Create a staker account, delegate to the delegate, and stake more
+     than the delegate's own_frozen to guarantee overstaking.
+     With global_limit = 1: cap = own_frozen - staked_frozen.
+     When staked_frozen > own_frozen, global_cap <= 0 → no CLST. *)
+  let* own_frozen = delegate_own_frozen (B b) delegate_pkh in
+  let stake_mutez = Int64.add (Tez.to_mutez own_frozen) 1_000_000L in
+  let staker_amount_mutez = Int64.add stake_mutez 500_000_000_000L in
+  let* staker, b =
+    create_funded_account ~funder:delegate ~amount_mutez:staker_amount_mutez b
+  in
+  let* delegation_op =
+    Op.delegation ~force_reveal:true (B b) staker (Some delegate_pkh)
+  in
+  let* b = Block.bake ~operation:delegation_op b in
+  let stake_amount = Tez.of_mutez_exn stake_mutez in
+  let* stake_op =
+    Op.transaction
+      ~entrypoint:Entrypoint.stake
+      ~fee:Tez.zero
+      (B b)
+      staker
+      staker
+      stake_amount
+  in
+  let* b = Block.bake ~operation:stake_op b in
+  (* Bake a cycle so the stake is frozen *)
+  let* b = Block.bake_until_cycle_end b in
+  (* Register the delegate with CLST (ratio = 20%) *)
+  let* b, parameters =
+    register_delegate_and_bake
+      ~ratio_of_clst_staking_over_direct_staking_billionth:200_000_000l
+      b
+      delegate
+  in
+  (* Fund and deposit to CLST *)
+  let deposit_mutez = 100_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:delegate ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* Bake until CLST parameters activate *)
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* CLST allocation should be zero — delegate is overstaked *)
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  Assert.equal_tez ~loc:__LOC__ Tez.zero alloc
