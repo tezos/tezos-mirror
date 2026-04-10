@@ -1258,6 +1258,10 @@ where
                     log!(Info, "Delayed Tezos operation runtime error: {:?}", err);
                     return Err(err.into());
                 }
+                Err(OperationError::BlockAbort(msg)) => {
+                    log!(Error, "CRAC block abort: {msg}");
+                    return Err(anyhow::anyhow!("CRAC block abort: {msg}"));
+                }
             }?
         }
     };

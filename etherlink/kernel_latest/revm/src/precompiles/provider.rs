@@ -109,8 +109,11 @@ impl EtherlinkPrecompiles {
             }
             Err(CustomPrecompileError::OutOfGas(gas)) => out_of_gas(gas.spent()),
             Err(CustomPrecompileError::RevertKeepGas(reason, gas)) => revert(reason, gas),
-            Err(CustomPrecompileError::Abort(runtime)) => {
+            Err(CustomPrecompileError::RuntimeAbort(runtime)) => {
                 return Err(Error::Runtime(runtime))
+            }
+            Err(CustomPrecompileError::CracAbort(msg)) => {
+                return Err(Error::Custom(format!("CRAC block abort: {msg}")))
             }
         };
 

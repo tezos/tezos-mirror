@@ -48,7 +48,7 @@ sol! {
             (string, string)[] headers,
             bytes body,
             uint8 method,
-        ) external returns (bool success, bytes memory response);
+        ) external returns (bytes memory response);
     }
 
     /// Emitted on every outgoing CRAC (EVM -> other runtime).
@@ -106,32 +106,58 @@ fn build_http_request(
     })
 }
 
-/// Extract `X-Tezos-Gas-Consumed` from a CRAC response, convert to
-/// EVM gas units, and charge the caller's gas tracker.
+/// Classify a CRAC HTTP response, charge gas, and return the body on success.
 ///
-/// Called on both success and failure paths so that the EVM caller
-/// always pays for the work done by the target runtime.
+/// Gas is charged on a best-effort basis for all statuses, on block
+/// aborts the block is reverted anyway, so a missing header is harmless.
+/// On 2xx the header is mandatory.
 ///
-/// Returns `Ok(true)` if gas was recorded, `Ok(false)` if the caller
-/// ran out of gas. The caller should return `out_of_gas` in that case.
-fn charge_crac_gas(
-    response: &http::Response<Vec<u8>>,
+/// - 2xx/4xx: charge callee gas, then:
+///   - out of gas from charging: return `Ok(None)`.
+///   - 2xx: return `Ok(Some(body))`.
+///   - 4xx (incl. 429 OOG): catchable revert.
+/// - anything else: block abort.
+fn classify_and_charge_crac_response(
+    response: http::Response<Vec<u8>>,
     target_runtime: RuntimeId,
     gas: &mut Gas,
-) -> Result<bool, CustomPrecompileError> {
-    let callee_consumed = response
+) -> Result<Vec<u8>, CustomPrecompileError> {
+    let callee_gas = response
         .headers()
         .get(X_TEZOS_GAS_CONSUMED)
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
-        .ok_or(CustomPrecompileError::Revert(
-            "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
-        ))?;
-    let evm_consumed = gas::convert(target_runtime, RuntimeId::Ethereum, callee_consumed)
-        .ok_or(CustomPrecompileError::Revert(
-            "X-Tezos-Gas-Consumed overflows EVM gas units".into(),
-        ))?;
-    Ok(gas.record_cost(evm_consumed))
+        .and_then(|c| gas::convert(target_runtime, RuntimeId::Ethereum, c));
+
+    if let Some(evm_consumed) = callee_gas {
+        if !gas.record_cost(evm_consumed) {
+            return Err(CustomPrecompileError::OutOfGas(*gas));
+        }
+    }
+
+    if response.status().is_success() {
+        if callee_gas.is_none() {
+            return Err(CustomPrecompileError::Revert(
+                "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
+            ));
+        }
+        Ok(response.into_body())
+    } else if response.status().is_client_error() {
+        Err(CustomPrecompileError::RevertKeepGas(
+            format!(
+                "Cross-runtime call failed with status {}: {}",
+                response.status(),
+                String::from_utf8_lossy(response.body())
+            ),
+            *gas,
+        ))
+    } else {
+        Err(CustomPrecompileError::CracAbort(format!(
+            "Cross-runtime call returned status {}: {}",
+            response.status(),
+            String::from_utf8_lossy(response.body())
+        )))
+    }
 }
 
 /// Resolve sender and source aliases, charging gas for lookups and any
@@ -319,20 +345,9 @@ where
                 &crac_id,
             )?;
 
-            let response = context.journal_mut().tezosx_call_http(request)?;
-            if !charge_crac_gas(&response, RuntimeId::Tezos, &mut gas)? {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
-            if !response.status().is_success() {
-                return Err(CustomPrecompileError::RevertKeepGas(
-                    format!(
-                        "Cross-runtime call failed with status {}: {}",
-                        response.status(),
-                        String::from_utf8_lossy(response.body())
-                    ),
-                    gas,
-                ));
-            }
+            let response = context.journal_mut().tezosx_call_http(request);
+            let _body =
+                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
 
             // Emit CracSent event
             let crac_log = Log {
@@ -405,20 +420,9 @@ where
                 &crac_id,
             )?;
 
-            let response = context.journal_mut().tezosx_call_http(request)?;
-            if !charge_crac_gas(&response, RuntimeId::Tezos, &mut gas)? {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
-            if !response.status().is_success() {
-                return Err(CustomPrecompileError::RevertKeepGas(
-                    format!(
-                        "Cross-runtime call failed with status {}: {}",
-                        response.status(),
-                        String::from_utf8_lossy(response.body())
-                    ),
-                    gas,
-                ));
-            }
+            let response = context.journal_mut().tezosx_call_http(request);
+            let _body =
+                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
 
             // Emit CracSent event
             let crac_log = Log {
@@ -493,13 +497,10 @@ where
             let target_rt = uri.host().unwrap_or("unknown").to_string();
             let target_addr = uri.path().trim_start_matches('/').to_string();
 
-            let response = context.journal_mut().tezosx_call_http(request)?;
-            if !charge_crac_gas(&response, target_runtime, &mut gas)? {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
-
-            let success = response.status().is_success();
-            let output: Vec<u8> = (success, response.body()).abi_encode_params();
+            let response = context.journal_mut().tezosx_call_http(request);
+            let body =
+                classify_and_charge_crac_response(response, target_runtime, &mut gas)?;
+            let output: Vec<u8> = (body,).abi_encode_params();
 
             // The precompile is expected to have a zero balance at this stage.
             // However, due to differences in representation precision across runtimes,

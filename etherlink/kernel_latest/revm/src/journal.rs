@@ -603,7 +603,7 @@ pub trait CrossRuntimeCall {
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, CustomPrecompileError>;
+    ) -> http::Response<Vec<u8>>;
 
     /// Get the CRAC-ID for the current transaction.
     fn crac_id(&self) -> String;
@@ -670,15 +670,10 @@ where
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, CustomPrecompileError> {
+    ) -> http::Response<Vec<u8>> {
         self.database
             .registry
             .serve(self.database.host, self.journal, http_request)
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!(
-                    "Cross-runtime HTTP call failed: {e:?}"
-                ))
-            })
     }
 
     fn crac_id(&self) -> String {

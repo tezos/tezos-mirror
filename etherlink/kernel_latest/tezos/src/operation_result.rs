@@ -236,6 +236,8 @@ pub enum ApplyOperationError {
     // This is a temporary solution while waiting for better error support.
     #[error("")]
     PastError(Vec<u8>),
+    #[error("Block abort: {0}")]
+    BlockAbort(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -244,6 +246,8 @@ pub enum OperationError {
     Validation(#[from] ValidityError),
     #[error("Runtime error: {0}")]
     RuntimeError(#[from] RuntimeError),
+    #[error("Block abort: {0}")]
+    BlockAbort(String),
 }
 
 fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {

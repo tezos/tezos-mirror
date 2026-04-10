@@ -67,6 +67,7 @@ pub enum TezosXRuntimeError {
     /// Indicates a gateway bug; propagates as Err and reverts the blueprint.
     #[error("Header error: {0}")]
     HeaderError(String),
+    /// The callee ran out of gas. Maps to HTTP 429.
     #[error("Gas exhaustion")]
     OutOfGas,
 }
@@ -103,7 +104,7 @@ pub trait Registry {
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1;
 }
@@ -142,7 +143,7 @@ pub trait RuntimeInterface {
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1;
 

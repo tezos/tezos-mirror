@@ -79,30 +79,28 @@ impl Registry for RegistryImpl {
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, tezosx_interfaces::TezosXRuntimeError>
+    ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1,
     {
         journal.record_request(&request);
-        let result = match request.uri().host() {
+        let response = match request.uri().host() {
             Some(h) if h == self.tezos.host() => {
                 self.tezos.serve(self, host, journal, request)
             }
             Some(h) if h == self.ethereum.host() => {
                 self.ethereum.serve(self, host, journal, request)
             }
-            unknown => Ok(http::Response::builder()
+            unknown => http::Response::builder()
                 .status(http::StatusCode::NOT_FOUND)
                 .body(
                     format!("No runtime handles host: {}", unknown.unwrap_or("(none)"))
                         .into_bytes(),
                 )
-                .unwrap()),
+                .unwrap(),
         };
-        if let Ok(ref response) = result {
-            journal.record_response(response.clone());
-        }
-        result
+        journal.record_response(response.clone());
+        response
     }
 }
 
@@ -123,7 +121,7 @@ mod tests {
             .unwrap();
 
         let mut journal = TezosXJournal::default();
-        let response = registry.serve(&mut host, &mut journal, request).unwrap();
+        let response = registry.serve(&mut host, &mut journal, request);
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
         assert!(body.contains("unknown"));
@@ -140,7 +138,7 @@ mod tests {
             .unwrap();
 
         let mut journal = TezosXJournal::default();
-        let response = registry.serve(&mut host, &mut journal, request).unwrap();
+        let response = registry.serve(&mut host, &mut journal, request);
         assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
         let body = String::from_utf8(response.into_body()).unwrap();
         assert!(body.contains("(none)"));

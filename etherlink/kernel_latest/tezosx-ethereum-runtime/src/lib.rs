@@ -9,7 +9,7 @@ use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU25
 use alloy_sol_types::SolCall;
 use http::StatusCode;
 use primitive_types::U256;
-use revm::context::result::{ExecutionResult, Output};
+use revm::context::result::{ExecutionResult, HaltReason, Output};
 use revm::state::Bytecode;
 use revm_etherlink::{
     precompiles::constants::{
@@ -90,7 +90,8 @@ fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types:
 /// Execution results are mapped to HTTP status codes:
 /// - `Success` → 200
 /// - `Revert` → 400 (the contract rejected the call)
-/// - `Halt` → 500 (out of gas, invalid opcode, etc.)
+/// - `Halt(OutOfGas)` → 429 (OOG)
+/// - `Halt(other)` → 500 (invalid opcode, stack overflow, etc.)
 ///
 /// Pre-execution errors are mapped as:
 /// - `BadRequest` → 400
@@ -100,44 +101,60 @@ fn read_sequencer_pool_address(host: &impl StorageV1) -> Option<primitive_types:
 /// problems that cannot be meaningfully represented as HTTP responses.
 fn build_response(
     result: Result<ExecutionOutcome, TezosXRuntimeError>,
-) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
-    let builder_result = match result {
+) -> http::Response<Vec<u8>> {
+    let (status, body, gas_consumed) = match result {
         Ok(outcome) => {
             // X-Tezos-Gas-Consumed is in the called runtime's units (EVM here).
             // The caller is responsible for converting to its own units.
-            let gas_consumed = outcome.result.gas_used().to_string();
+            let gas = outcome.result.gas_used().to_string();
             match outcome.result {
                 ExecutionResult::Success { output, .. } => {
                     let body = match output {
                         Output::Call(bytes) => bytes.to_vec(),
                         Output::Create(bytes, _) => bytes.to_vec(),
                     };
-                    http::Response::builder()
-                        .status(StatusCode::OK)
-                        .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
-                        .body(body)
+                    (StatusCode::OK, body, gas)
                 }
-                ExecutionResult::Revert { output, .. } => http::Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
-                    .body(output.to_vec()),
-                ExecutionResult::Halt { reason, .. } => http::Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
-                    .body(format!("EVM execution halted: {reason:?}").into_bytes()),
+                ExecutionResult::Revert { output, .. } => {
+                    (StatusCode::BAD_REQUEST, output.to_vec(), gas)
+                }
+                ExecutionResult::Halt { reason, .. } => {
+                    let status = match reason {
+                        HaltReason::OutOfGas(_) => StatusCode::TOO_MANY_REQUESTS,
+                        _ => StatusCode::INTERNAL_SERVER_ERROR,
+                    };
+                    (
+                        status,
+                        format!("EVM execution halted: {reason:?}").into_bytes(),
+                        gas,
+                    )
+                }
             }
         }
-        Err(TezosXRuntimeError::BadRequest(msg)) => http::Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(msg.into_bytes()),
-        Err(TezosXRuntimeError::NotFound(msg)) => http::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(msg.into_bytes()),
-        Err(e) => return Err(e),
+        Err(TezosXRuntimeError::BadRequest(msg)) => {
+            (StatusCode::BAD_REQUEST, msg.into_bytes(), "0".to_string())
+        }
+        Err(TezosXRuntimeError::NotFound(msg)) => {
+            (StatusCode::NOT_FOUND, msg.into_bytes(), "0".to_string())
+        }
+        Err(TezosXRuntimeError::OutOfGas) => (
+            StatusCode::TOO_MANY_REQUESTS,
+            b"OOG".to_vec(),
+            "0".to_string(),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{e:?}").into_bytes(),
+            "0".to_string(),
+        ),
     };
-    builder_result.map_err(|e| {
-        TezosXRuntimeError::Custom(format!("Failed to build HTTP response: {e}"))
-    })
+    // Safe to unwrap: status is a predefined constant, header name is a
+    // static ASCII string, and the value is a decimal u64.
+    http::Response::builder()
+        .status(status)
+        .header(X_TEZOS_GAS_CONSUMED, &gas_consumed)
+        .body(body)
+        .unwrap()
 }
 
 /// Execute a cross-runtime request: parse the URL, extract the
@@ -344,7 +361,7 @@ impl RuntimeInterface for EthereumRuntime {
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1,
     {
@@ -434,7 +451,7 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        ) -> http::Response<Vec<u8>>
         where
             Host: StorageV1,
         {
@@ -483,9 +500,7 @@ mod tests {
 
         let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "5", vec![]);
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
             &mut host,
@@ -536,9 +551,7 @@ mod tests {
 
         let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &contract, "0", vec![]);
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
             &mut host,
@@ -593,9 +606,7 @@ mod tests {
 
         let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &contract, "42", vec![]);
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
             &mut host,
@@ -696,14 +707,14 @@ mod tests {
 
         #[test]
         fn success_returns_200() {
-            let resp = build_response(Ok(make_success(b"hello".to_vec()))).unwrap();
+            let resp = build_response(Ok(make_success(b"hello".to_vec())));
             assert_eq!(resp.status(), StatusCode::OK);
             assert_eq!(resp.body(), b"hello");
         }
 
         #[test]
         fn success_empty_body() {
-            let resp = build_response(Ok(make_success(vec![]))).unwrap();
+            let resp = build_response(Ok(make_success(vec![])));
             assert_eq!(resp.status(), StatusCode::OK);
             assert!(resp.body().is_empty());
         }
@@ -718,13 +729,13 @@ mod tests {
                 },
                 withdrawals: vec![],
             };
-            let resp = build_response(Ok(outcome)).unwrap();
+            let resp = build_response(Ok(outcome));
             assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
             assert_eq!(resp.body(), b"revert reason");
         }
 
         #[test]
-        fn halt_returns_500() {
+        fn halt_out_of_gas_returns_429() {
             let outcome = ExecutionOutcome {
                 result: ExecutionResult::Halt {
                     reason: HaltReason::OutOfGas(
@@ -735,15 +746,28 @@ mod tests {
                 },
                 withdrawals: vec![],
             };
-            let resp = build_response(Ok(outcome)).unwrap();
+            let resp = build_response(Ok(outcome));
+            assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        }
+
+        #[test]
+        fn halt_other_returns_500() {
+            let outcome = ExecutionOutcome {
+                result: ExecutionResult::Halt {
+                    reason: HaltReason::StackOverflow,
+                    logs: vec![],
+                    gas: ResultGas::new(u64::MAX, 21000, 0, 0, 0),
+                },
+                withdrawals: vec![],
+            };
+            let resp = build_response(Ok(outcome));
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         }
 
         #[test]
         fn bad_request_error_returns_400() {
             let resp =
-                build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())))
-                    .unwrap();
+                build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())));
             assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
             assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
         }
@@ -752,16 +776,15 @@ mod tests {
         fn not_found_error_returns_404() {
             let resp = build_response(Err(TezosXRuntimeError::NotFound(
                 "no such contract".into(),
-            )))
-            .unwrap();
+            )));
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             assert!(String::from_utf8_lossy(resp.body()).contains("no such contract"));
         }
 
         #[test]
-        fn custom_error_propagates() {
-            let result = build_response(Err(TezosXRuntimeError::Custom("boom".into())));
-            assert!(result.is_err());
+        fn custom_error_returns_500() {
+            let resp = build_response(Err(TezosXRuntimeError::Custom("boom".into())));
+            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         }
 
         // Gas header tests: make_success uses ResultGas::new(u64::MAX, 21000, 0, 0, 0)
@@ -769,7 +792,7 @@ mod tests {
 
         #[test]
         fn success_has_gas_consumed_header() {
-            let resp = build_response(Ok(make_success(vec![]))).unwrap();
+            let resp = build_response(Ok(make_success(vec![])));
             assert_eq!(
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
@@ -788,7 +811,7 @@ mod tests {
                 },
                 withdrawals: vec![],
             };
-            let resp = build_response(Ok(outcome)).unwrap();
+            let resp = build_response(Ok(outcome));
             assert_eq!(
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
@@ -809,7 +832,7 @@ mod tests {
                 },
                 withdrawals: vec![],
             };
-            let resp = build_response(Ok(outcome)).unwrap();
+            let resp = build_response(Ok(outcome));
             assert_eq!(
                 resp.headers()
                     .get(X_TEZOS_GAS_CONSUMED)
@@ -819,10 +842,9 @@ mod tests {
         }
 
         #[test]
-        fn error_response_has_no_gas_consumed_header() {
-            let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())))
-                .unwrap();
-            assert!(resp.headers().get(X_TEZOS_GAS_CONSUMED).is_none());
+        fn error_response_has_zero_gas_consumed() {
+            let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())));
+            assert_eq!(resp.headers().get(X_TEZOS_GAS_CONSUMED).unwrap(), "0");
         }
     }
 
@@ -839,9 +861,7 @@ mod tests {
 
         let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "0", vec![]);
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
             &mut host,
@@ -873,9 +893,7 @@ mod tests {
 
         let mut journal = TezosXJournal::default();
         let request = build_serve_request(&sender, &destination, "0.5", vec![]);
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
         commit_evm_journal_from_external(
             &mut host,
@@ -961,9 +979,7 @@ mod tests {
             .unwrap();
 
         let mut journal = TezosXJournal::default();
-        let resp = runtime
-            .serve(&registry, &mut host, &mut journal, request)
-            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
         assert_eq!(resp.status(), http::StatusCode::OK);
     }
 }

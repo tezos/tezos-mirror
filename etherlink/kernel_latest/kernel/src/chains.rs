@@ -1000,6 +1000,9 @@ where
                 Err(OperationError::RuntimeError(err)) => {
                     return Err(err.into());
                 }
+                Err(OperationError::BlockAbort(msg)) => {
+                    return Err(anyhow::anyhow!("CRAC block abort: {msg}"));
+                }
             };
 
             let consumed_milligas =

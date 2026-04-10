@@ -529,8 +529,7 @@ where
     match to_account.add_balance(host, amount) {
         Ok(()) => {
             let mut success = TransferSuccess::default();
-            let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR)
-                .map_err(|e| TransferError::DepositError(format!("{e:?}")))?;
+            let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR).unwrap();
             let balance_updates = BalanceUpdate::transfer(depositor, receiver, amount);
             success.balance_updates = balance_updates;
             Ok(success)

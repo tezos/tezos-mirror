@@ -21,6 +21,7 @@ use tezos_execution::{
     account_storage::{TezlinkAccount, TezosOriginatedAccount},
     context::Context,
     cross_runtime_transfer,
+    enshrined_contracts::CracError,
     mir_ctx::{OperationCtx, TcCtx},
     CracTransferError, OriginationNonce, TezlinkOperationGas,
 };
@@ -81,7 +82,7 @@ pub mod url;
 fn build_response(
     result: Result<TransferSuccess, TezosXRuntimeError>,
     consumed_milligas: u64,
-) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError> {
+) -> http::Response<Vec<u8>> {
     let gas_header = consumed_milligas.to_string();
     let (status, body) = match result {
         Ok(response) => (
@@ -94,16 +95,21 @@ fn build_response(
         Err(TezosXRuntimeError::NotFound(msg)) => {
             (StatusCode::NOT_FOUND, msg.into_bytes())
         }
+        Err(TezosXRuntimeError::OutOfGas) => {
+            (StatusCode::TOO_MANY_REQUESTS, b"OOG".to_vec())
+        }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("{e:?}").into_bytes(),
         ),
     };
+    // Safe to unwrap: status is a predefined constant, header name is a
+    // static ASCII string, and the value is a decimal u64.
     http::Response::builder()
         .status(status)
         .header(X_TEZOS_GAS_CONSUMED, &gas_header)
         .body(body)
-        .map_err(|e| TezosXRuntimeError::Custom(format!("Failed to build response: {e}")))
+        .unwrap()
 }
 
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
@@ -476,11 +482,59 @@ where
                 .get_and_reset_milligas_consumed()
                 .map(|n| n.0.try_into().unwrap_or(u64::MAX))
                 .unwrap_or(u64::MAX);
+
+            // Map CracError to the TezosXRuntimeError HTTP status bearing equivalent.
+            // User-facing errors become 400/429 (catchable revert).
+            // Infrastructure errors and BlockAbort become 500 (abort the block).
+            let rt_err = match &error {
+                CracError::Operation(e) => match e {
+                    // OOG: 429 (catchable revert)
+                    TransferError::OutOfGas => TezosXRuntimeError::OutOfGas,
+                    // User-facing errors: 400 (catchable revert)
+                    TransferError::BalanceTooLow(_)
+                    | TransferError::UnspendableContract(_)
+                    | TransferError::NonSmartContractExecutionCall
+                    | TransferError::EmptyImplicitTransfer
+                    | TransferError::MichelineDecodeError(_)
+                    | TransferError::MichelsonContractInterpretError(_)
+                    | TransferError::MirTypecheckingError(_)
+                    | TransferError::MirAddressUnsupportedError
+                    | TransferError::MirAmountToNarithError(_)
+                    | TransferError::MirNarithToAmountError(_)
+                    | TransferError::FailedToExecuteInternalOperation(_)
+                    | TransferError::DepositError(_)
+                    | TransferError::GatewayError(_) => {
+                        TezosXRuntimeError::BadRequest(e.to_string())
+                    }
+                    // Infrastructure errors: 500 (block abort)
+                    TransferError::FailedToApplyBalanceChanges
+                    | TransferError::FailedToAllocateDestination
+                    | TransferError::FailedToFetchDestinationAccount
+                    | TransferError::FailedToFetchContractCode
+                    | TransferError::FailedToFetchContractStorage
+                    | TransferError::FailedToFetchDestinationBalance
+                    | TransferError::FailedToFetchSenderBalance
+                    | TransferError::FailedToUpdateContractStorage
+                    | TransferError::FailedToUpdateDestinationBalance
+                    | TransferError::FailedToComputeBalanceUpdate => {
+                        TezosXRuntimeError::Custom(format!(
+                            "internal error during cross-runtime transfer: {e}"
+                        ))
+                    }
+                },
+                CracError::BlockAbort(msg) => {
+                    TezosXRuntimeError::Custom(format!("block abort: {msg}"))
+                }
+            };
             if is_crac {
                 // Build a failed receipt so the Michelson block records the
                 // failed CRAC (RFC Example 4), including any partial
                 // internal operations with backtracked/failed/skipped statuses.
-                if let Some(kt1) = hdrs.crac_origin_contract.as_ref() {
+                // Only emitted for operation-level failures; BlockAbort aborts
+                // the whole block, so no per-operation receipt is produced.
+                if let (Some(kt1), CracError::Operation(te)) =
+                    (hdrs.crac_origin_contract.as_ref(), error)
+                {
                     let source_contract = Contract::Originated(kt1.clone());
                     match build_failed_crac_receipt(
                         &source_pkh,
@@ -489,7 +543,7 @@ where
                         &hdrs.amount,
                         &parsed.destination,
                         &parameters,
-                        error,
+                        te,
                         internal_receipts,
                         crac_id_for_event.as_deref(),
                         base_nonce,
@@ -503,9 +557,7 @@ where
                     }
                 }
             }
-            return Err(TezosXRuntimeError::Custom(
-                "cross-runtime transfer failed".to_string(),
-            ));
+            return Err(rt_err);
         }
     };
 
@@ -623,7 +675,7 @@ impl RuntimeInterface for TezosRuntime {
         host: &mut Host,
         journal: &mut TezosXJournal,
         request: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+    ) -> http::Response<Vec<u8>>
     where
         Host: StorageV1,
     {
@@ -751,14 +803,14 @@ mod tests {
 
     #[test]
     fn build_response_success() {
-        let resp = build_response(Ok(make_success(Some(b"hello".to_vec()))), 0).unwrap();
+        let resp = build_response(Ok(make_success(Some(b"hello".to_vec()))), 0);
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), b"hello");
     }
 
     #[test]
     fn build_response_success_empty_body() {
-        let resp = build_response(Ok(make_success(None)), 0).unwrap();
+        let resp = build_response(Ok(make_success(None)), 0);
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
     }
@@ -766,8 +818,7 @@ mod tests {
     #[test]
     fn build_response_bad_request() {
         let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())), 0)
-                .unwrap();
+            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())), 0);
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
     }
@@ -775,8 +826,7 @@ mod tests {
     #[test]
     fn build_response_not_found() {
         let resp =
-            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())), 0)
-                .unwrap();
+            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())), 0);
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(String::from_utf8_lossy(resp.body()).contains("KT1 not found"));
     }
@@ -784,7 +834,7 @@ mod tests {
     #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(make_success(None)), 0).unwrap();
+        let resp = build_response(Ok(make_success(None)), 0);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -796,8 +846,7 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp =
-            build_response(Ok(make_success_with_milligas(None, 5000)), 5000).unwrap();
+        let resp = build_response(Ok(make_success_with_milligas(None, 5000)), 5000);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -808,8 +857,7 @@ mod tests {
 
     #[test]
     fn build_response_error_has_no_gas_consumed_header() {
-        let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0).unwrap();
+        let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -855,11 +903,14 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        ) -> http::Response<Vec<u8>>
         where
             Host: StorageV1,
         {
-            Err(TezosXRuntimeError::Custom("stub".into()))
+            http::Response::builder()
+                .status(http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body(b"stub".to_vec())
+                .expect("stub response must build")
         }
     }
 
