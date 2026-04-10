@@ -1607,20 +1607,28 @@ let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (Contract.Originated clst_hash)
     Tez.zero
 
-let clst_finalize ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
-    (ctxt : Context.t) (src : Contract.t) =
+let clst_finalize_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(sender : Contract.t)
+    ~(redeemer : Signature.Public_key_hash.t) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
   let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(
+        String (dummy_location, Signature.Public_key_hash.to_b58check redeemer)
+        |> strip_locations)
+  in
   unsafe_transaction
     ?force_reveal
     ?counter
     ?fee
     ?gas_limit
     ?storage_limit
-    ~entrypoint:(Entrypoint.of_string_strict_exn "finalize")
+    ~entrypoint:(Entrypoint.of_string_strict_exn "finalize_redeem")
+    ~parameters
     ctxt
-    src
+    sender
     (Contract.Originated clst_hash)
     Tez.zero
 
