@@ -463,32 +463,32 @@ let test_adaptive_issuance ~contracts ?endpoint client =
   in
   unit
 
-let test_clst ~contracts ?endpoint client =
-  Log.info "Test CLST parameters retrieval" ;
+let test_stez ~contracts ?endpoint client =
+  Log.info "Test STEZ parameters retrieval" ;
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_clst_contract_hash ()
+    @@ RPC.get_chain_block_context_stez_contract_hash ()
   in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_clst_total_supply ()
+    @@ RPC.get_chain_block_context_stez_total_supply ()
   in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_clst_total_amount_of_tez ()
+    @@ RPC.get_chain_block_context_stez_total_amount_of_tez ()
   in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_clst_exchange_rate ()
+    @@ RPC.get_chain_block_context_stez_exchange_rate ()
   in
   let bootstrap = List.hd contracts in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_contract_clst_balance ~id:bootstrap ()
+    @@ RPC.get_chain_block_context_contract_stez_balance ~id:bootstrap ()
   in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
-    @@ RPC.get_chain_block_context_contract_clst_ticket_balance ~id:bootstrap ()
+    @@ RPC.get_chain_block_context_contract_stez_ticket_balance ~id:bootstrap ()
   in
   unit
 
@@ -690,10 +690,10 @@ let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   test_adaptive_issuance ~contracts ?endpoint client
 
-(* Test the CLST RPC. *)
-let test_clst _test_mode_tag (_ : Protocol.t) ?endpoint client =
+(* Test the sTEZ RPC. *)
+let test_stez _test_mode_tag (_ : Protocol.t) ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  test_clst ~contracts ?endpoint client
+  test_stez ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -1745,8 +1745,8 @@ let register protocols =
       ~test_function:test_adaptive_issuance ;
     check_rpc_regression
       ~supports:Protocol.(From_protocol 25)
-      "clst"
-      ~test_function:test_clst ;
+      "stez"
+      ~test_function:test_stez ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

@@ -188,36 +188,36 @@ val single_sapling_get_diff :
   unit ->
   (Sapling.root * Sapling.diff) shell_tzresult Lwt.t
 
-val clst_contract_hash :
+val stez_contract_hash :
   'a #RPC_context.simple -> 'a -> Contract_hash.t shell_tzresult Lwt.t
 
-val clst_balance :
+val stez_balance :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
   Script_int.n Script_int.num shell_tzresult Lwt.t
 
-val clst_ticket_balance :
+val stez_ticket_balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Z.t shell_tzresult Lwt.t
 
-val clst_total_supply :
+val stez_total_supply :
   'a #RPC_context.simple ->
   'a ->
   Script_int.n Script_int.num shell_tzresult Lwt.t
 
-val clst_total_amount_of_tez :
+val stez_total_amount_of_tez :
   'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
 
-val clst_exchange_rate :
+val stez_exchange_rate :
   'a #RPC_context.simple -> 'a -> Q.t shell_tzresult Lwt.t
 
-val clst_redeemed_frozen_balance :
+val stez_redeemed_frozen_balance :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->
   Tez.t option shell_tzresult Lwt.t
 
-val clst_redeemed_finalizable_balance :
+val stez_redeemed_finalizable_balance :
   'a #RPC_context.simple ->
   'a ->
   Contract.t ->

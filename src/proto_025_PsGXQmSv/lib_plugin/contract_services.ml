@@ -392,44 +392,45 @@ module S = struct
   module CLST = struct
     let contract_hash =
       RPC_service.get_service
-        ~description:"Returns the CLST contract hash."
+        ~description:"Returns the sTEZ contract hash."
         ~query:RPC_query.empty
         ~output:Contract_hash.encoding
-        RPC_path.(open_root / "context" / "clst" / "contract_hash")
+        RPC_path.(open_root / "context" / "stez" / "contract_hash")
 
     let balance_service =
       RPC_service.get_service
         ~description:
-          "Returns the CLST balance of a contract. Returns 0 if the contract \
-           is originated or does not hold any CLST token."
+          "Returns the sTEZ token balance of the contract. Returns 0 if the \
+           contract is originated or does not hold any sTEZ tokens."
         ~query:RPC_query.empty
         ~output:Script_int.n_encoding
-        RPC_path.(custom_root /: Contract.rpc_arg / "clst_balance")
+        RPC_path.(custom_root /: Contract.rpc_arg / "stez_balance")
 
     let ticket_balance_service =
       RPC_service.get_service
         ~description:
-          "Returns the CLST ticket balance of a contract. Returns 0 if the \
-           contract does not hold any CLST ticket."
+          "Returns the sTEZ ticket balance of the contract (for tokens \
+           exported as tickets). Returns 0 if the contract does not hold any \
+           sTEZ tickets."
         ~query:RPC_query.empty
         ~output:n
-        RPC_path.(custom_root /: Contract.rpc_arg / "clst_ticket_balance")
+        RPC_path.(custom_root /: Contract.rpc_arg / "stez_ticket_balance")
 
     let total_supply_service =
       RPC_service.get_service
-        ~description:"Returns the total supply of CLST tokens."
+        ~description:"Returns the total supply of sTEZ tokens."
         ~query:RPC_query.empty
         ~output:Script_int.n_encoding
-        RPC_path.(open_root / "context" / "clst" / "total_supply")
+        RPC_path.(open_root / "context" / "stez" / "total_supply")
 
     let total_amount_of_tez_service =
       RPC_service.get_service
         ~description:
-          "Returns the total amount of tez in the CLST staking ledger (in \
+          "Returns the total amount of tez in the sTEZ staking ledger (in \
            mutez)."
         ~query:RPC_query.empty
         ~output:Tez.encoding
-        RPC_path.(open_root / "context" / "clst" / "total_amount_of_tez")
+        RPC_path.(open_root / "context" / "stez" / "total_amount_of_tez")
 
     let q_encoding =
       conv
@@ -440,35 +441,36 @@ module S = struct
     let exchange_rate_service =
       RPC_service.get_service
         ~description:
-          "Returns the exchange rate between CLST token and tez calculated as \
-           the ratio of total_amount_of_tez to total_supply."
+          "Returns the exchange rate between sTEZ token and tez calculated as \
+           the ratio of total_amount_of_tez to total_supply. Returns {1, 1} if \
+           total_supply is 0."
         ~query:RPC_query.empty
         ~output:q_encoding
-        RPC_path.(open_root / "context" / "clst" / "exchange_rate")
+        RPC_path.(open_root / "context" / "stez" / "exchange_rate")
 
     let redeemed_frozen_balance =
       RPC_service.get_service
         ~description:
-          "Access the balance of a contract that was requested for a redeem \
-           operation, but is still frozen for the duration of the slashing \
-           operation, but is still frozen for the standard unstake \
-           finalization delay. Returns None if the contract is originated."
+          "Returns the balance (in mutez) of funds that were requested for a \
+           redeem operation but are still frozen for the standard unstake \
+           finalization delay. Returns null if the contract is originated."
         ~query:RPC_query.empty
         ~output:(option Tez.encoding)
         RPC_path.(
-          custom_root /: Contract.rpc_arg / "clst_redeemed_frozen_balance")
+          custom_root /: Contract.rpc_arg / "stez_redeemed_frozen_balance")
 
     let redeemed_finalizable_balance =
       RPC_service.get_service
         ~description:
-          "Access the balance of a contract that was requested for a redeem \
-           operation, and is no longer frozen, which means it will appear in \
-           the spendable balance of the contract after any finalize operation. \
-           Returns None if the contract is originated."
+          "Returns the balance (in mutez) of funds that were requested for a \
+           redeem operation and are no longer frozen. These can be transferred \
+           to the contract's spendable balance with any deposit, redeem, or \
+           finalize_redeem operation. Returns null if the contract is \
+           originated."
         ~query:RPC_query.empty
         ~output:(option Tez.encoding)
         RPC_path.(
-          custom_root /: Contract.rpc_arg / "clst_redeemed_finalizable_balance")
+          custom_root /: Contract.rpc_arg / "stez_redeemed_finalizable_balance")
 
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
@@ -1023,25 +1025,25 @@ let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
     (Contract.Originated id)
     Sapling_services.{offset_commitment; offset_nullifier}
 
-let clst_contract_hash ctxt block =
+let stez_contract_hash ctxt block =
   RPC_context.make_call0 S.CLST.contract_hash ctxt block () ()
 
-let clst_balance ctxt block contract =
+let stez_balance ctxt block contract =
   RPC_context.make_call1 S.CLST.balance_service ctxt block contract () ()
 
-let clst_ticket_balance ctxt block contract =
+let stez_ticket_balance ctxt block contract =
   RPC_context.make_call1 S.CLST.ticket_balance_service ctxt block contract () ()
 
-let clst_total_supply ctxt block =
+let stez_total_supply ctxt block =
   RPC_context.make_call0 S.CLST.total_supply_service ctxt block () ()
 
-let clst_total_amount_of_tez ctxt block =
+let stez_total_amount_of_tez ctxt block =
   RPC_context.make_call0 S.CLST.total_amount_of_tez_service ctxt block () ()
 
-let clst_exchange_rate ctxt block =
+let stez_exchange_rate ctxt block =
   RPC_context.make_call0 S.CLST.exchange_rate_service ctxt block () ()
 
-let clst_redeemed_frozen_balance ctxt block contract =
+let stez_redeemed_frozen_balance ctxt block contract =
   RPC_context.make_call1
     S.CLST.redeemed_frozen_balance
     ctxt
@@ -1050,7 +1052,7 @@ let clst_redeemed_frozen_balance ctxt block contract =
     ()
     ()
 
-let clst_redeemed_finalizable_balance ctxt block contract =
+let stez_redeemed_finalizable_balance ctxt block contract =
   RPC_context.make_call1
     S.CLST.redeemed_finalizable_balance
     ctxt

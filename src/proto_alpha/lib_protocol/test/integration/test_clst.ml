@@ -144,7 +144,7 @@ let create_funded_account ~funder ~amount_mutez b =
 let check_clst_balance_diff ~loc ~init ~diff b account =
   let open Lwt_result_syntax in
   let* balance =
-    Plugin.Contract_services.clst_balance Block.rpc_ctxt b account
+    Plugin.Contract_services.stez_balance Block.rpc_ctxt b account
   in
   let balance =
     Option.value_f
@@ -568,10 +568,10 @@ let test_total_supply (total_supply_f : Block.t -> int64 tzresult Lwt.t) =
        exchange_rate = 1 *)
     let* total_supply = total_supply_f b in
     let* total_amount_of_tez =
-      Plugin.Contract_services.clst_total_amount_of_tez Block.rpc_ctxt b
+      Plugin.Contract_services.stez_total_amount_of_tez Block.rpc_ctxt b
     in
     let* exchange_rate =
-      Plugin.Contract_services.clst_exchange_rate Block.rpc_ctxt b
+      Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
     in
     let* () = Assert.equal_int64 ~loc total_supply expected_in_mutez in
     let* () =
@@ -650,7 +650,7 @@ let () =
   test_total_supply (fun b ->
       let open Lwt_result_syntax in
       let* total_supply =
-        Plugin.Contract_services.clst_total_supply Block.rpc_ctxt b
+        Plugin.Contract_services.stez_total_supply Block.rpc_ctxt b
       in
       let total_supply =
         Option.value_f
@@ -717,7 +717,7 @@ let () =
   let open Lwt_result_wrap_syntax in
   let* b, _funder = Context.init1 ~consensus_threshold_size:0 () in
   let* exchange_rate =
-    Plugin.Contract_services.clst_exchange_rate Block.rpc_ctxt b
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
   in
   let* () = Assert.is_true ~loc:__LOC__ (Q.equal exchange_rate Q.one) in
   return_unit
@@ -879,14 +879,14 @@ let () =
 
   (* Let's check the frozen and finalizable balances *)
   let* () =
-    Assert.clst_frozen_redeemed_balance_is
+    Assert.stez_frozen_redeemed_balance_is
       ~loc:__LOC__
       b
       sender
       second_redeemed_amount
   in
   let* () =
-    Assert.clst_finalizable_redeemed_balance_is
+    Assert.stez_finalizable_redeemed_balance_is
       ~loc:__LOC__
       b
       sender
@@ -911,13 +911,13 @@ let () =
   (* Let's check the frozen and finalizable balances again, frozen shouldn't
      have changed, but there shouldn't be any finalizable balance anymore. *)
   let* () =
-    Assert.clst_frozen_redeemed_balance_is
+    Assert.stez_frozen_redeemed_balance_is
       ~loc:__LOC__
       b
       sender
       second_redeemed_amount
   in
-  Assert.clst_finalizable_redeemed_balance_is ~loc:__LOC__ b sender Tez.zero
+  Assert.stez_finalizable_redeemed_balance_is ~loc:__LOC__ b sender Tez.zero
 
 let () =
   register_test ~title:"Test allowance entrypoint and get_allowance view"
@@ -1210,13 +1210,13 @@ let () =
       b
       src
   in
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance)
+      (Z.to_int64 stez_ticket_balance)
       ticket_amount_export
   in
 
@@ -1259,20 +1259,20 @@ let () =
       b
       src
   in
-  let* clst_balance =
-    Plugin.Contract_services.clst_balance Block.rpc_ctxt b dst
+  let* stez_balance =
+    Plugin.Contract_services.stez_balance Block.rpc_ctxt b dst
   in
-  let clst_balance =
+  let stez_balance =
     Option.value_f
       ~default:(fun () -> assert false)
-      (Script_int.to_int64 clst_balance)
+      (Script_int.to_int64 stez_balance)
   in
-  let* () = Assert.equal_int64 ~loc:__LOC__ clst_balance ticket_amount in
+  let* () = Assert.equal_int64 ~loc:__LOC__ stez_balance ticket_amount in
 
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
-  Assert.equal_int64 ~loc:__LOC__ (Z.to_int64 clst_ticket_balance) 0L
+  Assert.equal_int64 ~loc:__LOC__ (Z.to_int64 stez_ticket_balance) 0L
 
 let () =
   register_test ~title:"Test lambda_export is not implemented" @@ fun () ->
@@ -1839,13 +1839,13 @@ let () =
       b
       src
   in
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance)
+      (Z.to_int64 stez_ticket_balance)
       ticket_amount_export
   in
 
@@ -1943,13 +1943,13 @@ let () =
       b
       src
   in
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance)
+      (Z.to_int64 stez_ticket_balance)
       ticket_amount_export
   in
 
@@ -1966,13 +1966,13 @@ let () =
       b
       src
   in
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance)
+      (Z.to_int64 stez_ticket_balance)
       (Int64.mul ticket_amount_export 2L)
   in
 
@@ -2098,8 +2098,8 @@ let () =
       b
       dst
   in
-  let* clst_ticket_balance =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst
+  let* stez_ticket_balance =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst
   in
   let expected_clst_ticked_balance =
     Int64.sub ticket_amount_export ticket_amount_import
@@ -2107,7 +2107,7 @@ let () =
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance)
+      (Z.to_int64 stez_ticket_balance)
       expected_clst_ticked_balance
   in
 
@@ -2480,22 +2480,22 @@ let () =
       b
       src
   in
-  let* clst_ticket_balance_dst1 =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst1
+  let* stez_ticket_balance_dst1 =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst1
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance_dst1)
+      (Z.to_int64 stez_ticket_balance_dst1)
       30_000_000L
   in
-  let* clst_ticket_balance_dst2 =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst2
+  let* stez_ticket_balance_dst2 =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst2
   in
   let* () =
     Assert.equal_int64
       ~loc:__LOC__
-      (Z.to_int64 clst_ticket_balance_dst2)
+      (Z.to_int64 stez_ticket_balance_dst2)
       5_000_000L
   in
   return_unit

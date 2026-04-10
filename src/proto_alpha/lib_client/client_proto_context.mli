@@ -1076,7 +1076,7 @@ val is_delegate :
   public_key_hash ->
   bool tzresult Lwt.t
 
-val get_clst_contract_hash :
+val get_stez_contract_hash :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->

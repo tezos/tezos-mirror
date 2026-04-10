@@ -2219,10 +2219,10 @@ let commands_rw () =
             entrypoint,
             replace_by_fees,
             successor_level ));
-    (* Start: CLST client commands *)
+    (* Start: sTEZ client commands *)
     command
       ~group
-      ~desc:"Deposit the given amount of tez into the CLST contract."
+      ~desc:"Deposit the given amount of tez into the sTEZ contract."
       (args13
          fee_arg
          dry_run_switch
@@ -2237,7 +2237,7 @@ let commands_rw () =
          fee_parameter_args
          replace_by_fees_arg
          successor_level_arg)
-      (prefixes ["clst"; "deposit"]
+      (prefixes ["stez"; "deposit"]
       @@ tez_param ~name:"qty" ~desc:"amount deposited from source"
       @@ prefix "for"
       @@ Public_key_hash.source_param
@@ -2262,8 +2262,8 @@ let commands_rw () =
            (cctxt : Protocol_client_context.full)
          ->
         let open Lwt_result_syntax in
-        let* clst_contract_hash =
-          get_clst_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
+        let* stez_contract_hash =
+          get_stez_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
         in
         let contract = Contract.Implicit source in
         let arg = None in
@@ -2271,7 +2271,7 @@ let commands_rw () =
         transfer_command
           amount
           contract
-          (Contract.Originated clst_contract_hash)
+          (Contract.Originated stez_contract_hash)
           cctxt
           ( fee,
             dry_run,
@@ -2290,7 +2290,7 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Redeem the given amount of tez from the CLST contract."
+      ~desc:"Redeem the given amount of tez from the sTEZ contract."
       (args13
          fee_arg
          dry_run_switch
@@ -2305,8 +2305,8 @@ let commands_rw () =
          fee_parameter_args
          replace_by_fees_arg
          successor_level_arg)
-      (prefixes ["clst"; "redeem"]
-      @@ tez_param ~name:"qty" ~desc:"amount in tez to redeem from CLST"
+      (prefixes ["stez"; "redeem"]
+      @@ tez_param ~name:"qty" ~desc:"amount in tez to redeem from sTEZ"
       @@ prefix "for"
       @@ Public_key_hash.source_param
            ~name:"src"
@@ -2330,8 +2330,8 @@ let commands_rw () =
            cctxt
          ->
         let open Lwt_result_syntax in
-        let* clst_contract_hash =
-          get_clst_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
+        let* stez_contract_hash =
+          get_stez_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
         in
         let contract = Contract.Implicit source in
         let arg = Some (Int64.to_string (Tez.to_mutez amount)) in
@@ -2339,7 +2339,7 @@ let commands_rw () =
         transfer_command
           Tez.zero
           contract
-          (Contract.Originated clst_contract_hash)
+          (Contract.Originated stez_contract_hash)
           cctxt
           ( fee,
             dry_run,
@@ -2356,7 +2356,7 @@ let commands_rw () =
             entrypoint,
             replace_by_fees,
             successor_level ));
-    (* End: CLST client commands *)
+    (* End: sTEZ client commands *)
     command
       ~group
       ~desc:"Set delegate parameters"
