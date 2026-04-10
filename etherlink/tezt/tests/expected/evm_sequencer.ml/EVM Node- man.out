@@ -912,9 +912,9 @@ Kernel commands:
     --enable-michelson-gas-refund: Enable flag enable_michelson_gas_refund in the installer
       config.
   
-  make l2 kernel installer config <kernel config file> [--minimum-base-fee-per-gas <111...>]
-      [--da-fee-per-byte <111...>] [--sequencer-pool-address <0x...>]
-      [--maximum-gas-per-transaction <30000...>]
+  make l2 kernel installer config <kernel config file> [--kernel-compat <bifrost|calypso|...>]
+      [--minimum-base-fee-per-gas <111...>] [--da-fee-per-byte <111...>]
+      [--sequencer-pool-address <0x...>] [--maximum-gas-per-transaction <30000...>]
       [--eth-bootstrap-balance <9999000000000000000000>] [--eth-bootstrap-account <0x...>]
       [--tez-bootstrap-balance <3800000>] [--tez-bootstrap-account <edp...>]
       [--tez-bootstrap-contract <KT1...,0x...,0x....>] [--set-code <0x...,0x....>]
@@ -923,6 +923,10 @@ Kernel commands:
     Produce a file containing the part of the kernel configuration instructions related to a
     particular L2 chain.
     <kernel config file>: File path where the config will be written to.
+    --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
+      specified kernel version. Supported values: mainnet-beta, mainnet-gamma, bifrost,
+      calypso, calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, farfadet-r2,
+      latest.
     --minimum-base-fee-per-gas <111...>: Value for minimum_base_fee_per_gas in the installer
       config.
     --da-fee-per-byte <111...>: Value for da_fee_per_byte in the installer config.
