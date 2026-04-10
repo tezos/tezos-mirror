@@ -36,7 +36,6 @@ use tezos_ethereum::{
         FromRlpBytes,
     },
 };
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::IsEvmNode;
@@ -146,7 +145,7 @@ pub fn read_single_tx_execution_input(
 
 fn get_evm_config<Host>(host: &mut Host) -> Result<EvmChainConfig, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let chain_id = retrieve_chain_id(host)?;
     Ok(fetch_pure_evm_config(host, chain_id))
@@ -159,7 +158,7 @@ fn block_constants<Host>(
     number: U256,
 ) -> Result<TezosXBlockConstants, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
     let da_fee_per_byte = retrieve_da_fee(host)?;
@@ -198,7 +197,7 @@ pub fn handle_run_transaction<Host>(
     input_data: SingleTxExecutionInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + Logging + WithGas,
+    Host: StorageV1 + WithGas,
 {
     let __attrs = [
         (
@@ -326,7 +325,7 @@ pub fn assemble_block<Host>(
     input_data: AssembleBlockInput,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + Logging + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
     let __attrs = [
         (

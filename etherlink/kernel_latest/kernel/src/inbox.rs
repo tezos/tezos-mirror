@@ -38,7 +38,7 @@ use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -60,7 +60,7 @@ pub fn read_input<Host, Mode: Parsable>(
     enable_fa_deposits: bool,
 ) -> Result<InputResult<Mode>, Error>
 where
-    Host: WasmHost + Logging,
+    Host: WasmHost,
 {
     let input = host.read_input()?;
 
@@ -68,7 +68,6 @@ where
         Some(input) => {
             *inbox_is_empty = false;
             Ok(InputResult::parse(
-                host,
                 input,
                 smart_rollup_address,
                 tezos_contracts,
@@ -94,7 +93,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode;
 
     fn handle_deposit<Host>(
         host: &mut Host,
@@ -103,7 +102,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode;
 
     fn handle_fa_deposit<Host>(
         host: &mut Host,
@@ -112,7 +111,7 @@ where
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode;
+        Host: StorageV1 + HostReveal + IsEvmNode;
 }
 
 impl InputHandler for ProxyInput {
@@ -126,7 +125,7 @@ impl InputHandler for ProxyInput {
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         match input {
             Self::SimpleTransaction(tx) => inbox_content
@@ -184,11 +183,10 @@ fn handle_blueprint_chunk<Host>(
     blueprint: UnsignedSequencerBlueprint,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
-    log!(host, Benchmarking, "Handling a blueprint input");
+    log!(Benchmarking, "Handling a blueprint input");
     log!(
-        host,
         Debug,
         "Storing chunk {} of sequencer blueprint number {}",
         blueprint.chunk_index,
@@ -209,14 +207,14 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode,
     {
-        log!(host, Debug, "Handling input in sequencer mode: {:?}", input);
+        log!(Debug, "Handling input in sequencer mode: {:?}", input);
         match input {
             Self::DelayedInput(tx) => {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
-                log!(host, Benchmarking, "Handling a delayed input");
+                log!(Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(
                     host,
                     TezosXTransaction::Ethereum(tx),
@@ -230,19 +228,14 @@ impl InputHandler for SequencerInput {
             Self::SequencerBlueprint(
                 InvalidNumberOfChunks | InvalidSignature | InvalidNumber | Unparsable,
             ) => {
-                log!(
-                    host,
-                    Debug,
-                    "Sequencer blueprint refused because: {:?}",
-                    input
-                );
+                log!(Debug, "Sequencer blueprint refused because: {:?}", input);
                 Ok(())
             }
             Self::DalSlotImportSignals(DalSlotImportSignals {
                 signals,
                 signature: _,
             }) => {
-                log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
+                log!(Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
                 let slot_size = params.slot_size;
                 let page_size = params.page_size;
@@ -253,7 +246,6 @@ impl InputHandler for SequencerInput {
                     let slot_indices = &signal.slot_indices;
                     for slot_index in slot_indices.0.iter() {
                         log!(
-                            host,
                             Debug,
                             "Handling a signal for slot index {} and published_level {}",
                             slot_index,
@@ -270,7 +262,6 @@ impl InputHandler for SequencerInput {
                             )
                         {
                             log!(
-                                host,
                                 Debug,
                                 "DAL slot is a blueprint of {} chunks",
                                 unsigned_seq_blueprints.len()
@@ -293,7 +284,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -309,7 +300,7 @@ impl InputHandler for SequencerInput {
         delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()>
     where
-        Host: StorageV1 + Logging + HostReveal + IsEvmNode,
+        Host: StorageV1 + HostReveal + IsEvmNode,
     {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -326,7 +317,7 @@ fn handle_transaction_chunk<Host>(
     data: Vec<u8>,
 ) -> Result<Option<Transaction>, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // If the number of chunks doesn't exist in the storage, the chunked
     // transaction wasn't created, so the chunk is ignored.
@@ -334,7 +325,6 @@ where
         Ok(x) => x,
         Err(_) => {
             log!(
-                host,
                 Info,
                 "Ignoring chunk {} of unknown transaction {}",
                 i,
@@ -401,7 +391,7 @@ fn handle_fa_deposit(
 
 fn force_kernel_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
     match upgrade::read_kernel_upgrade(host)? {
         Some(kernel_upgrade) => {
@@ -429,7 +419,7 @@ fn import_dal_attested_slots<Host>(
     slot_indices: &[u8],
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + HostReveal,
+    Host: StorageV1 + HostReveal,
 {
     // Skip if there are no attested slots
     if slot_indices.is_empty() {
@@ -440,7 +430,6 @@ where
         crate::blueprint_storage::read_next_blueprint_number(host)?;
 
     log!(
-        host,
         Debug,
         "Importing {} DAL attested slots for published level {}",
         slot_indices.len(),
@@ -449,7 +438,6 @@ where
 
     for slot_index in slot_indices {
         log!(
-            host,
             Debug,
             "Importing DAL slot {} at published level {}",
             slot_index,
@@ -467,7 +455,6 @@ where
             )
         {
             log!(
-                host,
                 Debug,
                 "DAL slot {} successfully parsed as {} unsigned blueprint chunks",
                 slot_index,
@@ -476,7 +463,6 @@ where
             for chunk in unsigned_seq_blueprints {
                 if let Err(e) = handle_blueprint_chunk(host, chunk) {
                     log!(
-                        host,
                         Error,
                         "Failed to handle blueprint chunk from slot {}: {:?}",
                         slot_index,
@@ -497,7 +483,7 @@ pub fn handle_input<Host, Mode>(
     inbox_content: &mut Mode::Inbox,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
     Mode: Parsable + InputHandler,
 {
     match input {
@@ -556,7 +542,7 @@ fn read_and_dispatch_input<Host, Mode, ChainConfig>(
     chain_configuration: &ChainConfig,
 ) -> anyhow::Result<ReadStatus>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
     Mode: Parsable + InputHandler,
     ChainConfig: ChainConfigTrait,
 {
@@ -574,12 +560,12 @@ where
                 // If `inbox_is_empty` is true, that means we haven't see
                 // any input in the current call of `read_inbox`. Therefore,
                 // the inbox of this level has already been consumed.
-                log!(host, Debug, "Inbox is empty, moving to stage 2.");
+                log!(Debug, "Inbox is empty, moving to stage 2.");
                 Ok(ReadStatus::FinishedIgnore)
             } else {
                 // If it's a `NoInput` and `inbox_is_empty` is false, we
                 // have simply reached the end of the inbox.
-                log!(host, Debug, "Reaching end of inbox.");
+                log!(Debug, "Reaching end of inbox.");
                 Ok(ReadStatus::FinishedRead)
             }
         }
@@ -607,7 +593,7 @@ pub fn read_proxy_inbox<Host>(
     chain_configuration: &EvmChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
     let mut res = ProxyInboxContent {
         transactions: vec![],
@@ -635,7 +621,6 @@ where
             // present in the inbox.
             {
                 log!(
-                    host,
                     Fatal,
                     "An input made `read_and_dispatch_input` fail, we ignore it ({:?})",
                     err
@@ -681,7 +666,7 @@ pub fn read_sequencer_inbox<Host, ChainConfig>(
     chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
     ChainConfig: ChainConfigTrait,
 {
     // The mutable variable is used to retrieve the information of whether the
@@ -713,7 +698,6 @@ where
         // full size. If it is not the case, asks for reboot.
         if parsing_context.allocated_ticks < maximum_ticks_for_sequencer_chunk() {
             log!(
-                host,
                 Benchmarking,
                 "Estimated ticks: {}",
                 maximum_allowed_ticks.saturating_sub(parsing_context.allocated_ticks)
@@ -737,7 +721,6 @@ where
             // present in the inbox.
             {
                 log!(
-                    host,
                     Fatal,
                     "An input made `read_and_dispatch_input` fail, we ignore it ({:?})",
                     err
@@ -746,7 +729,6 @@ where
             Ok(ReadStatus::Ongoing) => (),
             Ok(ReadStatus::FinishedRead) => {
                 log!(
-                    host,
                     Benchmarking,
                     "Estimated ticks: {}",
                     maximum_allowed_ticks.saturating_sub(parsing_context.allocated_ticks)

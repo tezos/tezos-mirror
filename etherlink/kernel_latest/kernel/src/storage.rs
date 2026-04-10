@@ -19,7 +19,7 @@ use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
 use tezos_crypto_rs::hash::ChainId;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::nom::NomReader;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
@@ -460,7 +460,7 @@ pub fn create_chunked_transaction<Host>(
     chunk_hashes: Vec<TransactionHash>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let chunked_transaction_path = chunked_transaction_path(tx_hash)?;
 
@@ -471,7 +471,6 @@ where
         > 0
     {
         log!(
-            host,
             Info,
             "The chunked transaction {} already exist, ignoring the message.\n",
             hex::encode(tx_hash)
@@ -591,12 +590,12 @@ pub fn read_burned_fees(host: &mut impl StorageV1) -> U256 {
 
 pub fn read_sequencer_pool_address<Host>(host: &Host) -> Option<H160>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut bytes = [0; std::mem::size_of::<H160>()];
     let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice())
     else {
-        log!(host, Debug, "No sequencer pool address set");
+        log!(Debug, "No sequencer pool address set");
         return None;
     };
     Some(bytes.into())
@@ -707,7 +706,7 @@ pub fn store_storage_version(
 
 pub fn read_storage_version<Host>(host: &mut Host) -> Result<StorageVersion, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Try the new /base/ path first, fall back to legacy /evm/ path
     // only when the new path does not exist yet.
@@ -723,7 +722,7 @@ where
         bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
     let version_u64 = u64::from_le_bytes(slice_of_bytes);
     let version = FromPrimitive::from_u64(version_u64).ok_or(Error::InvalidConversion)?;
-    log!(host, Debug, "Current storage version: {:?}", version);
+    log!(Debug, "Current storage version: {:?}", version);
     Ok(version)
 }
 
@@ -756,12 +755,11 @@ pub fn store_block_in_progress<Host>(
     bip: &BlockInProgress,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
     log!(
-        host,
         Benchmarking,
         "Storing Block In Progress of size {}",
         bytes.len()
@@ -778,7 +776,7 @@ pub fn read_block_in_progress<Host>(
     host: &Host,
 ) -> anyhow::Result<Option<BlockInProgress>>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
@@ -786,7 +784,6 @@ where
             .store_read_all(&path)
             .context("Failed to read current block in progress")?;
         log!(
-            host,
             Benchmarking,
             "Reading Block In Progress of size {}",
             bytes.len()
@@ -918,7 +915,7 @@ pub fn store_sequencer(
 
 pub fn clear_events<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     if host.store_has(&KEEP_EVENTS)?.is_some() {
         host.store_delete(&KEEP_EVENTS)?;
@@ -938,7 +935,7 @@ pub fn store_event(host: &mut impl StorageV1, event: &Event) -> anyhow::Result<(
 
 pub fn delayed_inbox_timeout<Host>(host: &Host) -> anyhow::Result<u64>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // The default timeout is 12 hours
     let default_timeout = 43200;
@@ -947,7 +944,6 @@ where
         store_read_slice(host, &EVM_DELAYED_INBOX_TIMEOUT, &mut buffer, 8)?;
         let timeout = u64::from_le_bytes(buffer);
         log!(
-            host,
             Debug,
             "Using delayed inbox timeout of {} seconds ({} hours)",
             timeout,
@@ -956,7 +952,6 @@ where
         Ok(timeout)
     } else {
         log!(
-            host,
             Debug,
             "Using default delayed inbox timeout of {} seconds ({} hours)",
             default_timeout,
@@ -968,23 +963,17 @@ where
 
 pub fn delayed_inbox_min_levels<Host>(host: &Host) -> anyhow::Result<u32>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let default_min_levels = 720;
     if host.store_has(&EVM_DELAYED_INBOX_MIN_LEVELS)?.is_some() {
         let mut buffer = [0u8; 4];
         store_read_slice(host, &EVM_DELAYED_INBOX_MIN_LEVELS, &mut buffer, 4)?;
         let min_levels = u32::from_le_bytes(buffer);
-        log!(
-            host,
-            Debug,
-            "Using delayed inbox minimum levels: {}",
-            min_levels
-        );
+        log!(Debug, "Using delayed inbox minimum levels: {}", min_levels);
         Ok(min_levels)
     } else {
         log!(
-            host,
             Debug,
             "Using default delayed inbox minimum levels: {}",
             default_min_levels
@@ -995,7 +984,7 @@ where
 
 pub fn read_tracer_input<Host>(host: &mut Host) -> anyhow::Result<Option<TracerInput>>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     if let Some(ValueType::Value) = host.store_has(&TRACER_INPUT).map_err(Error::from)? {
         let bytes = host
@@ -1011,7 +1000,7 @@ where
                 FromRlpBytes::from_rlp_bytes(&bytes)?;
             TracerInput::StructLogger(struct_logger_input)
         };
-        log!(host, Debug, "Tracer input found: {:?}", tracer);
+        log!(Debug, "Tracer input found: {:?}", tracer);
 
         Ok(Some(tracer))
     } else {

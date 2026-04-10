@@ -7,7 +7,7 @@ use crate::helpers::storage::concat;
 use evm_types::Error;
 
 use revm::primitives::B256;
-use tezos_evm_logging::{log, Level::Debug, Logging};
+use tezos_evm_logging::{log, Level::Debug};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
@@ -67,11 +67,11 @@ pub fn store_trace_failed<Host>(
     hash: &Option<B256>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = trace_tx_path(hash, &FAILED)?;
     host.store_write(&path, &[u8::from(!is_success)], 0)?;
-    log!(host, Debug, "Store trace info: is_success {is_success}");
+    log!(Debug, "Store trace info: is_success {is_success}");
     Ok(())
 }
 
@@ -81,11 +81,11 @@ pub fn store_return_value<Host>(
     hash: &Option<B256>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = trace_tx_path(hash, &RETURN_VALUE)?;
     host.store_write(&path, value, 0)?;
-    log!(host, Debug, "Store trace info: value {value:?}");
+    log!(Debug, "Store trace info: value {value:?}");
     Ok(())
 }
 
@@ -95,7 +95,7 @@ pub fn store_struct_log<Host>(
     hash: &Option<B256>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let encoded_strug_log = rlp::encode(struct_log);
 
@@ -106,6 +106,6 @@ where
         .push_value(host, &encoded_strug_log)
         .map_err(|err| Error::Custom(err.to_string()))?;
 
-    log!(host, Debug, "Store struct log: {encoded_strug_log:?}");
+    log!(Debug, "Store struct log: {encoded_strug_log:?}");
     Ok(())
 }

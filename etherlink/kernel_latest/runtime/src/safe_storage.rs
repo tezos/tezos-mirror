@@ -7,7 +7,6 @@
 
 use crate::extensions::WithGas;
 use crate::runtime::IsEvmNode;
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, Path, RefPath},
@@ -138,12 +137,6 @@ impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     ) -> Result<[u8; tezos_smart_rollup_core::STORE_HASH_SIZE], RuntimeError> {
         let path = safe_path(path)?;
         self.host.store_get_hash(&path)
-    }
-}
-
-impl<Host: Logging> Logging for SafeStorage<&mut Host> {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
     }
 }
 

@@ -27,11 +27,11 @@ use tezos_crypto_rs::{
     public_key::PublicKey,
 };
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, tracing::instrument, Level, Logging};
+use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_smart_rollup_host::{runtime::RuntimeError, storage::StorageV1};
 use tezosx_interfaces::Registry;
 
-pub struct EtherlinkVMDB<'a, Host: StorageV1 + Logging, R: Registry> {
+pub struct EtherlinkVMDB<'a, Host: StorageV1, R: Registry> {
     pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
@@ -59,7 +59,7 @@ enum AccountState {
 
 impl<'a, Host, R: Registry> EtherlinkVMDB<'a, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     #[instrument(skip_all)]
     pub fn new(
@@ -84,7 +84,7 @@ macro_rules! abort_on_error {
     ($obj:expr, $expr:expr, $msg:expr) => {
         if let Err(err) = $expr {
             $obj.abort();
-            log!($obj.host, Level::Error, "{} error: {err:?}", $msg);
+            log!(Level::Error, "{} error: {err:?}", $msg);
             return;
         }
     };
@@ -92,7 +92,7 @@ macro_rules! abort_on_error {
 
 impl<Host, R: Registry> EtherlinkVMDB<'_, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
@@ -173,10 +173,10 @@ where
 // as path not found is the only one that will produce a revert result
 impl<Host, R: Registry> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     fn log_node_message(&mut self, level: Level, message: &str) {
-        log!(self.host, level, "{message:?}");
+        log!(level, "{message:?}");
     }
 
     fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
@@ -233,7 +233,7 @@ where
 
 impl<Host, R: Registry> Database for EtherlinkVMDB<'_, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     type Error = Error;
 
@@ -279,7 +279,7 @@ where
 impl<Host, R: Registry> DatabaseCommitPrecompileStateChanges
     for EtherlinkVMDB<'_, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals;
@@ -325,7 +325,7 @@ where
 
 impl<Host, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     fn commit(&mut self, changes: AddressMap<Account>) {
         for (address, account) in changes {

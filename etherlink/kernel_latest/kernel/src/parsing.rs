@@ -31,7 +31,7 @@ use tezos_ethereum::{
     transaction::{TransactionHash, TRANSACTION_HASH_SIZE},
     tx_common::EthereumTransactionCommon,
 };
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_encoding::{
     inbox::{
@@ -177,7 +177,6 @@ pub trait Parsable {
     type Context;
 
     fn parse_external(
-        host: &mut impl Logging,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -281,12 +280,7 @@ impl ProxyInput {
 impl Parsable for ProxyInput {
     type Context = ();
 
-    fn parse_external(
-        _host: &mut impl Logging,
-        tag: &u8,
-        input: &[u8],
-        _: &mut (),
-    ) -> InputResult<Self> {
+    fn parse_external(tag: &u8, input: &[u8], _: &mut ()) -> InputResult<Self> {
         // External transactions are only allowed in proxy mode
         match *tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(input),
@@ -430,7 +424,6 @@ impl SequencerInput {
     }
 
     pub fn parse_dal_slot_import_signal(
-        host: &mut impl Logging,
         bytes: &[u8],
         context: &mut SequencerParsingContext,
     ) -> InputResult<Self> {
@@ -447,9 +440,7 @@ impl SequencerInput {
         // The kernel would then rely entirely on DalAttestedSlots internal
         // messages from the protocol.
         if context.legacy_dal_signals_disabled {
-            log!(
-                host,
-                Error,
+            log!(Error,
                 "Legacy DAL slot import signal ignored (disable_legacy_dal_signals is enabled)"
             );
             return InputResult::Unparsable;
@@ -640,7 +631,6 @@ impl Parsable for SequencerInput {
     type Context = SequencerParsingContext;
 
     fn parse_external(
-        host: &mut impl Logging,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -651,7 +641,7 @@ impl Parsable for SequencerInput {
                 Self::parse_sequencer_blueprint_input(input, context)
             }
             DAL_SLOT_IMPORT_SIGNAL_TAG => {
-                Self::parse_dal_slot_import_signal(host, input, context)
+                Self::parse_dal_slot_import_signal(input, context)
             }
             _ => InputResult::Unparsable,
         }
@@ -769,7 +759,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
     pub fn parse_external(
-        host: &mut impl Logging,
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,
@@ -788,7 +777,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
-            _ => Mode::parse_external(host, transaction_tag, remaining, context),
+            _ => Mode::parse_external(transaction_tag, remaining, context),
         }
     }
 
@@ -801,7 +790,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     fn parse_fa_deposit(
-        host: &mut impl Logging,
         ticket: FA2_1Ticket,
         routing_info: MichelsonBytes,
         inbox_level: u32,
@@ -813,12 +801,11 @@ impl<Mode: Parsable> InputResult<Mode> {
         Mode::on_fa_deposit(context);
         match FaDeposit::try_parse(ticket, routing_info, inbox_level, inbox_msg_id) {
             Ok((fa_deposit, chain_id)) => {
-                log!(host, Debug, "Parsed from input: {}", fa_deposit.display());
+                log!(Debug, "Parsed from input: {}", fa_deposit.display());
                 InputResult::Input(Input::FaDeposit((fa_deposit, chain_id)))
             }
             Err(err) => {
                 log!(
-                    host,
                     Debug,
                     "FA deposit ignored because of parsing errors: {}",
                     err
@@ -829,7 +816,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     fn parse_deposit(
-        host: &mut impl Logging,
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
         inbox_level: u32,
@@ -841,16 +827,11 @@ impl<Mode: Parsable> InputResult<Mode> {
         Mode::on_deposit(context);
         match Deposit::try_parse(ticket, receiver, inbox_level, inbox_msg_id) {
             Ok((deposit, chain_id)) => {
-                log!(host, Info, "Parsed from input: {}", deposit.display());
+                log!(Info, "Parsed from input: {}", deposit.display());
                 Self::Input(Input::Deposit((deposit, chain_id)))
             }
             Err(err) => {
-                log!(
-                    host,
-                    Info,
-                    "Deposit ignored because of parsing errors: {}",
-                    err
-                );
+                log!(Info, "Deposit ignored because of parsing errors: {}", err);
                 Self::Unparsable
             }
         }
@@ -858,7 +839,6 @@ impl<Mode: Parsable> InputResult<Mode> {
 
     #[allow(clippy::too_many_arguments)]
     fn parse_internal_transfer(
-        host: &mut impl Logging,
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -869,7 +849,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     ) -> Self {
         if transfer.destination.hash().as_ref() != smart_rollup_address {
             log!(
-                host,
                 Info,
                 "Deposit ignored because of different smart rollup address"
             );
@@ -885,7 +864,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                         Contract::Originated(kt1) => {
                             if Some(kt1) == tezos_contracts.ticketer.as_ref() {
                                 Self::parse_deposit(
-                                    host,
                                     ticket,
                                     receiver,
                                     inbox_level,
@@ -894,7 +872,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                                 )
                             } else if enable_fa_deposits {
                                 Self::parse_fa_deposit(
-                                    host,
                                     ticket,
                                     receiver,
                                     inbox_level,
@@ -903,7 +880,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                                 )
                             } else {
                                 log!(
-                                    host,
                                     Info,
                                     "FA deposit ignored because the feature is disabled"
                                 );
@@ -911,11 +887,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                             }
                         }
                         _ => {
-                            log!(
-                                host,
-                                Info,
-                                "Deposit ignored because of invalid ticketer"
-                            );
+                            log!(Info, "Deposit ignored because of invalid ticketer");
                             InputResult::Unparsable
                         }
                     }
@@ -945,7 +917,6 @@ impl<Mode: Parsable> InputResult<Mode> {
 
     #[allow(clippy::too_many_arguments)]
     fn parse_internal(
-        host: &mut impl Logging,
         message: InternalInboxMessage<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
@@ -959,7 +930,6 @@ impl<Mode: Parsable> InputResult<Mode> {
                 InputResult::Input(Input::Info(LevelWithInfo { level, info }))
             }
             InternalInboxMessage::Transfer(transfer) => Self::parse_internal_transfer(
-                host,
                 transfer,
                 smart_rollup_address,
                 tezos_contracts,
@@ -1008,9 +978,7 @@ impl<Mode: Parsable> InputResult<Mode> {
 
                 // Log summary
                 if rejected_publishers.is_empty() {
-                    log!(
-                        host,
-                        Debug,
+                    log!(Debug,
                         "For published level {}, accepted {}/{} DAL slots from {} publishers",
                         dal_attested.published_level,
                         slot_indices.len(),
@@ -1018,9 +986,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                         dal_attested.slots_by_publisher.len()
                     );
                 } else {
-                    log!(
-                        host,
-                        Debug,
+                    log!(Debug,
                         "For published level {}, accepted {}/{} DAL slots; not whitelisted: {}",
                         dal_attested.published_level,
                         slot_indices.len(),
@@ -1041,7 +1007,6 @@ impl<Mode: Parsable> InputResult<Mode> {
     }
 
     pub fn parse(
-        host: &mut impl Logging,
         input: Message,
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,
@@ -1057,10 +1022,9 @@ impl<Mode: Parsable> InputResult<Mode> {
         match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
-                    Self::parse_external(host, message, &smart_rollup_address, context)
+                    Self::parse_external(message, &smart_rollup_address, context)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
-                    host,
                     message,
                     &smart_rollup_address,
                     tezos_contracts,
@@ -1079,19 +1043,15 @@ impl<Mode: Parsable> InputResult<Mode> {
 pub mod tests {
     use super::*;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
-    use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::input::Message;
 
     const ZERO_SMART_ROLLUP_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn parse_unparsable_transaction() {
-        let mut host = MockKernelHost::default();
-
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
             InputResult::<ProxyInput>::parse(
-                &mut host,
                 message,
                 ZERO_SMART_ROLLUP_ADDRESS,
                 &TezosContracts {

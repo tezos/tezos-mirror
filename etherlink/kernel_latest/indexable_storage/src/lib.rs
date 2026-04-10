@@ -6,7 +6,7 @@
 use num_bigint::{BigUint, TryFromBigIntError};
 use rlp::DecoderError;
 use tezos_evm_logging::log;
-use tezos_evm_logging::{Level::Error, Logging};
+use tezos_evm_logging::Level::Error;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, PathError, RefPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -129,7 +129,7 @@ impl IndexableStorage {
     /// not exists, the storage is considered as empty and returns '0'.
     pub fn length<Host>(&self, host: &Host) -> Result<u64, IndexableStorageError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let path = concat(&self.path, &LENGTH)?;
         match read_u64_le(host, &path) {
@@ -147,7 +147,7 @@ impl IndexableStorage {
                 // bounds since the value has never been allocated before
             ) => Ok(0_u64),
             Err(e) => {
-                log!(host, Error, "Error in indexable storage: {}", e);
+                log!(Error, "Error in indexable storage: {}", e);
                 Err(e.into())
             }
         }
@@ -172,7 +172,7 @@ impl IndexableStorage {
         index: u64,
     ) -> Result<Vec<u8>, IndexableStorageError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let length = self.length(host)?;
         if index >= length {
@@ -214,7 +214,7 @@ impl IndexableStorage {
 
     pub fn clear<Host>(&self, host: &mut Host) -> Result<(), IndexableStorageError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let length = self.length(host)?;
         for index in 0..length {

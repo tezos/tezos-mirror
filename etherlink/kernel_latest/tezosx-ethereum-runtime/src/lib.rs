@@ -23,7 +23,6 @@ use revm_etherlink::{
     ExecutionOutcome, GasData, TransactionOrigin,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::{
     CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
@@ -154,7 +153,7 @@ fn execute_request<Host>(
     request: http::Request<Vec<u8>>,
 ) -> Result<ExecutionOutcome, TezosXRuntimeError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let parsed = url::parse_ethereum_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -232,7 +231,7 @@ impl RuntimeInterface for EthereumRuntime {
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
-        Host: StorageV1 + tezos_evm_logging::Logging,
+        Host: StorageV1,
     {
         // Step 1: Compute the alias address deterministically from the native address
         let mut hasher = Keccak256::new();
@@ -347,7 +346,7 @@ impl RuntimeInterface for EthereumRuntime {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         build_response(execute_request(self, registry, host, journal, request))
     }
@@ -394,7 +393,6 @@ mod tests {
         storage::{code::CodeStorage, world_state_handler::StorageAccount},
     };
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::storage::StorageV1;
     use tezosx_interfaces::{
@@ -418,7 +416,7 @@ mod tests {
             _gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             unimplemented!("not needed for this test")
         }
@@ -438,7 +436,7 @@ mod tests {
             _request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             unimplemented!("not needed for this test")
         }

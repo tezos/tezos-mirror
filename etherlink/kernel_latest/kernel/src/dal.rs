@@ -6,7 +6,7 @@ use crate::parsing::{parse_unsigned_blueprint_chunk, SequencerBlueprintRes};
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::reveal::HostReveal;
 
 const TAG_SIZE: usize = 1;
@@ -70,7 +70,6 @@ fn rlp_length(data: &[u8]) -> Result<usize, DecoderError> {
 }
 
 fn parse_unsigned_sequencer_blueprint(
-    host: &mut impl Logging,
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -91,13 +90,12 @@ fn parse_unsigned_sequencer_blueprint(
             SequencerBlueprintRes::Unparsable => (None, chunk_length + TAG_SIZE),
         }
     } else {
-        log!(host, Debug, "Read an invalid chunk from slot.");
+        log!(Debug, "Read an invalid chunk from slot.");
         (None, TAG_SIZE)
     }
 }
 
 fn parse_input(
-    host: &mut impl Logging,
     bytes: &[u8],
     next_blueprint_number: &U256,
 ) -> (Option<ParsedInput>, usize) {
@@ -109,11 +107,10 @@ fn parse_input(
         DAL_PADDING_TAG => (Some(ParsedInput::Padding), TAG_SIZE),
         DAL_BLUEPRINT_INPUT_TAG => {
             let bytes = &bytes[TAG_SIZE..];
-            parse_unsigned_sequencer_blueprint(host, bytes, next_blueprint_number)
+            parse_unsigned_sequencer_blueprint(bytes, next_blueprint_number)
         }
         invalid_tag => {
             log!(
-                host,
                 Debug,
                 "DAL slot contains an invalid message tag: '{}'.",
                 invalid_tag
@@ -125,7 +122,6 @@ fn parse_input(
 }
 
 fn parse_slot(
-    host: &mut impl Logging,
     slot: &[u8],
     next_blueprint_number: &U256,
 ) -> Vec<UnsignedSequencerBlueprint> {
@@ -147,8 +143,7 @@ fn parse_slot(
         if offset >= slot.len() {
             return buffer;
         };
-        let (next_input, length) =
-            parse_input(host, &slot[offset..], next_blueprint_number);
+        let (next_input, length) = parse_input(&slot[offset..], next_blueprint_number);
 
         match next_input {
             None => return buffer, // Once an unparsable input has been read,
@@ -174,13 +169,12 @@ pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host>(
     published_level: u32,
 ) -> Option<Vec<UnsignedSequencerBlueprint>>
 where
-    Host: HostReveal + Logging,
+    Host: HostReveal,
 {
     if let Some(slot) =
         import_dal_slot(host, slot_size, page_size, published_level, slot_index)
     {
         log!(
-            host,
             Debug,
             "DAL slot at level {} and index {} successfully imported",
             published_level,
@@ -191,9 +185,8 @@ where
         // size, we need to remove this padding before parsing the
         // slot as a blueprint chunk.
 
-        let chunks = parse_slot(host, &slot, next_blueprint_number);
+        let chunks = parse_slot(&slot, next_blueprint_number);
         log!(
-            host,
             Debug,
             "DAL slot successfully parsed as {} unsigned blueprint chunks",
             chunks.len()
@@ -201,7 +194,6 @@ where
         Some(chunks)
     } else {
         log!(
-            host,
             Debug,
             "Slot {} at level {} is invalid",
             slot_index,

@@ -32,7 +32,6 @@ use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_ethereum::block::EthBlock;
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::{evm_node_flag, IsEvmNode};
 use tezos_smart_rollup::storage::path::RefPath;
@@ -307,9 +306,9 @@ fn migrate_to<Host>(
     version: StorageVersion,
 ) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
-    log!(host, Info, "Migrating to {:?}", version);
+    log!(Info, "Migrating to {:?}", version);
     match version {
         StorageVersion::V11 => anyhow::bail!(Error::UpgradeError(
             UpgradeProcessError::InternalUpgrade("V11 has no predecessor"),
@@ -862,7 +861,7 @@ where
 //
 fn migration<Host>(host: &mut Host) -> anyhow::Result<MigrationStatus>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     match read_storage_version(host)?.next() {
         Some(next_version) => {
@@ -885,7 +884,7 @@ where
 
 pub fn storage_migration<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     let migration_result = migration(host);
     migration_result.map_err(|_| Error::UpgradeError(UpgradeProcessError::Fallback))

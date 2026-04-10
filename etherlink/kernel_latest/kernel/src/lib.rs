@@ -29,7 +29,7 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::{IsEvmNode, KernelHost};
 use tezos_smart_rollup::entrypoint;
@@ -85,14 +85,10 @@ const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 fn switch_to_public_rollup<Host>(host: &mut Host) -> Result<(), Error>
 where
-    Host: StorageV1 + WasmHost + Logging,
+    Host: StorageV1 + WasmHost,
 {
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
-        log!(
-            host,
-            Info,
-            "Submitting outbox message to make the rollup public."
-        );
+        log!(Info, "Submitting outbox message to make the rollup public.");
         let whitelist_update: OutboxMessage<_> =
             OutboxMessage::<MichelsonUnit>::WhitelistUpdate(
                 OutboxMessageWhitelistUpdate { whitelist: None },
@@ -109,9 +105,9 @@ where
 #[trace_kernel]
 pub fn stage_zero<Host>(host: &mut Host) -> Result<MigrationStatus, Error>
 where
-    Host: StorageV1 + WasmHost + Logging + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
-    log!(host, Debug, "Entering stage zero.");
+    log!(Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     switch_to_public_rollup(host)?;
     storage_migration(host)
@@ -129,11 +125,11 @@ pub fn stage_one<Host>(
     configuration: &mut Configuration,
 ) -> Result<StageOneStatus, anyhow::Error>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost + IsEvmNode,
+    Host: StorageV1 + HostReveal + WasmHost + IsEvmNode,
 {
-    log!(host, Debug, "Entering stage one.");
-    log!(host, Debug, "Chain Configuration: {}", chain_config);
-    log!(host, Debug, "Configuration: {}", configuration);
+    log!(Debug, "Entering stage one.");
+    log!(Debug, "Chain Configuration: {}", chain_config);
+    log!(Debug, "Configuration: {}", configuration);
 
     fetch_blueprints(host, smart_rollup_address, chain_config, configuration)
 }
@@ -177,7 +173,7 @@ fn retrieve_chain_id(host: &mut impl StorageV1) -> Result<U256, Error> {
 
 fn retrieve_minimum_base_fee_per_gas<Host>(host: &mut Host) -> U256
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match read_minimum_base_fee_per_gas(host) {
         Ok(minimum_base_fee_per_gas) => minimum_base_fee_per_gas,
@@ -186,12 +182,7 @@ where
             if let Err(err) =
                 store_minimum_base_fee_per_gas(host, minimum_base_fee_per_gas)
             {
-                log!(
-                    host,
-                    Error,
-                    "Can't store the default minimum_base_fee: {:?}",
-                    err
-                );
+                log!(Error, "Can't store the default minimum_base_fee: {:?}", err);
             }
             minimum_base_fee_per_gas
         }
@@ -232,7 +223,7 @@ fn retrieve_block_fees<Host>(
     host: &mut Host,
 ) -> Result<tezos_ethereum::block::BlockFees, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let minimum_base_fee_per_gas = retrieve_minimum_base_fee_per_gas(host);
     let base_fee_per_gas = retrieve_base_fee_per_gas(host, minimum_base_fee_per_gas);
@@ -248,7 +239,7 @@ where
 
 pub fn run<Host>(host: &mut Host) -> Result<(), anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
@@ -274,12 +265,7 @@ where
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
             let configuration = fetch_configuration(host);
-            log!(
-                host,
-                Info,
-                "Configuration after migration: {}",
-                configuration
-            );
+            log!(Info, "Configuration after migration: {}", configuration);
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
@@ -341,7 +327,7 @@ where
     // Start processing blueprints
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
-        log!(host, Debug, "Entering stage two.");
+        log!(Debug, "Entering stage two.");
         if let block::ComputationResult::RebootNeeded = match chain_configuration {
             chains::ChainConfig::Evm(chain_configuration) => block::produce(
                 host,
@@ -366,12 +352,12 @@ where
 
     #[cfg(feature = "benchmark-bypass-stage2")]
     {
-        log!(host, Benchmarking, "Shortcircuiting computation");
+        log!(Benchmarking, "Shortcircuiting computation");
         #[cfg(not(target_arch = "riscv64"))]
         return Ok(());
     }
 
-    log!(host, Debug, "End of kernel run.");
+    log!(Debug, "End of kernel run.");
     Ok(())
 }
 
@@ -446,7 +432,7 @@ where
     match run(&mut host) {
         Ok(()) => (),
         Err(err) => {
-            log!(&host, Fatal, "The kernel produced an error: {:?}", err);
+            log!(Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }

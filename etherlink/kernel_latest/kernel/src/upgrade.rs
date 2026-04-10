@@ -23,7 +23,7 @@ use tezos_ethereum::rlp_helpers::decode_field;
 use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::IsEvmNode;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -88,10 +88,9 @@ pub fn store_kernel_upgrade<Host>(
     kernel_upgrade: &KernelUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(
-        host,
         Info,
         "An upgrade to {} is planned for {}",
         hex::encode(kernel_upgrade.preimage_hash),
@@ -122,9 +121,9 @@ pub fn upgrade<Host>(
     root_hash: [u8; PREIMAGE_HASH_SIZE],
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + HostReveal + WasmHost,
+    Host: StorageV1 + HostReveal + WasmHost,
 {
-    log!(host, Info, "Kernel upgrade initialisation.");
+    log!(Info, "Kernel upgrade initialisation.");
 
     backup_current_kernel(host)?;
     let config = upgrade_reveal_flow(root_hash);
@@ -140,7 +139,7 @@ where
     // or not.
     host.mark_for_reboot()?;
 
-    log!(host, Info, "Kernel is ready to be upgraded.");
+    log!(Info, "Kernel is ready to be upgraded.");
     Ok(())
 }
 
@@ -201,10 +200,9 @@ pub fn store_sequencer_upgrade<Host>(
     sequencer_upgrade: SequencerUpgrade,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + IsEvmNode,
+    Host: StorageV1 + IsEvmNode,
 {
     log!(
-        host,
         Info,
         "A sequencer upgrade to {} is planned for {}",
         sequencer_upgrade.sequencer.to_b58check(),
@@ -235,21 +233,21 @@ fn sequencer_upgrade<Host>(
     sequencer: &PublicKey,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
-    log!(host, Info, "sequencer upgrade initialisation.");
+    log!(Info, "sequencer upgrade initialisation.");
 
     store_sequencer(host, sequencer)?;
     store_sequencer_pool_address(host, pool_address)?;
     delete_sequencer_upgrade(host)?;
     delete_sequencer_key_change(host)?;
-    log!(host, Info, "Sequencer has been updated.");
+    log!(Info, "Sequencer has been updated.");
     Ok(())
 }
 
 pub fn possible_sequencer_upgrade<Host>(host: &mut Host) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
@@ -281,14 +279,14 @@ fn sequencer_key_change<Host>(
     key_change: EVMBasedSequencerKeyChange,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
-    log!(host, Info, "EVM based sequencer key change initialisation.");
+    log!(Info, "EVM based sequencer key change initialisation.");
 
     store_sequencer(host, key_change.sequencer_key())?;
     delete_sequencer_key_change(host)?;
 
-    log!(host, Info, "Sequencer key has been updated.");
+    log!(Info, "Sequencer key has been updated.");
     Ok(())
 }
 
@@ -297,7 +295,7 @@ pub fn possible_sequencer_key_change<Host>(
     evm_timestamp: Timestamp,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let upgrade = read_sequencer_key_change(host)?;
     if let Some(upgrade) = upgrade {

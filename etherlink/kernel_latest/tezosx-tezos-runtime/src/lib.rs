@@ -10,7 +10,6 @@ use tezos_crypto_rs::{
     blake2b, hash::ChainId, hash::ContractKt1Hash, hash::HashTrait, hash::OperationHash,
 };
 use tezos_data_encoding::{enc::BinWriter, types::Zarith};
-use tezos_evm_logging::Logging;
 use tezos_execution::{
     account_storage::{TezlinkAccount, TezosOriginatedAccount},
     context::Context,
@@ -104,7 +103,7 @@ fn execute_request<Host>(
     consumed_milligas: &mut u64,
 ) -> Result<TransferSuccess, TezosXRuntimeError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let parsed = url::parse_tezos_url(request.uri())?;
     let hdrs = headers::parse_request_headers(request.headers())?;
@@ -204,7 +203,7 @@ impl RuntimeInterface for TezosRuntime {
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         // Gas costs in milligas, charged incrementally so we fail early.
         let mut remaining = gas_remaining;
@@ -263,7 +262,7 @@ impl RuntimeInterface for TezosRuntime {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         // Default to max: if execute_request fails before writing the
         // actual value (early setup error), the caller sees full gas
@@ -457,7 +456,7 @@ mod tests {
             _gas_remaining: u64,
         ) -> Result<(String, u64), TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }
@@ -477,7 +476,7 @@ mod tests {
             _request: http::Request<Vec<u8>>,
         ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
         where
-            Host: StorageV1 + Logging,
+            Host: StorageV1,
         {
             Err(TezosXRuntimeError::Custom("stub".into()))
         }

@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use rlp::Encodable;
-use tezos_evm_logging::{log, Level::Info, Logging};
+use tezos_evm_logging::{log, Level::Info};
 use tezos_smart_rollup_host::{path::OwnedPath, storage::StorageV1};
 
 use crate::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
@@ -16,10 +16,9 @@ pub fn store_sequencer_key_change<Host>(
     sequencer_key_change: SequencerKeyChange,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     log!(
-        host,
         Info,
         "An L2 based sequencer key change is planned: {}",
         sequencer_key_change

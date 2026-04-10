@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_evm_logging::Logging;
 use tezos_evm_runtime::{
     extensions::WithGas,
     runtime::{IsEvmNode, MockKernelHost},
@@ -207,12 +206,6 @@ impl WasmHost for EvalHost {
 }
 
 impl SdkRuntime for EvalHost {}
-
-impl Logging for EvalHost {
-    fn verbosity(&self) -> tezos_evm_logging::Level {
-        self.host.verbosity()
-    }
-}
 
 // This is a blank implementation on purpose, as this is not useful for the
 // evaluation

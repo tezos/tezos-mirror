@@ -4,6 +4,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::cell::Cell;
+
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
@@ -78,12 +80,27 @@ impl std::fmt::Display for Level {
     }
 }
 
+std::thread_local! {
+    /// Globally set verbosity level
+    static VERBOSITY: Cell<Level> = Cell::new(Level::default());
+}
+
+/// Set the global logging verbosity level.
+pub fn set_global_verbosity(level: Level) {
+    VERBOSITY.set(level)
+}
+
+/// Get the globally set verbosity level.
+#[doc(hidden)]
+pub fn get_verbosity_level() -> Level {
+    VERBOSITY.get()
+}
+
 #[cfg(feature = "alloc")]
 #[macro_export]
 macro_rules! log {
-    ($host: expr, $level: expr, $fmt: expr $(, $arg:expr)*)  => {{
-        use $crate::Logging as _;
-        if $host.verbosity() >= $level {
+    ($level: expr, $fmt: expr $(, $arg:expr)*)  => {{
+        if $crate::get_verbosity_level() >= $level {
             let msg = format!("[{}] {}\n", $level, format_args!($fmt $(, $arg)*));
             $crate::debug_str!(&msg);
         }
@@ -204,8 +221,4 @@ pub mod tracing {
             $f
         }};
     }
-}
-
-pub trait Logging {
-    fn verbosity(&self) -> Level;
 }

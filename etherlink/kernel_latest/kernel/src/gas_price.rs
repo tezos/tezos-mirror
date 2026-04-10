@@ -168,7 +168,6 @@ mod test {
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
-    use tezos_evm_logging::Logging;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_execution::context::Context;
     use tezos_smart_rollup_host::storage::StorageV1;
@@ -288,7 +287,7 @@ mod test {
 
     fn load_gas_price<Host>(host: &mut Host) -> (U256, U256)
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let bf = crate::retrieve_block_fees(host).unwrap();
 

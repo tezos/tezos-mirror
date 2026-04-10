@@ -11,7 +11,6 @@ use revm::{
     primitives::Bytes,
 };
 
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -39,7 +38,7 @@ pub(crate) fn global_counter_precompile<'j, CTX, Host, R>(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
-    Host: StorageV1 + Logging + 'j,
+    Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {

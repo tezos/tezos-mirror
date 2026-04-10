@@ -29,7 +29,6 @@ use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{__trace_kernel, log, Level::*};
 use tezos_evm_runtime::extensions::WithGas;
 use tezos_evm_runtime::runtime::IsEvmNode;
@@ -114,14 +113,9 @@ pub fn compute<Host, ChainConfig: ChainConfigTrait>(
     tracer_input: Option<TracerInput>,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
-    Host: StorageV1 + Logging + WithGas,
+    Host: StorageV1 + WithGas,
 {
-    log!(
-        host,
-        Debug,
-        "Queue length {}.",
-        block_in_progress.queue_length()
-    );
+    log!(Debug, "Queue length {}.", block_in_progress.queue_length());
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
@@ -129,7 +123,7 @@ where
         let is_delayed = transaction.is_delayed();
         let data_size: u64 = transaction.data_size();
 
-        log!(host, Benchmarking, "Transaction data size: {}", data_size);
+        log!(Benchmarking, "Transaction data size: {}", data_size);
 
         if !chain_config.can_fit_in_reboot(
             host.executed_gas().into(),
@@ -137,7 +131,6 @@ where
             block_constants,
         )? {
             log!(
-                host,
                 Debug,
                 "There are not enough gas left in the current kernel run \
                  to try the transaction, but it will be retried after reboot."
@@ -204,7 +197,7 @@ pub fn bip_from_blueprint<Host, ChainConfig: ChainConfigTrait>(
     blueprint: Blueprint,
 ) -> BlockInProgress
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
@@ -216,7 +209,7 @@ where
         gas_price,
     );
 
-    tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
+    tezos_evm_logging::log!(tezos_evm_logging::Level::Debug, "bip: {bip:?}");
     bip
 }
 
@@ -224,7 +217,7 @@ fn get_next_bip_info<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
 ) -> (U256, Timestamp, ChainConfig::ChainHeader)
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match read_current_block_header(host) {
         Err(_) => (
@@ -254,9 +247,9 @@ fn build_next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
 where
-    Host: HostReveal + StorageV1 + WasmHost + Logging,
+    Host: HostReveal + StorageV1 + WasmHost,
 {
-    log!(host, Debug, "Next blueprint number: {:?}", next_bip_number);
+    log!(Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) = read_blueprint::<_, ChainConfig>(
         host,
         config,
@@ -264,7 +257,7 @@ where
         timestamp,
         chain_header,
     )?;
-    log!(host, Benchmarking, "Size of blueprint: {}", size);
+    log!(Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
@@ -308,7 +301,7 @@ pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
     chain_header: ChainConfig::ChainHeader,
 ) -> anyhow::Result<BlockComputationResult>
 where
-    Host: StorageV1 + Logging + WithGas,
+    Host: StorageV1 + WithGas,
 {
     let constants: ChainConfig::BlockConstants =
         chain_config.constants(host, &block_in_progress, da_fee_per_byte, coinbase)?;
@@ -324,7 +317,7 @@ where
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
-            log!(host, Info, "Ask for reboot.");
+            log!(Info, "Ask for reboot.");
             storage::store_block_in_progress(host, &block_in_progress)?;
             Ok(BlockComputationResult::RebootNeeded)
         }
@@ -355,10 +348,9 @@ fn revert_block<Host>(
     error: anyhow::Error,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     log!(
-        safe_host,
         Error,
         "Block{} {} failed with '{:?}'. Reverting.",
         match block_in_progress_provenance {
@@ -383,7 +375,7 @@ fn clean_delayed_transactions<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     for hash in delayed_txs {
         delayed_inbox.delete(host, hash.into())?;
@@ -400,7 +392,7 @@ pub fn promote_block<Host>(
     delayed_txs: Vec<TransactionHash>,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging + WasmHost + IsEvmNode,
+    Host: StorageV1 + WasmHost + IsEvmNode,
 {
     if let BlockInProgressProvenance::Storage = block_in_progress_provenance {
         storage::delete_block_in_progress(safe_host)?;
@@ -417,12 +409,7 @@ where
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.
     let level = if written > 0 { Info } else { Debug };
-    log!(
-        safe_host,
-        level,
-        "Flushed outbox queue messages ({} flushed)",
-        written
-    );
+    log!(level, "Flushed outbox queue messages ({} flushed)", written);
 
     if let ConfigurationMode::Sequencer { delayed_inbox, .. } = &mut config.mode {
         clean_delayed_transactions(safe_host.host, delayed_inbox, delayed_txs)?;
@@ -440,7 +427,7 @@ pub fn produce<Host, ChainConfig: ChainConfigTrait>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ComputationResult, anyhow::Error>
 where
-    Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+    Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
 {
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
@@ -468,7 +455,7 @@ where
     let (block_in_progress_provenance, block_in_progress) =
         match read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
-                log!(safe_host, Debug, "Restauring BIP from storage.");
+                log!(Debug, "Restauring BIP from storage.");
                 (BlockInProgressProvenance::Storage, block_in_progress)
             }
             None => {
@@ -476,29 +463,28 @@ where
                 // because the sequencer pool address is located outside of `/evm/world_state`.
                 upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
-                log!(safe_host, Debug, "Creating BIP from Blueprint.");
+                log!(Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
-                let block_in_progress = match build_next_bip_from_blueprints::<
-                    Host,
-                    ChainConfig,
-                >(
-                    safe_host.host,
-                    chain_config,
-                    next_bip_number,
-                    timestamp,
-                    &chain_header,
-                    config,
-                    &kernel_upgrade,
-                )? {
-                    BlueprintParsing::Next(bip) => {
-                        log!(safe_host, Debug, "Creating BIP from Blueprint: Success.");
-                        bip
-                    }
-                    BlueprintParsing::None => {
-                        log!(safe_host, Debug, "Creating BIP from Blueprint: Failure.");
-                        return Ok(ComputationResult::Finished);
-                    }
-                };
+                let block_in_progress =
+                    match build_next_bip_from_blueprints::<Host, ChainConfig>(
+                        safe_host.host,
+                        chain_config,
+                        next_bip_number,
+                        timestamp,
+                        &chain_header,
+                        config,
+                        &kernel_upgrade,
+                    )? {
+                        BlueprintParsing::Next(bip) => {
+                            log!(Debug, "Creating BIP from Blueprint: Success.");
+                            bip
+                        }
+                        BlueprintParsing::None => {
+                            log!(Debug, "Creating BIP from Blueprint: Failure.");
+                            return Ok(ComputationResult::Finished);
+                        }
+                    };
+
                 // We are going to execute a new block, we copy the storage to allow
                 // to revert if the block fails.
                 safe_host.start()?;
@@ -631,7 +617,7 @@ mod tests {
 
     fn read_current_number<Host>(host: &Host) -> anyhow::Result<U256>
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
@@ -985,7 +971,7 @@ mod tests {
         start_number: U256,
         blueprints: Vec<Blueprint>,
     ) where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(
@@ -1001,7 +987,7 @@ mod tests {
         host: &mut Host,
         blueprints: Vec<Blueprint>,
     ) where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         store_blueprints_from_number::<Host, ChainConfig>(host, U256::zero(), blueprints)
     }
@@ -1020,7 +1006,7 @@ mod tests {
 
     fn produce_block_with_several_valid_txs<Host>(host: &mut Host)
     where
-        Host: HostReveal + StorageV1 + WasmHost + Logging + WithGas + IsEvmNode,
+        Host: HostReveal + StorageV1 + WasmHost + WithGas + IsEvmNode,
     {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -1888,7 +1874,7 @@ mod tests {
 
     fn first_block<MockHost>(host: &mut MockHost) -> TezosXBlockConstants
     where
-        MockHost: StorageV1 + Logging,
+        MockHost: StorageV1,
     {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
@@ -2063,7 +2049,7 @@ mod tests {
 
     fn check_current_block_number<Host>(host: &mut Host, nb: usize)
     where
-        Host: StorageV1 + Logging,
+        Host: StorageV1,
     {
         let current_nb =
             read_current_number(host).expect("Should have manage to check block number");

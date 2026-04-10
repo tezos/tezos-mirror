@@ -26,7 +26,7 @@ use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
     decode_timestamp,
 };
-use tezos_evm_logging::{log, Level::*, Logging};
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
@@ -300,7 +300,7 @@ fn store_blueprint_nb_chunks<Host>(
     nb_chunks: u16,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = blueprint_nb_chunks_path(blueprint_path)?;
     let bytes = nb_chunks.to_le_bytes();
@@ -312,7 +312,7 @@ pub fn store_sequencer_blueprint<Host>(
     blueprint: UnsignedSequencerBlueprint,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let blueprint_path = blueprint_path(blueprint.number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
@@ -330,7 +330,7 @@ pub fn store_inbox_blueprint_by_number<Host>(
     number: U256,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
@@ -346,7 +346,7 @@ pub fn store_inbox_blueprint<Host>(
     blueprint: Blueprint,
 ) -> anyhow::Result<()>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
@@ -355,7 +355,7 @@ where
 #[inline(always)]
 pub fn read_next_blueprint_number<Host>(host: &Host) -> Result<U256, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match read_current_blueprint_header(host) {
         Ok(blueprint_header) => Ok(blueprint_header.number + 1),
@@ -373,7 +373,7 @@ pub fn store_forced_blueprint<Host>(
     number: U256,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
@@ -499,7 +499,7 @@ pub fn store_current_block_header<Host>(
     current_block_header: &BlockHeader<ChainHeader>,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     store_rlp(current_block_header, host, &EVM_CURRENT_BLOCK_HEADER).map_err(Error::from)
 }
@@ -508,14 +508,14 @@ pub fn read_current_block_header<Host, H: Decodable>(
     host: &Host,
 ) -> Result<BlockHeader<H>, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     Ok(read_rlp(host, &EVM_CURRENT_BLOCK_HEADER)?)
 }
 
 pub fn read_current_blueprint_header<Host>(host: &Host) -> Result<BlueprintHeader, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
@@ -526,14 +526,14 @@ pub fn store_current_tez_block_header<Host>(
     header: &TezBlockHeader,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     store_rlp(header, host, &EVM_CURRENT_TEZ_BLOCK_HEADER).map_err(Error::from)
 }
 
 pub fn read_current_tez_block_header<Host>(host: &Host) -> Result<TezBlockHeader, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     Ok(read_rlp(host, &EVM_CURRENT_TEZ_BLOCK_HEADER)?)
 }
@@ -580,7 +580,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host>(
     current_blueprint_size: usize,
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
@@ -591,9 +591,7 @@ where
             Some(tx) => {
                 if let TransactionContent::TezosDelayed(_) = &tx.0.content {
                     if !experimental_features.is_tezos_runtime_enabled() {
-                        log!(
-                            host,
-                            Error,
+                        log!(Error,
                             "TezosDelayed transaction found in delayed inbox while Tezos runtime is disabled. Skipping."
                         );
                         continue;
@@ -631,14 +629,13 @@ where
 }
 
 fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
-    host: &mut impl Logging,
     transactions: Vec<Vec<u8>>,
     blueprint_version: u8,
 ) -> anyhow::Result<Vec<TezosXTransaction>> {
     let mut result = vec![];
     for tx_common in transactions.iter() {
         let transaction =
-            ChainConfig::transaction_from_bytes(host, tx_common, blueprint_version)?;
+            ChainConfig::transaction_from_bytes(tx_common, blueprint_version)?;
         result.push(transaction)
     }
     Ok(result)
@@ -651,7 +648,7 @@ pub fn fetch_delayed_txs<Host, ChainConfig: ChainConfigTrait>(
     current_blueprint_size: usize,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let (mut delayed_txs, total_size) =
         match ChainConfig::fetch_hashes_from_delayed_inbox(
@@ -672,7 +669,6 @@ where
         };
 
     let transactions_with_hashes = transactions_from_bytes::<ChainConfig>(
-        host,
         blueprint_with_hashes.transactions,
         blueprint_with_hashes.version,
     )?;
@@ -706,7 +702,7 @@ fn parse_and_validate_blueprint<Host, ChainConfig: ChainConfigTrait>(
     head_timestamp: Timestamp,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
@@ -748,7 +744,6 @@ where
                 // so it must not fails on this.
                 if !evm_node_flag && blueprint_with_hashes.timestamp > accepted_bound {
                     log!(
-                        host,
                         Debug,
                         "Accepted bound is {}, Blueprint.timestamp is {}",
                         accepted_bound,
@@ -775,10 +770,9 @@ fn invalidate_blueprint<Host>(
     error: &BlueprintValidity,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     log!(
-        host,
         Info,
         "Deleting invalid blueprint at path {}, error: {:?}",
         blueprint_path,
@@ -797,7 +791,7 @@ fn read_all_chunks_and_validate<Host, ChainConfig: ChainConfigTrait>(
     previous_timestamp: Timestamp,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let mut chunks = vec![];
     let mut size = 0;
@@ -853,7 +847,6 @@ where
                 validity
             {
                 log!(
-                    host,
                     Benchmarking,
                     "Number of transactions in blueprint: {}",
                     blueprint.transactions.len()
@@ -875,7 +868,7 @@ pub fn read_blueprint<Host, ChainConfig: ChainConfigTrait>(
     previous_chain_header: &ChainConfig::ChainHeader,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let blueprint_path = blueprint_path(number)?;
     let exists = blueprint_exists(host, &blueprint_path)?;
@@ -893,12 +886,7 @@ where
             )?;
             return Ok((None, 0));
         }
-        log!(
-            host,
-            Benchmarking,
-            "Number of chunks in blueprint: {}",
-            nb_chunks
-        );
+        log!(Benchmarking, "Number of chunks in blueprint: {}", nb_chunks);
         // All chunks are available
         let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
             host,
@@ -910,13 +898,8 @@ where
         )?;
         Ok((blueprint, size))
     } else {
-        log!(host, Benchmarking, "Number of chunks in blueprint: {}", 0);
-        log!(
-            host,
-            Benchmarking,
-            "Number of transactions in blueprint: {}",
-            0
-        );
+        log!(Benchmarking, "Number of chunks in blueprint: {}", 0);
+        log!(Benchmarking, "Number of transactions in blueprint: {}", 0);
         Ok((None, 0))
     }
 }
@@ -927,7 +910,7 @@ pub fn read_next_blueprint<Host>(
     config: &mut Configuration,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<_, EVMBlockHeader>(host) {
@@ -956,7 +939,7 @@ where
 
 pub fn drop_blueprint<Host>(host: &mut Host, number: U256) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let path = blueprint_path(number)?;
     delete_blueprint(host, &path)
@@ -967,7 +950,7 @@ pub fn delete_blueprint<Host>(
     blueprint_path: &OwnedPath,
 ) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let exists = blueprint_exists(host, blueprint_path)?;
     if !exists {
@@ -988,7 +971,7 @@ pub fn blueprint_exists<Host>(
     blueprint_path: &OwnedPath,
 ) -> Result<bool, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     host.store_has(&blueprint_nb_chunks_path(blueprint_path)?)
         .map_err(Error::from)
@@ -997,7 +980,7 @@ where
 
 pub fn clear_all_blueprints<Host>(host: &mut Host) -> Result<(), Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     increment_current_generation(host)?;
     Ok(())

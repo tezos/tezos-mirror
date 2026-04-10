@@ -5,7 +5,6 @@
 pub mod headers;
 
 use primitive_types::U256;
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_journal::TezosXJournal;
@@ -90,7 +89,7 @@ pub trait Registry {
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
 
     fn address_from_string(
         &self,
@@ -106,7 +105,7 @@ pub trait Registry {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
 }
 
 pub trait RuntimeInterface {
@@ -125,7 +124,7 @@ pub trait RuntimeInterface {
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
 
     /// Handle an incoming cross-runtime HTTP request.
     ///
@@ -145,7 +144,7 @@ pub trait RuntimeInterface {
         request: http::Request<Vec<u8>>,
     ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
     where
-        Host: StorageV1 + Logging;
+        Host: StorageV1;
 
     /// The URL host that identifies this runtime in HTTP requests routed
     /// by the registry (e.g. `"tezos"`, `"ethereum"`).

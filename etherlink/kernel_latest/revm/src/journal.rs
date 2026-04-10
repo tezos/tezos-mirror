@@ -33,7 +33,6 @@ use evm_types::{
 };
 use michelson_types::Withdrawal;
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::Logging;
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{path::OwnedPath, runtime::RuntimeError};
@@ -44,7 +43,7 @@ use tezosx_interfaces::{CrossRuntimeContext, Registry, RuntimeId};
 /// On each additional call, the depth of the journaled state is increased (`depth`) and a new journal is added.
 ///
 /// The journal contains every state change that happens within that call, making it possible to revert changes made in a specific call.
-pub struct Journal<'a, Host: StorageV1 + Logging, R: Registry> {
+pub struct Journal<'a, Host: StorageV1, R: Registry> {
     /// Database
     pub database: EtherlinkVMDB<'a, Host, R>,
 
@@ -57,7 +56,7 @@ pub struct Journal<'a, Host: StorageV1 + Logging, R: Registry> {
     deferred_error: Option<RuntimeError>,
 }
 
-impl<'a, Host: StorageV1 + Logging, R: Registry> Journal<'a, Host, R> {
+impl<'a, Host: StorageV1, R: Registry> Journal<'a, Host, R> {
     pub fn new_with_inner(
         database: EtherlinkVMDB<'a, Host, R>,
         journal: &'a mut TezosXJournal,
@@ -77,7 +76,7 @@ impl<'a, Host: StorageV1 + Logging, R: Registry> Journal<'a, Host, R> {
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<'a, Host: StorageV1 + Logging, R: Registry> JournalTr for Journal<'a, Host, R> {
+impl<'a, Host: StorageV1, R: Registry> JournalTr for Journal<'a, Host, R> {
     type Database = EtherlinkVMDB<'a, Host, R>;
     type State = EvmState;
     type JournaledAccount<'b>
@@ -472,7 +471,7 @@ impl<'a, Host: StorageV1 + Logging, R: Registry> JournalTr for Journal<'a, Host,
     }
 }
 
-impl<Host: StorageV1 + Logging, R: Registry> JournalExt for Journal<'_, Host, R> {
+impl<Host: StorageV1, R: Registry> JournalExt for Journal<'_, Host, R> {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
         &self.journal.evm.inner.journal
@@ -489,7 +488,7 @@ impl<Host: StorageV1 + Logging, R: Registry> JournalExt for Journal<'_, Host, R>
     }
 }
 
-impl<Host: StorageV1 + Logging, R: Registry> Journal<'_, Host, R> {
+impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     pub fn get_and_increment_global_counter(
         &mut self,
     ) -> Result<U256, CustomPrecompileError> {
@@ -604,7 +603,7 @@ pub trait CrossRuntimeCall {
 
 impl<'a, Host, R: Registry> CrossRuntimeCall for Journal<'a, Host, R>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     fn tezosx_resolve_source_alias(
         &mut self,
@@ -679,7 +678,7 @@ pub fn commit_evm_journal_from_external<Host>(
     journal: &mut TezosXJournal,
 ) -> Result<Vec<Withdrawal>, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let db = EtherlinkVMDB::new(host, registry, block_constants)?;
     let mut journal = Journal::new_with_inner(db, journal);

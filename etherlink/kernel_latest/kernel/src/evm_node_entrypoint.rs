@@ -91,7 +91,6 @@ where
         Ok(Some(input)) => input,
         Ok(None) => {
             log!(
-                host,
                 Error,
                 "No single transaction execution input found in storage"
             );
@@ -99,7 +98,6 @@ where
         }
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Error while reading single transaction execution input: {:?}",
                 err
@@ -111,7 +109,6 @@ where
         Ok(()) => (),
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Error during single transaction execution: {:?}",
                 err
@@ -136,23 +133,18 @@ where
     let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {
         Ok(Some(input)) => input,
         Ok(None) => {
-            log!(host, Error, "No assemble block input found in storage");
+            log!(Error, "No assemble block input found in storage");
             return;
         }
         Err(err) => {
-            log!(
-                host,
-                Error,
-                "Error while reading assemble block input: {:?}",
-                err
-            );
+            log!(Error, "Error while reading assemble block input: {:?}", err);
             return;
         }
     };
     match sub_block::assemble_block(&mut host, assemble_block_input) {
         Ok(()) => (),
         Err(err) => {
-            log!(host, Error, "Error while assembling block: {:?}", err);
+            log!(Error, "Error while assembling block: {:?}", err);
         }
     }
 }
@@ -173,12 +165,7 @@ where
     let input = match host.store_read_all(&TEZOSX_SIMULATION_INPUT) {
         Ok(bytes) => bytes,
         Err(err) => {
-            log!(
-                host,
-                Error,
-                "Error reading Tezos X simulation input: {:?}",
-                err
-            );
+            log!(Error, "Error reading Tezos X simulation input: {:?}", err);
             return;
         }
     };
@@ -187,7 +174,7 @@ where
     // Fees checks are always skipped during simulation.
 
     if input.is_empty() {
-        log!(host, Error, "Tezos X simulation: empty input");
+        log!(Error, "Tezos X simulation: empty input");
         return;
     }
 
@@ -198,7 +185,6 @@ where
             Ok(v) => v,
             Err(err) => {
                 log!(
-                    host,
                     Error,
                     "Tezos X simulation: failed to decode input: {:?}",
                     err
@@ -211,7 +197,6 @@ where
             Ok(v) => v,
             Err(err) => {
                 log!(
-                    host,
                     Error,
                     "Tezos X simulation: failed to decode input: {:?}",
                     err
@@ -221,7 +206,6 @@ where
         };
 
     log!(
-        host,
         Debug,
         "Tezos X simulation starts, skip signature flag: {skip_signature_check:?}, \
          input length: {:?}",
@@ -233,7 +217,6 @@ where
         Ok(id) => id,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: failed to read chain id: {:?}",
                 err
@@ -246,7 +229,6 @@ where
         Ok(h) => h,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: failed to read blueprint header: {:?}",
                 err
@@ -258,19 +240,18 @@ where
 
     // Parse the transaction bytes as a Tezos X transaction (blueprint
     // version 1 format: tag byte + raw bytes).
-    let transaction =
-        match EvmChainConfig::transaction_from_bytes(&mut host, &transaction_bytes, 1) {
-            Ok(tx) => tx,
-            Err(err) => {
-                log!(
-                    host,
-                    Error,
-                    "Tezos X simulation: failed to parse transaction: {:?}",
-                    err
-                );
-                return;
-            }
-        };
+    let transaction = match EvmChainConfig::transaction_from_bytes(&transaction_bytes, 1)
+    {
+        Ok(tx) => tx,
+        Err(err) => {
+            log!(
+                Error,
+                "Tezos X simulation: failed to parse transaction: {:?}",
+                err
+            );
+            return;
+        }
+    };
 
     let block_in_progress = bip_from_blueprint(
         &host,
@@ -293,7 +274,6 @@ where
         Ok(c) => c,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: failed to build block constants: {:?}",
                 err
@@ -345,7 +325,6 @@ where
         Ok(result) => result,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: operation execution failed: {:?}",
                 err
@@ -358,7 +337,6 @@ where
     let traces = trace_journal.into_http_traces();
     if let Err(err) = crate::storage::store_simulation_http_traces(&mut host, &traces) {
         log!(
-            host,
             Error,
             "Tezos X simulation: failed to store HTTP traces: {:?}",
             err
@@ -369,20 +347,18 @@ where
         ExecutionResult::Valid(RuntimeExecutionInfo::Tezos { op, .. }) => op,
         ExecutionResult::Valid(RuntimeExecutionInfo::Ethereum(_)) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: unexpected Ethereum execution result"
             );
             return;
         }
         ExecutionResult::Invalid => {
-            log!(host, Error, "Tezos X simulation: operation was invalid");
+            log!(Error, "Tezos X simulation: operation was invalid");
             return;
         }
     };
 
     log!(
-        host,
         Debug,
         "Tezos X simulation finished, result: {:?}",
         applied_operation
@@ -391,7 +367,6 @@ where
         Ok(b) => b,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X simulation: failed to serialize result: {:?}",
                 err
@@ -403,12 +378,7 @@ where
     let mut stream = RlpStream::new();
     stream.append(&op_bytes);
     if let Err(err) = host.store_write_all(&TEZOSX_SIMULATION_RESULT, &stream.out()) {
-        log!(
-            host,
-            Error,
-            "Error writing Tezos X simulation result: {:?}",
-            err
-        );
+        log!(Error, "Error writing Tezos X simulation result: {:?}", err);
     }
 }
 
@@ -428,12 +398,7 @@ where
     let input = match host.store_read_all(&TEZOSX_ENTRYPOINTS_INPUT) {
         Ok(bytes) => bytes,
         Err(err) => {
-            log!(
-                host,
-                Error,
-                "Error reading tezosx entrypoints input: {:?}",
-                err
-            );
+            log!(Error, "Error reading tezosx entrypoints input: {:?}", err);
             return;
         }
     };
@@ -458,7 +423,6 @@ fn handle_query_entrypoints_to<Host, R>(
         Ok(a) => a,
         Err(err) => {
             log!(
-                host,
                 Error,
                 "Tezos X entrypoints: invalid AddressHash payload ({} bytes): {:?}",
                 payload.len(),
@@ -472,7 +436,7 @@ fn handle_query_entrypoints_to<Host, R>(
     {
         Ok(c) => c,
         Err(err) => {
-            log!(host, Error, "Tezos X entrypoints: context error: {:?}", err);
+            log!(Error, "Tezos X entrypoints: context error: {:?}", err);
             return;
         }
     };
@@ -480,12 +444,7 @@ fn handle_query_entrypoints_to<Host, R>(
         tezos_execution::get_contract_entrypoint(&*host, &context, &address);
     let result = encode_entrypoints_result(entrypoints);
     if let Err(err) = host.store_write_all(result_path, &result) {
-        log!(
-            host,
-            Error,
-            "Error writing tezos entrypoints result: {:?}",
-            err
-        );
+        log!(Error, "Error writing tezos entrypoints result: {:?}", err);
     }
 }
 

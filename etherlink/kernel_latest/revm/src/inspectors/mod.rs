@@ -21,7 +21,6 @@ use revm::{
     ExecuteCommitEvm, ExecuteEvm, InspectEvm, Inspector,
 };
 use struct_logger::StructLoggerInput;
-use tezos_evm_logging::Logging;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezosx_interfaces::Registry;
 
@@ -41,7 +40,7 @@ pub type EvmInspection<'a, Host, INSP, R> = Evm<
 
 pub struct EtherlinkEvmInspector<'a, Host, R, INSP>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
     R: Registry,
     INSP: EtherlinkInspector<'a, Host, R>,
 {
@@ -50,7 +49,7 @@ where
 
 impl<'a, Host, R, INSP> ExecuteEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
     R: Registry,
     INSP: EtherlinkInspector<'a, Host, R>,
 {
@@ -87,7 +86,7 @@ where
 
 impl<'a, Host, R, INSP> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
     R: Registry,
     INSP: EtherlinkInspector<'a, Host, R>,
 {
@@ -135,7 +134,7 @@ where
 
 impl<'a, Host, R, INSP> InspectEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
     R: Registry,
     INSP: EtherlinkInspector<'a, Host, R>,
 {
@@ -172,7 +171,7 @@ impl TracerInput {
 pub trait EtherlinkInspector<'a, Host, R>:
     Inspector<EVMInnerContext<'a, Host, R>>
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool;
@@ -182,7 +181,7 @@ where
 impl<'a, Host, R> EtherlinkInspector<'a, Host, R>
     for Box<dyn EtherlinkInspector<'a, Host, R>>
 where
-    Host: StorageV1 + Logging + 'a,
+    Host: StorageV1 + 'a,
     R: Registry + 'a,
 {
     fn is_struct_logger(&self) -> bool {

@@ -39,7 +39,6 @@ use tezos_ethereum::transaction::{
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_execution::context::Context;
 use tezos_execution::mir_ctx::BlockCtx;
@@ -180,19 +179,19 @@ pub fn is_valid_ethereum_transaction_common<Host>(
     limits: &EvmLimits,
 ) -> Result<Validity, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Chain id is correct.
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
     {
-        log!(host, Benchmarking, "Transaction status: ERROR_CHAINID");
+        log!(Benchmarking, "Transaction status: ERROR_CHAINID");
         return Ok(Validity::InvalidChainId);
     }
 
     // ensure that the user was willing to at least pay the base fee
     if transaction.max_fee_per_gas < block_constant.base_fee_per_gas() {
-        log!(host, Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
+        log!(Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
         return Ok(Validity::InvalidMaxBaseFee);
     }
 
@@ -200,7 +199,7 @@ where
     let caller = match transaction.caller() {
         Ok(caller) => caller,
         Err(_err) => {
-            log!(host, Benchmarking, "Transaction status: ERROR_SIGNATURE.");
+            log!(Benchmarking, "Transaction status: ERROR_SIGNATURE.");
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
             return Ok(Validity::InvalidSignature);
@@ -212,7 +211,7 @@ where
 
     // The transaction nonce is valid.
     if info.nonce != transaction.nonce {
-        log!(host, Benchmarking, "Transaction status: ERROR_NONCE.");
+        log!(Benchmarking, "Transaction status: ERROR_NONCE.");
         return Ok(Validity::InvalidNonce);
     };
 
@@ -223,7 +222,7 @@ where
     let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
 
     if info.balance < u256_to_alloy(&cost) || info.balance < u256_to_alloy(&max_fee) {
-        log!(host, Benchmarking, "Transaction status: ERROR_PRE_PAY.");
+        log!(Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
 
@@ -234,7 +233,7 @@ where
         if !code.is_empty()
             && !code.original_byte_slice().starts_with(&[0xef, 0x01, 0x00])
         {
-            log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
+            log!(Benchmarking, "Transaction status: ERROR_CODE.");
             return Ok(Validity::InvalidCode);
         }
     }
@@ -243,7 +242,7 @@ where
     let Ok(gas_limit) =
         tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
     else {
-        log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
+        log!(Benchmarking, "Transaction status: ERROR_GAS_FEE.");
         return Ok(Validity::InvalidNotEnoughGasForFees);
     };
     let capped_gas_limit = u64::min(gas_limit, limits.maximum_gas_limit);
@@ -305,13 +304,13 @@ pub fn extract_cross_runtime_effects(
 /// Technically incorrect: it is possible to do a call without sending any data,
 /// however it's done for benchmarking only, and benchmarking doesn't include
 /// such a scenario
-fn log_transaction_type(host: &impl Logging, to: Option<H160>, data: &[u8]) {
+fn log_transaction_type(to: Option<H160>, data: &[u8]) {
     if to.is_none() {
-        log!(host, Benchmarking, "Transaction type: CREATE");
+        log!(Benchmarking, "Transaction type: CREATE");
     } else if data.is_empty() {
-        log!(host, Benchmarking, "Transaction type: TRANSFER");
+        log!(Benchmarking, "Transaction type: TRANSFER");
     } else {
-        log!(host, Benchmarking, "Transaction type: CALL");
+        log!(Benchmarking, "Transaction type: CALL");
     }
 }
 
@@ -338,7 +337,7 @@ pub fn revm_run_transaction<Host>(
     origin: revm_etherlink::TransactionOrigin,
 ) -> Result<ExecutionOutcome, anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -434,7 +433,7 @@ fn apply_ethereum_transaction_common<Host>(
     crac_id: CracId,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -447,7 +446,7 @@ where
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => {
-            log!(host, Benchmarking, "Transaction type: INVALID");
+            log!(Benchmarking, "Transaction type: INVALID");
             return Ok(ExecutionResult::Invalid);
         }
     };
@@ -490,7 +489,7 @@ where
 
     let to = transaction.to;
     let call_data = transaction.data.clone();
-    log_transaction_type(host, to, &call_data);
+    log_transaction_type(to, &call_data);
     let value = transaction.value;
     let mut journal = TezosXJournal::new(crac_id);
     let execution_outcome = match revm_run_transaction(
@@ -566,7 +565,7 @@ pub fn pure_xtz_deposit<Host>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Fees are set to zero, this is an internal call to the XTZ bridge
     // solidity contract.
@@ -686,7 +685,7 @@ pub fn pure_fa_deposit<Host>(
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
@@ -753,7 +752,7 @@ fn apply_fa_deposit<Host>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let execution_outcome = pure_fa_deposit(
         host,
@@ -843,19 +842,19 @@ pub fn push_withdrawals_to_outbox<Host>(
     withdrawals: Vec<Withdrawal>,
 ) -> Result<(), anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     for message in withdrawals {
         match message {
             Withdrawal::Standard(message) => {
                 let outbox_message: OutboxMessage<RouterInterface> = message;
                 let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+                log!(Debug, "Length of the outbox queue: {}", len);
             }
             Withdrawal::Fast(message) => {
                 let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
                 let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+                log!(Debug, "Length of the outbox queue: {}", len);
             }
         }
     }
@@ -875,7 +874,7 @@ pub fn handle_transaction_result<Host>(
     sequencer_pool_address: Option<H160>,
 ) -> Result<RuntimeExecutionInfo, anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match transaction_result {
         RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
@@ -893,13 +892,12 @@ where
                 .fee_updates(&block_constants.block_fees, gas_used.into());
 
             log!(
-                host,
                 Debug,
                 "Transaction executed, outcome: {:?}",
                 execution_outcome
             );
-            log!(host, Benchmarking, "gas_used: {:?}", gas_used);
-            log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
+            log!(Benchmarking, "gas_used: {:?}", gas_used);
+            log!(Benchmarking, "reason: {:?}", execution_outcome.result);
 
             let withdrawals = std::mem::take(&mut execution_outcome.withdrawals);
             push_withdrawals_to_outbox(host, outbox_queue, withdrawals)?;
@@ -961,7 +959,7 @@ pub fn apply_transaction<Host>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let tracer_input = get_tracer_configuration(
         revm::primitives::B256::from_slice(&transaction.tx_hash),
@@ -1001,7 +999,7 @@ where
             crac_id,
         )?,
         TransactionContent::Deposit(deposit) => {
-            log!(host, Benchmarking, "Transaction type: DEPOSIT");
+            log!(Benchmarking, "Transaction type: DEPOSIT");
             apply_tezosx_xtz_deposit(
                 host,
                 registry,
@@ -1014,7 +1012,7 @@ where
             )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
-            log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
+            log!(Benchmarking, "Transaction type: FA_DEPOSIT");
             apply_fa_deposit(
                 host,
                 registry,
@@ -1072,7 +1070,6 @@ where
             ) {
                 Ok(operations_with_metadata) => {
                     log!(
-                        host,
                         Debug,
                         "Delayed Tezos operation status: SUCCESS - {:?}",
                         operations_with_metadata
@@ -1106,21 +1103,11 @@ where
                     ))
                 }
                 Err(OperationError::Validation(err)) => {
-                    log!(
-                        host,
-                        Info,
-                        "Delayed Tezos operation status: ERROR - {:?}",
-                        err
-                    );
+                    log!(Info, "Delayed Tezos operation status: ERROR - {:?}", err);
                     Ok::<_, anyhow::Error>(ExecutionResult::Invalid)
                 }
                 Err(OperationError::RuntimeError(err)) => {
-                    log!(
-                        host,
-                        Info,
-                        "Delayed Tezos operation runtime error: {:?}",
-                        err
-                    );
+                    log!(Info, "Delayed Tezos operation runtime error: {:?}", err);
                     return Err(err.into());
                 }
             }?

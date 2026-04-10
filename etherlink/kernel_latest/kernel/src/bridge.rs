@@ -27,7 +27,6 @@ use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
 };
-use tezos_evm_logging::Logging;
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_execution::account_storage::{TezlinkAccount, TezosImplicitAccount};
 use tezos_execution::context::Context;
@@ -403,7 +402,7 @@ pub fn apply_tezosx_xtz_deposit<Host>(
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {
@@ -454,7 +453,7 @@ where
                     TransferSuccess::default(),
                 )),
                 Err(err) => {
-                    log!(host, Info, "Deposit failed because of {err}");
+                    log!(Info, "Deposit failed because of {err}");
                     ContentResult::Failed(ApplyOperationErrors { errors: vec![] })
                 }
             };
@@ -507,7 +506,7 @@ fn tezlink_deposit<Host, C: Context>(
     receiver: Contract,
 ) -> Result<TransferSuccess, TransferError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     let to_account = context
         .implicit_from_contract(&receiver)
@@ -527,7 +526,7 @@ where
             Ok(success)
         }
         Err(e) => {
-            log!(host, Error, "Deposit failed because of {e}");
+            log!(Error, "Deposit failed because of {e}");
             Err(TransferError::DepositError(e.to_string()))
         }
     }
@@ -541,7 +540,7 @@ pub fn execute_tezlink_deposit<Host, C: Context>(
     deposit: &Deposit,
 ) -> Result<DepositResult<TezlinkOutcome>, BridgeError>
 where
-    Host: StorageV1 + Logging,
+    Host: StorageV1,
 {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
