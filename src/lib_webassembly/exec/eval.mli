@@ -1,6 +1,12 @@
 open Values
 open Instance
 
+(** Raised when an [Nds_host_func] is dispatched against
+    [Eval_storage.Durable_only] storage.  This is a PVM-level
+    invariant violation — NDS host functions must only be linked when
+    storage is [Dual]. *)
+exception Nds_host_func_without_nds_storage
+
 (* Kontinuation *)
 
 type ('a, 'b) map_kont = {

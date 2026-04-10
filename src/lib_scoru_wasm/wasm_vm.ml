@@ -393,8 +393,12 @@ let next_tick_state ~wasm_entrypoint ~version ~stack_size_limit
         host_function_registry
         pvm_state)
     (fun exn ->
-      let+ tick_state = exn_to_stuck pvm_state exn in
-      (pvm_state.storage, tick_state, Failing))
+      match exn with
+      | Tezos_webassembly_interpreter.Eval.Nds_host_func_without_nds_storage ->
+          Lwt.reraise exn
+      | _ ->
+          let+ tick_state = exn_to_stuck pvm_state exn in
+          (pvm_state.storage, tick_state, Failing))
 
 let next_last_top_level_call {current_tick; last_top_level_call; _} = function
   | Forcing_yield | Yielding | Reboot -> Z.succ current_tick

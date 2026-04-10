@@ -5,6 +5,8 @@ open Instance
 open Ast
 open Source
 
+exception Nds_host_func_without_nds_storage
+
 (* Kontinuations *)
 
 type ('a, 'b) map_kont = {
@@ -551,6 +553,28 @@ let invoke_step ~init ~host_funcs ~(storage : Eval_storage.t)
                   ( Eval_storage.update_durable storage durable',
                     Inv_stop
                       {code = (vs', es); fresh_frame = None; remaining_ticks} )
+              | Nds_host_func f -> (
+                  match storage with
+                  | Dual {nds; _} ->
+                      let+ ( (nds' : Octez_riscv_nds_common.Nds.t),
+                             res,
+                             remaining_ticks ) =
+                        f
+                          buffers.input
+                          buffers.output
+                          nds
+                          available_memories
+                          args
+                      in
+                      let vs' = Vector.prepend_list res vs' in
+                      ( Eval_storage.update_nds storage nds',
+                        Inv_stop
+                          {
+                            code = (vs', es);
+                            fresh_frame = None;
+                            remaining_ticks;
+                          } )
+                  | Durable_only _ -> raise Nds_host_func_without_nds_storage)
               | Reveal_func f -> (
                   let* result = f available_memories args in
                   match result with

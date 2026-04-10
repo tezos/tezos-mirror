@@ -1057,7 +1057,8 @@ let test_store_write ~version () =
       values
   in
   assert (result = [Values.Num (I32 0l)]) ;
-  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
+  let durable = Eval_storage.durable_of storage in
+  let tree = Durable.of_storage_exn durable in
   let* value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn existing_key
   in
@@ -1079,7 +1080,7 @@ let test_store_write ~version () =
         Num (I32 (Int32.of_int @@ String.length contents));
       ]
   in
-  let* _durable, result =
+  let* _storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
@@ -1168,7 +1169,8 @@ let test_store_create ~version =
       create_values
   in
   assert (result = [Values.Num (I32 0l)]) ;
-  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
+  let durable = Eval_storage.durable_of storage in
+  let tree = Durable.of_storage_exn durable in
   let* new_value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn new_key
   in
@@ -1201,7 +1203,8 @@ let test_store_create ~version =
   assert (
     result
     = [Values.Num (I32 Host_funcs.Error.(code Store_value_already_exists))]) ;
-  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
+  let durable = Eval_storage.durable_of storage in
+  let tree = Durable.of_storage_exn durable in
   let* value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn existing_key
   in
