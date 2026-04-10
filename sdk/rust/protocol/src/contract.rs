@@ -61,6 +61,13 @@ impl Contract {
             Self::Originated(kt1) => kt1.to_b58check(),
         }
     }
+
+    pub fn is_implicit(&self) -> bool {
+        match self {
+            Self::Implicit(_) => true,
+            Self::Originated(_) => false,
+        }
+    }
 }
 
 impl From<Contract> for Vec<u8> {
