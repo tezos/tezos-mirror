@@ -240,8 +240,21 @@ module Worker = struct
         {key = path}
         ()
     in
+    (* TODO: L2-1218
+       Once all kernels have migrated past V53, remove this
+       fallback and read only the /base/ path to avoid the extra RPC. *)
+    (* Try the legacy /evm/ path first (covers pre-V53 kernels with a single
+       RPC). Fall back to the new /base/ path only if nothing is there. *)
     let* finalized_current_block_header =
-      read_from_rollup_node Durable_storage_path.BlockHeader.current
+      let* h =
+        read_from_rollup_node
+          (Durable_storage_path.BlockHeader.current ~storage_version:0)
+      in
+      match h with
+      | Some _ -> return h
+      | None ->
+          read_from_rollup_node
+            (Durable_storage_path.BlockHeader.current ~storage_version:max_int)
     in
     match finalized_current_block_header with
     | Some bytes -> (

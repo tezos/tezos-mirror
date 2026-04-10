@@ -115,17 +115,29 @@ let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 let michelson_to_evm_gas_multiplier =
   World_state.make "/fees/michelson_to_evm_gas_multiplier"
 
-let kernel_version = EVM.make "/kernel_version"
+let kernel_version ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/kernel_version"
+  else EVM.make "/kernel_version"
 
-let kernel_verbosity = EVM.make "/logging_verbosity"
+let kernel_verbosity ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/logging_verbosity"
+  else EVM.make "/logging_verbosity"
 
 let storage_version_base = BASE.make "/storage_version"
 
 let storage_version_legacy = EVM.make "/storage_version"
 
-let kernel_root_hash = EVM.make "/kernel_root_hash"
+let kernel_root_hash ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/kernel_root_hash"
+  else EVM.make "/kernel_root_hash"
 
-let kernel_upgrade = EVM.make "/kernel_upgrade"
+let kernel_upgrade ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/kernel_upgrade"
+  else EVM.make "/kernel_upgrade"
 
 let sequencer_upgrade ~storage_version =
   if
@@ -134,7 +146,10 @@ let sequencer_upgrade ~storage_version =
   then World_state.make "/sequencer_upgrade"
   else EVM.make "/sequencer_upgrade"
 
-let delayed_inbox = EVM.make "/delayed-inbox"
+let delayed_inbox ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/delayed-inbox"
+  else EVM.make "/delayed-inbox"
 
 let sequencer_pool_address = EVM.make "/sequencer_pool_address"
 
@@ -153,6 +168,11 @@ let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 
 let michelson_runtime_sunrise_level =
   EVM.make "/michelson_runtime/sunrise_level"
+
+let maximum_allowed_ticks ~storage_version =
+  if Storage_version.governance_config_moved_to_base ~storage_version then
+    BASE.make "/maximum_allowed_ticks"
+  else EVM.make "/maximum_allowed_ticks"
 
 module Accounts = struct
   let accounts_path = World_state.make "/eth_accounts"
@@ -236,17 +256,26 @@ module Code = struct
 end
 
 module Blueprint = struct
-  let current_generation = EVM.make "/blueprints/generation"
+  let blueprints_root ~storage_version =
+    if Storage_version.governance_config_moved_to_base ~storage_version then
+      BASE.make "/blueprints"
+    else EVM.make "/blueprints"
 
-  let blueprint blueprint_number =
-    EVM.make "/blueprints/" ^ Z.to_string blueprint_number
+  let current_generation ~storage_version =
+    blueprints_root ~storage_version ^ "/generation"
 
-  let chunk ~blueprint_number ~chunk_index =
-    blueprint blueprint_number ^ "/" ^ string_of_int chunk_index
+  let blueprint ~storage_version blueprint_number =
+    blueprints_root ~storage_version ^ "/" ^ Z.to_string blueprint_number
 
-  let nb_chunks ~blueprint_number = blueprint blueprint_number ^ "/nb_chunks"
+  let chunk ~storage_version ~blueprint_number ~chunk_index =
+    blueprint ~storage_version blueprint_number
+    ^ "/" ^ string_of_int chunk_index
 
-  let generation ~blueprint_number = blueprint blueprint_number ^ "/generation"
+  let nb_chunks ~storage_version ~blueprint_number =
+    blueprint ~storage_version blueprint_number ^ "/nb_chunks"
+
+  let generation ~storage_version ~blueprint_number =
+    blueprint ~storage_version blueprint_number ^ "/generation"
 end
 
 module Block = struct
@@ -270,7 +299,10 @@ module Block = struct
 end
 
 module BlockHeader = struct
-  let current = "/evm/current_block_header"
+  let current ~storage_version =
+    if Storage_version.governance_config_moved_to_base ~storage_version then
+      "/base/current_block_header"
+    else "/evm/current_block_header"
 end
 
 module Indexes = struct
@@ -301,17 +333,25 @@ module Transaction_object = struct
 end
 
 module Delayed_transaction = struct
-  let hashes = EVM.make "/delayed-inbox"
+  let hashes ~storage_version =
+    if Storage_version.governance_config_moved_to_base ~storage_version then
+      BASE.make "/delayed-inbox"
+    else EVM.make "/delayed-inbox"
 
-  let transaction (Hash (Hex tx_hash)) = hashes ^ "/" ^ tx_hash ^ "/data"
+  let transaction ~storage_version (Hash (Hex tx_hash)) =
+    hashes ~storage_version ^ "/" ^ tx_hash ^ "/data"
 end
 
 module Evm_events = struct
-  let events = EVM.make "/events"
+  let events ~storage_version =
+    if Storage_version.governance_config_moved_to_base ~storage_version then
+      BASE.make "/rollup_events"
+    else EVM.make "/events"
 
-  let length = events ^ "/" ^ "length"
+  let length ~storage_version = events ~storage_version ^ "/" ^ "length"
 
-  let nth_event i = events ^ "/" ^ string_of_int i
+  let nth_event ~storage_version i =
+    events ~storage_version ^ "/" ^ string_of_int i
 end
 
 module Trace = struct
@@ -354,20 +394,28 @@ end
 module Chain_configuration = struct
   open L2_types
 
-  let root chain_id =
-    EVM.make "/chain_configurations/" ^ Chain_id.to_string chain_id
+  let root ~storage_version chain_id =
+    let prefix =
+      if Storage_version.governance_config_moved_to_base ~storage_version then
+        BASE.make "/chain_configurations/"
+      else EVM.make "/chain_configurations/"
+    in
+    prefix ^ Chain_id.to_string chain_id
 
-  let minimum_base_fee_per_gas chain_id =
-    root chain_id ^ "/minimum_base_fee_per_gas"
+  let minimum_base_fee_per_gas ~storage_version chain_id =
+    root ~storage_version chain_id ^ "/minimum_base_fee_per_gas"
 
-  let da_fee_per_byte chain_id = root chain_id ^ "/da_fee_per_byte"
+  let da_fee_per_byte ~storage_version chain_id =
+    root ~storage_version chain_id ^ "/da_fee_per_byte"
 
-  let maximum_gas_per_transaction chain_id =
-    root chain_id ^ "/maximum_gas_per_transaction"
+  let maximum_gas_per_transaction ~storage_version chain_id =
+    root ~storage_version chain_id ^ "/maximum_gas_per_transaction"
 
-  let chain_family chain_id = root chain_id ^ "/chain_family"
+  let chain_family ~storage_version chain_id =
+    root ~storage_version chain_id ^ "/chain_family"
 
-  let world_state chain_id = root chain_id ^ "/world_state"
+  let world_state ~storage_version chain_id =
+    root ~storage_version chain_id ^ "/world_state"
 end
 
 module Feature_flags = struct

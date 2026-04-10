@@ -1667,10 +1667,13 @@ module State = struct
             } ;
         background_preemptive_download ctxt.configuration upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
+        let* storage_version =
+          Durable_storage.storage_version ctxt.session.evm_state
+        in
         let* () =
           modify_in_place
             ctxt
-            ~key:Durable_storage_path.kernel_upgrade
+            ~key:(Durable_storage_path.kernel_upgrade ~storage_version)
             ~value:payload
         in
         let* () =
@@ -3017,10 +3020,11 @@ let reset = State.reset
 
 let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   let* kernel_upgrade =
     let* kernel_upgrade_payload =
       Durable_storage.read_opt
-        (Raw_path Durable_storage_path.kernel_upgrade)
+        (Raw_path (Durable_storage_path.kernel_upgrade ~storage_version))
         evm_state
     in
     Option.bind kernel_upgrade_payload Evm_events.Upgrade.of_bytes

@@ -27,9 +27,10 @@ let patch_kernel ~kernel evm_state =
 
 let patch_verbosity ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   let* evm_state =
     Durable_storage.write
-      (Raw_path Durable_storage_path.kernel_verbosity)
+      (Raw_path (Durable_storage_path.kernel_verbosity ~storage_version))
       (Bytes.of_string (Events.string_from_kernel_log_level kernel_verbosity))
       evm_state
   in
