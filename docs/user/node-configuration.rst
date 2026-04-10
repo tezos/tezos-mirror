@@ -268,10 +268,13 @@ take two main forms:
 
 Thus all costly or risky endpoints are blocked by default. This can be
 relaxed or tightened by modifying the configuration file. It's
-worth noting that this default policy among other things disallows baking and
-attesting by bakers running on remote servers,
-because endpoints such as ``/injection/block`` are not open remotely.
-Rather than opening them remotely, the recommended practice for baking is to run a node locally listening to ``localhost``, with the default ACL policy.
+worth noting that this default policy disallows use cases such as:
+
+- public RPC nodes, because it disables many useful RPCs.
+  RPC operators should define on their own the list of unsafe RPCs (that can take lot of RAM/CPU/...) that they want to open, according to their infrastructure capacity, support for load balancing, debouncing in case of any abuse/attack, etc.
+- baking and attesting by bakers running on remote servers,
+  because endpoints such as ``/injection/block`` are not open remotely.
+  Rather than opening them remotely, the recommended practice for baking is to run a node locally listening to ``localhost``, with the default ACL policy.
 
 The following is the default ACL policy for the node,
 hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
