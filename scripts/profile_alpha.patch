@@ -1,6 +1,6 @@
-From 4cba8cf2cc0ba876977bade05183ecfa8ed54d42 Mon Sep 17 00:00:00 2001
+From 3bcff1e60ec86dc41f6175358bf17b84bce100b8 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Tue, 31 Mar 2026 10:56:47 +0200
+Date: Fri, 10 Apr 2026 13:59:59 +0200
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
@@ -315,10 +315,10 @@ index 0000000000..efbc52c38a
 +
 +val mark : verbosity -> ids -> unit
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index f128a25b22..cbd2995674 100644
+index 368c935741..2290a4ad56 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
-@@ -2595,7 +2595,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+@@ -2586,7 +2586,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
      ~source ~operation contents_list =
    let open Lwt_result_syntax in
    let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -331,7 +331,7 @@ index f128a25b22..cbd2995674 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2874,11 +2878,12 @@ let may_start_new_cycle ctxt =
+@@ -2865,11 +2869,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -521,7 +521,7 @@ index 73d5aa9356..3c3f38dc44 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index 835242d7ff..2ebb5c3cc3 100644
+index aa5b6e6ed8..5dd23258b7 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
