@@ -220,3 +220,31 @@ docker:merge_manifests:snapshot:
     DOCKER_VERSION: 28.5.1
     CI_DOCKER_HUB: "true"
   retry: 0
+
+docker:promote_weekly:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/alpine-docker-ci:28.5.1-master-be43e621
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - docker:merge_manifests:snapshot
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)
+  - ./scripts/ci/docker-promote.sh --target-tag weekly
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 28.5.1
+    CI_DOCKER_HUB: "true"
+  retry: 0

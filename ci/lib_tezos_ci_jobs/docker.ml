@@ -171,6 +171,25 @@ let job_docker_merge_manifests =
       ]
     mode
 
+let job_docker_promote_weekly =
+  CI.job
+    "docker:promote_weekly"
+    ~__POS__
+    ~description:
+      "Promote the master snapshot Docker image to the rolling [weekly] tag."
+    ~stage:Publish
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~needs:[(Job, job_docker_merge_manifests_snapshot `experimental_with_evm)]
+    ~image:Tezos_ci.Images.Base_images.alpine_docker_ci
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~variables:[("DOCKER_VERSION", version); ("CI_DOCKER_HUB", "true")]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/docker_image_names.sh --image-tag master-$(date +%Y%m%d)";
+        "./scripts/ci/docker-promote.sh --target-tag weekly";
+      ]
+
 let job_script_docker_verify_image =
   Cacio.parameterize @@ fun arch ->
   let arch_string = Tezos_ci.Runner.Arch.show_uniform arch in
@@ -250,5 +269,8 @@ let register () =
     [(Auto, job_docker_merge_manifests `experimental_with_evm `real)] ;
   Cacio.register_jobs
     Scheduled_docker_master_snapshot
-    [(Auto, job_docker_merge_manifests_snapshot `experimental_with_evm)] ;
+    [
+      (Auto, job_docker_merge_manifests_snapshot `experimental_with_evm);
+      (Auto, job_docker_promote_weekly);
+    ] ;
   ()
