@@ -3189,6 +3189,7 @@ dependencies = [
 name = "tezos-evm-runtime-latest"
 version = "0.1.0"
 dependencies = [
+ "hex-literal",
  "tezos-evm-logging-latest",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",

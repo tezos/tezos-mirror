@@ -81,6 +81,22 @@ let test_execution_correspondance ~version skip count () =
       explore tree 1L)
     ()
 
+(* The Blake2B hash of an empty irmin tree (Context.Tree.empty).
+   This value is hardcoded in the Rust KeySpace implementation
+   (StorageV1KeySpaceCompat::hash) and must remain stable. *)
+let expected_empty_tree_hash =
+  `Hex "81e47a19e6b29b0a65b9591762ce5143ed30d0261e5d24a3201752506b20f15c"
+
+let test_empty_tree_hash ~version:_ () =
+  let open Lwt_result_syntax in
+  let*! index = Context.init "/tmp" in
+  let empty_store = Context.empty index in
+  let tree = Context.Tree.empty empty_store in
+  let hash = Context.Tree.hash tree in
+  let actual = Hex.of_string (Context_hash.to_string hash) in
+  assert (actual = expected_empty_tree_hash) ;
+  return_unit
+
 let tests =
   tztests_with_all_pvms
     [
@@ -98,6 +114,9 @@ let tests =
       ( "Executions correspondence (ticks 30,000 to 35,000)",
         `Quick,
         test_execution_correspondance 30_000L 5_000L );
+      ( "Empty tree hash matches hardcoded Rust constant",
+        `Quick,
+        test_empty_tree_hash );
     ]
 
 let () =

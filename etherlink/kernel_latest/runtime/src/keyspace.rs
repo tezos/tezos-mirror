@@ -11,6 +11,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use hex_literal::hex;
 use tezos_smart_rollup_host::{
     path::{concat, OwnedPath},
     runtime::{RuntimeError, ValueType},
@@ -18,6 +19,10 @@ use tezos_smart_rollup_host::{
     Error as HostError,
 };
 use tezos_smart_rollup_keyspace::{Key, KeySpace, KeySpaceWriteError, Name};
+
+/// Blake2B hash of an empty irmin tree (`Context.Tree.empty` in OCaml).
+const EMPTY_TREE_HASH: [u8; 32] =
+    hex!("81e47a19e6b29b0a65b9591762ce5143ed30d0261e5d24a3201752506b20f15c");
 
 /// Errors that can legitimately occur in durable storage operations.
 ///
@@ -288,7 +293,7 @@ impl<Host: StorageV1> KeySpace for StorageV1KeySpaceCompat<Host> {
             .map_err(StorageV1ReadError::from);
         match res {
             Ok(hash) => hash.to_vec(),
-            Err(StorageV1ReadError::PathNotFound) => Vec::new(),
+            Err(StorageV1ReadError::PathNotFound) => EMPTY_TREE_HASH.to_vec(),
             // Read: store_get_hash hashes the subtree, not a value.
             Err(StorageV1ReadError::NotAValue) => {
                 unreachable!("store_get_hash hashes the subtree: {res:?}")
