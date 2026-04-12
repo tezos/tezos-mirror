@@ -107,24 +107,43 @@ impl From<String> for ChainFamily {
 
 #[derive(Debug, Default)]
 pub struct ExperimentalFeatures {
-    enable_tezos_runtime: bool,
     enable_michelson_gas_refund: bool,
+    /// If `Some(level)`, the Michelson runtime is enabled and activates at the
+    /// given EVM block number. `None` means the feature flag is not set.
+    enabled_michelson_target_sunrise_level: Option<U256>,
 }
 
 impl ExperimentalFeatures {
     pub fn read_from_storage(host: &mut impl StorageV1) -> Self {
-        let enable_tezos_runtime = crate::storage::enable_tezos_runtime(host);
         let enable_michelson_gas_refund =
             crate::storage::enable_michelson_gas_refund(host);
 
+        let enabled_michelson_target_sunrise_level =
+            if crate::storage::enable_tezos_runtime(host) {
+                // The target sunrise level defaults to 0 if not set. This allows
+                // current deployment where only enable_tezos_runtime is set to still
+                // activate the Michelson runtime.
+                Some(
+                    crate::storage::read_michelson_runtime_target_sunrise_level(host)
+                        .unwrap_or(U256::zero()),
+                )
+            } else {
+                None
+            };
+
         ExperimentalFeatures {
-            enable_tezos_runtime,
             enable_michelson_gas_refund,
+            enabled_michelson_target_sunrise_level,
         }
     }
 
-    pub fn is_tezos_runtime_enabled(&self) -> bool {
-        self.enable_tezos_runtime
+    pub fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
+        self.enabled_michelson_target_sunrise_level
+            .is_some_and(|target| current_level >= target)
+    }
+
+    pub fn tezos_runtime_feature_flag(&self) -> bool {
+        self.enabled_michelson_target_sunrise_level.is_some()
     }
 
     // Used in the gas refund implementation (!21392).
@@ -144,8 +163,13 @@ pub struct EvmChainConfig {
 }
 
 impl EvmChainConfig {
-    pub fn enable_tezos_runtime(&self) -> bool {
-        self.experimental_features.enable_tezos_runtime
+    pub fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
+        self.experimental_features
+            .is_tezos_runtime_enabled(current_level)
+    }
+
+    pub fn tezos_runtime_feature_flag(&self) -> bool {
+        self.experimental_features.tezos_runtime_feature_flag()
     }
 }
 
@@ -357,6 +381,8 @@ pub trait ChainConfigTrait: Debug {
 
     fn get_chain_family(&self) -> ChainFamily;
 
+    fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool;
+
     fn storage_root_paths(&self) -> Vec<RefPath>;
 
     fn constants(
@@ -541,6 +567,11 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
+    }
+
+    fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool {
+        self.experimental_features
+            .is_tezos_runtime_enabled(current_level)
     }
 
     fn init_registry(&self) -> RegistryImpl {
@@ -1100,6 +1131,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
+    }
+
+    fn is_tezos_runtime_enabled(&self, _current_level: U256) -> bool {
+        true
     }
 
     fn init_registry(&self) -> RegistryImpl {
