@@ -152,6 +152,16 @@ pub const ENABLE_MULTICHAIN: RefPath =
 pub const ENABLE_TEZOS_RUNTIME: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_tezos_runtime");
 
+// Target EVM block number for the Michelson runtime sunrise. Written by the
+// installer when scheduling a future activation.
+const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
+    RefPath::assert_from(b"/evm/michelson_runtime/target_sunrise_level");
+
+// EVM block number where the Michelson runtime first started producing
+// Tezos blocks. Written once by the kernel at the sunrise block.
+const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
+    RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
+
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
     RefPath::assert_from(b"/evm/chain_configurations");
@@ -833,6 +843,26 @@ where
 
 pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
     Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
+}
+
+#[allow(dead_code)]
+pub fn read_michelson_runtime_target_sunrise_level(
+    host: &impl StorageV1,
+) -> Option<U256> {
+    read_u256_le(host, &MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL).ok()
+}
+
+#[allow(dead_code)]
+pub fn store_michelson_runtime_sunrise_level(
+    host: &mut impl StorageV1,
+    level: U256,
+) -> Result<(), Error> {
+    write_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL, level).map_err(Error::from)
+}
+
+#[allow(dead_code)]
+pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
+    read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
 }
 
 pub fn tweak_dal_activation(
