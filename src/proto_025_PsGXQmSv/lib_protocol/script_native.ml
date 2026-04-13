@@ -61,9 +61,19 @@ module CLST_contract = struct
     let* amount, ctxt =
       Clst_contract_storage.get_balance_from_storage ctxt storage address
     in
-    let added_amount =
-      Tez.to_mutez step_constants.amount
-      |> Script_int.of_int64 |> Script_int.abs
+    let total_supply =
+      Clst_contract_storage.get_total_supply_from_storage storage
+    in
+    let* added_amount, ctxt =
+      Clst_contract_storage.tez_to_clst_tokens
+        ctxt
+        ~total_supply
+        step_constants.amount
+    in
+    let*? () =
+      error_when
+        Compare.Int.(Script_int.(compare zero_n added_amount) = 0)
+        Empty_transfer
     in
     let new_amount = Script_int.(add_n added_amount amount) in
     let* new_storage, ctxt =
@@ -151,9 +161,20 @@ module CLST_contract = struct
         address
         new_amount
     in
-    let amount_tez =
-      Tez.of_mutez_exn
-        (Option.value ~default:0L (Script_int.to_int64 removed_amount))
+    let total_supply =
+      Clst_contract_storage.get_total_supply_from_storage storage
+    in
+    let* amount_tez, ctxt =
+      if Compare.Int.(Script_int.compare removed_amount total_supply = 0) then
+        (* Last redeemer: clear all dust by transferring exact remaining
+           pool balance *)
+        let* total_tez = Clst.total_amount_of_tez ctxt in
+        return (total_tez, ctxt)
+      else
+        Clst_contract_storage.clst_tokens_to_tez
+          ctxt
+          ~total_supply
+          removed_amount
     in
     let*? new_storage =
       Clst_contract_storage.decrement_total_supply new_storage removed_amount
