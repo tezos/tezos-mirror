@@ -18,5 +18,9 @@ val job_build_exp : Tezos_ci.Runner.Arch.t -> Cacio.job
 val job_build_static_linux_binaries :
   Tezos_ci.Runner.Arch.t -> [`release | `test] -> Cacio.job
 
+(** Jobs [oc.build:static-*-linux-experimental-binaries]. *)
+val job_build_static_linux_experimental_binaries :
+  Tezos_ci.Runner.Arch.t -> Cacio.job
+
 (** Register build jobs. *)
 val register : unit -> unit
