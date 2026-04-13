@@ -707,7 +707,7 @@ mod test {
                 host: &mut Host,
                 journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            ) -> http::Response<Vec<u8>>
             where
                 Host: StorageV1,
             {
@@ -715,7 +715,7 @@ mod test {
                     Some("tezos") | Some("stub") => {
                         self.mock_tezos.serve(self, host, journal, request)
                     }
-                    unknown => Ok(http::Response::builder()
+                    unknown => http::Response::builder()
                         .status(http::StatusCode::NOT_FOUND)
                         .body(
                             format!(
@@ -724,7 +724,7 @@ mod test {
                             )
                             .into_bytes(),
                         )
-                        .unwrap()),
+                        .unwrap(),
                 }
             }
         }
@@ -771,7 +771,7 @@ mod test {
                 host: &mut Host,
                 _journal: &mut TezosXJournal,
                 request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            ) -> http::Response<Vec<u8>>
             where
                 Host: StorageV1,
             {
@@ -780,9 +780,7 @@ mod test {
                 let address_str = path
                     .strip_prefix('/')
                     .and_then(|rest| rest.split('/').next())
-                    .ok_or_else(|| {
-                        TezosXRuntimeError::Custom("Missing address in URL".to_string())
-                    })?;
+                    .expect("Missing address in URL");
                 // Parse the amount from the X-Tezos-Amount header (TEZ decimal → mutez)
                 let amount = request
                     .headers()
@@ -793,9 +791,8 @@ mod test {
 
                 // Store the balance keyed by the address string from the URL
                 let address_hex = hex::encode(address_str.as_bytes());
-                let path = OwnedPath::try_from(format!("/{address_hex}"))
-                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
-                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
+                let path = OwnedPath::try_from(format!("/{address_hex}")).unwrap();
+                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path).unwrap();
 
                 let current_balance = match host.store_read_all(&full_path) {
                     Ok(bytes) if bytes.len() == 32 => {
@@ -806,21 +803,19 @@ mod test {
 
                 let new_balance = current_balance
                     .checked_add(primitive_types::U256::from(amount))
-                    .ok_or_else(|| {
-                        TezosXRuntimeError::Custom("Balance overflow".to_string())
-                    })?;
+                    .expect("Balance overflow");
                 let mut balance_bytes = [0u8; 32];
                 new_balance.to_little_endian(&mut balance_bytes);
-                host.store_write_all(&full_path, &balance_bytes)?;
+                host.store_write_all(&full_path, &balance_bytes).unwrap();
 
-                Ok(http::Response::builder()
+                http::Response::builder()
                     .status(http::StatusCode::OK)
                     .header(
                         tezosx_interfaces::X_TEZOS_GAS_CONSUMED,
                         MOCK_TEZOS_GAS_CONSUMED.to_string(),
                     )
                     .body(Vec::new())
-                    .unwrap())
+                    .unwrap()
             }
 
             fn host(&self) -> &'static str {

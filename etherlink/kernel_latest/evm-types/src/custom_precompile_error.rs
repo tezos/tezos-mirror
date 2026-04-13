@@ -10,7 +10,8 @@ use crate::Error;
 
 #[derive(Debug)]
 pub enum CustomPrecompileError {
-    Abort(RuntimeError),
+    RuntimeAbort(RuntimeError),
+    CracAbort(String),
     Revert(String),
     RevertKeepGas(String, Gas),
     OutOfGas(Gas),
@@ -22,7 +23,7 @@ impl From<RuntimeError> for CustomPrecompileError {
             RuntimeError::PathNotFound => {
                 CustomPrecompileError::Revert("Path not found".to_string())
             }
-            other => CustomPrecompileError::Abort(other),
+            other => CustomPrecompileError::RuntimeAbort(other),
         }
     }
 }

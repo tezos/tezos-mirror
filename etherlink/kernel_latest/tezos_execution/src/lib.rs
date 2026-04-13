@@ -5,6 +5,7 @@ use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
 use enshrined_contracts::get_enshrined_contract_entrypoint;
+use enshrined_contracts::CracError;
 use mir::ast::BinWriter;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
@@ -363,7 +364,10 @@ where
                                     })
                                 }
                             }
-                            Err(err) => {
+                            Err(CracError::BlockAbort(msg)) => {
+                                return Err(ApplyOperationError::BlockAbort(msg));
+                            }
+                            Err(CracError::Operation(err)) => {
                                 failed = Some(index);
                                 log!(Error, "Internal transfer failed: {err:?}");
                                 ContentResult::Failed(
@@ -530,7 +534,7 @@ fn transfer<'a, Host, C: Context>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     skip_sender_debit: bool,
     nonce_counter: &mut u16,
-) -> Result<TransferSuccess, TransferError>
+) -> Result<TransferSuccess, CracError>
 where
     Host: StorageV1,
 {
@@ -542,11 +546,11 @@ where
                 .map_err(|_| TransferError::OutOfGas)?;
 
             if param != Micheline::from(()) || !entrypoint.is_default() {
-                return Err(TransferError::NonSmartContractExecutionCall);
+                return Err(TransferError::NonSmartContractExecutionCall.into());
             }
             // Transfers of 0 tez to an implicit contract are rejected.
             if amount.eq(&0_u64.into()) {
-                return Err(TransferError::EmptyImplicitTransfer);
+                return Err(TransferError::EmptyImplicitTransfer.into());
             };
 
             let dest_account = tc_ctx
@@ -624,7 +628,7 @@ where
                 .map_err(|_| TransferError::OutOfGas)?;
             let lazy_storage_diff =
                 convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
-            execute_internal_operations(
+            match execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
                 registry,
@@ -634,10 +638,19 @@ where
                 parser,
                 all_internal_receipts,
                 nonce_counter,
-            )
-            .map_err(|err| {
-                TransferError::FailedToExecuteInternalOperation(err.to_string())
-            })?;
+            ) {
+                Ok(()) => {}
+                Err(ApplyOperationError::BlockAbort(msg)) => {
+                    return Err(CracError::BlockAbort(msg))
+                }
+                Err(other) => {
+                    return Err(CracError::Operation(
+                        TransferError::FailedToExecuteInternalOperation(
+                            other.to_string(),
+                        ),
+                    ))
+                }
+            }
             // Append any pre-built internal operations (e.g. from
             // enshrined gateway contracts).
             all_internal_receipts.extend(exec_result.prebuilt_receipts);
@@ -707,7 +720,7 @@ fn transfer_external<'a, Host, C: Context>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
     nonce_counter: &mut u16,
-) -> Result<TransferTarget, TransferError>
+) -> Result<TransferTarget, CracError>
 where
     Host: StorageV1,
 {
@@ -716,7 +729,8 @@ where
         operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
-    let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value)
+        .map_err(|e| CracError::Operation(TransferError::from(e)))?;
 
     transfer(
         tc_ctx,
@@ -753,16 +767,22 @@ pub struct CrossRuntimeTransferResult {
 /// collected before the failure (RFC Example 4: backtracked / failed /
 /// skipped statuses).
 pub struct CracTransferError {
-    pub error: TransferError,
+    pub error: CracError,
     pub internal_receipts: Vec<InternalOperationSum>,
 }
 
-impl From<TransferError> for CracTransferError {
-    fn from(error: TransferError) -> Self {
+impl From<CracError> for CracTransferError {
+    fn from(error: CracError) -> Self {
         Self {
             error,
             internal_receipts: vec![],
         }
+    }
+}
+
+impl From<TransferError> for CracTransferError {
+    fn from(error: TransferError) -> Self {
+        Self::from(CracError::Operation(error))
     }
 }
 
@@ -844,8 +864,10 @@ where
                 // receipt can include backtracked/failed/skipped ops
                 // (RFC Example 4).
                 Err(CracTransferError {
-                    error: TransferError::FailedToExecuteInternalOperation(
-                        "internal operation failed during cross-runtime call".into(),
+                    error: CracError::Operation(
+                        TransferError::FailedToExecuteInternalOperation(
+                            "internal operation failed during cross-runtime call".into(),
+                        ),
                     ),
                     internal_receipts,
                 })
@@ -1189,7 +1211,7 @@ fn execute_smart_contract<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, TransferError>
+) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, CracError>
 where
     Host: StorageV1,
 {
@@ -1293,7 +1315,8 @@ where
         validation_info,
         block_ctx,
         &mut nonce_counter,
-    );
+    )
+    .map_err(OperationError::BlockAbort)?;
 
     if applied {
         log!(
@@ -1329,7 +1352,7 @@ fn apply_batch<Host, C: Context>(
     validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
-) -> (Vec<ProcessedOperation>, bool)
+) -> Result<(Vec<ProcessedOperation>, bool), String>
 where
     Host: StorageV1,
 {
@@ -1371,7 +1394,7 @@ where
                 &mut next_temporary_id,
                 block_ctx,
                 nonce_counter,
-            )
+            )?
         };
 
         if first_failure.is_none()
@@ -1401,10 +1424,10 @@ where
                     &mut processed.operation_with_metadata.receipt,
                 )
             });
-        return (processed_ops, false);
+        return Ok((processed_ops, false));
     }
 
-    (processed_ops, true)
+    Ok((processed_ops, true))
 }
 
 fn log_on_operation_failure<T, E: std::fmt::Debug>(
@@ -1428,7 +1451,7 @@ fn apply_operation<Host, C: Context>(
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
     nonce_counter: &mut u16,
-) -> ProcessedOperation
+) -> Result<ProcessedOperation, String>
 where
     Host: StorageV1,
 {
@@ -1478,7 +1501,20 @@ where
                 &parser,
                 nonce_counter,
             );
-            log_on_operation_failure("Transfer", &transfer_result);
+            let transfer_result = match transfer_result {
+                Ok(v) => Ok(v),
+                Err(CracError::BlockAbort(msg)) => {
+                    log!(
+                        Error,
+                        "Block abort was triggered by a Michelson transfer: {msg}"
+                    );
+                    return Err(msg);
+                }
+                Err(CracError::Operation(e)) => {
+                    log!(Error, "Transfer failed because of: {e:?}");
+                    Err(e)
+                }
+            };
             OperationResultSum::Transfer(produce_operation_result(
                 validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
@@ -1519,13 +1555,13 @@ where
     // sub-operations). Skipped operations never reach this point: they are
     // built directly in `apply_batch` with `operation_consumed_milligas: 0`.
     let operation_consumed_milligas = tc_ctx.operation_gas.total_milligas_consumed();
-    ProcessedOperation {
+    Ok(ProcessedOperation {
         operation_with_metadata: OperationWithMetadata {
             content: validated_operation.content.into_manager_operation_content(),
             receipt,
         },
         operation_consumed_milligas,
-    }
+    })
 }
 
 /// Shared test utilities for gateway testing
@@ -1589,12 +1625,16 @@ pub(crate) mod test_utils {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        ) -> http::Response<Vec<u8>>
         where
             Host: StorageV1,
         {
             self.serve_calls.borrow_mut().push(request);
-            Ok(http::Response::builder().status(200).body(vec![]).unwrap())
+            http::Response::builder()
+                .status(200)
+                .header(tezosx_interfaces::X_TEZOS_GAS_CONSUMED, "0")
+                .body(vec![])
+                .unwrap()
         }
     }
 
@@ -1652,15 +1692,15 @@ pub(crate) mod test_utils {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        ) -> http::Response<Vec<u8>>
         where
             Host: StorageV1,
         {
             self.serve_calls.borrow_mut().push(request);
-            Ok(http::Response::builder()
+            http::Response::builder()
                 .status(self.status_code)
                 .body(self.response_body.clone())
-                .unwrap())
+                .unwrap()
         }
     }
 }
@@ -1756,7 +1796,7 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _request: http::Request<Vec<u8>>,
-        ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+        ) -> http::Response<Vec<u8>>
         where
             Host: StorageV1,
         {
@@ -6633,14 +6673,14 @@ mod tests {
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
                 _request: http::Request<Vec<u8>>,
-            ) -> Result<http::Response<Vec<u8>>, TezosXRuntimeError>
+            ) -> http::Response<Vec<u8>>
             where
                 Host: StorageV1,
             {
-                Ok(http::Response::builder()
-                    .status(http::StatusCode::INTERNAL_SERVER_ERROR)
+                http::Response::builder()
+                    .status(http::StatusCode::BAD_REQUEST)
                     .body(b"reverted".to_vec())
-                    .unwrap())
+                    .unwrap()
             }
         }
 

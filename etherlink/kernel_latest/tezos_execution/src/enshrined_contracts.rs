@@ -34,6 +34,31 @@ use crate::alias::{get_alias, store_alias};
 use crate::account_storage::TezlinkAccount;
 use crate::mir_ctx::{HasContractAccount, HasHost, HasOperationGas};
 
+/// Errors from CRAC-capable operations. The two variants have fundamentally
+/// different semantics and must be handled at different levels.
+#[derive(Debug)]
+pub enum CracError {
+    /// Operation-level failure (4xx, bad input, etc.), revert this operation only.
+    Operation(TransferError),
+    /// The target runtime is broken (5xx), abort the entire block.
+    BlockAbort(String),
+}
+
+impl std::fmt::Display for CracError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CracError::Operation(e) => write!(f, "{e}"),
+            CracError::BlockAbort(msg) => write!(f, "block abort: {msg}"),
+        }
+    }
+}
+
+impl From<TransferError> for CracError {
+    fn from(e: TransferError) -> Self {
+        CracError::Operation(e)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EnshrinedContracts {
     TezosXGateway,
@@ -124,7 +149,7 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-) -> Result<Vec<OperationInfo<'a>>, TransferError>
+) -> Result<Vec<OperationInfo<'a>>, CracError>
 where
     Host: StorageV1,
 {
@@ -135,7 +160,8 @@ where
                 let TypedValue::String(dest) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected string for default entrypoint".into(),
-                    ));
+                    )
+                    .into());
                 };
                 tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])?;
                 Ok(vec![])
@@ -151,6 +177,7 @@ where
                 match callback {
                     Some(destination) => {
                         dispatch_callback(ctx, destination, response_body)
+                            .map_err(Into::into)
                     }
                     None => Ok(vec![]),
                 }
@@ -164,24 +191,15 @@ where
                     journal,
                     registry,
                 )?;
-                let response = registry
-                    .serve(ctx.host(), journal, request)
-                    .map_err(|err| TransferError::GatewayError(err.to_string()))?;
-                let consumed_milligas =
-                    extract_gas_consumed(&response, target_host.as_deref())?;
-                ctx.operation_gas()
-                    .cast_and_consume_milligas(consumed_milligas)
-                    .map_err(|_| TransferError::OutOfGas)?;
-                if !response.status().is_success() {
-                    return Err(TransferError::GatewayError(format!(
-                        "Cross-runtime call failed with status {}: {}",
-                        response.status(),
-                        String::from_utf8_lossy(response.body())
-                    )));
-                }
+                let response = registry.serve(ctx.host(), journal, request);
+                let body = classify_and_charge_crac_response(
+                    response,
+                    target_host.as_deref(),
+                    ctx.operation_gas(),
+                )?;
                 match callback {
                     Some(destination) => {
-                        dispatch_callback(ctx, destination, response.into_body())
+                        dispatch_callback(ctx, destination, body).map_err(Into::into)
                     }
                     None => Ok(vec![]),
                 }
@@ -198,13 +216,15 @@ where
                 let TypedValue::Bytes(_payload) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
-                    ));
+                    )
+                    .into());
                 };
                 Ok(vec![])
             } else {
                 Err(TransferError::GatewayError(format!(
                     "Unknown entrypoint: {entrypoint}"
-                )))
+                ))
+                .into())
             }
         }
         EnshrinedContracts::ERC20Wrapper => {
@@ -215,7 +235,8 @@ where
                 _ => {
                     return Err(TransferError::GatewayError(format!(
                         "Unknown ERC-20 wrapper entrypoint: {entrypoint}"
-                    )))
+                    ))
+                    .into())
                 }
             };
             let (evm_contract, addr_bytes, amount) =
@@ -754,12 +775,12 @@ fn tezosx_cross_runtime_call<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
     dest: &str,
     data: &[u8],
-) -> Result<Vec<u8>, TransferError>
+) -> Result<Vec<u8>, CracError>
 where
     Host: StorageV1,
 {
     if ctx.amount() < 0 {
-        return Err(TransferError::GatewayError("Negative amount".into()));
+        return Err(TransferError::GatewayError("Negative amount".into()).into());
     }
 
     // Build an HTTP POST request targeting the Ethereum runtime.
@@ -781,26 +802,21 @@ where
         registry,
     )?;
 
-    let response = registry
-        .serve(ctx.host(), journal, request)
-        .map_err(|err| TransferError::GatewayError(err.to_string()))?;
+    let response = registry.serve(ctx.host(), journal, request);
+    let response_body = classify_and_charge_crac_response(
+        response,
+        Some("ethereum"),
+        ctx.operation_gas(),
+    )?;
 
-    if response.status().is_success() {
-        // Debit the gateway: after a successful call, the gateway
-        // forwarded the funds to EVM so its balance should be reset to 0.
-        let account = ctx.contract_account().clone();
-        let host = ctx.host();
-        account
-            .set_balance(host, &0u64.into())
-            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-        Ok(response.into_body())
-    } else {
-        Err(TransferError::GatewayError(format!(
-            "Cross-runtime call failed with status {}: {}",
-            response.status(),
-            String::from_utf8_lossy(response.body())
-        )))
-    }
+    // Debit the gateway: after a successful call, the gateway
+    // forwarded the funds to EVM so its balance should be reset to 0.
+    let account = ctx.contract_account().clone();
+    let host = ctx.host();
+    account
+        .set_balance(host, &0u64.into())
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    Ok(response_body)
 }
 
 fn bigint_to_u256(value: &num_bigint::BigInt) -> Result<U256, TransferError> {
@@ -821,6 +837,48 @@ fn biguint_to_u256(value: num_bigint::BigUint) -> Result<U256, TransferError> {
         ));
     }
     Ok(U256::from_little_endian(&bytes))
+}
+
+/// Classify a CRAC HTTP response and charge gas.
+///
+/// Gas is charged on a best-effort basis for all statuses, on block
+/// aborts the block is reverted anyway, so a missing header is harmless.
+/// On 2xx the header is mandatory.
+fn classify_and_charge_crac_response(
+    response: http::Response<Vec<u8>>,
+    target_host: Option<&str>,
+    operation_gas: &mut crate::gas::TezlinkOperationGas,
+) -> Result<Vec<u8>, CracError> {
+    let callee_gas = extract_gas_consumed(&response, target_host).ok();
+
+    if let Some(milligas) = callee_gas {
+        operation_gas
+            .cast_and_consume_milligas(milligas)
+            .map_err(|_| TransferError::OutOfGas)?;
+    }
+
+    if response.status().is_success() {
+        if callee_gas.is_none() {
+            return Err(TransferError::GatewayError(
+                "http_call: missing or invalid X-Tezos-Gas-Consumed header in response"
+                    .into(),
+            )
+            .into());
+        }
+        Ok(response.into_body())
+    } else if response.status().is_client_error() {
+        Err(CracError::Operation(TransferError::GatewayError(format!(
+            "Cross-runtime call failed with status {}: {}",
+            response.status(),
+            String::from_utf8_lossy(response.body())
+        ))))
+    } else {
+        Err(CracError::BlockAbort(format!(
+            "Cross-runtime call returned status {}: {}",
+            response.status(),
+            String::from_utf8_lossy(response.body())
+        )))
+    }
 }
 
 /// Extract the gas consumed from an HTTP response's `X-Tezos-Gas-Consumed`

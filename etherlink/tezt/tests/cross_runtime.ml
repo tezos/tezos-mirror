@@ -339,6 +339,84 @@ module EvmCrossRuntimeRunnerTez = struct
     unit
 end
 
+(** EVM contract that exercises the generic [call(url, headers, body, method)]
+ *  precompile to reach a Tezos target.  Increments [count] before and after
+ *  the cross-runtime call.  [runCatch()] wraps the call in try/catch. *)
+module EvmCracHttpCall = struct
+  open EvmContract
+  include EvmRunner
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.crac_http_call
+
+  let init ~sequencer ~sender ~nonce ~value ~tez_contract_target_address
+      contract =
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"initialize(string)"
+        ~arguments:[tez_contract_target_address]
+        ()
+    in
+    unit
+
+  let call_run_catch ?expected_status ~sequencer ~sender ~nonce ~value contract
+      =
+    let* receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"runCatch()"
+        ~arguments:[]
+        ?expected_status
+        ()
+    in
+    return receipt.gasUsed
+
+  let call_run_catch_with_gas_limit ?expected_status ~sequencer ~sender ~nonce
+      ~value ~gas_limit contract =
+    let* receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"runCatchWithGasLimit(uint256)"
+        ~arguments:[string_of_int gas_limit]
+        ?expected_status
+        ()
+    in
+    return receipt.gasUsed
+
+  let check_storage ~sequencer ?(expected_catches = 0) ~expected_counter
+      contract =
+    let count_storage_pos = "0x00" in
+    let*@ evm_count =
+      Rpc.get_storage_at ~address:contract ~pos:count_storage_pos sequencer
+    in
+    Check.(
+      (int_of_string evm_count = expected_counter)
+        int
+        ~error_msg:"Expected EvmCracHttpCall `count` %R but got %L") ;
+    let catches_storage_pos = "0x01" in
+    let*@ evm_catches =
+      Rpc.get_storage_at ~address:contract ~pos:catches_storage_pos sequencer
+    in
+    Check.(
+      (int_of_string evm_catches = expected_catches)
+        int
+        ~error_msg:"Expected EvmCracHttpCall `catches` %R but got %L") ;
+    unit
+end
+
 (** EVM contract that iterates [run()] over its [callees].  Before
  *  each call, increments [counter].  If a callee's revert is caught,
  *  increments [catches] instead of propagating.  After all calls,
@@ -522,6 +600,29 @@ module TezMultiRunCaller = struct
     unit
 end
 
+(** Tezos contract that burns all available gas by looping forever.
+ *  Exposes [%run] for compatibility with the CRAC runner framework. *)
+module TezGasBurner = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    let script_name = ["mini_scenarios"; "gas_burner"] in
+    let init_storage_data = "Unit" in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -565,6 +666,26 @@ module CracRunnerWrapper = struct
       val check_storage : expected_counter:int -> evm_runner -> unit Lwt.t
     end
 
+    module EvmCracHttpCall : sig
+      val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
+
+      val call_run_catch :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
+
+      val call_run_catch_with_gas_limit :
+        ?expected_status:bool ->
+        ?value:Wei.t ->
+        gas_limit:int ->
+        evm_runner ->
+        int64 Lwt.t
+
+      val check_storage :
+        ?expected_catches:int ->
+        expected_counter:int ->
+        evm_runner ->
+        unit Lwt.t
+    end
+
     module EvmMultiRunCaller : sig
       val deploy_and_init :
         ?value:Wei.t ->
@@ -599,6 +720,10 @@ module CracRunnerWrapper = struct
         tez_runner Lwt.t
 
       val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezGasBurner : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
   end
 
@@ -689,6 +814,69 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter (`Evm_runner runner) =
           EvmCrossRuntimeRunnerTez.check_storage
             ~sequencer
+            ~expected_counter
+            runner
+      end
+
+      module EvmCracHttpCall = struct
+        let deploy_and_init ?(value = Wei.zero) (`Tez_runner (_, address)) =
+          let* addr =
+            EvmCracHttpCall.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmCracHttpCall.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~tez_contract_target_address:address
+              addr
+          in
+          return (`Evm_runner addr)
+
+        let call_run_catch ?expected_status ?(value = Wei.zero)
+            (`Evm_runner runner) =
+          let* gas_used =
+            EvmCracHttpCall.call_run_catch
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
+
+        let call_run_catch_with_gas_limit ?expected_status ?(value = Wei.zero)
+            ~gas_limit (`Evm_runner runner) =
+          let* gas_used =
+            EvmCracHttpCall.call_run_catch_with_gas_limit
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~gas_limit
+              runner
+          in
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
+
+        let check_storage ?expected_catches ~expected_counter
+            (`Evm_runner runner) =
+          EvmCracHttpCall.check_storage
+            ~sequencer
+            ?expected_catches
             ~expected_counter
             runner
       end
@@ -799,6 +987,24 @@ module CracRunnerWrapper = struct
             ~sc_rollup_node
             ~expected_counter
             (runner_hex, runner_address)
+      end
+
+      module TezGasBurner = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezGasBurner.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
       end
     end in
     (module Helper)
@@ -1073,7 +1279,7 @@ let test_crac_tez_multiple_independent_crossings =
     TezMultiRunCaller.originate ~callees:[tez_bridge_1; tez_bridge_2] ()
   in
   Log.debug ~prefix "Call TEZ main" ;
-  let* () = TezRunner.call_run tez_main in
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:3 tez_main in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:1 evm_runner_1 in
@@ -1154,7 +1360,7 @@ let test_crac_tez_shared_leaf_via_direct_and_chain =
       ()
   in
   Log.debug ~prefix "Call TEZ main" ;
-  let* () = TezRunner.call_run tez_main in
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
   let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_leaf in
@@ -2592,9 +2798,6 @@ let test_crac_tez_catch_deep_revert_through_double_crac =
       ()
   in
   Log.debug ~prefix "Call TEZ main" ;
-  (* The default gas_limit (10_000) is too low: the inner try-catch path
-     crosses three runtimes (TEZ->EVM->TEZ->EVM) and adds extra EVM contract calls,
-     exhausting the budget. 20_000 provides enough headroom. *)
   let* () = TezRunner.call_run ~gas_limit:200_000 tez_main in
   Log.debug ~prefix "Verify counters" ;
   let* () = TezMultiRunCaller.check_storage ~expected_counter:4 tez_main in
@@ -5037,6 +5240,92 @@ let test_crac_receipt_tez_mixed_calls_with_crac =
   check_fake_crac_tx_hash ~prefix ~expected_crac_id:"0-0" block ;
   unit
 
+(** Generic call() precompile: EVM calls TEZ via HTTP, succeeds.
+ *
+ *    EVM[evm_caller] --call()--> TEZ[tez_runner]
+ *
+ *)
+let test_crac_http_call_success =
+  register_crac_runner_test
+    ~title:"CRAC: generic call() EVM to TEZ success"
+    ~tags:["http_call"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP" in
+  Log.debug ~prefix "Originate TEZ runner" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM caller using generic call()" ;
+  let* evm_caller = EvmCracHttpCall.deploy_and_init tez_runner in
+  Log.debug ~prefix "Call run() on EVM caller" ;
+  let* _ = EvmRunner.call_run evm_caller in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmCracHttpCall.check_storage ~expected_counter:2 evm_caller in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_runner in
+  unit
+
+(** Generic call() precompile: TEZ target reverts, 4xx is caught.
+ *
+ *    EVM[evm_caller] --call()--> TEZ[tez_reverter]
+ *                                |-> REVERT
+ *    runCatch() catches the revert, execution continues.
+ *
+ *)
+let test_crac_http_call_catch_revert =
+  register_crac_runner_test
+    ~title:"CRAC: generic call() 4xx is catchable"
+    ~tags:["http_call"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP" in
+  Log.debug ~prefix "Originate TEZ reverter" ;
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  Log.debug ~prefix "Deploy EVM caller using generic call()" ;
+  let* evm_caller = EvmCracHttpCall.deploy_and_init tez_reverter in
+  Log.debug ~prefix "Call runCatch() on EVM caller" ;
+  let* _ = EvmCracHttpCall.call_run_catch evm_caller in
+  Log.debug ~prefix "Verify counters: catches=1, count=2 (pre + post catch)" ;
+  let* () =
+    EvmCracHttpCall.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_caller
+  in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  unit
+
+(** Generic call() precompile: TEZ target OOGs, parent catches and continues.
+ *
+ *    EVM[evm_caller] --call(gasLimit)--> TEZ[gas_burner]
+ *                                        |-> OOG (loops forever)
+ *    runCatchWithGasLimit() forwards limited gas to the subcall.
+ *    The subcall OOGs (429), the catch triggers, and the parent
+ *    continues with its remaining gas.
+ *
+ *)
+let test_crac_http_call_catch_oog =
+  register_crac_runner_test
+    ~title:"CRAC: generic call() subcall OOG is catchable"
+    ~tags:["http_call"; "oog"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP" in
+  Log.debug ~prefix "Originate TEZ gas burner" ;
+  let* tez_burner = TezGasBurner.originate () in
+  Log.debug ~prefix "Deploy EVM caller using generic call()" ;
+  let* evm_caller = EvmCracHttpCall.deploy_and_init tez_burner in
+  Log.debug ~prefix "Call runCatchWithGasLimit() on EVM caller" ;
+  let* _ =
+    EvmCracHttpCall.call_run_catch_with_gas_limit ~gas_limit:50000 evm_caller
+  in
+  Log.debug ~prefix "Verify counters: catches=1, count=2 (pre + post catch)" ;
+  let* () =
+    EvmCracHttpCall.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_caller
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -5102,4 +5391,7 @@ let () =
   test_crac_receipt_tez_to_evm [Alpha] ;
   test_crac_receipt_tez_evm_tez_evm [Alpha] ;
   test_crac_receipt_evm_5_crossing_chain [Alpha] ;
-  test_crac_receipt_tez_mixed_calls_with_crac [Alpha]
+  test_crac_receipt_tez_mixed_calls_with_crac [Alpha] ;
+  test_crac_http_call_success [Alpha] ;
+  test_crac_http_call_catch_revert [Alpha] ;
+  test_crac_http_call_catch_oog [Alpha]
