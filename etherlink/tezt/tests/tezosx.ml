@@ -26,7 +26,7 @@ let runtime_tags = List.map Tezosx_runtime.tag
 
 module Setup = struct
   let register_sandbox_test ?uses_client ~title ~tags ~with_runtimes
-      ?tez_bootstrap_accounts ?chain_id =
+      ?tez_bootstrap_accounts ?chain_id ?enable_michelson_gas_refund =
     Test_helpers.register_sandbox
       ~__FILE__
       ?uses_client
@@ -36,6 +36,7 @@ module Setup = struct
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
+      ?enable_michelson_gas_refund
 
   let register_sandbox_regression_test ?uses_client ~title ~tags ~with_runtimes
       ?tez_bootstrap_accounts body =
@@ -109,6 +110,22 @@ let test_runtime_feature_flag ~runtime () =
         "Could not read feature flag %s: %s"
         (Tezosx_runtime.feature_flag runtime)
         err.message
+
+let test_gas_refund_feature_flag () =
+  Setup.register_sandbox_test
+    ~title:"Set gas refund feature flag"
+    ~tags:["feature_flag"; "gas_refund"]
+    ~with_runtimes:[Tezos]
+    ~enable_michelson_gas_refund:true
+  @@ fun sandbox ->
+  let* rpc_result =
+    Rpc.state_value sandbox "/tezlink/feature_flags/enable_michelson_gas_refund"
+  in
+  match rpc_result with
+  | Ok (Some _) -> unit
+  | Ok None -> Test.fail "Feature flag for gas refund was not set"
+  | Error err ->
+      Test.fail "Could not read gas refund feature flag: %s" err.message
 
 let tezos_client node =
   let endpoint =
@@ -3650,6 +3667,7 @@ let () =
   test_evm_gateway_catch_revert [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
+  test_gas_refund_feature_flag () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
   test_get_ethereum_tezos_address_rpc ~runtime:Tezos () ;
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;

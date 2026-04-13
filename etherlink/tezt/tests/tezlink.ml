@@ -84,7 +84,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
     ?catchup_cooldown ?da_fee ?sequencer_pool_address
-    ?michelson_to_evm_gas_multiplier scenario =
+    ?michelson_to_evm_gas_multiplier ?enable_michelson_gas_refund scenario =
   let scenario setup protocol =
     let* () =
       if wait_for_valid_block then
@@ -121,6 +121,7 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     ~enable_dal:false
     ~enable_multichain:false
     ~instant_confirmations:false
+    ?enable_michelson_gas_refund
     scenario
 
 let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
