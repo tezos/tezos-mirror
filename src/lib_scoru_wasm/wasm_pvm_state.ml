@@ -184,28 +184,44 @@ module Internal_state = struct
 
   (** Durable storage configuration for the PVM.
 
-      [Irmin_only] provides only the Irmin-backed durable storage.
+      [Durable_only] provides only the Irmin-backed durable storage.
       [Dual] additionally carries an opaque NDS handle alongside the
       Irmin storage. *)
   type pvm_storage =
-    | Irmin_only of {durable : Durable.t}
+    | Durable_only of {durable : Durable.t}
     | Dual of {durable : Durable.t; nds : Nds.t}
+
+  let to_eval_storage = function
+    | Durable_only {durable} ->
+        Tezos_webassembly_interpreter.Eval_storage.durable_only
+          (Durable.to_storage durable)
+    | Dual {durable; nds} ->
+        Tezos_webassembly_interpreter.Eval_storage.dual
+          (Durable.to_storage durable)
+          nds
 
   (** [durable_of storage] extracts the [Durable.t] from either storage
       variant. *)
   let durable_of = function
-    | Irmin_only {durable} -> durable
+    | Durable_only {durable} -> durable
     | Dual {durable; _} -> durable
 
-  (** [nds_of storage] returns [Some nds] for [Dual] and [None] for
-      [Irmin_only]. *)
-  let nds_of = function Irmin_only _ -> None | Dual {nds; _} -> Some nds
+  let of_eval_storage ~default
+      (eval_storage : Tezos_webassembly_interpreter.Eval_storage.t) =
+    let durable =
+      Durable.of_storage
+        ~default:(durable_of default)
+        (Tezos_webassembly_interpreter.Eval_storage.durable_of eval_storage)
+    in
+    match default with
+    | Durable_only _ -> Durable_only {durable}
+    | Dual {nds; _} -> Dual {durable; nds}
 
   (** [update_durable storage durable] replaces the [Durable.t] inside
       [storage] while preserving the variant and any NDS handle. *)
   let update_durable storage durable =
     match storage with
-    | Irmin_only _ -> Irmin_only {durable}
+    | Durable_only _ -> Durable_only {durable}
     | Dual {nds; _} -> Dual {durable; nds}
 
   type pvm_state = {

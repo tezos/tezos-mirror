@@ -61,7 +61,7 @@ let test_store_has_missing_key ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_has
       values
@@ -98,7 +98,7 @@ let test_store_has_key_too_long ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_has
       values
@@ -112,7 +112,7 @@ let test_store_has_key_too_long ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_has
       values
@@ -155,7 +155,7 @@ let test_store_list_size ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_list_size
       values
@@ -217,7 +217,7 @@ let test_store_get_nth_key ~version () =
         Eval.invoke
           ~module_reg
           ~caller:module_key
-          ~durable
+          ~storage:(Eval_storage.Durable_only durable)
           host_funcs_registry
           Host_funcs.Internal_for_tests.store_get_nth_key
           wrong_value
@@ -239,7 +239,7 @@ let test_store_get_nth_key ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_get_nth_key
       value_at_zero
@@ -258,7 +258,7 @@ let test_store_get_nth_key ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_get_nth_key
       value_at_one
@@ -277,7 +277,7 @@ let test_store_get_nth_key ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_get_nth_key
       value_at_two
@@ -296,7 +296,7 @@ let test_store_get_nth_key ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_get_nth_key
       truncated_value_at_two
@@ -344,7 +344,7 @@ let test_store_get_hash ~version =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable:durable_storage
+      ~storage:(Eval_storage.Durable_only durable_storage)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_get_hash
       values
@@ -413,7 +413,7 @@ let test_store_exists ~version =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable:durable_storage
+      ~storage:(Eval_storage.Durable_only durable_storage)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_exists
       values
@@ -475,17 +475,17 @@ let test_store_delete_generic ~kind ~version =
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       store_delete
       values
   in
   assert (result = [Values.(Num (I32 0l))]) ;
-  let durable = Durable.of_storage_exn durable in
+  let durable = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* value_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn key
   in
@@ -538,7 +538,7 @@ let test_store_has_existing_key ~version () =
       Eval.invoke
         ~module_reg
         ~caller:module_key
-        ~durable
+        ~storage:(Eval_storage.Durable_only durable)
         host_funcs_registry
         Host_funcs.Internal_for_tests.store_has
         values
@@ -677,18 +677,18 @@ let test_store_copy ~version () =
         Num (I32 to_length);
       ]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_copy
       values
   in
   (* If everything goes well, the function returns `0l`. *)
   assert (result = [Values.(Num (I32 0l))]) ;
-  let durable = Durable.of_storage_exn durable in
+  let durable = Durable.of_storage_exn (Eval_storage.durable_of storage) in
 
   let* new_value_at_two =
     Durable.find_value durable @@ Durable.key_of_string_exn wrong_key
@@ -738,7 +738,7 @@ let test_store_copy_missing_path ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_copy
       values
@@ -791,18 +791,18 @@ let test_store_move ~version () =
         Num (I32 to_length);
       ]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_move
       values
   in
   (* If everything goes well, the function returns `0l`. *)
   assert (result = [Values.(Num (I32 0l))]) ;
-  let durable = Durable.of_storage_exn durable in
+  let durable = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* empty_from_tree_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn from_key
   in
@@ -851,7 +851,7 @@ let test_store_move_missing_path ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_move
       values
@@ -893,7 +893,7 @@ let test_store_read ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_read
       values
@@ -940,7 +940,7 @@ let test_store_read_non_value ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_read
       values
@@ -957,7 +957,7 @@ let test_store_value_size ~version () =
       Eval.invoke
         ~module_reg
         ~caller
-        ~durable
+        ~storage:(Eval_storage.Durable_only durable)
         host_funcs_reg
         Host_funcs.Internal_for_tests.store_value_size
         values
@@ -1047,17 +1047,17 @@ let test_store_write ~version () =
         Num (I32 (Int32.of_int @@ String.length contents));
       ]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_write
       values
   in
   assert (result = [Values.Num (I32 0l)]) ;
-  let tree = Durable.of_storage_exn durable in
+  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn existing_key
   in
@@ -1083,7 +1083,7 @@ let test_store_write ~version () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_write
       values
@@ -1104,17 +1104,17 @@ let test_store_write ~version () =
         Num (I32 (Int32.of_int @@ String.length contents));
       ]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_write
       values
   in
   assert (result = [Values.Num (I32 0l)]) ;
-  let tree = Durable.of_storage_exn durable in
+  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn new_key
   in
@@ -1158,17 +1158,17 @@ let test_store_create ~version =
     Values.
       [Num (I32 new_key_src); Num (I32 new_key_length); Num (I32 valid_size)]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_create
       create_values
   in
   assert (result = [Values.Num (I32 0l)]) ;
-  let tree = Durable.of_storage_exn durable in
+  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* new_value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn new_key
   in
@@ -1189,11 +1189,11 @@ let test_store_create ~version =
         Num (I32 value_size);
       ]
   in
-  let* durable, result =
+  let* storage, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_create
       create_existing_key_values
@@ -1201,7 +1201,7 @@ let test_store_create ~version =
   assert (
     result
     = [Values.Num (I32 Host_funcs.Error.(code Store_value_already_exists))]) ;
-  let tree = Durable.of_storage_exn durable in
+  let tree = Durable.of_storage_exn (Eval_storage.durable_of storage) in
   let* value =
     Durable.find_value_exn tree @@ Durable.key_of_string_exn existing_key
   in
@@ -1258,7 +1258,7 @@ let test_store_create ~version =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      ~durable
+      ~storage:(Eval_storage.Durable_only durable)
       host_funcs_registry
       Host_funcs.Internal_for_tests.store_create
       create_with_invalid_size_values
