@@ -216,3 +216,4 @@ node_modules/
 
 # AI agent files
 .claude/*.local.md
+.opencode/
