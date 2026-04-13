@@ -53,20 +53,6 @@ let world_state state chain_id =
 
 let storage_version = Durable_storageV2.storage_version
 
-let sequencer =
- fun ?storage_version state ->
-  let open Lwt_result_syntax in
-  let* sequencer_path =
-    let* storage_version =
-      match storage_version with
-      | Some storage_version -> return storage_version
-      | None -> Durable_storageV2.storage_version state
-    in
-    return (Durable_storage_path.sequencer_key ~storage_version)
-  in
-  inspect_durable_and_decode state sequencer_path (fun bytes ->
-      Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
-
 let block_number ~root state n =
   let open Lwt_result_syntax in
   match n with

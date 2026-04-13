@@ -169,9 +169,7 @@ module Worker = struct
         let signals = List.map snd ready_injections in
         let*! head_info = Evm_context.head_info () in
         let* expected_sequencer =
-          Durable_storage.sequencer
-            ~storage_version:head_info.storage_version
-            head_info.evm_state
+          Durable_storageV2.read Sequencer_key head_info.evm_state
         in
         let*? signer = Signer.get_signer state.signer expected_sequencer in
         let* payload =

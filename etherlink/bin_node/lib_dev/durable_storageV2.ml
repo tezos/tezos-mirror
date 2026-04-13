@@ -51,6 +51,7 @@ type _ path =
   | Kernel_version : string path
   | Kernel_root_hash : Ethereum_types.hex path
   | Multichain_flag : unit path
+  | Sequencer_key : Signature.Public_key.t path
   | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
 
 type 'a resolved = {
@@ -62,7 +63,6 @@ type 'a resolved = {
 type 'a resolution =
   | Static of 'a resolved
   | Versioned of (storage_version:int -> 'a resolved)
-[@@warning "-37"]
 
 let resolve : type a. a path -> a resolution =
   let infallible_decode decode bytes = Ok (decode bytes) in
@@ -112,6 +112,16 @@ let resolve : type a. a path -> a resolution =
           decode = (fun _bytes -> Ok ());
           encode = (fun () -> "");
         }
+  | Sequencer_key ->
+      Versioned
+        (fun ~storage_version ->
+          {
+            path = Durable_storage_path.sequencer_key ~storage_version;
+            decode =
+              (fun bytes ->
+                Signature.Public_key.of_b58check (Bytes.to_string bytes));
+            encode = (fun pk -> Signature.Public_key.to_b58check pk);
+          })
   | Chain_config_family cid ->
       Static
         {
