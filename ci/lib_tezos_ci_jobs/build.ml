@@ -195,7 +195,7 @@ let job_build_static_linux_released_binaries =
   Cacio.parameterize @@ fun mode ->
   let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
   CI.job
-    ("oc.build:static-" ^ arch_string ^ "-linux-binaries")
+    ("oc.build:static-" ^ arch_string ^ "-linux-released-binaries")
     ~__POS__
     ~description:
       ("Build the static Octez released binaries for " ^ arch_string ^ ".")

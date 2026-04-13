@@ -4650,7 +4650,7 @@ oc.build:static-arm64-linux-experimental-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-arm64-linux-binaries:
+oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -5055,7 +5055,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -5363,14 +5363,14 @@ tezt-static-binaries:
   - oc.docker:ci:amd64
   - trigger
   - select_tezts
-  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-x86_64-linux-experimental-binaries
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp
   dependencies:
   - oc.docker:ci:amd64
   - select_tezts
-  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
   - oc.build:static-x86_64-linux-experimental-binaries
   - oc.build_x86_64-extra-dev
   - oc.build_x86_64-exp

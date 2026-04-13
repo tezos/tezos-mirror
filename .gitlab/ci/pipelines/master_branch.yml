@@ -158,7 +158,7 @@ oc.build:static-arm64-linux-experimental-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-arm64-linux-binaries:
+oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -432,7 +432,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
