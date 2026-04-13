@@ -162,6 +162,9 @@ const MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL: RefPath =
 const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
     RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
 
+pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
+    RefPath::assert_from(b"/tezlink/feature_flags/enable_michelson_gas_refund");
+
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
     RefPath::assert_from(b"/evm/chain_configurations");
@@ -863,6 +866,10 @@ pub fn store_michelson_runtime_sunrise_level(
 #[allow(dead_code)]
 pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
     read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
+}
+
+pub fn enable_michelson_gas_refund(host: &impl StorageV1) -> bool {
+    Ok(Some(ValueType::Value)) == host.store_has(&ENABLE_MICHELSON_GAS_REFUND)
 }
 
 pub fn tweak_dal_activation(
