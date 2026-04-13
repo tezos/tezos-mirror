@@ -1147,6 +1147,8 @@ module Constants : sig
 
   val tz5_account_enable : context -> bool
 
+  val native_contracts_enable : context -> bool
+
   (** All constants: fixed and parametric and derived. *)
   type t = private {
     fixed : fixed;

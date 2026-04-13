@@ -33,6 +33,10 @@ open Environment.Error_monad
 open Protocol
 open Protocol.Alpha_context
 
+type under_feature_flag = Stez | SWRR
+
+type error += Non_activated_feature of under_feature_flag
+
 val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
