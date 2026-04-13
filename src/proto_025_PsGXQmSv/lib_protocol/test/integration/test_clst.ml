@@ -2481,7 +2481,7 @@ let () =
       src
   in
   let* clst_ticket_balance_dst1 =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst1
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst1
   in
   let* () =
     Assert.equal_int64
@@ -2490,7 +2490,7 @@ let () =
       30_000_000L
   in
   let* clst_ticket_balance_dst2 =
-    Plugin.Contract_services.clst_ticket_balance Block.rpc_ctxt b dst2
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst2
   in
   let* () =
     Assert.equal_int64
