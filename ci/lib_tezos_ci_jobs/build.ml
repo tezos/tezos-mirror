@@ -190,7 +190,7 @@ let job_build_layer1_profiling =
       "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
     ]
 
-let job_build_static_linux_binaries =
+let job_build_static_linux_released_binaries =
   Cacio.parameterize @@ fun arch ->
   Cacio.parameterize @@ fun mode ->
   let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
@@ -266,7 +266,7 @@ let register () =
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
       (Manual, job_build_exp Arm64);
-      (Manual, job_build_static_linux_binaries Arm64 `test);
+      (Manual, job_build_static_linux_released_binaries Arm64 `test);
       (Manual, job_build_static_linux_experimental_binaries Arm64);
     ] ;
   (* Even though the build jobs are automatically added by Cacio as dependencies
@@ -278,7 +278,7 @@ let register () =
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
       (Auto, job_build_layer1_profiling `test);
-      (Auto, job_build_static_linux_binaries Amd64 `test);
+      (Auto, job_build_static_linux_released_binaries Amd64 `test);
       (Auto, job_build_static_linux_experimental_binaries Amd64);
     ] ;
   Cacio.register_jobs
@@ -292,7 +292,7 @@ let register () =
       (Auto, job_build_extra_dev Arm64);
       (Auto, job_build_exp Arm64);
       (Auto, job_build_layer1_profiling `test);
-      (Auto, job_build_static_linux_binaries Arm64 `test);
+      (Auto, job_build_static_linux_released_binaries Arm64 `test);
       (Auto, job_build_static_linux_experimental_binaries Arm64);
     ] ;
   Cacio.register_jobs
@@ -301,8 +301,8 @@ let register () =
       (Manual, job_build_released Arm64);
       (Manual, job_build_extra_dev Arm64);
       (Manual, job_build_exp Arm64);
-      (Auto, job_build_static_linux_binaries Amd64 `test);
-      (Auto, job_build_static_linux_binaries Arm64 `test);
+      (Auto, job_build_static_linux_released_binaries Amd64 `test);
+      (Auto, job_build_static_linux_released_binaries Arm64 `test);
       (Auto, job_build_static_linux_experimental_binaries Amd64);
       (Auto, job_build_static_linux_experimental_binaries Arm64);
     ] ;
