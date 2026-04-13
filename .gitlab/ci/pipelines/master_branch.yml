@@ -146,6 +146,7 @@ oc.build:static-arm64-linux-experimental-binaries:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/octez-experimental-executables
+    VERSION_EXECUTABLE: octez-baker-alpha
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
@@ -420,6 +421,7 @@ oc.build:static-x86_64-linux-experimental-binaries:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/octez-experimental-executables
+    VERSION_EXECUTABLE: octez-baker-alpha
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"

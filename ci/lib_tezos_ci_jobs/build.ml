@@ -245,6 +245,7 @@ let job_build_static_linux_experimental_binaries =
       [
         ("ARCH", arch_string);
         ("EXECUTABLE_FILES", "script-inputs/octez-experimental-executables");
+        ("VERSION_EXECUTABLE", "octez-baker-alpha");
         ("DUNE_BUILD_JOBS", "-j 12");
       ]
     ~artifacts:(Gitlab_ci.Util.artifacts ["octez-binaries/$ARCH/*"])
