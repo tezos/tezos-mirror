@@ -47,6 +47,7 @@ let subkeys_durable evm_state key =
 type _ path =
   | Raw_path : string -> bytes path
   | Chain_id : L2_types.chain_id path
+  | Michelson_runtime_chain_id : L2_types.chain_id path
 
 type 'a resolved = {
   path : string;
@@ -75,6 +76,13 @@ let resolve : type a. a path -> a resolution =
           path = Durable_storage_path.chain_id;
           decode = infallible_decode L2_types.Chain_id.decode_le;
           encode = L2_types.Chain_id.encode_le;
+        }
+  | Michelson_runtime_chain_id ->
+      Static
+        {
+          path = Durable_storage_path.michelson_runtime_chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_be;
+          encode = L2_types.Chain_id.encode_be;
         }
 
 let storage_version state =

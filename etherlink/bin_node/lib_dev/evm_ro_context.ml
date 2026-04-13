@@ -43,7 +43,7 @@ let read_enable_multichain_flag ctxt =
 let chain_id ctxt = with_latest_state ctxt (Durable_storageV2.read Chain_id)
 
 let michelson_runtime_chain_id ctxt =
-  with_latest_state ctxt Durable_storage.michelson_runtime_chain_id
+  with_latest_state ctxt (Durable_storageV2.read Michelson_runtime_chain_id)
 
 let michelson_activation_level ctxt =
   with_latest_read ctxt Durable_storage.michelson_runtime_activation_level
