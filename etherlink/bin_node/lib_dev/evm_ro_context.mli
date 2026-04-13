@@ -148,7 +148,7 @@ val get_state :
   Evm_state.t tzresult Lwt.t
 
 (** [read_state state path] reads a value from the durable storage at [path]
-    in the given [state]. Alias for {!Evm_state.inspect} wrapped in a result. *)
+    in the given [state]. Uses {!Durable_storageV2.read_opt} internally. *)
 val read_state :
   Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
 

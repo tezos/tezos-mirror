@@ -25,10 +25,7 @@ let get_evm_state ctxt hash =
   let*! res = Pvm.State.get context in
   return res
 
-let read state path =
-  let open Lwt_result_syntax in
-  let*! res = Evm_state.inspect state path in
-  return res
+let read state path = Durable_storageV2.read_opt (Raw_path path) state
 
 let with_latest_state ctxt f =
   let open Lwt_result_syntax in
@@ -371,10 +368,7 @@ let get_state ctxt
 
 let read_state = read
 
-let subkeys state path =
-  let open Lwt_result_syntax in
-  let*! res = Evm_state.subkeys state path in
-  return res
+let subkeys state path = Durable_storageV2.subkeys (Raw_path path) state
 
 let entrypoint_config ctxt =
   Pvm.Kernel.config
@@ -406,9 +400,7 @@ let execute_entrypoint_with_insights ctxt state ~input_path ~input
     ~insight_requests ~entrypoint =
   let open Lwt_result_syntax in
   let config = entrypoint_config ctxt in
-  let*! state =
-    Evm_state.modify ~key:input_path ~value:(Bytes.to_string input) state
-  in
+  let* state = Durable_storageV2.write (Raw_path input_path) input state in
   let execution_input =
     Simulation.Encodings.
       {

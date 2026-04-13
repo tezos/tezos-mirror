@@ -250,7 +250,7 @@ let take_delayed_transactions evm_state maximum_number_of_chunks =
   let maximum_delayed_transactions =
     maximum_cumulative_size / maximum_delayed_transaction_size
   in
-  let*! delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
+  let* delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
   let delayed_transactions =
     List.take_n maximum_delayed_transactions delayed_transactions
   in

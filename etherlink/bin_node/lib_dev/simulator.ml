@@ -99,12 +99,12 @@ module Etherlink = struct
     let* simulation_version = simulation_version simulation_state in
     let* simulation_state =
       if overwrite_tick_limit then
-        let*! state =
-          Evm_state.modify
-            ~key:"/evm/maximum_allowed_ticks"
-            ~value:
-              Data_encoding.(
-                Binary.to_string_exn Little_endian.int64 1_000_000_000_000L)
+        let* state =
+          Durable_storageV2.write
+            (Raw_path "/evm/maximum_allowed_ticks")
+            (Bytes.of_string
+               Data_encoding.(
+                 Binary.to_string_exn Little_endian.int64 1_000_000_000_000L))
             simulation_state
         in
         return state

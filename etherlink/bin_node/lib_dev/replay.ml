@@ -6,9 +6,9 @@
 (*****************************************************************************)
 
 let patch_da_fees evm_state =
-  Evm_state.modify
-    ~key:"/evm/world_state/fees/da_fee_per_byte"
-    ~value:(Int.to_string 0)
+  Durable_storageV2.write
+    (Raw_path "/evm/world_state/fees/da_fee_per_byte")
+    (Bytes.of_string (Int.to_string 0))
     evm_state
 
 let patch_kernel ~kernel evm_state =
@@ -17,25 +17,28 @@ let patch_kernel ~kernel evm_state =
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
-  let*! evm_state =
-    Evm_state.modify ~key:"/kernel/boot.wasm" ~value:kernel evm_state
+  let* evm_state =
+    Durable_storageV2.write
+      (Raw_path "/kernel/boot.wasm")
+      (Bytes.of_string kernel)
+      evm_state
   in
   return evm_state
 
 let patch_verbosity ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
-  let*! evm_state =
-    Evm_state.modify
-      ~key:Durable_storage_path.kernel_verbosity
-      ~value:(Events.string_from_kernel_log_level kernel_verbosity)
+  let* evm_state =
+    Durable_storageV2.write
+      (Raw_path Durable_storage_path.kernel_verbosity)
+      (Bytes.of_string (Events.string_from_kernel_log_level kernel_verbosity))
       evm_state
   in
   return evm_state
 
 let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
-  let*! evm_state =
-    if disable_da_fees then patch_da_fees evm_state else Lwt.return evm_state
+  let* evm_state =
+    if disable_da_fees then patch_da_fees evm_state else return evm_state
   in
   let* evm_state =
     match kernel with

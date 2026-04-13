@@ -36,8 +36,11 @@ let update_storage address state_diff state =
     let (Hex value) = value in
     if String.length value = 64 then
       let*? key = Durable_storage_path.Accounts.storage_e address key in
-      let*! state =
-        Evm_state.modify ~key ~value:(hex_to_bytes (Hex value)) state
+      let* state =
+        Durable_storageV2.write
+          (Raw_path key)
+          (Bytes.of_string (hex_to_bytes (Hex value)))
+          state
       in
       return state
     else tzfail (Invalid_storage_value value)
@@ -50,9 +53,7 @@ let replace_storage address state_override state =
   | None -> return state
   | Some state_override ->
       let*? key = Durable_storage_path.Accounts.storage_dir_e address in
-      let*! state =
-        Evm_state.delete ~kind:Tezos_scoru_wasm.Durable.Directory state key
-      in
+      let* state = Durable_storageV2.delete_dir (Raw_path key) state in
       update_storage address state_override state
 
 let is_invalid state_override =
@@ -66,7 +67,9 @@ let update_account address state_override evm_state =
   let open Lwt_result_syntax in
   if is_invalid state_override then tzfail State_and_state_diff
   else
-    let* info = Evm_state.read evm_state (Accounts.info address) in
+    let* info =
+      Durable_storageV2.read_opt (Raw_path (Accounts.info address)) evm_state
+    in
     let* evm_state =
       match info with
       | None ->
@@ -74,7 +77,12 @@ let update_account address state_override evm_state =
             match v_opt with
             | None -> return state
             | Some v ->
-                let*! state = Evm_state.modify ~key ~value:(encode v) state in
+                let* state =
+                  Durable_storageV2.write
+                    (Raw_path key)
+                    (Bytes.of_string (encode v))
+                    state
+                in
                 return state
           in
 
@@ -129,21 +137,19 @@ let update_account address state_override evm_state =
                     state_override.code;
               }
           in
-          let*! evm_state =
-            Evm_state.modify
-              ~key:(Accounts.info address)
-              ~value:
-                (Etherlink_durable_storage.AccountInfo.encode new_info
-                |> Bytes.to_string)
+          let* evm_state =
+            Durable_storageV2.write
+              (Raw_path (Accounts.info address))
+              (Etherlink_durable_storage.AccountInfo.encode new_info)
               evm_state
           in
           match state_override.code with
           | None -> return evm_state
           | Some code ->
-              let*! evm_state =
-                Evm_state.modify
-                  ~key:(Code.code new_info.code_hash)
-                  ~value:(Ethereum_types.hex_to_bytes code)
+              let* evm_state =
+                Durable_storageV2.write
+                  (Raw_path (Code.code new_info.code_hash))
+                  (Bytes.of_string (Ethereum_types.hex_to_bytes code))
                   evm_state
               in
               return evm_state)

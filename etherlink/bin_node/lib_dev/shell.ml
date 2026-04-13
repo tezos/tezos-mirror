@@ -57,11 +57,21 @@ let run ~(config : Configuration.t) block_param k =
       let*! tree = Pvm.State.get context in
       k ro_ctxt tree
 
-let ls = Commands.ls ~subkeys:Evm_state.subkeys ~inspect:Evm_state.inspect
+let inspect state path =
+  Lwt.map
+    (function Ok v -> v | Error _ -> None)
+    (Durable_storageV2.read_opt (Raw_path path) state)
 
-let cat = Commands.cat ~inspect:Evm_state.inspect
+let subkeys state path =
+  Lwt.map
+    (function Ok v -> v | Error _ -> [])
+    (Durable_storageV2.subkeys (Raw_path path) state)
 
-let tree = Commands.tree ~subkeys:Evm_state.subkeys
+let ls = Commands.ls ~subkeys ~inspect
+
+let cat = Commands.cat ~inspect
+
+let tree = Commands.tree ~subkeys
 
 let commands = [Commands.Command ls; Command cat; Command tree]
 
