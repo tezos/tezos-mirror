@@ -2851,3 +2851,53 @@ let () =
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
   let* alloc = clst_allocated_tez (B b) delegate_pkh in
   Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test deallocation after unregistration" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  (* Bake until activation: the allocation will happen at the end of this
+     cycle. *)
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* Check the allocation worked *)
+  let* alloc_with_clst = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_with_clst > zero) in
+  let* total_with_clst = total_amount_of_tez (B b) in
+  (* Unregister the delegate from CLST *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let* b = Block.bake ~operation:unregister_tx b in
+  let* unregister_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Unregister]
+  in
+  let unregister_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) unregister_activation_cycle
+  in
+  (* Bake until unregistration activates: rebalance will remove the allocated
+     stake at the end of this cycle. *)
+  let* b = Block.bake_until_cycle unregister_activation_cycle b in
+  (* Check that the allocation is not removed until the end of the activation
+     cycle. *)
+  let* alloc_at_unregistration_activation =
+    clst_allocated_tez (B b) delegate_pkh
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      alloc_with_clst
+      alloc_at_unregistration_activation
+  in
+  let* b = Block.bake_until_cycle_end b in
+  (* CLST allocation should be zero (immediately cleared, no unfreezing) *)
+  let* alloc_after = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_after in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  Assert.equal_tez ~loc:__LOC__ total_with_clst total_after
