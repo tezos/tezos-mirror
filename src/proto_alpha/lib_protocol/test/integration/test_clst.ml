@@ -2653,18 +2653,19 @@ let setup_delegate_with_clst_deposit
     ?(limit_of_staking_over_baking = Q.of_int 5)
     ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
     ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l)
-    ?adaptive_issuance ~deposit_mutez () =
+    ?adaptive_issuance
+    ?(issuance_weights =
+      {
+        Default_parameters.constants_test.issuance_weights with
+        base_total_issued_per_minute = Tez.zero;
+      }) ~deposit_mutez () =
   let open Lwt_result_wrap_syntax in
   let* b, delegate =
     Context.init1
       ~consensus_threshold_size:0
       ~cost_per_byte:Tez.zero
       ?adaptive_issuance
-      ~issuance_weights:
-        {
-          Default_parameters.constants_test.issuance_weights with
-          base_total_issued_per_minute = Tez.zero;
-        }
+      ~issuance_weights
       ()
   in
   let delegate_pkh = pkh_of_contract delegate in
@@ -3157,3 +3158,320 @@ let () =
   (* CLST allocation should be zero — delegate is overstaked *)
   let* alloc = clst_allocated_tez (B b) delegate_pkh in
   Assert.equal_tez ~loc:__LOC__ Tez.zero alloc
+
+(* Exchange rate tests                                                    *)
+(* -------------------------------------------------------------------- *)
+
+let () =
+  register_test
+    ~title:"Exchange rate is 1:1 on deposit without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* Empty pool: rate is 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  let deposit_mutez = 100_000_000L in
+  let* account_a, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_a
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* After deposit, 1 mutez = 1 token unit *)
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_mutez
+      b
+      account_a
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Second deposit from another account also 1:1 *)
+  let* account_b, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let deposit_b_mutez = 50_000_000L in
+  let* deposit_b_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_b
+      (Tez.of_mutez_exn deposit_b_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_b_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_b_mutez
+      b
+      account_b
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate increases with rewards" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () =
+    Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before > 0)
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Deposit and redeem do not change the exchange rate"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  (* Bake until rewards shift the rate away from 1:1 *)
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Rate must be different from 1:1 for this test to be meaningful *)
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare rate_before Q.one > 0) in
+  (* Fund a new account, deposit and immediately redeem in the next block *)
+  let* account, b =
+    create_funded_account ~funder:delegate ~amount_mutez:100_000_000L b
+  in
+  let deposit_amount = Tez.of_mutez_exn 50_000_000L in
+  let* deposit_tx =
+    Op.clst_deposit ~force_reveal:true (B b) account deposit_amount
+  in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:deposit_tx b
+  in
+  (* Record rate after deposit *)
+  let* rate_after_deposit =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Record the CLST balance obtained *)
+  let* balance =
+    Plugin.Contract_services.stez_balance Block.rpc_ctxt b account
+  in
+  let balance_mutez = Option.value ~default:0L (Script_int.to_int64 balance) in
+  let* () = Assert.is_true ~loc:__LOC__ Compare.Int64.(balance_mutez > 0L) in
+  let* redeem_tx = Op.clst_redeem ~fee:Tez.zero (B b) account balance_mutez in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:redeem_tx b
+  in
+  let* rate_after_redeem =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Deposit and redeem preserve the exchange rate. Between blocks,
+     rewards accrue and shift the rate slightly. We verify the rate
+     difference is negligible (< 1/1_000_000). *)
+  let diff = Q.abs (Q.sub rate_after_redeem rate_after_deposit) in
+  let epsilon = Q.(1 // 1_000_000) in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare diff epsilon < 0) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate stable without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, _delegate, _delegate_pkh, _activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_before Q.one) in
+  let* b = Block.bake_until_n_cycle_end 3 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_after Q.one) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate decreases with slashing" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Double baking requires two distinct bakers, so we use
+     init_with_constants2 instead of the single-baker helper. *)
+  let constants =
+    let c = Default_parameters.constants_test in
+    {
+      c with
+      issuance_weights =
+        {c.issuance_weights with base_total_issued_per_minute = Tez.zero};
+      consensus_threshold_size = 0;
+      cost_per_byte = Tez.zero;
+    }
+  in
+  let* genesis, (contract_a, contract_b) =
+    Context.init_with_constants2 constants
+  in
+  let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
+  let baker1_contract = Contract.Implicit baker1 in
+  let limit_of_staking_over_baking_millionth =
+    Q.mul (Q.of_int 5) (Q.of_int 1_000_000) |> Q.to_int
+  in
+  let edge_of_baking_over_staking_billionth =
+    Q.mul Q.one (Q.of_int 1_000_000_000) |> Q.to_int
+  in
+  let set_params_parameters =
+    Script.lazy_expr
+      (Expr.from_string
+         (Printf.sprintf
+            "Pair %d (Pair %d Unit)"
+            limit_of_staking_over_baking_millionth
+            edge_of_baking_over_staking_billionth))
+  in
+  let* op =
+    Op.transaction
+      ~force_reveal:true
+      ~entrypoint:Entrypoint.set_delegate_parameters
+      ~parameters:set_params_parameters
+      ~fee:Tez.zero
+      (B genesis)
+      baker1_contract
+      baker1_contract
+      Tez.zero
+  in
+  let* b = Block.bake ~operation:op genesis in
+  let* b =
+    Block.bake_until_n_cycle_end
+      (constants.delegate_parameters_activation_delay + 1)
+      b
+  in
+  let* b, parameters = register_delegate_and_bake b baker1_contract in
+  let deposit_mutez = 2_000_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:baker1_contract ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      baker1
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = clst_allocated_tez (B b) baker1 in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Create double baking evidence *)
+  let* blk_a, blk_b =
+    let* operation = Op.transaction (B b) contract_a contract_b Tez.one_cent in
+    let* blk_a = Block.bake ~policy:(By_account baker1) ~operation b in
+    let+ blk_b = Block.bake ~policy:(By_account baker1) b in
+    (blk_a, blk_b)
+  in
+  let bh1, bh2 =
+    let h1 = Block_header.hash blk_a.header in
+    let h2 = Block_header.hash blk_b.header in
+    if Block_hash.(h1 < h2) then (blk_a.header, blk_b.header)
+    else (blk_b.header, blk_a.header)
+  in
+  let operation = Op.double_baking (B blk_a) bh1 bh2 in
+  let* b = Block.bake ~policy:(By_account baker2) ~operation blk_a in
+  let* b = Block.bake_until_n_cycle_end ~policy:(By_account baker2) 2 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () =
+    Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before < 0)
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate RPC lifecycle" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Empty pool: rate is 1:1 *)
+  let* b, funder =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Deposit *)
+  let deposit_mutez = 100_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* After deposit, rate still 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Redeem all *)
+  let* redeem_tx = Op.clst_redeem ~fee:Tez.zero (B b) account deposit_mutez in
+  let* b = Block.bake ~operation:redeem_tx b in
+  (* After full redeem, rate back to 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  return_unit

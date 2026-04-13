@@ -501,22 +501,7 @@ module S = struct
       register0 ~chunked:false total_amount_of_tez_service (fun ctxt () () ->
           Clst.total_amount_of_tez ctxt) ;
       register0 ~chunked:false exchange_rate_service (fun ctxt () () ->
-          let open Lwt_result_syntax in
-          let* total_amount = Clst.total_amount_of_tez ctxt in
-          let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
-          let total_amount = Tez.to_mutez total_amount in
-          let total_supply = Script_int.to_zint total_supply in
-          let rate =
-            if
-              Compare.Int64.equal total_amount 0L || Z.equal total_supply Z.zero
-            then
-              (* This follows Invariant 1 from
-                 Staking_pseudotokens_storage: when there are no
-                 tokens, the rate is 1. *)
-              Q.one
-            else Q.div (Q.of_int64 total_amount) (Q.of_bigint total_supply)
-          in
-          return rate) ;
+          Clst_contract_storage.exchange_rate ctxt) ;
       register1
         ~chunked:false
         redeemed_frozen_balance
