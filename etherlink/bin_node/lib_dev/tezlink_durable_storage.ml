@@ -67,7 +67,7 @@ end
 
 let contract_of_path = Contract.of_hex
 
-let balance read ~data_model (c : Contract.t) =
+let balance state ~data_model (c : Contract.t) =
   let open Lwt_result_syntax in
   match data_model with
   | Rlp -> (
@@ -78,7 +78,7 @@ let balance read ~data_model (c : Contract.t) =
             ^ Path.to_path Tezos_types.Contract.encoding c
             ^ "balance"
           in
-          let* bytes_opt = read path in
+          let* bytes_opt = Durable_storageV2.read_opt (Raw_path path) state in
           match bytes_opt with
           | Some bytes -> (
               match
@@ -93,7 +93,9 @@ let balance read ~data_model (c : Contract.t) =
           | None -> return Tez.zero)
       | Implicit pkh -> (
           let* bytes_opt =
-            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+            Durable_storageV2.read_opt
+              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
+              state
           in
           match bytes_opt with
           | None -> return Tez.zero
@@ -103,16 +105,16 @@ let balance read ~data_model (c : Contract.t) =
   | Path ->
       Durable_storage.inspect_durable_and_decode_default
         ~default:Tezos_types.Tez.zero
-        read
+        state
         (Path.balance c)
         (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
-let balance_z read ~data_model c =
+let balance_z state ~data_model c =
   let open Lwt_result_syntax in
-  let* b = balance read ~data_model c in
+  let* b = balance state ~data_model c in
   return @@ Tezos_types.Tez.to_mutez_z b
 
-let manager read ~data_model (c : Contract.t) =
+let manager state ~data_model (c : Contract.t) =
   let open Lwt_result_syntax in
   match data_model with
   | Rlp -> (
@@ -120,7 +122,9 @@ let manager read ~data_model (c : Contract.t) =
       | Originated _ -> return_none
       | Implicit pkh -> (
           let* bytes_opt =
-            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+            Durable_storageV2.read_opt
+              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
+              state
           in
           match bytes_opt with
           | None -> return_none
@@ -132,11 +136,11 @@ let manager read ~data_model (c : Contract.t) =
       )
   | Path ->
       Durable_storage.inspect_durable_and_decode_opt
-        read
+        state
         (Path.manager c)
         (Data_encoding.Binary.of_bytes_exn Manager.encoding)
 
-let counter read ~data_model (c : Contract.t) =
+let counter state ~data_model (c : Contract.t) =
   let open Lwt_result_syntax in
   match data_model with
   | Rlp -> (
@@ -144,7 +148,9 @@ let counter read ~data_model (c : Contract.t) =
       | Originated _ -> return_none
       | Implicit pkh -> (
           let* bytes_opt =
-            read (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+            Durable_storageV2.read_opt
+              (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
+              state
           in
           match bytes_opt with
           | None -> return_none
@@ -153,11 +159,11 @@ let counter read ~data_model (c : Contract.t) =
               return_some (Z.of_int64 info.nonce)))
   | Path ->
       Durable_storage.inspect_durable_and_decode_opt
-        read
+        state
         (Path.counter c)
         (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
 
-let big_map_get read id key_hash =
+let big_map_get state id key_hash =
   let open Lwt_result_syntax in
   let path = Path.big_map_value id key_hash in
   let decode =
@@ -165,11 +171,11 @@ let big_map_get read id key_hash =
       Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
-    Durable_storage.inspect_durable_and_decode_opt read path decode
+    Durable_storage.inspect_durable_and_decode_opt state path decode
   in
   Option.join result
 
-let big_map_key_type read id =
+let big_map_key_type state id =
   let open Lwt_result_syntax in
   let path = Path.big_map_key_type id in
   let decode =
@@ -177,11 +183,11 @@ let big_map_key_type read id =
       Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
-    Durable_storage.inspect_durable_and_decode_opt read path decode
+    Durable_storage.inspect_durable_and_decode_opt state path decode
   in
   Option.join result
 
-let big_map_value_type read id =
+let big_map_value_type state id =
   let open Lwt_result_syntax in
   let path = Path.big_map_value_type id in
   let decode =
@@ -189,19 +195,19 @@ let big_map_value_type read id =
       Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
-    Durable_storage.inspect_durable_and_decode_opt read path decode
+    Durable_storage.inspect_durable_and_decode_opt state path decode
   in
   Option.join result
 
-let nth_block read n =
+let nth_block state n =
   let open Lwt_result_syntax in
   let number = Durable_storage_path.Block.(Nth n) in
   let* (Ethereum_types.Qty level) =
-    Durable_storage.block_number ~root read number
+    Durable_storage.block_number ~root state number
   in
   let* block_hash_opt =
     Durable_storage.inspect_durable_and_decode_opt
-      read
+      state
       (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
       Ethereum_types.decode_block_hash
   in
@@ -210,7 +216,7 @@ let nth_block read n =
   | Some block_hash -> (
       let* block_opt =
         Durable_storage.inspect_durable_and_decode_opt
-          read
+          state
           (Durable_storage_path.Block.by_hash ~root block_hash)
           L2_types.Tezos_block.block_from_kernel
       in
@@ -220,18 +226,18 @@ let nth_block read n =
           @@ Durable_storage.Invalid_block_structure "Couldn't decode bytes"
       | Some block -> return block)
 
-let nth_block_hash read n =
+let nth_block_hash state n =
   let number = Durable_storage_path.Block.(Nth n) in
   Durable_storage.inspect_durable_and_decode_opt
-    read
+    state
     (Durable_storage_path.Indexes.block_by_number ~root number)
     Ethereum_types.decode_block_hash
 
-let da_fee_per_byte_mutez read =
+let da_fee_per_byte_mutez state =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty da_fee_per_byte_wei) =
     Durable_storage.inspect_durable_and_decode
-      read
+      state
       Durable_storage_path.da_fee_per_byte
       Ethereum_types.decode_number_le
   in

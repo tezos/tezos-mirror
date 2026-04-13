@@ -98,12 +98,10 @@ module Types = struct
     tezosx_infos : tezosx_infos;
   }
 
-  let read state = Evm_ro_context.read_state state
-
   let da_fee_per_bytes_of_state state =
     let open Lwt_result_syntax in
     let* (Qty da_fee_per_bytes) =
-      Etherlink_durable_storage.da_fee_per_byte (read state)
+      Etherlink_durable_storage.da_fee_per_byte state
     in
     return da_fee_per_bytes
 
@@ -111,7 +109,7 @@ module Types = struct
     let open Lwt_result_syntax in
     let* (Qty base_fee_per_gas) =
       Lwt.catch
-        (fun () -> Etherlink_durable_storage.base_fee_per_gas (read state))
+        (fun () -> Etherlink_durable_storage.base_fee_per_gas state)
         (function
           | Durable_storage.Invalid_block_structure _ ->
               (* Placeholder value for observer starting from genesis.
@@ -120,14 +118,14 @@ module Types = struct
           | exn -> Lwt.reraise exn)
     in
     let* minimum_base_fee_per_gas =
-      Etherlink_durable_storage.minimum_base_fee_per_gas (read state)
+      Etherlink_durable_storage.minimum_base_fee_per_gas state
     in
     let* da_fee_per_bytes = da_fee_per_bytes_of_state state in
     let* (Qty maximum_gas_per_transaction) =
-      Etherlink_durable_storage.maximum_gas_per_transaction (read state)
+      Etherlink_durable_storage.maximum_gas_per_transaction state
     in
     let* michelson_to_evm_gas_multiplier =
-      Etherlink_durable_storage.michelson_to_evm_gas_multiplier (read state)
+      Etherlink_durable_storage.michelson_to_evm_gas_multiplier state
     in
     return
       {
@@ -140,7 +138,7 @@ module Types = struct
 
   let session_of_state chain_family ctxt state =
     let open Lwt_result_syntax in
-    let* storage_version = Durable_storage.storage_version (read state) in
+    let* storage_version = Durable_storage.storage_version state in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
         let* tezosx_infos = tezosx_infos_of_state state in
@@ -366,9 +364,7 @@ let validate_authorizations txn =
 let validate_sender_not_a_contract session caller :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* (Hex code) =
-    Etherlink_durable_storage.code (Types.read session.state) caller
-  in
+  let* (Hex code) = Etherlink_durable_storage.code session.state caller in
   if
     (* EOA: *)
     code = ""
@@ -556,9 +552,7 @@ let validate_balance_and_max_fee_per_gas ~base_fee_per_gas ~transaction
 
 let validate_balance_and_gas_with_backend ~caller session transaction =
   let open Lwt_result_syntax in
-  let* from_balance =
-    Etherlink_durable_storage.balance (Types.read session.state) caller
-  in
+  let* from_balance = Etherlink_durable_storage.balance session.state caller in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
       ~base_fee_per_gas:(Qty session.tezosx_infos.base_fee_per_gas)
@@ -586,9 +580,7 @@ let full_validation ~next_nonce ~max_number_of_chunks ~caller ctxt transaction =
 let valid_transaction_object ctxt session mode txn =
   let open Lwt_result_syntax in
   let caller = Transaction_object.sender txn in
-  let* next_nonce =
-    Etherlink_durable_storage.nonce (Types.read session.state) caller
-  in
+  let* next_nonce = Etherlink_durable_storage.nonce session.state caller in
   let next_nonce =
     match next_nonce with None -> Qty Z.zero | Some next_nonce -> next_nonce
   in
@@ -662,7 +654,6 @@ module Handlers = struct
       Lwt.t =
     let open Lwt_result_syntax in
     let open Tezos_types.Tez in
-    let read = Types.read session.state in
     let michelson_to_evm_gas_multiplier =
       ctxt.session.tezosx_infos.michelson_to_evm_gas_multiplier
     in
@@ -678,7 +669,7 @@ module Handlers = struct
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~simulator_mode
         ~nanotez_per_michelson_gas
-        ~read
+        ~state:session.state
         ~data_model
         raw_transaction
     in
@@ -753,9 +744,7 @@ let start (type f) ?max_number_of_chunks
   let*! start_result =
     protect @@ fun () ->
     let* state = Evm_ro_context.get_state ctxt () in
-    let* chain_id =
-      Durable_storage.chain_id (Evm_ro_context.read_state state)
-    in
+    let* chain_id = Durable_storage.chain_id state in
     let* session =
       Types.session_of_state (Ex_chain_family chain_family) ctxt state
     in

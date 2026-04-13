@@ -235,7 +235,7 @@ let make (ctxt : Evm_ro_context.t) =
       let* state = Evm_ro_context.get_state ctxt ~block () in
       Lwt_result.map (Option.value ~default:None)
       @@ Durable_storage.inspect_durable_and_decode_opt
-           (Evm_ro_context.read_state state)
+           state
            (contract_path c "/data/storage")
            (Data_encoding.Binary.of_bytes_opt
               Tezlink_imports.Imported_context.Script.expr_encoding)
@@ -249,7 +249,7 @@ let make (ctxt : Evm_ro_context.t) =
       let* state = Evm_ro_context.get_state ctxt ~block () in
       Lwt_result.map (Option.value ~default:None)
       @@ Durable_storage.inspect_durable_and_decode_opt
-           (Evm_ro_context.read_state state)
+           state
            (contract_path c "/data/code")
            (Data_encoding.Binary.of_bytes_opt
               Tezlink_imports.Imported_context.Script.expr_encoding)
@@ -356,10 +356,7 @@ let make (ctxt : Evm_ro_context.t) =
           Tezlink_imports.Imported_context.Script.expr_encoding
       in
       let+ result =
-        Durable_storage.inspect_durable_and_decode_opt
-          (Evm_ro_context.read_state state)
-          path
-          decode
+        Durable_storage.inspect_durable_and_decode_opt state path decode
       in
       Option.join result
 
@@ -376,10 +373,7 @@ let make (ctxt : Evm_ro_context.t) =
           Tezlink_imports.Imported_context.Script.expr_encoding
       in
       let+ result =
-        Durable_storage.inspect_durable_and_decode_opt
-          (Evm_ro_context.read_state state)
-          path
-          decode
+        Durable_storage.inspect_durable_and_decode_opt state path decode
       in
       Option.join result
 
@@ -396,10 +390,7 @@ let make (ctxt : Evm_ro_context.t) =
           Tezlink_imports.Imported_context.Script.expr_encoding
       in
       let+ result =
-        Durable_storage.inspect_durable_and_decode_opt
-          (Evm_ro_context.read_state state)
-          path
-          decode
+        Durable_storage.inspect_durable_and_decode_opt state path decode
       in
       Option.join result
 

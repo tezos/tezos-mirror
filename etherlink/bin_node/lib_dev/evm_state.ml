@@ -223,9 +223,9 @@ let read state key =
   let*! res = inspect state key in
   return res
 
-let storage_version state = Durable_storage.storage_version (read state)
+let storage_version state = Durable_storage.storage_version state
 
-let tezosx_runtimes state = Durable_storage.list_runtimes (read state)
+let tezosx_runtimes state = Durable_storage.list_runtimes state
 
 let kernel_version evm_state =
   let open Lwt_syntax in
@@ -332,7 +332,7 @@ let store_blueprint_chunks ~blueprint_number evm_state
     let* current_generation =
       Durable_storage.inspect_durable_and_decode_default
         ~default:Qty.zero
-        (read evm_state)
+        evm_state
         Durable_storage_path.Blueprint.current_generation
         Ethereum_types.decode_number_le
     in
@@ -672,7 +672,10 @@ let clear_events evm_state =
 
 let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
-  let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
+  let* storage_version =
+    let+ r = storage_version evm_state in
+    match r with Ok v -> v | Error _ -> 0
+  in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     return evm_state
   else

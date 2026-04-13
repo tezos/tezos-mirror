@@ -30,38 +30,43 @@ let read state path =
   let*! res = Evm_state.inspect state path in
   return res
 
-let with_latest_read ctxt f =
+let with_latest_state ctxt f =
   let open Lwt_result_syntax in
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
-  f (read evm_state)
+  f evm_state
 
 let read_chain_family ctxt chain_id =
-  with_latest_read ctxt (fun read -> Durable_storage.chain_family read chain_id)
+  with_latest_state ctxt (fun state ->
+      Durable_storage.chain_family state chain_id)
 
 let read_enable_multichain_flag ctxt =
-  with_latest_read ctxt Durable_storage.is_multichain_enabled
+  with_latest_state ctxt Durable_storage.is_multichain_enabled
 
-let chain_id ctxt = with_latest_read ctxt Durable_storage.chain_id
+let chain_id ctxt = with_latest_state ctxt Durable_storage.chain_id
 
 let michelson_runtime_chain_id ctxt =
-  with_latest_read ctxt Durable_storage.michelson_runtime_chain_id
+  with_latest_state ctxt Durable_storage.michelson_runtime_chain_id
 
 let michelson_activation_level ctxt =
   with_latest_read ctxt Durable_storage.michelson_runtime_activation_level
 
 let current_block_number_durable ctxt ~root =
-  with_latest_read ctxt (fun read ->
-      Durable_storage.block_number ~root read Durable_storage_path.Block.Current)
+  with_latest_state ctxt (fun state ->
+      Durable_storage.block_number
+        ~root
+        state
+        Durable_storage_path.Block.Current)
 
-let storage_version ctxt = with_latest_read ctxt Durable_storage.storage_version
+let storage_version ctxt =
+  with_latest_state ctxt Durable_storage.storage_version
 
-let kernel_version ctxt = with_latest_read ctxt Durable_storage.kernel_version
+let kernel_version ctxt = with_latest_state ctxt Durable_storage.kernel_version
 
 let kernel_root_hash ctxt =
-  with_latest_read ctxt Durable_storage.kernel_root_hash
+  with_latest_state ctxt Durable_storage.kernel_root_hash
 
-let list_runtimes ctxt = with_latest_read ctxt Durable_storage.list_runtimes
+let list_runtimes ctxt = with_latest_state ctxt Durable_storage.list_runtimes
 
 let list_l1_l2_levels ctxt ~from_l1_level =
   let open Lwt_result_syntax in
@@ -211,7 +216,7 @@ let network_sanity_check ~network ctxt =
 
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
-  let*! chain_id = Durable_storage.chain_id (read evm_state) in
+  let*! chain_id = Durable_storage.chain_id evm_state in
 
   let* () =
     match chain_id with
@@ -626,14 +631,10 @@ let replay ctxt ?log_file ?profile ?evm_state
   match apply_result with
   | Apply_success {block; evm_state; tezos_block} ->
       let* (Qty base_fee_per_gas) =
-        Etherlink_durable_storage.base_fee_per_gas (fun path ->
-            let*! result = Evm_state.inspect evm_state path in
-            return result)
+        Etherlink_durable_storage.base_fee_per_gas evm_state
       in
       let* da_fee_per_byte =
-        Etherlink_durable_storage.da_fee_per_byte (fun path ->
-            let*! result = Evm_state.inspect evm_state path in
-            return result)
+        Etherlink_durable_storage.da_fee_per_byte evm_state
       in
       let* execution_gas =
         cumulative_execution_gas ~base_fee_per_gas ~da_fee_per_byte ctxt block
@@ -654,32 +655,32 @@ module Etherlink = struct
   let balance ctxt address block_param =
     let open Lwt_result_syntax in
     let* state = get_state ctxt ~block:block_param () in
-    Etherlink_durable_storage.balance (read_state state) address
+    Etherlink_durable_storage.balance state address
 
   let nonce ctxt address block_param =
     let open Lwt_result_syntax in
     let* state = get_state ctxt ~block:block_param () in
-    Etherlink_durable_storage.nonce (read_state state) address
+    Etherlink_durable_storage.nonce state address
 
   let code ctxt address block_param =
     let open Lwt_result_syntax in
     let* state = get_state ctxt ~block:block_param () in
-    Etherlink_durable_storage.code (read_state state) address
+    Etherlink_durable_storage.code state address
 
   let storage_at ctxt address position block_param =
     let open Lwt_result_syntax in
     let* state = get_state ctxt ~block:block_param () in
-    Etherlink_durable_storage.storage_at (read_state state) address position
+    Etherlink_durable_storage.storage_at state address position
 
   let base_fee_per_gas ctxt =
-    with_latest_read ctxt Etherlink_durable_storage.base_fee_per_gas
+    with_latest_state ctxt Etherlink_durable_storage.base_fee_per_gas
 
-  let backlog ctxt = with_latest_read ctxt Etherlink_durable_storage.backlog
+  let backlog ctxt = with_latest_state ctxt Etherlink_durable_storage.backlog
 
   let minimum_base_fee_per_gas ctxt =
-    with_latest_read ctxt Etherlink_durable_storage.minimum_base_fee_per_gas
+    with_latest_state ctxt Etherlink_durable_storage.minimum_base_fee_per_gas
 
-  let coinbase ctxt = with_latest_read ctxt Etherlink_durable_storage.coinbase
+  let coinbase ctxt = with_latest_state ctxt Etherlink_durable_storage.coinbase
 
   let replay ctxt number =
     let open Lwt_result_syntax in

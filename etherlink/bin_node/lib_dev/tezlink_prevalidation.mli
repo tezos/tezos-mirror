@@ -56,13 +56,14 @@
     e.g. octez-client.
 *)
 
-(** [parse_and_validate_for_queue read ~data_model raw_op]
+(** [parse_and_validate_for_queue state ~data_model raw_op]
     parses [raw_op] into an operation, and checks that the operation
-    is valid on its own. [read] is used to check information about the
-    source in the current context (counter, balance, public key);
-    [data_model] is used to know which data model (path-based
-    or RLP-based) to use when checking information. This first
-    validation pass should be done at insertion in the [tx_queue].
+    is valid on its own. [state] is the EVM state used to check
+    information about the source in the current context (counter,
+    balance, public key); [data_model] is used to know which data
+    model (path-based or RLP-based) to use when checking information.
+    This first validation pass should be done at insertion in the
+    [tx_queue].
 
     At this point operations are valid if they could be inserted into a future
     blueprint, i.e. it is either valid or could be valid in the future. For
@@ -88,7 +89,7 @@
 val parse_and_validate_for_queue :
   simulator_mode:Tezlink_backend_sig.simulator_mode ->
   nanotez_per_michelson_gas:Tezos_types.Tez.nanotez ->
-  read:(string -> bytes option tzresult Lwt.t) ->
+  state:Evm_state.t ->
   data_model:Tezlink_durable_storage.implicit_account_data_model ->
   string ->
   (Tezos_types.Operation.t, string) result tzresult Lwt.t
@@ -98,11 +99,10 @@ val parse_and_validate_for_queue :
 val gas_limit_could_fit :
   Validation_types.validation_state -> Tezos_types.Operation.t -> bool
 
-(** [init_blueprint_validation read ~data_model ()] creates an empty
-    validation state, from the context the [read] returns info
-    about. *)
+(** [init_blueprint_validation state ~data_model ()] creates an empty
+    validation state, from the EVM [state]. *)
 val init_blueprint_validation :
-  (string -> bytes option tzresult Lwt.t) ->
+  Evm_state.t ->
   data_model:Tezlink_durable_storage.implicit_account_data_model ->
   unit ->
   Validation_types.validation_state

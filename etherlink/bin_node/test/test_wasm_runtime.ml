@@ -51,11 +51,7 @@ let test_wasm_runtime_id () =
   in
   let tree = Pvm.Wasm_internal.of_irmin tree in
   Log.info "Check state consistency" ;
-  let* quantity =
-    Etherlink_durable_storage.current_block_number (fun key ->
-        let* candidate = Evm_state.inspect tree key in
-        return (Ok candidate))
-  in
+  let* quantity = Etherlink_durable_storage.current_block_number tree in
   let (Qty number) =
     expect_ok "Should be able to read the current number" quantity
   in

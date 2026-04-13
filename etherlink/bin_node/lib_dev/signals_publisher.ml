@@ -171,10 +171,7 @@ module Worker = struct
         let* expected_sequencer =
           Durable_storage.sequencer
             ~storage_version:head_info.storage_version
-            (fun path ->
-              let open Lwt_result_syntax in
-              let*! res = Evm_state.inspect head_info.evm_state path in
-              return res)
+            head_info.evm_state
         in
         let*? signer = Signer.get_signer state.signer expected_sequencer in
         let* payload =
