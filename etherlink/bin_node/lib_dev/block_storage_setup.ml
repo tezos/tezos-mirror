@@ -85,9 +85,7 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
     then
       Lwt_domain.run_in_main @@ fun () ->
       let* pred_result =
-        Evm_state.current_block_height
-          ~root:Durable_storage_path.etherlink_root
-          evm_node_state
+        Evm_state.current_block_height ~chain_family:EVM evm_node_state
       in
       let pred =
         match pred_result with
@@ -105,9 +103,7 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
     then
       Lwt_domain.run_in_main @@ fun () ->
       let* pred_result =
-        Evm_state.current_block_height
-          ~root:Durable_storage_path.etherlink_root
-          evm_node_state
+        Evm_state.current_block_height ~chain_family:EVM evm_node_state
       in
       let pred =
         match pred_result with

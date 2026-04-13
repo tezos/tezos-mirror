@@ -2980,8 +2980,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* storage_version = Evm_state.storage_version evm_state in
+  let* storage_version = Durable_storageV2.storage_version evm_state in
   (* Tell the kernel that it is executed by an EVM node *)
   let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
   (* We remove the delayed inbox from the EVM state. Its contents will be
@@ -2993,15 +2992,8 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
   let*! checkpoint = Pvm.Context.commit evm_node_context in
 
   (* Assert we can read the current blueprint number *)
-  let* current_blueprint_number =
-    let* current_blueprint_number_opt =
-      Durable_storageV2.read_opt
-        (Raw_path (Durable_storage_path.Block.current_number ~root))
-        evm_state
-    in
-    match current_blueprint_number_opt with
-    | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
-    | None -> failwith "The blueprint number was not found"
+  let* (Qty current_blueprint_number) =
+    Durable_storageV2.read (Current_block_number chain_family) evm_state
   in
 
   (* Read the current block *)

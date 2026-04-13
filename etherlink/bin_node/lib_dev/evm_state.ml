@@ -198,12 +198,10 @@ let init ~kernel =
 
 let storage_version state = Durable_storage.storage_version state
 
-let current_block_height ~root evm_state =
+let current_block_height ~chain_family evm_state =
   let open Lwt_result_syntax in
   let* current_block_number =
-    Durable_storageV2.read_opt
-      (Raw_path (Durable_storage_path.Block.current_number ~root))
-      evm_state
+    Durable_storageV2.read_opt (Current_block_number chain_family) evm_state
   in
   match current_block_number with
   | None ->
@@ -212,9 +210,7 @@ let current_block_height ~root evm_state =
          [apply_unsigned_chunks] is to verify the block height has been
          incremented once, we default to [-1]. *)
       return (Qty Z.(pred zero))
-  | Some current_block_number ->
-      let (Qty current_block_number) = decode_number_le current_block_number in
-      return (Qty current_block_number)
+  | Some qty -> return qty
 
 let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
@@ -553,8 +549,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* (Qty before_height) = current_block_height ~root evm_state in
+  let* (Qty before_height) = current_block_height ~chain_family evm_state in
   let* evm_state =
     store_blueprint_chunks
       ~blueprint_number:(Z.succ before_height)

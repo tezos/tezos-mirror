@@ -118,7 +118,7 @@ let code state address =
                 decode))
 
 let current_block_number state =
-  Durable_storage.block_number ~root state Durable_storage_path.Block.Current
+  Durable_storageV2.read (Current_block_number L2_types.EVM) state
 
 let current_block_hash state =
   let open Lwt_result_syntax in
@@ -387,7 +387,11 @@ let blocks_by_number state ~full_transaction_object ~number =
             state
         else raise (post_v41_unsupported_function ~__FUNCTION__)
   else
-    let* (Ethereum_types.Qty level) = block_number ~root state number in
+    let* (Ethereum_types.Qty level) =
+      match number with
+      | Durable_storage_path.Block.Nth i -> return (Ethereum_types.Qty i)
+      | Current -> current_block_number state
+    in
     let* block_hash_opt =
       inspect_durable_and_decode_opt
         state

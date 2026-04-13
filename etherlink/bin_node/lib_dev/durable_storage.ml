@@ -53,24 +53,6 @@ let world_state state chain_id =
 
 let storage_version = Durable_storageV2.storage_version
 
-let block_number ~root state n =
-  let open Lwt_result_syntax in
-  match n with
-  | Durable_storage_path.Block.Nth i -> return @@ Ethereum_types.Qty i
-  | Durable_storage_path.Block.Current -> (
-      let* answer =
-        Durable_storageV2.read_opt
-          (Raw_path (Durable_storage_path.Block.current_number ~root))
-          state
-      in
-      match answer with
-      | Some bytes ->
-          return (Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits))
-      | None ->
-          raise
-          @@ Invalid_block_structure
-               "Unexpected [None] value for [current_number]'s [answer]")
-
 let michelson_runtime_sunrise_level state =
   inspect_durable_and_decode_opt
     state

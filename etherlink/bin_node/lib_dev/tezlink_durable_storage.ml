@@ -201,10 +201,7 @@ let big_map_value_type state id =
 
 let nth_block state n =
   let open Lwt_result_syntax in
-  let number = Durable_storage_path.Block.(Nth n) in
-  let* (Ethereum_types.Qty level) =
-    Durable_storage.block_number ~root state number
-  in
+  let level = n in
   let* block_hash_opt =
     Durable_storage.inspect_durable_and_decode_opt
       state

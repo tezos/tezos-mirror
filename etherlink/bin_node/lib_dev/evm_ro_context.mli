@@ -63,10 +63,12 @@ val michelson_runtime_chain_id : t -> L2_types.chain_id tzresult Lwt.t
     Michelson runtime was activated, or [None] if it has not been activated. *)
 val michelson_activation_level : t -> int64 option tzresult Lwt.t
 
-(** [current_block_number_durable ctxt ~root] returns the current block
-    number of the L2 chain prefixed by [root] from durable storage. *)
+(** [current_block_number_durable ctxt ~chain_family] returns the current block
+    number of the L2 chain for the given [chain_family] from durable storage. *)
 val current_block_number_durable :
-  t -> root:string -> Ethereum_types.quantity tzresult Lwt.t
+  t ->
+  chain_family:_ L2_types.chain_family ->
+  Ethereum_types.quantity tzresult Lwt.t
 
 (** [storage_version ctxt] returns the latest storage version known to the
     current kernel. *)

@@ -46,14 +46,18 @@ let michelson_runtime_chain_id ctxt =
   with_latest_state ctxt (Durable_storageV2.read Michelson_runtime_chain_id)
 
 let michelson_activation_level ctxt =
-  with_latest_read ctxt Durable_storage.michelson_runtime_activation_level
+  let open Lwt_result_syntax in
+  let* qty_opt =
+    with_latest_state
+      ctxt
+      (Durable_storage.read_opt Michelson_runtime_sunrise_level)
+  in
+  return (Option.map (fun (Ethereum_types.Qty z) -> Z.to_int64 z) qty_opt)
 
-let current_block_number_durable ctxt ~root =
-  with_latest_state ctxt (fun state ->
-      Durable_storage.block_number
-        ~root
-        state
-        Durable_storage_path.Block.Current)
+let current_block_number_durable ctxt ~chain_family =
+  with_latest_state
+    ctxt
+    (Durable_storageV2.read (Current_block_number chain_family))
 
 let storage_version ctxt =
   with_latest_state ctxt Durable_storage.storage_version
