@@ -1047,6 +1047,15 @@ module S = struct
       ~output:(list pending_clst_staking_parameters_encoding)
       RPC_path.(path / "pending_clst_parameters")
 
+  let stez_staking_power =
+    RPC_service.get_service
+      ~description:
+        "Returns the current staking power from sTEZ allocated to this \
+         delegate."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "stez_staking_power")
+
   let pending_denunciations =
     RPC_service.get_service
       ~description:"Returns the pending denunciations for the given delegate."
@@ -1580,6 +1589,10 @@ let register () =
       let open Lwt_result_syntax in
       let*? () = stez_under_feature_flag ctxt in
       Clst.Delegates.get_pending_parameters ctxt pkh) ;
+  register1 ~chunked:false S.stez_staking_power (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.For_RPC.allocated_rights_of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
       Delegate.For_RPC.pending_denunciations ctxt pkh) ;
   register1
