@@ -21,7 +21,11 @@ module Chain_id : sig
 
   val decode_le : bytes -> chain_id
 
+  val encode_le : chain_id -> string
+
   val decode_be : bytes -> chain_id
+
+  val encode_be : chain_id -> string
 
   val compare : chain_id -> chain_id -> int
 

@@ -744,7 +744,7 @@ let start (type f) ?max_number_of_chunks
   let*! start_result =
     protect @@ fun () ->
     let* state = Evm_ro_context.get_state ctxt () in
-    let* chain_id = Durable_storage.chain_id state in
+    let* chain_id = Durable_storageV2.read Chain_id state in
     let* session =
       Types.session_of_state (Ex_chain_family chain_family) ctxt state
     in

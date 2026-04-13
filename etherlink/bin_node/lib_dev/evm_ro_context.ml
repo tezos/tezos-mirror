@@ -40,7 +40,7 @@ let read_chain_family ctxt chain_id =
 let read_enable_multichain_flag ctxt =
   with_latest_state ctxt Durable_storage.is_multichain_enabled
 
-let chain_id ctxt = with_latest_state ctxt Durable_storage.chain_id
+let chain_id ctxt = with_latest_state ctxt (Durable_storageV2.read Chain_id)
 
 let michelson_runtime_chain_id ctxt =
   with_latest_state ctxt Durable_storage.michelson_runtime_chain_id
@@ -213,7 +213,7 @@ let network_sanity_check ~network ctxt =
 
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
-  let*! chain_id = Durable_storage.chain_id evm_state in
+  let*! chain_id = Durable_storageV2.read Chain_id evm_state in
 
   let* () =
     match chain_id with

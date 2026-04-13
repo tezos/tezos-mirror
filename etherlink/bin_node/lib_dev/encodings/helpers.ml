@@ -46,6 +46,10 @@ let decode_z_be bytes =
     Z.zero
     bytes
 
+let encode_z_be z =
+  let le = Z.to_bits z in
+  String.init (String.length le) (fun i -> le.[String.length le - 1 - i])
+
 (* A variation of List.fold_left where the function f returns an option.
    If f returns None, the fold stops and returns None.
    If f returns Some, the fold continues with the updated accumulator.

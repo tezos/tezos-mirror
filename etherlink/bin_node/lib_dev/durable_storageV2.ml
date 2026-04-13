@@ -44,7 +44,9 @@ let subkeys_durable evm_state key =
 
 (* Typed path GADT *)
 
-type _ path = Raw_path : string -> bytes path
+type _ path =
+  | Raw_path : string -> bytes path
+  | Chain_id : L2_types.chain_id path
 
 type 'a resolved = {
   path : string;
@@ -66,6 +68,13 @@ let resolve : type a. a path -> a resolution =
           path = key;
           decode = infallible_decode Fun.id;
           encode = Bytes.to_string;
+        }
+  | Chain_id ->
+      Static
+        {
+          path = Durable_storage_path.chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_le;
+          encode = L2_types.Chain_id.encode_le;
         }
 
 let storage_version state =

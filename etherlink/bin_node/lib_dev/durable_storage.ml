@@ -26,12 +26,6 @@ let inspect_durable_and_decode state path decode =
   | Some res -> return res
   | None -> failwith "No value found under %s" path
 
-let chain_id state =
-  inspect_durable_and_decode
-    state
-    Durable_storage_path.chain_id
-    L2_types.Chain_id.decode_le
-
 let michelson_runtime_chain_id state =
   inspect_durable_and_decode
     state

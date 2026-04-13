@@ -22,7 +22,11 @@ module Chain_id = struct
 
   let decode_le bytes = Chain_id (Helpers.decode_z_le bytes)
 
+  let encode_le (Chain_id z) = Z.to_bits z
+
   let decode_be bytes = Chain_id (Helpers.decode_z_be bytes)
+
+  let encode_be (Chain_id z) = Helpers.encode_z_be z
 
   let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
 
