@@ -258,6 +258,7 @@ where
                 delayed_txs: Vec::new(),
                 cumulative_gas: U256::zero(),
                 index: 0,
+                michelson_index: 0,
                 ethereum_parent_hash: read_current_block_hash(&safe_host)?,
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,

@@ -16,6 +16,50 @@ mod integration_tests;
 
 pub use decode::*;
 
+use crate::ast::Micheline;
+use typed_arena::Arena;
+
+/// Return the byte size of one canonical Micheline expression starting at
+/// `input[0]`.  Walks the binary structure without allocating an output value.
+pub fn micheline_expr_size(input: &[u8]) -> Result<usize, DecodeError> {
+    let arena = Arena::new();
+    let (_, consumed) = Micheline::decode_raw_prefix(&arena, input)?;
+    Ok(consumed)
+}
+
+/// Wrapper around raw Micheline bytes that uses self-delimiting encoding
+/// (matching OCaml's `Script.expr_encoding`).  Unlike a plain `Vec<u8>`,
+/// this reads/writes exactly one Micheline expression without a length
+/// prefix, relying on the Micheline structure for boundary detection.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct MichelineExpr(pub Vec<u8>);
+
+impl tezos_data_encoding::enc::BinWriter for MichelineExpr {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+        tezos_data_encoding::enc::bytes(&self.0, output)
+    }
+}
+
+impl<'a> tezos_data_encoding::nom::NomReader<'a> for MichelineExpr {
+    fn nom_read(
+        input: &'a [u8],
+    ) -> tezos_data_encoding::nom::NomResult<'a, Self> {
+        let consumed = micheline_expr_size(input).map_err(|e| {
+            nom::Err::Error(tezos_data_encoding::nom::error::DecodeError::invalid_tag(
+                input,
+                format!("invalid Micheline expression: {e}"),
+            ))
+        })?;
+        Ok((&input[consumed..], MichelineExpr(input[..consumed].to_vec())))
+    }
+}
+
+impl From<Vec<u8>> for MichelineExpr {
+    fn from(v: Vec<u8>) -> Self {
+        MichelineExpr(v)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::constants::APP_NO_ARGS_NO_ANNOTS_TAG;

@@ -16,7 +16,7 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 
 /// Tezos operation without signature/watermark, as used for forging.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct UnsignedOperation {
     /// The branch (blockhash) this operation is applied against.
     pub branch: BlockHash,
@@ -25,14 +25,14 @@ pub struct UnsignedOperation {
 }
 
 /// List wrapper for operation contents, as encoded by the protocol.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct OperationContentList {
     /// The sequence of contents included in the operation.
     pub contents: Vec<OperationContent>,
 }
 
 /// Tezos operation contents.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 #[encoding(tags = "u8")]
 pub enum OperationContent {
     /// Reveal a manager's public key.
@@ -57,7 +57,7 @@ pub enum OperationContent {
 }
 
 /// Common fields for Tezos manager operations.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct ManagerOperationContent<Op> {
     /// Manager source account.
     pub source: PublicKeyHash,
@@ -74,7 +74,7 @@ pub struct ManagerOperationContent<Op> {
 }
 
 /// Reveal operation payload.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct RevealContent {
     /// Manager public key to reveal.
     pub pk: PublicKey,
@@ -154,7 +154,7 @@ mod internal {
 }
 
 /// Transaction operation payload.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Eq)]
 pub struct TransactionContent {
     /// Amount transferred (mutez).
     pub amount: Narith,
@@ -165,7 +165,7 @@ pub struct TransactionContent {
 }
 
 /// Parameters attached to a transaction.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct Parameters {
     /// Entrypoint called on the destination contract.
     pub entrypoint: Entrypoint,
@@ -186,7 +186,7 @@ impl Default for Parameters {
 }
 
 /// Origination operation payload.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct OriginationContent {
     /// Initial balance for the originated contract (mutez).
     pub balance: Narith,
@@ -197,7 +197,7 @@ pub struct OriginationContent {
 }
 
 /// Micheline script for contract origination.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct Script {
     /// Micheline-encoded contract code.
     #[encoding(dynamic, bytes)]
@@ -208,21 +208,21 @@ pub struct Script {
 }
 
 /// Delegation operation payload.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct DelegationContent {
     /// Delegate to set, or `None` to clear.
     pub delegate: Option<PublicKeyHash>,
 }
 
 /// Smart rollup cement operation payload.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct SmartRollupCementContent {
     /// Smart rollup address.
     pub address: SmartRollupHash,
 }
 
 /// Smart rollup commitment data.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct SmartRollupCommitment {
     /// Compressed state hash.
     pub compressed_state: SmartRollupStateHash,
@@ -235,7 +235,7 @@ pub struct SmartRollupCommitment {
 }
 
 /// Smart rollup publish operation payload.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter, Eq)]
 pub struct SmartRollupPublishContent {
     /// Smart rollup address.
     pub address: SmartRollupHash,

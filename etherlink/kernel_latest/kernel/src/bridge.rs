@@ -430,6 +430,7 @@ where
                 RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
                     caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
                     execution_outcome,
+                    crac_receipts: vec![],
                 });
 
             Ok(ExecutionResult::Valid(transaction_result))

@@ -10,21 +10,21 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Update {
     pub key_hash: ScriptExprHash,
     pub key: Vec<u8>,
     pub value: Option<Vec<u8>>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Copy {
     pub source: Zarith,
     #[encoding(dynamic, list)]
     pub updates: Vec<Update>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct Alloc {
     #[encoding(dynamic, list)]
     pub updates: Vec<Update>,
@@ -32,7 +32,7 @@ pub struct Alloc {
     pub value_type: Vec<u8>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 #[encoding(tags = "u8")]
 pub enum StorageDiff {
     #[encoding(dynamic, list)]
@@ -42,19 +42,19 @@ pub enum StorageDiff {
     Alloc(Alloc),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct BigMapDiff {
     pub id: Zarith,
     pub storage_diff: StorageDiff,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 #[encoding(tags = "u8")]
 pub enum LazyStorageDiff {
     BigMap(BigMapDiff),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone, Eq)]
 pub struct LazyStorageDiffList {
     #[encoding(dynamic, list)]
     pub diff: Vec<LazyStorageDiff>,

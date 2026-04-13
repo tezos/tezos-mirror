@@ -111,7 +111,7 @@ pub enum RevealError {
     OutOfGas,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, BinWriter, NomReader)]
 #[error("{contract:?} cannot spend {amount:?} as its balance is {balance:?}")]
 pub struct BalanceTooLow {
     pub contract: Contract,
@@ -119,7 +119,7 @@ pub struct BalanceTooLow {
     pub amount: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(Error, Clone, Debug, PartialEq, Eq, BinWriter, NomReader)]
 pub enum TransferError {
     #[error(transparent)]
     BalanceTooLow(BalanceTooLow),
@@ -341,6 +341,7 @@ pub trait HasConsumedMilligas {
 
 pub trait OperationKind {
     type Success: PartialEq
+        + Eq
         + Debug
         + BinWriter
         + for<'a> NomReader<'a>
@@ -363,7 +364,7 @@ impl OperationKind for EventContent {
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
@@ -382,7 +383,7 @@ impl From<TransferTarget> for TransferSuccess {
     }
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
 }
@@ -394,7 +395,7 @@ impl HasConsumedMilligas for RevealSuccess {
 }
 
 // PlaceHolder Type for temporary unused fields
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Eq)]
 pub struct Empty;
 
 impl BinWriter for Empty {
@@ -429,7 +430,7 @@ impl NomReader<'_> for Empty {
 // the one implemented in the kernel_sdk Contract. However, this type
 // cannot be an implicit account. Therefore, we created a new type that
 // only holds a KT1. The new type reuses the existing functions.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Eq)]
 pub struct Originated {
     pub contract: ContractKt1Hash,
 }
@@ -455,7 +456,7 @@ impl NomReader<'_> for Originated {
 }
 
 // Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct OriginationSuccess {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -473,16 +474,15 @@ impl HasConsumedMilligas for OriginationSuccess {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct AddressRegistry {
     pub address: Contract,
     pub index: Zarith,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct TransferSuccess {
-    #[encoding(option, bytes)]
-    pub storage: Option<Vec<u8>>,
+    pub storage: Option<MichelineExpr>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     #[encoding(dynamic, bytes)]
@@ -511,7 +511,7 @@ impl HasConsumedMilligas for TransferTarget {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct EventSuccess {
     pub consumed_milligas: Narith,
 }
@@ -542,7 +542,7 @@ impl Default for TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -564,7 +564,7 @@ impl From<ApplyOperationError> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -572,7 +572,7 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(BacktrackedResult<M>),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct BacktrackedResult<M: OperationKind> {
     pub errors: Option<()>,
     pub result: M::Success,
@@ -612,7 +612,7 @@ impl<M: OperationKind> ContentResult<M> {
 
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 #[encoding(tags = "u8")]
 pub enum Balance {
     #[encoding(tag = 0)]
@@ -626,14 +626,14 @@ pub enum Balance {
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum UpdateOrigin {
     BlockApplication,
 }
 
 /// Depending of the sign of [changes], the balance is credited or debited
 /// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub struct BalanceUpdate {
     pub balance: Balance,
     pub changes: i64,
@@ -643,7 +643,7 @@ pub struct BalanceUpdate {
 // Inspired from `Manager_operation_result` case in 'kind contents_result type
 // from `src/proto_alpha/lib_protocol/apply_results.ml` file.
 // Still need to implement internal_results
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -652,7 +652,7 @@ pub struct OperationResult<M: OperationKind> {
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Eq)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
     pub nonce: u16,
@@ -676,14 +676,20 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
 //
 // See: `Event` case in `internal_operation_contents` type and `event_case` value
 // in `src/proto_alpha/lib_protocol/apply_internal_results.ml`.
-#[derive(PartialEq, Debug, Clone, BinWriter, NomReader)]
+pub use mir::serializer::MichelineExpr;
+
+/// Event internal operation content.
+///
+/// Binary layout (matching OCaml `event_case` in `apply_internal_results.ml`):
+///   [type: MichelineExpr] [tag: optional(Entrypoint)] [payload: optional(MichelineExpr)]
+#[derive(PartialEq, Debug, Clone, BinWriter, NomReader, Eq)]
 pub struct EventContent {
-    pub ty: Vec<u8>,
+    pub ty: MichelineExpr,
     pub tag: Option<Entrypoint>,
-    pub payload: Option<Vec<u8>>,
+    pub payload: Option<MichelineExpr>,
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
@@ -739,9 +745,16 @@ impl InternalOperationSum {
             }
         }
     }
+    pub fn set_nonce(&mut self, nonce: u16) {
+        match self {
+            Self::Transfer(inner) => inner.nonce = nonce,
+            Self::Origination(inner) => inner.nonce = nonce,
+            Self::Event(inner) => inner.nonce = nonce,
+        }
+    }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Eq)]
 pub enum OperationResultSum {
     Reveal(OperationResult<RevealContent>),
     Transfer(OperationResult<TransferContent>),
@@ -843,19 +856,19 @@ fn produce_skipped_result<M: OperationKind>(
     }
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub enum OperationDataAndMetadata {
     OperationWithMetadata(OperationBatchWithMetadata),
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Eq)]
 pub struct OperationBatchWithMetadata {
     #[encoding(dynamic, list)]
     pub operations: Vec<OperationWithMetadata>,
     pub signature: UnknownSignature,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Eq)]
 pub struct OperationWithMetadata {
     pub content: ManagerOperationContent,
     pub receipt: OperationResultSum,
@@ -1235,8 +1248,8 @@ mod tests {
         let operation = InternalOperationSum::Event(InternalContentWithMetadata {
             content: EventContent {
                 tag: Some(Entrypoint::from_string_unchecked("add".into())),
-                payload: Some(payload),
-                ty,
+                payload: Some(payload.into()),
+                ty: ty.into(),
             },
             sender: Contract::from_b58check("KT1SHrxmgUojs2hwe4hguExy6BqteeG1rDHi")
                 .unwrap(),
@@ -1276,7 +1289,9 @@ mod tests {
             result: ContentResult::BackTracked(BacktrackedResult {
                 errors: None,
                 result: TransferTarget::ToContrat(TransferSuccess {
-                    storage: Some(hex::decode("010000000568656c6c6f").unwrap()),
+                    storage: Some(MichelineExpr(
+                        hex::decode("010000000568656c6c6f").unwrap(),
+                    )),
                     lazy_storage_diff: None,
                     balance_updates: vec![
                         BalanceUpdate {

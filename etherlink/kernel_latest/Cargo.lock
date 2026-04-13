@@ -3561,12 +3561,17 @@ dependencies = [
  "evm-types",
  "http",
  "michelson-types",
+ "mir",
  "revm",
  "rlp",
  "tezos-evm-logging-latest",
+ "tezos-protocol",
+ "tezos-smart-rollup",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_tezlink_latest",
 ]
 
 [[package]]
