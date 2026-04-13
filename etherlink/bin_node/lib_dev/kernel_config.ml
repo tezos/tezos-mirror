@@ -362,10 +362,10 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
     ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
     ?disable_legacy_dal_signals ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
-    ?tez_bootstrap_accounts ~tez_bootstrap_balance ?tez_bootstrap_contracts
-    ~output () =
+    ?enable_fast_fa_withdrawal ?enable_multichain ?enable_michelson_gas_refund
+    ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
+    ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance
+    ?tez_bootstrap_contracts ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -559,6 +559,9 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           Bytes.to_string (encode rlp_item))
         dal_publishers_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
+    @ make_instr
+        ~path_prefix:["tezlink"; "feature_flags"]
+        enable_michelson_gas_refund
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length

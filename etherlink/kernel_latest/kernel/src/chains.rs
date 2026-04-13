@@ -107,19 +107,29 @@ impl From<String> for ChainFamily {
 #[derive(Debug, Default)]
 pub struct ExperimentalFeatures {
     enable_tezos_runtime: bool,
+    enable_michelson_gas_refund: bool,
 }
 
 impl ExperimentalFeatures {
     pub fn read_from_storage(host: &mut impl StorageV1) -> Self {
         let enable_tezos_runtime = crate::storage::enable_tezos_runtime(host);
+        let enable_michelson_gas_refund =
+            crate::storage::enable_michelson_gas_refund(host);
 
         ExperimentalFeatures {
             enable_tezos_runtime,
+            enable_michelson_gas_refund,
         }
     }
 
     pub fn is_tezos_runtime_enabled(&self) -> bool {
         self.enable_tezos_runtime
+    }
+
+    // Used in the gas refund implementation (!21392).
+    #[allow(dead_code)]
+    pub(crate) fn is_michelson_gas_refund_enabled(&self) -> bool {
+        self.enable_michelson_gas_refund
     }
 }
 

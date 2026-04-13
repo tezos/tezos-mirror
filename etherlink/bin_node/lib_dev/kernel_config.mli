@@ -45,6 +45,7 @@ val make :
   ?enable_fast_withdrawal:string * string ->
   ?enable_fast_fa_withdrawal:string * string ->
   ?enable_multichain:string * string ->
+  ?enable_michelson_gas_refund:string * string ->
   ?set_account_code:(string * string) list ->
   ?max_delayed_inbox_blueprint_length:string * string ->
   ?evm_version:evm_version ->

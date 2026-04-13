@@ -166,6 +166,7 @@ type kernel_setup = {
   enable_fast_withdrawal : bool option;
   enable_fast_fa_withdrawal : bool option;
   enable_multichain : bool option;
+  enable_michelson_gas_refund : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
   michelson_runtime_chain_id : string option;
@@ -184,7 +185,8 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     ?set_account_code ?enable_fa_bridge ?enable_revm ?enable_dal ?dal_slots
     ?dal_publishers_whitelist ?disable_legacy_dal_signals
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?enable_multichain
-    ?evm_version ?with_runtimes ?michelson_runtime_chain_id () =
+    ?enable_michelson_gas_refund ?evm_version ?with_runtimes
+    ?michelson_runtime_chain_id () =
   let tez_bootstrap_accounts =
     match tez_bootstrap_accounts with
     | Some _ -> tez_bootstrap_accounts
@@ -232,6 +234,7 @@ let make_kernel_setup ?kernel ?l2_chain_ids ?max_delayed_inbox_blueprint_length
     enable_fast_withdrawal;
     enable_fast_fa_withdrawal;
     enable_multichain;
+    enable_michelson_gas_refund;
     evm_version;
     with_runtimes;
     michelson_runtime_chain_id;
@@ -1845,6 +1848,9 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
     @ Cli_arg.optional_switch
         "enable-multichain"
         (Option.value ~default:false kernel_setup.enable_multichain)
+    @ Cli_arg.optional_switch
+        "enable-michelson-gas-refund"
+        (Option.value ~default:false kernel_setup.enable_michelson_gas_refund)
     @ Cli_arg.optional_switch
         "enable-dal"
         (Option.value ~default:false kernel_setup.enable_dal)
