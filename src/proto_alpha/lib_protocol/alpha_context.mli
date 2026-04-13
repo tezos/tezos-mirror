@@ -4720,6 +4720,17 @@ module Clst : sig
       their parameters. *)
     val registered_delegates :
       context -> (Contract.t * Clst_delegates_parameters_repr.t) list Lwt.t
+
+    (** [allocated_rights_of_delegate ctxt delegate] returns the tez amount
+    allocated to [delegate] from the sTez deposits for baking rights (i.e. the
+    [stez_frozen] field of the delegate's staking balance).
+    Returns [Tez_repr.zero] if no sTez stake is allocated to the delegate. *)
+    val allocated_rights_of_delegate :
+      context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+
+    (** [total_allocated_rights ctxt] returns the total tez allocated across all
+    registered delegates from the sTez deposits for baking rights. *)
+    val total_allocated_rights : context -> Tez.t tzresult Lwt.t
   end
 end
 
