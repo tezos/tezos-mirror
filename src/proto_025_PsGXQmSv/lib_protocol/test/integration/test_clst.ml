@@ -765,8 +765,11 @@ let () =
      <amount before finalization> + <redeemed amount>
   *)
   let* balance_before_finalization = Context.Contract.balance (B b) sender in
+  let sender_pkh =
+    match sender with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
   let* finalize_tx =
-    Op.clst_finalize_redeem ~fee:Tez.zero (Context.B b) sender
+    Op.clst_finalize_redeem ~fee:Tez.zero (B b) ~sender ~redeemer:sender_pkh
   in
   let* b, full_metadata = Block.bake_with_metadata b ~operation:finalize_tx in
   let* balance_after_finalization = Context.Contract.balance (B b) sender in
@@ -899,8 +902,11 @@ let () =
      <amount before finalization> + <first redeemed amount>
   *)
   let* balance_before_finalization = Context.Contract.balance (B b) sender in
+  let sender_pkh =
+    match sender with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
   let* finalize_tx =
-    Op.clst_finalize_redeem ~fee:Tez.zero (Context.B b) sender
+    Op.clst_finalize_redeem ~fee:Tez.zero (B b) ~sender ~redeemer:sender_pkh
   in
   let* b = Block.bake b ~operation:finalize_tx in
   let* balance_after_finalization = Context.Contract.balance (B b) sender in
