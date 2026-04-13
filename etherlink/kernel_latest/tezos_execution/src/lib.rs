@@ -33,8 +33,8 @@ use tezos_tezlink::operation::{
 };
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, BacktrackedResult, ContentResult,
-    InternalContentWithMetadata, InternalOperationSum, OperationKind, OperationResult,
-    OperationWithMetadata, Originated, OriginationSuccess, TransferTarget,
+    InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
+    OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
@@ -1317,28 +1317,12 @@ where
     (processed_ops, true)
 }
 
-fn log_operation_failure<T, E: std::fmt::Debug>(
+fn log_on_operation_failure<T, E: std::fmt::Debug>(
     operation_name: &str,
     result: &Result<T, E>,
 ) {
     if let Err(err) = result {
         log!(Error, "{operation_name} failed because of: {err:?}");
-    }
-}
-
-/// Resolves the total milligas consumed by an operation, including all
-/// internal sub-operations.
-///
-/// Uses [`TezlinkOperationGas::total_milligas_consumed`] which computes
-/// `initial_limit - remaining`, immune to baseline resets performed by
-/// per-segment gas measurements.
-fn resolve_operation_consumed_milligas<M: OperationKind>(
-    operation_gas: &TezlinkOperationGas,
-    manager_result: &OperationResult<M>,
-) -> u32 {
-    match &manager_result.result {
-        ContentResult::Skipped => 0,
-        _ => operation_gas.total_milligas_consumed(),
     }
 }
 
@@ -1367,26 +1351,16 @@ where
         next_temporary_id,
     };
     let parser = Parser::new();
-    match &validated_operation.content.operation {
+    let mut counter = 0u128;
+    let receipt = match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
-            log_operation_failure("Reveal", &reveal_result);
-            let manager_result = produce_operation_result(
+            log_on_operation_failure("Reveal", &reveal_result);
+            OperationResultSum::Reveal(produce_operation_result(
                 validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
-            );
-            let operation_consumed_milligas = resolve_operation_consumed_milligas(
-                tc_ctx.operation_gas,
-                &manager_result,
-            );
-            ProcessedOperation {
-                operation_with_metadata: OperationWithMetadata {
-                    content: validated_operation.content.into_manager_operation_content(),
-                    receipt: OperationResultSum::Reveal(manager_result),
-                },
-                operation_consumed_milligas,
-            }
+            ))
         }
         OperationContent::Transfer(TransferContent {
             amount,
@@ -1395,7 +1369,7 @@ where
         }) => {
             let mut operation_ctx = OperationCtx {
                 source: source_account,
-                counter: &mut 0u128,
+                counter: &mut counter,
                 origination_nonce,
                 level: block_ctx.level,
                 now: block_ctx.now,
@@ -1412,24 +1386,12 @@ where
                 &mut internal_operations_receipts,
                 &parser,
             );
-
-            log_operation_failure("Transfer", &transfer_result);
-            let manager_result = produce_operation_result(
+            log_on_operation_failure("Transfer", &transfer_result);
+            OperationResultSum::Transfer(produce_operation_result(
                 validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
-            );
-            let operation_consumed_milligas = resolve_operation_consumed_milligas(
-                tc_ctx.operation_gas,
-                &manager_result,
-            );
-            ProcessedOperation {
-                operation_with_metadata: OperationWithMetadata {
-                    content: validated_operation.content.into_manager_operation_content(),
-                    receipt: OperationResultSum::Transfer(manager_result),
-                },
-                operation_consumed_milligas,
-            }
+            ))
         }
         OperationContent::Origination(OriginationContent {
             ref balance,
@@ -1451,25 +1413,26 @@ where
                 ),
                 Err(err) => Err(err),
             };
-
-            log_operation_failure("Origination", &origination_result);
-            let manager_result = produce_operation_result(
+            log_on_operation_failure("Origination", &origination_result);
+            OperationResultSum::Origination(produce_operation_result(
                 validated_operation.balance_updates,
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
-            );
-            let operation_consumed_milligas = resolve_operation_consumed_milligas(
-                tc_ctx.operation_gas,
-                &manager_result,
-            );
-            ProcessedOperation {
-                operation_with_metadata: OperationWithMetadata {
-                    content: validated_operation.content.into_manager_operation_content(),
-                    receipt: OperationResultSum::Origination(manager_result),
-                },
-                operation_consumed_milligas,
-            }
+            ))
         }
+    };
+    // Read the total gas consumed since the start of the operation, immune
+    // to baseline resets performed by per-segment measurements (e.g. via
+    // `get_and_reset_milligas_consumed` while attributing gas to internal
+    // sub-operations). Skipped operations never reach this point: they are
+    // built directly in `apply_batch` with `operation_consumed_milligas: 0`.
+    let operation_consumed_milligas = tc_ctx.operation_gas.total_milligas_consumed();
+    ProcessedOperation {
+        operation_with_metadata: OperationWithMetadata {
+            content: validated_operation.content.into_manager_operation_content(),
+            receipt,
+        },
+        operation_consumed_milligas,
     }
 }
 
