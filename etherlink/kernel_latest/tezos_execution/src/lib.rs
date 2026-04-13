@@ -33,8 +33,8 @@ use tezos_tezlink::operation::{
 };
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, BacktrackedResult, ContentResult,
-    InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
-    OriginationSuccess, TransferTarget,
+    InternalContentWithMetadata, InternalOperationSum, OperationKind, OperationResult,
+    OperationWithMetadata, Originated, OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
@@ -56,6 +56,44 @@ use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
     HasContractAccount, HasHost, HasOperationGas, OperationCtx, TcCtx,
 };
+
+/// Result of applying a single operation within a batch.
+///
+/// Wraps the serializable [`OperationWithMetadata`] together with
+/// runtime-computed gas that is NOT part of the binary encoding.
+#[derive(Debug, PartialEq)]
+pub struct ProcessedOperation {
+    pub operation_with_metadata: OperationWithMetadata,
+    /// Total gas consumed by this operation (including internal operations),
+    /// in milligas.
+    ///
+    /// - For Applied/BackTracked/Failed: total gas consumed since the start
+    ///   of the operation, computed from the gas tracker's initial limit and
+    ///   remaining gas. This includes gas from all internal sub-operations.
+    ///   For BackTracked operations, this reflects gas actually burned during
+    ///   execution, even though the operation's effects were reverted (because
+    ///   a later operation in the batch failed).
+    /// - For Skipped: 0.
+    pub operation_consumed_milligas: u32,
+}
+
+impl ProcessedOperation {
+    /// Total milligas consumed across a batch of processed operations.
+    /// In practice, individual operation gas is bounded by
+    /// `hard_gas_limit_per_operation` (1_040_000 gas = 1_040_000_000 milligas),
+    /// so neither per-operation values nor batch totals will overflow `u64`.
+    pub fn total_consumed_milligas(ops: &[ProcessedOperation]) -> u64 {
+        ops.iter()
+            .map(|p| u64::from(p.operation_consumed_milligas))
+            .sum()
+    }
+
+    /// Extract the operation-with-metadata from each processed operation,
+    /// discarding the per-operation consumed milligas.
+    pub fn into_receipts(ops: Vec<Self>) -> Vec<OperationWithMetadata> {
+        ops.into_iter().map(|p| p.operation_with_metadata).collect()
+    }
+}
 
 extern crate alloc;
 pub mod account_storage;
@@ -1159,7 +1197,7 @@ where
     safe_host.start()?;
 
     let mut origination_nonce = OriginationNonce::initial(hash);
-    let (receipts, applied) = apply_batch(
+    let (processed_ops, applied) = apply_batch(
         &mut safe_host,
         registry,
         journal,
@@ -1181,7 +1219,7 @@ where
             Debug,
             "Reverting the changes because some operation failed."
         );
-        log!(Debug, "Receipts: {receipts:#?}");
+        log!(Debug, "Processed operations: {processed_ops:#?}");
         safe_host.revert()?;
         // Clear the in-memory EVM journal: safe_host.revert() only rolls
         // back Tezos durable storage but cannot affect the in-memory REVM
@@ -1190,7 +1228,7 @@ where
         journal.evm.clear();
     }
 
-    Ok(receipts)
+    Ok(ProcessedOperation::into_receipts(processed_ops))
 }
 
 fn apply_batch<Host, C: Context>(
@@ -1201,7 +1239,7 @@ fn apply_batch<Host, C: Context>(
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
     block_ctx: &BlockCtx,
-) -> (Vec<OperationWithMetadata>, bool)
+) -> (Vec<ProcessedOperation>, bool)
 where
     Host: StorageV1,
 {
@@ -1210,7 +1248,7 @@ where
         validated_operations,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
-    let mut receipts = Vec::with_capacity(validated_operations.len());
+    let mut processed_ops = Vec::with_capacity(validated_operations.len());
     let mut next_temporary_id = BigMapId { value: (-1).into() };
     for (index, validated_operation) in validated_operations.into_iter().enumerate() {
         log!(
@@ -1218,15 +1256,19 @@ where
             "Applying operation #{index} in the batch with counter {:?}.",
             validated_operation.content.counter
         );
-        let receipt = if first_failure.is_some() {
+        let processed = if first_failure.is_some() {
             log!(
                 Debug,
                 "Skipping this operation because we already failed on {first_failure:?}."
             );
-            produce_skipped_receipt(
-                validated_operation.content,
-                validated_operation.balance_updates,
-            )
+            ProcessedOperation {
+                operation_with_metadata: produce_skipped_receipt(
+                    validated_operation.content,
+                    validated_operation.balance_updates,
+                ),
+                // Skipped operations were not executed, so consumed no gas.
+                operation_consumed_milligas: 0,
+            }
         } else {
             apply_operation(
                 host,
@@ -1241,11 +1283,13 @@ where
             )
         };
 
-        if first_failure.is_none() && !receipt.receipt.is_applied() {
+        if first_failure.is_none()
+            && !processed.operation_with_metadata.receipt.is_applied()
+        {
             first_failure = Some(index);
         }
 
-        receipts.push(receipt);
+        processed_ops.push(processed);
     }
 
     // Clear all the temporaries big_map after the application of the batch
@@ -1259,13 +1303,42 @@ where
     }
 
     if let Some(failure_idx) = first_failure {
-        receipts[..failure_idx].iter_mut().for_each(|receipt| {
-            OperationResultSum::transform_result_backtrack(&mut receipt.receipt)
-        });
-        return (receipts, false);
+        processed_ops[..failure_idx]
+            .iter_mut()
+            .for_each(|processed| {
+                OperationResultSum::transform_result_backtrack(
+                    &mut processed.operation_with_metadata.receipt,
+                )
+            });
+        return (processed_ops, false);
     }
 
-    (receipts, true)
+    (processed_ops, true)
+}
+
+fn log_operation_failure<T, E: std::fmt::Debug>(
+    operation_name: &str,
+    result: &Result<T, E>,
+) {
+    if let Err(err) = result {
+        log!(Error, "{operation_name} failed because of: {err:?}");
+    }
+}
+
+/// Resolves the total milligas consumed by an operation, including all
+/// internal sub-operations.
+///
+/// Uses [`TezlinkOperationGas::total_milligas_consumed`] which computes
+/// `initial_limit - remaining`, immune to baseline resets performed by
+/// per-segment gas measurements.
+fn resolve_operation_consumed_milligas<M: OperationKind>(
+    operation_gas: &TezlinkOperationGas,
+    manager_result: &OperationResult<M>,
+) -> u32 {
+    match &manager_result.result {
+        ContentResult::Skipped => 0,
+        _ => operation_gas.total_milligas_consumed(),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1279,7 +1352,7 @@ fn apply_operation<Host, C: Context>(
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
-) -> OperationWithMetadata
+) -> ProcessedOperation
 where
     Host: StorageV1,
 {
@@ -1296,19 +1369,22 @@ where
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
-
-            if reveal_result.is_err() {
-                log!(Error, "Reveal failed because of: {reveal_result:?}");
-            }
-
+            log_operation_failure("Reveal", &reveal_result);
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             );
-            OperationWithMetadata {
-                content: validated_operation.content.into_manager_operation_content(),
-                receipt: OperationResultSum::Reveal(manager_result),
+            let operation_consumed_milligas = resolve_operation_consumed_milligas(
+                tc_ctx.operation_gas,
+                &manager_result,
+            );
+            ProcessedOperation {
+                operation_with_metadata: OperationWithMetadata {
+                    content: validated_operation.content.into_manager_operation_content(),
+                    receipt: OperationResultSum::Reveal(manager_result),
+                },
+                operation_consumed_milligas,
             }
         }
         OperationContent::Transfer(TransferContent {
@@ -1336,18 +1412,22 @@ where
                 &parser,
             );
 
-            if transfer_result.is_err() {
-                log!(Error, "Transfer failed because of: {transfer_result:?}");
-            }
-
+            log_operation_failure("Transfer", &transfer_result);
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             );
-            OperationWithMetadata {
-                content: validated_operation.content.into_manager_operation_content(),
-                receipt: OperationResultSum::Transfer(manager_result),
+            let operation_consumed_milligas = resolve_operation_consumed_milligas(
+                tc_ctx.operation_gas,
+                &manager_result,
+            );
+            ProcessedOperation {
+                operation_with_metadata: OperationWithMetadata {
+                    content: validated_operation.content.into_manager_operation_content(),
+                    receipt: OperationResultSum::Transfer(manager_result),
+                },
+                operation_consumed_milligas,
             }
         }
         OperationContent::Origination(OriginationContent {
@@ -1371,21 +1451,22 @@ where
                 Err(err) => Err(err),
             };
 
-            if origination_result.is_err() {
-                log!(
-                    Error,
-                    "Origination failed because of: {origination_result:?}"
-                );
-            }
-
+            log_operation_failure("Origination", &origination_result);
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
             );
-            OperationWithMetadata {
-                content: validated_operation.content.into_manager_operation_content(),
-                receipt: OperationResultSum::Origination(manager_result),
+            let operation_consumed_milligas = resolve_operation_consumed_milligas(
+                tc_ctx.operation_gas,
+                &manager_result,
+            );
+            ProcessedOperation {
+                operation_with_metadata: OperationWithMetadata {
+                    content: validated_operation.content.into_manager_operation_content(),
+                    receipt: OperationResultSum::Origination(manager_result),
+                },
+                operation_consumed_milligas,
             }
         }
     }
