@@ -4675,8 +4675,8 @@ module Address_registry : sig
 end
 
 module Clst : sig
-  (** [total_amount_of_tez ctxt] returns the total amount of tez available for
-      staking in the CLST contract. *)
+  (** [total_amount_of_tez ctxt] returns the total amount of tez in
+      the sTEZ staking ledger. *)
   val total_amount_of_tez : context -> Tez.t tzresult Lwt.t
 
   (** [add_redemption_request ctxt contract cycle amount] adds a redemption
