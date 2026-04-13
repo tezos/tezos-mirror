@@ -70,6 +70,8 @@ val sequencer_key : storage_version:int -> path
 
 val maximum_gas_per_transaction : path
 
+val michelson_runtime_sunrise_level : path
+
 (** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
   val input_tx : storage_version:int -> path

@@ -151,6 +151,9 @@ let sequencer_key ~storage_version =
 
 let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 
+let michelson_runtime_sunrise_level =
+  EVM.make "/michelson_runtime/sunrise_level"
+
 module Accounts = struct
   let accounts_path = World_state.make "/eth_accounts"
 
