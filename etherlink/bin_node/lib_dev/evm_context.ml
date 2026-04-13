@@ -612,7 +612,7 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storageV2.storage_version evm_state in
     let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () = Tx_queue.clear () in
@@ -805,7 +805,7 @@ module State = struct
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        let* storage_version = Durable_storage.storage_version evm_state in
+        let* storage_version = Durable_storageV2.storage_version evm_state in
         if not (Storage_version.legacy_storage_compatible ~storage_version) then
           let* receipts =
             Etherlink_durable_storage.current_transactions_receipts
@@ -1493,7 +1493,7 @@ module State = struct
       ctxt.session.pending_sequencer_upgrade <- None ;
     let* () =
       if kernel_change then (
-        let* storage_version = Evm_state.storage_version evm_state in
+        let* storage_version = Durable_storageV2.storage_version evm_state in
         let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
         ctxt.session.kernel_change <- No ;
         Result.iter
@@ -2069,7 +2069,7 @@ module State = struct
   let load_existing_state ~sequencer_key_source ~next_blueprint_number context =
     let open Lwt_result_syntax in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storageV2.storage_version evm_state in
     let sequencer_key_path =
       Durable_storage_path.sequencer_key ~storage_version
     in
@@ -2138,7 +2138,7 @@ module State = struct
         evm_state
         (`Inbox [])
     in
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storageV2.storage_version evm_state in
     let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
     (* Now that the storage version is known, remove whichever
        key path is not canonical for this version, so no stale
@@ -3029,7 +3029,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   in
 
   let* sequencer_upgrade =
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storageV2.storage_version evm_state in
     let* sequencer_upgrade_payload =
       Durable_storageV2.read_opt
         (Raw_path (Durable_storage_path.sequencer_upgrade ~storage_version))

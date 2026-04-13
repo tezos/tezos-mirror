@@ -70,7 +70,7 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
     let enable_fallback =
       match
         Lwt_domain.run_in_main @@ fun () ->
-        Evm_state.storage_version evm_node_state
+        Durable_storageV2.storage_version evm_node_state
       with
       | Ok storage_version ->
           Storage_version.kernel_has_txs_in_storage ~storage_version

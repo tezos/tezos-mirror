@@ -152,7 +152,7 @@ let current_transactions_receipts block_hash storage_version state =
 
 let transaction_receipt state ?block_hash tx_hash =
   let open Lwt_result_syntax in
-  let* storage_version = storage_version state in
+  let* storage_version = Durable_storageV2.storage_version state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* block_hash = current_block_hash state in
     let* receipts =
@@ -228,7 +228,7 @@ let current_transactions_objects ?block_hash storage_version state =
 
 let transaction_object state tx_hash =
   let open Lwt_result_syntax in
-  let* storage_version = storage_version state in
+  let* storage_version = Durable_storageV2.storage_version state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* transaction_objects =
       current_transactions_objects storage_version state
@@ -274,7 +274,7 @@ let transaction_object_with_block_hash ?known_storage_version state block_hash
   let* storage_version =
     match known_storage_version with
     | Some v -> return v
-    | None -> storage_version state
+    | None -> Durable_storageV2.storage_version state
   in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     raise (post_v41_unsupported_function ~__FUNCTION__)
@@ -319,7 +319,7 @@ let block_by_hash ?known_storage_version state ~full_transaction_object
   let* storage_version =
     match known_storage_version with
     | Some v -> return v
-    | None -> storage_version state
+    | None -> Durable_storageV2.storage_version state
   in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     raise (post_v41_unsupported_function ~__FUNCTION__)
@@ -339,7 +339,7 @@ let current_block ?known_storage_version state ~full_transaction_object =
   let* storage_version =
     match known_storage_version with
     | Some v -> return v
-    | None -> storage_version state
+    | None -> Durable_storageV2.storage_version state
   in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* block_opt =
@@ -370,7 +370,7 @@ let current_block ?known_storage_version state ~full_transaction_object =
 
 let blocks_by_number state ~full_transaction_object ~number =
   let open Lwt_result_syntax in
-  let* storage_version = storage_version state in
+  let* storage_version = Durable_storageV2.storage_version state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     match number with
     | Durable_storage_path.Block.Current ->

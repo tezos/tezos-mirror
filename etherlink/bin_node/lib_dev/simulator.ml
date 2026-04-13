@@ -77,7 +77,7 @@ module Etherlink = struct
   *)
   let simulation_version simulation_state =
     let open Lwt_result_syntax in
-    let* storage_version = Durable_storage.storage_version simulation_state in
+    let* storage_version = Durable_storageV2.storage_version simulation_state in
     if Storage_version.simulation_v0 ~storage_version then return `V0
     else if Storage_version.simulation_v2 ~storage_version then return `V2
     else

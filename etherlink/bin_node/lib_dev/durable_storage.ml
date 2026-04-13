@@ -51,8 +51,6 @@ let world_state state chain_id =
     (Durable_storage_path.Chain_configuration.world_state chain_id)
     Bytes.to_string
 
-let storage_version = Durable_storageV2.storage_version
-
 let michelson_runtime_sunrise_level state =
   inspect_durable_and_decode_opt
     state

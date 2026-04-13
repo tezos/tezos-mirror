@@ -196,8 +196,6 @@ let init ~kernel =
   let*! evm_state = init_reboot_counter evm_state in
   return evm_state
 
-let storage_version state = Durable_storage.storage_version state
-
 let current_block_height ~chain_family evm_state =
   let open Lwt_result_syntax in
   let* current_block_number =
@@ -296,7 +294,7 @@ let store_blueprint_chunks ~blueprint_number evm_state
       (Bytes.of_string (Z.to_bits (Z.of_int nb_chunks)))
       evm_state
   in
-  let* version = storage_version evm_state in
+  let* version = Durable_storageV2.storage_version evm_state in
   if version >= 39 then
     let* current_generation =
       Durable_storage.inspect_durable_and_decode_default
@@ -437,7 +435,7 @@ let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
 
 let retrieve_block_at_root ~chain_family ~root evm_state =
   let open Lwt_result_syntax in
-  let* storage_version = storage_version evm_state in
+  let* storage_version = Durable_storageV2.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* bytes =
       Durable_storageV2.read_opt
@@ -638,7 +636,7 @@ let clear_events evm_state =
 
 let clear_block_storage chain_family block evm_state =
   let open Lwt_result_syntax in
-  let* storage_version = storage_version evm_state in
+  let* storage_version = Durable_storageV2.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     return evm_state
   else

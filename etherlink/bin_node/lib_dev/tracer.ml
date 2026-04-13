@@ -29,7 +29,7 @@ let read_value ?default state path =
 
 let check_tracer_activation ~state ~version =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version state in
+  let* storage_version = Durable_storageV2.storage_version state in
   if storage_version < version then tzfail Tracer_types.Tracer_not_activated
   else return_unit
 

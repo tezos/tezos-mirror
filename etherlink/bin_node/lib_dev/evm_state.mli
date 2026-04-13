@@ -209,11 +209,6 @@ val clear_block_storage :
     durable storage of [state]. *)
 val clear_events : t -> t tzresult Lwt.t
 
-(** [storage_version tree] returns the current storage version set by the
-    kernel. This storage version is used by the EVM node to determine whether a
-    given feature is implemented by the kernel or not. *)
-val storage_version : t -> int tzresult Lwt.t
-
 (** [delayed_inbox_hashes tree] returns a list of hashes—each hash identifying
     an item of the delayed inbox.
 

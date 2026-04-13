@@ -60,7 +60,7 @@ let current_block_number_durable ctxt ~chain_family =
     (Durable_storageV2.read (Current_block_number chain_family))
 
 let storage_version ctxt =
-  with_latest_state ctxt Durable_storage.storage_version
+  with_latest_state ctxt Durable_storageV2.storage_version
 
 let kernel_version ctxt =
   with_latest_state ctxt (Durable_storageV2.read Kernel_version)

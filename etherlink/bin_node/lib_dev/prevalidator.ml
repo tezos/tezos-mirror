@@ -138,7 +138,7 @@ module Types = struct
 
   let session_of_state chain_family ctxt state =
     let open Lwt_result_syntax in
-    let* storage_version = Durable_storage.storage_version state in
+    let* storage_version = Durable_storageV2.storage_version state in
     match chain_family with
     | L2_types.Ex_chain_family EVM ->
         let* tezosx_infos = tezosx_infos_of_state state in
