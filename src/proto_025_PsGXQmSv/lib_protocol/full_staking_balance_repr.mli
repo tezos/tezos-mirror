@@ -26,8 +26,6 @@ val encoding_up_to_t : t Data_encoding.t
 (** The weight of a delegate used for voting rights. *)
 val voting_weight : t -> Int64.t tzresult
 
-val apply_slashing : percentage:Percentage.t -> t -> t
-
 (** The delegate's own frozen funds. *)
 val own_frozen : t -> Tez_repr.t
 
@@ -88,17 +86,30 @@ val allowed_staked_frozen :
   t ->
   Tez_repr.t
 
-(** Computes [(num, den)] representing the ratio of [own_frozen] over
-    [own_frozen + allowed_staked_frozen].
+type ratios = {
+  baker_over_all_frozen : Int64.t * Int64.t;
+  staker_over_external_frozen : Int64.t * Int64.t;
+}
 
-    If [allowed_staked_frozen] is zero, returns [(1L, 1L)].
+(** Computes two ratio of the form [(num, den)]:
+    - [baker_over_all_frozen] represents the ratio of [own_frozen] over
+    [own_frozen + allowed_staked_frozen + stez_frozen];
+    - [staker_over_all_external_frozen] represents the ratio of [allowed_staked_frozen] over
+    [allowed_staked_frozen + stez_frozen];
 
-    If [own_frozen] is zero, returns [(0L, 1L)]. *)
-val own_ratio :
+    If [allowed_staked_frozen + stez_frozen] is zero, returns [(1L, 1L)] for both ratios.
+
+    Otherwise, if [own_frozen] is zero, returns [(0L, 1L)] for [baker_over_all_frozen].
+
+    If [stez_frozen] is zero, returns [(1L, 1L)] for [staker_over_all_external_frozen].
+
+    Otherwise, If [allowed_staked_frozen] is zero, returns [(0L, 1L)] for [staker_over_all_external_frozen].
+ *)
+val distribution_ratios :
   adaptive_issuance_global_limit_of_staking_over_baking:int ->
   delegate_limit_of_staking_over_baking_millionth:int32 ->
   t ->
-  int64 * int64
+  ratios
 
 val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 

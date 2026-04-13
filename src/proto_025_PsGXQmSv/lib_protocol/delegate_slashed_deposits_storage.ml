@@ -295,7 +295,8 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                                        = own_frozen + staked_frozen]
               *)
             in
-            let* {baker_part; stakers_part = _} =
+            (* TODO handle stez case *)
+            let* {baker_part; stakers_part = _; stez_part = _} =
               Shared_stake.share
                 ~rounding:`Towards_baker
                 ctxt
@@ -553,14 +554,14 @@ module For_RPC = struct
 
   let get_estimated_shared_pending_slashed_amount ctxt delegate =
     let open Lwt_result_syntax in
-    let* {baker_part; stakers_part} =
+    let* {baker_part; stakers_part; stez_part = _} =
       get_estimated_punished_share ctxt delegate
     in
     Lwt.return Tez_repr.(baker_part +? stakers_part)
 
   let get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate =
     let open Lwt_result_syntax in
-    let+ {baker_part; stakers_part = _} =
+    let+ {baker_part; stakers_part = _; stez_part = _} =
       get_estimated_punished_share ctxt delegate
     in
     baker_part
@@ -574,7 +575,7 @@ module For_RPC = struct
         if Contract_repr.(equal (Contract_repr.Implicit delegate) contract) then
           get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate
         else
-          let* {baker_part = _; stakers_part} =
+          let* {baker_part = _; stakers_part; stez_part = _} =
             get_estimated_punished_share ctxt delegate
           in
           let* num =
