@@ -45,3 +45,11 @@ val unregister :
     over all delegates registered with the CLST. *)
 val activate_parameters :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t
+
+module For_RPC : sig
+  (** [registered_delegates ctxt] returns the list of registered delegates with
+      their parameters. *)
+  val registered_delegates :
+    Raw_context.t ->
+    (Contract_repr.t * Clst_delegates_parameters_repr.t) list Lwt.t
+end

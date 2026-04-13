@@ -58,3 +58,7 @@ let activate_parameters ctxt ~new_cycle =
         | Unregister -> Storage.Clst.Registered_delegates.remove ctxt contract)
   in
   Storage.Clst.Pending_delegate_parameters.clear (ctxt, new_cycle)
+
+module For_RPC = struct
+  let registered_delegates = Storage.Clst.Registered_delegates.bindings
+end

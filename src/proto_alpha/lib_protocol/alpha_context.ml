@@ -515,6 +515,7 @@ module Clst = struct
 
   module For_RPC = struct
     include Clst_redemption_requests_storage.For_RPC
+    include Clst_delegates_storage.For_RPC
   end
 end
 
