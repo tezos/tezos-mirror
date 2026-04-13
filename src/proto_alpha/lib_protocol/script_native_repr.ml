@@ -78,7 +78,7 @@ let encoding : t Data_encoding.t =
     [
       case
         (Tag 0)
-        ~title:"CLST"
+        ~title:"sTEZ"
         unit
         (function CLST -> Some ())
         (fun () -> CLST);
@@ -97,7 +97,7 @@ let rpc_arg =
   RPC_arg.make
     ~descr:"A native contract kind"
     ~name:"kind"
-    ~construct:(function CLST -> "CLST")
+    ~construct:(function CLST -> "sTEZ")
     ~destruct:(fun _ -> Ok CLST)
     ()
 

@@ -419,8 +419,8 @@ module CLST_types = struct
 
   let delegate_parameters_type : delegate_parameters ty_node tzresult =
     pair_ty
-      (add_name "edge_of_clst_staking" nat_ty)
-      (add_name "ratio_of_clst_staking" nat_ty)
+      (add_name "edge_of_stez_staking" nat_ty)
+      (add_name "ratio_of_stez_staking" nat_ty)
 
   let register_delegate_type :
       (register_delegate ty_node * register_delegate entrypoints_node) tzresult
