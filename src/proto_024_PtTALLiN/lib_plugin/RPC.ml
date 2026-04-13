@@ -1184,7 +1184,7 @@ module Scripts = struct
       let gas =
         match gas_opt with
         | Some gas ->
-            Gas.Arith.max gas (Constants.hard_gas_limit_per_operation ctxt)
+            Gas.Arith.min gas (Constants.hard_gas_limit_per_operation ctxt)
         | None -> Constants.hard_gas_limit_per_operation ctxt
       in
       let ctxt = Gas.set_limit ctxt gas in
