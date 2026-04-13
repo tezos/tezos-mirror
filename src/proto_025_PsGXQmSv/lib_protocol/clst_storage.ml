@@ -17,6 +17,8 @@ let decrease_deposit_only_call_from_token ctxt amount =
   let*? new_deposited_balance = Tez_repr.(deposited_balance_before -? amount) in
   Storage.Clst.Deposits_balance.update ctxt new_deposited_balance
 
+let get_deposits_balance ctxt = Storage.Clst.Deposits_balance.get ctxt
+
 (* See {Unstaked_frozen_deposits_storage.get_all} *)
 let get_all_redeemed_frozen_deposits ctxt =
   let open Lwt_result_syntax in
