@@ -36,8 +36,10 @@ make -C src/riscv all
 - [ ] Add tests for bugs that have been fixed.
 - [ ] Put in reasonable effort to ensure that CI will pass.
   - `make -C src/riscv`
-  - `dune test src/lib_riscv`
   - `dune build src/rust_deps`
+  - `dune build src/rollup_node_rust_deps`
+  - `dune build etherlink/lib_wasm_runtime`
+  - `dune test src/lib_riscv`
 - [ ] If applicable, trigger the `tezt-riscv-slow-sequential` test job.
 - [ ] Write commit messages to reflect the changes they're about.
 - [ ] Self-review your changes to ensure they are high-quality.
@@ -58,12 +60,12 @@ make -C src/riscv all
 /assign @kurtis.charnock
 /assign @thomas.athorne
 
-/assign_reviewer @victor-dumitrescu
-/assign_reviewer @emturner
-/assign_reviewer @santnr
-/assign_reviewer @jobjo
-/assign_reviewer @kurtis.charnock
-/assign_reviewer @thomas.athorne
+/request_review @victor-dumitrescu
+/request_review @emturner
+/request_review @santnr
+/request_review @jobjo
+/request_review @kurtis.charnock
+/request_review @thomas.athorne
 
 /unassign me
 /unassign_reviewer me
