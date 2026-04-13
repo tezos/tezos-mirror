@@ -2628,17 +2628,6 @@ let pkh_of_contract = function
   | Contract.Implicit pkh -> pkh
   | Contract.Originated _ -> assert false
 
-let clst_allocated_tez ctxt delegate_pkh =
-  let open Lwt_result_wrap_syntax in
-  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
-  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
-  let*@ staking_balance =
-    Stake_storage.get_full_staking_balance raw_ctxt delegate_pkh
-  in
-  let amount = Full_staking_balance_repr.stez_frozen staking_balance in
-  (* Convert Tez_repr.t to Alpha_context.Tez.t via mutez *)
-  return (Tez.of_mutez_exn (Tez_repr.to_mutez amount))
-
 let delegate_own_frozen ctxt delegate_pkh =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
@@ -2739,7 +2728,9 @@ let () =
   let* () =
     Assert.equal_tez ~loc:__LOC__ (Tez.of_mutez_exn deposit_mutez) total_before
   in
-  let* alloc_before = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc_before =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_before in
   let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
   (* Bake until activation cycle — triggers first rebalance *)
@@ -2748,7 +2739,9 @@ let () =
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
   (* Check: CLST allocated some tez to the delegate *)
-  let* alloc_after = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc_after =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_after > zero) in
   (* Check: baking power increased after CLST allocation *)
   let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
@@ -2765,7 +2758,9 @@ let () =
   let* total_after_2 = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after_2 in
   (* Allocation should be the same (idempotent) *)
-  let* alloc_after_2 = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc_after_2 =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   Assert.equal_tez ~loc:__LOC__ alloc_after alloc_after_2
 
 let () =
@@ -2791,7 +2786,9 @@ let () =
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
   (* CLST allocation is non-zero (global limit allows it) *)
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
   let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
   let expected_power_after = Int64.add power_before (Tez.to_mutez alloc) in
@@ -2822,7 +2819,9 @@ let () =
   let* b = Block.bake_until_cycle_end b in
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   (* Allocation matches the exact computed cap *)
   Assert.equal_tez ~loc:__LOC__ expected_cap alloc
 
@@ -2851,7 +2850,9 @@ let () =
   let* b = Block.bake_until_cycle_end b in
   let* total_after = total_amount_of_tez (B b) in
   let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   Assert.equal_tez ~loc:__LOC__ expected_cap alloc
 
 let () =
@@ -2866,7 +2867,9 @@ let () =
   let* b = Block.bake_until_cycle activation_cycle b in
   let* b = Block.bake_until_cycle_end b in
   (* Check the allocation worked *)
-  let* alloc_with_clst = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc_with_clst =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_with_clst > zero) in
   let* total_with_clst = total_amount_of_tez (B b) in
   (* Unregister the delegate from CLST *)
@@ -2888,7 +2891,7 @@ let () =
   (* Check that the allocation is not removed until the end of the activation
      cycle. *)
   let* alloc_at_unregistration_activation =
-    clst_allocated_tez (B b) delegate_pkh
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
   in
   let* () =
     Assert.equal_tez
@@ -2898,7 +2901,9 @@ let () =
   in
   let* b = Block.bake_until_cycle_end b in
   (* CLST allocation should be zero (immediately cleared, no unfreezing) *)
-  let* alloc_after = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc_after =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_after in
   (* total_amount_of_tez is preserved *)
   let* total_after = total_amount_of_tez (B b) in
@@ -3015,7 +3020,9 @@ let () =
   (* Collect allocations sorted by pkh order (same as greedy order) *)
   let pkhs_sorted = List.sort Signature.Public_key_hash.compare pkhs in
   let* allocs =
-    List.map_es (fun pkh -> clst_allocated_tez (B b) pkh) pkhs_sorted
+    List.map_es
+      (fun pkh -> Delegate_services.stez_staking_power Block.rpc_ctxt b pkh)
+      pkhs_sorted
   in
   let* () =
     List.iter_es
@@ -3156,7 +3163,9 @@ let () =
   let* b = Block.bake_until_cycle activation_cycle b in
   let* b = Block.bake_until_cycle_end b in
   (* CLST allocation should be zero — delegate is overstaked *)
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   Assert.equal_tez ~loc:__LOC__ Tez.zero alloc
 
 (* Exchange rate tests                                                    *)
@@ -3240,7 +3249,9 @@ let () =
   in
   let* b = Block.bake_until_cycle activation_cycle b in
   let* b = Block.bake_until_cycle_end b in
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
   let* rate_before =
     Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
@@ -3267,7 +3278,9 @@ let () =
   in
   let* b = Block.bake_until_cycle activation_cycle b in
   let* b = Block.bake_until_cycle_end b in
-  let* alloc = clst_allocated_tez (B b) delegate_pkh in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
   (* Bake until rewards shift the rate away from 1:1 *)
   let* b = Block.bake_until_n_cycle_end 2 b in
@@ -3407,7 +3420,7 @@ let () =
   in
   let* b = Block.bake_until_cycle activation_cycle b in
   let* b = Block.bake_until_cycle_end b in
-  let* alloc = clst_allocated_tez (B b) baker1 in
+  let* alloc = Delegate_services.stez_staking_power Block.rpc_ctxt b baker1 in
   let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
   let* rate_before =
     Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
