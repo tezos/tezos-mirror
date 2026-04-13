@@ -284,8 +284,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ?dal_publishers_whitelist ?evm_version ?with_runtimes ~sequencer
-    ~preimages_dir ~kernel protocol () =
+    ?dal_publishers_whitelist ?evm_version ?with_runtimes
+    ?enable_michelson_gas_refund ~sequencer ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
@@ -368,6 +368,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?evm_version
       ?enable_fa_bridge
       ?with_runtimes
+      ?enable_michelson_gas_refund
       ()
   in
   let*! () =
@@ -537,8 +538,8 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
     ?dal_publishers_whitelist ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ~preimages_dir ~kernel ?evm_version ?with_runtimes ~client
-    protocol () =
+    ?enable_fa_bridge ~preimages_dir ~kernel ?evm_version ?with_runtimes
+    ?enable_michelson_gas_refund ~client protocol () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config : Evm_node.l2_setup = List.hd l2_chains in
@@ -570,6 +571,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?enable_fa_bridge
       ?evm_version
       ?with_runtimes
+      ?enable_michelson_gas_refund
       ~preimages_dir
       ~kernel
       protocol
@@ -612,7 +614,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ~enable_dal ?dal_slots ?dal_publishers_whitelist ~enable_multichain
     ~l2_chains ?rpc_server ?websockets ?history_mode ?spawn_rpc
     ?periodic_snapshot_path ?(signatory = false) ?tx_queue
-    ?(sequencer_sunset_sec = 0) ?with_runtimes ?instant_confirmations protocol =
+    ?(sequencer_sunset_sec = 0) ?with_runtimes ?enable_michelson_gas_refund
+    ?instant_confirmations protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -714,6 +717,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
       ?with_runtimes
+      ?enable_michelson_gas_refund
       ~preimages_dir
       ~kernel
       ~client
@@ -944,8 +948,8 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ?dal_publishers_whitelist ~enable_multichain ~l2_setups ?rpc_server
     ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
-    ?signatory ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body
-    ~title ~tags protocols =
+    ?signatory ?sequencer_sunset_sec ?with_runtimes ?enable_michelson_gas_refund
+    ?instant_confirmations body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -1019,6 +1023,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?signatory
         ?sequencer_sunset_sec
         ?with_runtimes
+        ?enable_michelson_gas_refund
         ?instant_confirmations
         protocol
     in
@@ -1072,7 +1077,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?dal_slots ?dal_publishers_whitelist ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
     ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes
-    ?instant_confirmations body ~title ~tags protocols =
+    ?enable_michelson_gas_refund ?instant_confirmations body ~title ~tags
+    protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -1127,6 +1133,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~l2_setups
     ?sequencer_sunset_sec
     ?with_runtimes
+    ?enable_michelson_gas_refund
     ?instant_confirmations
     body
     ~title

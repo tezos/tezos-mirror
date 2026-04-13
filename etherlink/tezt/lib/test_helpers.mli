@@ -315,6 +315,7 @@ val init_sequencer_sandbox :
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?enable_michelson_gas_refund:bool ->
   unit ->
   Evm_node.t Lwt.t
 
@@ -389,6 +390,7 @@ val register_sandbox :
   ?regression:bool ->
   ?with_runtimes:Tezosx_runtime.t list ->
   ?chain_id:int ->
+  ?enable_michelson_gas_refund:bool ->
   (Evm_node.t -> unit Lwt.t) ->
   unit
 

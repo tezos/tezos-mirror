@@ -595,7 +595,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?(sequencer_keys = []) ?with_runtimes () =
+    ?(sequencer_keys = []) ?with_runtimes ?enable_michelson_gas_refund () =
   let patch_config =
     Option.map
       (fun input_patch json ->
@@ -625,6 +625,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?evm_version
       ?with_runtimes
       ?chain_id
+      ?enable_michelson_gas_refund
       ?kernel_compat:(Kernel.name_of kernel)
       ?sequencer_pool_address
       ?sequencer:
@@ -772,7 +773,8 @@ let produce_block_and_wait_for ?timestamp ~sequencer n =
 let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
     ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id body =
+    ?sequencer_keys ?(regression = false) ?with_runtimes ?chain_id
+    ?enable_michelson_gas_refund body =
   let register =
     if regression then Regression.register ?file:None
     else Test.register ?seed:None
@@ -809,6 +811,7 @@ let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
       ?tez_bootstrap_accounts
       ?with_runtimes
       ?chain_id
+      ?enable_michelson_gas_refund
       ()
   in
   body sequencer

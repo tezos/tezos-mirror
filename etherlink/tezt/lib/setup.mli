@@ -135,6 +135,7 @@ val register_test :
   ?l2_setups:Evm_node.l2_setup list ->
   ?sequencer_sunset_sec:int ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?enable_michelson_gas_refund:bool ->
   ?instant_confirmations:bool ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
@@ -193,6 +194,7 @@ val register_multichain_test :
   ?signatory:bool ->
   ?sequencer_sunset_sec:int ->
   ?with_runtimes:Tezosx_runtime.t list ->
+  ?enable_michelson_gas_refund:bool ->
   ?instant_confirmations:bool ->
   (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
