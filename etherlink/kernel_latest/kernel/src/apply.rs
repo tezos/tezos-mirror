@@ -42,6 +42,7 @@ use tezos_ethereum::tx_common::{
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_execution::context::Context;
 use tezos_execution::mir_ctx::BlockCtx;
+use tezos_execution::ProcessedOperation;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -1068,18 +1069,20 @@ where
                 skip_signature_check,
                 None,
             ) {
-                Ok(operations_with_metadata) => {
+                Ok(processed_operations) => {
                     log!(
                         Debug,
                         "Delayed Tezos operation status: SUCCESS - {:?}",
-                        operations_with_metadata
+                        processed_operations
                     );
+                    let operations =
+                        ProcessedOperation::into_receipts(processed_operations);
                     let operation_and_receipt = AppliedOperation {
                         hash: op_hash,
                         branch: op.branch.clone(),
                         op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                             OperationBatchWithMetadata {
-                                operations: operations_with_metadata,
+                                operations,
                                 signature: op.signature.clone(),
                             },
                         ),
