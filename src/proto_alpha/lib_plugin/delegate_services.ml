@@ -1025,27 +1025,29 @@ module S = struct
   let clst_registered =
     RPC_service.get_service
       ~description:
-        "Returns true if the delegate is registered with CLST. Otherwise, \
-         returns false."
+        "Returns true if the delegate is registered with the sTEZ contract. \
+         Otherwise, returns false."
       ~query:RPC_query.empty
       ~output:bool
-      RPC_path.(path / "clst_registered")
+      RPC_path.(path / "stez_registered")
 
   let active_clst_staking_parameters =
     RPC_service.get_service
       ~description:
-        "Returns the currently active delegate's parameters for CLST."
+        "Returns the currently active delegate's parameters for the sTEZ \
+         contract."
       ~query:RPC_query.empty
       ~output:(option Clst_delegates_parameters_repr.encoding)
-      RPC_path.(path / "active_clst_parameters")
+      RPC_path.(path / "active_stez_parameters")
 
   let pending_clst_staking_parameters =
     RPC_service.get_service
       ~description:
-        "Returns the currently pending delegate's parameters for CLST."
+        "Returns the currently pending delegate's parameters for the sTEZ \
+         contract."
       ~query:RPC_query.empty
       ~output:(list pending_clst_staking_parameters_encoding)
-      RPC_path.(path / "pending_clst_parameters")
+      RPC_path.(path / "pending_stez_parameters")
 
   let stez_staking_power =
     RPC_service.get_service
