@@ -84,6 +84,27 @@ val exchange_rate_from_storage :
 (** [exchange_rate ctxt] returns the rate to exchange tez to sTez. *)
 val exchange_rate : context -> Q.t tzresult Lwt.t
 
+(** [tez_to_clst_tokens ctxt ~total_supply tez_amount] converts a tez amount
+    to CLST tokens using the current exchange rate (total_tez / total_supply).
+    When either totals is zero, returns the identity conversion (1:1). Uses
+    floor rounding to avoid minting unbacked tokens. *)
+val tez_to_clst_tokens :
+  context ->
+  total_supply:CLST_types.nat ->
+  Tez.t ->
+  (CLST_types.nat * context) tzresult Lwt.t
+
+(** [clst_tokens_to_tez ctxt ~total_supply token_amount] converts a CLST
+    token amount to tez using the current exchange rate
+    (total_tez / total_supply). When either totals is zero, returns the
+    identity conversion (1:1). Uses floor rounding to protect the sTEZ
+    staking ledger from over-drainage. *)
+val clst_tokens_to_tez :
+  context ->
+  total_supply:CLST_types.nat ->
+  CLST_types.nat ->
+  (Tez.t * context) tzresult Lwt.t
+
 (** [deposit_to_clst_deposits context ~clst_contract_hash amount] deposits
     [amount] tez from [clst_contract_hash] balance to the CLST deposits
     container *)

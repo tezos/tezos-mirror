@@ -139,6 +139,48 @@ let exchange_rate ctxt =
   let* total_supply, _ = get_total_supply ctxt in
   exchange_rate_from_storage ctxt ~total_supply
 
+let tez_to_clst_tokens ctxt ~total_supply tez_amount =
+  let open Lwt_result_syntax in
+  let* {num = total_amount_of_tez; den = total_supply} =
+    exchange_rate_from_storage ctxt ~total_supply
+  in
+  let total_supply_int64 = Z.to_int64 total_supply in
+  let total_amount_of_mutez = Z.to_int64 total_amount_of_tez in
+  let*? result =
+    Tez.mul_ratio
+      ~rounding:`Down
+      tez_amount
+      ~num:total_supply_int64
+      ~den:total_amount_of_mutez
+  in
+  return (Script_int.(abs (of_int64 (Tez.to_mutez result))), ctxt)
+
+let clst_tokens_to_tez ctxt ~total_supply token_amount =
+  let open Lwt_result_syntax in
+  let* {num = total_amount_of_tez; den = total_supply} =
+    exchange_rate_from_storage ctxt ~total_supply
+  in
+  let total_supply_int64 = Z.to_int64 total_supply in
+  let total_amount_of_mutez =
+    (* We know that the total supply of tez cannot overflow, otherwise the total
+       supply of tez of the whole protocol would have overflown before the
+       contract. And it cannot be negative. *)
+    Z.to_int64 total_amount_of_tez
+    |> Tez.of_mutez
+    |> Option.value ~default:Tez.zero
+  in
+  let token_amount_int64 =
+    Option.value ~default:0L (Script_int.to_int64 token_amount)
+  in
+  let*? result =
+    Tez.mul_ratio
+      ~rounding:`Down
+      total_amount_of_mutez
+      ~num:token_amount_int64
+      ~den:total_supply_int64
+  in
+  return (result, ctxt)
+
 let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
   let clst_contract = Contract.Originated clst_contract_hash in
   Token.transfer ctxt (`Contract clst_contract) `CLST_deposits amount
