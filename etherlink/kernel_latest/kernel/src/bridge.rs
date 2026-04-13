@@ -166,7 +166,14 @@ impl rlp::Decodable for DepositReceiver {
                             "Can't decode Tezos receiver using NomReader",
                         )
                     })?;
-                    Ok(Self::Tezos(contract))
+
+                    if contract.is_implicit() {
+                        Ok(Self::Tezos(contract))
+                    } else {
+                        Err(DecoderError::Custom(
+                            "Deposit to smart contracts are disabled",
+                        ))
+                    }
                 }
                 _ => Err(DecoderError::Custom("Unknown receiver tag.")),
             }
