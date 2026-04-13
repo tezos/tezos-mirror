@@ -73,15 +73,6 @@ let sequencer =
   inspect_durable_and_decode state sequencer_path (fun bytes ->
       Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
 
-let is_multichain_enabled state =
-  let open Lwt_result_syntax in
-  let* bytes_opt =
-    Durable_storageV2.read_opt
-      (Raw_path Durable_storage_path.Feature_flags.multichain)
-      state
-  in
-  return (Option.is_some bytes_opt)
-
 let block_number ~root state n =
   let open Lwt_result_syntax in
   match n with

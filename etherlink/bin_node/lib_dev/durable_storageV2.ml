@@ -50,6 +50,7 @@ type _ path =
   | Michelson_runtime_chain_id : L2_types.chain_id path
   | Kernel_version : string path
   | Kernel_root_hash : Ethereum_types.hex path
+  | Multichain_flag : unit path
 
 type 'a resolved = {
   path : string;
@@ -102,6 +103,13 @@ let resolve : type a. a path -> a resolution =
               let (`Hex s) = Hex.of_bytes bytes in
               Ok (Ethereum_types.Hex s));
           encode = Ethereum_types.hex_to_string;
+        }
+  | Multichain_flag ->
+      Static
+        {
+          path = Durable_storage_path.Feature_flags.multichain;
+          decode = (fun _bytes -> Ok ());
+          encode = (fun () -> "");
         }
 
 let storage_version state =
