@@ -325,6 +325,144 @@ mod tests {
     }
 
     #[test]
+    fn store_read_slice_above_max_file_chunk_size() {
+        // Arrange
+
+        // The value read is formed of 3 chunks, two of the max chunk value and
+        // the last one being less than the max size.
+        const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
+        const VALUE_FIRST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'a'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_SECOND_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'b'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_LAST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE / 2] =
+            [b'c'; MAX_FILE_CHUNK_SIZE / 2];
+        const VALUE_SIZE: usize =
+            VALUE_FIRST_CHUNK.len() + VALUE_SECOND_CHUNK.len() + VALUE_LAST_CHUNK.len();
+
+        const ADDITIONAL_BYTES: usize = 10;
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        // Check that the path is the one given to `store_read_all` and the
+        // offset is always a multiple of `MAX_FILE_CHUNK_SIZE`.
+        mock.expect_store_read()
+            .withf(|path_ptr, path_size, offset, _, max_bytes| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                if PATH.as_bytes() != slice {
+                    return false;
+                }
+
+                let last_offset = MAX_FILE_CHUNK_SIZE * 2;
+
+                let expected_max_bytes = if offset == &VALUE_SIZE {
+                    // final read for rest of the buffer
+                    return *max_bytes == ADDITIONAL_BYTES;
+                } else if *offset == last_offset {
+                    VALUE_LAST_CHUNK.len() + ADDITIONAL_BYTES
+                } else {
+                    MAX_FILE_CHUNK_SIZE
+                };
+
+                (offset % MAX_FILE_CHUNK_SIZE) == 0 && &expected_max_bytes == max_bytes
+            })
+            // Returns the expected chunks, as we know the offsets are consistent.
+            .returning(|_, _, offset, buf_ptr, _| {
+                let chunk = if offset == 0 {
+                    VALUE_FIRST_CHUNK.to_vec()
+                } else if offset == MAX_FILE_CHUNK_SIZE {
+                    VALUE_SECOND_CHUNK.to_vec()
+                } else if offset == 2 * MAX_FILE_CHUNK_SIZE {
+                    VALUE_LAST_CHUNK.to_vec()
+                } else {
+                    return Error::StoreInvalidAccess as i32;
+                };
+                let buffer = unsafe { from_raw_parts_mut(buf_ptr, chunk.len()) };
+                buffer.copy_from_slice(&chunk);
+                (chunk.len()).try_into().unwrap()
+            });
+
+        // Act
+        let mut buffer = vec![0; VALUE_SIZE + ADDITIONAL_BYTES];
+        let result = StorageV1::store_read_slice(&mock, &PATH, 0, buffer.as_mut_slice());
+
+        // Assert
+        let mut expected: Vec<u8> = Vec::new();
+        expected.extend_from_slice(&VALUE_FIRST_CHUNK);
+        expected.extend_from_slice(&VALUE_SECOND_CHUNK);
+        expected.extend_from_slice(&VALUE_LAST_CHUNK);
+        expected.extend_from_slice(&[0; ADDITIONAL_BYTES]);
+
+        assert_eq!(Ok(VALUE_SIZE), result);
+        assert_eq!(expected, buffer);
+    }
+
+    #[test]
+    fn store_read_above_max_file_chunk_size() {
+        // Arrange
+
+        // The value read is formed of 3 chunks, two of the max chunk value and
+        // the last one being less than the max size.
+        const PATH: RefPath<'static> = RefPath::assert_from("/a/simple/path".as_bytes());
+        const VALUE_FIRST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'a'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_SECOND_CHUNK: [u8; MAX_FILE_CHUNK_SIZE] = [b'b'; MAX_FILE_CHUNK_SIZE];
+        const VALUE_LAST_CHUNK: [u8; MAX_FILE_CHUNK_SIZE / 2] =
+            [b'c'; MAX_FILE_CHUNK_SIZE / 2];
+        const VALUE_SIZE: usize =
+            VALUE_FIRST_CHUNK.len() + VALUE_SECOND_CHUNK.len() + VALUE_LAST_CHUNK.len();
+
+        const ADDITIONAL_BYTES: usize = 10;
+
+        let mut mock = mock_path_exists(PATH.as_bytes());
+        // Check that the path is the one given to `store_read_all` and the
+        // offset is always a multiple of `MAX_FILE_CHUNK_SIZE`.
+        mock.expect_store_read()
+            .withf(|path_ptr, path_size, offset, _, max_bytes| {
+                let slice = unsafe { from_raw_parts(*path_ptr, *path_size) };
+                if PATH.as_bytes() != slice {
+                    return false;
+                }
+
+                let last_offset = MAX_FILE_CHUNK_SIZE * 2;
+
+                let expected_max_bytes = if offset == &VALUE_SIZE {
+                    // final read for rest of the buffer
+                    return *max_bytes == ADDITIONAL_BYTES;
+                } else if *offset == last_offset {
+                    VALUE_LAST_CHUNK.len() + ADDITIONAL_BYTES
+                } else {
+                    MAX_FILE_CHUNK_SIZE
+                };
+
+                (offset % MAX_FILE_CHUNK_SIZE) == 0 && &expected_max_bytes == max_bytes
+            })
+            // Returns the expected chunks, as we know the offsets are consistent.
+            .returning(|_, _, offset, buf_ptr, _| {
+                let chunk = if offset == 0 {
+                    VALUE_FIRST_CHUNK.to_vec()
+                } else if offset == MAX_FILE_CHUNK_SIZE {
+                    VALUE_SECOND_CHUNK.to_vec()
+                } else if offset == 2 * MAX_FILE_CHUNK_SIZE {
+                    VALUE_LAST_CHUNK.to_vec()
+                } else {
+                    return Error::StoreInvalidAccess as i32;
+                };
+                let buffer = unsafe { from_raw_parts_mut(buf_ptr, chunk.len()) };
+                buffer.copy_from_slice(&chunk);
+                (chunk.len()).try_into().unwrap()
+            });
+
+        // Act
+        let result =
+            StorageV1::store_read(&mock, &PATH, 0, VALUE_SIZE + ADDITIONAL_BYTES);
+
+        // Assert
+        let mut expected: Vec<u8> = Vec::new();
+        expected.extend_from_slice(&VALUE_FIRST_CHUNK);
+        expected.extend_from_slice(&VALUE_SECOND_CHUNK);
+        expected.extend_from_slice(&VALUE_LAST_CHUNK);
+
+        assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
     fn store_read_all_above_max_file_chunk_size() {
         // Arrange
 

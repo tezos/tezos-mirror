@@ -220,7 +220,7 @@ impl InMemoryStore {
         }
 
         let bytes = self.0.get_value(&path);
-        if offset > bytes.len() {
+        if offset >= bytes.len() {
             return Err(Error::StoreInvalidAccess);
         }
 
