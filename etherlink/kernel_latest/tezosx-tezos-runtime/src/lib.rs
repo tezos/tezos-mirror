@@ -224,8 +224,14 @@ fn build_crac_receipt(
             signature,
         });
 
+    let mut serialized = Vec::new();
+    op_data.bin_write(&mut serialized).map_err(|e| {
+        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
+    })?;
+    let hash = OperationHash::from(blake2b::digest_256(&serialized));
+
     Ok(AppliedOperation {
-        hash: OperationHash::default(),
+        hash,
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
@@ -335,8 +341,14 @@ fn build_failed_crac_receipt(
             signature,
         });
 
+    let mut serialized = Vec::new();
+    op_data.bin_write(&mut serialized).map_err(|e| {
+        TezosXRuntimeError::Custom(format!("Failed to serialize op: {e}"))
+    })?;
+    let hash = OperationHash::from(blake2b::digest_256(&serialized));
+
     Ok(AppliedOperation {
-        hash: OperationHash::default(),
+        hash,
         branch: BlockHash::default(),
         op_and_receipt: op_data,
     })
