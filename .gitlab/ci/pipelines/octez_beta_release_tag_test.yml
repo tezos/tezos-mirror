@@ -295,7 +295,7 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.build:static-arm64-linux-binaries:
+oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -343,7 +343,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -501,12 +501,12 @@ publish:release-page:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -537,13 +537,13 @@ gitlab:release:
   - gcp_not_interruptible
   needs:
   - oc.create-homebrew-formula
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   - docker:merge_manifests
   dependencies:
   - oc.create-homebrew-formula
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:

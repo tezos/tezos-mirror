@@ -157,7 +157,8 @@ let job_tezt_static_binaries =
     ~needs:
       [
         (* No need for kernels for this job. *)
-        (Artifacts, Build.job_build_static_linux_binaries Amd64 `test);
+        (Artifacts, Build.job_build_static_linux_released_binaries Amd64 `test);
+        (Artifacts, Build.job_build_static_linux_experimental_binaries Amd64);
         (Artifacts, Build.job_build_extra_dev Amd64);
         (Artifacts, Build.job_build_exp Amd64);
       ]

@@ -267,7 +267,7 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.build:static-arm64-linux-binaries:
+oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -318,7 +318,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -484,11 +484,11 @@ gitlab:create_package:
   - when: manual
     allow_failure: false
   needs:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   dependencies:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   allow_failure: false
   timeout: 60 minutes
   interruptible: true
@@ -540,12 +540,12 @@ publish:release-page-packaging-revision:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-released-binaries
+  - oc.build:static-arm64-linux-released-binaries
   timeout: 60 minutes
   interruptible: true
   before_script:

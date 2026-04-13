@@ -99,8 +99,10 @@ let job_gitlab_release =
     ~stage:Publish
     ~needs:
       [
-        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
-        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Amd64 `release );
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Arm64 `release );
         (Job, job_docker_merge_manifests mode);
       ]
     ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
@@ -120,8 +122,10 @@ let job_gitlab_publish =
     ~stage:Publish
     ~needs:
       [
-        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
-        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Amd64 `release );
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Arm64 `release );
       ]
     ~needs_legacy:[(Artifacts, job_build_homebrew_release)]
     ?variables:
@@ -180,8 +184,10 @@ let job_release_page =
       | `wait_for_build ->
           Some
             [
-              (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
-              (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+              ( Artifacts,
+                Build.job_build_static_linux_released_binaries Amd64 `release );
+              ( Artifacts,
+                Build.job_build_static_linux_released_binaries Arm64 `release );
             ])
     ~variables:(release_page_variables ~mode)
     ["eval $(opam env)"; "./scripts/releases/publish-release-page.sh"]
@@ -370,8 +376,10 @@ let job_create_gitlab_package =
       "Create GitLab packages with static binaries from this packaging revision"
     ~needs:
       [
-        (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
-        (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Amd64 `release );
+        ( Artifacts,
+          Build.job_build_static_linux_released_binaries Arm64 `release );
       ]
     ~id_tokens:Tezos_ci.id_tokens
     ~allow_failure:No
@@ -410,8 +418,10 @@ let job_release_page_packaging_revision =
     ?needs:
       (Some
          [
-           (Artifacts, Build.job_build_static_linux_binaries Amd64 `release);
-           (Artifacts, Build.job_build_static_linux_binaries Arm64 `release);
+           ( Artifacts,
+             Build.job_build_static_linux_released_binaries Amd64 `release );
+           ( Artifacts,
+             Build.job_build_static_linux_released_binaries Arm64 `release );
          ])
     ~variables:(release_page_variables ~mode)
     [
