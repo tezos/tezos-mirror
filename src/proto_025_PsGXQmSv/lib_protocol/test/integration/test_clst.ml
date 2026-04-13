@@ -2653,18 +2653,19 @@ let setup_delegate_with_clst_deposit
     ?(limit_of_staking_over_baking = Q.of_int 5)
     ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
     ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l)
-    ?adaptive_issuance ~deposit_mutez () =
+    ?adaptive_issuance
+    ?(issuance_weights =
+      {
+        Default_parameters.constants_test.issuance_weights with
+        base_total_issued_per_minute = Tez.zero;
+      }) ~deposit_mutez () =
   let open Lwt_result_wrap_syntax in
   let* b, delegate =
     Context.init1
       ~consensus_threshold_size:0
       ~cost_per_byte:Tez.zero
       ?adaptive_issuance
-      ~issuance_weights:
-        {
-          Default_parameters.constants_test.issuance_weights with
-          base_total_issued_per_minute = Tez.zero;
-        }
+      ~issuance_weights
       ()
   in
   let delegate_pkh = pkh_of_contract delegate in
@@ -3157,3 +3158,72 @@ let () =
   (* CLST allocation should be zero — delegate is overstaked *)
   let* alloc = clst_allocated_tez (B b) delegate_pkh in
   Assert.equal_tez ~loc:__LOC__ Tez.zero alloc
+
+(* Exchange rate tests                                                    *)
+(* -------------------------------------------------------------------- *)
+
+let () =
+  register_test
+    ~title:"Exchange rate is 1:1 on deposit without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* Empty pool: rate is 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  let deposit_mutez = 100_000_000L in
+  let* account_a, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_a
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* After deposit, 1 mutez = 1 token unit *)
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_mutez
+      b
+      account_a
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Second deposit from another account also 1:1 *)
+  let* account_b, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let deposit_b_mutez = 50_000_000L in
+  let* deposit_b_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_b
+      (Tez.of_mutez_exn deposit_b_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_b_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_b_mutez
+      b
+      account_b
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  return_unit
