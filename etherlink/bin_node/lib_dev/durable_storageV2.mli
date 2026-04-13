@@ -22,6 +22,7 @@ type _ path =
   | Kernel_version : string path
   | Kernel_root_hash : Ethereum_types.hex path
   | Multichain_flag : unit path
+  | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
 
 (** {2 Typed operations} *)
 

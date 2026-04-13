@@ -35,7 +35,7 @@ let with_latest_state ctxt f =
 
 let read_chain_family ctxt chain_id =
   with_latest_state ctxt (fun state ->
-      Durable_storage.chain_family state chain_id)
+      Durable_storageV2.read (Chain_config_family chain_id) state)
 
 let read_enable_multichain_flag ctxt =
   with_latest_state ctxt (Durable_storageV2.exists Multichain_flag)

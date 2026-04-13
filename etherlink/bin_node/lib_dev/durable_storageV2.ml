@@ -51,6 +51,7 @@ type _ path =
   | Kernel_version : string path
   | Kernel_root_hash : Ethereum_types.hex path
   | Multichain_flag : unit path
+  | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
 
 type 'a resolved = {
   path : string;
@@ -110,6 +111,15 @@ let resolve : type a. a path -> a resolution =
           path = Durable_storage_path.Feature_flags.multichain;
           decode = (fun _bytes -> Ok ());
           encode = (fun () -> "");
+        }
+  | Chain_config_family cid ->
+      Static
+        {
+          path = Durable_storage_path.Chain_configuration.chain_family cid;
+          decode = L2_types.Chain_family.of_bytes;
+          encode =
+            (fun (L2_types.Ex_chain_family cf) ->
+              L2_types.Chain_family.to_string cf);
         }
 
 let storage_version state =

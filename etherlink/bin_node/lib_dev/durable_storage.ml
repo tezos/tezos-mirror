@@ -45,12 +45,6 @@ let l2_maximum_gas_per_transaction state chain_id =
        chain_id)
     Helpers.decode_z_le
 
-let chain_family state chain_id =
-  inspect_durable_and_decode
-    state
-    (Durable_storage_path.Chain_configuration.chain_family chain_id)
-    (fun x -> L2_types.Chain_family.of_string_exn (Bytes.to_string x))
-
 let world_state state chain_id =
   inspect_durable_and_decode
     state

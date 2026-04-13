@@ -85,6 +85,8 @@ module Chain_family : sig
   *)
   val of_string_exn : string -> ex_chain_family
 
+  val of_bytes : bytes -> ex_chain_family tzresult
+
   val to_string : _ chain_family -> string
 
   val pp : Format.formatter -> _ chain_family -> unit

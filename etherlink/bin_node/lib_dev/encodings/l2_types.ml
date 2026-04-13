@@ -55,6 +55,12 @@ module Chain_family = struct
     | "michelson" -> Ex_chain_family Michelson
     | _ -> invalid_arg "Chain_family.of_string"
 
+  let of_bytes bytes =
+    match String.lowercase_ascii (Bytes.to_string bytes) with
+    | "evm" -> Ok (Ex_chain_family EVM)
+    | "michelson" -> Ok (Ex_chain_family Michelson)
+    | s -> error_with "Chain_family.of_bytes: invalid chain family %s" s
+
   let encoding =
     Data_encoding.string_enum
       [("EVM", Ex_chain_family EVM); ("Michelson", Ex_chain_family Michelson)]
