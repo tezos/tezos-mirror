@@ -499,6 +499,21 @@ module S = struct
         RPC_path.(
           custom_root /: Contract.rpc_arg / "stez_redeemed_finalizable_balance")
 
+    let registered_baker_encoding =
+      let open Data_encoding in
+      obj2
+        (req "pkh" Signature.Public_key_hash.encoding)
+        (req "parameters" Clst_delegates_parameters_repr.encoding)
+
+    let bakers =
+      RPC_service.get_service
+        ~description:
+          "List of delegates registered with sTEZ together with their fee and \
+           capacity."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list registered_baker_encoding)
+        RPC_path.(open_root / "context" / "stez" / "bakers")
+
     let under_feature_flag (ctxt : context) =
       let open Result_syntax in
       if Constants.native_contracts_enable ctxt then return_unit
@@ -556,7 +571,19 @@ module S = struct
         (fun ctxt contract () () ->
           let open Lwt_result_syntax in
           let*? () = under_feature_flag ctxt in
-          Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract)
+          Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract) ;
+      register0 ~chunked:false bakers (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
+          let*! delegates = Clst.For_RPC.registered_delegates ctxt in
+          let delegates_with_parameters =
+            List.filter_map
+              (function
+                | Contract.Implicit pkh, parameters -> Some (pkh, parameters)
+                | Originated _, _ -> None)
+              delegates
+          in
+          return delegates_with_parameters)
   end
 end
 
@@ -1090,3 +1117,6 @@ let stez_redeemed_finalizable_balance ctxt block contract =
     contract
     ()
     ()
+
+let stez_bakers ctxt block =
+  RPC_context.make_call0 S.CLST.bakers ctxt block () ()
