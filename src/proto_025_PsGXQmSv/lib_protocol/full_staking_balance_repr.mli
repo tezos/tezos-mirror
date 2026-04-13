@@ -66,6 +66,9 @@ val min_delegated_in_cycle :
 (** Sum of [own_frozen] and [staked_frozen]. *)
 val total_frozen : t -> Tez_repr.t tzresult
 
+(** Sum of [own_frozen], [staked_frozen], and [stez_frozen]. *)
+val total_frozen_with_stez : t -> Tez_repr.t tzresult
+
 (** Sum of [own_frozen], [staked_frozen], and [current_delegated]. *)
 val current_total : t -> Tez_repr.t tzresult
 
