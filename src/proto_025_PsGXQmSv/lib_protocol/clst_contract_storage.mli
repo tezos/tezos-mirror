@@ -75,6 +75,15 @@ val increment_total_supply : t -> CLST_types.nat -> t
 (** [decrement_total_supply storage amount] decrements the total supply by [amount]. *)
 val decrement_total_supply : t -> CLST_types.nat -> t tzresult
 
+(** [exchange_rate_from_storage ctxt ~total_supply] returns the rate to
+    exchange tez to sTez, given the already-parsed [total_supply] from the
+    contract storage. Avoids re-parsing the contract storage. *)
+val exchange_rate_from_storage :
+  context -> total_supply:CLST_types.nat -> Q.t tzresult Lwt.t
+
+(** [exchange_rate ctxt] returns the rate to exchange tez to sTez. *)
+val exchange_rate : context -> Q.t tzresult Lwt.t
+
 (** [deposit_to_clst_deposits context ~clst_contract_hash amount] deposits
     [amount] tez from [clst_contract_hash] balance to the CLST deposits
     container *)
