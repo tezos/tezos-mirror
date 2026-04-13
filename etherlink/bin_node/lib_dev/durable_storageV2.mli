@@ -19,6 +19,7 @@ type _ path =
   | Raw_path : string -> bytes path
   | Chain_id : L2_types.chain_id path
   | Michelson_runtime_chain_id : L2_types.chain_id path
+  | Kernel_version : string path
 
 (** {2 Typed operations} *)
 

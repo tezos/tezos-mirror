@@ -200,15 +200,6 @@ let storage_version state = Durable_storage.storage_version state
 
 let tezosx_runtimes state = Durable_storage.list_runtimes state
 
-let kernel_version evm_state =
-  let open Lwt_result_syntax in
-  let+ version =
-    Durable_storageV2.read_opt
-      (Raw_path Durable_storage_path.kernel_version)
-      evm_state
-  in
-  match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
-
 let current_block_height ~root evm_state =
   let open Lwt_result_syntax in
   let* current_block_number =
@@ -615,7 +606,7 @@ let preload_kernel ~pool evm_state =
     Wasm_runtime.preload_kernel ~pool (Pvm.Wasm_internal.to_irmin_exn evm_state)
   in
   if loaded then
-    let* version_result = kernel_version evm_state in
+    let* version_result = Durable_storageV2.read Kernel_version evm_state in
     let version =
       match version_result with Ok v -> v | Error _ -> "(unknown)"
     in

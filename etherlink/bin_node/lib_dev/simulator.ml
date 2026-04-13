@@ -83,7 +83,9 @@ module Etherlink = struct
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
-      let* kernel_version = Durable_storage.kernel_version simulation_state in
+      let* kernel_version =
+        Durable_storageV2.read Kernel_version simulation_state
+      in
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
       if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then

@@ -48,6 +48,7 @@ type _ path =
   | Raw_path : string -> bytes path
   | Chain_id : L2_types.chain_id path
   | Michelson_runtime_chain_id : L2_types.chain_id path
+  | Kernel_version : string path
 
 type 'a resolved = {
   path : string;
@@ -83,6 +84,13 @@ let resolve : type a. a path -> a resolution =
           path = Durable_storage_path.michelson_runtime_chain_id;
           decode = infallible_decode L2_types.Chain_id.decode_be;
           encode = L2_types.Chain_id.encode_be;
+        }
+  | Kernel_version ->
+      Static
+        {
+          path = Durable_storage_path.kernel_version;
+          decode = infallible_decode Bytes.to_string;
+          encode = Fun.id;
         }
 
 let storage_version state =
