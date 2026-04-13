@@ -1002,6 +1002,8 @@ where
                 }
             };
 
+            let consumed_milligas =
+                ProcessedOperation::total_consumed_milligas(&processed_operations);
             let operations = ProcessedOperation::into_receipts(processed_operations);
 
             // Add the applied operation in the block in progress
@@ -1037,6 +1039,7 @@ where
                 RuntimeExecutionInfo::Tezos {
                     op: applied_operation,
                     cross_runtime_effects,
+                    consumed_milligas,
                 },
             ))
         }
@@ -1079,6 +1082,8 @@ where
                 RuntimeExecutionInfo::Tezos {
                     op: applied_operation,
                     cross_runtime_effects: Vec::new(),
+                    // Deposits bypass the Michelson interpreter — no gas consumed.
+                    consumed_milligas: 0,
                 },
             ))
         }

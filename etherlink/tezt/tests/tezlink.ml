@@ -3846,7 +3846,7 @@ let test_michelson_gas_backlog =
   let initial_base_fee =
     match initial_result with
     | Ok block -> block.Block.baseFeePerGas
-    | Error _ -> Stdlib.failwith "Couldn't retrieve latest block"
+    | Error _ -> Test.fail "Couldn't retrieve latest block"
   in
   (* Fee and gas_limit are auto-estimated by the client.
      fee_cap must be high enough to cover the large execution gas fees
@@ -3870,6 +3870,144 @@ let test_michelson_gas_backlog =
   let*@ new_block = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((new_block.Block.baseFeePerGas > initial_base_fee) int64)
     ~error_msg:"baseFeePerGas should have increased: expected > %R, got %L" ;
+  unit
+
+(** Tests that the gas backlog accounts for the actual gas consumed by failed
+    operations — not zero and not the full gas_limit.
+
+    Deploys two contracts and calls both with the same [gas_limit]:
+    - [fail_on_false.tz] with [False]: FAILWITHs almost immediately, consuming
+      very little gas.
+    - [loop.tz] with 1_500_000 iterations: runs until gas exhaustion,
+      consuming the entire gas budget.
+
+    After each call, we measure how much [baseFeePerGas] increased. Since both
+    operations use the same [gas_limit], charging the full limit (or zero) would
+    produce equal increases. Instead, the gas-exhausting operation should produce
+    a significantly larger increase than the early FAILWITH, confirming that
+    actual consumed gas is what feeds the backlog. *)
+let test_michelson_gas_backlog_on_failed_op =
+  register_tezosx_test
+    ~title:"Failed Tezos operations update EVM gas backlog"
+    ~tags:["kernel"; "gas"; "backlog"; "failed"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~michelson_to_evm_gas_multiplier:1_000_000L
+  @@ fun {sequencer; _} protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  (* Use fixed timestamps so the backlog decay is deterministic
+     (independent of wall-clock / CI speed). *)
+  let next_timestamp =
+    let t = ref 1 in
+    fun () ->
+      let ts = sf "2050-01-01T00:00:%02dZ" !t in
+      incr t ;
+      ts
+  in
+  (* Deploy fail_on_false.tz *)
+  let* fail_contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"fail_on_false"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:
+        Michelson_script.(
+          find ["mini_scenarios"; "fail_on_false"] protocol |> path)
+      ~burn_cap:Tez.one
+      client_tezlink
+  in
+  let*@ _ = Rpc.produce_block ~timestamp:(next_timestamp ()) sequencer in
+  (* Deploy loop.tz *)
+  let* loop_contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"loop"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:"Unit"
+      ~prg:Michelson_script.(find ["mini_scenarios"; "loop"] protocol |> path)
+      ~burn_cap:Tez.one
+      client_tezlink
+  in
+  let*@ _ = Rpc.produce_block ~timestamp:(next_timestamp ()) sequencer in
+  let gas_limit = 10_000 in
+  let get_base_fee () =
+    let* result = Rpc.get_block_by_number ~block:"latest" sequencer in
+    match result with
+    | Ok block -> return block.Block.baseFeePerGas
+    | Error _ -> Test.fail "Couldn't retrieve latest block"
+  in
+  let produce_blocks () =
+    repeat 2 (fun () ->
+        let*@ _ = Rpc.produce_block ~timestamp:(next_timestamp ()) sequencer in
+        unit)
+  in
+  (* Fee must cover execution gas costs. 15 tez is enough for gas_limit = 10,000. *)
+  let fee = Tez.of_mutez_int 15_000_000 in
+  let fee_cap = Tez.of_mutez_int 20_000_000 in
+  (* Both operations below are guaranteed to fail:
+     - fail_on_false.tz + False = immediate FAILWITH
+     - loop.tz + 1,500,000 iterations with gas_limit=10,000 = gas exhaustion
+     ~force:true is needed because the client simulation already rejects them. *)
+  (* 1. Fail early: FAILWITH almost immediately, very little gas consumed *)
+  let* base_fee_0 = get_base_fee () in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~force:true
+      ~amount:Tez.zero
+      ~fee
+      ~fee_cap
+      ~gas_limit
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:fail_contract
+      ~arg:"False"
+      ~burn_cap:Tez.one
+      client_tezlink
+  in
+  let* () = produce_blocks () in
+  let* base_fee_1 = get_base_fee () in
+  let delta_early = Int64.sub base_fee_1 base_fee_0 in
+  (* 2. Fail late: loop until gas exhaustion, consuming the entire gas budget *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~force:true
+      ~amount:Tez.zero
+      ~fee
+      ~fee_cap
+      ~gas_limit
+      ~storage_limit:0
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:loop_contract
+      ~arg:"1500000"
+      ~burn_cap:Tez.one
+      client_tezlink
+  in
+  let* () = produce_blocks () in
+  let* base_fee_2 = get_base_fee () in
+  let delta_late = Int64.sub base_fee_2 base_fee_1 in
+  (* Not (A): early failure still consumes some gas *)
+  Check.((delta_early > 0L) int64)
+    ~error_msg:
+      "baseFeePerGas should increase after early-failing op: delta = %L" ;
+  (* Not (B): gas-exhausting op consumes ~10,000 gas while early FAILWITH
+     consumes ~100 gas, so the expected ratio is ~100x. We use 10x as a
+     conservative threshold that still clearly rules out equal deltas
+     (which would indicate gas_limit is charged instead of actual gas). *)
+  Check.((delta_late > Int64.mul 10L delta_early) int64)
+    ~error_msg:
+      "Gas-exhausting op should bump baseFee much more than early FAILWITH \
+       (delta_late = %L, 10 * delta_early = %R). Equal deltas would mean \
+       gas_limit is charged instead of actual consumed gas." ;
   unit
 
 (** Tests that Michelson operations in TezosX validate execution gas fees.
@@ -4793,6 +4931,7 @@ let () =
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_michelson_gas_backlog [Alpha] ;
+  test_michelson_gas_backlog_on_failed_op [Alpha] ;
   test_michelson_execution_gas_fee [Alpha] ;
   test_michelson_gas_exhaustion [Alpha] ;
   test_mempool_filter_fields [Alpha] ;

@@ -715,6 +715,17 @@ mod tests {
     use tezos_data_encoding::types::Narith;
 
     use super::*;
+    use tezos_tezlink::operation_result::OperationKind;
+
+    trait ContentResultExt<M: OperationKind> {
+        fn is_failed(&self) -> bool;
+    }
+
+    impl<M: OperationKind> ContentResultExt<M> for ContentResult<M> {
+        fn is_failed(&self) -> bool {
+            matches!(self, ContentResult::Failed(_))
+        }
+    }
 
     fn make_success(storage: Option<Vec<u8>>) -> TransferSuccess {
         make_success_with_milligas(storage, 0)
