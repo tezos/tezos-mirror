@@ -936,9 +936,9 @@ val clst_redeem :
   int64 ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_finalize ctxt src] returns a finalize operation on the CLST
-    contract. *)
-val clst_finalize :
+(** [clst_finalize_redeem ctxt src] returns a finalize redeem
+    operation on the CLST contract. *)
+val clst_finalize_redeem :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?fee:Tez.t ->

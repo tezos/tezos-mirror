@@ -195,7 +195,7 @@ module CLST_contract = struct
         Script_int.(compare token_id Clst_contract_storage.token_id) = 0)
       (standard_error ~mnemonic:"FA2_TOKEN_UNDEFINED")
 
-  let execute_finalize (ctxt, (step_constants : step_constants)) ()
+  let execute_finalize_redeem (ctxt, (step_constants : step_constants)) ()
       (storage : Clst_contract_storage.t) :
       entrypoint_execution_result tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -1011,7 +1011,8 @@ module CLST_contract = struct
     match entrypoint_from_arg value with
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
-    | Finalize () -> execute_finalize (ctxt, step_constants) () storage
+    | Finalize_redeem () ->
+        execute_finalize_redeem (ctxt, step_constants) () storage
     | Register_delegate parameters ->
         execute_register_delegate (ctxt, step_constants) parameters storage
     | Update_delegate_parameters parameters ->

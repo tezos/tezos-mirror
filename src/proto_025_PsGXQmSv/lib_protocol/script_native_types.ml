@@ -236,9 +236,9 @@ module CLST_types = struct
 
   type redeem = nat
 
-  type finalize = unit
+  type finalize_redeem = unit
 
-  type staker_entrypoints = ((deposit, redeem) or_, finalize) or_
+  type staker_entrypoints = ((deposit, redeem) or_, finalize_redeem) or_
 
   type delegate_parameters =
     nat (* edge_of_clst_staking *) * nat (* ratio_of_clst_staking *)
@@ -346,7 +346,7 @@ module CLST_types = struct
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
-    | Finalize of finalize
+    | Finalize_redeem of finalize_redeem
     | Register_delegate of register_delegate
     | Update_delegate_parameters of update_delegate_parameters
     | Unregister_delegate of unregister_delegate
@@ -362,7 +362,7 @@ module CLST_types = struct
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L (L p))) -> Deposit p
     | L (L (L (R p))) -> Redeem p
-    | L (L (R p)) -> Finalize p
+    | L (L (R p)) -> Finalize_redeem p
     | L (R (L p)) -> Register_delegate p
     | L (R (R (L p))) -> Update_delegate_parameters p
     | L (R (R (R p))) -> Unregister_delegate p
@@ -378,7 +378,7 @@ module CLST_types = struct
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L (L p)))
     | Redeem p -> L (L (L (R p)))
-    | Finalize p -> L (L (R p))
+    | Finalize_redeem p -> L (L (R p))
     | Register_delegate p -> L (R (L p))
     | Update_delegate_parameters p -> L (R (R (L p)))
     | Unregister_delegate p -> L (R (R (R p)))
@@ -410,8 +410,9 @@ module CLST_types = struct
     let* transfer = list_ty elt in
     make_entrypoint_leaf "transfer" transfer
 
-  let finalize_type : (finalize ty_node * finalize entrypoints_node) tzresult =
-    make_entrypoint_leaf "finalize" unit_ty
+  let finalize_redeem_type :
+      (finalize_redeem ty_node * finalize_redeem entrypoints_node) tzresult =
+    make_entrypoint_leaf "finalize_redeem" unit_ty
 
   let delegate_parameters_type : delegate_parameters ty_node tzresult =
     pair_ty
@@ -583,7 +584,7 @@ module CLST_types = struct
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
-    let* finalize_type in
+    let* finalize_redeem_type in
     let* register_delegate_type in
     let* update_delegate_parameters_type in
     let* unregister_delegate_type in
@@ -599,7 +600,7 @@ module CLST_types = struct
       make_entrypoint_node deposit_type redeem_type
     in
     let* clst_staker_entrypoints_type =
-      make_entrypoint_node clst_staker_entrypoints_type_l finalize_type
+      make_entrypoint_node clst_staker_entrypoints_type_l finalize_redeem_type
     in
     let* clst_delegate_entrypoints_type_r =
       make_entrypoint_node

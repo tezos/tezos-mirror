@@ -1607,7 +1607,7 @@ let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (Contract.Originated clst_hash)
     Tez.zero
 
-let clst_finalize ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+let clst_finalize_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (ctxt : Context.t) (src : Contract.t) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
@@ -1618,7 +1618,7 @@ let clst_finalize ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?fee
     ?gas_limit
     ?storage_limit
-    ~entrypoint:(Entrypoint.of_string_strict_exn "finalize")
+    ~entrypoint:(Entrypoint.of_string_strict_exn "finalize_redeem")
     ctxt
     src
     (Contract.Originated clst_hash)
