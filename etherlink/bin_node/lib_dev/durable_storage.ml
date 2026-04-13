@@ -71,16 +71,6 @@ let block_number ~root state n =
           @@ Invalid_block_structure
                "Unexpected [None] value for [current_number]'s [answer]")
 
-let list_runtimes state =
-  let open Lwt_result_syntax in
-  let check_runtime r =
-    let* bytes_opt =
-      Durable_storageV2.read_opt (Raw_path (Tezosx.feature_flag r)) state
-    in
-    if Option.is_some bytes_opt then return @@ Some r else return None
-  in
-  List.filter_map_ep check_runtime Tezosx.known_runtimes
-
 let michelson_runtime_sunrise_level state =
   inspect_durable_and_decode_opt
     state

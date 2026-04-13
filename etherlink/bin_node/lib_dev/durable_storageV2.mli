@@ -24,6 +24,7 @@ type _ path =
   | Multichain_flag : unit path
   | Sequencer_key : Signature.Public_key.t path
   | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
+  | Tezosx_feature_flag : Tezosx.runtime -> unit path
 
 (** {2 Typed operations} *)
 
@@ -42,3 +43,5 @@ val delete_dir : 'a path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 val exists : 'a path -> Pvm.State.t -> bool tzresult Lwt.t
 
 val subkeys : 'a path -> Pvm.State.t -> string trace tzresult Lwt.t
+
+val list_runtimes : Pvm.State.t -> Tezosx.runtime list tzresult Lwt.t

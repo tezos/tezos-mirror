@@ -613,7 +613,7 @@ module State = struct
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
     let* storage_version = Evm_state.storage_version evm_state in
-    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+    let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () = Tx_queue.clear () in
     (* Clear the store. *)
@@ -1220,8 +1220,10 @@ module State = struct
        level has been reached (i.e. the runtime started producing Tezos
        blocks). *)
     let* tezosx_tez_block =
-      let* runtimes = Durable_storage.list_runtimes evm_state in
-      if List.mem ~equal:( = ) Tezosx.Tezos runtimes then
+      let* tezos_enabled =
+        Durable_storageV2.exists (Tezosx_feature_flag Tezos) evm_state
+      in
+      if tezos_enabled then
         let* sunrise_level =
           Durable_storage.michelson_runtime_sunrise_level evm_state
         in
@@ -1492,7 +1494,7 @@ module State = struct
     let* () =
       if kernel_change then (
         let* storage_version = Evm_state.storage_version evm_state in
-        let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+        let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
         ctxt.session.kernel_change <- No ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
@@ -2273,7 +2275,7 @@ module State = struct
              initial kernel"
     in
 
-    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+    let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
 
     let* last_split_block =
       match history_mode with
@@ -2428,7 +2430,7 @@ module State = struct
     let* () =
       if commit then (
         let* tezosx_runtimes =
-          Evm_state.tezosx_runtimes ctxt.session.evm_state
+          Durable_storageV2.list_runtimes ctxt.session.evm_state
         in
         ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
         return_unit)

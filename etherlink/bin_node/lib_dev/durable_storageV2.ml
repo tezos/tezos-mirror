@@ -53,6 +53,7 @@ type _ path =
   | Multichain_flag : unit path
   | Sequencer_key : Signature.Public_key.t path
   | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
+  | Tezosx_feature_flag : Tezosx.runtime -> unit path
 
 type 'a resolved = {
   path : string;
@@ -130,6 +131,13 @@ let resolve : type a. a path -> a resolution =
           encode =
             (fun (L2_types.Ex_chain_family cf) ->
               L2_types.Chain_family.to_string cf);
+        }
+  | Tezosx_feature_flag runtime ->
+      Static
+        {
+          path = Tezosx.feature_flag runtime;
+          decode = (fun _bytes -> Ok ());
+          encode = (fun () -> "");
         }
 
 let storage_version state =
@@ -214,3 +222,11 @@ let subkeys (type a) (p : a path) (state : Pvm.State.t) :
   let* r = resolve_with_state p state in
   let*! keys = subkeys_durable state r.path in
   return keys
+
+let list_runtimes state =
+  let open Lwt_result_syntax in
+  let check_runtime r =
+    let* enabled = exists (Tezosx_feature_flag r) state in
+    if enabled then return @@ Some r else return None
+  in
+  List.filter_map_ep check_runtime Tezosx.known_runtimes

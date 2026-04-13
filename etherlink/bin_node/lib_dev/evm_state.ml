@@ -198,8 +198,6 @@ let init ~kernel =
 
 let storage_version state = Durable_storage.storage_version state
 
-let tezosx_runtimes state = Durable_storage.list_runtimes state
-
 let current_block_height ~root evm_state =
   let open Lwt_result_syntax in
   let* current_block_number =

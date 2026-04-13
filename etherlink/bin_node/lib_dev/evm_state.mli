@@ -212,12 +212,6 @@ val clear_events : t -> t tzresult Lwt.t
     given feature is implemented by the kernel or not. *)
 val storage_version : t -> int tzresult Lwt.t
 
-(** [tezosx_runtimes tree] returns the current list of active extra
-    Tezos X runtimes set by the kernel. When this list is not empty,
-    the EVM runtime is implicitly assumed and the list contains the
-    other runtimes. *)
-val tezosx_runtimes : t -> Tezosx.runtime list tzresult Lwt.t
-
 (** [delayed_inbox_hashes tree] returns a list of hashes—each hash identifying
     an item of the delayed inbox.
 

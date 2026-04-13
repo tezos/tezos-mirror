@@ -64,7 +64,7 @@ let kernel_version ctxt =
 let kernel_root_hash ctxt =
   with_latest_state ctxt (Durable_storageV2.read_opt Kernel_root_hash)
 
-let list_runtimes ctxt = with_latest_state ctxt Durable_storage.list_runtimes
+let list_runtimes ctxt = with_latest_state ctxt Durable_storageV2.list_runtimes
 
 let list_l1_l2_levels ctxt ~from_l1_level =
   let open Lwt_result_syntax in
