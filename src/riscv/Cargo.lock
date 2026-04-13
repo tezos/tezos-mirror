@@ -1509,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f56bd35ef494286d0f1a4ce5514162c8199b747e"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=f56bd35ef494286d0f1a4ce5514162c8199b747e#f56bd35ef494286d0f1a4ce5514162c8199b747e"
 dependencies = [
  "arbitrary-int 2.1.1",
  "bincode",
@@ -1577,7 +1577,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-data"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f56bd35ef494286d0f1a4ce5514162c8199b747e"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=f56bd35ef494286d0f1a4ce5514162c8199b747e#f56bd35ef494286d0f1a4ce5514162c8199b747e"
 dependencies = [
  "bincode",
  "blake3",
@@ -1595,7 +1595,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv-durable-storage"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#f56bd35ef494286d0f1a4ce5514162c8199b747e"
+source = "git+https://github.com/tezos/riscv-pvm.git?rev=f56bd35ef494286d0f1a4ce5514162c8199b747e#f56bd35ef494286d0f1a4ce5514162c8199b747e"
 dependencies = [
  "bincode",
  "bytes",
