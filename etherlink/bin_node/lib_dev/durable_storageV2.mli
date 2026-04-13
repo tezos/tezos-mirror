@@ -20,6 +20,7 @@ type _ path =
   | Chain_id : L2_types.chain_id path
   | Michelson_runtime_chain_id : L2_types.chain_id path
   | Kernel_version : string path
+  | Kernel_root_hash : Ethereum_types.hex path
 
 (** {2 Typed operations} *)
 

@@ -745,21 +745,14 @@ module State = struct
     | Some
         Evm_store.{kernel_upgrade = Evm_events.Upgrade.{hash = root_hash; _}; _}
       ->
-        let* bytes =
-          Durable_storageV2.read_opt
-            (Raw_path Durable_storage_path.kernel_root_hash)
-            evm_state
-        in
-        let new_hash_candidate =
-          Option.map
-            (fun bytes ->
-              let (`Hex hex) = Hex.of_bytes bytes in
-              Ethereum_types.hash_of_string hex)
-            bytes
+        let* new_hash_candidate =
+          Durable_storageV2.read_opt Kernel_root_hash evm_state
         in
 
         let*! () =
-          match new_hash_candidate with
+          match
+            Option.map (fun h -> Ethereum_types.Hash h) new_hash_candidate
+          with
           | Some current_root_hash when root_hash = current_root_hash ->
               Events.applied_upgrade
                 root_hash

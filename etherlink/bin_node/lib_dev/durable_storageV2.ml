@@ -49,6 +49,7 @@ type _ path =
   | Chain_id : L2_types.chain_id path
   | Michelson_runtime_chain_id : L2_types.chain_id path
   | Kernel_version : string path
+  | Kernel_root_hash : Ethereum_types.hex path
 
 type 'a resolved = {
   path : string;
@@ -91,6 +92,16 @@ let resolve : type a. a path -> a resolution =
           path = Durable_storage_path.kernel_version;
           decode = infallible_decode Bytes.to_string;
           encode = Fun.id;
+        }
+  | Kernel_root_hash ->
+      Static
+        {
+          path = Durable_storage_path.kernel_root_hash;
+          decode =
+            (fun bytes ->
+              let (`Hex s) = Hex.of_bytes bytes in
+              Ok (Ethereum_types.Hex s));
+          encode = Ethereum_types.hex_to_string;
         }
 
 let storage_version state =

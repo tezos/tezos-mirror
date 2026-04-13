@@ -73,12 +73,6 @@ let sequencer =
   inspect_durable_and_decode state sequencer_path (fun bytes ->
       Signature.Public_key.of_b58check_exn (String.of_bytes bytes))
 
-let kernel_root_hash state =
-  inspect_durable_and_decode_opt
-    state
-    Durable_storage_path.kernel_root_hash
-    Bytes.to_string
-
 let is_multichain_enabled state =
   let open Lwt_result_syntax in
   let* bytes_opt =

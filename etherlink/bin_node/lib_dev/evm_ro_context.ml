@@ -62,7 +62,7 @@ let kernel_version ctxt =
   with_latest_state ctxt (Durable_storageV2.read Kernel_version)
 
 let kernel_root_hash ctxt =
-  with_latest_state ctxt Durable_storage.kernel_root_hash
+  with_latest_state ctxt (Durable_storageV2.read_opt Kernel_root_hash)
 
 let list_runtimes ctxt = with_latest_state ctxt Durable_storage.list_runtimes
 
