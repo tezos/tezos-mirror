@@ -1264,17 +1264,19 @@ let execute (type arg storage) (ctxt, step_constants)
 let () =
   register_error_kind
     `Branch
-    ~id:"clst.empty_transfer"
+    ~id:"stez.empty_transfer"
     ~title:"Empty transfer"
-    ~description:"Forbidden to deposit or withdraw 0ꜩ on CLST contract."
+    ~description:"Forbidden to deposit or withdraw 0ꜩ on the sTEZ contract."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "Deposit or withdraw 0ꜩ on CLST are forbidden.")
+      Format.fprintf
+        ppf
+        "Deposit or withdraw 0ꜩ on the sTEZ contract are forbidden.")
     Data_encoding.unit
     (function CLST_contract.Empty_transfer -> Some () | _ -> None)
     (fun () -> CLST_contract.Empty_transfer) ;
   register_error_kind
     `Branch
-    ~id:"clst.non_empty_transfer"
+    ~id:"stez.non_empty_transfer"
     ~title:"Non empty transfer"
     ~description:"Transferred amount is not used"
     ~pp:(fun ppf (address, amount) ->
@@ -1295,16 +1297,16 @@ let () =
       CLST_contract.Non_empty_transfer (address, amount)) ;
   register_error_kind
     `Branch
-    ~id:"clst.non_implicit_contract"
+    ~id:"stez.non_implicit_contract"
     ~title:"Non implicit contract"
     ~description:
-      "Only implicit contracts can deposit on CLST, or be the origin or \
-       destination of token transfers."
+      "Only implicit contracts can deposit on the sTEZ contract, or be the \
+       origin or destination of token transfers."
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
-        "Only implicit contracts can deposit on CLST, or be the origin or \
-         destination of token transfers; %a is not implicit."
+        "Only implicit contracts can deposit on the sTEZ contract, or be the \
+         origin or destination of token transfers; %a is not implicit."
         Destination.pp
         address)
     Data_encoding.(obj1 (req "address" Destination.encoding))
@@ -1313,9 +1315,9 @@ let () =
     (fun address -> CLST_contract.Non_implicit_contract address) ;
   register_error_kind
     `Branch
-    ~id:"clst.balance_too_low"
+    ~id:"stez.balance_too_low"
     ~title:"Balance is too low"
-    ~description:"Spending more clst tokens than the contract has"
+    ~description:"Spending more stez tokens than the contract has"
     ~pp:(fun ppf (address, balance, amount) ->
       Format.fprintf
         ppf
@@ -1337,7 +1339,7 @@ let () =
       CLST_contract.Balance_too_low (address, balance, amount)) ;
   register_error_kind
     `Branch
-    ~id:"clst.amount_too_large"
+    ~id:"stez.amount_too_large"
     ~title:"Amount is too large"
     ~description:"Amount is too large for transfer"
     ~pp:(fun ppf (address, amount) ->
@@ -1358,7 +1360,7 @@ let () =
     (fun (address, amount) -> CLST_contract.Amount_too_large (address, amount)) ;
   register_error_kind
     `Branch
-    ~id:"clst.only_owner_can_change_operator"
+    ~id:"stez.only_owner_can_change_operator"
     ~title:"Only the owner can update operators"
     ~description:"Only the owner can update operators"
     ~pp:(fun ppf (sender, owner) ->
@@ -1383,7 +1385,7 @@ let () =
       CLST_contract.Only_owner_can_change_operator (sender, owner)) ;
   register_error_kind
     `Branch
-    ~id:"clst.empty_ticket"
+    ~id:"stez.empty_ticket"
     ~title:"Empty ticket"
     ~description:"Forbidden to create a zero ticket."
     ~pp:(fun ppf () -> Format.fprintf ppf "Zero tickets are forbidden.")
@@ -1392,14 +1394,14 @@ let () =
     (fun () -> CLST_contract.Empty_ticket) ;
   register_error_kind
     `Branch
-    ~id:"clst.contract_is_not_delegate"
+    ~id:"stez.contract_is_not_delegate"
     ~title:"Contract is not a delegate"
-    ~description:"A non-delegate contract cannot register on CLST contract"
+    ~description:"A non-delegate contract cannot register on sTEZ contract"
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
-        "Only bakers can register to get staking power on CLST. Contract %a is \
-         not a baker."
+        "Only bakers can register to get staking power from the sTEZ contract. \
+         Contract %a is not a baker."
         Destination.pp
         address)
     Data_encoding.(obj1 (req "address" Destination.encoding))
@@ -1409,16 +1411,16 @@ let () =
     (fun address -> CLST_contract.Contract_is_not_delegate address) ;
   register_error_kind
     `Branch
-    ~id:"clst.delegate_is_not_registered"
-    ~title:"Delegate is not registered on CLST contract"
+    ~id:"stez.delegate_is_not_registered"
+    ~title:"Delegate is not registered on the sTEZ contract"
     ~description:
       "A delegate cannot update its parameters or unregister without being \
-       registered on CLST contract"
+       registered on the sTEZ contract"
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
         "Delegate %a cannot update its parameters or unregister without being \
-         registered on CLST contract"
+         registered on the sTEZ contract"
         Destination.pp
         address)
     Data_encoding.(obj1 (req "address" Destination.encoding))
@@ -1428,13 +1430,14 @@ let () =
     (fun address -> CLST_contract.Delegate_is_not_registered address) ;
   register_error_kind
     `Branch
-    ~id:"clst.delegate_is_already_registered"
-    ~title:"Delegate is already registered on CLST contract"
-    ~description:"A registered delegate cannot register again on CLST contract"
+    ~id:"stez.delegate_is_already_registered"
+    ~title:"Delegate is already registered on the sTEZ contract"
+    ~description:
+      "A registered delegate cannot register again on the sTEZ contract"
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
-        "Delegate %a is already registered on CLST contract, no need to \
+        "Delegate %a is already registered on sTEZ contract, no need to \
          refresh it"
         Destination.pp
         address)
