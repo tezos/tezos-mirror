@@ -3311,3 +3311,22 @@ let () =
   let epsilon = Q.(1 // 1_000_000) in
   let* () = Assert.is_true ~loc:__LOC__ (Q.compare diff epsilon < 0) in
   return_unit
+
+let () =
+  register_test ~title:"Exchange rate stable without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, _delegate, _delegate_pkh, _activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_before Q.one) in
+  let* b = Block.bake_until_n_cycle_end 3 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_after Q.one) in
+  return_unit
