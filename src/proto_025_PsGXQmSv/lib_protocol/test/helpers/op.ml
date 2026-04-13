@@ -2023,3 +2023,27 @@ let clst_unregister_delegate ?force_reveal ?counter ?fee ?gas_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let set_delegate_parameters ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit ctxt delegate ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth =
+  let set_params_parameters =
+    Script.lazy_expr
+      (Expr.from_string
+         (Printf.sprintf
+            "Pair %s (Pair %s Unit)"
+            (Z.to_string limit_of_staking_over_baking_millionth)
+            (Z.to_string edge_of_baking_over_staking_billionth)))
+  in
+  transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:Entrypoint.set_delegate_parameters
+    ~parameters:set_params_parameters
+    ctxt
+    delegate
+    delegate
+    Tez.zero

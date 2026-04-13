@@ -1088,3 +1088,19 @@ val clst_unregister_delegate :
   Context.t ->
   Contract.t ->
   Operation.packed tzresult Lwt.t
+
+(** [set_delegate_parameters ctxt delegate
+    ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth] returns a `set_delegate_parameters`
+    operation. *)
+val set_delegate_parameters :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  limit_of_staking_over_baking_millionth:Z.t ->
+  edge_of_baking_over_staking_billionth:Z.t ->
+  Operation.packed tzresult Lwt.t
