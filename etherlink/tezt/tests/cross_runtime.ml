@@ -6892,6 +6892,110 @@ let test_crac_gas_accounting_investigation =
          consistent") ;
   unit
 
+(** Regression test for the error path of [execute_request].
+ *
+ *  When the TEZ runtime's [execute_request] enters the error path
+ *  (e.g. an internal operation FAILWITHs), the [X-Tezos-Gas-Consumed]
+ *  header must still report the accurate cumulative gas consumption.
+ *
+ *  The bug: the error path used [get_and_reset_milligas_consumed()]
+ *  which returns only the delta since the last per-operation baseline
+ *  reset.  After earlier internal operations (like a gateway call to
+ *  GasBurner) have already executed and reset the baseline, the delta
+ *  is ~0 — so the header reports ~0 and the EVM side charges nothing.
+ *
+ *  The fix: use [total_milligas_consumed()] on the error path, same
+ *  as the success path.
+ *
+ *  == Scenario ==
+ *
+ *    EVM[evm_main] -(catch)-> EVM[evm_bridge] ~CRAC~> TEZ[tez_caller]
+ *      TEZ[tez_caller]:
+ *        |-> TEZ[tez_bridge] ~CRAC~> EVM[gas_burner]  (succeeds)
+ *        |-> TEZ[tez_reverter]                         (FAILWITHs)
+ *
+ *  The TEZ caller invokes [bridge] first (which calls GasBurner via
+ *  [%%call_evm], consuming ~600K EVM gas charged to TEZ milligas),
+ *  then the reverter FAILWITHs.  The overall TEZ execution fails,
+ *  entering the error path.
+ *
+ *  If the error path reports accurate gas, the outer gasUsed must
+ *  include the GasBurner gas (> G_direct).  If buggy (~0), it cannot.
+ *)
+let test_crac_gas_error_path_reporting =
+  register_crac_runner_test
+    ~title:"CRAC: error path reports accurate gas in X-Tezos-Gas-Consumed"
+    ~tags:["gas"; "error"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-err" in
+
+  (* --- Deploy contracts ------------------------------------------------- *)
+  Log.debug ~prefix "Deploy GasBurner (heavy EVM leaf)" ;
+  let* gas_burner = EvmGasBurner.deploy () in
+
+  (* Pre-warm GasBurner storage: first call fills 120 slots with
+     non-zero values, avoiding cold 22,100-gas SSTOREs later. *)
+  Log.debug ~prefix "Warm up GasBurner storage slots" ;
+  let* _ = EvmRunner.call_run gas_burner in
+
+  (* Reference: direct warm GasBurner call = true inner EVM cost. *)
+  Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
+  let* g_direct = EvmRunner.call_run gas_burner in
+  Log.info ~prefix "G_direct = %Ld" g_direct ;
+
+  (* Error chain: bridge succeeds, reverter FAILWITHs. *)
+  Log.debug ~prefix "Originate TEZ bridge to GasBurner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate gas_burner in
+  Log.debug ~prefix "Originate TEZ reverter" ;
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  Log.debug ~prefix "Originate TEZ caller with [bridge; reverter]" ;
+  let* tez_caller =
+    TezMultiRunCaller.originate ~callees:[tez_bridge; tez_reverter] ()
+  in
+  Log.debug ~prefix "Deploy EVM bridge to TEZ caller" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_caller in
+  Log.debug ~prefix "Deploy EVM main with catch" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+
+  (* --- Warmup call (generates aliases, catches revert) ------------------ *)
+  Log.debug ~prefix "Warmup call (alias generation + catch)" ;
+  let* _warmup = EvmRunner.call_run evm_main in
+
+  (* --- Measurement call ------------------------------------------------- *)
+  Log.debug ~prefix "Measurement call" ;
+  let* g_error = EvmRunner.call_run evm_main in
+  Log.info ~prefix "G_error = %Ld" g_error ;
+
+  (* Verify the catch worked: catches=2 (warmup + measurement),
+     counter=4 (2 x pre+post per successful catch). *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:4
+      evm_main
+  in
+
+  (* --- Assertion -------------------------------------------------------- *)
+  (* The TEZ caller's bridge call charges ~600K EVM gas equivalent to
+     the TEZ gas tracker.  When the reverter FAILWITHs and the error
+     path reports accurate gas, the X-Tezos-Gas-Consumed header carries
+     this cost back to the EVM gateway, which charges the outer caller.
+     The outer gasUsed must therefore exceed G_direct.
+
+     If the error path failed to report the consumed gas, gasUsed
+     would be just EVM overhead (~30-50K), far below G_direct
+     (~600K).  *)
+  Check.(
+    (g_error > g_direct)
+      int64
+      ~error_msg:
+        "Error path gasUsed (%L) should exceed G_direct (%R), proving the \
+         error path reports accurate gas in X-Tezos-Gas-Consumed") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -6974,4 +7078,5 @@ let () =
   test_crac_callback_mixed_with_normal_runners [Alpha] ;
   test_crac_gas_model_callee_gas_in_evm_receipt [Alpha] ;
   test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
-  test_crac_gas_accounting_investigation [Alpha]
+  test_crac_gas_accounting_investigation [Alpha] ;
+  test_crac_gas_error_path_reporting [Alpha]
