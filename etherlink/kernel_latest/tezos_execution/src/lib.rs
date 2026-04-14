@@ -1721,6 +1721,7 @@ mod tests {
     use mir::parser::Parser;
     use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
+    use num_traits::ToPrimitive;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::fs::read_to_string;
@@ -6863,6 +6864,280 @@ mod tests {
             gateway_account.balance(&host).unwrap(),
             0_u64.into(),
             "Gateway balance should be 0 after forwarding"
+        );
+    }
+
+    /// Tests that `operation_consumed_milligas` correctly captures gas from
+    /// internal sub-operations (multiple `get_and_reset_milligas_consumed`
+    /// calls within a single manager operation).
+    ///
+    /// Uses `SCRIPT_EMITING_INTERNAL_TRANSFER` which MAP-iterates over a
+    /// list of addresses and emits one `TRANSFER_TOKENS` per address.
+    /// Each internal transfer triggers a separate gas measurement cycle,
+    /// so `total_milligas_consumed` (initial_limit − remaining) is the
+    /// only correct way to compute the total.
+    ///
+    /// Five scenarios:
+    /// 1. **Success**: all internal targets run `UNIT_SCRIPT` → Applied
+    /// 2. **FAILWITH**: one target runs `FAILING_SCRIPT` → BackTracked
+    /// 3. **Out-of-gas**: gas limit too low → Failed, consumes entire limit
+    /// 4. **FAILWITH direct**: transfer to `FAILING_SCRIPT` → Failed, partial gas
+    /// 5. **Skipped**: batch where first op fails → second op Skipped, 0 gas
+    #[test]
+    fn gas_tracking_with_internal_operations() {
+        let mut host = MockKernelHost::default();
+        let ctx = context::TezlinkContext::init_context();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100_000);
+        reveal_account(&mut host, &src);
+
+        // Chapo contract: emits internal transfers to each address in param
+        let chapo = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        init_contract(
+            &mut host,
+            &chapo,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
+            &Micheline::from(()),
+            &10_000_u64.into(),
+        );
+
+        // OK target: accepts unit, does nothing
+        let ok_target = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
+        init_contract(
+            &mut host,
+            &ok_target,
+            UNIT_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+
+        // Fail target: always FAILWITHs
+        let fail_target = ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
+        init_contract(
+            &mut host,
+            &fail_target,
+            FAILING_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+
+        let ok_addr =
+            Micheline::Bytes(Contract::Originated(ok_target.clone()).to_bytes().unwrap());
+        let fail_addr = Micheline::Bytes(
+            Contract::Originated(fail_target.clone())
+                .to_bytes()
+                .unwrap(),
+        );
+
+        // Gas limit that comfortably covers all scenarios except OOG.
+        const AMPLE_GAS: u64 = 21_150;
+
+        // Helper: build, validate and apply an operation with given content
+        // and gas limit. Reads the counter from durable storage each time
+        // so it stays in sync even if an operation is rejected during
+        // validation.
+        let run = |host: &mut MockKernelHost,
+                   content: Vec<OperationContent>,
+                   gas_limit: u64|
+         -> Vec<ProcessedOperation> {
+            let counter = ctx
+                .implicit_from_public_key_hash(&src.pkh)
+                .unwrap()
+                .counter(host)
+                .unwrap()
+                .0
+                .to_u64()
+                .unwrap()
+                + 1;
+            let op = make_operation(5, counter, gas_limit, 0, src.clone(), content);
+            validate_and_apply_operation(
+                host,
+                &MockRegistry,
+                &mut TezosXJournal::default(),
+                &ctx,
+                OperationHash::default(),
+                op,
+                &block_ctx!(),
+                false,
+                None,
+            )
+            .expect("should not fail with a kernel error")
+        };
+
+        // Helper: build a direct transfer to a contract with unit parameter.
+        let direct_transfer = |target: &ContractKt1Hash| -> OperationContent {
+            OperationContent::Transfer(TransferContent {
+                amount: 0.into(),
+                destination: Contract::Originated(target.clone()),
+                parameters: Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value: Micheline::from(()).encode(),
+                },
+            })
+        };
+
+        // Helper: build a single transfer-to-chapo content with the given
+        // target addresses as parameter.
+        let chapo_transfer = |addrs: &[Micheline]| -> Vec<OperationContent> {
+            vec![OperationContent::Transfer(TransferContent {
+                amount: 0.into(),
+                destination: Contract::Originated(chapo.clone()),
+                parameters: Parameters {
+                    entrypoint: mir::ast::Entrypoint::default(),
+                    value: Micheline::Seq(addrs).encode(),
+                },
+            })]
+        };
+
+        // ── Scenario 1: Success ──────────────────────────────────────
+        let addrs_ok = vec![ok_addr.clone(), ok_addr.clone(), ok_addr.clone()];
+        let success = run(&mut host, chapo_transfer(&addrs_ok), AMPLE_GAS);
+        assert_eq!(success.len(), 1);
+        assert!(
+            matches!(
+                &success[0].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            ),
+            "Expected Applied, got {:?}",
+            success[0].operation_with_metadata.receipt
+        );
+        let gas_success = success[0].operation_consumed_milligas;
+        assert!(
+            gas_success > 0,
+            "Applied op with internal transfers should consume non-zero gas"
+        );
+
+        // ── Scenario 2: FAILWITH (middle internal target) ────────────
+        let addrs_fail = vec![ok_addr.clone(), fail_addr.clone(), ok_addr.clone()];
+        let failed = run(&mut host, chapo_transfer(&addrs_fail), AMPLE_GAS);
+        assert_eq!(failed.len(), 1);
+        assert!(
+            matches!(
+                &failed[0].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "Expected BackTracked (internal FAILWITH), got {:?}",
+            failed[0].operation_with_metadata.receipt
+        );
+        let gas_fail = failed[0].operation_consumed_milligas;
+        assert!(
+            gas_fail > 0,
+            "BackTracked op should still report non-zero consumed gas"
+        );
+        assert!(
+            gas_fail < gas_success,
+            "BackTracked gas ({gas_fail}) should be less than success gas ({gas_success}): \
+             the 3rd internal transfer was skipped"
+        );
+
+        // ── Scenario 3: Out-of-gas ──────────────────────────────────
+        // 200 gas = 200_000 milligas. Validation consumes
+        // manager_operation (100k) + check_signature (~65k) ≈ 165k,
+        // leaving ~35k milligas — not enough to interpret the
+        // chapo script.
+        let oog_gas_limit: u64 = 200;
+        let oog = run(&mut host, chapo_transfer(&addrs_ok), oog_gas_limit);
+        assert_eq!(oog.len(), 1);
+        assert!(
+            matches!(
+                &oog[0].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                    ..
+                }) if errors.iter().any(|e| match e {
+                    ApplyOperationError::Transfer(TransferError::OutOfGas) => true,
+                    ApplyOperationError::Transfer(
+                        TransferError::FailedToExecuteInternalOperation(msg)
+                    ) => msg.contains("Gas exhaustion"),
+                    _ => false,
+                })
+            ),
+            "Expected Failed with gas exhaustion error, got {:?}",
+            oog[0].operation_with_metadata.receipt
+        );
+        let gas_oog = oog[0].operation_consumed_milligas;
+        assert_eq!(
+            u64::from(gas_oog),
+            oog_gas_limit * 1000,
+            "Out-of-gas op should consume its entire gas limit"
+        );
+
+        // ── Scenario 4: Failed (FAILWITH) with partial gas ──────────
+        // Direct transfer to a contract that FAILWITHs immediately.
+        // Unlike scenario 3, the script fails before exhausting gas,
+        // so consumed gas is strictly less than the limit.
+        let fail_direct = run(&mut host, vec![direct_transfer(&fail_target)], AMPLE_GAS);
+        assert_eq!(fail_direct.len(), 1);
+        assert!(
+            matches!(
+                &fail_direct[0].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "Expected Failed (FAILWITH), got {:?}",
+            fail_direct[0].operation_with_metadata.receipt
+        );
+        let gas_fail_direct = fail_direct[0].operation_consumed_milligas;
+        assert!(
+            gas_fail_direct > 0,
+            "Failed (FAILWITH) op should consume non-zero gas"
+        );
+        assert!(
+            u64::from(gas_fail_direct) < AMPLE_GAS * 1000,
+            "Failed (FAILWITH) gas ({gas_fail_direct}) should be less than \
+             gas limit ({}) — script fails before exhausting gas",
+            AMPLE_GAS * 1000
+        );
+
+        // ── Scenario 5: Skipped ─────────────────────────────────────
+        // Batch of two operations: first fails (FAILWITH), second is
+        // skipped. Skipped operations consume 0 gas.
+        let skipped = run(
+            &mut host,
+            vec![
+                direct_transfer(&fail_target), // Op 1 → Failed
+                direct_transfer(&ok_target),   // Op 2 → Skipped
+            ],
+            AMPLE_GAS,
+        );
+        assert_eq!(skipped.len(), 2, "Batch should produce 2 receipts");
+        assert!(
+            matches!(
+                &skipped[0].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "First op should be Failed, got {:?}",
+            skipped[0].operation_with_metadata.receipt
+        );
+        assert!(
+            matches!(
+                &skipped[1].operation_with_metadata.receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Skipped,
+                    ..
+                })
+            ),
+            "Second op should be Skipped, got {:?}",
+            skipped[1].operation_with_metadata.receipt
+        );
+        assert!(
+            skipped[0].operation_consumed_milligas > 0,
+            "Failed op should consume non-zero gas"
+        );
+        assert_eq!(
+            skipped[1].operation_consumed_milligas, 0,
+            "Skipped op should consume 0 gas"
         );
     }
 }
