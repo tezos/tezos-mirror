@@ -161,6 +161,11 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Added ``swrr_selected_bakers`` and ``swrr_credits`` RPCs to query the SWRR
+  baker selection results and associated credits. The SWRR sampler is under
+  feature flag for this protocol, so the RPCs do not provide any information
+  yet. (MR :gl:`!20180`)
+
 Operation receipts
 ------------------
 
@@ -171,6 +176,15 @@ Errors
 
 Protocol parameters
 -------------------
+
+- Changed ``cache_layout_size`` from 3 to 5. (MRs :gl:`!20194`, :gl:`!20706`)
+
+- Added ``cache_stake_info_cycles`` parametric constant to configure the number
+  of cycles for which stake information is cached. (MR :gl:`!20706`)
+
+- Added ``cache_swrr_selected_distribution_cycles`` parametric constant to
+  configure the number of cycles for which the SWRR selected distribution is
+  cached. (MR :gl:`!20194`)
 
 Feature flags
 ^^^^^^^^^^^^^
