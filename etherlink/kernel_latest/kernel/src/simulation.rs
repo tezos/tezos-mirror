@@ -414,13 +414,14 @@ impl Evaluation {
                     block.base_fee_per_gas,
                     da_fee,
                 );
+                let next_block_number = block.number + 1;
                 BlockConstants {
-                    number: block.number + 1,
+                    number: next_block_number,
                     coinbase,
                     timestamp,
                     gas_limit: crate::block::GAS_LIMIT,
                     tezos_experimental_features: experimental_features
-                        .is_tezos_runtime_enabled(),
+                        .is_tezos_runtime_enabled(next_block_number),
                     block_fees,
                     chain_id,
                     prevrandao: None,

@@ -663,7 +663,10 @@ impl Parsable for SequencerInput {
 
         let (tag, remaining) = parsable!(bytes.split_first());
 
-        if context.experimental_features.is_tezos_runtime_enabled() {
+        if context
+            .experimental_features
+            .is_tezos_runtime_enabled(context.next_blueprint_number)
+        {
             let (tx, tx_hash) = parsable!(match *tag {
                 delayed_chunked_transaction::NEW_CHUNK_TAG => {
                     delayed_chunked_transaction::parse_new_chunk(

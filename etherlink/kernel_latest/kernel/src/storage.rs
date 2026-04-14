@@ -848,14 +848,12 @@ pub fn enable_tezos_runtime(host: &impl StorageV1) -> bool {
     Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
 }
 
-#[allow(dead_code)]
 pub fn read_michelson_runtime_target_sunrise_level(
     host: &impl StorageV1,
 ) -> Option<U256> {
     read_u256_le(host, &MICHELSON_RUNTIME_TARGET_SUNRISE_LEVEL).ok()
 }
 
-#[allow(dead_code)]
 pub fn store_michelson_runtime_sunrise_level(
     host: &mut impl StorageV1,
     level: U256,
@@ -863,7 +861,6 @@ pub fn store_michelson_runtime_sunrise_level(
     write_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL, level).map_err(Error::from)
 }
 
-#[allow(dead_code)]
 pub fn read_michelson_runtime_sunrise_level(host: &impl StorageV1) -> Option<U256> {
     read_u256_le(host, &MICHELSON_RUNTIME_SUNRISE_LEVEL).ok()
 }
