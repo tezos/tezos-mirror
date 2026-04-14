@@ -142,3 +142,17 @@ let list_runtimes read =
     if Option.is_some bytes_opt then return @@ Some r else return None
   in
   List.filter_map_ep check_runtime Tezosx.known_runtimes
+
+let michelson_runtime_sunrise_level read =
+  let open Lwt_result_syntax in
+  let* bytes_opt = read Durable_storage_path.michelson_runtime_sunrise_level in
+  match bytes_opt with
+  | None -> return_none
+  | Some bytes ->
+      return_some (Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits))
+
+let michelson_runtime_activation_level read =
+  inspect_durable_and_decode_opt
+    read
+    Durable_storage_path.michelson_runtime_sunrise_level
+    (fun bytes -> Helpers.decode_z_le bytes |> Z.to_int64)
