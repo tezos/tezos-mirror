@@ -66,6 +66,7 @@ oc.build-debian:
   - ./scripts/ci/sccache-stop.sh
   variables:
     DISTRIBUTION: debian
+    DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_ONLY

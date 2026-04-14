@@ -325,9 +325,7 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  let jobs_debian_repository =
-    Debian_repository.jobs ~limit_dune_build_jobs:true Release
-  in
+  let jobs_debian_repository = Debian_repository.jobs Release in
   let job_trigger_monitoring =
     trigger_job
       ~__POS__
@@ -459,9 +457,7 @@ let () =
   ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
-  let jobs_debian_repository =
-    Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
-  in
+  let jobs_debian_repository = Debian_repository.jobs ~manual:true Release in
   (* We want to be able to trigger each "batch" of jobs manually.
      There are two batches: one with the static jobs, and one that publishes.
      The static jobs are independent so they are both manual,
