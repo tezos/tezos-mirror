@@ -9296,7 +9296,7 @@ let execute_payout ~service_provider_pkh ~exchanger
     ~storage_limit:Int.max_int
     ~burn_cap:(Tez.of_int 100)
     ~amount:withdraw_amount
-    ~giver:Constant.bootstrap1.public_key_hash
+    ~giver:Constant.bootstrap3.public_key_hash
     ~receiver:service_provider_proxy
     ~entrypoint:(if fa_tokens then "payout_proxy_fa" else "payout_proxy_tez")
     ~arg:
@@ -9428,7 +9428,7 @@ let test_deposit_and_fast_withdraw =
     Client.originate_contract
       ~alias:"service_provider"
       ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src:Constant.bootstrap3.public_key_hash
       ~init:
         "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
          \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
@@ -9614,7 +9614,7 @@ let test_deposit_and_fa_fast_withdraw =
     Client.originate_contract
       ~alias:"service_provider"
       ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src:Constant.bootstrap3.public_key_hash
       ~init:
         "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
          \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
