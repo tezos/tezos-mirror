@@ -182,7 +182,7 @@ where
             coinbase,
             timestamp: timestamp.as_u64().into(),
             gas_limit: GAS_LIMIT,
-            tezos_experimental_features: config.enable_tezos_runtime(),
+            tezos_experimental_features: config.is_tezos_runtime_enabled(number),
             block_fees,
             chain_id: config.get_chain_id(),
             prevrandao: None,
@@ -365,10 +365,11 @@ where
         block_in_progress.timestamp,
         block_in_progress.queue_length(),
     )?;
+    let number = block_in_progress.number;
     let block = block_in_progress.finalize_and_store(
         &mut safe_host,
         &block_constants,
-        config.enable_tezos_runtime(),
+        config.is_tezos_runtime_enabled(number),
     )?;
 
     let timestamp = block.timestamp();
