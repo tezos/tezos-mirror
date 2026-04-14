@@ -41,16 +41,17 @@ impl tezos_data_encoding::enc::BinWriter for MichelineExpr {
 }
 
 impl<'a> tezos_data_encoding::nom::NomReader<'a> for MichelineExpr {
-    fn nom_read(
-        input: &'a [u8],
-    ) -> tezos_data_encoding::nom::NomResult<'a, Self> {
+    fn nom_read(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
         let consumed = micheline_expr_size(input).map_err(|e| {
             nom::Err::Error(tezos_data_encoding::nom::error::DecodeError::invalid_tag(
                 input,
                 format!("invalid Micheline expression: {e}"),
             ))
         })?;
-        Ok((&input[consumed..], MichelineExpr(input[..consumed].to_vec())))
+        Ok((
+            &input[consumed..],
+            MichelineExpr(input[..consumed].to_vec()),
+        ))
     }
 }
 

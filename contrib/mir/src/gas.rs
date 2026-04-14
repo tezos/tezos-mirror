@@ -91,21 +91,29 @@ trait Log2i {
     /// &c
     ///
     /// `log2i(0)` is not well-defined, and likely is a logic error, hence the
-    /// function will panic on `0`.
-    fn log2i(self) -> u32;
+    /// function returns [OutOfGas] on `0`.
+    fn log2i(self) -> Result<u32, OutOfGas>;
 }
 
 impl Log2i for usize {
-    fn log2i(self) -> u32 {
-        assert!(self != 0);
-        self.next_power_of_two().trailing_zeros()
+    fn log2i(self) -> Result<u32, OutOfGas> {
+        debug_assert!(self != 0, "log2i(0) is undefined");
+        if self == 0 {
+            Err(OutOfGas)
+        } else {
+            Ok(self.next_power_of_two().trailing_zeros())
+        }
     }
 }
 
 impl Log2i for u64 {
-    fn log2i(self) -> u32 {
-        assert!(self != 0);
-        self.next_power_of_two().trailing_zeros()
+    fn log2i(self) -> Result<u32, OutOfGas> {
+        debug_assert!(self != 0, "log2i(0) is undefined");
+        if self == 0 {
+            Err(OutOfGas)
+        } else {
+            Ok(self.next_power_of_two().trailing_zeros())
+        }
     }
 }
 
@@ -208,7 +216,7 @@ pub mod tc_cost {
         // to avoid log2(0) it's more practical to compute log2(n + 1)
         let n = Checked::from(sz);
         let key_size = Checked::from(key_size);
-        let log2n = (n + 1).ok_or(OutOfGas)?.log2i() as usize;
+        let log2n = (n + 1).ok_or(OutOfGas)?.log2i()? as usize;
         (80 * n + key_size * n * log2n).as_gas_cost()
     }
 
@@ -216,7 +224,7 @@ pub mod tc_cost {
         // Similar to `construct_map`, only the coefficient differs
         let n = Checked::from(sz);
         let key_size = Checked::from(val_size);
-        let log2n = (n + 1).ok_or(OutOfGas)?.log2i() as usize;
+        let log2n = (n + 1).ok_or(OutOfGas)?.log2i()? as usize;
         (130 * n + key_size * n * log2n).as_gas_cost()
     }
 
@@ -540,7 +548,7 @@ pub mod interpret_cost {
         let v0 = if a.is_zero() {
             Checked::from(0)
         } else {
-            a * (a.ok_or(OutOfGas)?.log2i() as u64)
+            a * (a.ok_or(OutOfGas)?.log2i()? as u64)
         };
         (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
     }
@@ -571,86 +579,93 @@ pub mod interpret_cost {
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {
         use TypedValue as V;
-        let cmp_bytes = |s1: u64, s2: u64| {
+        let incomparable = || -> Result<u32, OutOfGas> {
+            debug_assert!(false, "comparison of incomparable values");
+            Err(OutOfGas)
+        };
+        let cmp_bytes = |s1: u64, s2: u64| -> Result<u32, OutOfGas> {
             // Approximating 35 + 0.024413 x term
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair =
-            |l1: &Rc<TypedValue>, l2: &Rc<TypedValue>, r1: &Rc<TypedValue>, r2: &Rc<TypedValue>| {
-                let c = Checked::from(10u32);
-                (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
-                    .as_gas_cost()
-            };
+        let cmp_pair = |l1: &Rc<TypedValue>,
+                        l2: &Rc<TypedValue>,
+                        r1: &Rc<TypedValue>,
+                        r2: &Rc<TypedValue>|
+         -> Result<u32, OutOfGas> {
+            let c = Checked::from(10u32);
+            (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
+                .as_gas_cost()
+        };
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
         const CMP_CHAIN_ID: u32 = 30;
         const CMP_KEY: u32 = 92; // hard-coded in the protocol
         const CMP_SIGNATURE: u32 = 92; // hard-coded in the protocol
         let cmp_or = Checked::from(10u32);
-        #[track_caller]
-        fn incomparable() -> ! {
-            unreachable!("Comparison of incomparable values")
-        }
-        Ok(match (v1, v2) {
-            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+        match (v1, v2) {
+            (V::Nat(l), V::Nat(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
             (V::Nat(_), _) => incomparable(),
 
-            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Int(l), V::Int(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
             (V::Int(_), _) => incomparable(),
 
-            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size())?,
+            (V::Timestamp(l), V::Timestamp(r)) => cmp_bytes(l.byte_size(), r.byte_size()),
             (V::Timestamp(_), _) => incomparable(),
 
-            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1)?,
+            (V::Bool(_), V::Bool(_)) => cmp_bytes(1, 1),
             (V::Bool(_), _) => incomparable(),
 
-            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8)?,
+            (V::Mutez(_), V::Mutez(_)) => cmp_bytes(8, 8),
             (V::Mutez(_), _) => incomparable(),
 
-            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+            (V::String(l), V::String(r)) => cmp_bytes(l.len() as u64, r.len() as u64),
             (V::String(_), _) => incomparable(),
 
-            (V::Unit, V::Unit) => 10,
+            (V::Unit, V::Unit) => Ok(10),
             (V::Unit, _) => incomparable(),
 
-            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2)?,
+            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2),
             (V::Pair(..), _) => incomparable(),
 
-            (V::Option(l), V::Option(r)) => match (l, r) {
-                (None, None) => cmp_option,
-                (None, Some(_)) => cmp_option,
-                (Some(_), None) => cmp_option,
-                (Some(l), Some(r)) => cmp_option + compare(l.as_ref(), r.as_ref())?,
+            (V::Option(l), V::Option(r)) => {
+                let cost = match (l, r) {
+                    (None, None) => cmp_option,
+                    (None, Some(_)) => cmp_option,
+                    (Some(_), None) => cmp_option,
+                    (Some(l), Some(r)) => cmp_option + compare(l.as_ref(), r.as_ref())?,
+                };
+                cost.as_gas_cost()
             }
-            .as_gas_cost()?,
             (V::Option(_), _) => incomparable(),
 
-            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE)?,
+            (V::Address(..), V::Address(..)) => cmp_bytes(ADDRESS_SIZE, ADDRESS_SIZE),
             (V::Address(_), _) => incomparable(),
 
-            (V::ChainId(..), V::ChainId(..)) => CMP_CHAIN_ID,
+            (V::ChainId(..), V::ChainId(..)) => Ok(CMP_CHAIN_ID),
             (V::ChainId(_), _) => incomparable(),
 
-            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64)?,
+            (V::Bytes(l), V::Bytes(r)) => cmp_bytes(l.len() as u64, r.len() as u64),
             (V::Bytes(_), _) => incomparable(),
 
-            (V::Key(_), V::Key(_)) => CMP_KEY,
+            (V::Key(_), V::Key(_)) => Ok(CMP_KEY),
             (V::Key(_), _) => incomparable(),
 
-            (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
+            (V::Signature(_), V::Signature(_)) => Ok(CMP_SIGNATURE),
             (V::Signature(_), _) => incomparable(),
 
-            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
+            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64),
             (V::KeyHash(_), _) => incomparable(),
 
-            (V::Or(l), V::Or(r)) => match (l, r) {
-                (Or::Left(x), Or::Left(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
-                (Or::Right(x), Or::Right(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
-                (Or::Left(_), Or::Right(_)) => cmp_or,
-                (Or::Right(_), Or::Left(_)) => cmp_or,
+            (V::Or(l), V::Or(r)) => {
+                let cost = match (l, r) {
+                    (Or::Left(x), Or::Left(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
+                    (Or::Right(x), Or::Right(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
+                    (Or::Left(_), Or::Right(_)) => cmp_or,
+                    (Or::Right(_), Or::Left(_)) => cmp_or,
+                };
+                cost.as_gas_cost()
             }
-            .as_gas_cost()?,
             (V::Or(..), _) => incomparable(),
 
             #[cfg(feature = "bls")]
@@ -667,7 +682,7 @@ pub mod interpret_cost {
                 | V::Lambda(_),
                 _,
             ) => incomparable(),
-        })
+        }
     }
 
     /// Cost charged for computing total entries size (needed for the subsequent
@@ -714,7 +729,7 @@ pub mod interpret_cost {
         // exactly one comparison.
         let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i();
+        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (80 + lookup_cost).as_gas_cost()
     }
@@ -722,7 +737,7 @@ pub mod interpret_cost {
     pub fn set_mem(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         (115 + lookup_cost).as_gas_cost()
     }
@@ -731,7 +746,7 @@ pub mod interpret_cost {
         // NB: same considerations as for map_get
         let map_size = Checked::from(map_size);
         let compare_cost = compare(k, k)?;
-        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i();
+        let size_log = (map_size + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 2 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead.
@@ -741,7 +756,7 @@ pub mod interpret_cost {
     pub fn set_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_update
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // coefficient larger than in case of Map looks suspicious, something
         // to benchmark later
@@ -751,7 +766,7 @@ pub mod interpret_cost {
     pub fn map_get_and_update(k: &TypedValue, map_size: usize) -> Result<u32, OutOfGas> {
         // NB: same considerations as for map_get
         let compare_cost = compare(k, k)?;
-        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i();
+        let size_log = (Checked::from(map_size) + 1).ok_or(OutOfGas)?.log2i()?;
         let lookup_cost = Checked::from(compare_cost) * size_log;
         // NB: 3 factor copied from Tezos protocol, in principle it should
         // reflect update vs get overhead, but it seems like an overestimation,
@@ -1003,34 +1018,50 @@ mod test {
 
     #[test]
     fn log2i_test() {
-        assert_eq!(1usize.log2i(), 0);
-        assert_eq!(2usize.log2i(), 1);
-        assert_eq!(3usize.log2i(), 2);
-        assert_eq!(4usize.log2i(), 2);
-        assert_eq!(5usize.log2i(), 3);
-        assert_eq!(70_000usize.log2i(), 17);
-        assert_eq!(100_000usize.log2i(), 17);
-        assert_eq!(300_000usize.log2i(), 19);
+        assert_eq!(1usize.log2i(), Ok(0));
+        assert_eq!(2usize.log2i(), Ok(1));
+        assert_eq!(3usize.log2i(), Ok(2));
+        assert_eq!(4usize.log2i(), Ok(2));
+        assert_eq!(5usize.log2i(), Ok(3));
+        assert_eq!(70_000usize.log2i(), Ok(17));
+        assert_eq!(100_000usize.log2i(), Ok(17));
+        assert_eq!(300_000usize.log2i(), Ok(19));
 
-        assert_eq!(1u64.log2i(), 0);
-        assert_eq!(2u64.log2i(), 1);
-        assert_eq!(3u64.log2i(), 2);
-        assert_eq!(4u64.log2i(), 2);
-        assert_eq!(5u64.log2i(), 3);
-        assert_eq!(70_000u64.log2i(), 17);
-        assert_eq!(100_000u64.log2i(), 17);
-        assert_eq!(300_000u64.log2i(), 19);
+        assert_eq!(1u64.log2i(), Ok(0));
+        assert_eq!(2u64.log2i(), Ok(1));
+        assert_eq!(3u64.log2i(), Ok(2));
+        assert_eq!(4u64.log2i(), Ok(2));
+        assert_eq!(5u64.log2i(), Ok(3));
+        assert_eq!(70_000u64.log2i(), Ok(17));
+        assert_eq!(100_000u64.log2i(), Ok(17));
+        assert_eq!(300_000u64.log2i(), Ok(19));
+    }
+
+    // In debug builds, log2i(0) triggers a debug_assert panic.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "log2i(0) is undefined")]
+    fn log2i_zero_usize_debug() {
+        let _ = 0usize.log2i();
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: self != 0")]
-    fn log2i_test_panic_usize() {
-        0usize.log2i();
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "log2i(0) is undefined")]
+    fn log2i_zero_u64_debug() {
+        let _ = 0u64.log2i();
+    }
+
+    // In release builds, log2i(0) returns OutOfGas.
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn log2i_zero_usize_release() {
+        assert_eq!(0usize.log2i(), Err(OutOfGas));
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: self != 0")]
-    fn log2i_test_panic_u64() {
-        0u64.log2i();
+    #[cfg(not(debug_assertions))]
+    fn log2i_zero_u64_release() {
+        assert_eq!(0u64.log2i(), Err(OutOfGas));
     }
 }

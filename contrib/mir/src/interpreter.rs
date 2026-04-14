@@ -37,8 +37,8 @@ use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum InterpretError<'a> {
     /// Interpreter ran out of gas.
-    #[error(transparent)]
-    OutOfGas(#[from] OutOfGas),
+    #[error("Gas_exhaustion")]
+    OutOfGas,
     /// Cryptographic error.
     #[error(transparent)]
     CryptoError(#[from] CryptoError),
@@ -63,6 +63,12 @@ pub enum InterpretError<'a> {
     /// Error when typechecking unserialized data
     #[error(transparent)]
     TcError(#[from] TcError),
+}
+
+impl<'a> From<OutOfGas> for InterpretError<'a> {
+    fn from(_: OutOfGas) -> Self {
+        InterpretError::OutOfGas
+    }
 }
 
 impl<'a> From<SigCostError> for InterpretError<'a> {

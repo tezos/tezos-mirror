@@ -31,8 +31,7 @@ use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
 use crate::context::TypecheckingCtx;
-use crate::gas::OutOfGas;
-use crate::gas::{self, tc_cost, Gas};
+use crate::gas::{self, tc_cost, Gas, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -44,8 +43,8 @@ pub enum TcError {
     #[error("type stacks not equal: {0:?} != {1:?}")]
     StacksNotEqual(TypeStack, TypeStack, StacksNotEqualReason),
     /// Ran out of gas during typechecking.
-    #[error(transparent)]
-    OutOfGas(#[from] OutOfGas),
+    #[error("Gas_exhaustion")]
+    OutOfGas,
     /// The type didn't satisfy a given [TypeProperty].
     #[error("type is not {0}: {1:?}")]
     InvalidTypeProperty(TypeProperty, Type),
@@ -188,6 +187,12 @@ impl From<TryFromBigIntError<()>> for TcError {
 impl From<ByteReprError> for TcError {
     fn from(value: ByteReprError) -> Self {
         Self::ByteReprError(Type::Bytes, value)
+    }
+}
+
+impl From<OutOfGas> for TcError {
+    fn from(_: OutOfGas) -> Self {
+        TcError::OutOfGas
     }
 }
 
@@ -6098,7 +6103,7 @@ mod typecheck_tests {
                 gas,
                 &mut tc_stk![Type::Unit, Type::Unit]
             ),
-            Err(TcError::OutOfGas(OutOfGas))
+            Err(TcError::OutOfGas)
         );
     }
 
