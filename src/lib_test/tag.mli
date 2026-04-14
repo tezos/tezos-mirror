@@ -132,3 +132,14 @@ val extra : string
     If you do so, tag your test with both [extra] and [memory_hungry],
     because memory usage alerts also apply to the scheduled pipeline. *)
 val memory_hungry : string
+
+(** ["add_new_script"]: tag for regression tests that need to be updated when a
+    new michelson script is added.
+
+    This tag means: "This test should be rerun with --reset-regressions when a
+    new script is added in tezos/michelson_test_script".
+
+    When adding a new script, it should be enough to run the following command
+    to update the impacted regression tests, and only them:
+    `dune exec tezt/tests/main.exe -- add_new_script --reset-regressions` *)
+val add_new_script : string

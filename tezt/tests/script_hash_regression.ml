@@ -36,7 +36,7 @@ let test_script_hash_regression =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test script hash regression"
-    ~tags:[team; "script"; "michelson"; "hash"]
+    ~tags:[team; "script"; "michelson"; "hash"; Tag.add_new_script]
     ~uses:(fun _protocol -> [Constant.michelson_test_scripts])
     ~uses_node:false
   @@ fun protocol ->
