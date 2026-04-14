@@ -52,8 +52,6 @@ floodgate: etherlink/bin_floodgate, etherlink/bin_floodgate/lib_floodgate
 gitlab_ci: ci/lib_gitlab_ci
 internal-devtools: devtools/tztop, src/lib_sqlite/gen_migrations
 internal-devtools_proto-context-du: devtools/proto_context_du
-kaitai: client-libs/kaitai-ocaml/src, client-libs/kaitai-ocaml/test
-kaitai-of-data-encoding: client-libs/lib_kaitai_of_data_encoding, client-libs/lib_kaitai_of_data_encoding/test
 octez-accuser: src/bin_agnostic_accuser
 octez-accuser-PsGXQmSv: src/proto_025_PsGXQmSv/bin_accuser
 octez-accuser-PtTALLiN: src/proto_024_PtTALLiN/bin_accuser
@@ -67,7 +65,6 @@ octez-baker-lib: src/lib_agnostic_baker
 octez-baking-common-lib: src/lib_baking_common
 octez-client: src/bin_client
 octez-codec: src/bin_codec
-octez-codec-kaitai: client-libs/bin_codec_kaitai
 octez-connpool: src/lib_connpool, src/lib_connpool/test
 octez-crawler: src/lib_crawler
 octez-dal-node: src/bin_dal_node

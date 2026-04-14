@@ -32,7 +32,6 @@ module Internals = Internals
 module Data_encoding = Product_data_encoding
 module Octez = Product_octez
 open Octez
-module Client_libs = Product_client_libs
 module Tooling = Product_tooling
 module Etherlink = Product_etherlink
 module CIAO = Product_ciao

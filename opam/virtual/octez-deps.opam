@@ -94,7 +94,6 @@ depends: [
   "ppx_hash"
   "ppx_import"
   "ppx_repr" { >= "0.6.0" }
-  "ppx_sexp_conv"
   "ppxlib" { >= "0.34.0" }
   "prbnmcn-linalg" { = "0.0.1" }
   "prbnmcn-stats" { = "0.0.6" }
@@ -115,7 +114,6 @@ depends: [
   "secp256k1-internal" { >= "0.4.0" }
   "semaphore-compat" { >= "1.0.1" }
   "seqes" { >= "0.2" }
-  "sexplib"
   "sqlite3" { = "5.3.1" }
   "stdint"
   "tar"

@@ -27,7 +27,6 @@ module Files = struct
       "tezt/**/*.ml*";
       "brassaia/**/*.ml*";
       "irmin/**/*.ml*";
-      "client-libs/**/*.ml*";
       "etherlink/**/*.ml*";
       "data-encoding/**/*.ml*";
       "vendors/**/*.ml*";

@@ -99,7 +99,6 @@
               autoconf
               cacert
               curl
-              kaitai-struct-compiler
               nodejs
               poetry
               rustup

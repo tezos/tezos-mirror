@@ -106,7 +106,6 @@ let job_oc_misc_checks =
         "scripts/**/*";
         "docs/**/*";
         "contrib/**/*";
-        "client-libs/**/*";
         "etherlink/**/*";
       ]
     (List.flatten

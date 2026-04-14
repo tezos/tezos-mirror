@@ -69,10 +69,6 @@ workflow:
     variables:
       PIPELINE_TYPE: etherlink.daily
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "client-libs.daily"
-    variables:
-      PIPELINE_TYPE: client-libs.daily
-    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "tezos_x.build"
     variables:
       PIPELINE_TYPE: tezos_x.build
@@ -331,10 +327,6 @@ include:
 - local: .gitlab/ci/pipelines/etherlink.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.daily"
-    when: always
-- local: .gitlab/ci/pipelines/client-libs.daily.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "client-libs.daily"
     when: always
 - local: .gitlab/ci/pipelines/tezos_x.build.yml
   rules:

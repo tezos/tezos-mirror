@@ -78,8 +78,6 @@ __pycache__
 /_coverage_output/*.coverage
 /_coverage_report
 
-client-libs/kaitai-struct-files/doc
-
 # Ignore individual dockerfiles for `tezt-cloud`
 tezt/lib_cloud/dockerfiles/*.Dockerfile
 tezt/lib_cloud/dockerfiles/*.Dockerfile.dockerignore
