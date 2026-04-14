@@ -95,7 +95,7 @@ let etherlink_safe_root = "/tmp" ^ World_state.make ""
 
 (** TezosX: Tezos blocks are stored under the EVM world state so they
     are included in SafeStorage transactions. *)
-let tezosx_tezos_blocks_root = World_state.make "/tezlink"
+let tezosx_tezos_blocks_root = World_state.make "/eth_accounts/tezos"
 
 let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
   match chain_family with
