@@ -35,10 +35,10 @@ type error += Invalid_clst_delegates_parameters
 let () =
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_clst_delegates_parameters"
-    ~title:"Invalid parameters for CLST delegates parameters"
-    ~description:"The CLST delegates parameters are invalid."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid CLST delegates parameters")
+    ~id:"operations.invalid_stez_delegates_parameters"
+    ~title:"Invalid parameters for sTEZ delegates parameters"
+    ~description:"The sTEZ delegates parameters are invalid."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid sTEZ delegates parameters")
     Data_encoding.empty
     (function Invalid_clst_delegates_parameters -> Some () | _ -> None)
     (fun () -> Invalid_clst_delegates_parameters)
@@ -85,8 +85,8 @@ let encoding =
            ~edge_of_clst_staking_over_baking_millionth
            ~ratio_of_clst_staking_over_direct_staking_billionth))
     (obj2
-       (req "edge_of_clst_staking_over_baking_millionth" int32)
-       (req "ratio_of_clst_staking_over_direct_staking_billionth" int32))
+       (req "edge_of_stez_staking_over_baking_millionth" int32)
+       (req "ratio_of_stez_staking_over_direct_staking_billionth" int32))
 
 let update_encoding =
   let open Data_encoding in

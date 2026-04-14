@@ -85,8 +85,8 @@ let encoding =
            ~edge_of_clst_staking_over_baking_millionth
            ~ratio_of_clst_staking_over_direct_staking_billionth))
     (obj2
-       (req "edge_of_clst_staking_over_baking_millionth" int32)
-       (req "ratio_of_clst_staking_over_direct_staking_billionth" int32))
+       (req "edge_of_stez_staking_over_baking_millionth" int32)
+       (req "ratio_of_stez_staking_over_direct_staking_billionth" int32))
 
 let update_encoding =
   let open Data_encoding in

@@ -631,7 +631,7 @@ module Contract = struct
     module CLST =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
-          let name = ["clst"]
+          let name = ["stez"]
         end)
         (struct
           type t = Contract_hash.t
@@ -1517,7 +1517,7 @@ module Cycle = struct
     Make_indexed_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["pending_clst_delegate_parameters"]
+           let name = ["pending_stez_delegate_parameters"]
          end))
          (Make_index (Contract_repr.Index))
       (struct

@@ -502,18 +502,18 @@ let balance_and_update_encoding =
            (fun ((), (), delegate) -> Lost_dal_attesting_rewards delegate);
          tez_case
            (Tag 31)
-           ~title:"CLST_deposits"
+           ~title:"STEZ_deposits"
            (obj2
               (req "kind" (constant "freezer"))
-              (req "category" (constant "clst_deposits")))
+              (req "category" (constant "stez_deposits")))
            (function CLST_deposits -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> CLST_deposits);
          tez_case
            (Tag 32)
-           ~title:"CLST_redeemed_deposits"
+           ~title:"STEZ_redeemed_deposits"
            (obj4
               (req "kind" (constant "freezer"))
-              (req "category" (constant "clst_redeemed_deposits"))
+              (req "category" (constant "stez_redeemed_deposits"))
               (req "staker" Contract_repr.encoding)
               (req "cycle" Cycle_repr.encoding))
            (function
