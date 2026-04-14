@@ -589,7 +589,7 @@ impl ChainConfigTrait for EvmChainConfig {
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
-        let level = block_in_progress.number.try_into()?;
+        let level: BlockNumber = block_in_progress.number.try_into()?;
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let da_fee_per_byte_mutez = mutez_from_wei(da_fee_per_byte)
             .map_err(|_| crate::Error::InvalidConversion)?;
@@ -602,7 +602,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 da_fee_per_byte,
                 crate::block::GAS_LIMIT,
                 coinbase,
-                self.enable_tezos_runtime(),
+                self.is_tezos_runtime_enabled(level.into()),
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level,
@@ -785,10 +785,11 @@ impl ChainConfigTrait for EvmChainConfig {
     where
         Host: StorageV1,
     {
+        let current_level = block_in_progress.number;
         block_in_progress.finalize_and_store(
             host,
             block_constants,
-            self.enable_tezos_runtime(),
+            self.is_tezos_runtime_enabled(current_level),
         )
     }
 
