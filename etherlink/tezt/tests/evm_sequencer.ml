@@ -310,6 +310,60 @@ let test_make_l2_kernel_installer_config chain_family =
         "Unexpected value decoded at path %s in durable storage"
         chain_ids
 
+(* Guards against the [Kernel.name_of Mainnet] string drifting out of sync
+   with the WASM kernel we actually ship as [Constant.WASM.mainnet_kernel].
+   The name is consumed by the EVM node's [--kernel-compat] flag to pick
+   the right storage-path / feature gates in [kernel_config.ml]; a
+   mismatch is silent at parse time but breaks installer configs the
+   moment a gate keyed on the wrong kernel version is introduced. *)
+let test_mainnet_kernel_name_matches_root_hash () =
+  Test.register
+    ~__FILE__
+    ~title:"Kernel.name_of Mainnet matches mainnet_kernel.wasm root hash"
+    ~tags:["kernel"; "mainnet"; "compat"]
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:[Constant.WASM.mainnet_kernel; Constant.smart_rollup_installer]
+  @@ fun () ->
+  let name =
+    match Kernel.name_of Mainnet with
+    | Some n -> n
+    | None -> Test.fail "Kernel.name_of Mainnet returned None"
+  in
+  let kernel_enum =
+    match Evm_node_lib_dev.Constants.kernel_from_string name with
+    | Some k -> k
+    | None ->
+        Test.fail
+          "Kernel.name_of Mainnet returned %S, which \
+           Constants.kernel_from_string does not recognize"
+          name
+  in
+  let expected_hash =
+    match
+      Evm_node_lib_dev.Constants.root_hash_from_released_kernel kernel_enum
+    with
+    | Some (`Hex h) -> h
+    | None ->
+        Test.fail
+          "No released root hash known for kernel %S — Kernel.name_of Mainnet \
+           must point to a released kernel"
+          name
+  in
+  let preimages_dir = Temp.dir "wasm_2_0_0" in
+  let* {root_hash; _} =
+    prepare_installer_kernel ~preimages_dir Constant.WASM.mainnet_kernel
+  in
+  Check.((root_hash = expected_hash) string)
+    ~error_msg:
+      (Printf.sprintf
+         "mainnet_kernel.wasm has root hash %%L, but Kernel.name_of Mainnet = \
+          %S points to a kernel whose released root hash is %%R — update \
+          Kernel.name_of in etherlink/tezt/lib/kernel.ml"
+         name) ;
+  unit
+
 (* The test uses a very specific setup, so it doesn't use general  *)
 let test_observer_reset =
   Protocol.register_test
@@ -16369,6 +16423,7 @@ let () =
   test_evm_node_flag [Alpha] ;
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;
+  test_mainnet_kernel_name_matches_root_hash () ;
   test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_deposit_and_fa_fast_withdraw protocols ;

@@ -475,6 +475,7 @@ let _etherlink_tezts =
         (* This executable includes the tests of [lib_wasm_runtime_callbacks]. *)
         wasm_runtime_callbacks_tests;
         evm_node_lib_dev_encoding;
+        evm_node_lib_dev;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
