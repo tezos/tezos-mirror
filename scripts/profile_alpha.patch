@@ -1,6 +1,6 @@
-From 3bcff1e60ec86dc41f6175358bf17b84bce100b8 Mon Sep 17 00:00:00 2001
+From 405cafd71c6b7225723082caf9aec9462eaf8af6 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Fri, 10 Apr 2026 13:59:59 +0200
+Date: Tue, 14 Apr 2026 15:11:11 +0200
 Subject: [PATCH 1/1] Profiler: patch proto_alpha
 
 ---
@@ -582,10 +582,10 @@ index 65e764427f..e62296a0a7 100644
          return (ctxt, [])
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
 diff --git a/src/proto_alpha/lib_protocol/main.ml b/src/proto_alpha/lib_protocol/main.ml
-index 4b75e1cd23..7d245e6afa 100644
+index d7c5e71d6e..0dc4d4e1f7 100644
 --- a/src/proto_alpha/lib_protocol/main.ml
 +++ b/src/proto_alpha/lib_protocol/main.ml
-@@ -163,20 +163,39 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
+@@ -163,7 +163,15 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
    let open Lwt_result_syntax in
    let open Alpha_context in
    let* ctxt, attestations_map =
@@ -602,22 +602,23 @@ index 4b75e1cd23..7d245e6afa 100644
    in
    let*? can_contain_preattestations = can_contain_preattestations mode in
    let current_level = Level.current ctxt in
-   let* ctxt, allowed_preattestations =
-     if can_contain_preattestations then
-       let* ctxt, preattestations_map =
--        Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
-+        (Baking.attesting_rights_by_first_slot
-+           ctxt
-+           ~attested_level:current_level
-+         [@profiler.record_s
-+           {verbosity = Notice}
-+             (Format.asprintf
-+                "Block: attesting_rights - AL: %a"
-+                Level.pp
-+                current_level)])
-       in
-       return (ctxt, Some preattestations_map)
-     else return (ctxt, None)
+@@ -175,13 +183,24 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
+      skip them when there is no locked round, causing divergent cache domains
+      and context hashes. *)
+   let* ctxt, preattestations_map =
+-    Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
++    (Baking.attesting_rights_by_first_slot
++       ctxt
++       ~attested_level:current_level
++     [@profiler.record_s
++       {verbosity = Notice}
++         (Format.asprintf
++            "Block: attesting_rights - AL: %a"
++            Level.pp
++            current_level)])
+   in
+   let allowed_preattestations =
+     if can_contain_preattestations then Some preattestations_map else None
    in
    let* ctxt, delegate_to_shard_count =
 -    delegate_to_shard_count ctxt ~attested_levels:[current_level]
@@ -628,7 +629,7 @@ index 4b75e1cd23..7d245e6afa 100644
    in
    let ctxt =
      Consensus.initialize_consensus_operation
-@@ -211,16 +230,26 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
+@@ -216,16 +235,26 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
      List.fold_left_es
        (fun (ctxt, minimal_slots) level ->
          let* ctxt, level_minimal_slot =
