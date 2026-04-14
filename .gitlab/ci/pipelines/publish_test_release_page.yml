@@ -87,6 +87,9 @@ publish:release-page:
     expire_in: 1 day
     paths:
     - index.html
+    - older_releases.html
+    - index.md
+    - older_releases.md
   retry: 0
 
 grafazos.release_page:

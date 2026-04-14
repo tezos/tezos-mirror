@@ -567,6 +567,9 @@ publish:release-page-packaging-revision:
     expire_in: 1 day
     paths:
     - index.html
+    - older_releases.html
+    - index.md
+    - older_releases.md
   retry: 0
 
 oc.docker:promote_revision_to_version:
