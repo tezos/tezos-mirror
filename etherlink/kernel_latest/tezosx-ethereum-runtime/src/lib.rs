@@ -206,7 +206,6 @@ where
                 sender: hdrs.sender,
                 gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
                 amount: revm::primitives::U256::from_limbs(hdrs.amount.into_limbs()),
-                gas_used: 0,
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
@@ -255,11 +254,6 @@ where
         },
     )
     .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
-
-    // Accumulate EVM gas from this CRAC execution.
-    journal
-        .evm
-        .accumulate_crac_execution(outcome.result.gas_used());
 
     Ok(outcome)
 }

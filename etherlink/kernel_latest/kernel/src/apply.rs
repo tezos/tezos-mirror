@@ -53,7 +53,7 @@ use tezos_tezlink::operation_result::{
     OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
 };
 use tezos_tracing::trace_kernel;
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_journal::{CracId, TezosXJournal};
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
@@ -274,6 +274,7 @@ pub enum RuntimeTransactionResult {
 /// during a Michelson transaction that may have CRACed into EVM.
 pub fn extract_cross_runtime_effects(
     journal: &mut TezosXJournal,
+    consumed_milligas: u64,
 ) -> Vec<CrossRuntimeEffect> {
     let mut effects = Vec::new();
 
@@ -299,7 +300,14 @@ pub fn extract_cross_runtime_effects(
             sender: H160(*tx_info.sender.0),
             gas_limit: U256::from_little_endian(&tx_info.gas_limit.to_le_bytes::<32>()),
             amount: U256::from_little_endian(&tx_info.amount.to_le_bytes::<32>()),
-            gas_used: U256::from(tx_info.gas_used),
+            gas_used: U256::from(
+                tezosx_interfaces::gas::convert(
+                    RuntimeId::Tezos,
+                    RuntimeId::Ethereum,
+                    consumed_milligas,
+                )
+                .unwrap_or(0),
+            ),
         }));
     }
 
@@ -1239,8 +1247,10 @@ where
                     )?;
                     // Extract cross-runtime side effects accumulated
                     // during the Michelson execution (e.g. CRAC into EVM).
-                    let cross_runtime_effects =
-                        extract_cross_runtime_effects(&mut tezosx_journal);
+                    let cross_runtime_effects = extract_cross_runtime_effects(
+                        &mut tezosx_journal,
+                        consumed_milligas,
+                    );
                     Ok::<_, anyhow::Error>(ExecutionResult::Valid(
                         RuntimeTransactionResult::Tezos {
                             op: operation_and_receipt,
