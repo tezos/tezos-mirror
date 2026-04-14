@@ -33,7 +33,7 @@ let commit_of = function
 
 let name_of = function
   | Latest -> None
-  | Mainnet -> Some "farfadet-r1"
+  | Mainnet -> Some "farfadet-r2"
   | Tezlink_shadownet -> Some "farfadet-r1"
 
 let upgrade_to = function
