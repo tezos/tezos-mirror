@@ -80,7 +80,8 @@ pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezl
 
 /// Path for TezBlock storage within the EVM world state (used by EVM chain config).
 /// This path is under ETHERLINK_SAFE_STORAGE_ROOT_PATH so it's included in SafeStorage transactions.
-pub const TEZOS_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/tezlink");
+pub const TEZOS_BLOCKS_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos");
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {

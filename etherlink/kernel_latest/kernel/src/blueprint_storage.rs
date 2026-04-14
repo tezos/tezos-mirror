@@ -51,7 +51,7 @@ const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/evm/current_block_header");
 
 const EVM_CURRENT_TEZ_BLOCK_HEADER: RefPath =
-    RefPath::assert_from(b"/evm/world_state/tezlink/current_chain_header");
+    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos/current_chain_header");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
