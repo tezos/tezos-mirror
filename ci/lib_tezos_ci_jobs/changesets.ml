@@ -65,36 +65,6 @@ let changeset_octez =
           "tzt_reference_test_suite/**/*";
         ])
 
-(** Only if documentation has changed *)
-
-let octez_docs_base_folders =
-  ["src"; "tezt"; "brassaia"; "irmin"; "etherlink"; "data-encoding"; "vendors"]
-
-let changeset_octez_docs =
-  Changeset.(
-    changeset_base
-    (* TODO refine scripts *)
-    @ make ["scripts/**/*/"; "script-inputs/**/*/"]
-    @ make
-        (octez_docs_base_folders |> List.map (fun x -> String.cat x "/**/*.ml*"))
-    @ make
-        [
-          "dune";
-          "dune-project";
-          "dune-workspace";
-          "**/*.rst";
-          (* Nota: stays as it is, many non-rst files in this folder *)
-          "docs/**/*";
-          "grafazos/doc/**/*";
-        ])
-
-(* Job [documentation:manuals] requires the build jobs, because it needs
-   to run Octez executables to generate the man pages.
-   So the build jobs need to be included if the documentation changes. *)
-let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
-
-let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
-
 let changeset_debian_packages =
   Changeset.(
     make
@@ -142,22 +112,6 @@ let changeset_homebrew =
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])
-
-(* The linting job runs over the set of [source_directories]
-   defined in [scripts/lint.sh] that must be included here: *)
-let changeset_lint_files =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/**/*";
-          "tezt/**/*";
-          "devtools/**/*";
-          "scripts/**/*";
-          "docs/**/*";
-          "contrib/**/*";
-          "etherlink/**/*";
-        ])
 
 let changeset_test_sdk_bindings =
   Changeset.(
