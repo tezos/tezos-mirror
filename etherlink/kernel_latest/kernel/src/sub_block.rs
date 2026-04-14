@@ -230,7 +230,7 @@ where
     let mut safe_host = SafeStorage {
         host,
         world_states: config
-            .storage_root_paths()
+            .storage_root_paths(input_data.block_number)
             .into_iter()
             .map(OwnedPath::from)
             .collect(),
@@ -350,7 +350,7 @@ where
     let mut safe_host = SafeStorage {
         host,
         world_states: config
-            .storage_root_paths()
+            .storage_root_paths(input_data.block_number)
             .into_iter()
             .map(OwnedPath::from)
             .collect(),

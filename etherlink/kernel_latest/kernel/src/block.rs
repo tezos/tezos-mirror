@@ -438,10 +438,13 @@ where
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
+    let (next_bip_number, timestamp, chain_header) =
+        get_next_bip_info::<Host, ChainConfig>(host);
+
     let mut safe_host = SafeStorage {
         host,
         world_states: chain_config
-            .storage_root_paths()
+            .storage_root_paths(next_bip_number)
             .iter()
             .map(OwnedPath::from)
             .collect(),
@@ -450,8 +453,6 @@ where
 
     let registry = chain_config.init_registry();
 
-    let (next_bip_number, timestamp, chain_header) =
-        get_next_bip_info::<Host, ChainConfig>(safe_host.host);
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
         match read_block_in_progress(&safe_host)? {
@@ -2229,7 +2230,7 @@ mod tests {
         let safe_host = SafeStorage {
             host: &mut host,
             world_states: chain_config
-                .storage_root_paths()
+                .storage_root_paths(U256::zero())
                 .iter()
                 .map(OwnedPath::from)
                 .collect(),
@@ -2331,7 +2332,7 @@ mod tests {
         let safe_host = SafeStorage {
             host: &mut host,
             world_states: chain_config
-                .storage_root_paths()
+                .storage_root_paths(U256::zero())
                 .iter()
                 .map(OwnedPath::from)
                 .collect(),

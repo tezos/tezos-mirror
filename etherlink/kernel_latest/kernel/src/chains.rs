@@ -383,7 +383,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn is_tezos_runtime_enabled(&self, current_level: U256) -> bool;
 
-    fn storage_root_paths(&self) -> Vec<RefPath>;
+    fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath>;
 
     fn constants(
         &self,
@@ -803,8 +803,8 @@ impl ChainConfigTrait for EvmChainConfig {
         start_simulation_mode(host, registry, &self.spec_id)
     }
 
-    fn storage_root_paths(&self) -> Vec<RefPath> {
-        if self.enable_tezos_runtime() {
+    fn storage_root_paths(&self, block_number: U256) -> Vec<RefPath> {
+        if self.is_tezos_runtime_enabled(block_number) {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 TEZLINK_SAFE_STORAGE_ROOT_PATH,
@@ -1434,7 +1434,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(())
     }
 
-    fn storage_root_paths(&self) -> Vec<RefPath> {
+    fn storage_root_paths(&self, _block_number: U256) -> Vec<RefPath> {
         vec![
             TEZLINK_SAFE_STORAGE_ROOT_PATH,
             ETHERLINK_SAFE_STORAGE_ROOT_PATH,
