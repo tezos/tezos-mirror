@@ -564,8 +564,6 @@ module Images : sig
 
   val macosx_15 : Image.t
 
-  val client_libs_dependencies : Image.t
-
   val rust_toolchain : Image.t
 
   val rust_sdk_bindings : Image.t
