@@ -353,7 +353,8 @@ let job_install_bin_debian_bookworm_systemd =
     "oc.install_bin_debian_bookworm_systemd"
     ~__POS__
     ~stage:Test_publication
-    ~description:"Check that Debian packages that use systemd can be installed."
+    ~description:
+      "Check the installation process in a systemd enabled Docker image."
     ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
     ~image:Images_external.docker
     ~variables:
@@ -382,7 +383,7 @@ let job_upgrade_bin_debian_bookworm_systemd =
     "oc.upgrade_bin_debian_bookworm-systemd"
     ~__POS__
     ~stage:Test_publication
-    ~description:"Check that Debian packages that use systemd can be upgraded."
+    ~description:"Check the upgrade process in a systemd enabled Docker image."
     ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
     ~image:Images_external.docker
     ~variables:
