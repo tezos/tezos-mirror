@@ -405,6 +405,7 @@ pub trait ChainConfigTrait: Debug {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
+        block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
         Host: StorageV1;
@@ -674,6 +675,7 @@ impl ChainConfigTrait for EvmChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
+        block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
         Host: StorageV1,
@@ -683,6 +685,7 @@ impl ChainConfigTrait for EvmChainConfig {
             delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
+            block_number,
         )
     }
 
@@ -1181,6 +1184,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
+        block_number: U256,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     where
         Host: StorageV1,
@@ -1195,6 +1199,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 delayed_hashes,
                 delayed_inbox,
                 current_blueprint_size,
+                block_number,
             )?;
         Ok((
             match delayed {

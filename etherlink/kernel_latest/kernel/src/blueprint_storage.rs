@@ -578,6 +578,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host>(
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
+    block_number: U256,
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
 where
     Host: StorageV1,
@@ -590,7 +591,7 @@ where
         match tx {
             Some(tx) => {
                 if let TransactionContent::TezosDelayed(_) = &tx.0.content {
-                    if !experimental_features.is_tezos_runtime_enabled() {
+                    if !experimental_features.is_tezos_runtime_enabled(block_number) {
                         log!(Error,
                             "TezosDelayed transaction found in delayed inbox while Tezos runtime is disabled. Skipping."
                         );
@@ -646,6 +647,7 @@ pub fn fetch_delayed_txs<Host, ChainConfig: ChainConfigTrait>(
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
+    block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
     Host: StorageV1,
@@ -656,6 +658,7 @@ where
             blueprint_with_hashes.delayed_hashes,
             delayed_inbox,
             current_blueprint_size,
+            block_number,
         )? {
             (DelayedTransactionFetchingResult::Ok(delayed_txs), total_size) => {
                 (delayed_txs, total_size)
@@ -700,6 +703,7 @@ fn parse_and_validate_blueprint<Host, ChainConfig: ChainConfigTrait>(
     max_blueprint_lookahead_in_seconds: i64,
     parent_chain_header: &ChainConfig::ChainHeader,
     head_timestamp: Timestamp,
+    block_number: U256,
 ) -> anyhow::Result<(BlueprintValidity, usize)>
 where
     Host: StorageV1,
@@ -759,6 +763,7 @@ where
                 blueprint_with_hashes,
                 delayed_inbox,
                 current_blueprint_size,
+                block_number,
             )
         }
     }
@@ -789,6 +794,7 @@ fn read_all_chunks_and_validate<Host, ChainConfig: ChainConfigTrait>(
     config: &mut Configuration,
     previous_chain_header: &ChainConfig::ChainHeader,
     previous_timestamp: Timestamp,
+    block_number: U256,
 ) -> anyhow::Result<(Option<Blueprint>, usize)>
 where
     Host: StorageV1,
@@ -842,6 +848,7 @@ where
                     *max_blueprint_lookahead_in_seconds,
                     previous_chain_header,
                     previous_timestamp,
+                    block_number,
                 )?;
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
@@ -895,6 +902,7 @@ where
             config,
             previous_chain_header,
             previous_timestamp,
+            number,
         )?;
         Ok((blueprint, size))
     } else {
@@ -1083,6 +1091,7 @@ mod tests {
                 transactions_root: vec![0; 32],
             },
             Timestamp::from(0),
+            U256::zero(),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
@@ -1150,6 +1159,7 @@ mod tests {
                 transactions_root: vec![0; 32],
             },
             Timestamp::from(0),
+            U256::zero(),
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
