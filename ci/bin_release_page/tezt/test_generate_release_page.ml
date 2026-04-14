@@ -45,10 +45,10 @@ let test_generate_release_page =
     Process.run
       ~name:"generate_release_page"
       generate_release_page_sh
-      ["--version-path"; dir]
+      ["--version-path"; dir; "--output-dir"; dir]
   in
-  let index = read_file (project_root // "index.html") in
-  let older = read_file (project_root // "older_releases.html") in
+  let index = read_file (dir // "index.html") in
+  let older = read_file (dir // "older_releases.html") in
   let feed = read_file (project_root // "feed.xml") in
   Check.(
     (index ^ older =~ rex "122\\.0")
