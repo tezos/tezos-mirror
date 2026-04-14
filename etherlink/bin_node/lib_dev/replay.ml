@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 let patch_da_fees evm_state =
-  Durable_storageV2.write
+  Durable_storage.write
     (Raw_path "/evm/world_state/fees/da_fee_per_byte")
     (Bytes.of_string (Int.to_string 0))
     evm_state
@@ -18,7 +18,7 @@ let patch_kernel ~kernel evm_state =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
   let* evm_state =
-    Durable_storageV2.write
+    Durable_storage.write
       (Raw_path "/kernel/boot.wasm")
       (Bytes.of_string kernel)
       evm_state
@@ -28,7 +28,7 @@ let patch_kernel ~kernel evm_state =
 let patch_verbosity ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
   let* evm_state =
-    Durable_storageV2.write
+    Durable_storage.write
       (Raw_path Durable_storage_path.kernel_verbosity)
       (Bytes.of_string (Events.string_from_kernel_log_level kernel_verbosity))
       evm_state

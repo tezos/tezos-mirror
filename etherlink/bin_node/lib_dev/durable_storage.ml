@@ -5,11 +5,260 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Low-level durable storage primitives *)
+
+let inspect_durable evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* value = Pvm.Kernel.find_key_in_durable evm_state key in
+  Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
+
+let modify_durable ?edit_readonly ~key ~value evm_state =
+  Pvm.Kernel.set_durable_value ?edit_readonly evm_state key value
+
+let delete_durable ~kind evm_state path =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
+  let* pvm_state = Pvm.Kernel.decode evm_state in
+  let open Tezos_scoru_wasm.Wasm_pvm_state.Internal_state in
+  let* durable =
+    Tezos_scoru_wasm.Durable.delete ~kind (durable_of pvm_state.storage) key
+  in
+  Pvm.Kernel.encode
+    {pvm_state with storage = update_durable pvm_state.storage durable}
+    evm_state
+
+let exists_durable evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  Tezos_scoru_wasm.Durable.exists durable key
+
+let subkeys_durable evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  Tezos_scoru_wasm.Durable.list durable key
+
+(* Typed path GADT *)
+
+type _ path =
+  | Raw_path : string -> bytes path
+  | Chain_id : L2_types.chain_id path
+  | Michelson_runtime_chain_id : L2_types.chain_id path
+  | Kernel_version : string path
+  | Kernel_root_hash : Ethereum_types.hex path
+  | Multichain_flag : unit path
+  | Sequencer_key : Signature.Public_key.t path
+  | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
+  | Tezosx_feature_flag : Tezosx.runtime -> unit path
+  | Michelson_runtime_sunrise_level : Ethereum_types.quantity path
+  | Current_block_number :
+      _ L2_types.chain_family
+      -> Ethereum_types.quantity path
+
+type 'a resolved = {
+  path : string;
+  decode : bytes -> 'a tzresult;
+  encode : 'a -> string;
+}
+
+type 'a resolution =
+  | Static of 'a resolved
+  | Versioned of (storage_version:int -> 'a resolved)
+
+let resolve : type a. a path -> a resolution =
+  let infallible_decode decode bytes = Ok (decode bytes) in
+  function
+  | Raw_path key ->
+      Static
+        {
+          path = key;
+          decode = infallible_decode Fun.id;
+          encode = Bytes.to_string;
+        }
+  | Chain_id ->
+      Static
+        {
+          path = Durable_storage_path.chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_le;
+          encode = L2_types.Chain_id.encode_le;
+        }
+  | Michelson_runtime_chain_id ->
+      Static
+        {
+          path = Durable_storage_path.michelson_runtime_chain_id;
+          decode = infallible_decode L2_types.Chain_id.decode_be;
+          encode = L2_types.Chain_id.encode_be;
+        }
+  | Kernel_version ->
+      Static
+        {
+          path = Durable_storage_path.kernel_version;
+          decode = infallible_decode Bytes.to_string;
+          encode = Fun.id;
+        }
+  | Kernel_root_hash ->
+      Static
+        {
+          path = Durable_storage_path.kernel_root_hash;
+          decode =
+            (fun bytes ->
+              let (`Hex s) = Hex.of_bytes bytes in
+              Ok (Ethereum_types.Hex s));
+          encode = Ethereum_types.hex_to_string;
+        }
+  | Multichain_flag ->
+      Static
+        {
+          path = Durable_storage_path.Feature_flags.multichain;
+          decode = (fun _bytes -> Ok ());
+          encode = (fun () -> "");
+        }
+  | Sequencer_key ->
+      Versioned
+        (fun ~storage_version ->
+          {
+            path = Durable_storage_path.sequencer_key ~storage_version;
+            decode =
+              (fun bytes ->
+                Signature.Public_key.of_b58check (Bytes.to_string bytes));
+            encode = (fun pk -> Signature.Public_key.to_b58check pk);
+          })
+  | Chain_config_family cid ->
+      Static
+        {
+          path = Durable_storage_path.Chain_configuration.chain_family cid;
+          decode = L2_types.Chain_family.of_bytes;
+          encode =
+            (fun (L2_types.Ex_chain_family cf) ->
+              L2_types.Chain_family.to_string cf);
+        }
+  | Tezosx_feature_flag runtime ->
+      Static
+        {
+          path = Tezosx.feature_flag runtime;
+          decode = (fun _bytes -> Ok ());
+          encode = (fun () -> "");
+        }
+  | Michelson_runtime_sunrise_level ->
+      Static
+        {
+          path = Durable_storage_path.michelson_runtime_sunrise_level;
+          decode =
+            infallible_decode (fun bytes ->
+                Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
+          encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
+        }
+  | Current_block_number chain_family ->
+      let root = Durable_storage_path.root_of_chain_family chain_family in
+      Static
+        {
+          path = Durable_storage_path.Block.current_number ~root;
+          decode =
+            infallible_decode (fun bytes ->
+                Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
+          encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
+        }
+
+let storage_version state =
+  let open Lwt_result_syntax in
+  let decode bytes = Helpers.decode_z_le bytes |> Z.to_int in
+  let*! bytes =
+    inspect_durable state Durable_storage_path.storage_version_base
+  in
+  match bytes with
+  | Some bytes -> return (decode bytes)
+  | None -> (
+      let*! bytes =
+        inspect_durable state Durable_storage_path.storage_version_legacy
+      in
+      match bytes with Some bytes -> return (decode bytes) | None -> return 0)
+
+let resolve_with_state (type a) (p : a path) (state : Pvm.State.t) :
+    a resolved tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  match resolve p with
+  | Static r -> return r
+  | Versioned f ->
+      let* sv = storage_version state in
+      return (f ~storage_version:sv)
+
+let read (type a) (p : a path) (state : Pvm.State.t) : a tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! bytes_opt = inspect_durable state r.path in
+  match bytes_opt with
+  | Some bytes ->
+      let*? v = r.decode bytes in
+      return v
+  | None -> failwith "No value found under %s" r.path
+
+let read_opt (type a) (p : a path) (state : Pvm.State.t) :
+    a option tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! bytes_opt = inspect_durable state r.path in
+  match bytes_opt with
+  | Some bytes ->
+      let*? v = r.decode bytes in
+      return_some v
+  | None -> return_none
+
+let write (type a) (p : a path) (value : a) (state : Pvm.State.t) :
+    Pvm.State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let encoded = r.encode value in
+  let*! state = modify_durable ~key:r.path ~value:encoded state in
+  return state
+
+let delete (type a) (p : a path) (state : Pvm.State.t) :
+    Pvm.State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! state =
+    delete_durable ~kind:Tezos_scoru_wasm.Durable.Value state r.path
+  in
+  return state
+
+let delete_dir (type a) (p : a path) (state : Pvm.State.t) :
+    Pvm.State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! state =
+    delete_durable ~kind:Tezos_scoru_wasm.Durable.Directory state r.path
+  in
+  return state
+
+let exists (type a) (p : a path) (state : Pvm.State.t) : bool tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! b = exists_durable state r.path in
+  return b
+
+let subkeys (type a) (p : a path) (state : Pvm.State.t) :
+    string trace tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_with_state p state in
+  let*! keys = subkeys_durable state r.path in
+  return keys
+
+let list_runtimes state =
+  let open Lwt_result_syntax in
+  let check_runtime r =
+    let* enabled = read_opt (Tezosx_feature_flag r) state in
+    if Option.is_some enabled then return @@ Some r else return None
+  in
+  List.filter_map_ep check_runtime Tezosx.known_runtimes
+
 exception Invalid_block_structure of string
 
 let inspect_durable_and_decode_opt state path decode =
   let open Lwt_result_syntax in
-  let* bytes = Durable_storageV2.read_opt (Raw_path path) state in
+  let* bytes = read_opt (Raw_path path) state in
   match bytes with
   | Some bytes -> return_some (decode bytes)
   | None -> return_none

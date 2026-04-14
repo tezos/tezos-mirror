@@ -120,7 +120,7 @@ let loop_sequencer multichain ?sandbox_config ~rpc_timeout
             in
             let*! head = Evm_context.head_info () in
             let* storage_version =
-              Durable_storageV2.storage_version head.evm_state
+              Durable_storage.storage_version head.evm_state
             in
             let sub_block_latency_disabled =
               Storage_version.sub_block_latency_entrypoints_disabled

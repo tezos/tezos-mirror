@@ -49,3 +49,48 @@ val exists : 'a path -> Pvm.State.t -> bool tzresult Lwt.t
 val subkeys : 'a path -> Pvm.State.t -> string trace tzresult Lwt.t
 
 val list_runtimes : Pvm.State.t -> Tezosx.runtime list tzresult Lwt.t
+
+(** {2 Deprecated untyped API}
+
+    The functions below operate on raw durable storage paths (strings) with
+    manual decoders. They will be removed once all callers have migrated to the
+    typed GADT API above ({!read}, {!read_opt}, {!write}, ...).
+
+    @deprecated Use the typed path API instead. *)
+
+(** @deprecated Use the typed path API instead. *)
+exception Invalid_block_structure of string
+
+(** @deprecated Use {!read_opt} instead. *)
+val inspect_durable_and_decode_opt :
+  Pvm.Context.tree ->
+  string ->
+  (bytes -> 'a) ->
+  ('a option, tztrace) result Lwt.t
+
+(** @deprecated Use {!read_opt} with [Option.value] instead. *)
+val inspect_durable_and_decode_default :
+  default:'a ->
+  Pvm.Context.tree ->
+  string ->
+  (bytes -> 'a) ->
+  ('a, tztrace) result Lwt.t
+
+(** @deprecated Use {!read} instead. *)
+val inspect_durable_and_decode :
+  Pvm.Context.tree -> string -> (bytes -> 'a) -> ('a, tztrace) result Lwt.t
+
+(** @deprecated Use the typed path API instead. *)
+val l2_minimum_base_fee_per_gas :
+  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
+
+(** @deprecated Use the typed path API instead. *)
+val l2_da_fee_per_byte :
+  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
+
+(** @deprecated Use the typed path API instead. *)
+val l2_maximum_gas_per_transaction :
+  Pvm.Context.tree -> L2_types.chain_id -> Z.t tzresult Lwt.t
+
+(** @deprecated Use the typed path API instead. *)
+val world_state : Pvm.Context.tree -> L2_types.chain_id -> string tzresult Lwt.t

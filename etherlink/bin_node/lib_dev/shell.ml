@@ -60,12 +60,12 @@ let run ~(config : Configuration.t) block_param k =
 let inspect state path =
   Lwt.map
     (function Ok v -> v | Error _ -> None)
-    (Durable_storageV2.read_opt (Raw_path path) state)
+    (Durable_storage.read_opt (Raw_path path) state)
 
 let subkeys state path =
   Lwt.map
     (function Ok v -> v | Error _ -> [])
-    (Durable_storageV2.subkeys (Raw_path path) state)
+    (Durable_storage.subkeys (Raw_path path) state)
 
 let ls = Commands.ls ~subkeys ~inspect
 

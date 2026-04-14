@@ -77,14 +77,14 @@ module Etherlink = struct
   *)
   let simulation_version simulation_state =
     let open Lwt_result_syntax in
-    let* storage_version = Durable_storageV2.storage_version simulation_state in
+    let* storage_version = Durable_storage.storage_version simulation_state in
     if Storage_version.simulation_v0 ~storage_version then return `V0
     else if Storage_version.simulation_v2 ~storage_version then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
       let* kernel_version =
-        Durable_storageV2.read Kernel_version simulation_state
+        Durable_storage.read Kernel_version simulation_state
       in
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
@@ -102,7 +102,7 @@ module Etherlink = struct
     let* simulation_state =
       if overwrite_tick_limit then
         let* state =
-          Durable_storageV2.write
+          Durable_storage.write
             (Raw_path "/evm/maximum_allowed_ticks")
             (Bytes.of_string
                Data_encoding.(

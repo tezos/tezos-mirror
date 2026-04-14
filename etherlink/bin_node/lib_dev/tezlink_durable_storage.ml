@@ -78,7 +78,7 @@ let balance state ~data_model (c : Contract.t) =
             ^ Path.to_path Tezos_types.Contract.encoding c
             ^ "balance"
           in
-          let* bytes_opt = Durable_storageV2.read_opt (Raw_path path) state in
+          let* bytes_opt = Durable_storage.read_opt (Raw_path path) state in
           match bytes_opt with
           | Some bytes -> (
               match
@@ -93,7 +93,7 @@ let balance state ~data_model (c : Contract.t) =
           | None -> return Tez.zero)
       | Implicit pkh -> (
           let* bytes_opt =
-            Durable_storageV2.read_opt
+            Durable_storage.read_opt
               (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
               state
           in
@@ -122,7 +122,7 @@ let manager state ~data_model (c : Contract.t) =
       | Originated _ -> return_none
       | Implicit pkh -> (
           let* bytes_opt =
-            Durable_storageV2.read_opt
+            Durable_storage.read_opt
               (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
               state
           in
@@ -148,7 +148,7 @@ let counter state ~data_model (c : Contract.t) =
       | Originated _ -> return_none
       | Implicit pkh -> (
           let* bytes_opt =
-            Durable_storageV2.read_opt
+            Durable_storage.read_opt
               (Raw_path (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh))
               state
           in

@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 open Ethereum_types
-open Durable_storageV2
 
 type t = Pvm.State.t
 
@@ -166,7 +165,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
   return evm_state
 
 let flag_local_exec evm_state ~storage_version =
-  Durable_storageV2.write
+  Durable_storage.write
     (Raw_path Durable_storage_path.(evm_node_flag ~storage_version))
     Bytes.empty
     evm_state
@@ -199,7 +198,7 @@ let init ~kernel =
 let current_block_height ~chain_family evm_state =
   let open Lwt_result_syntax in
   let* current_block_number =
-    Durable_storageV2.read_opt (Current_block_number chain_family) evm_state
+    Durable_storage.read_opt (Current_block_number chain_family) evm_state
   in
   match current_block_number with
   | None ->
@@ -214,7 +213,7 @@ let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
   let* current_hash =
-    Durable_storageV2.read_opt
+    Durable_storage.read_opt
       (Raw_path (Durable_storage_path.Block.current_hash ~root))
       evm_state
   in
@@ -258,7 +257,7 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
   in
   let* values =
     List.map_es
-      (fun key -> Durable_storageV2.read_opt (Raw_path key) evm_state)
+      (fun key -> Durable_storage.read_opt (Raw_path key) evm_state)
       keys
   in
   return values
@@ -279,7 +278,7 @@ let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
        RLP-encoded for 0. *)
     Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value] |> Rlp.encode
   in
-  let* evm_state = Durable_storageV2.write (Raw_path key) value evm_state in
+  let* evm_state = Durable_storage.write (Raw_path key) value evm_state in
   return evm_state
 
 let store_blueprint_chunks ~blueprint_number evm_state
@@ -289,12 +288,12 @@ let store_blueprint_chunks ~blueprint_number evm_state
   let nb_chunks = List.length chunks in
   let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
   let* evm_state =
-    Durable_storageV2.write
+    Durable_storage.write
       (Raw_path (Durable_storage_path.Blueprint.nb_chunks ~blueprint_number))
       (Bytes.of_string (Z.to_bits (Z.of_int nb_chunks)))
       evm_state
   in
-  let* version = Durable_storageV2.storage_version evm_state in
+  let* version = Durable_storage.storage_version evm_state in
   if version >= 39 then
     let* current_generation =
       Durable_storage.inspect_durable_and_decode_default
@@ -304,7 +303,7 @@ let store_blueprint_chunks ~blueprint_number evm_state
         Ethereum_types.decode_number_le
     in
     let* evm_state =
-      Durable_storageV2.write
+      Durable_storage.write
         (Raw_path (Durable_storage_path.Blueprint.generation ~blueprint_number))
         (encode_u256_le current_generation)
         evm_state
@@ -364,7 +363,7 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
       ]
   in
   let* evm_state =
-    Durable_storageV2.write
+    Durable_storage.write
       (Raw_path (Durable_storage_path.Single_tx.input_tx ~storage_version))
       (Rlp.encode rlp)
       evm_state
@@ -381,7 +380,7 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
   in
   if read_receipt then
     let* read_res =
-      Durable_storageV2.read_opt
+      Durable_storage.read_opt
         (Raw_path
            (Durable_storage_path.Block.current_receipts
               ~root:Durable_storage_path.etherlink_safe_root))
@@ -405,7 +404,7 @@ let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
     evm_state ~input_path ~input ~output_path ~entrypoint =
   let open Lwt_result_syntax in
   let* evm_state =
-    Durable_storageV2.write (Raw_path input_path) input evm_state
+    Durable_storage.write (Raw_path input_path) input evm_state
   in
   let output_path_parts =
     String.split_on_char '/' output_path |> List.filter (fun s -> s <> "")
@@ -435,10 +434,10 @@ let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config
 
 let retrieve_block_at_root ~chain_family ~root evm_state =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storageV2.storage_version evm_state in
+  let* storage_version = Durable_storage.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* bytes =
-      Durable_storageV2.read_opt
+      Durable_storage.read_opt
         (Raw_path (Durable_storage_path.Block.current_block ~root))
         evm_state
     in
@@ -446,7 +445,7 @@ let retrieve_block_at_root ~chain_family ~root evm_state =
   else
     let* current_block_hash = current_block_hash ~chain_family evm_state in
     let* bytes =
-      Durable_storageV2.read_opt
+      Durable_storage.read_opt
         (Raw_path (Durable_storage_path.Block.by_hash ~root current_block_hash))
         evm_state
     in
@@ -505,7 +504,7 @@ let assemble_block (type f) ~storage_version ~pool ~data_dir
       ]
   in
   let* evm_state =
-    Durable_storageV2.write
+    Durable_storage.write
       (Raw_path (Durable_storage_path.Assemble_block.input ~storage_version))
       (Rlp.encode rlp)
       evm_state
@@ -583,7 +582,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =
-  Durable_storageV2.delete_dir
+  Durable_storage.delete_dir
     (Raw_path Durable_storage_path.delayed_inbox)
     evm_state
 
@@ -597,7 +596,7 @@ let preload_kernel ~pool evm_state =
     Wasm_runtime.preload_kernel ~pool (Pvm.Wasm_internal.to_irmin_exn evm_state)
   in
   if loaded then
-    let* version_result = Durable_storageV2.read Kernel_version evm_state in
+    let* version_result = Durable_storage.read Kernel_version evm_state in
     let version =
       match version_result with Ok v -> v | Error _ -> "(unknown)"
     in
@@ -607,7 +606,7 @@ let preload_kernel ~pool evm_state =
 let get_delayed_inbox_item evm_state hash =
   let open Lwt_result_syntax in
   let* bytes =
-    Durable_storageV2.read_opt
+    Durable_storage.read_opt
       (Raw_path (Durable_storage_path.Delayed_transaction.transaction hash))
       evm_state
   in
@@ -630,13 +629,13 @@ let get_delayed_inbox_item evm_state hash =
   | _ -> failwith "invalid delayed inbox item"
 
 let clear_events evm_state =
-  Durable_storageV2.delete_dir
+  Durable_storage.delete_dir
     (Raw_path Durable_storage_path.Evm_events.events)
     evm_state
 
 let clear_block_storage chain_family block evm_state =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storageV2.storage_version evm_state in
+  let* storage_version = Durable_storage.storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     return evm_state
   else
@@ -658,7 +657,7 @@ let clear_block_storage chain_family block evm_state =
         let pred_block_path =
           Durable_storage_path.Block.by_hash ~root block_parent
         in
-        Durable_storageV2.delete (Raw_path pred_block_path) evm_state
+        Durable_storage.delete (Raw_path pred_block_path) evm_state
       else return evm_state
     in
     (* Handles case (2.). *)
@@ -674,18 +673,18 @@ let clear_block_storage chain_family block evm_state =
             ~root
             (Nth (Z.sub number to_keep))
         in
-        Durable_storageV2.delete (Raw_path index_path) evm_state
+        Durable_storage.delete (Raw_path index_path) evm_state
       else return evm_state
     in
     (* Receipts are not necessary for the kernel, we can just remove
      the directories. *)
     let* evm_state =
-      Durable_storageV2.delete_dir
+      Durable_storage.delete_dir
         (Raw_path Durable_storage_path.Transaction_receipt.receipts)
         evm_state
     in
     let* evm_state =
-      Durable_storageV2.delete_dir
+      Durable_storage.delete_dir
         (Raw_path Durable_storage_path.Transaction_object.objects)
         evm_state
     in
@@ -694,7 +693,7 @@ let clear_block_storage chain_family block evm_state =
 let delayed_inbox_hashes evm_state =
   let open Lwt_result_syntax in
   let* keys =
-    Durable_storageV2.subkeys
+    Durable_storage.subkeys
       (Raw_path Durable_storage_path.Delayed_transaction.hashes)
       evm_state
   in

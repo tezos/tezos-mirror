@@ -25,7 +25,7 @@ let get_evm_state ctxt hash =
   let*! res = Pvm.State.get context in
   return res
 
-let read state path = Durable_storageV2.read_opt (Raw_path path) state
+let read state path = Durable_storage.read_opt (Raw_path path) state
 
 let with_latest_state ctxt f =
   let open Lwt_result_syntax in
@@ -35,15 +35,15 @@ let with_latest_state ctxt f =
 
 let read_chain_family ctxt chain_id =
   with_latest_state ctxt (fun state ->
-      Durable_storageV2.read (Chain_config_family chain_id) state)
+      Durable_storage.read (Chain_config_family chain_id) state)
 
 let read_enable_multichain_flag ctxt =
-  with_latest_state ctxt (Durable_storageV2.exists Multichain_flag)
+  with_latest_state ctxt (Durable_storage.exists Multichain_flag)
 
-let chain_id ctxt = with_latest_state ctxt (Durable_storageV2.read Chain_id)
+let chain_id ctxt = with_latest_state ctxt (Durable_storage.read Chain_id)
 
 let michelson_runtime_chain_id ctxt =
-  with_latest_state ctxt (Durable_storageV2.read Michelson_runtime_chain_id)
+  with_latest_state ctxt (Durable_storage.read Michelson_runtime_chain_id)
 
 let michelson_activation_level ctxt =
   let open Lwt_result_syntax in
@@ -57,18 +57,18 @@ let michelson_activation_level ctxt =
 let current_block_number_durable ctxt ~chain_family =
   with_latest_state
     ctxt
-    (Durable_storageV2.read (Current_block_number chain_family))
+    (Durable_storage.read (Current_block_number chain_family))
 
 let storage_version ctxt =
-  with_latest_state ctxt Durable_storageV2.storage_version
+  with_latest_state ctxt Durable_storage.storage_version
 
 let kernel_version ctxt =
-  with_latest_state ctxt (Durable_storageV2.read Kernel_version)
+  with_latest_state ctxt (Durable_storage.read Kernel_version)
 
 let kernel_root_hash ctxt =
-  with_latest_state ctxt (Durable_storageV2.read_opt Kernel_root_hash)
+  with_latest_state ctxt (Durable_storage.read_opt Kernel_root_hash)
 
-let list_runtimes ctxt = with_latest_state ctxt Durable_storageV2.list_runtimes
+let list_runtimes ctxt = with_latest_state ctxt Durable_storage.list_runtimes
 
 let list_l1_l2_levels ctxt ~from_l1_level =
   let open Lwt_result_syntax in
@@ -218,7 +218,7 @@ let network_sanity_check ~network ctxt =
 
   let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
   let* evm_state = get_evm_state ctxt hash in
-  let*! chain_id = Durable_storageV2.read Chain_id evm_state in
+  let*! chain_id = Durable_storage.read Chain_id evm_state in
 
   let* () =
     match chain_id with
@@ -373,7 +373,7 @@ let get_state ctxt
 
 let read_state = read
 
-let subkeys state path = Durable_storageV2.subkeys (Raw_path path) state
+let subkeys state path = Durable_storage.subkeys (Raw_path path) state
 
 let entrypoint_config ctxt =
   Pvm.Kernel.config
@@ -405,7 +405,7 @@ let execute_entrypoint_with_insights ctxt state ~input_path ~input
     ~insight_requests ~entrypoint =
   let open Lwt_result_syntax in
   let config = entrypoint_config ctxt in
-  let* state = Durable_storageV2.write (Raw_path input_path) input state in
+  let* state = Durable_storage.write (Raw_path input_path) input state in
   let execution_input =
     Simulation.Encodings.
       {

@@ -358,7 +358,7 @@ module State = struct
   let modify_in_place ctxt ~key ~value =
     let open Lwt_result_syntax in
     let* evm_state =
-      Durable_storageV2.write
+      Durable_storage.write
         (Raw_path key)
         (Bytes.of_string value)
         ctxt.session.evm_state
@@ -370,8 +370,8 @@ module State = struct
     let open Lwt_result_syntax in
     let delete_f =
       match kind with
-      | Tezos_scoru_wasm.Durable.Directory -> Durable_storageV2.delete_dir
-      | Value -> Durable_storageV2.delete
+      | Tezos_scoru_wasm.Durable.Directory -> Durable_storage.delete_dir
+      | Value -> Durable_storage.delete
     in
     let* evm_state = delete_f (Raw_path key) ctxt.session.evm_state in
     ctxt.session.evm_state <- evm_state ;
@@ -612,8 +612,8 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Durable_storageV2.storage_version evm_state in
-    let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () = Tx_queue.clear () in
     (* Clear the store. *)
@@ -746,7 +746,7 @@ module State = struct
         Evm_store.{kernel_upgrade = Evm_events.Upgrade.{hash = root_hash; _}; _}
       ->
         let* new_hash_candidate =
-          Durable_storageV2.read_opt Kernel_root_hash evm_state
+          Durable_storage.read_opt Kernel_root_hash evm_state
         in
 
         let*! () =
@@ -769,7 +769,7 @@ module State = struct
       Evm_events.Sequencer_upgrade.{sequencer = new_sequencer; _} =
     let open Lwt_result_syntax in
     let* current_sequencer =
-      Durable_storageV2.read Sequencer_key ctxt.session.evm_state
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
     if new_sequencer = current_sequencer then
       let*! () =
@@ -805,7 +805,7 @@ module State = struct
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        let* storage_version = Durable_storageV2.storage_version evm_state in
+        let* storage_version = Durable_storage.storage_version evm_state in
         if not (Storage_version.legacy_storage_compatible ~storage_version) then
           let* receipts =
             Etherlink_durable_storage.current_transactions_receipts
@@ -1221,11 +1221,11 @@ module State = struct
        blocks). *)
     let* tezosx_tez_block =
       let* tezos_enabled =
-        Durable_storageV2.exists (Tezosx_feature_flag Tezos) evm_state
+        Durable_storage.exists (Tezosx_feature_flag Tezos) evm_state
       in
       if tezos_enabled then
         let* sunrise_level =
-          Durable_storageV2.read_opt Michelson_runtime_sunrise_level evm_state
+          Durable_storage.read_opt Michelson_runtime_sunrise_level evm_state
         in
         let past_sunrise =
           match sunrise_level with
@@ -1493,8 +1493,8 @@ module State = struct
       ctxt.session.pending_sequencer_upgrade <- None ;
     let* () =
       if kernel_change then (
-        let* storage_version = Durable_storageV2.storage_version evm_state in
-        let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
+        let* storage_version = Durable_storage.storage_version evm_state in
+        let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
         ctxt.session.kernel_change <- No ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
@@ -1565,7 +1565,7 @@ module State = struct
     in
 
     let* sequencer =
-      Durable_storageV2.read Sequencer_key ctxt.session.evm_state
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
     let*? signer = Signer.get_signer signer sequencer in
     return (chunks, sign ~signer chunks)
@@ -2055,7 +2055,7 @@ module State = struct
     | Some pk ->
         let*! () = Events.patched_sequencer_key pk in
         let* evm_state =
-          Durable_storageV2.write
+          Durable_storage.write
             (Raw_path sequencer_key_path)
             (Bytes.of_string (Signature.Public_key.to_b58check pk))
             evm_state
@@ -2069,7 +2069,7 @@ module State = struct
   let load_existing_state ~sequencer_key_source ~next_blueprint_number context =
     let open Lwt_result_syntax in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Durable_storageV2.storage_version evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
     let sequencer_key_path =
       Durable_storage_path.sequencer_key ~storage_version
     in
@@ -2138,7 +2138,7 @@ module State = struct
         evm_state
         (`Inbox [])
     in
-    let* storage_version = Durable_storageV2.storage_version evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
     let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
     (* Now that the storage version is known, remove whichever
        key path is not canonical for this version, so no stale
@@ -2150,11 +2150,11 @@ module State = struct
              Durable_storage_path.sequencer_key_world_state
              (Durable_storage_path.sequencer_key ~storage_version)
       then
-        Durable_storageV2.delete
+        Durable_storage.delete
           (Raw_path Durable_storage_path.sequencer_key_legacy)
           evm_state
       else if sequencer_key_patched then
-        Durable_storageV2.delete
+        Durable_storage.delete
           (Raw_path Durable_storage_path.sequencer_key_world_state)
           evm_state
       else return evm_state
@@ -2275,7 +2275,7 @@ module State = struct
              initial kernel"
     in
 
-    let* tezosx_runtimes = Durable_storageV2.list_runtimes evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
 
     let* last_split_block =
       match history_mode with
@@ -2394,7 +2394,7 @@ module State = struct
     in
     if key = "/kernel/boot.wasm" then ctxt.session.kernel_change <- Force_change ;
     let* previous_value =
-      Durable_storageV2.read_opt (Raw_path key) ctxt.session.evm_state
+      Durable_storage.read_opt (Raw_path key) ctxt.session.evm_state
     in
     let new_value = patch (Option.map Bytes.to_string previous_value) in
     let* () =
@@ -2430,7 +2430,7 @@ module State = struct
     let* () =
       if commit then (
         let* tezosx_runtimes =
-          Durable_storageV2.list_runtimes ctxt.session.evm_state
+          Durable_storage.list_runtimes ctxt.session.evm_state
         in
         ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
         return_unit)
@@ -2455,7 +2455,7 @@ module State = struct
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* sequencer =
-          Durable_storageV2.read Sequencer_key ctxt.session.evm_state
+          Durable_storage.read Sequencer_key ctxt.session.evm_state
         in
         let*? chunks =
           Sequencer_blueprint.chunks_of_external_messages
@@ -2525,7 +2525,7 @@ module State = struct
          if we agree with it.
       *)
       let* sequencer =
-        Durable_storageV2.read Sequencer_key ctxt.session.evm_state
+        Durable_storage.read Sequencer_key ctxt.session.evm_state
       in
       let*? blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
@@ -2980,7 +2980,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storageV2.storage_version evm_state in
+  let* storage_version = Durable_storage.storage_version evm_state in
   (* Tell the kernel that it is executed by an EVM node *)
   let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
   (* We remove the delayed inbox from the EVM state. Its contents will be
@@ -2993,7 +2993,7 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
 
   (* Assert we can read the current blueprint number *)
   let* (Qty current_blueprint_number) =
-    Durable_storageV2.read (Current_block_number chain_family) evm_state
+    Durable_storage.read (Current_block_number chain_family) evm_state
   in
 
   (* Read the current block *)
@@ -3019,7 +3019,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let open Lwt_result_syntax in
   let* kernel_upgrade =
     let* kernel_upgrade_payload =
-      Durable_storageV2.read_opt
+      Durable_storage.read_opt
         (Raw_path Durable_storage_path.kernel_upgrade)
         evm_state
     in
@@ -3029,9 +3029,9 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   in
 
   let* sequencer_upgrade =
-    let* storage_version = Durable_storageV2.storage_version evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
     let* sequencer_upgrade_payload =
-      Durable_storageV2.read_opt
+      Durable_storage.read_opt
         (Raw_path (Durable_storage_path.sequencer_upgrade ~storage_version))
         evm_state
     in
@@ -3124,7 +3124,7 @@ let apply_blueprint ?events ?expected_block_hash timestamp payload
     | Some {sequencer; timestamp = upgrade_timestamp; _}
       when Time.Protocol.(timestamp >= upgrade_timestamp) ->
         return sequencer
-    | _ -> Durable_storageV2.read Sequencer_key head.evm_state
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? chunks = Sequencer_blueprint.chunks_of_external_messages payload in
   let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
@@ -3149,7 +3149,7 @@ let apply_chunks ~signer timestamp chunks delayed_transactions =
         (* If we are this is the first block after the sequencer upgrade, the sequencer key in the state will still be the previous one. before applying the chunks, the sequencer key will change for the new one.
 In order to still be able to sign the chunks, we need to use the next sequencer key instead of the one in the state. *)
         return sequencer
-    | _ -> Durable_storageV2.read Sequencer_key head.evm_state
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? signer = Signer.get_signer signer expected_sequencer in
   let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in

@@ -1662,7 +1662,7 @@ let dispatch_request (type f) ~websocket
                   block_param
               in
               let* state = Evm_ro_context.get_state ro_ctxt ~block () in
-              let* pk = Durable_storageV2.read Sequencer_key state in
+              let* pk = Durable_storage.read Sequencer_key state in
               rpc_ok pk
             in
             build ~f module_ parameters

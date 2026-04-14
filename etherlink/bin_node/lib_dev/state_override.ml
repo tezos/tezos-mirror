@@ -37,7 +37,7 @@ let update_storage address state_diff state =
     if String.length value = 64 then
       let*? key = Durable_storage_path.Accounts.storage_e address key in
       let* state =
-        Durable_storageV2.write
+        Durable_storage.write
           (Raw_path key)
           (Bytes.of_string (hex_to_bytes (Hex value)))
           state
@@ -53,7 +53,7 @@ let replace_storage address state_override state =
   | None -> return state
   | Some state_override ->
       let*? key = Durable_storage_path.Accounts.storage_dir_e address in
-      let* state = Durable_storageV2.delete_dir (Raw_path key) state in
+      let* state = Durable_storage.delete_dir (Raw_path key) state in
       update_storage address state_override state
 
 let is_invalid state_override =
@@ -68,7 +68,7 @@ let update_account address state_override evm_state =
   if is_invalid state_override then tzfail State_and_state_diff
   else
     let* info =
-      Durable_storageV2.read_opt (Raw_path (Accounts.info address)) evm_state
+      Durable_storage.read_opt (Raw_path (Accounts.info address)) evm_state
     in
     let* evm_state =
       match info with
@@ -78,7 +78,7 @@ let update_account address state_override evm_state =
             | None -> return state
             | Some v ->
                 let* state =
-                  Durable_storageV2.write
+                  Durable_storage.write
                     (Raw_path key)
                     (Bytes.of_string (encode v))
                     state
@@ -138,7 +138,7 @@ let update_account address state_override evm_state =
               }
           in
           let* evm_state =
-            Durable_storageV2.write
+            Durable_storage.write
               (Raw_path (Accounts.info address))
               (Etherlink_durable_storage.AccountInfo.encode new_info)
               evm_state
@@ -147,7 +147,7 @@ let update_account address state_override evm_state =
           | None -> return evm_state
           | Some code ->
               let* evm_state =
-                Durable_storageV2.write
+                Durable_storage.write
                   (Raw_path (Code.code new_info.code_hash))
                   (Bytes.of_string (Ethereum_types.hex_to_bytes code))
                   evm_state
