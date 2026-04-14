@@ -46,11 +46,39 @@ COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup efunc-core tezos/efunc-core
 COPY --chown=tezos:nogroup teztale tezos/teztale
 COPY --chown=tezos:nogroup contrib tezos/contrib
+# sccache configuration for Rust compilation caching (via GCS backend).
+# When SCCACHE_GCS_BUCKET is non-empty, RUSTC_WRAPPER=sccache is activated.
+# Authentication uses GCP Application Default Credentials (ADC) via the
+# instance metadata service, which requires --network=host on the RUN step.
+# All other ARGs have sensible defaults and are effectively constants.
+# Note: Docker ARGs are automatically available as environment variables
+# during RUN instructions, so sccache picks them up without explicit ENV.
+ARG SCCACHE_GCS_BUCKET=""
+ARG SCCACHE_GCS_RW_MODE="READ_WRITE"
+ARG SCCACHE_GCS_KEY_PREFIX="sccache"
+ARG SCCACHE_IDLE_TIMEOUT="0"
+ARG SCCACHE_IGNORE_SERVER_IO_ERROR="1"
+ARG CARGO_INCREMENTAL="0"
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
-
 ENV GIT_VERSION=${GIT_VERSION}
-RUN opam exec -- make -C tezos release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin
+# hadolint ignore=DL3059
+RUN --network=host \
+    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
+      if sccache --start-server 2>&1; then \
+        export RUSTC_WRAPPER=sccache; \
+        echo "### sccache enabled (bucket: ${SCCACHE_GCS_BUCKET})"; \
+      else \
+        echo "### sccache server failed to start, compiling without cache"; \
+      fi; \
+    else \
+      echo "### sccache disabled (no bucket configured)"; \
+    fi && \
+    opam exec -- make -C tezos release OCTEZ_EXECUTABLES="${OCTEZ_EXECUTABLES}" OCTEZ_BIN_DIR=bin && \
+    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
+      echo "### sccache stats:"; \
+      sccache --show-stats || true; \
+    fi
 # Gather the parameters of all active protocols in 1 place
 RUN while read -r protocol; do \
     mkdir -p tezos/parameters/"$protocol"-parameters && \
@@ -58,6 +86,13 @@ RUN while read -r protocol; do \
     done < tezos/script-inputs/active_protocol_versions
 
 FROM ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} AS layer2-builder
+# Re-declare sccache ARGs for this stage (ARGs are stage-scoped after FROM).
+ARG SCCACHE_GCS_BUCKET=""
+ARG SCCACHE_GCS_RW_MODE="READ_WRITE"
+ARG SCCACHE_GCS_KEY_PREFIX="sccache"
+ARG SCCACHE_IDLE_TIMEOUT="0"
+ARG SCCACHE_IGNORE_SERVER_IO_ERROR="1"
+ARG CARGO_INCREMENTAL="0"
 WORKDIR /home/tezos/
 RUN mkdir -p /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup kernels.mk etherlink.mk evm_kernel/
@@ -66,9 +101,25 @@ COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 COPY --chown=tezos:nogroup contrib evm_kernel/contrib
 COPY --chown=tezos:nogroup vendors evm_kernel/vendors
-RUN make -C evm_kernel -f etherlink.mk build-deps \
-  && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
-  && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes evm_benchmark_kernel.wasm
+# hadolint ignore=DL3059
+RUN --network=host \
+    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
+      if sccache --start-server 2>&1; then \
+        export RUSTC_WRAPPER=sccache; \
+        echo "### sccache enabled for layer2 (bucket: ${SCCACHE_GCS_BUCKET})"; \
+      else \
+        echo "### sccache server failed to start, compiling without cache"; \
+      fi; \
+    else \
+      echo "### sccache disabled for layer2 (no bucket configured)"; \
+    fi && \
+    make -C evm_kernel -f etherlink.mk build-deps \
+    && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
+    && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes evm_benchmark_kernel.wasm && \
+    if [ -n "${SCCACHE_GCS_BUCKET}" ]; then \
+      echo "### sccache stats (layer2):"; \
+      sccache --show-stats || true; \
+    fi
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
