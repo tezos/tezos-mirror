@@ -30,12 +30,18 @@
     that they are publishing. They can also depend on test jobs to prevent
     publishing broken artifacts, and on other publish jobs if order matters.
 
+    The purpose of [Test_publication] jobs is to check the result of [Publish] jobs,
+    usually the fact that the artefacts have been published correctly.
+    In theory this should rather be done in [Publish] jobs themselves,
+    so that they can un-publish the artifacts, but some legacy jobs separate the
+    publication from the test. New jobs should avoid using [Test_publication].
+
     There is no need to include [Build] jobs explicitly in pipelines.
     One should only list [Test] and [Publish] jobs and let Cacio automatically
     include the relevant build jobs that they depend on.
     This reflects the fact that the purpose of build jobs is only to
     make artifacts for other jobs. *)
-type stage = Build | Test | Publish
+type stage = Build | Test | Publish | Test_publication
 
 (** Dependency relationships.
 
@@ -419,6 +425,9 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
 
 (** Add jobs to a given global pipeline. *)
 val register_jobs : global_pipeline -> (trigger * job) list -> unit

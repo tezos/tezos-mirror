@@ -372,8 +372,9 @@ let () =
     "debian.daily"
     debian_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Debian_repository.(jobs Full)
-      |> List.map (with_interruptible false))
+      ((Tezos_ci.job_datadog_pipeline_trace :: Debian_repository.(jobs Full)
+       |> List.map (with_interruptible false))
+      @ Cacio.get_jobs Debian_daily)
     ~description:
       "Daily pipeline containing all Debian jobs (build and extended tests)." ;
   register

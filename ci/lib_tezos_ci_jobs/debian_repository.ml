@@ -434,7 +434,7 @@ let register ~auto ~description pipeline_type =
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
   in
-  let jobs = jobs pipeline_type in
+  let jobs = jobs pipeline_type @ Cacio.get_jobs Debian_partial in
   Pipeline.register_child
     pipeline_name
     ~description

@@ -7,7 +7,7 @@
 
 open Gitlab_ci.Base
 
-type stage = Build | Test | Publish
+type stage = Build | Test | Publish | Test_publication
 
 (* Should actually be equivalent to [Stdlib.compare]
    if stages are defined in the right order.
@@ -19,17 +19,21 @@ type stage = Build | Test | Publish
 let compare_stages a b =
   match (a, b) with
   | Build, Build -> 0
-  | Build, (Test | Publish) -> -1
+  | Build, (Test | Publish | Test_publication) -> -1
   | Test, Build -> 1
   | Test, Test -> 0
-  | Test, Publish -> -1
+  | Test, (Publish | Test_publication) -> -1
   | Publish, (Build | Test) -> 1
   | Publish, Publish -> 0
+  | Publish, Test_publication -> -1
+  | Test_publication, (Build | Test | Publish) -> 1
+  | Test_publication, Test_publication -> 0
 
 let show_stage = function
   | Build -> "build"
   | Test -> "test"
   | Publish -> "publish"
+  | Test_publication -> "publishing_tests"
 
 type need = Job | Artifacts
 
@@ -508,6 +512,7 @@ let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
       Tezos_ci.Stages.sanity
   | Test, _ -> Tezos_ci.Stages.test
   | Publish, _ -> Tezos_ci.Stages.publish
+  | Test_publication, _ -> Tezos_ci.Stages.publishing_tests
 
 type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
@@ -622,17 +627,37 @@ let convert_graph ?(interruptible_pipeline = true)
                 in
                 Condition.encode ?when_ ?allow_failure condition
               in
-              let interruptible_stage =
+              let interruptible, interruptible_runner =
                 match stage with
-                | Build | Test -> true
-                | Publish -> interruptible_publish
+                | Build | Test ->
+                    (* Build and test jobs are canceled if another pipeline starts.
+                         This can be overridden by [interruptible_pipeline].
+                         The runner itself can always be preempted, to reduce costs. *)
+                    if interruptible_pipeline then (true, None)
+                    else (false, None)
+                | Publish ->
+                    (* Publish jobs are not canceled if another pipeline starts.
+                         This is to avoid partial publications.
+                         This can be overridden by [interruptible_publish].
+                         The runner can be preempted only if the job is interruptible,
+                         for the same reason (avoiding partial publications). *)
+                    if interruptible_publish then (true, None)
+                    else (false, Some false)
+                | Test_publication ->
+                    (* Tests that are performed after publish jobs are not canceled
+                         if another pipeline starts, because we do want to check
+                         that published artifacts are working.
+                         However, this is not a strong enough requirement for us
+                         to justify the increased costs,
+                         so the runners can still be preempted. *)
+                    if interruptible_publish then (true, None) else (false, None)
               in
               let retry : Gitlab_ci.Types.retry option =
                 match retry with
                 | Some _ -> retry
                 | None -> (
                     match stage with
-                    | Build | Test -> None
+                    | Build | Test | Test_publication -> None
                     | Publish -> Some {max = 0; when_ = []})
               in
               let dev_infra =
@@ -670,13 +695,8 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?rules
                 ?services
                 ?id_tokens
-                ~interruptible:(interruptible_stage && interruptible_pipeline)
-                ?interruptible_runner:
-                  (if interruptible_stage then
-                     (* Can be interruptible, or not. *)
-                     None
-                   else (* Cannot be interruptible. *)
-                     Some false)
+                ~interruptible
+                ?interruptible_runner
                 ?retry
                 ?timeout
                 ?variables
@@ -837,6 +857,9 @@ type global_pipeline =
   | Packaging_revision_test
   | Octez_latest_release
   | Octez_latest_release_test
+  (* Debian packaging pipelines *)
+  | Debian_partial
+  | Debian_daily
 
 let global_jobs : (global_pipeline, trigger * job) Hashtbl.t =
   Hashtbl.create 128
@@ -874,6 +897,8 @@ let get_jobs pipeline =
   | Master ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | Packaging_revision_test ->
+      convert_jobs ~interruptible_publish:true ~with_condition:false jobs
+  | Debian_partial ->
       convert_jobs ~interruptible_publish:true ~with_condition:false jobs
   | _ -> convert_jobs ~with_condition:false jobs
 
