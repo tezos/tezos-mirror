@@ -10,11 +10,17 @@
 set -eu
 
 version_path="./"
+output_dir="."
 while [ $# -gt 0 ]; do
   case "$1" in
   --version-path)
     shift
     version_path="$1"
+    shift
+    ;;
+  --output-dir)
+    shift
+    output_dir="$1"
     shift
     ;;
   *) shift ;;
@@ -48,12 +54,13 @@ echo "Building older releases page..."
 $RELEASE_PAGE --component 'octez' \
   --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" --filter-active inactive changelog $s3_assets packages \
-  --file "${versions_file}"
-mv index.html older_releases.html
+  --file "${versions_file}" \
+  ${output_dir:+--output "${output_dir}/older_releases.md"}
 
 # Generate main release page (active versions only)
 echo "Generating main release page..."
 $RELEASE_PAGE --component 'octez' \
   --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" --filter-active active changelog $s3_assets packages \
-  --file "${versions_file}"
+  --file "${versions_file}" \
+  ${output_dir:+--output "${output_dir}/index.md"}

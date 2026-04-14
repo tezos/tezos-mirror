@@ -240,7 +240,7 @@ let version_section ~component ~asset_types ~version =
    corresponding to a release page for the [versions] of [component] containing
    all the assets of [asset_types].
 
-   This markdown is stored in [temp_dir/release_page]. *)
+   This markdown is stored in [temp_dir/release_page] and its path is returned. *)
 let generate_md ~component ~versions ~asset_types ~filter_active =
   let page =
     List.map
@@ -277,29 +277,35 @@ let generate_md ~component ~versions ~asset_types ~filter_active =
   let index_file = open_out index in
   Fun.protect ~finally:(fun () -> close_out index_file) @@ fun () ->
   Printf.fprintf index_file "%s" md ;
-  Format.printf "Generated %s@." index
+  Format.printf "Generated %s@." index ;
+  index
 
-(* [generate_html ~template ~title ~path index] generates
-   an index.html, titled [title], file out of [temp_dir/index.md] markdown file
+(* [generate_html ~template ~title ~path md_path] generates
+   an index.html, titled [title], file out of the markdown file at [md_path]
    and the [template.html] file.
 
    As this file is supposed to be used for a release page,
    a [path] is required as a metadata used for the
-   assets. *)
-let generate_html ~template ~title ~path =
-  let index = Filename.concat Storage.temp_dir "index.md" in
+   assets.
+
+   Returns the path of the generated HTML file. *)
+let generate_html ~template ~title ~path md_path =
+  let html_path = Filename.concat Storage.temp_dir "index.html" in
   let command =
     sf
       "pandoc %s -s --template=\"%s\" --metadata=title=\"%s\" \
-       --metadata=path=\"%s\" --css=%s/style.css -o index.html"
-      index
+       --metadata=path=\"%s\" --css=%s/style.css -o %s"
+      md_path
       template
       title
       path
       path
+      html_path
   in
   match Sys.command command with
-  | 0 -> Format.printf "File index.html generated from %s@." index
+  | 0 ->
+      Format.printf "File %s generated from %s@." html_path md_path ;
+      html_path
   | n -> failwith ("Failed to generate release page: Error " ^ Int.to_string n)
 
 (* This script takes a [component] name, page [title], a [bucket] name,
@@ -422,6 +428,16 @@ let () =
       ~placeholder:"FILE"
       ()
   in
+  let output =
+    Clap.default_string
+      ~long:"output"
+      ~description:
+        "Path where the generated markdown file is written (e.g. [index.md]). \
+         The corresponding HTML file is written alongside it (e.g. \
+         [index.html])."
+      ~placeholder:"FILE"
+      "./index.md"
+  in
   Clap.close () ;
   let component =
     {
@@ -471,5 +487,22 @@ let () =
           "Warning: no [--filter-active] argument. No filter will be applied." ;
         all_versions
   in
-  generate_md ~component ~versions ~asset_types ~filter_active ;
-  generate_html ~template:"./docs/release_page/template.html" ~title ~path
+  let md_path = generate_md ~component ~versions ~asset_types ~filter_active in
+  let html_path =
+    generate_html
+      ~template:"./docs/release_page/template.html"
+      ~title
+      ~path
+      md_path
+  in
+  let move src dst =
+    try Sys.rename src dst
+    with Sys_error _ ->
+      (* Fallback for cross-device moves (e.g. /tmp to working directory) *)
+      let content = In_channel.(with_open_bin src input_all) in
+      Out_channel.(with_open_bin dst (fun oc -> output_string oc content)) ;
+      Sys.remove src
+  in
+  let dst_html = Filename.remove_extension output ^ ".html" in
+  move md_path output ;
+  move html_path dst_html

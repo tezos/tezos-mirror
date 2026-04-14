@@ -177,7 +177,9 @@ let job_release_page =
        bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
        its [index.html] is updated accordingly."
     ~artifacts:
-      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) ["index.html"])
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["index.html"; "older_releases.html"; "index.md"; "older_releases.md"])
     ?needs:
       (match wait_for with
       | `wait_for_nothing -> None
@@ -414,7 +416,9 @@ let job_release_page_packaging_revision =
        Updates build number in versions.json, re-uploads binaries, and \
        regenerates the release page and RSS feed."
     ~artifacts:
-      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) ["index.html"])
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["index.html"; "older_releases.html"; "index.md"; "older_releases.md"])
     ?needs:
       (Some
          [
