@@ -208,16 +208,13 @@ unsafe impl SmartRollupCore for MockHost {
             .try_into()
             .unwrap_or_else(|_| panic!("Hash is not {PREIMAGE_HASH_SIZE} bytes"));
 
-        let bytes = self
-            .state
-            .borrow()
-            .handle_reveal_preimage(&hash, max_bytes)
-            .to_vec();
+        let state = self.state.borrow();
+        let bytes = state.handle_reveal_preimage(&hash, max_bytes);
 
         assert!(bytes.len() <= max_bytes);
 
         let slice = from_raw_parts_mut(destination_addr, bytes.len());
-        slice.copy_from_slice(bytes.as_slice());
+        slice.copy_from_slice(bytes);
 
         bytes.len().try_into().unwrap()
     }
@@ -442,7 +439,7 @@ mod tests {
 
     #[test]
     fn test_store_write() {
-        let mut state = HostState::default();
+        let state = HostState::default();
         let size = 256_i32;
         let data = vec![b'a'; size as usize];
         let path = b"/a/b";

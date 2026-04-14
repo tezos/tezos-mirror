@@ -9,6 +9,8 @@
 //! for a given [`Key`]. Kernels can create and delete [`KeySpace`] instances as required
 //! and can generate hashes representing the entire state of a [`KeySpace`].
 
+use std::str::FromStr;
+
 #[cfg(feature = "irmin-compat")]
 mod irmin_path_validator;
 
@@ -21,7 +23,8 @@ pub const MAX_STORE_V2_KEY_SIZE: usize = 256;
 pub enum KeyError {
     /// Attempted to create a key that exceeds the maximum allowed size.
     KeyTooLarge,
-    /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step).
+    /// Path validation error (e.g. missing leading `/`, invalid bytes, empty step,
+    /// or reserved `/readonly` prefix).
     #[cfg(feature = "irmin-compat")]
     PathError(tezos_smart_rollup_host::path::PathError),
 }
@@ -43,7 +46,7 @@ impl Key {
 
     /// Create a key from raw bytes.
     ///
-    /// Returns an error if `key` fails validation (see [`Key::check_bytes`] for rules).
+    /// Returns an error if `key` fails validation (see `Key::check_bytes` for rules).
     pub fn from_bytes(key: &[u8]) -> Result<&Self, KeyError> {
         Self::check_bytes(key)?;
         // SAFETY: `Key` is `repr(transparent)` over `[u8]`, so `&[u8]` can be safely transmuted to `&Key`.
@@ -60,6 +63,23 @@ impl Key {
     }
 }
 
+impl core::fmt::Debug for Key {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Key({self})")
+    }
+}
+
+impl core::fmt::Display for Key {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // SAFETY: with irmin-compat, Key bytes are valid ASCII path characters.
+        // Without irmin-compat, we print hex-encoded bytes directly.
+        match core::str::from_utf8(&self.0) {
+            Ok(s) => f.write_str(s),
+            Err(_) => write!(f, "Key({:02x?})", &self.0),
+        }
+    }
+}
+
 /// Name creation error
 #[derive(Debug)]
 pub enum NameError {
@@ -73,8 +93,14 @@ pub enum NameError {
 }
 
 /// A validated keyspace name, used as a path prefix in durable storage.
-#[repr(transparent)]
-pub struct Name(str);
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+pub struct Name(String);
+
+impl core::fmt::Display for Name {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 impl Name {
     // Fallback: when `irmin-compat` is not enabled, no validation is performed.
@@ -83,33 +109,36 @@ impl Name {
     const fn check_bytes(_bytes: &[u8]) -> Result<(), NameError> {
         Ok(())
     }
+}
 
-    /// Create a name from a string slice.
-    ///
-    /// Returns an error if `name` fails validation (see [`Name::check_bytes`] for rules
-    /// when the `irmin-compat` feature is enabled).
-    pub fn from_slice(name: &str) -> Result<&Self, NameError> {
-        Self::check_bytes(name.as_bytes())?;
-        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
-        Ok(unsafe { std::mem::transmute::<&str, &Name>(name) })
-    }
-
-    /// Create a name from a static string. Should only be used to create constant names.
-    ///
-    /// Panics if the name fails validation (see [`Name::check_bytes`] for rules
-    /// when the `irmin-compat` feature is enabled).
-    pub const fn from_static_str(name: &'static str) -> &'static Self {
-        assert!(Self::check_bytes(name.as_bytes()).is_ok(), "Invalid name");
-        // SAFETY: `Name` is `repr(transparent)` over `str`, so `&str` can be safely transmuted to `&Name`.
-        unsafe { std::mem::transmute(name) }
+impl AsRef<str> for Name {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
-/// A key space in the durable storage
-pub trait KeySpace {
-    /// Find the key space with the given name. If it does not exist, create a new key space.
-    fn load_or_create(name: &Name) -> Self;
+impl FromStr for Name {
+    type Err = NameError;
 
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::check_bytes(s.as_bytes())?;
+        Ok(Name(s.to_owned()))
+    }
+}
+
+#[derive(Debug)]
+pub enum KeySpaceWriteError {
+    /// Attempted to write more than the maximum allowed bytes at a given key.
+    ValueSizeExceeded,
+    /// The write offset exceeds the current length of the stored value.
+    InvalidOffset,
+}
+
+/// A key space in the durable storage.
+///
+/// A `KeySpace` is a flat key-value store. Instances are created via
+/// [`KeySpaceLoader::load_or_create`].
+pub trait KeySpace {
     /// Read the whole value associated with the key.
     /// Returns `None` if the key does not exist.
     fn get(&self, key: &Key) -> Option<Vec<u8>>;
@@ -119,11 +148,20 @@ pub trait KeySpace {
     fn read(&self, key: &Key, offset: usize, buffer: &mut [u8]) -> Option<usize>;
 
     /// Write the given value to the key.
-    fn set(&mut self, key: &Key, value: impl AsRef<[u8]>);
+    fn set(
+        &mut self,
+        key: &Key,
+        value: impl AsRef<[u8]>,
+    ) -> Result<(), KeySpaceWriteError>;
 
     /// Write data to the value at the given key starting at the given offset.
     /// Returns the number of bytes written.
-    fn write(&self, key: &Key, offset: usize, data: impl AsRef<[u8]>) -> usize;
+    fn write(
+        &mut self,
+        key: &Key,
+        offset: usize,
+        data: impl AsRef<[u8]>,
+    ) -> Result<usize, KeySpaceWriteError>;
 
     /// Retrieve the length of the value associated with the key.
     /// Returns `None` if the key does not exist.
@@ -146,11 +184,42 @@ pub trait KeySpace {
     /// remove all key-value associations from `other`.
     fn move_from(&mut self, other: &mut Self);
 
-    /// Once all references to this key space are dropped, the key space will
-    /// be deleted.
-    fn mark_for_deletion(self);
-
     /// Obtain the hash that represents the current state of the key space. This hash is
     /// sensitive to the key-value associations and the order in which they were added.
     fn hash(&self) -> Vec<u8>;
+}
+
+/// Error returned by [`KeySpaceLoader::load_or_create`].
+#[derive(Debug)]
+pub enum KeySpaceLoaderError {
+    /// A key space whose name overlaps (is a prefix of, or has as prefix) the
+    /// requested name is already loaded.
+    Overlapping,
+    /// A key space with this exact name is already loaded and has not been
+    /// dropped yet.
+    AlreadyLoaded,
+}
+
+/// A loader for [`KeySpace`] instances backed by a specific storage implementation.
+///
+/// The loader tracks which keyspace names have been used and prevents
+/// overlapping names. Callers receive an owned key space handle; when the
+/// handle is dropped, the same name can be reloaded, but names that overlap
+/// with any previously loaded name are permanently rejected.
+pub trait KeySpaceLoader {
+    /// The type of key space produced by this loader.
+    type KeySpace: KeySpace;
+
+    /// Load or create a key space with the given name.
+    ///
+    /// Returns an owned key space handle. The caller may hold multiple
+    /// key spaces simultaneously as long as their names do not overlap.
+    ///
+    /// Returns an error if the requested name overlaps with any
+    /// previously loaded key space, or if a key space with this exact
+    /// name is already loaded.
+    fn load_or_create(
+        &mut self,
+        name: Name,
+    ) -> Result<Self::KeySpace, KeySpaceLoaderError>;
 }

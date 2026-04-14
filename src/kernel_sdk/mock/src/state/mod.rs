@@ -7,6 +7,7 @@
 //! Mock runtime state & state transitions
 
 use crypto::hash::SmartRollupHash;
+use std::collections::HashMap;
 use tezos_smart_rollup_core::{
     MAX_INPUT_MESSAGE_SIZE, MAX_OUTPUT_SIZE, PREIMAGE_HASH_SIZE,
 };
@@ -31,10 +32,14 @@ pub(crate) struct NextInput {
 /// The mock `HostState` used by the *mock runtime*, contains the *store* and *debug_log*.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct HostState {
-    /// Key-value store of runtime state.
+    /// Durable key-value store (the irmin tree).
     pub store: InMemoryStore,
     pub metadata: RollupMetadata,
     pub dal_parameters: RollupDalParameters,
+    // Side-state: not part of durable storage, not shared between substorages.
+    pub(crate) preimages: HashMap<[u8; PREIMAGE_HASH_SIZE], Vec<u8>>,
+    pub(crate) outbox: HashMap<u32, Vec<Vec<u8>>>,
+    pub(crate) dal_slots: HashMap<(i32, u8), Vec<u8>>,
     // Inbox metadata
     pub(crate) curr_level: u32,
     pub(crate) curr_input_id: usize,
@@ -64,6 +69,9 @@ impl Default for HostState {
             store,
             metadata,
             dal_parameters,
+            preimages: HashMap::new(),
+            outbox: HashMap::new(),
+            dal_slots: HashMap::new(),
             curr_level: crate::NAIROBI_ACTIVATION_LEVEL,
             curr_input_id: 0,
             input: vec![],
@@ -85,8 +93,9 @@ impl HostState {
             return Err(Error::InputOutputTooLarge);
         }
 
-        if self.store.0.outbox_at(self.curr_level).len() < MAX_OUTPUTS_PER_LEVEL {
-            self.store.0.outbox_insert(self.curr_level, output);
+        let outbox_len = self.outbox.get(&self.curr_level).map_or(0, |o| o.len());
+        if outbox_len < MAX_OUTPUTS_PER_LEVEL {
+            self.outbox.entry(self.curr_level).or_default().push(output);
             Ok(())
         } else {
             Err(Error::FullOutbox)
@@ -127,7 +136,7 @@ impl HostState {
         hash: &[u8; PREIMAGE_HASH_SIZE],
         max_bytes: usize,
     ) -> &[u8] {
-        let preimage = self.store.0.retrieve_preimage(hash);
+        let preimage: &[u8] = self.preimages.get(hash).expect("Cannot retrieve preimage");
         if preimage.len() < max_bytes {
             preimage
         } else {
@@ -136,7 +145,10 @@ impl HostState {
     }
 
     pub(crate) fn set_preimage(&mut self, preimage: Vec<u8>) -> [u8; PREIMAGE_HASH_SIZE] {
-        self.store.0.add_preimage(preimage)
+        let hash = tezos_smart_rollup_encoding::dac::pages::make_preimage_hash(&preimage)
+            .unwrap();
+        self.preimages.insert(hash, preimage);
+        hash
     }
 
     pub(crate) fn get_metadata(&self) -> &RollupMetadata {
@@ -157,7 +169,7 @@ impl HostState {
         published_level: i32,
         slot_index: u8,
     ) -> Option<&Vec<u8>> {
-        self.store.0.retrieve_dal_slot(published_level, slot_index)
+        self.dal_slots.get(&(published_level, slot_index))
     }
 
     pub(crate) fn set_dal_slot(
@@ -166,7 +178,7 @@ impl HostState {
         slot_index: u8,
         data: Vec<u8>,
     ) {
-        self.store.0.set_dal_slot(published_level, slot_index, data)
+        self.dal_slots.insert((published_level, slot_index), data);
     }
 }
 
@@ -175,7 +187,7 @@ mod tests {
     use super::*;
 
     use tezos_smart_rollup_core::{
-        VALUE_TYPE_NONE, VALUE_TYPE_SUBTREE, VALUE_TYPE_VALUE,
+        MAX_FILE_CHUNK_SIZE, VALUE_TYPE_NONE, VALUE_TYPE_SUBTREE, VALUE_TYPE_VALUE,
     };
 
     #[test]
@@ -214,7 +226,7 @@ mod tests {
     #[test]
     fn store_write_new_path() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let path: &[u8] = b"/test/path";
 
         let written = vec![1, 2, 3, 4];
@@ -228,13 +240,16 @@ mod tests {
             state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(written), state.store.handle_store_read(path, 0, 4096));
+        assert_eq!(
+            Ok(written),
+            state.store.handle_store_read(path, 0, MAX_FILE_CHUNK_SIZE)
+        );
     }
 
     #[test]
     fn store_write_extend_path() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let path: &[u8] = b"/test/path";
 
         let written = vec![1, 2, 3, 4];
@@ -250,13 +265,16 @@ mod tests {
             state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
+        assert_eq!(
+            Ok(expected),
+            state.store.handle_store_read(path, 0, MAX_FILE_CHUNK_SIZE)
+        );
     }
 
     #[test]
     fn store_write_extend_from_within() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let path: &[u8] = b"/test/path";
 
         let written = vec![1, 2, 3, 4];
@@ -272,13 +290,16 @@ mod tests {
             state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
+        assert_eq!(
+            Ok(expected),
+            state.store.handle_store_read(path, 0, MAX_FILE_CHUNK_SIZE)
+        );
     }
 
     #[test]
     fn store_write_fully_within() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let path: &[u8] = b"/test/path";
 
         state
@@ -296,13 +317,16 @@ mod tests {
             state.store.handle_store_has(path),
             "Path previously written to"
         );
-        assert_eq!(Ok(expected), state.store.handle_store_read(path, 0, 4096));
+        assert_eq!(
+            Ok(expected),
+            state.store.handle_store_read(path, 0, MAX_FILE_CHUNK_SIZE)
+        );
     }
 
     #[test]
     fn test_store_delete() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let prefix = "/a/long/prefix";
 
         state
@@ -350,7 +374,7 @@ mod tests {
     #[test]
     fn test_store_delete_value() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let prefix = "/a/long/prefix";
 
         state
@@ -401,7 +425,7 @@ mod tests {
     #[test]
     fn store_list_size() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         let prefix = "/a/long/prefix";
 
         for i in 0..10 {
@@ -450,7 +474,7 @@ mod tests {
     #[test]
     fn store_move() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         state.store.handle_store_write(b"/a/b", 0, b"ab").unwrap();
         state
             .store
@@ -472,19 +496,29 @@ mod tests {
         // Assert
         assert_eq!(
             Ok(b"ab".to_vec()),
-            state.store.handle_store_read(b"/a/b/c", 0, 4096)
+            state
+                .store
+                .handle_store_read(b"/a/b/c", 0, MAX_FILE_CHUNK_SIZE)
         );
         assert_eq!(
             Ok(b"abc".to_vec()),
-            state.store.handle_store_read(b"/a/b/c/c", 0, 4096)
+            state
+                .store
+                .handle_store_read(b"/a/b/c/c", 0, MAX_FILE_CHUNK_SIZE)
         );
         assert_eq!(
             b"abd".to_vec(),
-            state.store.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b/c/d", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.store.handle_store_read(b"/a/bc", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/bc", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             Ok(VALUE_TYPE_SUBTREE),
@@ -499,7 +533,7 @@ mod tests {
     #[test]
     fn store_copy() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         state.store.handle_store_write(b"/a/b", 0, b"ab").unwrap();
         state
             .store
@@ -521,23 +555,38 @@ mod tests {
         // Assert
         assert_eq!(
             b"ab".to_vec(),
-            state.store.handle_store_read(b"/a/b/c", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b/c", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.store.handle_store_read(b"/a/b/c/c", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b/c/c", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"abd".to_vec(),
-            state.store.handle_store_read(b"/a/b/c/d", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b/c/d", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"abc".to_vec(),
-            state.store.handle_store_read(b"/a/bc", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/bc", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"ab".to_vec(),
-            state.store.handle_store_read(b"/a/b", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             Ok(VALUE_TYPE_NONE),
@@ -548,7 +597,7 @@ mod tests {
     #[test]
     fn simple_store_copy() {
         // Arrange
-        let mut state = HostState::default();
+        let state = HostState::default();
         state.store.handle_store_write(b"/a/b", 0, b"xxx").unwrap();
 
         // Act
@@ -557,17 +606,23 @@ mod tests {
         // Assert
         assert_eq!(
             b"xxx".to_vec(),
-            state.store.handle_store_read(b"/a/b", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/a/b", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
         assert_eq!(
             b"xxx".to_vec(),
-            state.store.handle_store_read(b"/c/b", 0, 4096).unwrap()
+            state
+                .store
+                .handle_store_read(b"/c/b", 0, MAX_FILE_CHUNK_SIZE)
+                .unwrap()
         );
     }
 
     #[test]
     fn store_value_size() {
-        let mut state = HostState::default();
+        let state = HostState::default();
         let size = 256_i32;
         let data = vec![b'a'; size as usize];
         let path = b"/a/b";
@@ -580,9 +635,13 @@ mod tests {
 
     #[test]
     fn read_from_readonly() {
-        let mut state = HostState::default();
+        let state = HostState::default();
         let path = "/readonly/kernel/env/reboot_count";
-        state.store.0.set_value(path, 4i32.to_le_bytes().to_vec());
+        state
+            .store
+            .0
+            .borrow_mut()
+            .set_value(path, 4i32.to_le_bytes().to_vec());
         let read_back = state
             .store
             .handle_store_read(path.as_bytes(), 0, 4)

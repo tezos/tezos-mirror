@@ -4,6 +4,7 @@
 
 //! Irmin-backed durable storage functionality, currently integrated in the WASM pvm.
 
+use tezos_smart_rollup_core::rollup_host::RollupHost;
 use tezos_smart_rollup_core::SmartRollupCore;
 use tezos_smart_rollup_core::STORE_HASH_SIZE;
 
@@ -14,6 +15,20 @@ use crate::Error;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+
+/// Capability to construct a new storage handle.
+pub trait CoreStorage {
+    /// The concrete storage type provided by this host.
+    type Storage: StorageV1;
+
+    /// Create a new storage handle from this host.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the returned handle is only used to
+    /// access storage paths that do not overlap with any other live handle.
+    unsafe fn new_storage(&mut self) -> Self::Storage;
+}
 
 /// Durable storage capability, backed by irmin when running in the WASM pvm.
 pub trait StorageV1 {
@@ -106,6 +121,14 @@ pub trait StorageV1 {
         &self,
         path: &impl Path,
     ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError>;
+}
+
+impl CoreStorage for RollupHost {
+    type Storage = Self;
+
+    unsafe fn new_storage(&mut self) -> Self::Storage {
+        RollupHost::new()
+    }
 }
 
 impl<Host: SmartRollupCore> StorageV1 for Host {

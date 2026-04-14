@@ -6,29 +6,37 @@
 
 use super::store::Store;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, STORE_HASH_SIZE};
 use tezos_smart_rollup_host::{
     path::{PathError, RefPath},
     Error,
 };
 
-/// Wrapper over `Store` which implements methods equivalent to the host
+/// Sharable Wrapper over `Store` which implements methods equivalent to the host
 /// storage functions. It is used for both `MockHost` and for
 /// `RollupHostWithInMemoryStorage` in the `entrypoint` crate.
+///
+/// Cloning an `InMemoryStore` produces a handle that shares the same
+/// underlying storage (via `Rc`), enabling multiple components to
+/// operate on a single store.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct InMemoryStore(pub(crate) Store);
+pub struct InMemoryStore(pub(crate) Rc<RefCell<Store>>);
 
-/// Implementations of the storage host functions in `SmartRollupCore`
-/// backed by the in-memory store. See `smart_rollup_core.rs` in the `core`
-/// crate for documentation.
-#[allow(missing_docs, clippy::missing_safety_doc)]
-impl InMemoryStore {
-    pub unsafe fn store_has(&self, path: *const u8, path_len: usize) -> i32 {
+use tezos_smart_rollup_core::smart_rollup_core::{ReadInputMessageInfo, SmartRollupCore};
+
+/// [`SmartRollupCore`] implementation backed by the in-memory store.
+/// Non-storage methods are not supported and will panic.
+/// The blanket `impl<Host: SmartRollupCore> StorageV1 for Host` provides
+/// `StorageV1` automatically.
+unsafe impl SmartRollupCore for InMemoryStore {
+    unsafe fn store_has(&self, path: *const u8, path_len: usize) -> i32 {
         let path = from_raw_parts(path, path_len);
         self.handle_store_has(path).unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_read(
+    unsafe fn store_read(
         &self,
         path: *const u8,
         len: usize,
@@ -52,8 +60,8 @@ impl InMemoryStore {
         }
     }
 
-    pub unsafe fn store_write(
-        &mut self,
+    unsafe fn store_write(
+        &self,
         path: *const u8,
         len: usize,
         offset: usize,
@@ -68,7 +76,7 @@ impl InMemoryStore {
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_delete(&mut self, path: *const u8, len: usize) -> i32 {
+    unsafe fn store_delete(&self, path: *const u8, len: usize) -> i32 {
         let path = from_raw_parts(path, len);
 
         self.handle_store_delete(path)
@@ -76,7 +84,7 @@ impl InMemoryStore {
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_delete_value(&mut self, path: *const u8, len: usize) -> i32 {
+    unsafe fn store_delete_value(&self, path: *const u8, len: usize) -> i32 {
         let path = from_raw_parts(path, len);
 
         self.handle_store_delete_value(path)
@@ -84,15 +92,15 @@ impl InMemoryStore {
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_list_size(&self, path: *const u8, len: usize) -> i64 {
+    unsafe fn store_list_size(&self, path: *const u8, len: usize) -> i64 {
         let path = from_raw_parts(path, len);
 
         self.handle_store_list_size(path)
             .unwrap_or_else(|e| e.code() as i64)
     }
 
-    pub unsafe fn store_move(
-        &mut self,
+    unsafe fn store_move(
+        &self,
         from_path: *const u8,
         from_path_len: usize,
         to_path: *const u8,
@@ -106,8 +114,8 @@ impl InMemoryStore {
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_copy(
-        &mut self,
+    unsafe fn store_copy(
+        &self,
         from_path: *const u8,
         from_path_len: usize,
         to_path: *const u8,
@@ -121,13 +129,13 @@ impl InMemoryStore {
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
+    unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
         let path = from_raw_parts(path, path_len);
         self.handle_store_value_size(path)
             .unwrap_or_else(Error::code)
     }
 
-    pub unsafe fn __internal_store_get_hash(
+    unsafe fn __internal_store_get_hash(
         &self,
         path: *const u8,
         path_len: usize,
@@ -145,11 +153,49 @@ impl InMemoryStore {
             })
             .unwrap_or_else(Error::code)
     }
+
+    // Non-storage host functions are not supported by InMemoryStore.
+
+    unsafe fn read_input(
+        &self,
+        _: *mut ReadInputMessageInfo,
+        _: *mut u8,
+        _: usize,
+    ) -> i32 {
+        unimplemented!("InMemoryStore is storage-only")
+    }
+
+    unsafe fn write_output(&self, _: *const u8, _: usize) -> i32 {
+        unimplemented!("InMemoryStore is storage-only")
+    }
+
+    unsafe fn write_debug(&self, _: *const u8, _: usize) {
+        unimplemented!("InMemoryStore is storage-only")
+    }
+
+    unsafe fn reveal_preimage(
+        &self,
+        _: *const u8,
+        _: usize,
+        _: *mut u8,
+        _: usize,
+    ) -> i32 {
+        unimplemented!("InMemoryStore is storage-only")
+    }
+
+    unsafe fn reveal_metadata(&self, _: *mut u8, _: usize) -> i32 {
+        unimplemented!("InMemoryStore is storage-only")
+    }
+
+    unsafe fn reveal(&self, _: *const u8, _: usize, _: *mut u8, _: usize) -> i32 {
+        unimplemented!("InMemoryStore is storage-only")
+    }
 }
 
 fn validate_path(s: &[u8]) -> Result<String, Error> {
     match RefPath::try_from(s) {
         Err(PathError::PathTooLong) => Err(Error::StoreKeyTooLarge),
+        Err(PathError::ReadOnly) => Err(Error::StoreReadonlyValue),
         Err(_) => Err(Error::StoreInvalidKey),
         Ok(_) => {
             // SAFETY: a valid path is valid UTF-8
@@ -185,6 +231,7 @@ impl InMemoryStore {
     pub(crate) fn handle_store_list_size(&self, prefix: &[u8]) -> Result<i64, Error> {
         let prefix = validate_path(prefix)?;
         self.0
+            .borrow()
             .node_from_path(&prefix)
             .map(|n| n.inner.len() as i64)
             .ok_or(Error::StoreNotANode)
@@ -193,7 +240,7 @@ impl InMemoryStore {
     pub(crate) fn handle_store_has(&self, raw_path: &[u8]) -> Result<i32, Error> {
         let path = validate_path(raw_path)?;
 
-        let has_value = self.0.has_entry(&path);
+        let has_value = self.0.borrow().has_entry(&path);
         let has_subvalue = self.handle_store_list_size(raw_path).unwrap_or_default()
             > i64::from(has_value);
 
@@ -213,13 +260,17 @@ impl InMemoryStore {
         offset: usize,
         max_bytes: usize,
     ) -> Result<Vec<u8>, Error> {
+        if max_bytes > MAX_FILE_CHUNK_SIZE {
+            return Err(Error::InputOutputTooLarge);
+        }
         let path = validate_path_maybe_readonly(path)?;
+        let store = self.0.borrow();
 
-        if !self.0.has_entry(&path) {
+        if !store.has_entry(&path) {
             return Err(Error::StoreNotAValue);
         }
 
-        let bytes = self.0.get_value(&path);
+        let bytes = store.get_value(&path);
         if offset >= bytes.len() {
             return Err(Error::StoreInvalidAccess);
         }
@@ -235,7 +286,7 @@ impl InMemoryStore {
     }
 
     pub(crate) fn handle_store_write(
-        &mut self,
+        &self,
         path: &[u8],
         offset: usize,
         bytes: &[u8],
@@ -246,11 +297,17 @@ impl InMemoryStore {
 
         let path = validate_path(path)?;
 
-        let mut value = match self.0.maybe_get_value(&path) {
+        let mut value = match self.0.borrow().maybe_get_value(&path) {
             Some(value) => value.as_ref().clone(),
-            // No value, so only valid offset is zero (ie writing a new value).
             None => Vec::with_capacity(bytes.len()),
         };
+
+        // Match prod behaviour: i32 overflow check on total size.
+        let value_size = i32::try_from(value.len()).unwrap_or(i32::MAX);
+        let num_bytes = i32::try_from(bytes.len()).unwrap_or(i32::MAX);
+        if value_size.checked_add(num_bytes).is_none() {
+            return Err(Error::StoreValueSizeExceeded);
+        }
 
         if offset > value.len() {
             return Err(Error::StoreInvalidAccess);
@@ -263,30 +320,27 @@ impl InMemoryStore {
             value.extend_from_slice(bytes);
         };
 
-        self.0.set_value(&path, value);
+        self.0.borrow_mut().set_value(&path, value);
 
         Ok(())
     }
 
-    pub(crate) fn handle_store_delete(&mut self, prefix: &[u8]) -> Result<(), Error> {
+    pub(crate) fn handle_store_delete(&self, prefix: &[u8]) -> Result<(), Error> {
         let durable_prefix = validate_path(prefix)?;
 
-        self.0.node_delete(&durable_prefix);
+        self.0.borrow_mut().node_delete(&durable_prefix);
         Ok(())
     }
 
-    pub(crate) fn handle_store_delete_value(
-        &mut self,
-        prefix: &[u8],
-    ) -> Result<(), Error> {
+    pub(crate) fn handle_store_delete_value(&self, prefix: &[u8]) -> Result<(), Error> {
         let durable_prefix = validate_path(prefix)?;
 
-        self.0.delete_value(&durable_prefix);
+        self.0.borrow_mut().delete_value(&durable_prefix);
         Ok(())
     }
 
     pub(crate) fn handle_store_move(
-        &mut self,
+        &self,
         from_path: &[u8],
         to_path: &[u8],
     ) -> Result<(), Error> {
@@ -295,18 +349,20 @@ impl InMemoryStore {
 
         let from_node = self
             .0
+            .borrow()
             .node_from_path(&from_durable_prefix)
             .ok_or(Error::StoreNotANode)?
             .clone();
 
-        self.0.node_delete(&from_durable_prefix);
-        self.0.node_insert(&to_durable_prefix, from_node);
+        let mut store = self.0.borrow_mut();
+        store.node_delete(&from_durable_prefix);
+        store.node_insert(&to_durable_prefix, from_node);
 
         Ok(())
     }
 
     pub(crate) fn handle_store_copy(
-        &mut self,
+        &self,
         from_path: &[u8],
         to_path: &[u8],
     ) -> Result<(), Error> {
@@ -315,21 +371,25 @@ impl InMemoryStore {
 
         let from_node = self
             .0
+            .borrow()
             .node_from_path(&from_durable_prefix)
             .ok_or(Error::StoreNotANode)?
             .clone();
 
-        self.0.node_insert(&to_durable_prefix, from_node);
+        self.0
+            .borrow_mut()
+            .node_insert(&to_durable_prefix, from_node);
 
         Ok(())
     }
 
     pub(crate) fn handle_store_value_size(&self, path: &[u8]) -> Result<i32, Error> {
         let path = validate_path(path)?;
-        if !self.0.has_entry(&path) {
+        let store = self.0.borrow();
+        if !store.has_entry(&path) {
             return Err(Error::StoreNotAValue);
         }
-        Ok(self.0.get_value(&path).len() as i32)
+        Ok(store.get_value(&path).len() as i32)
     }
 
     /// Stand in implementation deterministically returns dummy hash
