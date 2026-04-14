@@ -501,16 +501,6 @@ where
         );
         all_internal_receipts.extend(reentrant_ops);
     }
-    if let Some(index) = failed {
-        log!(
-            Debug,
-            "Internal operation execution failed at index {index}"
-        );
-        all_internal_receipts
-            .iter_mut()
-            .take(index)
-            .for_each(InternalOperationSum::transform_result_backtrack);
-    }
     Ok(())
 }
 
@@ -860,6 +850,9 @@ where
                     .michelson
                     .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
+                internal_receipts
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
                 // Return the internal receipts so the failed CRAC
                 // receipt can include backtracked/failed/skipped ops
                 // (RFC Example 4).
@@ -878,6 +871,9 @@ where
                 .michelson
                 .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
                 .map_err(|e| CracTransferError::from(gw(e)))?;
+            internal_receipts
+                .iter_mut()
+                .for_each(InternalOperationSum::transform_result_backtrack);
             Err(CracTransferError {
                 error: e,
                 internal_receipts,
