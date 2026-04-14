@@ -33,6 +33,10 @@ open Environment.Error_monad
 open Protocol
 open Protocol.Alpha_context
 
+type under_feature_flag = Stez | SWRR
+
+type error += Non_activated_feature of under_feature_flag
+
 val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 
 type info = {
@@ -222,6 +226,13 @@ val stez_redeemed_finalizable_balance :
   'a ->
   Contract.t ->
   Tez.t option shell_tzresult Lwt.t
+
+val stez_bakers :
+  'a #RPC_context.simple ->
+  'a ->
+  (Signature.public_key_hash * Protocol.Clst_delegates_parameters_repr.t) list
+  shell_tzresult
+  Lwt.t
 
 val register : unit -> unit
 

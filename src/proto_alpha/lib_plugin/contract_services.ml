@@ -49,6 +49,33 @@ let info_encoding =
 
 let legacy = Script_ir_translator_config.make ~legacy:true ()
 
+type under_feature_flag = Stez | SWRR
+
+let under_feature_flag_to_string = function Stez -> "stez" | SWRR -> "SWRR"
+
+let under_feature_flag_encoding =
+  Data_encoding.string_enum
+  @@ List.map
+       (fun feature -> (under_feature_flag_to_string feature, feature))
+       [Stez; SWRR]
+
+type error += Non_activated_feature of under_feature_flag
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"plugin.non_activated_feature"
+    ~title:"Feature is not activated"
+    ~description:"An RPC from a non actived feature was accessed."
+    ~pp:(fun ppf feature ->
+      Format.fprintf
+        ppf
+        "The feature %s is not activated, its RPCs are not available."
+        (under_feature_flag_to_string feature))
+    Data_encoding.(obj1 (req "feature" under_feature_flag_encoding))
+    (function Non_activated_feature feature -> Some feature | _ -> None)
+    (fun feature -> Non_activated_feature feature)
+
 module S = struct
   open Data_encoding
 
@@ -472,11 +499,34 @@ module S = struct
         RPC_path.(
           custom_root /: Contract.rpc_arg / "stez_redeemed_finalizable_balance")
 
+    let registered_baker_encoding =
+      let open Data_encoding in
+      obj2
+        (req "pkh" Signature.Public_key_hash.encoding)
+        (req "parameters" Clst_delegates_parameters_repr.encoding)
+
+    let bakers =
+      RPC_service.get_service
+        ~description:
+          "List of delegates registered with sTEZ together with their fee and \
+           capacity."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list registered_baker_encoding)
+        RPC_path.(open_root / "context" / "stez" / "bakers")
+
+    let under_feature_flag (ctxt : context) =
+      let open Result_syntax in
+      if Constants.native_contracts_enable ctxt then return_unit
+      else tzfail (Non_activated_feature Stez)
+
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Contract.get_clst_contract_hash ctxt) ;
       register1 ~chunked:false balance_service (fun ctxt contract () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* balance, _ = Clst_contract_storage.get_balance ctxt contract in
           return balance) ;
       register1
@@ -484,6 +534,7 @@ module S = struct
         ticket_balance_service
         (fun ctxt contract () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* clst_hash = Contract.get_clst_contract_hash ctxt in
           let* ticket_token = Clst_contract_storage.ticket_token ~clst_hash in
           let* ticket_hash, ctxt =
@@ -496,22 +547,43 @@ module S = struct
           Option.value amount ~default:Z.zero) ;
       register0 ~chunked:false total_supply_service (fun ctxt () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
           return total_supply) ;
       register0 ~chunked:false total_amount_of_tez_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst.total_amount_of_tez ctxt) ;
       register0 ~chunked:false exchange_rate_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst_contract_storage.exchange_rate ctxt) ;
       register1
         ~chunked:false
         redeemed_frozen_balance
         (fun ctxt contract () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst.For_RPC.get_unfinalizable_redeemed_balance ctxt contract) ;
       register1
         ~chunked:false
         redeemed_finalizable_balance
         (fun ctxt contract () () ->
-          Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract)
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
+          Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract) ;
+      register0 ~chunked:false bakers (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
+          let*! delegates = Clst.For_RPC.registered_delegates ctxt in
+          let delegates_with_parameters =
+            List.filter_map
+              (function
+                | Contract.Implicit pkh, parameters -> Some (pkh, parameters)
+                | Originated _, _ -> None)
+              delegates
+          in
+          return delegates_with_parameters)
   end
 end
 
@@ -1045,3 +1117,6 @@ let stez_redeemed_finalizable_balance ctxt block contract =
     contract
     ()
     ()
+
+let stez_bakers ctxt block =
+  RPC_context.make_call0 S.CLST.bakers ctxt block () ()
