@@ -522,6 +522,17 @@ where
                 config,
                 included_delayed_transactions,
             )?;
+            // Write sunrise_level only after the block has been committed, so
+            // it is atomic with the Tezos genesis block existing in storage.
+            if chain_config.is_tezos_runtime_enabled(processed_blueprint)
+                && crate::storage::read_michelson_runtime_sunrise_level(safe_host.host)
+                    .is_none()
+            {
+                crate::storage::store_michelson_runtime_sunrise_level(
+                    safe_host.host,
+                    processed_blueprint,
+                )?;
+            }
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
             if safe_host.is_evm_node() {
