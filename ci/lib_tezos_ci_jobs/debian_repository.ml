@@ -268,102 +268,74 @@ let job_install_bin_debian_bookworm =
     ~release:"bookworm"
     []
 
-let job_install_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun pipeline_type ->
+let make_systemd_test_job ~script ~distribution ~release =
   CI.job
-    "oc.install_bin_ubuntu_24_04_systemd"
-    ~__POS__
     ~stage:Test_publication
-    ~description:"Check that Debian packages that use systemd can be installed."
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~image:Images_external.docker
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
       @ make_debian_variables
-          "ubuntu"
+          distribution
           "systemd"
-          "24.04"
+          release
           Tezos_ci.Images.Base_images.debian_version)
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/systemd-packages-test.sh \
-       scripts/packaging/tests/deb/install-bin-deb.sh \
-       images/packages/debian-systemd-tests.Dockerfile";
-    ]
+    ~script:
+      [
+        "./scripts/ci/docker_initialize.sh";
+        "./scripts/ci/systemd-packages-test.sh " ^ script
+        ^ " images/packages/debian-systemd-tests.Dockerfile";
+      ]
+
+let make_systemd_install_job =
+  make_systemd_test_job
+    ~description:"Check that Debian packages that use systemd can be installed."
+    ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
+
+let make_systemd_upgrade_job =
+  make_systemd_test_job
+    ~description:"Check the upgrade process in a systemd enabled Docker image."
+    ~script:"scripts/packaging/tests/deb/upgrade-systemd-test.sh"
+
+let job_install_bin_ubuntu_24_04_systemd =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_systemd_install_job
+    "oc.install_bin_ubuntu_24_04_systemd"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
+    ~distribution:"ubuntu"
+    ~release:"24.04"
+    []
 
 let job_upgrade_bin_ubuntu_22_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_systemd_upgrade_job
     "oc.upgrade_bin_ubuntu_22_04_systemd"
     ~__POS__
-    ~stage:Test_publication
-    ~description:"Check that Debian packages that use systemd can be upgraded."
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images_external.docker
-    ~variables:
-      ([("DOCKER_VERSION", Docker.version)]
-      @ make_debian_variables
-          "ubuntu"
-          "systemd"
-          "22.04"
-          Tezos_ci.Images.Base_images.debian_version)
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/systemd-packages-test.sh \
-       scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-       images/packages/debian-systemd-tests.Dockerfile";
-    ]
+    ~distribution:"ubuntu"
+    ~release:"22.04"
+    []
 
 let job_upgrade_bin_ubuntu_24_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_systemd_upgrade_job
     "oc.upgrade_bin_ubuntu_24_04_systemd"
     ~__POS__
-    ~stage:Test_publication
-    ~description:"Check that Debian packages that use systemd can be upgraded."
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~image:Images_external.docker
-    ~variables:
-      ([("DOCKER_VERSION", Docker.version)]
-      @ make_debian_variables
-          "ubuntu"
-          "systemd"
-          "24.04"
-          Tezos_ci.Images.Base_images.debian_version)
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/systemd-packages-test.sh \
-       scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-       images/packages/debian-systemd-tests.Dockerfile";
-    ]
+    ~distribution:"ubuntu"
+    ~release:"24.04"
+    []
 
 let job_install_bin_debian_bookworm_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_systemd_install_job
     "oc.install_bin_debian_bookworm_systemd"
     ~__POS__
-    ~stage:Test_publication
-    ~description:
-      "Check the installation process in a systemd enabled Docker image."
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~image:Images_external.docker
-    ~variables:
-      ([("DOCKER_VERSION", Docker.version)]
-      @ make_debian_variables
-          "debian"
-          "systemd"
-          "bookworm"
-          Tezos_ci.Images.Base_images.debian_version)
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/systemd-packages-test.sh \
-       scripts/packaging/tests/deb/install-bin-deb.sh \
-       images/packages/debian-systemd-tests.Dockerfile";
-    ]
+    ~distribution:"debian"
+    ~release:"bookworm"
+    []
 
 (* Note: this job is in the publish stage because it depends on a job
    that is in the publish stage, but it is a test.
@@ -371,27 +343,13 @@ let job_install_bin_debian_bookworm_systemd =
    and only then publish them in the publish stage. *)
 let job_upgrade_bin_debian_bookworm_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_systemd_upgrade_job
     "oc.upgrade_bin_debian_bookworm-systemd"
     ~__POS__
-    ~stage:Test_publication
-    ~description:"Check the upgrade process in a systemd enabled Docker image."
     ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~image:Images_external.docker
-    ~variables:
-      ([("DOCKER_VERSION", Docker.version)]
-      @ make_debian_variables
-          "debian"
-          "systemd"
-          "bookworm"
-          Tezos_ci.Images.Base_images.debian_version)
-    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
-    [
-      "./scripts/ci/docker_initialize.sh";
-      "./scripts/ci/systemd-packages-test.sh \
-       scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-       images/packages/debian-systemd-tests.Dockerfile";
-    ]
+    ~distribution:"debian"
+    ~release:"bookworm"
+    []
 
 let () =
   (* In merge pipelines we tests only Debian.
