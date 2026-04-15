@@ -126,23 +126,6 @@ let job_build_data_packages ~manual : tezos_job =
    for more info. *)
 let cargo_network_hack = "export CARGO_NET_OFFLINE=false"
 
-let make_job_build_packages ~__POS__ ~name ~matrix ~distribution ~script
-    ~dependencies ?(manual = false) () =
-  job
-    ~__POS__
-    ~name
-    ~image:build_dependency_image
-    ~stage:Stages.build
-    ?rules:
-      (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
-    ~variables:[("DISTRIBUTION", distribution); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix matrix)
-    ~dependencies
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-    [cargo_network_hack; script]
-  |> Tezos_ci.Cache.enable_sccache
-
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
 let job_build_debian_package =
