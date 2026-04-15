@@ -42,7 +42,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
-    wei::{eth_from_mutez, mutez_from_wei},
+    wei::{eth_from_mutez, gas_to_mutez, mutez_from_wei},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
@@ -940,21 +940,18 @@ fn get_fees_data(
     } else {
         let required_da_fees = get_required_da_fees(operation, da_fee_per_byte_mutez)?;
 
-        let required_execution_gas_fees = {
-            let total_gas_limit: u64 = operation
-                .content
-                .iter()
-                .filter_map(|c| c.gas_limit().ok())
-                .filter_map(|gl| gl.0.to_u64())
-                .try_fold(0u64, |acc, x| acc.checked_add(x))
-                .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
-            let gas_fee_wei = base_fee_per_gas
-                * U256::from(michelson_to_evm_gas_multiplier)
-                * U256::from(total_gas_limit);
-            // NB: Convert back to mutez with a floor division.
-            // (precision loss if gas_fee_wei < 1 mutez)
-            (gas_fee_wei / U256::exp10(12)).low_u64()
-        };
+        let total_gas_limit: u64 = operation
+            .content
+            .iter()
+            .filter_map(|c| c.gas_limit().ok())
+            .filter_map(|gl| gl.0.to_u64())
+            .try_fold(0u64, |acc, x| acc.checked_add(x))
+            .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+        let required_execution_gas_fees = gas_to_mutez(
+            base_fee_per_gas,
+            michelson_to_evm_gas_multiplier,
+            total_gas_limit,
+        );
 
         let required_fees = required_da_fees.saturating_add(required_execution_gas_fees);
 
