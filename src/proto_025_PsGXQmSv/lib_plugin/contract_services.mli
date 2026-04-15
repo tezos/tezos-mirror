@@ -227,6 +227,13 @@ val stez_redeemed_finalizable_balance :
   Contract.t ->
   Tez.t option shell_tzresult Lwt.t
 
+val stez_bakers :
+  'a #RPC_context.simple ->
+  'a ->
+  (Signature.public_key_hash * Protocol.Clst_delegates_parameters_repr.t) list
+  shell_tzresult
+  Lwt.t
+
 val register : unit -> unit
 
 (** Functions used in the implementation of this file's RPCs, but also
