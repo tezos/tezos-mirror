@@ -4807,8 +4807,8 @@ module S = struct
          via the SWRR algorithm. If the 'cycle' parameter is not provided, \
          defaults to the current cycle. Returns 'null' if the baking rights \
          for this cycle have not been computed yet or have already been \
-         cleaned from the context, or if the 'swrr_new_baker_lottery_enable' \
-         feature flag is not enabled."
+         cleaned from the context. Fails with a 'non_activated_feature' error \
+         if the 'swrr_new_baker_lottery_enable' feature flag is not enabled."
       ~query:cycle_query
       ~output:
         Data_encoding.(
@@ -4819,7 +4819,10 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the current SWRR state which contains the remaining credits \
-         for all the active delegates."
+         for all the active delegates. Delegates whose credits have not been \
+         initialized yet are returned with a credit of zero. Fails with a \
+         'non_activated_feature' error if the 'swrr_new_baker_lottery_enable' \
+         feature flag is not enabled."
       ~query:RPC_query.empty
       ~output:Data_encoding.(list swrr_credit_entry_encoding)
       RPC_path.(path / "swrr_credits")
@@ -4917,24 +4920,35 @@ let register () =
       in
       return (total_stake_weight, stake_info_list)) ;
   Registration.register0 ~chunked:false S.swrr_selected_bakers (fun ctxt q () ->
-      let cycle =
-        Option.value ~default:(Cycle.current ctxt) q
-        |> Cycle.to_int32 |> Cycle_repr.of_int32_exn
-      in
-      let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
-      Storage.Stake.Selected_bakers.find ctxt cycle) ;
+      if not (Constants.parametric ctxt).swrr_new_baker_lottery_enable then
+        Environment.Error_monad.tzfail
+          (Contract_services.Non_activated_feature SWRR)
+      else
+        let cycle =
+          Option.value ~default:(Cycle.current ctxt) q
+          |> Cycle.to_int32 |> Cycle_repr.of_int32_exn
+        in
+        let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+        Storage.Stake.Selected_bakers.find ctxt cycle) ;
   Registration.register0 ~chunked:false S.swrr_credits (fun ctxt () () ->
-      let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
-      Stake_storage.fold_on_active_delegates_with_minimal_stake_es
-        ctxt
-        ~order:`Undefined
-        ~init:[]
-        ~f:(fun pkh acc ->
-          let* credit =
-            Storage.Contract.SWRR_credit.get ctxt (Contract_repr.Implicit pkh)
-          in
-          let entry = {delegate = pkh; credit} in
-          return (entry :: acc))) ;
+      if not (Constants.parametric ctxt).swrr_new_baker_lottery_enable then
+        Environment.Error_monad.tzfail
+          (Contract_services.Non_activated_feature SWRR)
+      else
+        let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+        Stake_storage.fold_on_active_delegates_with_minimal_stake_es
+          ctxt
+          ~order:`Undefined
+          ~init:[]
+          ~f:(fun pkh acc ->
+            let* credit_opt =
+              Storage.Contract.SWRR_credit.find
+                ctxt
+                (Contract_repr.Implicit pkh)
+            in
+            let credit = Option.value ~default:Z.zero credit_opt in
+            let entry = {delegate = pkh; credit} in
+            return (entry :: acc))) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio
