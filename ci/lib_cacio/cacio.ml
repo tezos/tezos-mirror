@@ -780,6 +780,7 @@ module type COMPONENT_API = sig
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     ?id_tokens:Gitlab_ci.Types.id_tokens ->
+    ?script:string list ->
     string ->
     string list ->
     job
@@ -989,8 +990,17 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
-      ?timeout ?(image_dependencies = []) ?services ?id_tokens name script =
+      ?timeout ?(image_dependencies = []) ?services ?id_tokens ?(script = [])
+      name script2 =
     let name = make_name name in
+    let script =
+      match (script, script2) with
+      | [], x | x, [] -> x
+      | _ :: _, _ :: _ ->
+          invalid_arg
+            "Cacio.job: cannot specify both ?script and the unnamed script \
+             argument"
+    in
     declared_jobs := String_map.add name source_location !declared_jobs ;
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
