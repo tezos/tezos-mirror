@@ -4725,6 +4725,11 @@ module Clst : sig
         tez redeemed by [contract]. *)
     val get_unfinalizable_redeemed_balance :
       context -> Contract.t -> Tez.t option tzresult Lwt.t
+
+    (** [registered_delegates ctxt] returns the list of registered delegates with
+      their parameters. *)
+    val registered_delegates :
+      context -> (Contract.t * Clst_delegates_parameters_repr.t) list Lwt.t
   end
 end
 
