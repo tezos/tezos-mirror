@@ -90,23 +90,6 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
         ];
       ]
 
-(* data packages. we build them once *)
-let job_build_data_packages =
-  CI.job
-    "oc.build-data_packages"
-    ~__POS__
-    ~description:"Build the Debian packages that contain Tezos data."
-    ~image:build_dependency_image
-    ~stage:Build
-    ~variables:
-      [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-    [
-      "export CARGO_NET_OFFLINE=false";
-      "./scripts/ci/build-debian-packages.sh zcash";
-    ]
-
 (* This is a hack to enable Cargo networking for jobs in child pipelines.
 
    Global variables of the parent pipeline
@@ -122,6 +105,20 @@ let job_build_data_packages =
    {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
    for more info. *)
 let cargo_network_hack = "export CARGO_NET_OFFLINE=false"
+
+(* data packages. we build them once *)
+let job_build_data_packages =
+  CI.job
+    "oc.build-data_packages"
+    ~__POS__
+    ~description:"Build the Debian packages that contain Tezos data."
+    ~image:build_dependency_image
+    ~stage:Build
+    ~variables:
+      [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh zcash"]
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
