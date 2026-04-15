@@ -655,7 +655,6 @@ end
 (** This benchmark estimates the cost of installing a boot sector. *)
 module Sc_rollup_install_boot_sector_benchmark = struct
   open Pvm_state_generator
-  module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
   (* Benchmark starts here. *)
 
@@ -706,7 +705,12 @@ module Sc_rollup_install_boot_sector_benchmark = struct
     let boot_sector = uniform_string ~nbytes:boot_sector_length rng_state in
     let state = empty_tree in
 
-    let closure () = ignore (Full_Wasm.install_boot_sector state boot_sector) in
+    let closure () =
+      let (module Full_Wasm) =
+        Sc_rollup_wasm.V2_0_0.protocol_implementation ~config:[]
+      in
+      ignore (Full_Wasm.install_boot_sector state boot_sector)
+    in
     Generator.Plain {workload; closure}
 end
 

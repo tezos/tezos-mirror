@@ -408,7 +408,7 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
   (* Lookup the PVM of the rollup. *)
   let* ctxt, Packed (module PVM) =
     let+ ctxt, kind = Sc_rollup.kind ctxt rollup in
-    (ctxt, Sc_rollup.Kind.pvm_of kind)
+    (ctxt, Sc_rollup.Kind.pvm_of ~config:[] kind)
   in
   let output_proof_length = String.length output_proof in
   let*? ctxt =

@@ -453,10 +453,13 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
   | None -> (
       let play_cost = Sc_rollup_game_repr.cost_play ~step ~choice in
       let*? ctxt = Raw_context.consume_gas ctxt play_cost in
+      let* signals = Sc_rollup_storage.signals ctxt in
 
       let* move_result =
         Sc_rollup_game_repr.play
           kind
+          ~config:
+            (List.map (fun (s, l) -> (s, Raw_level_repr.to_int32 l)) signals)
           ~dal_activation_level
           ~find_dal_parameters:(Dal_storage.parameters ctxt)
           ~stakers

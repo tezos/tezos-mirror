@@ -4070,7 +4070,7 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val pvm_of : t -> PVM.t
+    val pvm_of : config:Wasm_2_0_0.config -> t -> PVM.t
 
     val all : t list
 
@@ -4162,11 +4162,12 @@ module Sc_rollup : sig
          and type state = WASM_machine.state
          and type proof = WASM_machine.proof
 
-    module Protocol_implementation :
-      PVM.PROTO_VERIFICATION
-        with type context = Wasm_2_0_0.Wasm_pvm_machine.context
-         and type state = Wasm_2_0_0.Wasm_pvm_machine.state
-         and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
+    val protocol_implementation :
+      config:Wasm_2_0_0.config ->
+      (module PVM.PROTO_VERIFICATION
+         with type context = Wasm_2_0_0.wasm_pvm_machine_context
+          and type state = Wasm_2_0_0.wasm_pvm_machine_state
+          and type proof = Wasm_2_0_0.wasm_pvm_machine_proof)
   end
 
   module Riscv_PVM : sig
@@ -4442,6 +4443,7 @@ module Sc_rollup : sig
 
     val play :
       Kind.t ->
+      config:Wasm_2_0_0.config ->
       dal_activation_level:Raw_level.t option ->
       find_dal_parameters:
         (Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t) ->
