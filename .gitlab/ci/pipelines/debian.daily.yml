@@ -37,7 +37,7 @@ oc.build-data_packages:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: false
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
