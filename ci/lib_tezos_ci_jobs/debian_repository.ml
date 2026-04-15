@@ -99,51 +99,51 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
    for more info. *)
 let cargo_network_hack = "export CARGO_NET_OFFLINE=false"
 
+let make_package_build_job ~target =
+  CI.job
+    ~image:build_dependency_image
+    ~stage:Build
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~script:
+      [cargo_network_hack; "./scripts/ci/build-debian-packages.sh " ^ target]
+
 (* data packages. we build them once *)
 let job_build_data_packages =
-  CI.job
+  make_package_build_job
     "oc.build-data_packages"
     ~__POS__
     ~description:"Build the Debian packages that contain Tezos data."
-    ~image:build_dependency_image
-    ~stage:Build
     ~variables:
       [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh zcash"]
+    ~target:"zcash"
+    []
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
 let job_build_debian =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_package_build_job
     "oc.build-debian"
     ~__POS__
     ~description:"Build the Debian packages for Debian."
-    ~image:build_dependency_image
-    ~stage:Build
     ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
     ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     ~sccache:(Cacio.sccache ())
-    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
+    ~target:"binaries"
+    []
 
 let job_build_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_package_build_job
     "oc.build-ubuntu"
     ~__POS__
     ~description:"Build the Debian packages for Ubuntu."
-    ~image:build_dependency_image
-    ~stage:Build
     ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
     ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     ~sccache:(Cacio.sccache ())
-    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
+    ~target:"binaries"
+    []
 
 let job_apt_repo_debian =
   Cacio.parameterize @@ fun pipeline_type ->
