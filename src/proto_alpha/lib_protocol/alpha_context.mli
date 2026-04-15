@@ -1269,6 +1269,11 @@ end
     not be used otherwise. *)
 module Internal_for_tests : sig
   val to_raw : context -> Raw_context.t
+
+  val patch_constants :
+    context ->
+    (Constants.Parametric.t -> Constants.Parametric.t) ->
+    context Lwt.t
 end
 
 (** This module re-exports definitions from {!Level_repr} and
@@ -3660,6 +3665,8 @@ module Sc_rollup : sig
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
 
+  val enable_signal : context -> string -> context tzresult Lwt.t
+
   val reveal_encoding : reveal Data_encoding.t
 
   val pp_reveal : Format.formatter -> reveal -> unit
@@ -4615,6 +4622,10 @@ module Sc_rollup : sig
     must not be used otherwise. *)
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
+
+    val is_signal_enable : context -> string -> bool tzresult Lwt.t
+
+    val signals : context -> (string * Raw_level.t) list tzresult Lwt.t
   end
 end
 
