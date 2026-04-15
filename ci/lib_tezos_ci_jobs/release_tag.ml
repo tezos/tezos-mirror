@@ -460,6 +460,7 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_promote_to_version `real);
       (Manual, job_release_page_packaging_revision `real);
+      (Manual, Debian_repository.job_build_ubuntu_package Release);
       (Auto, Debian_repository.job_apt_repo_debian false Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
     ] ;
@@ -473,6 +474,7 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_docker_promote_to_version `test);
       (Manual, job_release_page_packaging_revision `test);
+      (Manual, Debian_repository.job_build_ubuntu_package Release);
       (Auto, Debian_repository.job_apt_repo_debian false Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
     ] ;

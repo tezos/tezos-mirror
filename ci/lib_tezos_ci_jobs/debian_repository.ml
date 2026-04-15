@@ -156,16 +156,20 @@ let job_build_debian_package ~manual pipeline_type : tezos_job =
     ~manual
     ()
 
-let job_build_ubuntu_package ~manual pipeline_type : tezos_job =
-  make_job_build_packages
+let job_build_ubuntu_package =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.build-ubuntu"
     ~__POS__
-    ~name:"oc.build-ubuntu"
-    ~distribution:"ubuntu"
-    ~dependencies:(Dependent [])
-    ~script:"./scripts/ci/build-debian-packages.sh binaries"
-    ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
-    ~manual
-    ()
+    ~description:"Build the Debian packages for Ubuntu."
+    ~image:build_dependency_image
+    ~stage:Build
+    ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
+    ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~sccache:(Cacio.sccache ())
+    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
 
 let job_apt_repo_debian =
   Cacio.parameterize @@ fun manual ->
@@ -200,11 +204,8 @@ let job_apt_repo_ubuntu =
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs_legacy:
-      [
-        (Artifacts, job_build_ubuntu_package ~manual pipeline_type);
-        (Artifacts, job_build_data_packages ~manual);
-      ]
+    ~needs:[(Artifacts, job_build_ubuntu_package pipeline_type)]
+    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -218,14 +219,13 @@ let job_apt_repo_ubuntu =
     ]
 
 let job_lintian_ubuntu =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.lintian_ubuntu"
     ~__POS__
     ~stage:Test_publication
     ~description:"Run lintian on Debian packages."
-    ~needs_legacy:[(Artifacts, job_build_ubuntu_package ~manual pipeline_type)]
+    ~needs:[(Artifacts, job_build_ubuntu_package pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     [
       ". ./scripts/version.sh";
@@ -439,7 +439,7 @@ let () =
     [
       (Auto, job_apt_repo_debian false Full);
       (Auto, job_apt_repo_ubuntu false Full);
-      (Auto, job_lintian_ubuntu false Full);
+      (Auto, job_lintian_ubuntu Full);
       (Auto, job_lintian_debian false Full);
       (Auto, job_install_bin_ubuntu_22_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04 false Full);
@@ -457,17 +457,10 @@ let () =
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(manual = false) pipeline_type =
-  let debian_jobs =
-    [
-      job_build_debian_package ~manual pipeline_type;
-      job_build_data_packages ~manual;
-    ]
-  in
-  let ubuntu_jobs = [job_build_ubuntu_package ~manual pipeline_type] in
-  match pipeline_type with
-  | Partial -> debian_jobs
-  | Full -> debian_jobs @ ubuntu_jobs
-  | Release -> debian_jobs @ ubuntu_jobs
+  [
+    job_build_debian_package ~manual pipeline_type;
+    job_build_data_packages ~manual;
+  ]
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =
