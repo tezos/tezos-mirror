@@ -29,6 +29,8 @@ type error += Cannot_load_local_file of string
 
 type error += Broken_locked_values_invariant
 
+type error += Forge_worker_unavailable
+
 let register_error_kind category ~id ~title ~description ~pp encoding from_error
     to_error =
   Error_monad.register_error_kind
@@ -73,7 +75,17 @@ let () =
         "The expected consistency invariant on locked values does not hold")
     Data_encoding.unit
     (function Broken_locked_values_invariant -> Some () | _ -> None)
-    (fun () -> Broken_locked_values_invariant)
+    (fun () -> Broken_locked_values_invariant) ;
+  register_error_kind
+    `Temporary
+    ~id:"Forge_worker.unavailable"
+    ~title:"Forge worker unavailable"
+    ~description:"The forge worker is unavailable (queue closed or crashed)."
+    ~pp:(fun fmt () ->
+      Format.fprintf fmt "Forge worker unavailable (queue closed or crashed)")
+    Data_encoding.unit
+    (function Forge_worker_unavailable -> Some () | _ -> None)
+    (fun () -> Forge_worker_unavailable)
 
 type signing_request = [`Preattestation | `Attestation | `Block_header]
 
@@ -311,6 +323,40 @@ let () =
       | _ -> None)
     (fun (chain, block_hash, length) ->
       Unexpected_empty_block_list {chain; block_hash; length})
+
+type error +=
+  | Inconsistent_chain_id of {
+      uri : string;
+      expected : Chain_id.t;
+      found : Chain_id.t;
+    }
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_scheduling.inconsistent_chain_id"
+    ~title:"Inconsistent chain id"
+    ~description:
+      "The node's chain id does not match the baker's expected chain id."
+    ~pp:(fun ppf (uri, expected, found) ->
+      Format.fprintf
+        ppf
+        "Baking automaton %s: expected chain id %a but found %a."
+        uri
+        Chain_id.pp
+        expected
+        Chain_id.pp
+        found)
+    Data_encoding.(
+      obj3
+        (req "uri" string)
+        (req "expected" Chain_id.encoding)
+        (req "found" Chain_id.encoding))
+    (function
+      | Inconsistent_chain_id {uri; expected; found} ->
+          Some (uri, expected, found)
+      | _ -> None)
+    (fun (uri, expected, found) -> Inconsistent_chain_id {uri; expected; found})
 
 (* BLS related errors *)
 type error +=

@@ -487,6 +487,9 @@ type automaton_state = {
   cctxt : Protocol_client_context.full;
   validation_mode : validation_mode;
   operation_worker : Operation_worker.t;
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
+  push_forge_event : forge_event -> unit;
+  forge_event_stream : forge_event Lwt_stream.t;
 }
 
 type forge_request_content =
@@ -504,8 +507,7 @@ type forge_request = {
 }
 
 type forge_worker_hooks = {
-  push_request : forge_request -> bool Lwt.t;
-  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+  push_request : forge_request -> unit tzresult Lwt.t;
   cancel_all_pending_tasks : unit -> unit;
 }
 
@@ -518,8 +520,6 @@ type global_state = {
   round_durations : Round.round_durations;
   (* protocol constants *)
   constants : Constants.t;
-  (* worker that retrieves DAL attestable slots from the DAL node *)
-  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   (* hooks to the consensus and block forge worker *)
   mutable forge_worker_hooks : forge_worker_hooks;
   (* the delegates on behalf of which the baker is running *)

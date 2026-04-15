@@ -292,7 +292,7 @@ let sign_block_header (cctxt : Protocol_client_context.full) round_duration
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let prepare_block (automaton_state : automaton_state)
+let prepare_unsigned_block (automaton_state : automaton_state)
     (global_state : global_state) (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
@@ -420,7 +420,7 @@ let prepare_block (automaton_state : automaton_state)
   let*! () =
     Events.(emit forging_block (level, round, delegate, force_apply))
   in
-  let* {unsigned_block_header; operations; manager_operations_infos} =
+  let* unsigned_block =
     Utils.event_on_stalling_promise
       ~initial_delay:(round_duration /. 2.)
       ~event:(fun sum -> Events.(emit stalling_forge_block (level, round, sum)))
@@ -443,6 +443,21 @@ let prepare_block (automaton_state : automaton_state)
           global_state.constants.parametric
         [@profiler.record_s {verbosity = Info} "forge block"])
   in
+  return (unsigned_block, seed_nonce_opt, injection_level, liquidity_baking_vote)
+
+let sign_unsigned_block_and_register_seed_nonce
+    Block_forge.{unsigned_block_header; operations; manager_operations_infos}
+    automaton_state global_state block_to_bake seed_nonce_opt
+    (injection_level : Level.t) liquidity_baking_vote =
+  let cctxt = automaton_state.cctxt in
+  let {predecessor; round; delegate; _} = block_to_bake in
+  let level = Int32.succ predecessor.shell.level in
+  let chain_id = global_state.chain_id in
+  let round_duration =
+    Round.round_duration global_state.round_durations round
+    |> Period.to_seconds |> Int64.to_float
+  in
+  let open Lwt_result_syntax in
   let*! () = Events.(emit signing_block (level, round, delegate)) in
   let* signed_block_header =
     (sign_block_header
@@ -584,7 +599,7 @@ let trap_slot_indices slots =
     slots
   |> List.rev
 
-let emit_dal_attestation_logs ~delegate_id ~attested_level
+let emit_dal_attestation_logs ~automaton_name ~delegate_id ~attested_level
     ~no_dal_attestations_levels ~dal_trap_slots_per_level ~dal_content
     ~published_levels ~level ~round =
   let open Lwt_syntax in
@@ -597,7 +612,7 @@ let emit_dal_attestation_logs ~delegate_id ~attested_level
       Events.(
         emit
           no_attestable_dal_slots_for_levels
-          (delegate_id, attested_level, published_levels_str))
+          (automaton_name, delegate_id, attested_level, published_levels_str))
     else return_unit
   in
   let* () =
@@ -632,7 +647,7 @@ let may_get_dal_content state consensus_vote =
   in
   let delegate_id = Delegate.delegate_id delegate in
   let dal_attestable_slots_worker =
-    state.global_state.dal_attestable_slots_worker
+    state.automaton_state.dal_attestable_slots_worker
   in
   only_if_dal_feature_enabled
     state
@@ -726,6 +741,7 @@ let may_get_dal_content state consensus_vote =
       let dal_content = {attestations = dal_attestations} in
       let* () =
         emit_dal_attestation_logs
+          ~automaton_name:state.automaton_state.name
           ~delegate_id
           ~attested_level
           ~no_dal_attestations_levels
@@ -1365,7 +1381,7 @@ let update_to_level state level_update =
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
         Dal_attestable_slots_worker.update_streams_subscriptions
-          state.global_state.dal_attestable_slots_worker
+          state.automaton_state.dal_attestable_slots_worker
           dal_node_rpc_ctxt
           ~delegate_ids:next_level_delegate_ids)
   in
@@ -1413,7 +1429,7 @@ let prepare_block_request state block_to_bake =
       request = Forge_and_sign_block block_to_bake;
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_preattestations_request state unsigned_preattestations =
@@ -1424,7 +1440,7 @@ let prepare_preattestations_request state unsigned_preattestations =
       request = Forge_and_sign_preattestations {unsigned_preattestations};
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_attestations_request state unsigned_attestations =
@@ -1440,7 +1456,7 @@ let prepare_attestations_request state unsigned_attestations =
           {unsigned_attestations = unsigned_attestations_with_dal};
     }
   in
-  let*! _ = state.global_state.forge_worker_hooks.push_request request in
+  let* () = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539

@@ -737,6 +737,41 @@ module Scheduling = struct
         "The DAL node has no registered attester profile. It is recommended to \
          start the DAL node with '--attester-profiles <manager_key>'."
       ()
+
+  let supervisor_starting_automaton =
+    declare_1
+      ~section
+      ~name:"supervisor_starting_automaton"
+      ~level:Notice
+      ~msg:"Supervisor: starting automaton for node {uri}"
+      ("uri", Data_encoding.string)
+
+  let supervisor_automaton_crashed =
+    declare_1
+      ~section
+      ~name:"supervisor_automaton_crashed"
+      ~level:Warning
+      ~msg:
+        "Supervisor: automaton for node {uri} crashed, restarting the \
+         connection."
+      ("uri", Data_encoding.string)
+
+  let supervisor_automaton_retry =
+    declare_1
+      ~section
+      ~name:"supervisor_automaton_retry"
+      ~level:Warning
+      ~msg:"Supervisor: retrying connection to node {uri}."
+      ~pp1:Format.pp_print_string
+      ("uri", Data_encoding.string)
+
+  let supervisor_all_down =
+    declare_0
+      ~section
+      ~name:"supervisor_all_automatons_down"
+      ~level:Error
+      ~msg:"Supervisor: all automatons are simultaneously down, shutting down"
+      ()
 end
 
 module Lib = struct
@@ -799,12 +834,23 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_forge_block =
+  let failed_to_prepare_block =
     declare_2
       ~section
-      ~name:"failed_to_forge_block"
+      ~name:"failed_to_prepare_block"
       ~level:Error
-      ~msg:"failed to forge block for {delegate} -- {trace}"
+      ~msg:"failed to prepare block for {delegate} -- {trace}"
+      ~pp1:Delegate.pp
+      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let failed_to_sign_block =
+    declare_2
+      ~section
+      ~name:"failed_to_sign_block"
+      ~level:Error
+      ~msg:"failed to sign block for {delegate} -- {trace}"
       ~pp1:Delegate.pp
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Error_monad.pp_print_trace
@@ -1119,17 +1165,21 @@ module Actions = struct
       ~pp3:Error_monad.pp_print_trace
 
   let no_attestable_dal_slots_for_levels =
-    declare_3
+    declare_4
       ~section
       ~name:"no_attestable_dal_slots_for_levels"
       ~level:Warning
       ~msg:
-        "No DAL attestation data received for {delegate_id} at attested level \
-         {attested_level} for published levels [{published_levels}]"
+        "[{automaton_name}] No DAL attestation data received for {delegate_id} \
+         at attested level {attested_level} for published levels \
+         [{published_levels}]"
+      ~pp1:Format.pp_print_string
+      ("automaton_name", Data_encoding.string)
       ("delegate_id", Delegate_id.encoding)
+      ~pp3:pp_int32
       ("attested_level", Data_encoding.int32)
+      ~pp4:Format.pp_print_string
       ("published_levels", Data_encoding.string)
-      ~pp3:Format.pp_print_string
 
   let dal_slots_not_attested_due_to_traps =
     declare_2
@@ -1220,20 +1270,22 @@ module Nonces = struct
       ("level", Raw_level.encoding)
 
   let revealing_nonce =
-    declare_3
+    declare_4
       ~alternative_color:Internal_event.Cyan
       ~section
       ~name:"revealing_nonce"
       ~level:Notice
       ~msg:
         "revealing nonce of level {level} (chain {chain} with operation \
-         {ophash})"
+         {ophash} injected to {node})"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
       ~pp2:Format.pp_print_string
       ("chain", Data_encoding.string)
       ~pp3:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
+      ~pp4:Format.pp_print_string
+      ("node", Data_encoding.string)
 
   let cannot_fetch_chain_head_level =
     declare_0
@@ -1314,6 +1366,18 @@ module Nonces = struct
       ~level:Info
       ~msg:"revelation worker started"
       ()
+
+  let revelation_worker_new_proposal =
+    declare_3
+      ~section
+      ~name:"revelation_worker_new_proposal"
+      ~level:Debug
+      ~msg:"revelation worker received proposal at level {level} from {uri}"
+      ~pp1:pp_int32
+      ("level", Data_encoding.int32)
+      ("uri", Data_encoding.string)
+      ~pp3:Block_hash.pp
+      ("block", Block_hash.encoding)
 
   let success_migrate_nonces =
     declare_0
@@ -1467,6 +1531,14 @@ module Forge_worker = struct
       ~msg:"error while authorizing consensus votes: {errors}"
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
+
+  let forge_worker_unavailable =
+    declare_0
+      ~section
+      ~name:"forge_worker_unavailable"
+      ~level:Error
+      ~msg:"forge worker unavailable (queue closed or crashed)"
+      ()
 end
 
 module Client_daemon = struct

@@ -22,14 +22,16 @@ type loop_state
 
 (** {2 Functions used by the baker} *)
 
-(** [retry ctxt ~delay ?max_delay ~factor ~tries ?msg f x] retries applying [f
-    x] [tries] until it succeeds or returns an error different from
-    [Connection_failed], at most [tries] number of times. After each try it
-    waits for a number of seconds, but not more than [max_delay], if given. The
-    wait time between tries is given by the initial [delay], multiplied by
-    [factor] at each subsequent try. At each failure, [msg] together with the
-    current delay is printed using [ctxt#message].*)
+(** [retry ?is_error ?emit ctxt ~delay ?max_delay ~factor ~tries ?msg f x]
+    retries applying [f x] [tries] until it succeeds or returns an error
+    different from [Connection_failed], at most [tries] number of times. After
+    each try it waits for a number of seconds, but not more than [max_delay], if
+    given. The wait time between tries is given by the initial [delay],
+    multiplied by [factor] at each subsequent try. At each failure, [msg]
+    together with the current delay is printed using [ctxt#message].*)
 val retry :
+  ?is_error:(error -> bool) ->
+  ?emit:(string -> unit Lwt.t) ->
   #Protocol_client_context.full ->
   ?max_delay:float ->
   delay:float ->
@@ -90,12 +92,13 @@ val compute_bootstrap_event : state -> event tzresult
 (** [create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
     ~on_head_proposal_callback operation_worker] creates a loop state with the
     streams of valid blocks, new heads, forged events and operations from the
-    node's mempool. *)
+    node's mempool. The callback takes the [cctxt] of the node that sent the
+    proposal, followed by the [proposal] itself. *)
 val create_loop_state :
   ?get_valid_blocks_stream:proposal Lwt_stream.t Lwt.t ->
   heads_stream:proposal Lwt_stream.t ->
   forge_event_stream:forge_event Lwt_stream.t ->
-  on_head_proposal_callback:(proposal -> unit) ->
+  on_head_proposal_callback:(Protocol_client_context.full -> proposal -> unit) ->
   Operation_worker.t ->
   loop_state
 
@@ -133,6 +136,7 @@ val automaton_loop :
 val create_automaton_state :
   ?canceler:Lwt_canceler.t ->
   ?monitor_node_operations:bool ->
+  multi_node_setup:bool ->
   global_state:global_state ->
   Protocol_client_context.full ->
   automaton_state tzresult Lwt.t

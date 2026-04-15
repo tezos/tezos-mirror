@@ -37,7 +37,7 @@ type state = {
   legacy_location : [`Legacy_nonce] Baking_files.location;
   stateful_location : [`Stateful_nonce] Baking_files.location;
   orphaned_location : [`Orphaned_nonce] Baking_files.location;
-  mutable last_predecessor : Block_hash.t;
+  mutable last_seen_level : int32 option;
 }
 
 type t = state
@@ -517,36 +517,38 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
             Events.(
               emit
                 revealing_nonce
-                (Raw_level.to_int32 level, Chain_services.to_string chain, oph))
+                ( Raw_level.to_int32 level,
+                  Chain_services.to_string chain,
+                  oph,
+                  Uri.to_string cctxt#base ))
           in
           return_unit)
         nonces
 
 (** [reveal_potential_nonces state new_proposal] updates the internal [state]
-    of the worker each time a proposal with a new predecessor is received; this means
+    of the worker each time a proposal with a higher level is received; this means
     revealing the necessary nonces. *)
 let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
   let open Lwt_result_syntax in
-  let {
-    cctxt;
-    chain;
-    legacy_location;
-    stateful_location;
-    orphaned_location;
-    last_predecessor;
-    _;
-  } =
+  let {cctxt; chain; legacy_location; stateful_location; orphaned_location; _} =
     state
   in
-  let new_predecessor_hash = new_proposal.Baking_state_types.predecessor.hash in
+  let branch = new_proposal.Baking_state_types.block.hash in
+  let new_level = new_proposal.block.shell.level in
+  let should_process =
+    match state.last_seen_level with
+    | None -> true
+    | Some last_level -> Int32.compare new_level last_level > 0
+  in
+  (* Track the highest predecessor level seen to process each level at most once.
+     This prevents redundant nonce revelation attempts in scenarios such as:
+     - Chain reorganizations (temporary switch to lower-level competing branches)
+     - Multiple proposals at the same level (rounds)
+     - Stale proposals arriving late from the network or queue (in multi-node baker setup) *)
   if
-    Block_hash.(last_predecessor <> new_predecessor_hash)
-    && not (Baking_state.is_first_block_in_protocol new_proposal)
+    should_process && not (Baking_state.is_first_block_in_protocol new_proposal)
   then (
-    (* only try revealing nonces when the proposal's predecessor is a new one *)
-    state.last_predecessor <- new_predecessor_hash ;
     let block = `Head 0 in
-    let branch = new_predecessor_hash in
     (* improve concurrency *)
     () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
     cctxt#with_lock @@ fun () ->
@@ -622,7 +624,10 @@ let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
                      ~orphaned_location
                      updated_nonces
                    [@profiler.record_s {verbosity = Info} "save nonces"]))))
-  else return_unit
+  else
+    (* this failure is used to update [last_seen_level] if this function has
+       been successful *)
+    failwith "Ignoring the proposal"
 
 let start_revelation_worker cctxt config chain_id constants =
   let open Lwt_syntax in
@@ -643,7 +648,7 @@ let start_revelation_worker cctxt config chain_id constants =
       stateful_location;
       orphaned_location =
         Baking_files.resolve_location ~chain_id `Orphaned_nonce;
-      last_predecessor = Block_hash.zero;
+      last_seen_level = None;
     }
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7110
@@ -657,13 +662,23 @@ let start_revelation_worker cctxt config chain_id constants =
       Lwt.return_unit) ;
   let block_stream, push_block_stream = Lwt_stream.create () in
   let rec worker_loop () =
-    let* new_proposal = Lwt_stream.get block_stream in
-    match new_proposal with
+    let* item = Lwt_stream.get block_stream in
+    match item with
     | None ->
         (* The head stream closed meaning that the connection
-           with the node was interrupted: exit *)
+         with the node was interrupted: exit *)
         return_unit
-    | Some new_proposal ->
+    | Some (proposal_cctxt, new_proposal) ->
+        let state = {state with cctxt = proposal_cctxt} in
+        let node_uri = Uri.to_string proposal_cctxt#base in
+        let* () =
+          Events.(
+            emit
+              revelation_worker_new_proposal
+              ( new_proposal.Baking_state_types.block.shell.level,
+                node_uri,
+                new_proposal.Baking_state_types.block.hash ))
+        in
         Option.iter (fun _ -> (() [@profiler.stop])) !last_proposal ;
         ()
         [@profiler.record
@@ -672,12 +687,17 @@ let start_revelation_worker cctxt config chain_id constants =
         last_proposal := Some new_proposal.Baking_state_types.block.hash ;
         if !should_shutdown then return_unit
         else
-          let* _ =
+          let* res : unit tzresult =
             (reveal_potential_nonces
                state
                new_proposal
              [@profiler.record_s {verbosity = Notice} "reveal potential nonces"])
           in
+          (* If we successfully reveal the potential nonces, we consider that this
+           level has been processed. *)
+          if Result.is_ok res then
+            state.last_seen_level <-
+              Some new_proposal.Baking_state_types.block.shell.level ;
           worker_loop ()
   in
   Lwt.dont_wait
@@ -689,4 +709,7 @@ let start_revelation_worker cctxt config chain_id constants =
           (* never ending loop *) Lwt.return_unit)
         (fun () -> (* TODO *) Lwt.return_unit))
     (fun _exn -> ()) ;
-  Lwt.return (canceler, fun proposal -> push_block_stream (Some proposal))
+  Lwt.return
+    ( canceler,
+      fun proposal_cctxt proposal ->
+        push_block_stream (Some (proposal_cctxt, proposal)) )

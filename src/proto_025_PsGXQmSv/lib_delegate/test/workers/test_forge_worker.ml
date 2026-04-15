@@ -230,6 +230,7 @@ let with_forge_worker_test_env ?forge_consensus_vote_hook f =
   let* Mockup_simulator.
          {
            cctxt = _;
+           hooks = _;
            delegates;
            global_state;
            automaton_state;
@@ -243,16 +244,9 @@ let with_forge_worker_test_env ?forge_consensus_vote_hook f =
       ?forge_consensus_vote_hook
       global_state
   in
-  (* Get event stream *)
-  let event_stream = Forge_worker.get_event_stream worker in
   (* Run the test function *)
   let* result =
-    f
-      ~worker
-      ~event_stream
-      ~delegates
-      ~automaton_state
-      ~block_info:genesis_block_info
+    f ~worker ~delegates ~automaton_state ~block_info:genesis_block_info
   in
   (* Shutdown worker *)
   let*! () = Forge_worker.shutdown worker in
@@ -294,7 +288,7 @@ let collect_n_events ~event_stream ~matches ~expected =
 *)
 let test_forge_attestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -316,7 +310,7 @@ let test_forge_attestations () =
           delegates_with_slots
       in
       (* Push attestation request *)
-      let*! pushed =
+      let* () =
         Forge_worker.push_request
           worker
           Baking_state.
@@ -325,27 +319,25 @@ let test_forge_attestations () =
               request = Forge_and_sign_attestations {unsigned_attestations};
             }
       in
-      if not pushed then failwith "Failed to push attestation request"
-      else
-        (* Wait for attestation events *)
-        let is_attestation_ready = function
-          | Baking_state.Attestation_ready _ -> true
-          | _ -> false
-        in
-        let expected = List.length delegates in
-        let*! received =
-          with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
-              collect_n_events
-                ~event_stream
-                ~matches:is_attestation_ready
-                ~expected)
-        in
-        if received < expected then
-          failwith
-            "Expected %d Attestation_ready events, got %d"
-            expected
-            received
-        else return_unit)
+      (* Wait for attestation events *)
+      let is_attestation_ready = function
+        | Baking_state.Attestation_ready _ -> true
+        | _ -> false
+      in
+      let expected = List.length delegates in
+      let*! received =
+        with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
+            collect_n_events
+              ~event_stream:automaton_state.forge_event_stream
+              ~matches:is_attestation_ready
+              ~expected)
+      in
+      if received < expected then
+        failwith
+          "Expected %d Attestation_ready events, got %d"
+          expected
+          received
+      else return_unit)
 
 (**
    Integration Test 2: Forge and sign preattestations
@@ -355,7 +347,7 @@ let test_forge_attestations () =
 *)
 let test_forge_preattestations () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create preattestation batch for all delegates *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -377,7 +369,7 @@ let test_forge_preattestations () =
           delegates_with_slots
       in
       (* Push preattestation request *)
-      let*! pushed =
+      let* () =
         Forge_worker.push_request
           worker
           Baking_state.
@@ -387,27 +379,25 @@ let test_forge_preattestations () =
                 Forge_and_sign_preattestations {unsigned_preattestations};
             }
       in
-      if not pushed then failwith "Failed to push preattestation request"
-      else
-        (* Wait for preattestation events *)
-        let is_preattestation_ready = function
-          | Baking_state.Preattestation_ready _ -> true
-          | _ -> false
-        in
-        let expected = List.length delegates in
-        let*! received =
-          with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
-              collect_n_events
-                ~event_stream
-                ~matches:is_preattestation_ready
-                ~expected)
-        in
-        if received < expected then
-          failwith
-            "Expected %d Preattestation_ready events, got %d"
-            expected
-            received
-        else return_unit)
+      (* Wait for preattestation events *)
+      let is_preattestation_ready = function
+        | Baking_state.Preattestation_ready _ -> true
+        | _ -> false
+      in
+      let expected = List.length delegates in
+      let*! received =
+        with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
+            collect_n_events
+              ~event_stream:automaton_state.forge_event_stream
+              ~matches:is_preattestation_ready
+              ~expected)
+      in
+      if received < expected then
+        failwith
+          "Expected %d Preattestation_ready events, got %d"
+          expected
+          received
+      else return_unit)
 
 (**
    Integration Test 3: Forge and sign block
@@ -417,7 +407,7 @@ let test_forge_preattestations () =
 *)
 let test_forge_block () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       match delegates with
       | [] -> failwith "No delegates available"
@@ -437,39 +427,39 @@ let test_forge_block () =
               }
           in
           (* Push block forging request *)
-          let*! pushed =
+          let* () =
             Forge_worker.push_request
               worker
               Baking_state.
                 {automaton_state; request = Forge_and_sign_block block_to_bake}
           in
-          if not pushed then failwith "Failed to push block forging request"
-          else
-            (* Wait for block ready event *)
-            let block_ready = ref false in
-            let timeout = 10.0 in
-            let*! () =
-              Lwt.pick
-                [
-                  (let rec collect () =
-                     let open Lwt_syntax in
-                     let* event = Lwt_stream.get event_stream in
-                     match event with
-                     | Some (Baking_state.Block_ready _) ->
-                         block_ready := true ;
-                         return_unit
-                     | Some _ -> collect ()
-                     | None -> return_unit
+          (* Wait for block ready event *)
+          let block_ready = ref false in
+          let timeout = 10.0 in
+          let*! () =
+            Lwt.pick
+              [
+                (let rec collect () =
+                   let open Lwt_syntax in
+                   let* event =
+                     Lwt_stream.get automaton_state.forge_event_stream
                    in
-                   collect ());
-                  (let open Lwt_syntax in
-                   let* () = Lwt_unix.sleep timeout in
-                   return_unit);
-                ]
-            in
-            if not !block_ready then
-              failwith "Did not receive Block_ready event within timeout"
-            else return_unit)
+                   match event with
+                   | Some (Baking_state.Block_ready _) ->
+                       block_ready := true ;
+                       return_unit
+                   | Some _ -> collect ()
+                   | None -> return_unit
+                 in
+                 collect ());
+                (let open Lwt_syntax in
+                 let* () = Lwt_unix.sleep timeout in
+                 return_unit);
+              ]
+          in
+          if not !block_ready then
+            failwith "Did not receive Block_ready event within timeout"
+          else return_unit)
 
 (**
    Integration Test 4: Multiple delegates produce events concurrently
@@ -479,7 +469,7 @@ let test_forge_block () =
 *)
 let test_multiple_delegates_concurrent () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       (* Create attestation requests for each delegate separately *)
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
@@ -520,7 +510,7 @@ let test_multiple_delegates_concurrent () =
           [
             (let rec collect () =
                let open Lwt_syntax in
-               let* event = Lwt_stream.get event_stream in
+               let* event = Lwt_stream.get automaton_state.forge_event_stream in
                match event with
                | Some (Baking_state.Attestation_ready signed_vote) -> (
                    let delegate_id =
@@ -565,7 +555,7 @@ let test_multiple_delegates_concurrent () =
 let test_cancel_pending_tasks () =
   with_forge_worker_test_env
     ~forge_consensus_vote_hook:(fun () -> Lwt_unix.sleep 1.0)
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let key = Stdlib.List.hd delegates in
       let delegate =
@@ -621,7 +611,9 @@ let test_cancel_pending_tasks () =
             [
               (let rec collect () =
                  let open Lwt_syntax in
-                 let* event = Lwt_stream.get event_stream in
+                 let* event =
+                   Lwt_stream.get automaton_state.forge_event_stream
+                 in
                  match event with
                  | Some (Baking_state.Attestation_ready _) ->
                      incr events_received ;
@@ -672,7 +664,7 @@ let test_cancel_pending_tasks () =
 *)
 let test_same_delegate_serialization () =
   with_forge_worker_test_env
-    (fun ~worker ~event_stream ~delegates ~automaton_state ~block_info ->
+    (fun ~worker ~delegates ~automaton_state ~block_info ->
       let open Lwt_result_syntax in
       let batch_content = Mockup_simulator.create_batch_content ~block_info in
       (* Push one request per delegate - each request contains one attestation *)
@@ -714,7 +706,7 @@ let test_same_delegate_serialization () =
       let*! received =
         with_timeout ~timeout:5.0 ~on_timeout:0 (fun () ->
             collect_n_events
-              ~event_stream
+              ~event_stream:automaton_state.forge_event_stream
               ~matches:is_attestation_ready
               ~expected)
       in
@@ -724,6 +716,117 @@ let test_same_delegate_serialization () =
           expected
           received
       else return_unit)
+
+(**
+   Integration Test 7: Two-node high watermark filters slow block
+
+   This test simulates two nodes (fast and slow) pushing Forge_and_sign_block
+   requests for the same delegate, level, and round to a single forge worker.
+   The slow node's RPCs are delayed so that the fast node completes block
+   preparation first. The test verifies that:
+   - The fast node's block is signed and a Block_ready event is emitted
+   - The slow node's block is filtered by the high watermark's second check
+     (which happens just before signing) and no Block_ready is emitted for it
+*)
+let test_two_nodes_high_watermark_filters_slow_block () =
+  let open Lwt_result_syntax in
+  let* (env : Mockup_simulator.baker_test_env) =
+    Mockup_simulator.create_baker_test_env ~num_delegates:1 ()
+  in
+  let fast_automaton_state = env.automaton_state in
+  let slow_hooks, slow_preparation_done =
+    Mockup_simulator.wrap_hooks_with_delay ~delay:3.0 env.hooks
+  in
+  let* slow_cctxt = Mockup_simulator.create_cctxt ~hooks:slow_hooks env in
+  let* slow_automaton_state =
+    Baking_automaton.create_automaton_state
+      ~multi_node_setup:true
+      ~monitor_node_operations:false
+      ~global_state:env.global_state
+      slow_cctxt
+  in
+  let delegates = env.delegates in
+  let genesis_block_info = env.genesis_block_info in
+  (* Start a single forge worker shared by both nodes *)
+  let* worker = Forge_worker.Internal_for_tests.start env.global_state in
+  let key = match delegates with [k] -> k | _ -> assert false in
+  let delegate =
+    Baking_state_types.Internal_for_tests.make_delegate_from_key key
+  in
+  let block_to_bake =
+    Baking_state.
+      {
+        predecessor = genesis_block_info;
+        round = Round.zero;
+        delegate;
+        kind = Fresh Operation_pool.empty;
+        force_apply = false;
+      }
+  in
+  (* Push two requests for the SAME (level, round, delegate) from different
+     automaton_states. The slow node is pushed first so it starts its delayed
+     RPCs immediately. The fast node is pushed second and completes first. *)
+  let* () =
+    Forge_worker.push_request
+      worker
+      Baking_state.
+        {
+          automaton_state = slow_automaton_state;
+          request = Forge_and_sign_block block_to_bake;
+        }
+  in
+  let* () =
+    Forge_worker.push_request
+      worker
+      Baking_state.
+        {
+          automaton_state = fast_automaton_state;
+          request = Forge_and_sign_block block_to_bake;
+        }
+  in
+  (* 1. Wait for the fast node's Block_ready event *)
+  let*! fast_event = Lwt_stream.get fast_automaton_state.forge_event_stream in
+  let* prepared_block =
+    match fast_event with
+    | Some (Baking_state.Block_ready b) -> return b
+    | _ -> failwith "Fast node should have received Block_ready"
+  in
+  (* 2. Verify the block was actually signed by the delegate *)
+  let signed_header = prepared_block.signed_block_header in
+  let unsigned_header =
+    Data_encoding.Binary.to_bytes_exn
+      Protocol.Alpha_context.Block_header.unsigned_encoding
+      (signed_header.shell, signed_header.protocol_data.contents)
+  in
+  let* () =
+    if
+      Signature.check
+        ~watermark:
+          Alpha_context.Block_header.(
+            to_watermark (Block_header (Mockup_simulator.get_chain_id ())))
+        key.public_key
+        signed_header.protocol_data.signature
+        unsigned_header
+    then return_unit
+    else failwith "Block signature verification failed for fast node"
+  in
+  (* 3. Wait for the slow node's preparation to complete. After this, its
+     signing task has been pushed to the delegate's queue. Since the queue is
+     serial and the fast node's signing task already ran, the slow node's task
+     will execute next and be filtered by the high watermark. *)
+  let*! () = slow_preparation_done in
+  (* Shutdown waits for signing queues to drain, so the slow node's task
+     (which gets filtered by HWM) has fully executed after this. *)
+  let*! () = Forge_worker.shutdown worker in
+  (* 4. The slow node must NOT have received any Block_ready *)
+  if
+    Lwt_stream.get_available slow_automaton_state.forge_event_stream
+    |> List.exists (function Baking_state.Block_ready _ -> true | _ -> false)
+  then
+    failwith
+      "Slow node should NOT have received Block_ready (high watermark should \
+       filter it)"
+  else return_unit
 
 (** {2 Test Registration} *)
 
@@ -784,4 +887,8 @@ let () =
         test_cancel_pending_tasks );
       ( proto_name ^ ": forge worker integration - serialization",
         test_same_delegate_serialization );
+      ( proto_name
+        ^ ": forge worker integration - two nodes high watermark filters slow \
+           block",
+        test_two_nodes_high_watermark_filters_slow_block );
     ]
