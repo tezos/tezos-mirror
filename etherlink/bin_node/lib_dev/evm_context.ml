@@ -1225,7 +1225,7 @@ module State = struct
       in
       if tezos_enabled then
         let* sunrise_level =
-          Durable_storage.michelson_runtime_sunrise_level evm_state
+          Durable_storageV2.read_opt Michelson_runtime_sunrise_level evm_state
         in
         let past_sunrise =
           match sunrise_level with

@@ -54,6 +54,7 @@ type _ path =
   | Sequencer_key : Signature.Public_key.t path
   | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
   | Tezosx_feature_flag : Tezosx.runtime -> unit path
+  | Michelson_runtime_sunrise_level : Ethereum_types.quantity path
   | Current_block_number :
       _ L2_types.chain_family
       -> Ethereum_types.quantity path
@@ -141,6 +142,15 @@ let resolve : type a. a path -> a resolution =
           path = Tezosx.feature_flag runtime;
           decode = (fun _bytes -> Ok ());
           encode = (fun () -> "");
+        }
+  | Michelson_runtime_sunrise_level ->
+      Static
+        {
+          path = Durable_storage_path.michelson_runtime_sunrise_level;
+          decode =
+            infallible_decode (fun bytes ->
+                Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
+          encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
         }
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in

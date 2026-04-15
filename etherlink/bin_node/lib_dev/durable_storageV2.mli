@@ -25,6 +25,7 @@ type _ path =
   | Sequencer_key : Signature.Public_key.t path
   | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
   | Tezosx_feature_flag : Tezosx.runtime -> unit path
+  | Michelson_runtime_sunrise_level : Ethereum_types.quantity path
   | Current_block_number :
       _ L2_types.chain_family
       -> Ethereum_types.quantity path
