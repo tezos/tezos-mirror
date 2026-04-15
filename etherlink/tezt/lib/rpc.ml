@@ -183,6 +183,9 @@ module Request = struct
 
   let tez_kernelRootHash = {method_ = "tez_kernelRootHash"; parameters = `Null}
 
+  let tez_getMichelsonActivationLevel =
+    {method_ = "tez_getMichelsonActivationLevel"; parameters = `Null}
+
   let eth_call ~block ~to_ ~data =
     {
       method_ = "eth_call";
@@ -775,6 +778,17 @@ let tez_kernelRootHash ?websocket evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
+       response
+
+let tez_getMichelsonActivationLevel ?websocket evm_node =
+  let* response =
+    Evm_node.jsonrpc ?websocket evm_node Request.tez_getMichelsonActivationLevel
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response
+         |> JSON.as_opt |> Option.map JSON.as_int64)
        response
 
 let call ?websocket ~to_ ~data ?(block = Latest) evm_node =

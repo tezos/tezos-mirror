@@ -215,6 +215,20 @@ module Kernel_root_hash = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Michelson_activation_level = struct
+  type input = unit
+
+  type output = int64 option
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.(option int64)
+
+  let method_ = "tez_getMichelsonActivationLevel"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Sequencer = struct
   open Ethereum_types
 
@@ -1357,6 +1371,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Generic_block_number);
     (module Kernel_version);
     (module Kernel_root_hash);
+    (module Michelson_activation_level);
     (module Sequencer);
     (module Network_id);
     (module Chain_id);
