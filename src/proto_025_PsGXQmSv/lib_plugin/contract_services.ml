@@ -514,6 +514,19 @@ module S = struct
         ~output:Data_encoding.(list registered_baker_encoding)
         RPC_path.(open_root / "context" / "stez" / "bakers")
 
+    let staking_power =
+      RPC_service.get_service
+        ~description:
+          "List of delegates with their staking power from sTEZ for the \
+           current cycle."
+        ~query:RPC_query.empty
+        ~output:
+          Data_encoding.(
+            tup2
+              Tez.encoding
+              (list (tup2 Signature.Public_key_hash.encoding Tez.encoding)))
+        RPC_path.(open_root / "context" / "stez" / "staking_power")
+
     let under_feature_flag (ctxt : context) =
       let open Result_syntax in
       if Constants.native_contracts_enable ctxt then return_unit
@@ -583,7 +596,23 @@ module S = struct
                 | Originated _, _ -> None)
               delegates
           in
-          return delegates_with_parameters)
+          return delegates_with_parameters) ;
+      register0 ~chunked:true staking_power (fun ctxt _cycle () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
+          let*! delegates = Clst.For_RPC.registered_delegates ctxt in
+          List.fold_left_es
+            (fun (total_stake, delegates_acc) (delegate, _parameters) ->
+              match delegate with
+              | Contract.Implicit pkh ->
+                  let* allocated_stake =
+                    Clst.For_RPC.allocated_rights_of_delegate ctxt pkh
+                  in
+                  let*? total_stake = Tez.(total_stake +? allocated_stake) in
+                  return (total_stake, (pkh, allocated_stake) :: delegates_acc)
+              | Originated _ -> return (total_stake, delegates_acc))
+            (Tez.zero, [])
+            delegates)
   end
 end
 
