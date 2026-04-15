@@ -81,6 +81,7 @@ type ('a, 'cap) path =
     }
       -> (bytes, rw) path
   | Blueprint_nb_chunks : Z.t -> (int, rw) path
+  | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -245,6 +246,18 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                 infallible_decode (fun bytes ->
                     Helpers.decode_z_le bytes |> Z.to_int);
               encode = (fun n -> Z.to_bits (Z.of_int n));
+            })
+  | Blueprint_generation blueprint_number ->
+      versioned_read (fun ~storage_version ->
+          Read_write
+            {
+              path =
+                Durable_storage_path.Blueprint.generation
+                  ~storage_version
+                  ~blueprint_number;
+              decode = infallible_decode Ethereum_types.decode_number_le;
+              encode =
+                (fun qty -> Bytes.to_string (Ethereum_types.encode_u256_le qty));
             })
 
 let storage_version state =

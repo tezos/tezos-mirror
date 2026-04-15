@@ -296,11 +296,8 @@ let store_blueprint_chunks ~blueprint_number evm_state
     in
     let* evm_state =
       Durable_storage.write
-        (Raw_path
-           (Durable_storage_path.Blueprint.generation
-              ~storage_version:version
-              ~blueprint_number))
-        (encode_u256_le current_generation)
+        (Blueprint_generation blueprint_number)
+        current_generation
         evm_state
     in
     return evm_state

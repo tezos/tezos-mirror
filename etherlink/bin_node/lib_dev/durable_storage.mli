@@ -51,6 +51,7 @@ type ('a, 'cap) path =
     }
       -> (bytes, rw) path
   | Blueprint_nb_chunks : Z.t -> (int, rw) path
+  | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
 
 (** {2 Typed operations} *)
 
