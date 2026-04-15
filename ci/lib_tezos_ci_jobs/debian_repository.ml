@@ -227,29 +227,46 @@ let job_lintian_debian =
     ~releases:["bookworm"]
     []
 
-let job_install_bin_ubuntu_22_04 =
-  Cacio.parameterize @@ fun pipeline_type ->
+let make_install_bin_job ~distribution ~release =
   CI.job
-    "oc.install_bin_ubuntu_22_04"
-    ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages can be installed."
-    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~variables:[("PREFIX", "")]
+    ~script:
+      ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
+
+let job_install_bin_ubuntu_22_04 =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_install_bin_job
+    "oc.install_bin_ubuntu_22_04"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_22_04
-    ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"]
+    ~distribution:"ubuntu"
+    ~release:"22.04"
+    []
 
 let job_install_bin_ubuntu_24_04 =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_install_bin_job
     "oc.install_bin_ubuntu_24_04"
     ~__POS__
-    ~stage:Test_publication
-    ~description:"Check that Debian packages can be installed."
     ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
-    ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_24_04
-    ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"]
+    ~distribution:"ubuntu"
+    ~release:"24.04"
+    []
+
+let job_install_bin_debian_bookworm =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_install_bin_job
+    "oc.install_bin_debian_bookworm"
+    ~__POS__
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
+    ~image:Images.Base_images.debian_bookworm
+    ~distribution:"debian"
+    ~release:"bookworm"
+    []
 
 let job_install_bin_ubuntu_24_04_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -322,18 +339,6 @@ let job_upgrade_bin_ubuntu_24_04_systemd =
        scripts/packaging/tests/deb/upgrade-systemd-test.sh \
        images/packages/debian-systemd-tests.Dockerfile";
     ]
-
-let job_install_bin_debian_bookworm =
-  Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
-    "oc.install_bin_debian_bookworm"
-    ~__POS__
-    ~description:"Check that Debian packages can be installed."
-    ~stage:Test_publication
-    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
-    ~variables:[("PREFIX", "")]
-    ~image:Images.Base_images.debian_bookworm
-    ["./docs/introduction/install-bin-deb.sh debian bookworm"]
 
 let job_install_bin_debian_bookworm_systemd =
   Cacio.parameterize @@ fun pipeline_type ->
