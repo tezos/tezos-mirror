@@ -191,39 +191,41 @@ let job_apt_repo_ubuntu =
     ~releases:["22.04"; "24.04"]
     []
 
-let job_lintian_ubuntu =
-  Cacio.parameterize @@ fun pipeline_type ->
+let make_lintian_job ~distribution ~releases =
   CI.job
-    "oc.lintian_ubuntu"
-    ~__POS__
     ~stage:Test_publication
     ~description:"Run lintian on Debian packages."
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "export DEBIAN_FRONTEND=noninteractive";
+        "apt-get update";
+        "apt-get install lintian parallel -y";
+        "./scripts/ci/lintian_debian_packages.sh "
+        ^ String.concat " " (distribution :: releases);
+      ]
+
+let job_lintian_ubuntu =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_lintian_job
+    "oc.lintian_ubuntu"
+    ~__POS__
     ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
-    [
-      ". ./scripts/version.sh";
-      "export DEBIAN_FRONTEND=noninteractive";
-      "apt-get update";
-      "apt-get install lintian parallel -y";
-      "./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04";
-    ]
+    ~distribution:"ubuntu"
+    ~releases:["22.04"; "24.04"]
+    []
 
 let job_lintian_debian =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_lintian_job
     "oc.lintian_debian"
     ~__POS__
-    ~stage:Test_publication
-    ~description:"Run lintian on Debian packages."
     ~needs:[(Artifacts, job_build_debian pipeline_type)]
     ~image:Images.Base_images.debian_bookworm
-    [
-      ". ./scripts/version.sh";
-      "export DEBIAN_FRONTEND=noninteractive";
-      "apt-get update";
-      "apt-get install lintian parallel -y";
-      "./scripts/ci/lintian_debian_packages.sh debian bookworm";
-    ]
+    ~distribution:"debian"
+    ~releases:["bookworm"]
+    []
 
 let job_install_bin_ubuntu_22_04 =
   Cacio.parameterize @@ fun pipeline_type ->
