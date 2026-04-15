@@ -237,10 +237,7 @@ impl Encodable for TezlinkContent {
         match &self {
             Self::Tezos(tez) => {
                 stream.append(&TEZOS_OP_TAG);
-                // We don't want the kernel to panic if there's an error
-                // and we can't print a log as we don't have access to
-                // the host. So we just ignore the result.
-                let _ = tez.rlp_append(stream);
+                stream.append(tez);
             }
             Self::Deposit(dep) => {
                 stream.append(&DEPOSIT_OP_TAG);

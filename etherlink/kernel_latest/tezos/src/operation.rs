@@ -5,7 +5,7 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::operation_result::ValidityError;
-use rlp::Decodable;
+use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{
     BlockHash, HashType, OperationHash, SecretKeyEd25519, UnknownSignature,
@@ -120,16 +120,19 @@ impl NomReader<'_> for Operation {
     }
 }
 
-impl Operation {
-    // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
-    // return a result. To avoid unwrapping and risk a panic we're not implementing
-    // the trait exactly, but we expose a serialization function.
-    pub fn rlp_append(&self, s: &mut rlp::RlpStream) -> Result<(), BinError> {
-        let bytes = self.to_bytes()?;
-        s.append(&bytes);
-        Ok(())
+// `Encodable::rlp_append` can't fail but `to_bytes` can. We don't want the
+// kernel to panic and we can't log without host access, so on failure encode
+// an empty byte string (0x80): the RLP item count stays correct and decoding
+// fails cleanly instead of corrupting the surrounding list. Use
+// `bytes.rlp_append(stream)` (not `stream.append(&bytes)`) so the outer
+// `stream.append(&operation)` doesn't double-count the item.
+impl Encodable for Operation {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        self.to_bytes().unwrap_or_default().rlp_append(stream)
     }
+}
 
+impl Operation {
     pub fn hash(&self) -> Result<OperationHash, BinError> {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
@@ -379,7 +382,7 @@ mod tests {
     };
     use mir::ast::michelson_address::Entrypoint;
     use pretty_assertions::assert_eq;
-    use rlp::{Decodable, Rlp, RlpStream};
+    use rlp::{Decodable, Rlp};
     use tezos_crypto_rs::{hash::UnknownSignature, public_key::PublicKey};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKeyHash;
@@ -387,12 +390,8 @@ mod tests {
     #[test]
     fn operation_rlp_roundtrip() {
         let operation = make_dummy_reveal_operation();
-        let mut stream = RlpStream::new();
-        operation
-            .rlp_append(&mut stream)
-            .expect("rlp_append should have succeeded");
-        let bytes = stream.as_raw();
-        let rlp = Rlp::new(bytes);
+        let encoded = rlp::encode(&operation);
+        let rlp = Rlp::new(&encoded);
         let decoded_operation =
             Operation::decode(&rlp).expect("Decoding operation should have succeeded");
         assert_eq!(operation, decoded_operation);

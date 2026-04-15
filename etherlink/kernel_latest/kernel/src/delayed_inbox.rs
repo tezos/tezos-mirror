@@ -111,10 +111,7 @@ impl Encodable for DelayedTransaction {
             }
             DelayedTransaction::Tezos(op) => {
                 stream.append(&DELAYED_TEZOS_OPERATION_TAG);
-                // We don't want the kernel to panic if there's an error
-                // and we can't print a log as we don't have access to
-                // the host. So we just ignore the result.
-                let _ = op.rlp_append(stream);
+                stream.append(op);
             }
         }
     }
