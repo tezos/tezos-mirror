@@ -286,7 +286,20 @@ where
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
         .expect("WITHDRAWAL_OUTBOX_QUEUE is a valid path");
 
-    let skip_fees_check = true;
+    // This "tezosx_simulate_fn" function is actually called in two
+    // cases: actual simulation (the user has not signed the operation
+    // yet, and does not yet know what gas limit and fees are
+    // required) and pre-application (the user has signed the
+    // operation, all the fields are set, the user wants a detailed
+    // receipt before publishing the operation.  We use the
+    // `skip_signature_check` boolean from the input to tell these two
+    // cases apart; when it is set we are in simulation mode and there
+    // is no reason to check minimal fees (they are probably 0
+    // anyway), when it is unset we are in preapplication mode and we
+    // want to be as close as possible to what will happen during
+    // application.
+    let skip_fees_check = skip_signature_check;
+
     // For Tezos transactions, call apply_tezos_operation directly with an
     // external journal so we can capture HTTP traces.  For Ethereum
     // transactions, go through the normal apply_transaction path.
