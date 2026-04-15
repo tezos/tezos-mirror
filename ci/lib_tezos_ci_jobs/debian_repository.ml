@@ -145,53 +145,51 @@ let job_build_ubuntu =
     ~target:"binaries"
     []
 
-let job_apt_repo_debian =
-  Cacio.parameterize @@ fun pipeline_type ->
+let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
   CI.job
-    "apt_repo_debian"
-    ~__POS__
-    ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
+    ~stage:Publish
     ~needs:
       [
         (Artifacts, job_build_data_packages);
-        (Artifacts, job_build_debian pipeline_type);
+        (Artifacts, build_job pipeline_type);
       ]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~image:Images.Base_images.debian_trixie
     ~id_tokens:Tezos_ci.id_tokens
-    [
-      ". ./scripts/version.sh";
-      "apt-get install -y --update apt-utils debsigs";
-      "./scripts/ci/create_debian_repo.sh debian bookworm trixie";
-    ]
+    ~script:
+      [
+        ". ./scripts/version.sh";
+        "apt-get install -y --update apt-utils debsigs";
+        "./scripts/ci/create_debian_repo.sh "
+        ^ String.concat " " (distribution :: releases);
+      ]
+
+let job_apt_repo_debian =
+  Cacio.parameterize @@ fun pipeline_type ->
+  make_apt_repo_job
+    "apt_repo_debian"
+    ~__POS__
+    ~pipeline_type
+    ~build_job:job_build_debian
+    ~image:Images.Base_images.debian_trixie
+    ~distribution:"debian"
+    ~releases:["bookworm"; "trixie"]
+    []
 
 let job_apt_repo_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
-  CI.job
+  make_apt_repo_job
     "apt_repo_ubuntu"
     ~__POS__
-    ~stage:Publish
-    ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs:
-      [
-        (Artifacts, job_build_data_packages);
-        (Artifacts, job_build_ubuntu pipeline_type);
-      ]
-    ~variables:
-      (Common.Packaging.archs_variables pipeline_type
-      @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~pipeline_type
+    ~build_job:job_build_ubuntu
     ~image:Images.Base_images.ubuntu_24_04
-    ~id_tokens:Tezos_ci.id_tokens
-    [
-      ". ./scripts/version.sh";
-      "apt-get install -y --update apt-utils debsigs";
-      "./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04";
-    ]
+    ~distribution:"ubuntu"
+    ~releases:["22.04"; "24.04"]
+    []
 
 let job_lintian_ubuntu =
   Cacio.parameterize @@ fun pipeline_type ->
