@@ -4203,6 +4203,210 @@ let test_mempool_filter_fields =
       ~error_msg:"Expected minimal_nanotez_per_byte = %R but got %L") ;
   unit
 
+(* ---- Gas refund test helpers ----
+
+   All gas refund tests use:
+     fee = 1 tez,  gas_limit = 10_000
+   With defaults (base_fee_per_gas = 10^9, multiplier = 10):
+     execution_gas_fees = gas_to_mutez(10^9, 10, 10_000) = 100 mutez. *)
+
+let gas_refund_endpoint sequencer =
+  Client.(
+    Foreign_endpoint
+      Endpoint.{(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+
+let gas_refund_balance ~endpoint client =
+  Client.get_balance_for
+    ~endpoint
+    ~account:Constant.bootstrap1.public_key_hash
+    client
+
+(** Execute [f], produce a block, return mutez consumed by bootstrap1. *)
+let gas_refund_measure_consumed ~endpoint ~sequencer client f =
+  let* before = gas_refund_balance ~endpoint client in
+  let* () = f () in
+  let*@ _ = Rpc.produce_block sequencer in
+  let* after = gas_refund_balance ~endpoint client in
+  Check.((Tez.to_mutez before >= Tez.to_mutez after) int)
+    ~error_msg:"balance increased unexpectedly (before=%L, after=%R)" ;
+  return (Tez.to_mutez before - Tez.to_mutez after)
+
+let gas_refund_originate ~endpoint ~sequencer ~client ~protocol scripts ~alias
+    ~init =
+  let script_path = Michelson_script.(find scripts protocol |> path) in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  return contract
+
+let gas_refund_last_op_status ~endpoint client =
+  let* operations =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_operations ()
+  in
+  return
+    JSON.(
+      operations |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result" |-> "status" |> as_string)
+
+(* ---- Gas refund test scenarios ---- *)
+
+(** Gas refund on a successful implicit transfer.
+    enabled:  consumed < amount + fee (refund).
+    disabled: consumed = amount + fee (no refund). *)
+let test_gas_refund_on_transfer ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund on transfer (%s)" label)
+    ~tags:["gas_refund"; "transfer"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = gas_refund_endpoint sequencer in
+  let amount = Tez.one in
+  let fee = Tez.one in
+  let gas_limit = 10_000 in
+  let* consumed =
+    gas_refund_measure_consumed ~endpoint ~sequencer client (fun () ->
+        Client.transfer
+          ~endpoint
+          ~amount
+          ~fee
+          ~gas_limit
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:Constant.bootstrap2.alias
+          ~burn_cap:Tez.one
+          client)
+  in
+  let baseline = Tez.to_mutez amount + Tez.to_mutez fee in
+  Log.info "consumed=%d baseline=%d refund=%b" consumed baseline enable_refund ;
+  (if enable_refund then
+     Check.(
+       (consumed < baseline)
+         int
+         ~error_msg:
+           "Expected consumed (%L) < amount + fee (%R), gas refund should occur")
+   else
+     Check.(
+       (consumed = baseline)
+         int
+         ~error_msg:
+           "Expected consumed (%L) = amount + fee (%R), no refund expected")) ;
+  unit
+
+(** Gas refund on a FAILWITH operation.
+    enabled:  consumed < fee (refund even on failure).
+    disabled: consumed = fee (no refund). *)
+let test_gas_refund_on_failwith ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund on FAILWITH (%s)" label)
+    ~tags:["gas_refund"; "failwith"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} protocol ->
+  let endpoint = gas_refund_endpoint sequencer in
+  let* contract =
+    gas_refund_originate
+      ~endpoint
+      ~sequencer
+      ~client
+      ~protocol
+      ["mini_scenarios"; "fail_on_false"]
+      ~alias:"fail_on_false"
+      ~init:"Unit"
+  in
+  let fee = Tez.one in
+  let gas_limit = 10_000 in
+  let* consumed =
+    gas_refund_measure_consumed ~endpoint ~sequencer client (fun () ->
+        Client.transfer
+          ~endpoint
+          ~force:true
+          ~amount:Tez.zero
+          ~fee
+          ~gas_limit
+          ~storage_limit:0
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:contract
+          ~arg:"False"
+          ~burn_cap:Tez.one
+          client)
+  in
+  let* status = gas_refund_last_op_status ~endpoint client in
+  Check.((status = "failed") string ~error_msg:"Expected failed, got %L") ;
+  let fee_mutez = Tez.to_mutez fee in
+  Log.info "consumed=%d fee=%d refund=%b" consumed fee_mutez enable_refund ;
+  (if enable_refund then
+     Check.(
+       (consumed < fee_mutez)
+         int
+         ~error_msg:
+           "Expected consumed (%L) < fee (%R), gas refund should occur on \
+            failure")
+   else
+     Check.(
+       (consumed = fee_mutez)
+         int
+         ~error_msg:"Expected consumed (%L) = fee (%R), no refund expected")) ;
+  unit
+
+(** Gas refund on out-of-gas: all gas consumed, but fee surplus is still refunded.
+    consumed < fee because declared fee exceeds actual costs (DA + gas). *)
+let test_gas_refund_on_out_of_gas =
+  register_tezosx_test
+    ~title:"Gas refund on out-of-gas (fee surplus refunded)"
+    ~tags:["gas_refund"; "out_of_gas"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~enable_michelson_gas_refund:true
+  @@ fun {sequencer; client; _} protocol ->
+  let endpoint = gas_refund_endpoint sequencer in
+  let* contract =
+    gas_refund_originate
+      ~endpoint
+      ~sequencer
+      ~client
+      ~protocol
+      ["mini_scenarios"; "loop"]
+      ~alias:"loop"
+      ~init:"Unit"
+  in
+  let fee = Tez.one in
+  let gas_limit = 10_000 in
+  let* consumed =
+    gas_refund_measure_consumed ~endpoint ~sequencer client (fun () ->
+        Client.transfer
+          ~endpoint
+          ~force:true
+          ~amount:Tez.zero
+          ~fee
+          ~gas_limit
+          ~storage_limit:0
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:contract
+          ~arg:"150000"
+          ~burn_cap:Tez.one
+          client)
+  in
+  let* status = gas_refund_last_op_status ~endpoint client in
+  Check.((status = "failed") string ~error_msg:"Expected failed, got %L") ;
+  let fee_mutez = Tez.to_mutez fee in
+  Log.info "consumed=%d fee=%d" consumed fee_mutez ;
+  Check.(
+    (consumed < fee_mutez)
+      int
+      ~error_msg:
+        "Expected consumed (%L) < fee (%R), fee surplus should be refunded") ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4935,6 +5139,11 @@ let () =
   test_michelson_execution_gas_fee [Alpha] ;
   test_michelson_gas_exhaustion [Alpha] ;
   test_mempool_filter_fields [Alpha] ;
+  test_gas_refund_on_transfer ~enable_refund:true [Alpha] ;
+  test_gas_refund_on_transfer ~enable_refund:false [Alpha] ;
+  test_gas_refund_on_failwith ~enable_refund:true [Alpha] ;
+  test_gas_refund_on_failwith ~enable_refund:false [Alpha] ;
+  test_gas_refund_on_out_of_gas [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
