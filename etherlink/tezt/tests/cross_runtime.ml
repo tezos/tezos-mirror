@@ -879,6 +879,34 @@ module TezCallbackRunnerEvm = struct
     unit
 end
 
+(** Tezos contract that burns significant gas (SHA256 loop) and emits
+ *  an internal operation (self-call to [%_noop]).  The internal
+ *  operation triggers the [get_and_reset_milligas_consumed()] baseline
+ *  reset that caused the [X-Tezos-Gas-Consumed] header bug.
+ *
+ *  Unlike {!TezGasBurner} (infinite loop, always OOGs), this contract
+ *  terminates normally after burning a predictable amount of gas. *)
+module TezMichelsonGasBurner = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    let script_name = ["mini_scenarios"; "gas_burner_with_internal_op"] in
+    let init_storage_data = "Unit" in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Enshrined Michelson gateway contract — called by Michelson contracts
     to initiate outgoing CRACs to EVM. *)
 let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
@@ -1070,6 +1098,10 @@ module CracRunnerWrapper = struct
         ?amount:int ->
         unit ->
         unit Lwt.t
+    end
+
+    module TezMichelsonGasBurner : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
   end
 
@@ -1521,6 +1553,24 @@ module CracRunnerWrapper = struct
             ~abi_params
             ?amount
             ()
+      end
+
+      module TezMichelsonGasBurner = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezMichelsonGasBurner.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
       end
     end in
     (module Helper)
@@ -6536,6 +6586,100 @@ let test_crac_callback_mixed_with_normal_runners =
   in
   EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_cb
 
+(** Verify that the [X-Tezos-Gas-Consumed] header reports cumulative
+ *  Michelson gas even after internal operations reset the per-segment
+ *  baseline.
+ *
+ *  == Scenario ==
+ *
+ *  Baseline:  EVM[wrapper] -> CRAC -> TEZ[simple counter]
+ *  Burner:    EVM[wrapper] -> CRAC -> TEZ[michelson gas burner]
+ *
+ *  The Michelson gas burner runs 20000 KECCAK iterations (~32M milligas)
+ *  then emits a self-call to [%%_noop].  The self-call is an internal
+ *  operation that resets the per-segment gas baseline — the header must
+ *  still report the full cumulative consumption.
+ *
+ *  == Assertions ==
+ *
+ *  Sanity: [G_burner > 5 * G_baseline] ensures the KECCAK gas
+ *  dominates CRAC overhead, making the regression check robust.
+ *
+ *  Regression: [G_burner > threshold] proves the header carries the
+ *  Michelson gas.  If the header reported only the delta since the
+ *  last internal operation, G_burner would be ~ G_baseline (~60K).
+ *  Instead the ~32M milligas flow through the header to the EVM
+ *  receipt, pushing G_burner well above the threshold.
+ *)
+let test_crac_gas_header_michelson_burner =
+  register_crac_runner_test
+    ~title:"CRAC: X-Tezos-Gas-Consumed reports Michelson gas"
+    ~tags:["gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-header" in
+
+  (* Baseline: EVM->TEZ with simple counter (minimal Michelson gas) *)
+  Log.debug ~prefix "[baseline] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[baseline] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_baseline =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple
+  in
+  Log.debug ~prefix "[baseline] Deploy EVM wrapper" ;
+  let* runner_baseline =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_baseline, false)] ()
+  in
+
+  (* Burner: EVM->TEZ with Michelson gas burner + internal op *)
+  Log.debug ~prefix "[burner] Originate Michelson gas burner" ;
+  let* tez_burner = TezMichelsonGasBurner.originate () in
+  Log.debug ~prefix "[burner] Deploy EVM bridge to gas burner" ;
+  let* evm_bridge_burner =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_burner
+  in
+  Log.debug ~prefix "[burner] Deploy EVM wrapper" ;
+  let* runner_burner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_burner, false)] ()
+  in
+
+  (* Warmup calls (alias generation) *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _ = EvmRunner.call_run runner_baseline in
+  let* _ = EvmRunner.call_run runner_burner in
+
+  (* Measurement calls (aliases cached) *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_baseline = EvmRunner.call_run runner_baseline in
+  let* g_burner = EvmRunner.call_run runner_burner in
+
+  Log.info ~prefix "G_baseline=%Ld  G_burner=%Ld" g_baseline g_burner ;
+
+  (* Sanity: the Michelson gas burner dominates CRAC overhead.
+     If this fails, increase KECCAK iterations in
+     gas_burner_with_internal_op.tz. *)
+  Check.(
+    (g_burner > Int64.mul g_baseline 5L)
+      int64
+      ~error_msg:
+        "Sanity: G_burner (%L) should be > 5 * G_baseline (%R). Increase \
+         KECCAK iterations in gas_burner_with_internal_op.tz if this fails.") ;
+
+  (* Regression: the header must carry the Michelson gas.
+     If only the delta since the last internal operation were reported,
+     G_burner would be ~ G_baseline (~60K).  The 200K threshold sits
+     above the EVM-only overhead (~60K) and well below the expected
+     value (~320K+). *)
+  let threshold = 200_000L in
+  Check.(
+    (g_burner > threshold)
+      int64
+      ~error_msg:
+        "G_burner (%L) should exceed %R, proving X-Tezos-Gas-Consumed header \
+         reports Michelson gas (not ~0 from baseline reset bug)") ;
+
+  unit
+
 (** Verify that the outer EVM receipt's gasUsed in an EVM->TEZ->EVM
  *  chain includes the inner callee gas.
  *
@@ -7076,6 +7220,7 @@ let () =
   test_crac_callback_tez_revert_rolls_back_callback [Alpha] ;
   test_crac_callback_evm_catches_failing_callback_behind_crac [Alpha] ;
   test_crac_callback_mixed_with_normal_runners [Alpha] ;
+  test_crac_gas_header_michelson_burner [Alpha] ;
   test_crac_gas_model_callee_gas_in_evm_receipt [Alpha] ;
   test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
   test_crac_gas_accounting_investigation [Alpha] ;
