@@ -1,20 +1,32 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
 (* SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
 
-(** In-memory implementation of the RISC-V new durable storage.
+(** On-disk implementation of the RISC-V new durable storage.
 
-    All data is held in RAM with no persistence. State is lost when the
-    registry value is garbage collected. This variant is intended for fast
-    execution without disk I/O. *)
+    All data is persisted to disk via a repository. State survives
+    process restarts. This variant is used by the rollup node for
+    production storage. *)
 
 open Intf
 
-(** Proof objects for the in-memory durable storage.
+(** On-disk repository handle.
+
+    A repository is the root of the on-disk storage.  Opening a
+    repository gives access to the commit history and allows creating
+    or checking out registries. *)
+module Repo : sig
+  type t
+
+  (** [create path] opens (or creates) a repository at [path]. *)
+  val create : string -> t
+end
+
+(** Proof objects for the on-disk durable storage.
 
     {b Note}: Currently a stub (TZX-113). *)
 module Proof : PROOF
@@ -25,12 +37,19 @@ module Normal : sig
     include
       REGISTRY
         with type invalid_argument_error =
-          Octez_riscv_nds_memory_api.Octez_riscv_durable_storage_in_memory_api
+          Octez_riscv_nds_disk_api.Octez_riscv_durable_storage_on_disk_api
           .invalid_argument_error
 
-    (** [create ()] allocates a new, empty in-memory registry with no
-        databases. Use {!resize} to add databases. *)
-    val create : unit -> t
+    (** [create repo] creates a new, empty registry backed by [repo]. *)
+    val create : Repo.t -> t
+
+    (** [commit registry] persists the current state and returns a
+        commit identifier that can be used with {!checkout}. *)
+    val commit : t -> bytes
+
+    (** [checkout repo commit_id] restores the registry to the state
+        recorded at [commit_id]. *)
+    val checkout : Repo.t -> bytes -> t
   end
 
   (** Database key-value operations on a {!Registry.t}. See

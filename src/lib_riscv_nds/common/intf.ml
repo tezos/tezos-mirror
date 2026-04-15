@@ -22,7 +22,7 @@
       are raised as OCaml exceptions.
     - {b Invalid argument errors} are deterministic and indicate incorrect
       usage (e.g. key not found, offset too large). The state is left
-      coherent. They are returned in the [Error] case of the [tzresult]. *)
+      coherent. They are returned in the [Error] case of the [result]. *)
 
 (** Common signature for proof objects. *)
 module type PROOF = sig
@@ -50,39 +50,45 @@ end
 module type REGISTRY = sig
   type t
 
+  (** Backend-specific invalid-argument error type for registry
+      operations. *)
+  type invalid_argument_error
+
   (** [hash registry] computes the Merkle root hash of [registry],
       derived from the root hashes of all its databases. *)
-  val hash : t -> bytes tzresult
+  val hash : t -> (bytes, invalid_argument_error) result
 
   (** [size registry] returns the number of databases currently held in
       [registry]. *)
-  val size : t -> int64 tzresult
+  val size : t -> (int64, invalid_argument_error) result
 
   (** [resize registry n] adjusts [registry] to contain exactly [n]
       databases. The size can only change by one at a time; call this
       function in a loop for larger adjustments. Growing appends a new
       empty database; shrinking drops the last database. Returns an
       error if [|current_size - n| > 1]. *)
-  val resize : t -> int64 -> unit tzresult
+  val resize : t -> int64 -> (unit, invalid_argument_error) result
 
   (** [copy_database registry ~src ~dst] duplicates all contents of the
       database at index [src] into index [dst], completely replacing the
       previous contents of [dst]. The source database is unchanged.
       Copying to the same index is a no-op. Returns an error if [src] or
       [dst] is out of bounds. *)
-  val copy_database : t -> src:int64 -> dst:int64 -> unit tzresult
+  val copy_database :
+    t -> src:int64 -> dst:int64 -> (unit, invalid_argument_error) result
 
   (** [move_database registry ~src ~dst] transfers the database at index
       [src] to index [dst], completely replacing the previous contents of
       [dst]. The source is replaced with a fresh empty database. Moving
       to the same index is a no-op. Returns an error if [src] or [dst]
       is out of bounds. *)
-  val move_database : t -> src:int64 -> dst:int64 -> unit tzresult
+  val move_database :
+    t -> src:int64 -> dst:int64 -> (unit, invalid_argument_error) result
 
   (** [clear registry db_index] replaces the database at [db_index] with
       a fresh empty database. Returns an error if [db_index] is out of
       bounds. *)
-  val clear : t -> int64 -> unit tzresult
+  val clear : t -> int64 -> (unit, invalid_argument_error) result
 end
 
 (** Common signature for database key-value operations.
@@ -92,17 +98,29 @@ end
 module type DATABASE = sig
   type registry
 
+  (** Backend-specific invalid-argument error type for database
+      operations. *)
+  type invalid_argument_error
+
   (** [exists registry ~db_index ~key] returns [true] if [key] exists in
       the database at [db_index]. Returns an error if [db_index] is out
       of bounds or [key] exceeds 256 bytes. *)
-  val exists : registry -> db_index:int64 -> key:bytes -> bool tzresult
+  val exists :
+    registry ->
+    db_index:int64 ->
+    key:bytes ->
+    (bool, invalid_argument_error) result
 
   (** [set registry ~db_index ~key ~value] associates [key] with [value]
       in the database at [db_index], replacing any previous value
       entirely. Returns an error if [db_index] is out of bounds or [key]
       exceeds 256 bytes. *)
   val set :
-    registry -> db_index:int64 -> key:bytes -> value:bytes -> unit tzresult
+    registry ->
+    db_index:int64 ->
+    key:bytes ->
+    value:bytes ->
+    (unit, invalid_argument_error) result
 
   (** [write registry ~db_index ~key ~offset ~value] writes [value]
       starting at byte position [offset] within the existing value
@@ -119,7 +137,7 @@ module type DATABASE = sig
     key:bytes ->
     offset:int64 ->
     value:bytes ->
-    int64 tzresult
+    (int64, invalid_argument_error) result
 
   (** [read registry ~db_index ~key ~offset ~len] reads up to [len]
       bytes starting at byte position [offset] from the value associated
@@ -133,31 +151,43 @@ module type DATABASE = sig
     key:bytes ->
     offset:int64 ->
     len:int64 ->
-    bytes tzresult
+    (bytes, invalid_argument_error) result
 
   (** [value_length registry ~db_index ~key] returns the length in bytes
       of the value associated with [key]. Returns an error if the key
       does not exist, if [key] exceeds 256 bytes, or if [db_index] is
       out of bounds. *)
-  val value_length : registry -> db_index:int64 -> key:bytes -> int64 tzresult
+  val value_length :
+    registry ->
+    db_index:int64 ->
+    key:bytes ->
+    (int64, invalid_argument_error) result
 
   (** [delete registry ~db_index ~key] removes [key] and its associated
       value. Deleting a non-existent key is a silent no-op (the root hash
       is unchanged). Returns an error if [key] exceeds 256 bytes or
       [db_index] is out of bounds. *)
-  val delete : registry -> db_index:int64 -> key:bytes -> unit tzresult
+  val delete :
+    registry ->
+    db_index:int64 ->
+    key:bytes ->
+    (unit, invalid_argument_error) result
 
   (** [hash registry ~db_index] returns the Merkle root hash of the
       database at [db_index]. Returns an error if [db_index] is out of
       bounds. *)
-  val hash : registry -> db_index:int64 -> bytes tzresult
+  val hash :
+    registry -> db_index:int64 -> (bytes, invalid_argument_error) result
 end
 
 (** Normal mode: registry + database. *)
 module type NORMAL = sig
   module Registry : REGISTRY
 
-  module Database : DATABASE with type registry := Registry.t
+  module Database :
+    DATABASE
+      with type registry := Registry.t
+       and type invalid_argument_error := Registry.invalid_argument_error
 end
 
 (** Prove mode: registry + database + proof lifecycle.
@@ -170,7 +200,10 @@ module type PROVE = sig
 
   module Registry : REGISTRY
 
-  module Database : DATABASE with type registry := Registry.t
+  module Database :
+    DATABASE
+      with type registry := Registry.t
+       and type invalid_argument_error := Registry.invalid_argument_error
 
   module Proof : PROOF
 
@@ -193,7 +226,10 @@ module type VERIFY = sig
 
   module Registry : REGISTRY
 
-  module Database : DATABASE with type registry := Registry.t
+  module Database :
+    DATABASE
+      with type registry := Registry.t
+       and type invalid_argument_error := Registry.invalid_argument_error
 
   (** [start_verify proof] creates a verify-mode registry that replays
       operations against [proof] to validate the recorded state

@@ -10,18 +10,6 @@ open Nds_errors
 
 module Api = Octez_riscv_nds_disk_api.Octez_riscv_durable_storage_on_disk_api
 
-let convert_invalid_argument = function
-  | Api.Key_not_found -> Key_not_found
-  | Api.Key_too_long -> Key_too_long
-  | Api.Offset_too_large -> Offset_too_large
-  | Api.Database_index_out_of_bounds -> Database_index_out_of_bounds
-  | Api.Registry_resize_too_large -> Registry_resize_too_large
-
-let wrap_error = function
-  | Ok x -> Ok x
-  | Error e ->
-      Result_syntax.tzfail (Invalid_argument (convert_invalid_argument e))
-
 module Repo = struct
   type t = Api.repo
 
@@ -49,6 +37,8 @@ module Normal = struct
   module Registry = struct
     type t = Api.registry
 
+    type invalid_argument_error = Api.invalid_argument_error
+
     let hash registry =
       Ok (Api.octez_riscv_durable_on_disk_registry_hash registry)
 
@@ -56,19 +46,16 @@ module Normal = struct
       Ok (Api.octez_riscv_durable_on_disk_registry_size registry)
 
     let resize registry n =
-      Api.octez_riscv_durable_on_disk_registry_resize registry n |> wrap_error
+      Api.octez_riscv_durable_on_disk_registry_resize registry n
 
     let copy_database registry ~src ~dst =
       Api.octez_riscv_durable_on_disk_registry_copy registry src dst
-      |> wrap_error
 
     let move_database registry ~src ~dst =
       Api.octez_riscv_durable_on_disk_registry_move registry src dst
-      |> wrap_error
 
     let clear registry db_index =
       Api.octez_riscv_durable_on_disk_registry_clear registry db_index
-      |> wrap_error
 
     let create repo = Api.octez_riscv_durable_on_disk_registry_new repo
 
@@ -82,11 +69,9 @@ module Normal = struct
   module Database = struct
     let exists registry ~db_index ~key =
       Api.octez_riscv_durable_on_disk_database_exists registry db_index key
-      |> wrap_error
 
     let set registry ~db_index ~key ~value =
       Api.octez_riscv_durable_on_disk_database_set registry db_index key value
-      |> wrap_error
 
     let write registry ~db_index ~key ~offset ~value =
       Api.octez_riscv_durable_on_disk_database_write
@@ -95,7 +80,6 @@ module Normal = struct
         key
         offset
         value
-      |> wrap_error
 
     let read registry ~db_index ~key ~offset ~len =
       Api.octez_riscv_durable_on_disk_database_read
@@ -104,22 +88,18 @@ module Normal = struct
         key
         offset
         len
-      |> wrap_error
 
     let value_length registry ~db_index ~key =
       Api.octez_riscv_durable_on_disk_database_value_length
         registry
         db_index
         key
-      |> wrap_error
 
     let delete registry ~db_index ~key =
       Api.octez_riscv_durable_on_disk_database_delete registry db_index key
-      |> wrap_error
 
     let hash registry ~db_index =
       Api.octez_riscv_durable_on_disk_database_hash registry db_index
-      |> wrap_error
   end
 end
 
@@ -127,34 +107,30 @@ module Prove = struct
   module Registry = struct
     type t = Api.registry_prove
 
+    type invalid_argument_error = Api.invalid_argument_error
+
     let hash t = Ok (Api.octez_riscv_durable_on_disk_prove_registry_hash t)
 
     let size t = Ok (Api.octez_riscv_durable_on_disk_prove_registry_size t)
 
-    let resize t n =
-      Api.octez_riscv_durable_on_disk_prove_registry_resize t n |> wrap_error
+    let resize t n = Api.octez_riscv_durable_on_disk_prove_registry_resize t n
 
     let copy_database t ~src ~dst =
       Api.octez_riscv_durable_on_disk_prove_registry_copy t src dst
-      |> wrap_error
 
     let move_database t ~src ~dst =
       Api.octez_riscv_durable_on_disk_prove_registry_move t src dst
-      |> wrap_error
 
     let clear t db_index =
       Api.octez_riscv_durable_on_disk_prove_registry_clear t db_index
-      |> wrap_error
   end
 
   module Database = struct
     let exists t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_prove_database_exists t db_index key
-      |> wrap_error
 
     let set t ~db_index ~key ~value =
       Api.octez_riscv_durable_on_disk_prove_database_set t db_index key value
-      |> wrap_error
 
     let write t ~db_index ~key ~offset ~value =
       Api.octez_riscv_durable_on_disk_prove_database_write
@@ -163,7 +139,6 @@ module Prove = struct
         key
         offset
         value
-      |> wrap_error
 
     let read t ~db_index ~key ~offset ~len =
       Api.octez_riscv_durable_on_disk_prove_database_read
@@ -172,19 +147,15 @@ module Prove = struct
         key
         offset
         len
-      |> wrap_error
 
     let value_length t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_prove_database_value_length t db_index key
-      |> wrap_error
 
     let delete t ~db_index ~key =
       Api.octez_riscv_durable_on_disk_prove_database_delete t db_index key
-      |> wrap_error
 
     let hash t ~db_index =
       Api.octez_riscv_durable_on_disk_prove_database_hash t db_index
-      |> wrap_error
   end
 
   module Proof = Proof
@@ -196,27 +167,24 @@ module Prove = struct
     Api.octez_riscv_durable_on_disk_produce_proof registry_prove
 end
 
-let convert_verification = function Api.Not_found -> Not_found
-
-let convert_verification_argument = function
-  | Api.Invalid_argument e ->
-      Verification_invalid_argument (convert_invalid_argument e)
-  | Api.Verification e -> Verification (convert_verification e)
+type verify_error =
+  | Verify_invalid_argument of Api.invalid_argument_error
+  | Verify_not_found of Api.verification_error
 
 let wrap_verification_error = function
   | Ok x -> Ok x
-  | Error e ->
-      Result_syntax.tzfail (Verification_error (convert_verification e))
+  | Error e -> Error (Verify_not_found e)
 
 let wrap_verification_argument_error = function
   | Ok x -> Ok x
-  | Error e ->
-      Result_syntax.tzfail
-        (Verification_argument_error (convert_verification_argument e))
+  | Error (Api.Invalid_argument e) -> Error (Verify_invalid_argument e)
+  | Error (Api.Verification e) -> Error (Verify_not_found e)
 
 module Verify = struct
   module Registry = struct
     type t = Api.registry_verify
+
+    type invalid_argument_error = verify_error
 
     let hash t =
       Api.octez_riscv_durable_on_disk_verify_registry_hash t
