@@ -30,7 +30,8 @@ use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
-    ManagerOperationContentConv, Operation, OriginationContent, Script,
+    ManagerOperationContentConv, ManagerOperationField as _, Operation,
+    OriginationContent, Script,
 };
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, BacktrackedResult, ContentResult,
@@ -1336,6 +1337,63 @@ where
     }
 
     Ok(processed_ops)
+}
+
+/// Credit the source with a fee refund and record balance updates in the receipt.
+///
+/// Returns Ok(()) with no effect when `fee_refund == 0`.
+pub fn apply_fee_refund<Host, C>(
+    host: &mut Host,
+    context: &C,
+    processed_operations: &mut [ProcessedOperation],
+    fee_refund: u64,
+) -> Result<(), anyhow::Error>
+where
+    Host: StorageV1,
+    C: Context,
+{
+    if fee_refund == 0 {
+        return Ok(());
+    }
+
+    // Validate conversions before any storage mutation.
+    let source_delta: i64 = i64::try_from(fee_refund)?;
+    let block_fees_delta: i64 = -source_delta;
+
+    // Safe: validate_and_apply_operation rejects empty batches (ValidityError::EmptyBatch).
+    let first_op = processed_operations
+        .first_mut()
+        .ok_or_else(|| anyhow::anyhow!("Fee refund: empty processed_operations"))?;
+
+    let source_pkh = first_op.operation_with_metadata.content.source()?.clone();
+
+    // Credit source account with the refund.
+    let source_account = context.implicit_from_public_key_hash(&source_pkh)?;
+    source_account.add_balance(host, fee_refund)?;
+
+    log!(
+        Debug,
+        "Fee refund: {} mutez credited to {}",
+        fee_refund,
+        source_pkh
+    );
+
+    // Record balance updates in the receipt (same ordering as
+    // compute_fees_balance_updates: Account first, BlockFees second).
+    let contract = Contract::Implicit(source_pkh);
+    let receipt = &mut first_op.operation_with_metadata.receipt;
+    receipt.push_balance_update(BalanceUpdate {
+        balance: Balance::Account(contract),
+        changes: source_delta,
+        update_origin: UpdateOrigin::BlockApplication,
+    });
+    receipt.push_balance_update(BalanceUpdate {
+        balance: Balance::BlockFees,
+        changes: block_fees_delta,
+        update_origin: UpdateOrigin::BlockApplication,
+    });
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
