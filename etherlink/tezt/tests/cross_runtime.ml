@@ -7140,6 +7140,90 @@ let test_crac_gas_error_path_reporting =
          error path reports accurate gas in X-Tezos-Gas-Consumed") ;
   unit
 
+(** Verify that the OOG error path of [execute_request] reports the
+ *  full gas budget as consumed via [X-Tezos-Gas-Consumed].
+ *
+ *  Complements {!test_crac_gas_error_path_reporting} (which tests
+ *  FAILWITH) by exercising the OOG-specific branch where
+ *  [total_milligas_consumed()] returns [initial_limit] (gas
+ *  exhausted, [remaining] is [None]).
+ *
+ *  == Scenario ==
+ *
+ *  Baseline:  EVM[wrapper] -> CRAC -> TEZ[simple counter]     (succeeds)
+ *  OOG:       EVM[wrapper(catch)] -> CRAC -> TEZ[gas burner]  (OOGs, caught)
+ *
+ *  == Assertion ==
+ *
+ *  G_oog must significantly exceed G_baseline.  The gas burner
+ *  consumes its entire TEZ budget; the header carries this back
+ *  to the EVM receipt.  If the header reported ~0 on OOG, G_oog
+ *  would be close to G_baseline.
+ *)
+let test_crac_gas_oog_path_reporting =
+  register_crac_runner_test
+    ~title:"CRAC: OOG error path reports consumed gas in X-Tezos-Gas-Consumed"
+    ~tags:["gas"; "oog"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-oog" in
+
+  (* Baseline: EVM->TEZ with simple counter (succeeds, low gas) *)
+  Log.debug ~prefix "[baseline] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[baseline] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_baseline =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple
+  in
+  Log.debug ~prefix "[baseline] Deploy EVM wrapper" ;
+  let* runner_baseline =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_baseline, false)] ()
+  in
+
+  (* OOG: EVM->TEZ with infinite gas burner (always OOGs, caught) *)
+  Log.debug ~prefix "[oog] Originate TEZ gas burner (infinite loop)" ;
+  let* tez_burner = TezGasBurner.originate () in
+  Log.debug ~prefix "[oog] Deploy EVM bridge to gas burner" ;
+  let* evm_bridge_oog = EvmCrossRuntimeRunnerTez.deploy_and_init tez_burner in
+  Log.debug ~prefix "[oog] Deploy EVM wrapper with catch" ;
+  let* runner_oog =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_oog, true)] ()
+  in
+
+  (* Warmup calls (alias generation) *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _ = EvmRunner.call_run runner_baseline in
+  let* _ = EvmRunner.call_run runner_oog in
+
+  (* Measurement calls *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_baseline = EvmRunner.call_run runner_baseline in
+  let* g_oog = EvmRunner.call_run runner_oog in
+
+  Log.info ~prefix "G_baseline=%Ld  G_oog=%Ld" g_baseline g_oog ;
+
+  (* Verify the catch worked *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:4
+      runner_oog
+  in
+
+  (* The gas burner consumes its entire TEZ budget.  The header
+     must report initial_limit, flowing back to the EVM receipt.
+     G_oog must exceed G_baseline by a wide margin.
+
+     If the header reported ~0 on OOG, G_oog would be close to
+     G_baseline since only EVM overhead would be charged. *)
+  Check.(
+    (g_oog > Int64.mul g_baseline 5L)
+      int64
+      ~error_msg:
+        "OOG gasUsed (%L) should exceed 5 * G_baseline (%R), proving the OOG \
+         error path reports consumed gas via X-Tezos-Gas-Consumed") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -7224,4 +7308,5 @@ let () =
   test_crac_gas_model_callee_gas_in_evm_receipt [Alpha] ;
   test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
   test_crac_gas_accounting_investigation [Alpha] ;
-  test_crac_gas_error_path_reporting [Alpha]
+  test_crac_gas_error_path_reporting [Alpha] ;
+  test_crac_gas_oog_path_reporting [Alpha]
