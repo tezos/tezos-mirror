@@ -781,13 +781,20 @@ impl OperationResultSum {
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, ApplyOperationError>,
-    internal_operation_results: Vec<InternalOperationSum>,
+    mut internal_operation_results: Vec<InternalOperationSum>,
 ) -> OperationResult<M> {
     match result {
         Ok(success) => {
             let all_internal_succeded = internal_operation_results
                 .last()
                 .is_none_or(InternalOperationSum::is_applied);
+            if !all_internal_succeded {
+                // when any internal operation failed, retroactively convert
+                // every Applied internal op to BackTracked.
+                internal_operation_results
+                    .iter_mut()
+                    .for_each(InternalOperationSum::transform_result_backtrack);
+            }
             OperationResult {
                 balance_updates,
                 result: if all_internal_succeded {
@@ -795,17 +802,22 @@ pub fn produce_operation_result<M: OperationKind>(
                 } else {
                     ContentResult::BackTracked(BacktrackedResult {
                         errors: None,
-                        result: success, // If internal operations failed, we backtrack the main operation result
+                        result: success,
                     })
                 },
                 internal_operation_results,
             }
         }
-        Err(operation_error) => OperationResult {
-            balance_updates,
-            result: ContentResult::Failed(vec![operation_error].into()),
-            internal_operation_results,
-        },
+        Err(operation_error) => {
+            internal_operation_results
+                .iter_mut()
+                .for_each(InternalOperationSum::transform_result_backtrack);
+            OperationResult {
+                balance_updates,
+                result: ContentResult::Failed(vec![operation_error].into()),
+                internal_operation_results,
+            }
+        }
     }
 }
 

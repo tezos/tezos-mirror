@@ -548,6 +548,19 @@ module TezCrossRuntimeRunnerEvm = struct
     unit
 end
 
+let multi_run_caller_init_storage ~revert ~callees =
+  let pp_bool fmt b =
+    if b then Format.fprintf fmt "True" else Format.fprintf fmt "False"
+  in
+  let pp_semicolon fmt () = Format.fprintf fmt ";" in
+  let pp_callee fmt = Format.fprintf fmt "%S" in
+  Format.asprintf
+    {|Pair 0 (Pair %a {%a})|}
+    pp_bool
+    revert
+    (Format.pp_print_list ~pp_sep:pp_semicolon pp_callee)
+    callees
+
 (** Tezos contract that iterates [%run] over its [callees].  Before
  *  each call, increments [counter].  After all calls, reverts if
  *  initialised to do so, otherwise increments [counter]. *)
@@ -561,19 +574,7 @@ module TezMultiRunCaller = struct
   let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
       ~sequencer ~source ~counter ~protocol ?init_balance ~revert ~callees () =
     let script_name = ["mini_scenarios"; "multi_run_caller"] in
-    let init_storage_data =
-      let pp_bool fmt b =
-        if b then Format.fprintf fmt "True" else Format.fprintf fmt "False"
-      in
-      let pp_semicolon fmt () = Format.fprintf fmt ";" in
-      let pp_callee fmt = Format.fprintf fmt {|"%s"|} in
-      Format.asprintf
-        {|Pair 0 (Pair %a {%a})|}
-        pp_bool
-        revert
-        (Format.pp_print_list ~pp_sep:pp_semicolon pp_callee)
-        callees
-    in
+    let init_storage_data = multi_run_caller_init_storage ~revert ~callees in
     originate_contract_via_delayed_inbox
       ~sc_rollup_address
       ~sc_rollup_node
@@ -622,6 +623,67 @@ module TezGasBurner = struct
       ?init_balance
       protocol
 end
+
+(** L1 counterpart of {!TezMultiRunCaller}: originates
+    [multi_run_caller] contracts directly on the L1 node via
+    [Client.originate_contract_at]. *)
+module L1TezMultiRunCaller = struct
+  let originate ~client ~node ~protocol ~alias_counter ~revert ~callees () =
+    let alias =
+      let n = !alias_counter in
+      incr alias_counter ;
+      sf "mrc_%d" n
+    in
+    let init = multi_run_caller_init_storage ~revert ~callees in
+    let* _alias, addr =
+      Client.originate_contract_at
+        ~alias
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap2.alias
+        ~init
+        ~burn_cap:Tez.one
+        client
+        ["mini_scenarios"; "multi_run_caller"]
+        protocol
+    in
+    let* () = Client.bake_for_and_wait ~node client in
+    return addr
+end
+
+(** L1 counterpart of {!TezRunner}: calls [%run] directly on the L1
+    node via [Client.transfer]. *)
+module L1TezRunner = struct
+  let call_run ~client ~node addr =
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~fee:Tez.one
+        ~amount:Tez.zero
+        ~gas_limit:1_000_000
+        ~storage_limit:10_000
+        ~giver:Constant.bootstrap2.alias
+        ~receiver:addr
+        ~entrypoint:"run"
+        ~arg:"Unit"
+        ~force:true
+        client
+    in
+    Client.bake_for_and_wait ~node client
+end
+
+let fetch_l1_manager_ops client =
+  let* ops =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations ~force_metadata:true ()
+  in
+  let manager_ops = JSON.(ops |=> 3 |> as_list) in
+  match List.rev manager_ops with
+  | [] -> Test.fail "fetch_l1_manager_ops: no manager operations in block"
+  | last_op :: _ -> (
+      match List.rev JSON.(last_op |-> "contents" |> as_list) with
+      | [] ->
+          Test.fail "fetch_l1_manager_ops: manager operation has no contents"
+      | top :: _ -> return top)
 
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
@@ -5590,6 +5652,185 @@ let test_crac_http_call_catch_oog =
   in
   unit
 
+(* L1 vs TezosX receipt comparison helpers *)
+
+let extract_entrypoint_status internals =
+  List.map
+    (fun iop ->
+      let kind = JSON.(iop |-> "kind" |> as_string) in
+      let ep =
+        match kind with
+        | "transaction" ->
+            JSON.(
+              iop |-> "parameters" |-> "entrypoint" |> as_string_opt
+              |> Option.value ~default:"default")
+        | _ -> kind
+      in
+      let status = JSON.(iop |-> "result" |-> "status" |> as_string) in
+      (ep, status))
+    internals
+
+let fetch_tezosx_top_content sequencer =
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  match List.rev JSON.(ops |> as_list) with
+  | [] -> Test.fail "fetch_tezosx_top_content: no manager operations in block"
+  | last_op :: _ -> (
+      match List.rev JSON.(last_op |-> "contents" |> as_list) with
+      | [] ->
+          Test.fail
+            "fetch_tezosx_top_content: manager operation has no contents"
+      | top :: _ -> return top)
+
+(** Deploy the 6-contract nested-FAILWITH tree, call A.run, and return
+    the top-level status and [(entrypoint, status)] list.
+
+    [originate] and [call_run] abstract over L1 vs TezosX.
+    [fetch_top_content] returns the top-level content JSON from the
+    most recent block. *)
+let run_nested_failwith_scenario ~name ~originate ~call_run ~fetch_top_content =
+  Log.info "=== Running nested-FAILWITH scenario on %s ===" name ;
+  let* addr_f = originate ~revert:false ~callees:[] () in
+  let* addr_e = originate ~revert:false ~callees:[] () in
+  let* addr_d = originate ~revert:false ~callees:[] () in
+  let* addr_c = originate ~revert:true ~callees:[addr_d] () in
+  let* addr_b = originate ~revert:false ~callees:[addr_c; addr_e] () in
+  let* addr_a = originate ~revert:false ~callees:[addr_b; addr_f] () in
+  Log.info
+    "%s: A=%s B=%s C=%s D=%s E=%s F=%s"
+    name
+    addr_a
+    addr_b
+    addr_c
+    addr_d
+    addr_e
+    addr_f ;
+  let* () = call_run addr_a in
+  let* top = fetch_top_content () in
+  let status =
+    JSON.(top |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+  in
+  let internals =
+    JSON.(top |-> "metadata" |-> "internal_operation_results" |> as_list)
+  in
+  let pairs = extract_entrypoint_status internals in
+  Log.info "%s: top=%s  %d internal ops" name status (List.length pairs) ;
+  List.iteri
+    (fun i (ep, st) -> Log.info "%s: #%d  ep=%-20s status=%s" name i ep st)
+    pairs ;
+  return (status, pairs)
+
+(* L1 vs TezosX: deploy a nested call tree ending with FAILWITH and
+ * compare the receipts.  L1 is the source of truth.
+ *
+ *  Contracts (all multi_run_caller):
+ *    A (callees=[B,F], revert=false)
+ *     |-> B (callees=[C,E], revert=false)
+ *     |    |-> C (callees=[D], revert=true)
+ *     |    |    |-> D (callees=[], revert=false)
+ *     |    |    |-> FAILWITH
+ *     |    |-> E (callees=[], revert=false)    (never reached)
+ *     |-> F (callees=[], revert=false)         (never reached)
+ *
+ *  On L1, all executed internal ops get backtracked, the failing op
+ *  is failed, and the rest are skipped.  TezosX should match.
+ *)
+let test_l1_vs_tezosx_nested_failwith_receipt =
+  let with_runtimes = Tezosx_runtime.[Tezos] in
+  let tags =
+    ["tezosx"]
+    @ List.map Tezosx_runtime.tag with_runtimes
+    @ ["crac"; "receipt"; "l1_comparison"]
+  in
+  Setup.register_test
+    ~__FILE__
+    ~rpc_server:Evm_node.Resto
+    ~title:"L1 vs TezosX: nested FAILWITH receipt comparison"
+    ~time_between_blocks:Nothing
+    ~tags
+    ~kernel:Latest
+    ~with_runtimes
+    ~enable_dal:false
+    ~enable_multichain:false
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun sequencer_setup protocol ->
+  let client = sequencer_setup.client in
+  let node = sequencer_setup.node in
+  let source = Constant.bootstrap5 in
+  let {Setup.sc_rollup_address; sc_rollup_node; l1_contracts; sequencer; _} =
+    sequencer_setup
+  in
+  let tez_counter = ref 1 in
+  let next_tez_counter () =
+    let c = !tez_counter in
+    incr tez_counter ;
+    c
+  in
+  let l1_alias_counter = ref 0 in
+  let* l1_status, l1_pairs =
+    run_nested_failwith_scenario
+      ~name:"L1"
+      ~originate:
+        (L1TezMultiRunCaller.originate
+           ~client
+           ~node
+           ~protocol
+           ~alias_counter:l1_alias_counter)
+      ~call_run:(L1TezRunner.call_run ~client ~node)
+      ~fetch_top_content:(fun () -> fetch_l1_manager_ops client)
+  in
+  let* tx_status, tx_pairs =
+    run_nested_failwith_scenario
+      ~name:"TezosX"
+      ~originate:(fun ~revert ~callees () ->
+        let* _hex, kt1 =
+          TezMultiRunCaller.originate
+            ~sc_rollup_address
+            ~sc_rollup_node
+            ~client
+            ~l1_contracts
+            ~sequencer
+            ~source
+            ~counter:(next_tez_counter ())
+            ~protocol
+            ~revert
+            ~callees
+            ()
+        in
+        return kt1)
+      ~call_run:(fun addr ->
+        TezRunner.call_run
+          ~sc_rollup_address
+          ~sc_rollup_node
+          ~client
+          ~l1_contracts
+          ~sequencer
+          ~source
+          ~counter:(next_tez_counter ())
+          addr)
+      ~fetch_top_content:(fun () -> fetch_tezosx_top_content sequencer)
+  in
+  Log.info "Comparing L1 vs TezosX receipts" ;
+  Check.(
+    (l1_status = tx_status)
+      string
+      ~error_msg:"Top-level status: L1=%L, TezosX=%R") ;
+  Check.(
+    (List.length l1_pairs = List.length tx_pairs)
+      int
+      ~error_msg:"Internal op count: L1=%L, TezosX=%R") ;
+  List.iteri
+    (fun i ((l1_ep, l1_st), (tx_ep, tx_st)) ->
+      Check.(
+        (l1_ep = tx_ep)
+          string
+          ~error_msg:(sf "Internal #%d entrypoint: L1=%%L, TezosX=%%R" i)) ;
+      Check.(
+        (l1_st = tx_st)
+          string
+          ~error_msg:(sf "Internal #%d status: L1=%%L, TezosX=%%R" i)))
+    (List.combine l1_pairs tx_pairs) ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -5661,4 +5902,5 @@ let () =
   test_crac_http_call_catch_oog [Alpha] ;
   test_crac_debug_trace_transaction [Alpha] ;
   test_crac_debug_trace_block [Alpha] ;
-  test_crac_debug_trace_normal_tx_in_crac_block [Alpha]
+  test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;
+  test_l1_vs_tezosx_nested_failwith_receipt [Alpha]
