@@ -464,9 +464,6 @@ let test_operation_worker_crash_shuts_down_baker_single_node =
     ~__FILE__
     ~title:"Baker shuts down when node crashes"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "single_node"; "crash"]
-    ~supports:
-      Protocol.(
-        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let* node, client =
@@ -522,9 +519,6 @@ let test_operation_worker_crash_shuts_down_baker_multi_node =
     ~title:"Baker does not shut down when operation_worker crashes"
     ~tags:
       [team; "sandbox"; "agnostic"; "baker"; "multi_node"; "crash"; Tag.flaky]
-    ~supports:
-      Protocol.(
-        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P (in archive mode)" ;
@@ -783,7 +777,7 @@ let test_multi_node_dal_worker_connection_recovery =
     ~__FILE__
     ~title:"Baker multi-node DAL worker connection recovery"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "dal"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:Protocol.(From_protocol 025)
     ~uses:(fun _protocol ->
       [Constant.octez_agnostic_baker; Constant.octez_dal_node])
   @@ fun protocol ->
@@ -983,9 +977,6 @@ let test_multi_node_nonce_connection_recovery =
     ~__FILE__
     ~title:"Baker multi-node nonce worker connection recovery"
     ~tags:[team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"]
-    ~supports:
-      Protocol.(
-        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P" ;
@@ -1116,9 +1107,6 @@ let test_multi_node_nonce_revelation_injection =
       [
         team; "sandbox"; "agnostic"; "baker"; "multi_node"; "nonce"; "revelation";
       ]
-    ~supports:
-      Protocol.(
-        Or [And [From_protocol 024; Until_protocol 024]; From_protocol 026])
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Setting up two nodes connected via P2P" ;
