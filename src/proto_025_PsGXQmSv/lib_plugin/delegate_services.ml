@@ -1442,6 +1442,11 @@ module Implem = struct
   let delegators = delegators
 end
 
+let stez_under_feature_flag (ctxt : context) =
+  let open Result_syntax in
+  if Constants.native_contracts_enable ctxt then return_unit
+  else tzfail (Contract_services.Non_activated_feature Stez)
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -1558,15 +1563,23 @@ let register () =
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.pending_updates ctxt pkh) ;
   register1 ~chunked:false S.clst_registered (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
       Clst_contract_storage.is_delegate_registered ctxt pkh) ;
   register1
     ~chunked:false
     S.active_clst_staking_parameters
-    (fun ctxt pkh () () -> Clst.Delegates.get_delegate_parameters ctxt pkh) ;
+    (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.Delegates.get_delegate_parameters ctxt pkh) ;
   register1
     ~chunked:false
     S.pending_clst_staking_parameters
-    (fun ctxt pkh () () -> Clst.Delegates.get_pending_parameters ctxt pkh) ;
+    (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.Delegates.get_pending_parameters ctxt pkh) ;
   register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
       Delegate.For_RPC.pending_denunciations ctxt pkh) ;
   register1

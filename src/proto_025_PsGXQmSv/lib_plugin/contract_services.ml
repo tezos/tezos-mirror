@@ -49,6 +49,33 @@ let info_encoding =
 
 let legacy = Script_ir_translator_config.make ~legacy:true ()
 
+type under_feature_flag = Stez | SWRR
+
+let under_feature_flag_to_string = function Stez -> "stez" | SWRR -> "SWRR"
+
+let under_feature_flag_encoding =
+  Data_encoding.string_enum
+  @@ List.map
+       (fun feature -> (under_feature_flag_to_string feature, feature))
+       [Stez; SWRR]
+
+type error += Non_activated_feature of under_feature_flag
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"plugin.non_activated_feature"
+    ~title:"Feature is not activated"
+    ~description:"An RPC from a non actived feature was accessed."
+    ~pp:(fun ppf feature ->
+      Format.fprintf
+        ppf
+        "The feature %s is not activated, its RPCs are not available."
+        (under_feature_flag_to_string feature))
+    Data_encoding.(obj1 (req "feature" under_feature_flag_encoding))
+    (function Non_activated_feature feature -> Some feature | _ -> None)
+    (fun feature -> Non_activated_feature feature)
+
 module S = struct
   open Data_encoding
 
@@ -472,11 +499,19 @@ module S = struct
         RPC_path.(
           custom_root /: Contract.rpc_arg / "stez_redeemed_finalizable_balance")
 
+    let under_feature_flag (ctxt : context) =
+      let open Result_syntax in
+      if Constants.native_contracts_enable ctxt then return_unit
+      else tzfail (Non_activated_feature Stez)
+
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Contract.get_clst_contract_hash ctxt) ;
       register1 ~chunked:false balance_service (fun ctxt contract () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* balance, _ = Clst_contract_storage.get_balance ctxt contract in
           return balance) ;
       register1
@@ -484,6 +519,7 @@ module S = struct
         ticket_balance_service
         (fun ctxt contract () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* clst_hash = Contract.get_clst_contract_hash ctxt in
           let* ticket_token = Clst_contract_storage.ticket_token ~clst_hash in
           let* ticket_hash, ctxt =
@@ -496,21 +532,30 @@ module S = struct
           Option.value amount ~default:Z.zero) ;
       register0 ~chunked:false total_supply_service (fun ctxt () () ->
           let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
           return total_supply) ;
       register0 ~chunked:false total_amount_of_tez_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst.total_amount_of_tez ctxt) ;
       register0 ~chunked:false exchange_rate_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst_contract_storage.exchange_rate ctxt) ;
       register1
         ~chunked:false
         redeemed_frozen_balance
         (fun ctxt contract () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst.For_RPC.get_unfinalizable_redeemed_balance ctxt contract) ;
       register1
         ~chunked:false
         redeemed_finalizable_balance
         (fun ctxt contract () () ->
+          let open Lwt_result_syntax in
+          let*? () = under_feature_flag ctxt in
           Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract)
   end
 end
