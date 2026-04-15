@@ -45,6 +45,11 @@ type ('a, 'cap) path =
       _ L2_types.chain_family
       -> (Ethereum_types.block_hash, rw) path
   | Evm_node_flag : (unit, rw) path
+  | Blueprint_chunk : {
+      blueprint_number : Z.t;
+      chunk_index : int;
+    }
+      -> (bytes, rw) path
 
 (** {2 Typed operations} *)
 
@@ -69,6 +74,13 @@ val delete : ('a, rw) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 (** [exists p state] is [true] iff a value is stored at the exact leaf
     path [p]. For directory checks, use {!exists_dir} on a {!dir}. *)
 val exists : ('a, 'cap) path -> Pvm.State.t -> bool tzresult Lwt.t
+
+(** [write_all pairs state] writes each [(path, value)] pair in order. The
+    storage version is read at most once across the whole batch — lazily on
+    the first {!Versioned} path. Equivalent to folding {!write} over the
+    list, but without redundant version reads. *)
+val write_all :
+  (('a, rw) path * 'a) list -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
 (** [list_runtimes state] enumerates the TezosX runtimes whose feature
     flag is set in [state]. *)

@@ -255,38 +255,30 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
   in
   return values
 
-let store_blueprint_chunk ~storage_version evm_state
-    (chunk : Sequencer_blueprint.unsigned_chunk) =
-  let open Lwt_result_syntax in
-  let (Qty number) = chunk.number in
-  let key =
-    Durable_storage_path.Blueprint.chunk
-      ~storage_version
-      ~blueprint_number:number
-      ~chunk_index:chunk.chunk_index
-  in
-  let value =
-    (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs in
-       kernel_latest/kernel). The [StoreBlueprint] has two variants, and we
-       want to store a [SequencerChunk] whose tag is 0. [Value ""] is the
-       RLP-encoded for 0. *)
-    Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value] |> Rlp.encode
-  in
-  let* evm_state = Durable_storage.write (Raw_path key) value evm_state in
-  return evm_state
-
 let store_blueprint_chunks ~blueprint_number evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
   let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
   let nb_chunks = List.length chunks in
   let* version = Durable_storage.storage_version evm_state in
-  let* evm_state =
-    List.fold_left_es
-      (store_blueprint_chunk ~storage_version:version)
-      evm_state
+  let chunk_writes =
+    List.map
+      (fun (chunk : Sequencer_blueprint.unsigned_chunk) ->
+        let (Qty number) = chunk.number in
+        let value =
+          (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs
+             in kernel_latest/kernel). The [StoreBlueprint] has two variants,
+             and we want to store a [SequencerChunk] whose tag is 0. [Value ""]
+             is the RLP-encoded for 0. *)
+          Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
+          |> Rlp.encode
+        in
+        ( Durable_storage.Blueprint_chunk
+            {blueprint_number = number; chunk_index = chunk.chunk_index},
+          value ))
       chunks
   in
+  let* evm_state = Durable_storage.write_all chunk_writes evm_state in
   let* evm_state =
     Durable_storage.write
       (Raw_path

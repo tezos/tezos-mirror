@@ -75,6 +75,11 @@ type ('a, 'cap) path =
       _ L2_types.chain_family
       -> (Ethereum_types.block_hash, rw) path
   | Evm_node_flag : (unit, rw) path
+  | Blueprint_chunk : {
+      blueprint_number : Z.t;
+      chunk_index : int;
+    }
+      -> (bytes, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -215,6 +220,18 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       versioned_read (fun ~storage_version ->
           unit_flag_codec
             ~path:(Durable_storage_path.evm_node_flag ~storage_version))
+  | Blueprint_chunk {blueprint_number; chunk_index} ->
+      versioned_read (fun ~storage_version ->
+          Read_write
+            {
+              path =
+                Durable_storage_path.Blueprint.chunk
+                  ~storage_version
+                  ~blueprint_number
+                  ~chunk_index;
+              decode = infallible_decode Fun.id;
+              encode = Bytes.to_string;
+            })
 
 let storage_version state =
   let open Lwt_result_syntax in
@@ -231,19 +248,24 @@ let storage_version state =
       match bytes with Some bytes -> return (decode bytes) | None -> return 0)
 
 let resolve_with_state : type a cap.
-    (a, cap) path -> Pvm.State.t -> (a, cap) resolved tzresult Lwt.t =
- fun p state ->
+    ?sv:int ->
+    (a, cap) path ->
+    Pvm.State.t ->
+    (int option * (a, cap) resolved) tzresult Lwt.t =
+ fun ?sv p state ->
   let open Lwt_result_syntax in
   match resolve p with
-  | Static r -> return r
+  | Static r -> return (sv, r)
   | Versioned f ->
-      let* sv = storage_version state in
-      return (f ~storage_version:sv)
+      let* sv =
+        match sv with Some sv -> return sv | None -> storage_version state
+      in
+      return (Some sv, f ~storage_version:sv)
 
 let read (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
     a tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* (Read_write {path; decode; _}) = resolve_with_state p state in
+  let* _sv, Read_write {path; decode; _} = resolve_with_state p state in
   let*! bytes_opt = inspect_durable state path in
   match bytes_opt with
   | Some bytes ->
@@ -254,7 +276,7 @@ let read (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
 let read_opt (type a cap) (p : (a, cap) path) (state : Pvm.State.t) :
     a option tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* (Read_write {path; decode; _}) = resolve_with_state p state in
+  let* _sv, Read_write {path; decode; _} = resolve_with_state p state in
   let*! bytes_opt = inspect_durable state path in
   match bytes_opt with
   | Some bytes ->
@@ -266,7 +288,7 @@ let write : type a.
     (a, rw) path -> a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
  fun p value state ->
   let open Lwt_result_syntax in
-  let* (Read_write {path; encode; _}) = resolve_with_state p state in
+  let* _sv, Read_write {path; encode; _} = resolve_with_state p state in
   let*! state = modify_durable ~key:path ~value:(encode value) state in
   return state
 
@@ -274,7 +296,7 @@ let delete : type a cap.
     (a, cap) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
  fun p state ->
   let open Lwt_result_syntax in
-  let* r = resolve_with_state p state in
+  let* _sv, r = resolve_with_state p state in
   let*! state =
     delete_durable ~kind:Tezos_scoru_wasm.Durable.Value state (path_of r)
   in
@@ -283,9 +305,26 @@ let delete : type a cap.
 let exists : type a cap. (a, cap) path -> Pvm.State.t -> bool tzresult Lwt.t =
  fun p state ->
   let open Lwt_result_syntax in
-  let* r = resolve_with_state p state in
+  let* _sv, r = resolve_with_state p state in
   let*! b = exists_durable state (path_of r) in
   return b
+
+let write_all : type a.
+    ((a, rw) path * a) list -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t =
+ fun pairs state ->
+  let open Lwt_result_syntax in
+  let* _sv, state =
+    List.fold_left_es
+      (fun (sv, state) (p, value) ->
+        let* sv, Read_write {path; encode; _} =
+          resolve_with_state ?sv p state
+        in
+        let*! state = modify_durable ~key:path ~value:(encode value) state in
+        return (sv, state))
+      (None, state)
+      pairs
+  in
+  return state
 
 let list_runtimes state =
   let open Lwt_result_syntax in
