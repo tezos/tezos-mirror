@@ -223,6 +223,9 @@ val pending_clst_staking_parameters :
   public_key_hash ->
   (Cycle.t * Clst_delegates_parameters_repr.update) list shell_tzresult Lwt.t
 
+val stez_staking_power :
+  'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
+
 val pending_denunciations :
   'a #RPC_context.simple ->
   'a ->

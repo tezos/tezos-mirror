@@ -1701,6 +1701,9 @@ let clst_registered ctxt block pkh =
 let pending_clst_staking_parameters ctxt block pkh =
   RPC_context.make_call1 S.pending_clst_staking_parameters ctxt block pkh () ()
 
+let stez_staking_power ctxt block pkh =
+  RPC_context.make_call1 S.stez_staking_power ctxt block pkh () ()
+
 let pending_denunciations ctxt block pkh =
   RPC_context.make_call1 S.pending_denunciations ctxt block pkh () ()
 
