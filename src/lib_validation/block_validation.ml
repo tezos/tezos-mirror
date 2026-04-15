@@ -752,8 +752,7 @@ module Make (Proto : Protocol_plugin.T) = struct
             Shell_header_hash.equal
               result.shell_header_hash
               block_shell_header_hash
-          then return_false
-          else
+          then
             let*? cached_protocol_data =
               parse_protocol_data result.protocol_data
             in
@@ -764,6 +763,7 @@ module Make (Proto : Protocol_plugin.T) = struct
               (Proto.Plugin.equal_modulo_dummy_values
                  cached_protocol_data
                  block_protocol_data)
+          else return_false
       | None -> return false
     in
     match cached_result with
