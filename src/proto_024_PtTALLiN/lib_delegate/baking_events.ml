@@ -888,6 +888,33 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
+  let consensus_vote_already_signed =
+    declare_2
+      ~section
+      ~name:"consensus_vote_already_signed"
+      ~level:Info
+      ~msg:
+        "consensus vote already signed by another node, skipping \
+         {operation_information} -- {trace}"
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
+      ~pp2:Error_monad.pp_print_trace
+      ("trace", Error_monad.trace_encoding)
+
+  let block_already_signed =
+    declare_2
+      ~section
+      ~name:"block_already_signed"
+      ~level:Info
+      ~msg:
+        "block already signed by another node at level {level}, round {round}, \
+         skipping"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+
   let consensus_op_injected =
     declare_2
       ~section

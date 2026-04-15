@@ -266,8 +266,12 @@ let sign_block_header (cctxt : Protocol_client_context.full) round_duration
             in
             return_true
         | false ->
-            let*! () = Events.(emit potential_double_baking (level, round)) in
-            return force)
+            if global_state.config.multi_node then
+              let*! () = Events.(emit block_already_signed (level, round)) in
+              return force
+            else
+              let*! () = Events.(emit potential_double_baking (level, round)) in
+              return force)
   in
   match result with
   | false -> tzfail (Block_previously_baked {level; round})
@@ -849,7 +853,12 @@ let authorized_consensus_votes (automaton_state : automaton_state)
           | Attestation ->
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.(emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
+        if global_state.config.multi_node then
+          Events.(
+            emit consensus_vote_already_signed (unsigned_consensus_vote, [error]))
+        else
+          Events.(
+            emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
       unauthorized_votes
   in
   return authorized_votes

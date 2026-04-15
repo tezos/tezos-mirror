@@ -245,10 +245,21 @@ let handle_forge_block (state : Types.state) automaton_state
           let queue = get_or_create_queue state block_to_bake.delegate in
           Delegate_signing_queue.push_task
             ~on_error:(fun err ->
-              let*! () =
-                Events.(emit failed_to_sign_block (block_to_bake.delegate, err))
+              let is_already_baked =
+                List.exists
+                  (function
+                    | Baking_highwatermarks.Block_previously_baked _ -> true
+                    | _ -> false)
+                  err
               in
-              Lwt.return_unit)
+              if state.baking_state.config.multi_node && is_already_baked then
+                Lwt.return_unit
+              else
+                let*! () =
+                  Events.(
+                    emit failed_to_sign_block (block_to_bake.delegate, err))
+                in
+                Lwt.return_unit)
             task
             queue ;
           Lwt.return_unit)
