@@ -14,6 +14,7 @@ use octez_riscv_durable_storage::key::Key;
 
 /// KeyParam receiving a `bytes` value from OCaml.
 #[derive(ocaml::FromValue)]
+#[unboxed]
 pub struct KeyParam<'a>(pub &'a [u8]);
 
 impl<'a> TryFrom<KeyParam<'a>> for Key {
@@ -26,6 +27,7 @@ impl<'a> TryFrom<KeyParam<'a>> for Key {
 
 /// BytesParam receiving a `bytes` value from OCaml.
 #[derive(ocaml::FromValue)]
+#[unboxed]
 pub struct BytesParam<'a>(pub &'a [u8]);
 
 impl<'a> From<BytesParam<'a>> for Bytes {

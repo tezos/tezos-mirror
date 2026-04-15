@@ -244,7 +244,9 @@ where
         let key = Key::try_from(key)?;
         let db = registry.database(db_index)?;
 
-        db.read(&key, offset, &mut read)
+        // Pass a mutable slice to avoid Vec::BufMut which appends
+        // instead of writing in-place.
+        db.read(&key, offset, read.as_mut_slice())
     });
 
     let res = split_ds_errors(res)?.map(|read_bytes| {
