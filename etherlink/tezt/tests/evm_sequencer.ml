@@ -3594,6 +3594,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
   in
 
   let _, to_use = Kernel.to_uses_and_tags to_ in
+  let pending_upgrade = Evm_node.wait_for_pending_upgrade sequencer in
   let* _root_hash =
     upgrade
       ~sc_rollup_node
@@ -3612,6 +3613,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
+  let* _ = pending_upgrade in
 
   (* Produce a block where the upgrade would happen *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:10Z" sequencer in
