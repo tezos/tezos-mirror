@@ -167,13 +167,18 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   in
   let*? can_contain_preattestations = can_contain_preattestations mode in
   let current_level = Level.current ctxt in
-  let* ctxt, allowed_preattestations =
-    if can_contain_preattestations then
-      let* ctxt, preattestations_map =
-        Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
-      in
-      return (ctxt, Some preattestations_map)
-    else return (ctxt, None)
+  (* Always compute preattestation rights for current_level, even when the block
+     cannot contain preattestations. This ensures the cache domain (specifically
+     `stake_info` for current_cycle) is populated deterministically regardless
+     of the application mode (Construction vs Application). Without this,
+     Construction mode always computes these rights while Application mode may
+     skip them when there is no locked round, causing divergent cache domains
+     and context hashes. *)
+  let* ctxt, preattestations_map =
+    Baking.attesting_rights_by_first_slot ctxt ~attested_level:current_level
+  in
+  let allowed_preattestations =
+    if can_contain_preattestations then Some preattestations_map else None
   in
   let* ctxt, delegate_to_shard_count =
     delegate_to_shard_count ctxt ~attested_levels:[current_level]
