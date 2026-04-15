@@ -292,20 +292,26 @@ where
     let mut trace_journal =
         tezosx_journal::TezosXJournal::new(tezosx_journal::CracId::new(0, 0));
     let execution_result = match transaction {
-        chains::TezosXTransaction::Tezos(operation) => chains::apply_tezos_operation(
-            &evm_config.michelson_chain_config().chain_id,
-            &block_in_progress,
-            &mut host,
-            &registry,
-            &block_constants.michelson_runtime_block_constants,
-            operation,
-            None,
-            skip_signature_check,
-            skip_fees_check,
-            Some(&outbox_queue),
-            Some(&block_constants.evm_runtime_block_constants),
-            &mut trace_journal,
-        ),
+        chains::TezosXTransaction::Tezos(operation) => {
+            let enable_gas_refund = evm_config
+                .experimental_features
+                .is_michelson_gas_refund_enabled();
+            chains::apply_tezos_operation(
+                &evm_config.michelson_chain_config().chain_id,
+                &block_in_progress,
+                &mut host,
+                &registry,
+                &block_constants.michelson_runtime_block_constants,
+                operation,
+                None,
+                skip_signature_check,
+                skip_fees_check,
+                Some(&outbox_queue),
+                Some(&block_constants.evm_runtime_block_constants),
+                &mut trace_journal,
+                enable_gas_refund,
+            )
+        }
         _ => evm_config.apply_transaction(
             &block_in_progress,
             &mut host,

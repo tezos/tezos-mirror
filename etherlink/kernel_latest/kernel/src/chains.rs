@@ -146,8 +146,6 @@ impl ExperimentalFeatures {
         self.enabled_michelson_target_sunrise_level.is_some()
     }
 
-    // Used in the gas refund implementation (!21392).
-    #[allow(dead_code)]
     pub(crate) fn is_michelson_gas_refund_enabled(&self) -> bool {
         self.enable_michelson_gas_refund
     }
@@ -773,6 +771,7 @@ impl ChainConfigTrait for EvmChainConfig {
                     Some(outbox_queue),
                     Some(&block_constants.evm_runtime_block_constants),
                     &mut journal,
+                    self.experimental_features.is_michelson_gas_refund_enabled(),
                 )
             }
         }
@@ -983,6 +982,7 @@ pub fn apply_tezos_operation<Host>(
     outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
+    _enable_gas_refund: bool,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1272,6 +1272,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
+                // Not supported in standalone Tezlink (no ExperimentalFeatures).
+                let enable_gas_refund = false;
                 apply_tezos_operation(
                     &self.chain_id,
                     block_in_progress,
@@ -1285,6 +1287,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     None::<&OutboxQueue<'_, RefPath>>,
                     None,
                     &mut journal,
+                    enable_gas_refund,
                 )
             }
         }
