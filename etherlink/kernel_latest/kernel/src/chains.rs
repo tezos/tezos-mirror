@@ -924,6 +924,16 @@ impl CreditDaFees {
     }
 }
 
+/// Fees computed from an operation before execution.
+struct FeesData {
+    /// Total required fees (DA + gas) to check against declared fees,
+    /// or `None` in simulation (skip_fees_check).
+    required_fees: Option<u64>,
+    /// Action to credit the sequencer pool with DA fees after execution.
+    /// Also carries the DA fees amount (via `da_fees()`).
+    credit_da_fees: CreditDaFees,
+}
+
 /// Returns the required fees if any and the function to execute
 /// regarding DA fees, either skipped if operation is a simulation
 /// or credit sequencer pool address accordingly.
@@ -934,9 +944,12 @@ fn get_fees_data(
     base_fee_per_gas: U256,
     michelson_to_evm_gas_multiplier: u64,
     sequencer_pool_address: Option<H160>,
-) -> Result<(Option<u64>, CreditDaFees), anyhow::Error> {
+) -> Result<FeesData, anyhow::Error> {
     if skip_fees_check {
-        Ok((None, CreditDaFees::Skip))
+        Ok(FeesData {
+            required_fees: None,
+            credit_da_fees: CreditDaFees::Skip,
+        })
     } else {
         let required_da_fees = get_required_da_fees(operation, da_fee_per_byte_mutez)?;
 
@@ -955,13 +968,13 @@ fn get_fees_data(
 
         let required_fees = required_da_fees.saturating_add(required_execution_gas_fees);
 
-        Ok((
-            Some(required_fees),
-            CreditDaFees::Execute {
+        Ok(FeesData {
+            required_fees: Some(required_fees),
+            credit_da_fees: CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez: required_da_fees,
             },
-        ))
+        })
     }
 }
 
@@ -999,7 +1012,10 @@ where
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
-            let (fees, credit_da_fees) = get_fees_data(
+            let FeesData {
+                required_fees: fees,
+                credit_da_fees,
+            } = get_fees_data(
                 &operation,
                 skip_fees_check,
                 block_constants.da_fee_per_byte_mutez,
