@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-debian:
+oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
   stage: build
   tags:
@@ -38,6 +38,33 @@ oc.build-debian:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -72,44 +99,17 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
-  stage: build
-  tags:
-  - $TAGS
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh zcash
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-
 apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   dependencies:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   timeout: 60 minutes
   interruptible: false
   before_script:

@@ -145,16 +145,20 @@ let make_job_build_packages ~__POS__ ~name ~matrix ~distribution ~script
 
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
-let job_build_debian_package ~manual pipeline_type : tezos_job =
-  make_job_build_packages
+let job_build_debian_package =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.build-debian"
     ~__POS__
-    ~name:"oc.build-debian"
-    ~distribution:"debian"
-    ~dependencies:(Dependent [])
-    ~script:"./scripts/ci/build-debian-packages.sh binaries"
-    ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
-    ~manual
-    ()
+    ~description:"Build the Debian packages for Debian."
+    ~image:build_dependency_image
+    ~stage:Build
+    ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
+    ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~sccache:(Cacio.sccache ())
+    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
 
 let job_build_ubuntu_package =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -179,11 +183,8 @@ let job_apt_repo_debian =
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs_legacy:
-      [
-        (Artifacts, job_build_debian_package ~manual pipeline_type);
-        (Artifacts, job_build_data_packages ~manual);
-      ]
+    ~needs:[(Artifacts, job_build_debian_package pipeline_type)]
+    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -236,14 +237,13 @@ let job_lintian_ubuntu =
     ]
 
 let job_lintian_debian =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.lintian_debian"
     ~__POS__
     ~stage:Test_publication
     ~description:"Run lintian on Debian packages."
-    ~needs_legacy:[(Artifacts, job_build_debian_package ~manual pipeline_type)]
+    ~needs:[(Artifacts, job_build_debian_package pipeline_type)]
     ~image:Images.Base_images.debian_bookworm
     [
       ". ./scripts/version.sh";
@@ -429,7 +429,7 @@ let () =
     Debian_partial
     [
       (Auto, job_apt_repo_debian false Partial);
-      (Auto, job_lintian_debian false Partial);
+      (Auto, job_lintian_debian Partial);
       (Auto, job_install_bin_debian_bookworm false Partial);
       (Auto, job_install_bin_debian_bookworm_systemd false Partial);
       (Auto, job_upgrade_bin_debian_bookworm_systemd false Partial);
@@ -440,7 +440,7 @@ let () =
       (Auto, job_apt_repo_debian false Full);
       (Auto, job_apt_repo_ubuntu false Full);
       (Auto, job_lintian_ubuntu Full);
-      (Auto, job_lintian_debian false Full);
+      (Auto, job_lintian_debian Full);
       (Auto, job_install_bin_ubuntu_22_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04_systemd false Full);
@@ -456,11 +456,9 @@ let () =
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs ?(manual = false) pipeline_type =
-  [
-    job_build_debian_package ~manual pipeline_type;
-    job_build_data_packages ~manual;
-  ]
+let jobs ?(manual = false)
+    (_pipeline_type : Common.Packaging.repository_pipeline) =
+  [job_build_data_packages ~manual]
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =

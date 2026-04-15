@@ -86,50 +86,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
-  stage: build
-  tags:
-  - $TAGS
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh binaries
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    DISTRIBUTION: debian
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-  parallel:
-    matrix:
-    - RELEASE:
-      - bookworm
-      - trixie
-      TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
-
 oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
   stage: build
@@ -339,17 +295,62 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  stage: build
+  tags:
+  - $TAGS
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DISTRIBUTION: debian
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu_ramfs
+      - gcp_arm64
+
 apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
   stage: publish
   tags:
   - gcp
   needs:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   dependencies:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   timeout: 60 minutes
   interruptible: true
   before_script:
