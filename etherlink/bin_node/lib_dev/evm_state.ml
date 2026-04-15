@@ -281,11 +281,8 @@ let store_blueprint_chunks ~blueprint_number evm_state
   let* evm_state = Durable_storage.write_all chunk_writes evm_state in
   let* evm_state =
     Durable_storage.write
-      (Raw_path
-         (Durable_storage_path.Blueprint.nb_chunks
-            ~storage_version:version
-            ~blueprint_number))
-      (Bytes.of_string (Z.to_bits (Z.of_int nb_chunks)))
+      (Blueprint_nb_chunks blueprint_number)
+      nb_chunks
       evm_state
   in
   if version >= 39 then

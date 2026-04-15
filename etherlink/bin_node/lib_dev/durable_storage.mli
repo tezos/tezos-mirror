@@ -50,6 +50,7 @@ type ('a, 'cap) path =
       chunk_index : int;
     }
       -> (bytes, rw) path
+  | Blueprint_nb_chunks : Z.t -> (int, rw) path
 
 (** {2 Typed operations} *)
 

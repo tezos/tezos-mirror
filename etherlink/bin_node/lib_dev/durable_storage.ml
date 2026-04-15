@@ -80,6 +80,7 @@ type ('a, 'cap) path =
       chunk_index : int;
     }
       -> (bytes, rw) path
+  | Blueprint_nb_chunks : Z.t -> (int, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -231,6 +232,19 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                   ~chunk_index;
               decode = infallible_decode Fun.id;
               encode = Bytes.to_string;
+            })
+  | Blueprint_nb_chunks blueprint_number ->
+      versioned_read (fun ~storage_version ->
+          Read_write
+            {
+              path =
+                Durable_storage_path.Blueprint.nb_chunks
+                  ~storage_version
+                  ~blueprint_number;
+              decode =
+                infallible_decode (fun bytes ->
+                    Helpers.decode_z_le bytes |> Z.to_int);
+              encode = (fun n -> Z.to_bits (Z.of_int n));
             })
 
 let storage_version state =
