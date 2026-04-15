@@ -93,11 +93,23 @@ impl Decodable for Operation {
 }
 
 pub trait ManagerOperationField {
+    fn fee(&self) -> &Narith;
     fn gas_limit(&self) -> Result<&Narith, ValidityError>;
     fn source(&self) -> Result<&PublicKeyHash, ValidityError>;
 }
 
 impl ManagerOperationField for ManagerOperationContent {
+    fn fee(&self) -> &Narith {
+        match self {
+            ManagerOperationContent::Reveal(op) => &op.fee,
+            ManagerOperationContent::Transaction(op) => &op.fee,
+            ManagerOperationContent::Origination(op) => &op.fee,
+            ManagerOperationContent::Delegation(op) => &op.fee,
+            ManagerOperationContent::SmartRollupCement(op) => &op.fee,
+            ManagerOperationContent::SmartRollupPublish(op) => &op.fee,
+        }
+    }
+
     fn gas_limit(&self) -> Result<&Narith, ValidityError> {
         match self {
             ManagerOperationContent::Reveal(op) => Ok(&op.gas_limit),
