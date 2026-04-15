@@ -1,0 +1,10 @@
+
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/swrr_credits
+Fatal error:
+  Command failed: The feature SWRR is not activated, its RPCs are not available.
+  
+
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/swrr_selected_bakers
+Fatal error:
+  Command failed: The feature SWRR is not activated, its RPCs are not available.
+  

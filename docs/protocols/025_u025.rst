@@ -162,9 +162,9 @@ RPC Changes
 -----------
 
 - Added ``swrr_selected_bakers`` and ``swrr_credits`` RPCs to query the SWRR
-  baker selection results and associated credits. The SWRR sampler is under
-  feature flag for this protocol, so the RPCs do not provide any information
-  yet. (MR :gl:`!20180`)
+  baker selection results and associated credits. These RPCs return a
+  ``non_activated_feature`` error when the ``swrr_new_baker_lottery_enable`` feature
+  flag is disabled. (MRs :gl:`!20180`, :gl:`!21618`)
 
 Operation receipts
 ------------------
