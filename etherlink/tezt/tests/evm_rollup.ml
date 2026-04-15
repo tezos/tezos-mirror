@@ -3053,6 +3053,287 @@ let test_kernel_upgrade_via_kernel_security_governance =
   in
   unit
 
+(* Test the activation of the Michelson runtime on an already running, EVM-only
+   Tezos X instance.
+   * Start a regular Etherlink instance and let it produce a few blocks.
+   * Upgrade through admin governance with enable_tezos_runtime set and the
+     Michelson target_sunrise_level in the future (level 6 while upgrade happens
+     at block 4).
+   * Check the value associated to key paths in durable storage (runtime flag,
+     activation target, activation level).
+   * Produce a few blocks.
+   * Restart the EVM node so that it picks up the new configuration with the
+     Michelson runtime activated.
+   * Check a few blocks: before activation (not found), at activation
+     (predecessor = hash), a bit after activation (found), in the future (not
+     found). *)
+let test_kernel_upgrade_activates_michelson_runtime =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["upgrade"; "kernel_governance"; "michelson_runtime"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Kernel upgrade activates the Michelson runtime"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  let setup_mode =
+    Setup_sequencer
+      {
+        return_sequencer = true;
+        time_between_blocks = Some Nothing;
+        sequencer = admin;
+        max_blueprints_ahead = None;
+        genesis_timestamp = None;
+      }
+  in
+  let* common_setup, mode =
+    setup_evm_kernel
+      ~with_administrator:true
+      ~admin:(Some admin)
+      ~setup_mode
+      protocol
+  in
+  let {
+    client;
+    sc_rollup_node;
+    sc_rollup_address;
+    produce_block;
+    l1_contracts;
+    _;
+  } : common_setup =
+    common_setup
+  in
+  let l1_contracts = Option.get l1_contracts in
+  let evm_node =
+    match mode with Sequencer {evm_node} -> evm_node | Proxy -> assert false
+  in
+  (* Confirm genesis before sending the upgrade governance message.
+     Without this, the upgrade message could be processed by the rollup
+     before the genesis blueprint, causing the upgrade to trigger during
+     genesis block production. The sequencer computes genesis without the
+     upgrade active, but the rollup would compute it with the upgrade
+     active, leading to a genesis hash divergence. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* Produce a few EVM blocks before the upgrade to exercise the case where
+     the observer is initialised from a state that already has pre-upgrade
+     blocks (i.e. blocks that were never served by the Tezlink RPC). *)
+  let* _ = produce_block () in
+  let* _ = produce_block () in
+  let* _ = produce_block () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* Prepare an installer that sets the Tezos runtime feature flag.
+     The upgrade mechanism uses upgrade_reveal_flow which directly installs the
+     kernel at the given root hash. To have the installer process the Set
+     instruction, we must:
+     1. Create the installer WASM with the config (saved as .wasm for raw bytes).
+     2. Store the installer WASM itself as preimages to get its root hash.
+     3. Use the installer's root hash in the upgrade payload, so the upgrade
+        downloads and runs the installer, which then writes the feature flag
+        and installs the target kernel. *)
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let activation_target =
+    "0600000000000000000000000000000000000000000000000000000000000000"
+  in
+  let config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Set {value = ""; to_ = Tezosx_runtime.feature_flag Tezosx_runtime.Tezos};
+        Set
+          {
+            value = activation_target;
+            to_ = Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos;
+          };
+      ]
+  in
+  (* Step 1: create installer WASM with config; save as .wasm (raw bytes). *)
+  let installer_wasm_path = Temp.file "installer.wasm" in
+  let* _ =
+    Sc_rollup_helpers.prepare_installer_kernel_with_arbitrary_file
+      ~output:installer_wasm_path
+      ~preimages_dir
+      ~config:(`Config config)
+      (Uses.path Constant.WASM.evm_kernel)
+  in
+  (* Step 2: store the installer WASM as preimages; root_hash is the installer's
+     preimage hash. *)
+  let* {root_hash = installer_root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel_with_arbitrary_file
+      ~preimages_dir
+      installer_wasm_path
+  in
+  let* payload =
+    Evm_node.upgrade_payload
+      ~root_hash:installer_root_hash
+      ~activation_timestamp:"0"
+  in
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:admin.public_key_hash
+      ~receiver:l1_contracts.kernel_governance
+      ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _ = produce_block () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* Verify the feature flag is present in durable storage. *)
+  let* flag_value =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:(Tezosx_runtime.feature_flag Tezosx_runtime.Tezos)
+         ()
+  in
+  Check.((flag_value = Some "") (option string))
+    ~error_msg:
+      "Michelson runtime feature flag should be set after kernel upgrade" ;
+  (* Check that the target sunrise level is set (upgrade block 4 sets it). *)
+  let* target_sunrise_value =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:(Tezosx_runtime.target_sunrise_level Tezosx_runtime.Tezos)
+         ()
+  in
+  Check.((target_sunrise_value = Some activation_target) (option string))
+    ~error_msg:"Target sunrise level should be set after kernel upgrade" ;
+  (* Check that the actual sunrise level is not yet set (sunrise has not
+     happened yet — block 4 sets the target but block 6 is the sunrise). *)
+  let* sunrise_value =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ()
+  in
+  Check.((sunrise_value = None) (option string))
+    ~error_msg:"Sunrise level should not be set yet before the sunrise block" ;
+  (* Advance the rollup node's finalized pointer past block 4.
+     [init_from_rollup_node_data_dir] copies the state at the FINALIZED L2
+     block (rollup uses block_finality_time = 2, so the finalized block is
+     2 L1 levels behind the current head).  After [bake_until_sync] block 4
+     is *confirmed* but not yet *finalized*.  Baking 2 extra L1 blocks makes
+     the rollup advance its finalized pointer to block 4, so the observer
+     initialises from block 4's state (with the Michelson runtime flag set). *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* The /tezlink RPC directory is registered once at EVM node startup based on
+     the runtime feature flags in durable storage at that time. Start a fresh
+     observer after the upgrade by initialising it from the rollup node's
+     current Irmin state (which already has the Michelson runtime flag set),
+     so it registers the /tezlink endpoint from the start. *)
+  let observer =
+    Evm_node.create
+      ~node_setup:
+        (Evm_node.make_setup
+           ~preimages_dir:(Evm_node.preimages_dir evm_node)
+           ())
+      ~mode:
+        (Evm_node.Observer
+           {
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint evm_node;
+           })
+      ()
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () = Evm_node.init_from_rollup_node_data_dir observer sc_rollup_node in
+  let* () = Evm_node.run ~end_test_on_failure:true observer in
+  let* () = Evm_node.wait_for_drift_monitor_ready observer in
+  (* Produce 4 EVM blocks on the sequencer while the observer catches up, then
+     wait until the observer has applied the last of those blocks. *)
+  let wait_applied = Evm_node.wait_for_blueprint_applied observer 8 in
+  let* _ = produce_block () in
+  let* _ = produce_block () in
+  let* _ = produce_block () in
+  let* _ = produce_block () in
+  let* () = wait_applied in
+  (* Bake until the rollup node processes blueprints 5-8, so its durable
+     storage reflects the sunrise_level written by the kernel at block 6. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
+  (* Check that the sunrise level is now set (block 6 is the sunrise block). *)
+  let* sunrise_value =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Value
+         ~key:(Tezosx_runtime.sunrise_level Tezosx_runtime.Tezos)
+         ()
+  in
+  Check.((sunrise_value = Some activation_target) (option string))
+    ~error_msg:"Sunrise level should be set after the sunrise block" ;
+  let get_block_header i =
+    let* block_str =
+      Curl.get_raw
+        ~name:(sf "curl#%s" (Evm_node.name observer))
+        (Evm_node.endpoint observer
+        ^ sf "/tezlink/chains/main/blocks/%d/header" i)
+      |> Runnable.run
+    in
+    let origin = sf "tezlink_block_%d_header" i in
+    return @@ JSON.parse ~origin block_str
+  in
+  (* Block 5 is pre-sunrise: the kernel has enable_tezos_runtime=true but
+     block 5 < 6 (target sunrise level), so no Tezos block was stored for
+     block 5. The EVM node filters out pre-sunrise blocks, so querying it
+     should return not found. *)
+  let* block5 = get_block_header 5 in
+  Check.(
+    (JSON.(block5 |=> 0 |-> "msg" |> as_string)
+    = "TezosX Tezos block 5 not found")
+      string)
+    ~error_msg:"Block 5 (pre-sunrise) should not be found, got %L" ;
+  (* Block 6 is the activation/sunrise block: the first Tezos block produced.
+     It has a particular hash and its predecessor is itself (genesis
+     convention). *)
+  (* TODO https://linear.app/tezos/issue/L2-1182: adapt test with the correct
+     genesis hash and the fact that predecessor = own hash. *)
+  let* block6 = get_block_header 6 in
+  let block6_level = JSON.(block6 |-> "level" |> as_int) in
+  Check.((block6_level = 6) int)
+    ~error_msg:"Block 6 should have level %R, got %L" ;
+  let block6_hash = JSON.(block6 |-> "hash" |> as_string) in
+  let block6_predecessor = JSON.(block6 |-> "predecessor" |> as_string) in
+  Check.((block6_predecessor <> block6_hash) string)
+    ~error_msg:
+      "Block 6 (genesis Tezos block) is not yet its own predecessor: expected \
+       something different than %R" ;
+  (* Block 7: one block after the sunrise block. *)
+  let* block7 = get_block_header 7 in
+  let block7_level = JSON.(block7 |-> "level" |> as_int) in
+  Check.((block7_level = 7) int)
+    ~error_msg:"Block 7 should have level %R, got %L" ;
+  (* Block 8: two blocks after the sunrise block. *)
+  let* block8 = get_block_header 8 in
+  let block8_level = JSON.(block8 |-> "level" |> as_int) in
+  Check.((block8_level = 8) int)
+    ~error_msg:"Block 8 should have level %R, got %L" ;
+  (* Block 16 was never produced and should not be found. *)
+  let* block16 = get_block_header 16 in
+  Check.(
+    (JSON.(block16 |=> 0 |-> "msg" |> as_string)
+    = "TezosX Tezos block 16 not found")
+      string)
+    ~error_msg:"Block 16 in the future should not be found, got %L" ;
+  unit
+
 let test_sequencer_and_kernel_upgrade_via_kernel_admin =
   Protocol.register_test
     ~__FILE__
@@ -6289,6 +6570,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_version_change protocols ;
   test_kernel_upgrade_via_governance protocols ;
   test_kernel_upgrade_via_kernel_security_governance protocols ;
+  test_kernel_upgrade_activates_michelson_runtime protocols ;
   test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
