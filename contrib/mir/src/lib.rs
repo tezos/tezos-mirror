@@ -225,7 +225,7 @@ mod tests {
         ctx.gas = Gas::new(1);
         assert_eq!(
             ast.interpret(ctx, &temp, &mut istack),
-            Err(interpreter::InterpretError::OutOfGas(crate::gas::OutOfGas)),
+            Err(interpreter::InterpretError::OutOfGas),
         );
     }
 
@@ -281,7 +281,7 @@ mod tests {
         let ast = parse(FIBONACCI_SRC).unwrap();
         assert_eq!(
             ast.typecheck_instruction(&mut Gas::new(1000), None, &[parse("nat").unwrap()]),
-            Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
+            Err(typechecker::TcError::OutOfGas)
         );
     }
 
