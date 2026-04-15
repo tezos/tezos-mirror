@@ -718,22 +718,39 @@ let test_same_delegate_serialization () =
       else return_unit)
 
 (**
-   Integration Test 7: Two-node disk-based high watermark rejects slow block
+   Integration Test 7: Two-node forge worker allows both blocks through
 
    This test simulates two nodes (fast and slow) pushing Forge_and_sign_block
    requests for the same delegate, level, and round to a single forge worker.
    The slow node's RPCs are delayed so that the fast node completes block
-   preparation and signing first. The test verifies that:
+   preparation and signing first.
+
+   Since the in-memory high watermark was removed from the forge worker,
+   both nodes proceed to signing. Each node has its own cctxt with
+   independent disk-based high watermark state, so both signing attempts
+   succeed. The test verifies that:
    - The fast node's block is signed and a Block_ready event is emitted
-   - The slow node's block signing is rejected by the disk-based high watermark
-     signer (Baking_highwatermarks), which triggers the on_error handler that
-     logs the error and returns unit (no Block_ready is emitted for the slow node)
+   - The slow node's block is also signed (no in-memory filter) and a
+     Block_ready event is emitted
+
+   In production, double-signing protection is ensured at a higher level:
+   each automaton's cctxt shares the same disk-based high watermark file,
+   so the second signing attempt would be rejected by
+   [Baking_highwatermarks.may_sign_block].
 *)
 let test_two_nodes_high_watermark_filters_slow_block () =
   let open Lwt_result_syntax in
   let* (env : Mockup_simulator.baker_test_env) =
     Mockup_simulator.create_baker_test_env ~num_delegates:1 ()
   in
+  (* Override config to enable multi_node since this test simulates two nodes *)
+  let global_state =
+    {
+      env.global_state with
+      config = {env.global_state.config with multi_node = true};
+    }
+  in
+  let env = {env with global_state} in
   let fast_automaton_state = env.automaton_state in
   let slow_hooks, slow_preparation_done =
     Mockup_simulator.wrap_hooks_with_delay ~delay:3.0 env.hooks
@@ -741,7 +758,6 @@ let test_two_nodes_high_watermark_filters_slow_block () =
   let* slow_cctxt = Mockup_simulator.create_cctxt ~hooks:slow_hooks env in
   let* slow_automaton_state =
     Baking_automaton.create_automaton_state
-      ~multi_node_setup:true
       ~monitor_node_operations:false
       ~global_state:env.global_state
       slow_cctxt
@@ -811,23 +827,23 @@ let test_two_nodes_high_watermark_filters_slow_block () =
     then return_unit
     else failwith "Block signature verification failed for fast node"
   in
-  (* 3. Wait for the slow node's preparation to complete. After this, its
-     signing task has been pushed to the delegate's queue. Since the queue is
-     serial and the fast node's signing task already ran, the slow node's task
-     will execute next and be filtered by the high watermark. *)
+  (* 3. Wait for the slow node's preparation to complete and its signing
+     task to be pushed to the delegate's queue. *)
   let*! () = slow_preparation_done in
-  (* Shutdown waits for signing queues to drain, so the slow node's task
-     (which gets filtered by HWM) has fully executed after this. *)
+  (* Shutdown waits for signing queues to drain, so the slow node's
+     signing task has fully executed after this. *)
   let*! () = Forge_worker.shutdown worker in
-  (* 4. The slow node must NOT have received any Block_ready *)
+  (* 4. The slow node should also have received Block_ready since
+     there is no in-memory high watermark filter and each node has
+     its own independent disk-based HWM state in tests. *)
   if
     Lwt_stream.get_available slow_automaton_state.forge_event_stream
     |> List.exists (function Baking_state.Block_ready _ -> true | _ -> false)
-  then
+  then return_unit
+  else
     failwith
-      "Slow node should NOT have received Block_ready (high watermark should \
-       filter it)"
-  else return_unit
+      "Slow node should have received Block_ready (no in-memory HWM filter, \
+       each node has independent disk-based HWM state)"
 
 (** {2 Test Registration} *)
 

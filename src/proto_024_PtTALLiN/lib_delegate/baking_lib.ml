@@ -67,7 +67,6 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       cctxt
       ?synchronize
       ?monitor_node_operations
-      ~multi_node_setup:false
       ~global_state
       ~current_proposal
       delegates
