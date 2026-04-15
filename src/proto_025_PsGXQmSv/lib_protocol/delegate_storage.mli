@@ -129,6 +129,10 @@ val initial_frozen_deposits_of_previous_cycle :
 val current_frozen_deposits :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 
+(** Returns a delegate's current frozen deposits added to their current stez allocation. *)
+val current_frozen_deposits_with_stez :
+  Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
+
 val frozen_deposits_limit :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

@@ -216,6 +216,45 @@ let check_expected_pending_parameters ~loc expected parameters =
         (parameter_to_string expected)
         (parameter_to_string parameters)
 
+(* Returns a list of event type names extracted from internal event
+   operations of packed operation metadata *)
+let extract_events (metadata : Apply_results.packed_operation_metadata) =
+  let extract_from_internal_ops internal_operation_results =
+    List.filter_map
+      (fun (Apply_internal_results.Internal_operation_result (op, _result)) ->
+        match op.operation with
+        | Event {tag = _; payload = _; ty} -> (
+            match ty |> Environment.Micheline.root with
+            | Environment.Micheline.Prim (_, _, _, [annot]) -> Some annot
+            | _ -> None)
+        | _ -> None)
+      internal_operation_results
+  in
+  let extract_from_result : type a. a Apply_results.contents_result -> _ =
+    function
+    | Manager_operation_result {internal_operation_results; _} ->
+        extract_from_internal_ops internal_operation_results
+    | _ -> []
+  in
+  let rec extract_from_contents_result_list : type a.
+      a Apply_results.contents_result_list -> _ = function
+    | Single_result r -> extract_from_result r
+    | Cons_result (r, rest) ->
+        extract_from_result r @ extract_from_contents_result_list rest
+  in
+  match metadata with
+  | Apply_results.Operation_metadata {contents} ->
+      extract_from_contents_result_list contents
+  | Apply_results.No_operation_metadata -> []
+
+let get_events_from_metadata metadata =
+  let _header_metadata, operation_receipts = metadata in
+  List.concat_map extract_events operation_receipts
+
+let check_number_events ~loc ~expected event_type events =
+  let count = List.length (List.filter (String.equal event_type) events) in
+  Assert.equal_int ~loc count expected
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -726,7 +765,12 @@ let () =
      <amount before finalization> + <redeemed amount>
   *)
   let* balance_before_finalization = Context.Contract.balance (B b) sender in
-  let* finalize_tx = Op.clst_finalize ~fee:Tez.zero (Context.B b) sender in
+  let sender_pkh =
+    match sender with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
+  let* finalize_tx =
+    Op.clst_finalize_redeem ~fee:Tez.zero (B b) ~sender ~redeemer:sender_pkh
+  in
   let* b, full_metadata = Block.bake_with_metadata b ~operation:finalize_tx in
   let* balance_after_finalization = Context.Contract.balance (B b) sender in
 
@@ -781,6 +825,71 @@ let () =
     check_balance_updates
       full_metadata
       expected_balance_updates_contract_to_staker
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Finalize redeem with sender different from redeemer"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (staker, sender) =
+    Context.init2
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* staker deposits 100_000_000 mutez *)
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) staker amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* staker redeems 30_000_000 mutez *)
+  let redeemed_amount_mutez = 30_000_000L in
+  let redeemed_amount = Tez.of_mutez_exn redeemed_amount_mutez in
+  let* redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) staker redeemed_amount_mutez
+  in
+  let* b = Block.bake ~operation:redeem_tx b in
+
+  (* wait for the redemption request to be finalizable *)
+  let finalization_delay =
+    b.constants.consensus_rights_delay + Protocol.Constants_repr.slashing_delay
+    + 1
+  in
+  let* b = Block.bake_until_n_cycle_end finalization_delay b in
+
+  (* sender finalizes the redemption request of staker *)
+  let* staker_balance_before = Context.Contract.balance (B b) staker in
+  let* sender_balance_before = Context.Contract.balance (B b) sender in
+  let staker_pkh =
+    match staker with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
+  let* finalize_tx =
+    Op.clst_finalize_redeem
+      ~fee:Tez.zero
+      (Context.B b)
+      ~sender
+      ~redeemer:staker_pkh
+  in
+  let* b = Block.bake b ~operation:finalize_tx in
+
+  (* staker's spendable balance is increased by the redeemed amount *)
+  let* staker_balance_after = Context.Contract.balance (B b) staker in
+  let*?@ expected_staker_balance =
+    Tez.(staker_balance_before +? redeemed_amount)
+  in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ expected_staker_balance staker_balance_after
+  in
+  (* sender's spendable balance is not changed *)
+  let* sender_balance_after = Context.Contract.balance (B b) sender in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ sender_balance_before sender_balance_after
   in
   return_unit
 
@@ -858,7 +967,12 @@ let () =
      <amount before finalization> + <first redeemed amount>
   *)
   let* balance_before_finalization = Context.Contract.balance (B b) sender in
-  let* finalize_tx = Op.clst_finalize ~fee:Tez.zero (Context.B b) sender in
+  let sender_pkh =
+    match sender with Contract.Implicit pkh -> pkh | _ -> assert false
+  in
+  let* finalize_tx =
+    Op.clst_finalize_redeem ~fee:Tez.zero (B b) ~sender ~redeemer:sender_pkh
+  in
   let* b = Block.bake b ~operation:finalize_tx in
   let* balance_after_finalization = Context.Contract.balance (B b) sender in
 
@@ -894,7 +1008,10 @@ let () =
 
   let amount_incr_allowance = 40_000L in
   let* approve_tx =
-    Op.clst_approve (B b) ~src:owner ~spender amount_incr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [(owner, spender, amount_incr_allowance)]
   in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender b in
@@ -902,14 +1019,20 @@ let () =
 
   let amount_decr_allowance = -30_000L in
   let* approve_tx =
-    Op.clst_approve (B b) ~src:owner ~spender amount_decr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [(owner, spender, amount_decr_allowance)]
   in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender b in
   let* () = Assert.equal_int64 ~loc:__LOC__ 10_000L allowance in
 
   let* approve_tx =
-    Op.clst_approve (B b) ~src:spender ~owner ~spender amount_incr_allowance
+    Op.clst_approve
+      (B b)
+      ~sender:spender
+      [(owner, spender, amount_incr_allowance)]
   in
   let*! b = Block.bake ~operation:approve_tx b in
   match b with
@@ -932,21 +1055,21 @@ let () =
   let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:owner ~operator `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
   let* is_operator = is_operator_view ~owner ~operator b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:owner ~operator `Remove
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Remove)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
   let* is_operator = is_operator_view ~owner ~operator b in
   let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src:operator ~owner ~operator `Add
+    Op.clst_update_operator (B b) ~sender:operator [(owner, operator, `Add)]
   in
   let*! b = Block.bake ~operation:update_operator_tx b in
 
@@ -958,6 +1081,24 @@ let () =
         trace
 
 let () =
+  register_test
+    ~title:
+      "Test update_operator: remove operator for non-operator has no effect"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, operator) = Context.init2 ~consensus_threshold_size:0 () in
+  let* op =
+    Op.clst_update_operator (B b) ~sender:owner [(owner, operator, `Remove)]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%operator_update" events
+  in
+  let* is_operator = is_operator_view ~owner ~operator b in
+  Assert.equal_bool ~loc:__LOC__ false is_operator
+
+let () =
   register_test ~title:"Test adding operator on finite allowance" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, (owner, account) = Context.init2 ~consensus_threshold_size:0 () in
@@ -965,7 +1106,9 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) owner amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src:owner ~spender:account 50_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:owner [(owner, account, 50_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
   let* allowance = get_allowance ~owner ~spender:account b in
   let* () = Assert.equal_int64 ~loc:__LOC__ 50_000L allowance in
@@ -974,7 +1117,7 @@ let () =
 
   (* Adding an operator to a finite allowance replaces the allowance. *)
   let* update_op =
-    Op.clst_update_operator (B b) ~src:owner ~operator:account `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, account, `Add)]
   in
   let* b = Block.bake ~operation:update_op b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
@@ -992,14 +1135,16 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_op =
-    Op.clst_update_operator (B b) ~src:owner ~operator:account `Add
+    Op.clst_update_operator (B b) ~sender:owner [(owner, account, `Add)]
   in
   let* b = Block.bake ~operation:update_op b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
 
   (* Adding a finite allowance on an operator has no effect. *)
-  let* approve_tx = Op.clst_approve (B b) ~src:owner ~spender:account 50_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:owner [(owner, account, 50_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
   let* is_operator = is_operator_view ~owner ~operator:account b in
   let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
@@ -1126,7 +1271,10 @@ let () =
 
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1147,7 +1295,9 @@ let () =
       ticket_amount_export
   in
 
-  let* op_export_ticket_zero = Op.clst_export_ticket (B b) ~src ~dst 0L in
+  let* op_export_ticket_zero =
+    Op.clst_export_ticket (B b) ~sender:src [(dst, [(src, 0L)])]
+  in
   let*! b = Block.bake ~operation:op_export_ticket_zero b in
   match b with
   | Ok _ -> Test.fail "Empty tickets are forbidden and expected to fail"
@@ -1172,9 +1322,8 @@ let () =
     Op.clst_export_ticket
       ~destination_contract:(Some clst_import_ticket_entrypoint)
       (B b)
-      ~src
-      ~dst
-      ticket_amount
+      ~sender:src
+      [(dst, [(src, ticket_amount)])]
   in
   let* b = Block.bake ~operation:op b in
   let* () =
@@ -1521,7 +1670,9 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender:src [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1536,7 +1687,7 @@ let () =
   in
 
   (* Test a zero transfer *)
-  let* transfer_tx = Op.clst_transfer (B b) ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender:src [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1560,11 +1711,13 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:src [(src, sender, 40_000_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a zero transfer with an approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1579,7 +1732,9 @@ let () =
   (* Test a non-zero transfer with an approved sender with sufficient
      allowance *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1597,7 +1752,9 @@ let () =
 
   (* Test a non-zero transfer with an approved sender with
      insufficient allowance *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1611,7 +1768,7 @@ let () =
 
   (* Test a non-zero transfer with a non-approved sender *)
   let* transfer_tx =
-    Op.clst_transfer (B b) ~sender:dst ~src ~dst transfer_amount
+    Op.clst_transfer (B b) ~sender:dst [(src, [(dst, transfer_amount)])]
   in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
@@ -1627,7 +1784,7 @@ let () =
   in
 
   (* Test a zero transfer with a non-approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender:dst ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender:dst [(src, [(dst, 0L)])] in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1653,12 +1810,12 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+    Op.clst_update_operator (B b) ~sender:src [(src, sender, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
 
   (* Test a zero transfer with an approved operator *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1672,7 +1829,9 @@ let () =
 
   (* Test a non-zero transfer with an approved operator *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1687,7 +1846,9 @@ let () =
   in
 
   (* Test a second non-zero transfer with an approved operator *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1709,7 +1870,7 @@ let () =
   (* Test a non-zero transfer with an approved operator but with
      owner's insufficient balance *)
   let* transfer_tx =
-    Op.clst_transfer (B b) ~sender ~src ~dst (Tez.to_mutez amount)
+    Op.clst_transfer (B b) ~sender [(src, [(dst, Tez.to_mutez amount)])]
   in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
@@ -1733,14 +1894,16 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 40_000_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~sender:src [(src, sender, 40_000_000L)]
+  in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a non-zero ticket export with an approved sender with
      sufficient allowance *)
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1764,7 +1927,7 @@ let () =
   (* Test a non-zero ticket export with an approved sender with
      insufficient allowance *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1779,7 +1942,10 @@ let () =
 
   (* Test a non-zero ticket export with a non-approved sender *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:dst
+      [(dst, [(src, ticket_amount_export)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1796,7 +1962,7 @@ let () =
 
   (* Test a zero ticket export with an approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1807,7 +1973,7 @@ let () =
 
   (* Test a zero ticket export with a non-approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender:dst ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender:dst [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1834,14 +2000,14 @@ let () =
   let* b = Block.bake ~operation:deposit_tx b in
 
   let* update_operator_tx =
-    Op.clst_update_operator (B b) ~src ~operator:sender `Add
+    Op.clst_update_operator (B b) ~sender:src [(src, sender, `Add)]
   in
   let* b = Block.bake ~operation:update_operator_tx b in
 
   (* Test a non-zero ticket export with an approved operator *)
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1864,7 +2030,7 @@ let () =
 
   (* Test a second non-zero ticket export with an approved operator *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst ticket_amount_export
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1887,7 +2053,7 @@ let () =
 
   (* Test a zero ticket export with an approved operator *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1906,11 +2072,11 @@ let () =
   let* deposit_tx = Op.clst_deposit (B b) src amount in
   let* b = Block.bake ~operation:deposit_tx b in
 
-  let* approve_tx = Op.clst_approve (B b) ~src ~spender:sender 0L in
+  let* approve_tx = Op.clst_approve (B b) ~sender:src [(src, sender, 0L)] in
   let* b = Block.bake ~operation:approve_tx b in
 
   (* Test a zero transfer with an approved sender *)
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst 0L in
+  let* transfer_tx = Op.clst_transfer (B b) ~sender [(src, [(dst, 0L)])] in
   let* b = Block.bake ~operation:transfer_tx b in
   let* () =
     check_clst_balance_diff
@@ -1925,7 +2091,9 @@ let () =
   (* Test a non-zero transfer with an approved sender with insufficient
      allowance *)
   let transfer_amount = 30_000_000L in
-  let* transfer_tx = Op.clst_transfer (B b) ~sender ~src ~dst transfer_amount in
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender [(src, [(dst, transfer_amount)])]
+  in
   let*! b_error = Block.bake ~operation:transfer_tx b in
   let* () =
     match b_error with
@@ -1940,7 +2108,7 @@ let () =
   (* Test a non-zero ticket export with an approved sender with
      insufficient allowance *)
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst transfer_amount
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, transfer_amount)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket b in
   let* () =
@@ -1955,7 +2123,7 @@ let () =
 
   (* Test a zero ticket export with an approved sender *)
   let* op_export_ticket_zero =
-    Op.clst_export_ticket (B b) ~sender ~src ~dst 0L
+    Op.clst_export_ticket (B b) ~sender [(dst, [(src, 0L)])]
   in
   let*! b_error = Block.bake ~operation:op_export_ticket_zero b in
   let* () =
@@ -1977,7 +2145,10 @@ let () =
 
   let ticket_amount_export = 30_000_000L in
   let* op_export_ticket =
-    Op.clst_export_ticket (B b) ~src ~dst ticket_amount_export
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [(dst, [(src, ticket_amount_export)])]
   in
   let* b = Block.bake ~operation:op_export_ticket b in
 
@@ -2233,3 +2404,1087 @@ let () =
         ~loc:__LOC__
         "Operation is invalid, a non registered delegate cannot unregister"
   | Error e -> Error_helpers.expect_clst_unregistered_delegate ~loc:__LOC__ e
+
+let () =
+  register_test ~title:"Test event deduplication in transfer" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* Test the same dst twice *)
+  let* transfer_tx =
+    Op.clst_transfer
+      (B b)
+      ~sender:src
+      [(src, [(dst1, 10_000_000L); (dst1, 20_000_000L); (dst2, 5_000_000L)])]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:transfer_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:3 "%balance_update" events
+  in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:3 "%transfer_event" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 35_000_000L)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:30_000_000L b dst1
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:5_000_000L b dst2
+  in
+
+  (* Test self-transfer *)
+  let* transfer_tx =
+    Op.clst_transfer (B b) ~sender:src [(src, [(src, 10_000_000L)])]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:transfer_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%balance_update" events
+  in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%transfer_event" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Int64.sub (Tez.to_mutez amount) 35_000_000L)
+      ~diff:0L
+      b
+      src
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in approve" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, spender1, spender2) =
+    Context.init3 ~consensus_threshold_size:0 ()
+  in
+  (* Test the same spender twice *)
+  let* approve_tx =
+    Op.clst_approve
+      (B b)
+      ~sender:owner
+      [
+        (owner, spender1, 10_000L);
+        (owner, spender2, 5_000L);
+        (owner, spender1, 20_000L);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:approve_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:2 "%allowance_update" events
+  in
+  let* allowance = get_allowance ~owner ~spender:spender1 b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 30_000L allowance in
+  let* allowance = get_allowance ~owner ~spender:spender2 b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 5_000L allowance in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in update_operators"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, operator1, operator2) =
+    Context.init3 ~consensus_threshold_size:0 ()
+  in
+  (* Test the same operator twice *)
+  let* update_tx =
+    Op.clst_update_operator
+      (B b)
+      ~sender:owner
+      [
+        (owner, operator1, `Add);
+        (owner, operator2, `Add);
+        (owner, operator1, `Remove);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:update_tx b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:2 "%operator_update" events
+  in
+  let* is_op1 = is_operator_view ~owner ~operator:operator1 b in
+  let* () = Assert.equal_bool ~loc:__LOC__ false is_op1 in
+  let* is_op2 = is_operator_view ~owner ~operator:operator2 b in
+  let* () = Assert.equal_bool ~loc:__LOC__ true is_op2 in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in export_ticket" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* op_export =
+    Op.clst_export_ticket
+      (B b)
+      ~sender:src
+      [
+        (dst1, [(src, 10_000_000L)]);
+        (dst2, [(src, 5_000_000L)]);
+        (dst1, [(src, 20_000_000L)]);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op_export b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    check_number_events ~loc:__LOC__ ~expected:1 "%balance_update" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 35_000_000L)
+      b
+      src
+  in
+  let* clst_ticket_balance_dst1 =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst1
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance_dst1)
+      30_000_000L
+  in
+  let* clst_ticket_balance_dst2 =
+    Plugin.Contract_services.stez_ticket_balance Block.rpc_ctxt b dst2
+  in
+  let* () =
+    Assert.equal_int64
+      ~loc:__LOC__
+      (Z.to_int64 clst_ticket_balance_dst2)
+      5_000_000L
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test event deduplication in import_ticket" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (src, dst1, dst2) = Context.init3 ~consensus_threshold_size:0 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let clst_import_ticket_entrypoint =
+    Contract.to_b58check (Contract.Originated clst_hash) ^ "%import_ticket"
+  in
+
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_op = Op.clst_deposit (B b) src amount in
+  let* b = Block.bake ~operation:deposit_op b in
+
+  let* op =
+    Op.clst_export_ticket
+      ~destination_contract:(Some clst_import_ticket_entrypoint)
+      (B b)
+      ~sender:src
+      [
+        (dst1, [(src, 10_000_000L)]);
+        (dst2, [(src, 5_000_000L); (src, 3_000_000L)]);
+        (dst1, [(src, 20_000_000L)]);
+      ]
+  in
+  let* b, metadata = Block.bake_with_metadata ~operation:op b in
+  let events = get_events_from_metadata metadata in
+  let* () =
+    (* export_ticket: 1 update_balance event for src + 3 calls to
+       import_ticket *)
+    check_number_events ~loc:__LOC__ ~expected:4 "%balance_update" events
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:(Tez.to_mutez amount)
+      ~diff:(Int64.neg 38_000_000L)
+      b
+      src
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:30_000_000L b dst1
+  in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ ~init:0L ~diff:8_000_000L b dst2
+  in
+  return_unit
+
+(* --- Stake allocation tests --- *)
+
+let pkh_of_contract = function
+  | Contract.Implicit pkh -> pkh
+  | Contract.Originated _ -> assert false
+
+let delegate_own_frozen ctxt delegate_pkh =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let raw_ctxt = Alpha_context.Internal_for_tests.to_raw alpha_ctxt in
+  let*@ staking_balance =
+    Stake_storage.get_full_staking_balance raw_ctxt delegate_pkh
+  in
+  let amount = Full_staking_balance_repr.own_frozen staking_balance in
+  return (Tez.of_mutez_exn (Tez_repr.to_mutez amount))
+
+let setup_delegate_with_clst_deposit
+    ?(limit_of_staking_over_baking = Q.of_int 5)
+    ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
+    ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l)
+    ?adaptive_issuance
+    ?(issuance_weights =
+      {
+        Default_parameters.constants_test.issuance_weights with
+        base_total_issued_per_minute = Tez.zero;
+      }) ~deposit_mutez () =
+  let open Lwt_result_wrap_syntax in
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ?adaptive_issuance
+      ~issuance_weights
+      ()
+  in
+  let delegate_pkh = pkh_of_contract delegate in
+  (* Allow external staking — use Op.transaction directly with
+     ~force_reveal:true because bootstrap accounts may be unrevealed. *)
+  let limit_of_staking_over_baking_millionth =
+    Q.mul limit_of_staking_over_baking (Q.of_int 1_000_000) |> Q.to_bigint
+  in
+  let edge_of_baking_over_staking_billionth = Z.of_int 1_000_000_000 in
+  let* op =
+    Op.set_delegate_parameters
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      delegate
+      ~limit_of_staking_over_baking_millionth
+      ~edge_of_baking_over_staking_billionth
+  in
+  let* b = Block.bake ~operation:op b in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Register the delegate with CLST *)
+  let* b, parameters =
+    register_delegate_and_bake
+      ~edge_of_clst_staking_over_baking_millionth
+      ~ratio_of_clst_staking_over_direct_staking_billionth
+      b
+      delegate
+  in
+  (* Fund an account and deposit to CLST *)
+  let* sender, b =
+    create_funded_account ~funder:delegate ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  return (b, delegate, delegate_pkh, activation_cycle)
+
+let () =
+  register_test ~title:"Test basic stake allocation" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  (* Bake up to activation cycle: parameters are activated, rebalance will
+     happen at the end of this cycle. *)
+  let* b = Block.bake_until_cycle activation_cycle b in
+  (* Record state BEFORE the first rebalance *)
+  let* total_before = total_amount_of_tez (B b) in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ (Tez.of_mutez_exn deposit_mutez) total_before
+  in
+  let* alloc_before =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_before in
+  let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
+  (* Bake until activation cycle — triggers first rebalance *)
+  let* b = Block.bake_until_cycle_end b in
+  (* Check: total_amount_of_tez is preserved (pure accounting) *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* Check: CLST allocated some tez to the delegate *)
+  let* alloc_after =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_after > zero) in
+  (* Check: baking power increased after CLST allocation *)
+  let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
+  let expected_power_after =
+    Int64.add power_before (Tez.to_mutez alloc_after)
+  in
+  let* () =
+    Assert.is_true
+      ~loc:__LOC__
+      Compare.Int64.(power_after = expected_power_after)
+  in
+  (* Bake another cycle: recomputation should yield same result *)
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after_2 = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after_2 in
+  (* Allocation should be the same (idempotent) *)
+  let* alloc_after_2 =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  Assert.equal_tez ~loc:__LOC__ alloc_after alloc_after_2
+
+let () =
+  register_test ~title:"Test allocation when limit of direct staking is zero"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  (* limit_of_staking_over_baking = 0 means no direct external staking.
+     However, CLST allocation uses the global limit, so the delegate should
+     still receive an allocation. *)
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~limit_of_staking_over_baking:Q.zero
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* total_before = total_amount_of_tez (B b) in
+  let* power_before = Context.get_current_baking_power (B b) delegate_pkh in
+  (* Bake past activation — rebalance runs using global limit *)
+  let* b = Block.bake_until_cycle_end b in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* CLST allocation is non-zero (global limit allows it) *)
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* power_after = Context.get_current_baking_power (B b) delegate_pkh in
+  let expected_power_after = Int64.add power_before (Tez.to_mutez alloc) in
+  Assert.is_true ~loc:__LOC__ Compare.Int64.(power_after = expected_power_after)
+
+let () =
+  register_test ~title:"Test allocation is capped" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Use a small CLST ratio (0.1%) so the ratio cap is much smaller than the
+     global-limit cap and also smaller than the deposit. *)
+  let ratio = 1_000_000l in
+  let deposit_mutez = 10_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  (* Bootstrap accounts have 200_000 own frozen. With a ratio cap of 0.1% and
+     the global limit to 9, the cap is 200_000 * 9 * 0.001 = 1800. *)
+  let expected_cap =
+    Tez.of_mutez 1_800_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  (* Bake past activation — rebalance runs with cap < deposit *)
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  (* Allocation matches the exact computed cap *)
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test ratio cap includes global limit" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* With ratio = 20% and global_limit = 9, the ratio cap is
+     own_frozen * 9 * 0.2 = 1.8 * own_frozen = 360k tez.
+     We deposit more than own_frozen to ensure the ratio cap is the binding
+     constraint, and verify the allocation exceeds own_frozen * ratio (which
+     would be the result if global_limit were not included). *)
+  let ratio = 200_000_000l in
+  let deposit_mutez = 1_000_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~ratio_of_clst_staking_over_direct_staking_billionth:ratio
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let expected_cap =
+    Tez.of_mutez 360_000_000_000L
+    |> Option.value_f ~default:(fun () -> assert false)
+  in
+  let* total_before = total_amount_of_tez (B b) in
+  let* b = Block.bake_until_cycle_end b in
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  Assert.equal_tez ~loc:__LOC__ expected_cap alloc
+
+let () =
+  register_test ~title:"Test deallocation after unregistration" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  (* Bake until activation: the allocation will happen at the end of this
+     cycle. *)
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* Check the allocation worked *)
+  let* alloc_with_clst =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc_with_clst > zero) in
+  let* total_with_clst = total_amount_of_tez (B b) in
+  (* Unregister the delegate from CLST *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let* b = Block.bake ~operation:unregister_tx b in
+  let* unregister_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Unregister]
+  in
+  let unregister_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) unregister_activation_cycle
+  in
+  (* Bake until unregistration activates: rebalance will remove the allocated
+     stake at the end of this cycle. *)
+  let* b = Block.bake_until_cycle unregister_activation_cycle b in
+  (* Check that the allocation is not removed until the end of the activation
+     cycle. *)
+  let* alloc_at_unregistration_activation =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () =
+    Assert.equal_tez
+      ~loc:__LOC__
+      alloc_with_clst
+      alloc_at_unregistration_activation
+  in
+  let* b = Block.bake_until_cycle_end b in
+  (* CLST allocation should be zero (immediately cleared, no unfreezing) *)
+  let* alloc_after =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.equal_tez ~loc:__LOC__ Tez.zero alloc_after in
+  (* total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  Assert.equal_tez ~loc:__LOC__ total_with_clst total_after
+
+let () =
+  register_test ~title:"Test allocation across multiple delegates" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let adaptive_issuance =
+    {
+      Default_parameters.constants_test.adaptive_issuance with
+      global_limit_of_staking_over_baking = 2;
+    }
+  in
+  let* b, (d1, d2, d3) =
+    Context.init3
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ~adaptive_issuance
+      ()
+  in
+  let delegates = [d1; d2; d3] in
+  (* Set staking parameters for all delegates *)
+  let* b =
+    List.fold_left_es
+      (fun b d ->
+        let* op =
+          Op.set_delegate_parameters
+            ~force_reveal:true
+            ~limit_of_staking_over_baking_millionth:(Z.of_int 5_000_000)
+            ~edge_of_baking_over_staking_billionth:(Z.of_int 1_000_000_000)
+            ~fee:Tez.zero
+            (B b)
+            d
+        in
+        Block.bake ~operation:op b)
+      b
+      delegates
+  in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Register all delegates with CLST (ratio = 20%) *)
+  let clst_ratio = 200_000_000l in
+  let clst_fee = 50_000l in
+  let* b, clst_params =
+    register_delegate_and_bake
+      ~edge_of_clst_staking_over_baking_millionth:clst_fee
+      ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
+      b
+      d1
+  in
+  let* b =
+    List.fold_left_es
+      (fun b d ->
+        let* b, _params =
+          register_delegate_and_bake
+            ~edge_of_clst_staking_over_baking_millionth:clst_fee
+            ~ratio_of_clst_staking_over_direct_staking_billionth:clst_ratio
+            b
+            d
+        in
+        return b)
+      b
+      [d2; d3]
+  in
+  (* Deposit an amount that exceeds 2 caps but not 3.
+     With the global-limit formula: cap = min(own_frozen * ratio, own_frozen *
+     global_limit - staked_frozen).  Each delegate has ~200k tez own_frozen.
+     ratio = 20%, global_limit = 2.  The ratio bound dominates:
+     cap ~ 200k * 2 * 0.2 = 80k tez per delegate.
+     Deposit 250k tez: enough for 2.5 caps — first two get full cap (80k),
+     last one gets the remainder (40k). *)
+  let deposit_mutez = 200_000_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:d1 ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* total_before = total_amount_of_tez (B b) in
+  let pkhs = List.map pkh_of_contract delegates in
+  (* Bake until CLST params activate *)
+  let first_pkh = pkh_of_contract d1 in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      first_pkh
+      [Clst_delegates_parameters_repr.Update clst_params]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* Check: total_amount_of_tez is preserved *)
+  let* total_after = total_amount_of_tez (B b) in
+  let* () = Assert.equal_tez ~loc:__LOC__ total_before total_after in
+  (* Collect allocations sorted by pkh order (same as greedy order) *)
+  let pkhs_sorted = List.sort Signature.Public_key_hash.compare pkhs in
+  let* allocs =
+    List.map_es
+      (fun pkh -> Delegate_services.stez_staking_power Block.rpc_ctxt b pkh)
+      pkhs_sorted
+  in
+  let* () =
+    List.iter_es
+      (fun alloc -> Assert.is_true ~loc:__LOC__ Tez.(alloc > zero))
+      allocs
+  in
+  (* All delegates have the same cap (same ratio, similar own_frozen, no
+     direct stakers).  The first two should get equal amounts (full cap),
+     and the last gets the remainder from the pool.  Verify exact sum. *)
+  let first_alloc, second_alloc, last_alloc =
+    match allocs with
+    | [first; second; last] -> (first, second, last)
+    | _ -> Test.fail ~loc:__LOC__ "Expected exactly 3 allocations"
+  in
+  (* First two delegates get equal amounts (full cap) *)
+  let* () = Assert.equal_tez ~loc:__LOC__ first_alloc second_alloc in
+  (* Sum of all allocations equals the deposit *)
+  let total_alloc_mutez =
+    Int64.add
+      (Int64.add (Tez.to_mutez first_alloc) (Tez.to_mutez second_alloc))
+      (Tez.to_mutez last_alloc)
+  in
+  let* () = Assert.equal_int64 ~loc:__LOC__ deposit_mutez total_alloc_mutez in
+  (* The last delegate received strictly less (pool exhausted before cap) *)
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(last_alloc < first_alloc) in
+  (* Exact difference: last_alloc = deposit - 2 * first_alloc *)
+  let expected_last_mutez =
+    Int64.sub deposit_mutez (Int64.mul 2L (Tez.to_mutez first_alloc))
+  in
+  Assert.equal_tez
+    ~loc:__LOC__
+    (Tez.of_mutez_exn expected_last_mutez)
+    last_alloc
+
+let () =
+  register_test ~title:"Test no allocation when delegate is overstaked"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Set global_limit_of_staking_over_baking = 1 so that a single external
+     staker with balance >= own_frozen makes the delegate overstaked.
+     With global_limit = 1: cap = own_frozen * 1 - staked_frozen.
+     When staked_frozen >= own_frozen, global_cap <= 0 → no CLST. *)
+  let adaptive_issuance =
+    {
+      Default_parameters.constants_test.adaptive_issuance with
+      global_limit_of_staking_over_baking = 1;
+    }
+  in
+  let* b, delegate =
+    Context.init1
+      ~adaptive_issuance
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh = pkh_of_contract delegate in
+  (* Set delegate parameters to allow external staking (limit = 1) *)
+  let* op =
+    Op.set_delegate_parameters
+      ~force_reveal:true
+      ~limit_of_staking_over_baking_millionth:(Z.of_int 1_000_000)
+      ~edge_of_baking_over_staking_billionth:(Z.of_int 1_000_000_000)
+      ~fee:Tez.zero
+      (B b)
+      delegate
+  in
+  let* b = Block.bake ~operation:op b in
+  (* Wait for staking parameters to activate *)
+  let* b =
+    Block.bake_until_n_cycle_end
+      (Default_parameters.constants_test.delegate_parameters_activation_delay
+     + 1)
+      b
+  in
+  (* Create a staker account, delegate to the delegate, and stake more
+     than the delegate's own_frozen to guarantee overstaking.
+     With global_limit = 1: cap = own_frozen - staked_frozen.
+     When staked_frozen > own_frozen, global_cap <= 0 → no CLST. *)
+  let* own_frozen = delegate_own_frozen (B b) delegate_pkh in
+  let stake_mutez = Int64.add (Tez.to_mutez own_frozen) 1_000_000L in
+  let staker_amount_mutez = Int64.add stake_mutez 500_000_000_000L in
+  let* staker, b =
+    create_funded_account ~funder:delegate ~amount_mutez:staker_amount_mutez b
+  in
+  let* delegation_op =
+    Op.delegation ~force_reveal:true (B b) staker (Some delegate_pkh)
+  in
+  let* b = Block.bake ~operation:delegation_op b in
+  let stake_amount = Tez.of_mutez_exn stake_mutez in
+  let* stake_op =
+    Op.transaction
+      ~entrypoint:Entrypoint.stake
+      ~fee:Tez.zero
+      (B b)
+      staker
+      staker
+      stake_amount
+  in
+  let* b = Block.bake ~operation:stake_op b in
+  (* Bake a cycle so the stake is frozen *)
+  let* b = Block.bake_until_cycle_end b in
+  (* Register the delegate with CLST (ratio = 20%) *)
+  let* b, parameters =
+    register_delegate_and_bake
+      ~ratio_of_clst_staking_over_direct_staking_billionth:200_000_000l
+      b
+      delegate
+  in
+  (* Fund and deposit to CLST *)
+  let deposit_mutez = 100_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:delegate ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* Bake until CLST parameters activate *)
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  (* CLST allocation should be zero — delegate is overstaked *)
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  Assert.equal_tez ~loc:__LOC__ Tez.zero alloc
+
+(* Exchange rate tests                                                    *)
+(* -------------------------------------------------------------------- *)
+
+let () =
+  register_test
+    ~title:"Exchange rate is 1:1 on deposit without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* Empty pool: rate is 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  let deposit_mutez = 100_000_000L in
+  let* account_a, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_a
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* After deposit, 1 mutez = 1 token unit *)
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_mutez
+      b
+      account_a
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Second deposit from another account also 1:1 *)
+  let* account_b, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let deposit_b_mutez = 50_000_000L in
+  let* deposit_b_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account_b
+      (Tez.of_mutez_exn deposit_b_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_b_tx b in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      ~init:0L
+      ~diff:deposit_b_mutez
+      b
+      account_b
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate increases with rewards" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, _delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () =
+    Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before > 0)
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Deposit and redeem do not change the exchange rate"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 2_000_000_000L in
+  let* b, delegate, delegate_pkh, activation_cycle =
+    setup_delegate_with_clst_deposit
+      ~issuance_weights:Default_parameters.constants_test.issuance_weights
+      ~deposit_mutez
+      ()
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc =
+    Delegate_services.stez_staking_power Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  (* Bake until rewards shift the rate away from 1:1 *)
+  let* b = Block.bake_until_n_cycle_end 2 b in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Rate must be different from 1:1 for this test to be meaningful *)
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare rate_before Q.one > 0) in
+  (* Fund a new account, deposit and immediately redeem in the next block *)
+  let* account, b =
+    create_funded_account ~funder:delegate ~amount_mutez:100_000_000L b
+  in
+  let deposit_amount = Tez.of_mutez_exn 50_000_000L in
+  let* deposit_tx =
+    Op.clst_deposit ~force_reveal:true (B b) account deposit_amount
+  in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:deposit_tx b
+  in
+  (* Record rate after deposit *)
+  let* rate_after_deposit =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Record the CLST balance obtained *)
+  let* balance =
+    Plugin.Contract_services.stez_balance Block.rpc_ctxt b account
+  in
+  let balance_mutez = Option.value ~default:0L (Script_int.to_int64 balance) in
+  let* () = Assert.is_true ~loc:__LOC__ Compare.Int64.(balance_mutez > 0L) in
+  let* redeem_tx = Op.clst_redeem ~fee:Tez.zero (B b) account balance_mutez in
+  let* b =
+    Block.bake ~policy:(By_account delegate_pkh) ~operation:redeem_tx b
+  in
+  let* rate_after_redeem =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Deposit and redeem preserve the exchange rate. Between blocks,
+     rewards accrue and shift the rate slightly. We verify the rate
+     difference is negligible (< 1/1_000_000). *)
+  let diff = Q.abs (Q.sub rate_after_redeem rate_after_deposit) in
+  let epsilon = Q.(1 // 1_000_000) in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.compare diff epsilon < 0) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate stable without rewards or slashing"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let deposit_mutez = 100_000_000L in
+  let* b, _delegate, _delegate_pkh, _activation_cycle =
+    setup_delegate_with_clst_deposit ~deposit_mutez ()
+  in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_before Q.one) in
+  let* b = Block.bake_until_n_cycle_end 3 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate_after Q.one) in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate decreases with slashing" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Double baking requires two distinct bakers, so we use
+     init_with_constants2 instead of the single-baker helper. *)
+  let constants =
+    let c = Default_parameters.constants_test in
+    {
+      c with
+      issuance_weights =
+        {c.issuance_weights with base_total_issued_per_minute = Tez.zero};
+      consensus_threshold_size = 0;
+      cost_per_byte = Tez.zero;
+    }
+  in
+  let* genesis, (contract_a, contract_b) =
+    Context.init_with_constants2 constants
+  in
+  let* baker1, baker2 = Context.get_first_different_bakers (B genesis) in
+  let baker1_contract = Contract.Implicit baker1 in
+  let limit_of_staking_over_baking_millionth =
+    Q.mul (Q.of_int 5) (Q.of_int 1_000_000) |> Q.to_int
+  in
+  let edge_of_baking_over_staking_billionth =
+    Q.mul Q.one (Q.of_int 1_000_000_000) |> Q.to_int
+  in
+  let set_params_parameters =
+    Script.lazy_expr
+      (Expr.from_string
+         (Printf.sprintf
+            "Pair %d (Pair %d Unit)"
+            limit_of_staking_over_baking_millionth
+            edge_of_baking_over_staking_billionth))
+  in
+  let* op =
+    Op.transaction
+      ~force_reveal:true
+      ~entrypoint:Entrypoint.set_delegate_parameters
+      ~parameters:set_params_parameters
+      ~fee:Tez.zero
+      (B genesis)
+      baker1_contract
+      baker1_contract
+      Tez.zero
+  in
+  let* b = Block.bake ~operation:op genesis in
+  let* b =
+    Block.bake_until_n_cycle_end
+      (constants.delegate_parameters_activation_delay + 1)
+      b
+  in
+  let* b, parameters = register_delegate_and_bake b baker1_contract in
+  let deposit_mutez = 2_000_000_000L in
+  let* sender, b =
+    create_funded_account ~funder:baker1_contract ~amount_mutez:deposit_mutez b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (Context.B b)
+      sender
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      baker1
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+  let* alloc = Delegate_services.stez_staking_power Block.rpc_ctxt b baker1 in
+  let* () = Assert.is_true ~loc:__LOC__ Tez.(alloc > zero) in
+  let* rate_before =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  (* Create double baking evidence *)
+  let* blk_a, blk_b =
+    let* operation = Op.transaction (B b) contract_a contract_b Tez.one_cent in
+    let* blk_a = Block.bake ~policy:(By_account baker1) ~operation b in
+    let+ blk_b = Block.bake ~policy:(By_account baker1) b in
+    (blk_a, blk_b)
+  in
+  let bh1, bh2 =
+    let h1 = Block_header.hash blk_a.header in
+    let h2 = Block_header.hash blk_b.header in
+    if Block_hash.(h1 < h2) then (blk_a.header, blk_b.header)
+    else (blk_b.header, blk_a.header)
+  in
+  let operation = Op.double_baking (B blk_a) bh1 bh2 in
+  let* b = Block.bake ~policy:(By_account baker2) ~operation blk_a in
+  let* b = Block.bake_until_n_cycle_end ~policy:(By_account baker2) 2 b in
+  let* rate_after =
+    Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b
+  in
+  let* () =
+    Assert.is_true ~loc:__LOC__ (Q.compare rate_after rate_before < 0)
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Exchange rate RPC lifecycle" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Empty pool: rate is 1:1 *)
+  let* b, funder =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Deposit *)
+  let deposit_mutez = 100_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:300_000_000L b
+  in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      (B b)
+      account
+      (Tez.of_mutez_exn deposit_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* After deposit, rate still 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  (* Redeem all *)
+  let* redeem_tx = Op.clst_redeem ~fee:Tez.zero (B b) account deposit_mutez in
+  let* b = Block.bake ~operation:redeem_tx b in
+  (* After full redeem, rate back to 1:1 *)
+  let* rate = Plugin.Contract_services.stez_exchange_rate Block.rpc_ctxt b in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal rate Q.one) in
+  return_unit

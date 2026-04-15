@@ -1025,27 +1025,38 @@ module S = struct
   let clst_registered =
     RPC_service.get_service
       ~description:
-        "Returns true if the delegate is registered with CLST. Otherwise, \
-         returns false."
+        "Returns true if the delegate is registered with the sTEZ contract. \
+         Otherwise, returns false."
       ~query:RPC_query.empty
       ~output:bool
-      RPC_path.(path / "clst_registered")
+      RPC_path.(path / "stez_registered")
 
   let active_clst_staking_parameters =
     RPC_service.get_service
       ~description:
-        "Returns the currently active delegate's parameters for CLST."
+        "Returns the currently active delegate's parameters for the sTEZ \
+         contract."
       ~query:RPC_query.empty
       ~output:(option Clst_delegates_parameters_repr.encoding)
-      RPC_path.(path / "active_clst_parameters")
+      RPC_path.(path / "active_stez_parameters")
 
   let pending_clst_staking_parameters =
     RPC_service.get_service
       ~description:
-        "Returns the currently pending delegate's parameters for CLST."
+        "Returns the currently pending delegate's parameters for the sTEZ \
+         contract."
       ~query:RPC_query.empty
       ~output:(list pending_clst_staking_parameters_encoding)
-      RPC_path.(path / "pending_clst_parameters")
+      RPC_path.(path / "pending_stez_parameters")
+
+  let stez_staking_power =
+    RPC_service.get_service
+      ~description:
+        "Returns the current staking power from sTEZ allocated to this \
+         delegate."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "stez_staking_power")
 
   let pending_denunciations =
     RPC_service.get_service
@@ -1442,6 +1453,11 @@ module Implem = struct
   let delegators = delegators
 end
 
+let stez_under_feature_flag (ctxt : context) =
+  let open Result_syntax in
+  if Constants.native_contracts_enable ctxt then return_unit
+  else tzfail (Contract_services.Non_activated_feature Stez)
+
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
@@ -1558,15 +1574,27 @@ let register () =
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.pending_updates ctxt pkh) ;
   register1 ~chunked:false S.clst_registered (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
       Clst_contract_storage.is_delegate_registered ctxt pkh) ;
   register1
     ~chunked:false
     S.active_clst_staking_parameters
-    (fun ctxt pkh () () -> Clst.Delegates.get_delegate_parameters ctxt pkh) ;
+    (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.Delegates.get_delegate_parameters ctxt pkh) ;
   register1
     ~chunked:false
     S.pending_clst_staking_parameters
-    (fun ctxt pkh () () -> Clst.Delegates.get_pending_parameters ctxt pkh) ;
+    (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.Delegates.get_pending_parameters ctxt pkh) ;
+  register1 ~chunked:false S.stez_staking_power (fun ctxt pkh () () ->
+      let open Lwt_result_syntax in
+      let*? () = stez_under_feature_flag ctxt in
+      Clst.For_RPC.allocated_rights_of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
       Delegate.For_RPC.pending_denunciations ctxt pkh) ;
   register1
@@ -1674,6 +1702,9 @@ let clst_registered ctxt block pkh =
 
 let pending_clst_staking_parameters ctxt block pkh =
   RPC_context.make_call1 S.pending_clst_staking_parameters ctxt block pkh () ()
+
+let stez_staking_power ctxt block pkh =
+  RPC_context.make_call1 S.stez_staking_power ctxt block pkh () ()
 
 let pending_denunciations ctxt block pkh =
   RPC_context.make_call1 S.pending_denunciations ctxt block pkh () ()

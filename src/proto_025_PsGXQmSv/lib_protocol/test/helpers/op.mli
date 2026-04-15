@@ -936,23 +936,23 @@ val clst_redeem :
   int64 ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_finalize ctxt src] returns a finalize operation on the CLST
-    contract. *)
-val clst_finalize :
+(** [clst_finalize_redeem ctxt sender redeemer] returns a finalize redeem
+    operation on the CLST contract for the given [redeemer]. *)
+val clst_finalize_redeem :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  Contract.t ->
+  sender:Contract.t ->
+  redeemer:Signature.Public_key_hash.t ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_approve ctxt src ?owner spender amount] increases or
-    decreases the allowance by [amount] clst tokens set to [spender]
-    regarding a token [owner].
+(** [clst_approve ctxt sender batch] increases or decreases allowances
+    for the given [(owner, spender, amount)] batch.
 
-    [owner] defaults to [src]. *)
+    The operation is signed and sent by [sender]. *)
 val clst_approve :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -960,17 +960,15 @@ val clst_approve :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  src:Contract.t ->
-  ?owner:Contract.t ->
-  spender:Contract.t ->
-  int64 ->
+  sender:Contract.t ->
+  (Contract.t * Contract.t * int64) list ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_update_operator ctxt src ?owner operator is_operator]
-    approves or revokes an infinite allowance of clst tokens set to
-    [operator] regarding a token [owner].
+(** [clst_update_operator ctxt sender batch] approves or revokes an
+    infinite allowance of clst tokens set to [operator] regarding a
+    token [owner] for the given [(owner, operator, action)] batch.
 
-    [owner] defaults to [src]. *)
+    The operation is signed and sent by [sender]. *)
 val clst_update_operator :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -978,15 +976,14 @@ val clst_update_operator :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  src:Contract.t ->
-  ?owner:Contract.t ->
-  operator:Contract.t ->
-  [< `Add | `Remove] ->
+  sender:Contract.t ->
+  (Contract.t * Contract.t * [< `Add | `Remove]) list ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_transfer ctxt ?sender src dst amount] transfers [amount]
-    clst tokens from [src] to [dst]. The operation is triggered by
-    [sender], which defaults to [src]. *)
+(** [clst_transfer ctxt sender batch] performs a batch transfer with
+    the given [(src, [(dst, amount)])] batch.
+
+    The operation is signed and sent by [sender]. *)
 val clst_transfer :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -994,18 +991,18 @@ val clst_transfer :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  src:Contract.t ->
-  dst:Contract.t ->
-  ?sender:Contract.t ->
-  int64 ->
+  sender:Contract.t ->
+  (Contract.t * (Contract.t * int64) list) list ->
   Operation.packed tzresult Lwt.t
 
-(** [clst_export_ticket ?destination_contract ctxt src dst amount]
+(** [clst_export_ticket ?destination_contract ctxt sender batch]
     exports [amount] clst tokens as a clst ticket from [src] to [dst]
     if [destination_contract] is [None]. Otherwise, emits the internal
     transaction to the [destination_contract] entrypoint of [list
-    (pair dst_address (list ticket))] type. The operation is triggered
-    by [sender], which defaults to [src]. *)
+    (pair dst_address (list ticket))] type. The batch consists of
+    [(dst, [(src, amount)])] elements.
+
+    The operation is signed and sent by [sender]. *)
 val clst_export_ticket :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
@@ -1014,10 +1011,8 @@ val clst_export_ticket :
   ?storage_limit:Z.t ->
   ?destination_contract:string option ->
   Context.t ->
-  src:Contract.t ->
-  dst:Contract.t ->
-  ?sender:Contract.t ->
-  int64 ->
+  sender:Contract.t ->
+  (Contract.t * (Contract.t * int64) list) list ->
   Operation.packed tzresult Lwt.t
 
 (** [clst_lambda_export ctxt src amount lambda_action] exports
@@ -1092,4 +1087,20 @@ val clst_unregister_delegate :
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [set_delegate_parameters ctxt delegate
+    ~limit_of_staking_over_baking_millionth
+    ~edge_of_baking_over_staking_billionth] returns a `set_delegate_parameters`
+    operation. *)
+val set_delegate_parameters :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  limit_of_staking_over_baking_millionth:Z.t ->
+  edge_of_baking_over_staking_billionth:Z.t ->
   Operation.packed tzresult Lwt.t

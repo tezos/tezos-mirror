@@ -60,6 +60,8 @@ clst_finalization.ml
 clst_finalization.mli
 clst_redemption_requests_storage.ml
 clst_redemption_requests_storage.mli
+clst_stake_allocation.ml
+clst_stake_allocation.mli
 clst_storage.ml
 clst_storage.mli
 commitment_repr.ml

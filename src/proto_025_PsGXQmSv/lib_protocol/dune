@@ -215,6 +215,7 @@
   Staking
   Clst_finalization
   Clst_redemption_requests_storage
+  Clst_stake_allocation
   Delegate_cycles
   Vote_storage
   Ticket_storage
@@ -530,6 +531,7 @@
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
   clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -846,6 +848,7 @@
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
   clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -1146,6 +1149,7 @@
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
   clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
+  clst_stake_allocation.ml clst_stake_allocation.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli

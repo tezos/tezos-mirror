@@ -511,7 +511,7 @@ module Clst = struct
   let add_redemption_request =
     Clst_redemption_requests_storage.add_redemption_request
 
-  let total_amount_of_tez = Storage.Clst.Deposits_balance.get
+  let total_amount_of_tez ctxt = Clst_storage.get_deposits_balance ctxt
 
   let finalize = Clst_redemption_requests_storage.finalize
 
@@ -519,6 +519,8 @@ module Clst = struct
 
   module For_RPC = struct
     include Clst_redemption_requests_storage.For_RPC
+    include Clst_delegates_storage.For_RPC
+    include Clst_stake_allocation.For_RPC
   end
 end
 

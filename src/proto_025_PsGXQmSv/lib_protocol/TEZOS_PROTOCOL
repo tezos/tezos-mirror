@@ -198,6 +198,7 @@
         "Staking",
         "Clst_finalization",
         "Clst_redemption_requests_storage",
+        "Clst_stake_allocation",
         "Delegate_cycles",
 
         "Vote_storage",

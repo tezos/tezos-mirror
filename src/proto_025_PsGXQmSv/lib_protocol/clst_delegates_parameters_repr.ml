@@ -35,10 +35,10 @@ type error += Invalid_clst_delegates_parameters
 let () =
   register_error_kind
     `Permanent
-    ~id:"operations.invalid_clst_delegates_parameters"
-    ~title:"Invalid parameters for CLST delegates parameters"
-    ~description:"The CLST delegates parameters are invalid."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid CLST delegates parameters")
+    ~id:"operations.invalid_stez_delegates_parameters"
+    ~title:"Invalid parameters for sTEZ delegates parameters"
+    ~description:"The sTEZ delegates parameters are invalid."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid sTEZ delegates parameters")
     Data_encoding.empty
     (function Invalid_clst_delegates_parameters -> Some () | _ -> None)
     (fun () -> Invalid_clst_delegates_parameters)

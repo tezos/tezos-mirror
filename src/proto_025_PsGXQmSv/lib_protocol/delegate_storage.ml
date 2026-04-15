@@ -314,6 +314,14 @@ let current_frozen_deposits ctxt delegate =
   in
   Lwt.return (Full_staking_balance_repr.total_frozen full_staking_balance)
 
+let current_frozen_deposits_with_stez ctxt delegate =
+  let open Lwt_result_syntax in
+  let* full_staking_balance =
+    Stake_storage.get_full_staking_balance ctxt delegate
+  in
+  Lwt.return
+    (Full_staking_balance_repr.total_frozen_with_stez full_staking_balance)
+
 let frozen_deposits_limit ctxt delegate =
   Storage.Contract.Frozen_deposits_limit.find
     ctxt

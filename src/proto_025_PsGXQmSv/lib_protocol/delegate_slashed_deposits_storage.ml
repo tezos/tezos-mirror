@@ -283,7 +283,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                   delegate
               in
               let* current_amount =
-                Delegate_storage.current_frozen_deposits ctxt delegate
+                Delegate_storage.current_frozen_deposits_with_stez ctxt delegate
               in
               return (ctxt, Deposits_repr.{initial_amount; current_amount})
             in
@@ -292,10 +292,10 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               (* Ensures: [punishing_amount <= current_amount]
 
                  where [current_amount = frozen_deposits.current_amount
-                                       = own_frozen + staked_frozen]
+                                       = own_frozen + staked_frozen + stez_frozen]
               *)
             in
-            let* {baker_part; stakers_part = _} =
+            let* {baker_part; stakers_part = _; stez_part} =
               Shared_stake.share
                 ~rounding:`Towards_baker
                 ctxt
@@ -303,18 +303,19 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 punishing_amount
               (* Ensures:
 
-                 - [baker_part + stakers_part = punishing_amount]
+                 - [baker_part + stakers_part + stez_part = punishing_amount]
 
-                 - [baker_part / punishing_amount = own_frozen / (own_frozen + allowed_staked_frozen)]
+                 - [baker_part / punishing_amount = own_frozen / (own_frozen + allowed_staked_frozen + stez_frozen)]
+                 - [stez_part / punishing_amount = stez_frozen / (own_frozen + allowed_staked_frozen + stez_frozen)]
 
                  where [allowed_staked_frozen] is [staked_frozen]
                  capped by the delegate's [limit_of_staking_over_baking],
                  which notably means that [allowed_staked_frozen <= staked_frozen]
-                 i.e. [own_frozen + allowed_staked_frozen <= own_frozen + staked_frozen = current_amount]
+                 i.e. [own_frozen + allowed_staked_frozen + stez_frozen <= own_frozen + staked_frozen + stez_frozen = current_amount]
 
                  Combining all of the above:
 
-                 [baker_part / punishing_amount >= own_frozen / current_amount]
+                 [(baker_part + stez_part) / punishing_amount >= (own_frozen + stez_frozen) / current_amount]
 
                  [(punishing_amount - stakers_part) / punishing_amount >= (current_amount - staked_frozen) / current_amount]
 
@@ -329,6 +330,10 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                  [stakers_part <= staked_frozen]
               *)
             in
+            (* We first handle the baker + staker punishment *)
+            let*? baker_staker_punishing_amount =
+              Tez_repr.(punishing_amount -? stez_part)
+            in
             let* full_staking_balance =
               Stake_storage.get_full_staking_balance ctxt delegate
             in
@@ -337,7 +342,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
             in
             let actual_baker_part = Tez_repr.min baker_part own_frozen in
             let*? actual_stakers_part =
-              Tez_repr.(punishing_amount -? actual_baker_part)
+              Tez_repr.(baker_staker_punishing_amount -? actual_baker_part)
             in
             (* To avoid underflows, we need to guarantee that:
                - [actual_baker_part <= own_frozen] and
@@ -374,6 +379,11 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 actual_stakers_part
                 global_limit_of_staking_over_baking
             in
+            let*? {amount_to_burn = to_burn_stez; reward = to_reward_stez} =
+              split_reward_and_burn
+                stez_part
+                global_limit_of_staking_over_baking
+            in
             let giver_baker =
               `Frozen_deposits (Frozen_staker_repr.baker delegate)
             in
@@ -381,13 +391,19 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               `Frozen_deposits
                 (Frozen_staker_repr.shared_between_stakers ~delegate)
             in
+            let giver_stez = `CLST_deposits in
             let init_to_burn =
-              [(giver_baker, to_burn_baker); (giver_stakers, to_burn_stakers)]
+              [
+                (giver_baker, to_burn_baker);
+                (giver_stakers, to_burn_stakers);
+                (giver_stez, to_burn_stez);
+              ]
             in
             let init_to_reward =
               [
                 (giver_baker, to_reward_baker);
                 (giver_stakers, to_reward_stakers);
+                (giver_stez, to_reward_stez);
               ]
             in
             let* to_burn, to_reward =
@@ -526,7 +542,9 @@ module For_RPC = struct
                       delegate
                   in
                   let* current_amount =
-                    Delegate_storage.current_frozen_deposits ctxt delegate
+                    Delegate_storage.current_frozen_deposits_with_stez
+                      ctxt
+                      delegate
                   in
                   return {Deposits_repr.initial_amount; current_amount}
                 in
@@ -553,14 +571,14 @@ module For_RPC = struct
 
   let get_estimated_shared_pending_slashed_amount ctxt delegate =
     let open Lwt_result_syntax in
-    let* {baker_part; stakers_part} =
+    let* {baker_part; stakers_part; stez_part = _} =
       get_estimated_punished_share ctxt delegate
     in
     Lwt.return Tez_repr.(baker_part +? stakers_part)
 
   let get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate =
     let open Lwt_result_syntax in
-    let+ {baker_part; stakers_part = _} =
+    let+ {baker_part; stakers_part = _; stez_part = _} =
       get_estimated_punished_share ctxt delegate
     in
     baker_part
@@ -574,7 +592,7 @@ module For_RPC = struct
         if Contract_repr.(equal (Contract_repr.Implicit delegate) contract) then
           get_delegate_estimated_own_pending_slashed_amount ctxt ~delegate
         else
-          let* {baker_part = _; stakers_part} =
+          let* {baker_part = _; stakers_part; stez_part = _} =
             get_estimated_punished_share ctxt delegate
           in
           let* num =
