@@ -336,12 +336,15 @@ let job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type =
        images/packages/debian-systemd-tests.Dockerfile";
     ]
 
-let job_install_bin_debian_bookworm ~manual pipeline_type =
-  job
+let job_install_bin_debian_bookworm =
+  Cacio.parameterize @@ fun manual ->
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.install_bin_debian_bookworm"
     ~__POS__
-    ~name:"oc.install_bin_debian_bookworm"
-    ~stage:Stages.publishing_tests
-    ~dependencies:(Dependent [Job (job_apt_repo_debian ~manual pipeline_type)])
+    ~description:"Check that Debian packages can be installed."
+    ~stage:Test_publication
+    ~needs_legacy:[(Job, job_apt_repo_debian ~manual pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.debian_bookworm
     ["./docs/introduction/install-bin-deb.sh debian bookworm"]
@@ -405,12 +408,14 @@ let () =
   Cacio.register_jobs
     Debian_partial
     [
+      (Auto, job_install_bin_debian_bookworm false Partial);
       (Auto, job_install_bin_debian_bookworm_systemd false Partial);
       (Auto, job_upgrade_bin_debian_bookworm_systemd false Partial);
     ] ;
   Cacio.register_jobs
     Debian_daily
     [
+      (Auto, job_install_bin_debian_bookworm false Full);
       (Auto, job_install_bin_debian_bookworm_systemd false Full);
       (Auto, job_upgrade_bin_debian_bookworm_systemd false Full);
     ] ;
@@ -433,12 +438,7 @@ let jobs ?(manual = false) pipeline_type =
       job_upgrade_bin_ubuntu_24_04_systemd ~manual pipeline_type;
     ]
   in
-  let test_debian_packages_jobs =
-    [
-      job_lintian_debian ~manual pipeline_type;
-      job_install_bin_debian_bookworm ~manual pipeline_type;
-    ]
-  in
+  let test_debian_packages_jobs = [job_lintian_debian ~manual pipeline_type] in
   let debian_jobs =
     [
       job_build_debian_package ~manual pipeline_type;

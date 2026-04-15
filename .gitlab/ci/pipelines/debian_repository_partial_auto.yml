@@ -167,27 +167,6 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - apt_repo_debian
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/introduction/install-bin-deb.sh debian bookworm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    PREFIX: ""
-
 oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
@@ -247,3 +226,25 @@ oc.install_bin_debian_bookworm_systemd:
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
+
+oc.install_bin_debian_bookworm:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/introduction/install-bin-deb.sh debian bookworm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    PREFIX: ""
