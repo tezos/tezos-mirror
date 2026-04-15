@@ -366,25 +366,8 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
       (`Inbox [])
   in
   if read_receipt then
-    let* read_res =
-      Durable_storage.read_opt
-        (Raw_path
-           (Durable_storage_path.Block.current_receipts
-              ~root:Durable_storage_path.etherlink_safe_root))
-        evm_state
-    in
-    match read_res with
-    | Some bytes ->
-        let receipt =
-          Transaction_receipt.decode_last_from_list
-            Ethereum_types.(Block_hash (Hex (String.make 64 '0')))
-            bytes
-        in
-        return (L2_types.Ethereum receipt, evm_state)
-    | None ->
-        failwith
-          "No value found in context where transactions receipts should be \
-           stored"
+    let* receipt = Durable_storage.read Current_receipts evm_state in
+    return (L2_types.Ethereum receipt, evm_state)
   else return (L2_types.Tezos, evm_state)
 
 let execute_entrypoint ~data_dir ~pool ~native_execution_policy ~config

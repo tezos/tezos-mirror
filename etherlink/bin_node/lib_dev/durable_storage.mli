@@ -70,6 +70,7 @@ type ('a, 'cap) path =
       -> (unit, [`Delete]) path
   | Tezosx_tezos_current_block :
       (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
+  | Current_receipts : (Transaction_receipt.t, ro) path
 
 (** {2 Typed operations} *)
 

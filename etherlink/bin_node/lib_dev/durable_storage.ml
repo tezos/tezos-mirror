@@ -100,6 +100,7 @@ type ('a, 'cap) path =
       -> (unit, [`Delete]) path
   | Tezosx_tezos_current_block :
       (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
+  | Current_receipts : (Transaction_receipt.t, ro) path
 
 (** Read-capable resolution variants. [Delete_only] is intentionally absent
     here — it lives directly in {!resolved}, so [path_and_decode] can
@@ -356,6 +357,18 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              (Durable_storage_path.Block.current_block
                 ~root:Durable_storage_path.tezosx_tezos_blocks_root)
            ~chain_family:Michelson)
+  | Current_receipts ->
+      static_read
+        (Read_only
+           {
+             path =
+               Durable_storage_path.Block.current_receipts
+                 ~root:Durable_storage_path.etherlink_safe_root;
+             decode =
+               infallible_decode
+                 (Transaction_receipt.decode_last_from_list
+                    Ethereum_types.(Block_hash (Hex (String.make 64 '0'))));
+           })
 
 let storage_version state =
   let open Lwt_result_syntax in
