@@ -14,72 +14,6 @@ module Events = struct
   include Baking_events.Actions
 end
 
-(** [High_watermark] is an internal module that stores:
-    - the highest seen level
-    - the highest seen round for each level *)
-module High_watermark = struct
-  module LRU =
-    Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
-      (struct
-        type t = int32
-
-        let equal = Int32.equal
-
-        let hash = Int32.hash
-      end)
-
-  type t = {mutable highest_level : int32; round_per_level : Round.t LRU.t}
-
-  (** [create ()] returns a fresh highwatermark *)
-  let create () = {highest_level = Int32.zero; round_per_level = LRU.create 5}
-
-  (* [check t level round] checks that the level and round are not lower
-     than the ones already seen *)
-  let check {highest_level; round_per_level} level round =
-    (* levels below [highest_level - 2] are discarded as too old *)
-    if level < Int32.(pred (pred highest_level)) then false
-    else
-      (* for the current level, check that the last seen round is not greater
-         than the current round *)
-      match LRU.find_opt round_per_level level with
-      | Some round_at_level -> round > round_at_level
-      | None -> true
-
-  (** [push t level round] stores [level] and [level -> round] if each is higher
-      than the currently stored one *)
-  let push t level round =
-    t.highest_level <- Int32.max level t.highest_level ;
-    LRU.replace t.round_per_level level round
-end
-
-module Delegate_high_watermarks = struct
-  type delegate_highwatermarks = {
-    blocks : High_watermark.t;
-    preattestations : High_watermark.t;
-    attestations : High_watermark.t;
-  }
-
-  let create_delegate_highwatermarks () =
-    {
-      blocks = High_watermark.create ();
-      preattestations = High_watermark.create ();
-      attestations = High_watermark.create ();
-    }
-
-  type t = delegate_highwatermarks Key_id.Table.t
-
-  let create_highwatermarks () = Key_id.Table.create 13
-
-  let get_delegate_highwatermarks t (delegate : Baking_state_types.Delegate.t) =
-    let key = delegate.consensus_key.id in
-    match Key_id.Table.find_opt t key with
-    | Some h -> h
-    | None ->
-        let h = create_delegate_highwatermarks () in
-        Key_id.Table.replace t key h ;
-        h
-end
-
 module Delegate_signing_queue = struct
   type t = {
     delegate : Baking_state_types.Delegate.t;
@@ -226,7 +160,6 @@ module Types = struct
     delegate_signing_queues : Delegate_signing_queue.t Key_id.Table.t;
     baking_state : Baking_state.global_state;
     forge_consensus_vote_hook : (unit -> unit Lwt.t) option;
-    delegate_highwatermarks : Delegate_high_watermarks.t;
   }
 
   type parameters = {
@@ -277,77 +210,53 @@ let get_or_create_queue state delegate =
 let handle_forge_block (state : Types.state) automaton_state
     (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
-  let level = Int32.succ block_to_bake.predecessor.shell.level in
-  let round = block_to_bake.round in
-  let delegate_hwms =
-    Delegate_high_watermarks.get_delegate_highwatermarks
-      state.delegate_highwatermarks
-      block_to_bake.delegate
-  in
-  let block_highwatermark = delegate_hwms.blocks in
-  if High_watermark.check block_highwatermark level round then
-    (* [prepare_unsigned_block] is potentially slow (e.g. if the node's context
-       cache is cold). We run it in the background so that [on_request] returns
-       immediately and the worker can keep processing other requests (e.g.
-       attestations from other automatons). Once preparation completes, the
-       signing task is pushed to the delegate's signing queue. *)
-    Lwt.async (fun () ->
-        let*! result =
-          protect (fun () ->
-              Baking_actions.prepare_unsigned_block
+  (* [prepare_unsigned_block] is potentially slow (e.g. if the node's context
+     cache is cold). We run it in the background so that [on_request] returns
+     immediately and the worker can keep processing other requests (e.g.
+     attestations from other automatons). Once preparation completes, the
+     signing task is pushed to the delegate's signing queue. *)
+  Lwt.async (fun () ->
+      let*! result =
+        protect (fun () ->
+            Baking_actions.prepare_unsigned_block
+              automaton_state
+              state.baking_state
+              block_to_bake)
+      in
+      match result with
+      | Error err ->
+          Events.(emit failed_to_prepare_block (block_to_bake.delegate, err))
+      | Ok (unsigned_block, seed_nonce, injection_level, liquidity_baking_vote)
+        ->
+          let task () =
+            let* signed_block =
+              Baking_actions.sign_unsigned_block_and_register_seed_nonce
+                unsigned_block
                 automaton_state
                 state.baking_state
-                block_to_bake)
-        in
-        match result with
-        | Error err ->
-            Events.(emit failed_to_prepare_block (block_to_bake.delegate, err))
-        | Ok (unsigned_block, seed_nonce, injection_level, liquidity_baking_vote)
-          ->
-            let task () =
-              (* Check the high watermark again since a block may have been signed
-                 in the meantime *)
-              if High_watermark.check block_highwatermark level round then (
-                (* Push the high watermark only if the task to sign has been
-                   executed. The push is made before signing to ensure that only
-                   one signing attempt is performed regardless of the signer's
-                   response. *)
-                High_watermark.push block_highwatermark level round ;
-                let* signed_block =
-                  Baking_actions.sign_unsigned_block_and_register_seed_nonce
-                    unsigned_block
-                    automaton_state
-                    state.baking_state
-                    block_to_bake
-                    seed_nonce
-                    injection_level
-                    liquidity_baking_vote
-                in
-                automaton_state.push_forge_event (Block_ready signed_block) ;
-                return_unit)
-              else return_unit
+                block_to_bake
+                seed_nonce
+                injection_level
+                liquidity_baking_vote
             in
-            let queue = get_or_create_queue state block_to_bake.delegate in
-            Delegate_signing_queue.push_task
-              ~on_error:(fun err ->
-                let*! () =
-                  Events.(
-                    emit failed_to_sign_block (block_to_bake.delegate, err))
-                in
-                Lwt.return_unit)
-              task
-              queue ;
-            Lwt.return_unit)
+            automaton_state.push_forge_event (Block_ready signed_block) ;
+            return_unit
+          in
+          let queue = get_or_create_queue state block_to_bake.delegate in
+          Delegate_signing_queue.push_task
+            ~on_error:(fun err ->
+              let*! () =
+                Events.(emit failed_to_sign_block (block_to_bake.delegate, err))
+              in
+              Lwt.return_unit)
+            task
+            queue ;
+          Lwt.return_unit)
 
 let handle_forge_consensus_votes (state : Types.state) automaton_state
     (unsigned_consensus_votes : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let batch_branch = unsigned_consensus_votes.batch_branch in
-  let level =
-    unsigned_consensus_votes.batch_content.level
-    |> Protocol.Alpha_context.Raw_level.to_int32
-  in
-  let round = unsigned_consensus_votes.batch_content.round in
   let task unsigned_consensus_vote =
     (* Execute test hook if present *)
     let*! () =
@@ -395,22 +304,7 @@ let handle_forge_consensus_votes (state : Types.state) automaton_state
       let queue = get_or_create_queue state unsigned_consensus_vote.delegate in
       Delegate_signing_queue.push_task
         ~on_error:(fun _err -> Lwt.return_unit)
-        (fun () ->
-          (* Check and push the highwatermarks when executing the task *)
-          let delegate_hwms =
-            Delegate_high_watermarks.get_delegate_highwatermarks
-              state.delegate_highwatermarks
-              unsigned_consensus_vote.delegate
-          in
-          let highwatermark =
-            match unsigned_consensus_vote.vote_kind with
-            | Preattestation -> delegate_hwms.preattestations
-            | Attestation -> delegate_hwms.attestations
-          in
-          if High_watermark.check highwatermark level round then (
-            High_watermark.push highwatermark level round ;
-            task unsigned_consensus_vote)
-          else return_unit)
+        (fun () -> task unsigned_consensus_vote)
         queue)
     authorized_consensus_votes ;
   return_unit
@@ -420,16 +314,12 @@ module Handlers = struct
 
   let on_launch _self _name (parameters : Types.parameters) =
     let delegate_signing_queues = Key_id.Table.create 13 in
-    let delegate_highwatermarks =
-      Delegate_high_watermarks.create_highwatermarks ()
-    in
     Lwt.return_ok
       Types.
         {
           delegate_signing_queues;
           baking_state = parameters.baking_state;
           forge_consensus_vote_hook = parameters.forge_consensus_vote_hook;
-          delegate_highwatermarks;
         }
 
   let on_no_request _ = Lwt.return_unit
@@ -529,8 +419,6 @@ module Internal_for_tests = struct
   module Delegate_signing_queue = Delegate_signing_queue
   module Types = Types
 
-  type delegate_highwatermarks = Delegate_high_watermarks.t
-
   let get_or_create_queue = get_or_create_queue
 
   let create_test_state () =
@@ -544,8 +432,6 @@ module Internal_for_tests = struct
         delegate_signing_queues;
         baking_state = dummy_baking_state;
         forge_consensus_vote_hook = None;
-        delegate_highwatermarks =
-          Delegate_high_watermarks.create_highwatermarks ();
       }
 
   let queue_count state =

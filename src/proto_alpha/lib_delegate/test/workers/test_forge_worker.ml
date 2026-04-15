@@ -718,15 +718,16 @@ let test_same_delegate_serialization () =
       else return_unit)
 
 (**
-   Integration Test 7: Two-node high watermark filters slow block
+   Integration Test 7: Two-node disk-based high watermark rejects slow block
 
    This test simulates two nodes (fast and slow) pushing Forge_and_sign_block
    requests for the same delegate, level, and round to a single forge worker.
    The slow node's RPCs are delayed so that the fast node completes block
-   preparation first. The test verifies that:
+   preparation and signing first. The test verifies that:
    - The fast node's block is signed and a Block_ready event is emitted
-   - The slow node's block is filtered by the high watermark's second check
-     (which happens just before signing) and no Block_ready is emitted for it
+   - The slow node's block signing is rejected by the disk-based high watermark
+     signer (Baking_highwatermarks), which triggers the on_error handler that
+     logs the error and returns unit (no Block_ready is emitted for the slow node)
 *)
 let test_two_nodes_high_watermark_filters_slow_block () =
   let open Lwt_result_syntax in
