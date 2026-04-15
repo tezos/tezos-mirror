@@ -71,6 +71,9 @@ type ('a, 'cap) path =
   | Current_block_number :
       _ L2_types.chain_family
       -> (Ethereum_types.quantity, rw) path
+  | Current_block_hash :
+      _ L2_types.chain_family
+      -> (Ethereum_types.block_hash, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -197,6 +200,16 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
       let root = Durable_storage_path.root_of_chain_family chain_family in
       static_read
         (qty_le_codec ~path:(Durable_storage_path.Block.current_number ~root))
+  | Current_block_hash chain_family ->
+      let root = Durable_storage_path.root_of_chain_family chain_family in
+      static_read
+        (Read_write
+           {
+             path = Durable_storage_path.Block.current_hash ~root;
+             decode = infallible_decode Ethereum_types.decode_block_hash;
+             encode =
+               (fun h -> Bytes.to_string (Ethereum_types.encode_block_hash h));
+           })
 
 let storage_version state =
   let open Lwt_result_syntax in

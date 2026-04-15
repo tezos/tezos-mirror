@@ -41,6 +41,9 @@ type ('a, 'cap) path =
   | Current_block_number :
       _ L2_types.chain_family
       -> (Ethereum_types.quantity, rw) path
+  | Current_block_hash :
+      _ L2_types.chain_family
+      -> (Ethereum_types.block_hash, rw) path
 
 (** {2 Typed operations} *)
 

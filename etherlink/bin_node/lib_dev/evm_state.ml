@@ -211,14 +211,11 @@ let current_block_height ~chain_family evm_state =
 
 let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
   let* current_hash =
-    Durable_storage.read_opt
-      (Raw_path (Durable_storage_path.Block.current_hash ~root))
-      evm_state
+    Durable_storage.read_opt (Current_block_hash chain_family) evm_state
   in
   match current_hash with
-  | Some h -> return (decode_block_hash h)
+  | Some h -> return h
   | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
 let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
