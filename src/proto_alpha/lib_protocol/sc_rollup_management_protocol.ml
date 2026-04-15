@@ -55,6 +55,7 @@ type atomic_transaction_batch = {transactions : transaction list}
 type outbox_message =
   | Atomic_transaction_batch of atomic_transaction_batch
   | Whitelist_update of Sc_rollup.Whitelist.t option
+  | Canonical_rollup_signal of string
 
 let make_internal_transfer ctxt ty ~payload ~sender ~source ~destination =
   let open Lwt_result_syntax in
@@ -149,6 +150,8 @@ let outbox_message_of_outbox_message_repr ctxt transactions =
       return (Atomic_transaction_batch {transactions}, ctxt)
   | Sc_rollup.Outbox.Message.Whitelist_update whitelist_opt ->
       return (Whitelist_update whitelist_opt, ctxt)
+  | Sc_rollup.Outbox.Message.Canonical_rollup_signal signal ->
+      return (Canonical_rollup_signal signal, ctxt)
 
 module Internal_for_tests = struct
   let make_transaction ctxt parameters_ty ~parameters ~destination ~entrypoint =

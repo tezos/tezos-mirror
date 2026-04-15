@@ -55,6 +55,7 @@ type t =
   | Atomic_transaction_batch of {transactions : transaction list}
   | Atomic_transaction_batch_typed of {transactions : typed_transaction list}
   | Whitelist_update of Sc_rollup_whitelist_repr.t option
+  | Canonical_rollup_signal of string
 
 val encoding : t Data_encoding.t
 

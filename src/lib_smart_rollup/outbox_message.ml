@@ -15,6 +15,7 @@ type transaction_summary = {
 type summary =
   | Whitelist_update of Signature.Public_key_hash.t list option
   | Transaction_batch of transaction_summary list
+  | Canonical_rollup_signal of string
 
 let transaction_summary_encoding =
   let open Data_encoding in
@@ -58,6 +59,12 @@ let summary_encoding =
         (obj1 (req "transactions" (list transaction_summary_encoding)))
         (function Transaction_batch trs -> Some trs | _ -> None)
         (fun trs -> Transaction_batch trs);
+      case
+        ~title:"canonical_rollup_signal"
+        (Tag 2)
+        (obj1 (req "canonical_rollup_signal" (string' Plain)))
+        (function Canonical_rollup_signal signal -> Some signal | _ -> None)
+        (fun signal -> Canonical_rollup_signal signal);
     ]
 
 let pp_summary fmt = function
@@ -83,3 +90,4 @@ let pp_summary fmt = function
             (Tezos_micheline.Micheline_printer.printable Fun.id parameters))
         txs ;
       Format.fprintf fmt "@]"
+  | Canonical_rollup_signal signal -> Format.fprintf fmt "Signal: %s" signal

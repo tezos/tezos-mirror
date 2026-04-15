@@ -17,6 +17,7 @@ type transaction_summary = {
 type summary =
   | Whitelist_update of Signature.Public_key_hash.t list option
   | Transaction_batch of transaction_summary list
+  | Canonical_rollup_signal of string
 
 val summary_encoding : summary Data_encoding.t
 

@@ -1113,6 +1113,8 @@ module Constants : sig
 
   val sc_rollup_riscv_pvm_enable : context -> bool
 
+  val canonical_rollup : context -> Smart_rollup.Address.t option
+
   val sc_rollup_origination_size : context -> int
 
   val sc_rollup_stake_amount : t -> Tez.t
@@ -3873,6 +3875,7 @@ module Sc_rollup : sig
             transactions : typed_transaction list;
           }
         | Whitelist_update of Whitelist.t option
+        | Canonical_rollup_signal of string
 
       val pp : Format.formatter -> t -> unit
 

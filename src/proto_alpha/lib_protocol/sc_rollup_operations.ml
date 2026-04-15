@@ -666,6 +666,24 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
             ~outbox_level
             ~message_index
         else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
+    | Sc_rollup_management_protocol.Canonical_rollup_signal _signal -> (
+        let noop ctxt =
+          ( {
+              paid_storage_size_diff = Z.zero;
+              ticket_receipt = [];
+              operations = [];
+              whitelist_update = None;
+            },
+            ctxt )
+        in
+        match Constants.canonical_rollup ctxt with
+        | Some canonical_rollup_address
+          when Smart_rollup.Address.equal canonical_rollup_address rollup ->
+            (* TODO *)
+            return (noop ctxt)
+        | Some _ | None ->
+            (* Only the canonical rollup can send such a signal *)
+            return (noop ctxt))
   in
   (* Record that the message for the given level has been applied. This fails
      in case a message for the rollup, outbox-level and message index has
