@@ -82,6 +82,8 @@ type ('a, 'cap) path =
       -> (bytes, rw) path
   | Blueprint_nb_chunks : Z.t -> (int, rw) path
   | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
+  | Single_tx_input : (Rlp.item, rw) path
+  | Assemble_block_input : (Rlp.item, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -117,6 +119,15 @@ let qty_le_codec ~path : (Ethereum_types.quantity, rw) resolved =
         infallible_decode (fun bytes ->
             Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
       encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
+    }
+
+(** RLP-encoded values stored as bytes. *)
+let rlp_codec ~path : (Rlp.item, rw) resolved =
+  Read_write
+    {
+      path;
+      decode = Rlp.decode;
+      encode = (fun item -> Bytes.to_string (Rlp.encode item));
     }
 
 (** Smart constructors for read-capable [resolve] arms — wrap a [resolved]
@@ -259,6 +270,14 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
               encode =
                 (fun qty -> Bytes.to_string (Ethereum_types.encode_u256_le qty));
             })
+  | Single_tx_input ->
+      versioned_read (fun ~storage_version ->
+          rlp_codec
+            ~path:(Durable_storage_path.Single_tx.input_tx ~storage_version))
+  | Assemble_block_input ->
+      versioned_read (fun ~storage_version ->
+          rlp_codec
+            ~path:(Durable_storage_path.Assemble_block.input ~storage_version))
 
 let storage_version state =
   let open Lwt_result_syntax in

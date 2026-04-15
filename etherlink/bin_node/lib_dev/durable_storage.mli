@@ -52,6 +52,8 @@ type ('a, 'cap) path =
       -> (bytes, rw) path
   | Blueprint_nb_chunks : Z.t -> (int, rw) path
   | Blueprint_generation : Z.t -> (Ethereum_types.quantity, rw) path
+  | Single_tx_input : (Rlp.item, rw) path
+  | Assemble_block_input : (Rlp.item, rw) path
 
 (** {2 Typed operations} *)
 

@@ -156,7 +156,6 @@ val execute_entrypoint :
     assembles the block from already recorded effects and returns the result
     of this operation. *)
 val assemble_block :
-  storage_version:int ->
   pool:Lwt_domain.pool ->
   data_dir:string ->
   chain_family:'a L2_types.chain_family ->

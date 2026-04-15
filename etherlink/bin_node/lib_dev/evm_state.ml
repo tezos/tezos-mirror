@@ -354,12 +354,7 @@ let execute_single_transaction ~storage_version ~data_dir ~pool
         Value (Ethereum_types.encode_u256_le block_in_progress.number);
       ]
   in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path (Durable_storage_path.Single_tx.input_tx ~storage_version))
-      (Rlp.encode rlp)
-      evm_state
-  in
+  let* evm_state = Durable_storage.write Single_tx_input rlp evm_state in
   let* evm_state =
     execute
       ~pool
@@ -478,7 +473,7 @@ let retrieve_block ~chain_family evm_state =
   in
   return (Option.map (fun block -> (block, tezos_block)) block_opt)
 
-let assemble_block (type f) ~storage_version ~pool ~data_dir
+let assemble_block (type f) ~pool ~data_dir
     ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
     ~native_execution evm_state =
   let open Lwt_result_syntax in
@@ -495,12 +490,7 @@ let assemble_block (type f) ~storage_version ~pool ~data_dir
         Value (Ethereum_types.encode_u256_le number);
       ]
   in
-  let* evm_state =
-    Durable_storage.write
-      (Raw_path (Durable_storage_path.Assemble_block.input ~storage_version))
-      (Rlp.encode rlp)
-      evm_state
-  in
+  let* evm_state = Durable_storage.write Assemble_block_input rlp evm_state in
   let* evm_state =
     execute
       ~pool
