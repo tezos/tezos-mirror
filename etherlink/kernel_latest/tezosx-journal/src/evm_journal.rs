@@ -25,8 +25,6 @@ pub struct CracTransactionInfo {
     pub gas_limit: U256,
     /// Value attached to the call (from X-Tezos-Amount), in wei.
     pub amount: U256,
-    /// Cumulative gas used across all CRAC executions.
-    pub gas_used: u64,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -72,13 +70,6 @@ impl EvmJournal {
 
     pub fn get_access_list_copy(&self) -> AccessList {
         self.access_list.clone().unwrap_or_default()
-    }
-
-    /// Append logs and gas from a cross-runtime EVM execution.
-    pub fn accumulate_crac_execution(&mut self, gas_used: u64) {
-        if let Some(ref mut info) = self.crac_tx_info {
-            info.gas_used = info.gas_used.saturating_add(gas_used);
-        }
     }
 
     /// Set CRAC transaction info from the first incoming CRAC headers.
@@ -127,14 +118,12 @@ mod tests {
             sender: Address::from([0x22; 20]),
             gas_limit: U256::from(1000),
             amount: U256::from(42),
-            gas_used: 0,
         };
         let info2 = CracTransactionInfo {
             source: Address::from([0x33; 20]),
             sender: Address::from([0x44; 20]),
             gas_limit: U256::from(2000),
             amount: U256::from(99),
-            gas_used: 0,
         };
         journal.set_crac_tx_info(info1).unwrap();
         let err = journal.set_crac_tx_info(info2);
@@ -150,7 +139,6 @@ mod tests {
     #[test]
     fn test_take_crac_data_returns_none_without_tx_info() {
         let mut journal = EvmJournal::new();
-        journal.accumulate_crac_execution(100);
         // No tx info set → returns None
         assert!(journal.take_crac_data().is_none());
     }
@@ -164,7 +152,6 @@ mod tests {
                 sender: Address::from([0x22; 20]),
                 gas_limit: U256::from(1000),
                 amount: U256::ZERO,
-                gas_used: 0,
             })
             .unwrap();
         // No logs but tx info is set → returns Some with empty logs
@@ -181,10 +168,8 @@ mod tests {
                 sender: Address::from([0x22; 20]),
                 gas_limit: U256::from(1000),
                 amount: U256::ZERO,
-                gas_used: 0,
             })
             .unwrap();
-        journal.accumulate_crac_execution(100);
 
         let _ = journal.take_crac_data().unwrap();
 

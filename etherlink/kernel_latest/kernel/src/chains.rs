@@ -1072,7 +1072,8 @@ where
             }
 
             // Extract cross-runtime side effects from the journal.
-            let cross_runtime_effects = extract_cross_runtime_effects(journal);
+            let cross_runtime_effects =
+                extract_cross_runtime_effects(journal, consumed_milligas);
 
             Ok(crate::apply::ExecutionResult::Valid(
                 RuntimeExecutionInfo::Tezos {

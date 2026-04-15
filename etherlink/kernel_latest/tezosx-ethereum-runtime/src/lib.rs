@@ -6,11 +6,13 @@ mod headers;
 mod url;
 
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
-use alloy_sol_types::SolCall;
+use alloy_primitives::{IntoLogData, Log};
+use alloy_sol_types::{sol, SolCall};
 use http::StatusCode;
 use primitive_types::U256;
 use revm::context::result::{ExecutionResult, HaltReason, Output};
 use revm::state::Bytecode;
+use revm_etherlink::precompiles::constants::RUNTIME_GATEWAY_PRECOMPILE_ADDRESS;
 use revm_etherlink::{
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
@@ -157,6 +159,17 @@ fn build_response(
         .unwrap()
 }
 
+sol! {
+    event CracReceived(
+        string cracId,
+        string sourceRuntime,
+        string senderAddress,
+        string sourceAddress,
+        string targetAddress,
+        uint256 amount
+    );
+}
+
 /// Execute a cross-runtime request: parse the URL, extract the
 /// destination address, and run the EVM transaction.
 ///
@@ -193,7 +206,6 @@ where
                 sender: hdrs.sender,
                 gas_limit: revm::primitives::U256::from(hdrs.gas_limit),
                 amount: revm::primitives::U256::from_limbs(hdrs.amount.into_limbs()),
-                gas_used: 0,
             })
             .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     }
@@ -207,6 +219,20 @@ where
     let evm_version = read_evm_version(host);
     let block_constants = runtime.create_block_constants(host, &context);
     let gas_data = GasData::new(hdrs.gas_limit, 0, hdrs.gas_limit);
+    let crac_log = Log {
+        address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+        data: CracReceived {
+            cracId: journal.crac_id().to_string(),
+            // TODO: Pass it in headers when more than 2 runtimes are supported.
+            sourceRuntime: "tezos".to_string(),
+            senderAddress: hdrs.sender.to_string(),
+            sourceAddress: hdrs.source.unwrap_or_default().to_string(),
+            targetAddress: parsed.destination.to_string(),
+            amount: hdrs.amount,
+        }
+        .into_log_data(),
+    };
+    journal.evm.inner.log(crac_log);
 
     let outcome = run_transaction(
         host,
@@ -228,11 +254,6 @@ where
         },
     )
     .map_err(|e| TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}")))?;
-
-    // Accumulate EVM gas from this CRAC execution.
-    journal
-        .evm
-        .accumulate_crac_execution(outcome.result.gas_used());
 
     Ok(outcome)
 }

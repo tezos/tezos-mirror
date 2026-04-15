@@ -1021,12 +1021,7 @@ let reconstruct_from_transactions_list transactions
     (obj : legacy_transaction_object) =
   let open Result_syntax in
   match List.assoc ~equal:( = ) obj.hash transactions with
-  | None ->
-      (* The transaction is not in the blueprint.  This happens for CRAC
-         fake transactions which are kernel side effects, not submitted
-         transactions.  Return the stored object as-is. *)
-      return (from_store_transaction_object obj)
-  | Some None ->
+  | Some None | None ->
       (* It is a delayed transaction, there is nothing we can do except
          returning the potentially incorrect transaction object *)
       return (from_store_transaction_object obj)
