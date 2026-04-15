@@ -685,6 +685,144 @@ let fetch_l1_manager_ops client =
           Test.fail "fetch_l1_manager_ops: manager operation has no contents"
       | top :: _ -> return top)
 
+(** EVM contract that stores a uint256 and returns it.  Used as a
+ *  target for gateway calls in callback tests. *)
+module EvmStoreAndReturn = struct
+  open EvmContract
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.store_and_return
+
+  (** Asserts that the contract's stored value equals [expected_value]. *)
+  let check_storage ~sequencer ~expected_value store_and_return =
+    let*@ storage =
+      Rpc.get_storage_at ~address:store_and_return ~pos:"0x0" sequencer
+    in
+    Check.(
+      (int_of_string storage = expected_value)
+        int
+        ~error_msg:"Expected StoreAndReturn value %R but got %L") ;
+    unit
+end
+
+(** Michelson-to-EVM bridge with callback for CRAC test scenarios.
+ *  On [%run], calls the gateway's [%call_evm] with
+ *  [Some(SELF %on_result)] as callback.  [%on_result] stores the
+ *  received bytes and increments the counter.
+ *  When [failing] is true, originates [failing_callback_run_evm.tz]
+ *  whose [%on_result] always FAILWITHs. *)
+module TezCallbackRunnerEvm = struct
+  open TezContract
+  include TezRunner
+
+  (** Originates the contract.  [evm_contract_target_address] is the
+   *  EVM address that will be called on [%run]. *)
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~failing
+      ~evm_contract_target_address ~method_sig ~abi_params () =
+    let script_name =
+      if failing then ["mini_scenarios"; "failing_callback_run_evm"]
+      else ["mini_scenarios"; "callback_run_evm"]
+    in
+    let init_storage_data =
+      sf
+        {|Pair 0 (Pair "%s" (Pair "%s" (Pair 0x%s None)))|}
+        evm_contract_target_address
+        method_sig
+        abi_params
+    in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+
+  (** Asserts that the contract's [counter] equals [expected_counter]. *)
+  let check_counter ~sc_rollup_node ~expected_counter (hex, _addr) =
+    let* storage = get_storage ~sc_rollup_node hex in
+    (* Pair(nat %count, Pair(string %dest, ...)) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezCallbackRunnerEvm `count` %R but got %L") ;
+    unit
+
+  (** Asserts that the callback result field matches [expected_bytes].
+   *  [None] means the result should be [None] (callback did not fire
+   *  or was reverted).  [Some hex] means the result should be
+   *  [Some <hex>]. *)
+  let check_result ~sc_rollup_node ~expected_bytes (hex, _addr) =
+    let* storage = get_storage ~sc_rollup_node hex in
+    (* Storage: Pair(count, Pair(dest, Pair(sig, Pair(params, result)))) *)
+    let result_node =
+      JSON.(
+        storage |-> "args" |=> 1 |-> "args" |=> 1 |-> "args" |=> 1 |-> "args"
+        |=> 1)
+    in
+    (match expected_bytes with
+    | None ->
+        Check.(
+          (JSON.(result_node |-> "prim" |> as_string) = "None")
+            string
+            ~error_msg:"Expected result None but got %L")
+    | Some bytes ->
+        Check.(
+          (JSON.(result_node |-> "prim" |> as_string) = "Some")
+            string
+            ~error_msg:"Expected result Some but got %L") ;
+        let actual =
+          JSON.(result_node |-> "args" |=> 0 |-> "bytes" |> as_string)
+        in
+        Check.(
+          (actual = bytes)
+            string
+            ~error_msg:"Expected result bytes %R but got %L")) ;
+    unit
+end
+
+(** Enshrined Michelson gateway contract — called by Michelson contracts
+    to initiate outgoing CRACs to EVM. *)
+let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
+
+(** Direct gateway calls (fire-and-forget with None callback). *)
+module Gateway = struct
+  open TezContract
+
+  (** Calls the gateway's [%call_evm] with [None] callback. *)
+  let call_evm ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~evm_target ~method_sig ~abi_params
+      ?(amount = 0) () =
+    let arg_data =
+      sf
+        {|Pair "%s" (Pair "%s" (Pair 0x%s None))|}
+        evm_target
+        method_sig
+        abi_params
+    in
+    call_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~dest:gateway_address
+      ~arg_data
+      ~entrypoint:"call_evm"
+      ~amount
+      ~gas_limit:200_000
+      ()
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -799,6 +937,36 @@ module CracRunnerWrapper = struct
         producing a block.  Returns the tx hash. *)
     val send_evm_transfer_no_block :
       ?value:Wei.t -> address:string -> unit -> string Lwt.t
+
+    module EvmStoreAndReturn : sig
+      val deploy : unit -> evm_runner Lwt.t
+
+      val check_storage : expected_value:int -> evm_runner -> unit Lwt.t
+    end
+
+    module TezCallbackRunnerEvm : sig
+      val originate :
+        ?failing:bool ->
+        method_sig:string ->
+        abi_params:string ->
+        evm_runner ->
+        tez_runner Lwt.t
+
+      val check_counter : expected_counter:int -> tez_runner -> unit Lwt.t
+
+      val check_result :
+        expected_bytes:string option -> tez_runner -> unit Lwt.t
+    end
+
+    module Gateway : sig
+      val call_evm :
+        evm_target:evm_runner ->
+        method_sig:string ->
+        abi_params:string ->
+        ?amount:int ->
+        unit ->
+        unit Lwt.t
+    end
   end
 
   (** Builds a {!S} module from the given test setup.  [nonce] and
@@ -1138,6 +1306,76 @@ module CracRunnerWrapper = struct
         in
         let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
         return tx_hash
+
+      module EvmStoreAndReturn = struct
+        let deploy () =
+          let* addr =
+            EvmStoreAndReturn.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          return (`Evm_runner addr)
+
+        let check_storage ~expected_value (`Evm_runner runner) =
+          EvmStoreAndReturn.check_storage ~sequencer ~expected_value runner
+      end
+
+      module TezCallbackRunnerEvm = struct
+        let originate ?(failing = false) ~method_sig ~abi_params
+            (`Evm_runner address) =
+          let* contract_hex, address =
+            TezCallbackRunnerEvm.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ~failing
+              ~evm_contract_target_address:address
+              ~method_sig
+              ~abi_params
+              ()
+          in
+          return (`Tez_runner (contract_hex, address))
+
+        let check_counter ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCallbackRunnerEvm.check_counter
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
+
+        let check_result ~expected_bytes
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCallbackRunnerEvm.check_result
+            ~sc_rollup_node
+            ~expected_bytes
+            (runner_hex, runner_address)
+      end
+
+      module Gateway = struct
+        let call_evm ~evm_target:(`Evm_runner address) ~method_sig ~abi_params
+            ?amount () =
+          Gateway.call_evm
+            ~sc_rollup_address
+            ~sc_rollup_node
+            ~client
+            ~l1_contracts
+            ~sequencer
+            ~source
+            ~counter:(tez_counter ())
+            ~evm_target:address
+            ~method_sig
+            ~abi_params
+            ?amount
+            ()
+      end
     end in
     (module Helper)
 end
@@ -3651,10 +3889,6 @@ let fetch_recent_michelson_manager_ops sequencer =
     (both CRAC and non-CRAC). *)
 let handler_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
-(** Enshrined Michelson gateway contract — called by Michelson contracts
-    to initiate outgoing CRACs to EVM. *)
-let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
-
 (** Fetch the latest EVM block, verify it has [expected_tx_count] transactions,
     and return the block.  Uses [prefix] for log messages. *)
 let check_evm_block_tx_count ~prefix ~expected_tx_count sequencer =
@@ -5831,6 +6065,331 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
     (List.combine l1_pairs tx_pairs) ;
   unit
 
+(** ABI encoding of uint256(42). *)
+let abi_encoded_uint256_42 =
+  "000000000000000000000000000000000000000000000000000000000000002a"
+
+(** ABI encoding of uint256(99). *)
+let abi_encoded_uint256_99 =
+  "0000000000000000000000000000000000000000000000000000000000000063"
+
+(** Callback fire-and-forget: call the gateway directly with None callback.
+ *
+ *    Gateway.call_evm ~> EVM[store_and_return]
+ *
+ *)
+let test_crac_callback_fire_and_forget =
+  register_crac_runner_test
+    ~title:"CRAC: callback fire-and-forget (None)"
+    ~tags:["callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Call gateway with None callback" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      ()
+  in
+  Log.debug ~prefix "Verify EVM storage" ;
+  EvmStoreAndReturn.check_storage ~expected_value:42 evm_target
+
+(** Callback receives EVM result bytes.
+ *
+ *    TEZ[callback_runner] --%run-->
+ *        Gateway.call_evm(Some callback) ~> EVM[store_and_return]
+ *        Gateway --> TEZ[callback_runner %on_result]
+ *
+ *)
+let test_crac_callback_receives_result_bytes =
+  register_crac_runner_test
+    ~title:"CRAC: callback receives EVM result bytes"
+    ~tags:["callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Originate callback runner" ;
+  let* caller =
+    TezCallbackRunnerEvm.originate
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Call callback runner" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 caller in
+  Log.debug ~prefix "Verify EVM storage" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:42 evm_target in
+  Log.debug ~prefix "Verify callback counter and result" ;
+  let* () = TezCallbackRunnerEvm.check_counter ~expected_counter:3 caller in
+  TezCallbackRunnerEvm.check_result
+    ~expected_bytes:(Some abi_encoded_uint256_42)
+    caller
+
+(** Failing callback reverts entire operation group.
+ *
+ *    TEZ[failing_callback_runner] --%run-->
+ *        Gateway.call_evm(Some callback) ~> EVM[store_and_return]
+ *        Gateway --> TEZ[failing_callback_runner %on_result] --> FAILWITH
+ *
+ *)
+let test_crac_callback_failure_reverts_all =
+  register_crac_runner_test
+    ~title:"CRAC: failing callback reverts entire operation group"
+    ~tags:["callback"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Pre-store value 99 via fire-and-forget" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_99
+      ()
+  in
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Originate failing callback runner" ;
+  let* failing_caller =
+    TezCallbackRunnerEvm.originate
+      ~failing:true
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Call failing callback runner" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 failing_caller in
+  Log.debug ~prefix "Verify EVM storage unchanged (still 99)" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Verify callback counter and result reverted" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:0 failing_caller
+  in
+  TezCallbackRunnerEvm.check_result ~expected_bytes:None failing_caller
+
+(** Callback behind a CRAC crossing: EVM bridge invokes the callback
+ *  runner's [%run] via CRAC.  The callback runner then does its own
+ *  gateway call with [Some callback] to the EVM target.
+ *
+ *    EVM[evm_bridge] ~CRAC~> TEZ[callback_runner] --%run-->
+ *        Gateway.call_evm(Some callback) ~> EVM[store_and_return]
+ *        Gateway --> TEZ[callback_runner %on_result]
+ *
+ *)
+let test_crac_callback_behind_crac =
+  register_crac_runner_test
+    ~title:"CRAC: callback behind a CRAC crossing"
+    ~tags:["callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Originate callback runner" ;
+  let* callback_runner =
+    TezCallbackRunnerEvm.originate
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Deploy EVM bridge to callback runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init callback_runner in
+  Log.debug ~prefix "Call EVM bridge" ;
+  let* _ = EvmRunner.call_run evm_bridge in
+  Log.debug ~prefix "Verify EVM target storage" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:42 evm_target in
+  Log.debug ~prefix "Verify callback runner counter and result" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:3 callback_runner
+  in
+  let* () =
+    TezCallbackRunnerEvm.check_result
+      ~expected_bytes:(Some abi_encoded_uint256_42)
+      callback_runner
+  in
+  Log.debug ~prefix "Verify EVM bridge counter" ;
+  EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge
+
+(** TEZ caller invokes callback runner then reverts.  Both the callback
+ *  result and the EVM side effects must be rolled back.
+ *
+ *    TEZ[tez_main]
+ *     |-> TEZ[callback_runner] --%run--> Gateway ~> EVM[store_and_return]
+ *     |-> REVERT
+ *
+ *)
+let test_crac_callback_tez_revert_rolls_back_callback =
+  register_crac_runner_test
+    ~title:"CRAC: TEZ revert rolls back callback result"
+    ~tags:["callback"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Pre-store value 99" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_99
+      ()
+  in
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Originate callback runner" ;
+  let* callback_runner =
+    TezCallbackRunnerEvm.originate
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Originate TEZ main (calls callback runner, then reverts)" ;
+  let* tez_main =
+    TezMultiRunCaller.originate ~revert:true ~callees:[callback_runner] ()
+  in
+  Log.debug ~prefix "Call TEZ main" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_main in
+  Log.debug ~prefix "Verify EVM storage unchanged (still 99)" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Verify callback runner reverted" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:0 callback_runner
+  in
+  let* () =
+    TezCallbackRunnerEvm.check_result ~expected_bytes:None callback_runner
+  in
+  Log.debug ~prefix "Verify TEZ main reverted" ;
+  TezMultiRunCaller.check_storage ~expected_counter:0 tez_main
+
+(** EVM caller catches a failing callback runner behind a CRAC crossing.
+ *  The failing callback reverts the CRAC, but the EVM caller catches it
+ *  and continues execution.
+ *
+ *    EVM[evm_main]
+ *     |-> (Catch) EVM[evm_bridge] ~CRAC~> TEZ[failing_callback_runner]
+ *                                              |-> Gateway ~> EVM[store_and_return]
+ *                                              |-> %on_result --> FAILWITH
+ *
+ *)
+let test_crac_callback_evm_catches_failing_callback_behind_crac =
+  register_crac_runner_test
+    ~title:"CRAC: EVM catches failing callback behind CRAC"
+    ~tags:["callback"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Pre-store value 99" ;
+  let* () =
+    Gateway.call_evm
+      ~evm_target
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_99
+      ()
+  in
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Originate failing callback runner" ;
+  let* failing_runner =
+    TezCallbackRunnerEvm.originate
+      ~failing:true
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Deploy EVM bridge to failing callback runner" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init failing_runner in
+  Log.debug ~prefix "Deploy EVM main with catch" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* _ = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify EVM target unchanged (still 99)" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:99 evm_target in
+  Log.debug ~prefix "Verify EVM main caught the revert" ;
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_main
+  in
+  Log.debug ~prefix "Verify callback runner and bridge reverted" ;
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:0 failing_runner
+  in
+  let* () =
+    TezCallbackRunnerEvm.check_result ~expected_bytes:None failing_runner
+  in
+  EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:0 evm_bridge
+
+(** Callback runner alongside a normal CRAC runner in a mixed topology.
+ *  An EVM multi-caller invokes both a normal EVM-to-TEZ bridge and an
+ *  EVM bridge to a callback runner.  Both should succeed.
+ *
+ *    EVM[evm_main]
+ *     |-> EVM[evm_bridge_normal] ~CRAC~> TEZ[tez_leaf]
+ *     |-> EVM[evm_bridge_cb]     ~CRAC~> TEZ[callback_runner]
+ *                                             |-> Gateway ~> EVM[store_and_return]
+ *                                             |-> %on_result stores bytes
+ *
+ *)
+let test_crac_callback_mixed_with_normal_runners =
+  register_crac_runner_test
+    ~title:"CRAC: callback runner alongside normal CRAC runner"
+    ~tags:["callback"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-CB" in
+  Log.debug ~prefix "Deploy EVM store-and-return" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Originate TEZ leaf (normal runner)" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Originate callback runner" ;
+  let* callback_runner =
+    TezCallbackRunnerEvm.originate
+      ~method_sig:"store(uint256)"
+      ~abi_params:abi_encoded_uint256_42
+      evm_target
+  in
+  Log.debug ~prefix "Deploy EVM bridges" ;
+  let* evm_bridge_normal = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  let* evm_bridge_cb =
+    EvmCrossRuntimeRunnerTez.deploy_and_init callback_runner
+  in
+  Log.debug ~prefix "Deploy EVM main" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_normal, false); (evm_bridge_cb, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* _ = EvmRunner.call_run evm_main in
+  Log.debug ~prefix "Verify EVM target storage" ;
+  let* () = EvmStoreAndReturn.check_storage ~expected_value:42 evm_target in
+  Log.debug ~prefix "Verify counters" ;
+  let* () = EvmMultiRunCaller.check_storage ~expected_counter:3 evm_main in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:1 tez_leaf in
+  let* () =
+    TezCallbackRunnerEvm.check_counter ~expected_counter:3 callback_runner
+  in
+  let* () =
+    TezCallbackRunnerEvm.check_result
+      ~expected_bytes:(Some abi_encoded_uint256_42)
+      callback_runner
+  in
+  let* () =
+    EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_normal
+  in
+  EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_cb
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -5903,4 +6462,11 @@ let () =
   test_crac_debug_trace_transaction [Alpha] ;
   test_crac_debug_trace_block [Alpha] ;
   test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;
-  test_l1_vs_tezosx_nested_failwith_receipt [Alpha]
+  test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
+  test_crac_callback_fire_and_forget [Alpha] ;
+  test_crac_callback_receives_result_bytes [Alpha] ;
+  test_crac_callback_failure_reverts_all [Alpha] ;
+  test_crac_callback_behind_crac [Alpha] ;
+  test_crac_callback_tez_revert_rolls_back_callback [Alpha] ;
+  test_crac_callback_evm_catches_failing_callback_behind_crac [Alpha] ;
+  test_crac_callback_mixed_with_normal_runners [Alpha]
