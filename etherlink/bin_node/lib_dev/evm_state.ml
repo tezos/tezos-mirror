@@ -164,11 +164,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
   in
   return evm_state
 
-let flag_local_exec evm_state ~storage_version =
-  Durable_storage.write
-    (Raw_path Durable_storage_path.(evm_node_flag ~storage_version))
-    Bytes.empty
-    evm_state
+let flag_local_exec evm_state = Durable_storage.write Evm_node_flag () evm_state
 
 let init_reboot_counter evm_state =
   let initial_reboot_counter =

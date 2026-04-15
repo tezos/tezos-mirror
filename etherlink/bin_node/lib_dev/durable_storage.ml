@@ -74,6 +74,7 @@ type ('a, 'cap) path =
   | Current_block_hash :
       _ L2_types.chain_family
       -> (Ethereum_types.block_hash, rw) path
+  | Evm_node_flag : (unit, rw) path
 
 (** How a typed path is resolved to a concrete storage access. Every
     current path resolves to a [Read_write]; new variants will be
@@ -210,6 +211,10 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
              encode =
                (fun h -> Bytes.to_string (Ethereum_types.encode_block_hash h));
            })
+  | Evm_node_flag ->
+      versioned_read (fun ~storage_version ->
+          unit_flag_codec
+            ~path:(Durable_storage_path.evm_node_flag ~storage_version))
 
 let storage_version state =
   let open Lwt_result_syntax in

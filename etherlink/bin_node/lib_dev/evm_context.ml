@@ -2150,7 +2150,7 @@ module State = struct
         (`Inbox [])
     in
     let* storage_version = Durable_storage.storage_version evm_state in
-    let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
+    let* evm_state = Evm_state.flag_local_exec evm_state in
     (* Now that the storage version is known, remove whichever
        key path is not canonical for this version, so no stale
        entry is left in the state. *)
@@ -2991,9 +2991,8 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version evm_state in
   (* Tell the kernel that it is executed by an EVM node *)
-  let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
+  let* evm_state = Evm_state.flag_local_exec evm_state in
   (* We remove the delayed inbox from the EVM state. Its contents will be
      retrieved by the sequencer by inspecting the evm events. *)
   let* evm_state = Evm_state.clear_delayed_inbox evm_state in

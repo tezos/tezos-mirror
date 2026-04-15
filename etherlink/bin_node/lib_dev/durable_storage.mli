@@ -44,6 +44,7 @@ type ('a, 'cap) path =
   | Current_block_hash :
       _ L2_types.chain_family
       -> (Ethereum_types.block_hash, rw) path
+  | Evm_node_flag : (unit, rw) path
 
 (** {2 Typed operations} *)
 
