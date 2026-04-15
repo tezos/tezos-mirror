@@ -808,6 +808,19 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
   in
   unit
 
+(* Test that SWRR RPCs fail with a proper error when the feature flag is
+   disabled. *)
+let test_swrr_disabled _test_mode_tag _protocol ?endpoint client =
+  let check_failure rpc =
+    let*? process = Client.RPC.spawn ?endpoint ~hooks client @@ rpc in
+    Process.check ~expect_failure:true process
+  in
+  let* () = check_failure @@ RPC.get_chain_block_helpers_swrr_credits () in
+  let* () =
+    check_failure @@ RPC.get_chain_block_helpers_swrr_selected_bakers ()
+  in
+  unit
+
 let mempool_hooks =
   let replace_variable string =
     let replacements =
@@ -1777,6 +1790,13 @@ let register protocols =
         ]
         @ consensus_threshold protocol
         @ swrr_flag protocol) ;
+    check_rpc_regression
+      "swrr_disabled"
+      ~supports:Protocol.(From_protocol 025)
+      ~test_function:test_swrr_disabled
+      ~parameter_overrides:(fun protocol ->
+        consensus_threshold protocol
+        @ [(["swrr_new_baker_lottery_enable"], `Bool false)]) ;
     (match test_mode_tag with
     | `Light -> ()
     | _ ->
