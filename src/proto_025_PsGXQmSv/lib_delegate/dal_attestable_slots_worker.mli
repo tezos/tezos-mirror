@@ -63,13 +63,24 @@ val is_not_in_committee :
   committee_level:int32 ->
   bool
 
-(** [create ~attestation_lag ~attestation_lags ~number_of_slots] creates a new worker
+(** [create ~automaton_name ~attestation_lag ~attestation_lags ~number_of_slots] creates a new worker
     state. This does not start any background thread, as streams are opened via
     [update_streams_subscriptions]. *)
 val create :
-  attestation_lag:int -> attestation_lags:int list -> number_of_slots:int -> t
+  automaton_name:string ->
+  attestation_lag:int ->
+  attestation_lags:int list ->
+  number_of_slots:int ->
+  t
 
 (** [shutdown_worker state] stops all active delegate subscriptions and clears
     the worker's in-memory state. The worker will no longer hold any references
     to live streams and the cache will become empty. *)
 val shutdown_worker : t -> unit Lwt.t
+
+(** [get_automaton_name state] returns the automaton name associated with this worker. *)
+val get_automaton_name : t -> string
+
+(** [emit_dal_worker_started automaton_name dal_endpoint] emits an event indicating
+    the DAL worker has started for the given automaton with the specified endpoint. *)
+val emit_dal_worker_started : string -> string -> unit Lwt.t

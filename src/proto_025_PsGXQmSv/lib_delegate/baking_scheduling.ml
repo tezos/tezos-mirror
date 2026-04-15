@@ -71,51 +71,6 @@ let create_round_durations constants =
   Environment.wrap_tzresult
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
-let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
-    delegates =
-  let open Lwt_result_syntax in
-  let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
-  let register dal_ctxt =
-    let* profiles = Node_rpc.get_dal_profiles dal_ctxt in
-    let warn =
-      Events.emit Baking_events.Scheduling.dal_node_no_attester_profile
-    in
-    let*! () =
-      match profiles with
-      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
-      | Controller controller_profile ->
-          let attesters =
-            Tezos_dal_node_services.Controller_profiles.attesters
-              controller_profile
-          in
-          if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
-            warn ()
-          else Lwt.return_unit
-    in
-    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
-    let delegate_ids = List.map Delegate_id.of_pkh delegates in
-    let*! () =
-      (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)
-      Dal_attestable_slots_worker.update_streams_subscriptions
-        dal_attestable_slots_worker
-        dal_ctxt
-        ~delegate_ids
-    in
-    return_unit
-  in
-  Option.iter_es
-    (fun dal_ctxt ->
-      retry
-        cctxt
-        ~max_delay:2.
-        ~delay:1.
-        ~factor:2.
-        ~msg:(fun _errs ->
-          "Failed to register profiles, DAL node is not reachable. ")
-        (fun () -> register dal_ctxt)
-        ())
-    dal_node_rpc_ctxt
-
 (* initialises attestable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk
    if any *)
@@ -141,8 +96,8 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
-let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
-    config delegates =
+let create_global_state ?dal_node_rpc_ctxt ?constants ~chain cctxt config
+    delegates =
   let open Lwt_result_syntax in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
@@ -157,29 +112,15 @@ let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
       ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
-  let dal_attestable_slots_worker =
-    Dal_attestable_slots_worker.create
-      ~attestation_lag:constants.parametric.dal.attestation_lag
-      ~attestation_lags:constants.parametric.dal.attestation_lags
-      ~number_of_slots:constants.parametric.dal.number_of_slots
-  in
-  Option.iter
-    (fun canceler ->
-      Lwt_canceler.on_cancel canceler (fun () ->
-          Dal_attestable_slots_worker.shutdown_worker
-            dal_attestable_slots_worker))
-    canceler ;
   let global_state =
     {
       chain_id;
       config;
-      constants;
       round_durations;
-      dal_attestable_slots_worker;
+      constants;
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
-          get_forge_event_stream = (fun _ -> assert false);
           cancel_all_pending_tasks = (fun _ -> assert false);
         };
       delegates;
@@ -194,8 +135,6 @@ let create_global_state ?canceler cctxt ?dal_node_rpc_ctxt ?constants ~chain
   global_state.forge_worker_hooks <-
     {
       push_request = Forge_worker.push_request forge_worker;
-      get_forge_event_stream =
-        (fun () -> Forge_worker.get_event_stream forge_worker);
       cancel_all_pending_tasks =
         (fun () -> Forge_worker.cancel_all_pending_tasks forge_worker);
     } ;
@@ -256,23 +195,29 @@ let create_round_state ~global_state ~synchronize ~current_proposal =
       awaiting_unlocking_pqc = false;
     }
 
-let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
-    ?(synchronize = true) ?monitor_node_operations ~chain config
-    ~(current_proposal : proposal) ?constants delegates =
+let initialise_dal_committee_cache state =
+  Dal_included_attestations_cache.set_committee
+    state.global_state.dal_included_attestations_cache
+    ~level:state.level_state.current_level
+    (fun slot ->
+      Baking_state.Delegate_infos.slot_owner
+        state.level_state.delegate_infos
+        ~slot) ;
+  Dal_included_attestations_cache.set_committee
+    state.global_state.dal_included_attestations_cache
+    ~level:(Int32.succ state.level_state.current_level)
+    (fun slot ->
+      Baking_state.Delegate_infos.slot_owner
+        state.level_state.next_level_delegate_infos
+        ~slot)
+
+let create_initial_state ?canceler cctxt ?(synchronize = true)
+    ?monitor_node_operations ~multi_node_setup ~global_state
+    ~(current_proposal : proposal) delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
   let open Baking_state in
-  let* global_state =
-    create_global_state
-      ?canceler
-      cctxt
-      ?dal_node_rpc_ctxt
-      ?constants
-      ~chain
-      config
-      delegates
-  in
   let* level_state =
     create_level_state
       ~chain_id:global_state.chain_id
@@ -280,18 +225,6 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
       ~current_proposal
       ~delegates
   in
-  Dal_included_attestations_cache.set_committee
-    global_state.dal_included_attestations_cache
-    ~level:level_state.current_level
-    (fun slot ->
-      Baking_state.Delegate_infos.slot_owner level_state.delegate_infos ~slot) ;
-  Dal_included_attestations_cache.set_committee
-    global_state.dal_included_attestations_cache
-    ~level:(Int32.succ level_state.current_level)
-    (fun slot ->
-      Baking_state.Delegate_infos.slot_owner
-        level_state.next_level_delegate_infos
-        ~slot) ;
   let*? round_state =
     create_round_state ~global_state ~synchronize ~current_proposal
   in
@@ -299,15 +232,125 @@ let create_initial_state ?canceler cctxt ?dal_node_rpc_ctxt
     create_automaton_state
       ?canceler
       ?monitor_node_operations
+      ~multi_node_setup
       ~global_state
       cctxt
   in
   let state = {global_state; automaton_state; level_state; round_state} in
+  initialise_dal_committee_cache state ;
   (* Try loading locked round and attestable round from disk *)
   let* state = Baking_state.may_load_attestable_data state in
   may_initialise_with_latest_proposal_pqc state
 
-let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
+module Supervisor = struct
+  let run ~run_automaton cctxts =
+    let rec loop running_automatons_count pending_promises =
+      let open Lwt_syntax in
+      (* waits until one (or many) [pending_promises] gets fulfilled *)
+      let* fulfilled_promises, pending_promises =
+        Lwt.nchoose_split pending_promises
+      in
+      (* handle fulfilled promises *)
+      let* running_automatons_count, pending_promises =
+        List.fold_left_s
+          (fun (running_automatons_count, pending_promises) fulfilled_promise ->
+            match fulfilled_promise with
+            | `Start cctxt ->
+                let uri = Uri.to_string cctxt#base in
+                let* () = Events.(emit supervisor_starting_automaton uri) in
+                let promise =
+                  (* promise that resolves to (`Crash cctxt)
+                     when [run_automaton cctxt] resumes *)
+                  let* _res = run_automaton cctxt in
+                  return (`Crash cctxt)
+                in
+                return
+                  (succ running_automatons_count, promise :: pending_promises)
+            | `Crash cctxt ->
+                let uri = Uri.to_string cctxt#base in
+                let* () = Events.(emit supervisor_automaton_crashed uri) in
+                let promise =
+                  (* promise that resolves to (`Start cctxt) when the connection
+                    is restored. *)
+                  let* res =
+                    Client_confirmations.really_wait_for_bootstrapped
+                      ~retry:
+                        (Baking_automaton.retry
+                           ~emit:(fun _ ->
+                             Events.(emit supervisor_automaton_retry uri))
+                           cctxt
+                           ~is_error:(fun _ -> true)
+                           ~delay:1.
+                           ~factor:1.5
+                           ~max_delay:20.)
+                      cctxt
+                  in
+                  match res with
+                  | Ok _ -> return (`Start cctxt)
+                  | Error _ -> return (`Crash cctxt)
+                in
+                return
+                  (pred running_automatons_count, promise :: pending_promises))
+          (running_automatons_count, pending_promises)
+          fulfilled_promises
+      in
+      (* We deliberately shutdown the baker when all automatons are
+         simultaneously waiting for a restart. This is done in order to escalate
+         the situation and draw attention to it. *)
+      if running_automatons_count <= 0 then
+        let* () = Events.(emit supervisor_all_down ()) in
+        Lwt_result_syntax.tzfail Baking_errors.Node_connection_lost
+      else loop running_automatons_count pending_promises
+    in
+    loop 0 (List.map (fun cctxt -> Lwt.return (`Start cctxt)) cctxts)
+end
+
+let initialize_automaton ?canceler ?(synchronize = true) ~multi_node_setup
+    ~chain ~cache ~on_head_proposal_callback global_state delegates cctxt =
+  let open Lwt_result_syntax in
+  let* heads_stream, _ = Node_rpc.monitor_heads cctxt ~cache ~chain () in
+  let* current_proposal =
+    let*! head_opt = Lwt_stream.get heads_stream in
+    match head_opt with
+    | Some head -> return head
+    | None -> failwith "monitor_heads stream unexpectedly ended."
+  in
+  let* state =
+    create_initial_state
+      ?canceler
+      cctxt
+      ~synchronize
+      ~multi_node_setup
+      ~global_state
+      ~current_proposal
+      delegates
+  in
+  let loop_state =
+    let get_valid_blocks_stream =
+      let*! vbs =
+        Node_rpc.monitor_valid_proposals
+          cctxt
+          ~dal_included_attestations_cache:
+            global_state.dal_included_attestations_cache
+          ~cache
+          ~chain
+          ()
+      in
+      match vbs with
+      | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
+      | Ok (vbs, _) -> Lwt.return vbs
+    in
+    create_loop_state
+      ~get_valid_blocks_stream
+      ~on_head_proposal_callback
+      ~forge_event_stream:state.automaton_state.forge_event_stream
+      ~heads_stream
+      state.automaton_state.operation_worker
+  in
+  let*? event = compute_bootstrap_event state in
+  return (state, event, loop_state)
+
+let run cctxt ~extra_nodes ?dal_node_rpc_ctxt ?canceler
     ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
     config delegates =
@@ -317,39 +360,21 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
   let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
-  let* heads_stream, _block_stream_stopper =
-    Node_rpc.monitor_heads cctxt ~cache ~chain ()
-  in
-  let* current_proposal =
-    let*! proposal = Lwt_stream.get heads_stream in
-    match proposal with
-    | Some current_head -> return current_head
-    | None -> failwith "head stream unexpectedly ended"
-  in
-  let* initial_state =
-    create_initial_state
-      ?canceler
-      cctxt
+  let* global_state =
+    create_global_state
       ?dal_node_rpc_ctxt
-      ~chain
-      config
-      ~current_proposal
       ?constants
-      delegates
-  in
-  let _promise =
-    register_dal_profiles
+      ~chain
       cctxt
-      initial_state.global_state.dal_node_rpc_ctxt
-      initial_state.global_state.dal_attestable_slots_worker
+      config
       delegates
   in
   let*! revelation_worker_canceler, revelation_worker_push_proposal =
     Baking_nonces.start_revelation_worker
       cctxt
-      initial_state.global_state.config.nonce
-      initial_state.global_state.chain_id
-      initial_state.global_state.constants
+      global_state.config.nonce
+      global_state.chain_id
+      global_state.constants
   in
   Option.iter
     (fun canceler ->
@@ -357,31 +382,6 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
           let*! _ = Lwt_canceler.cancel revelation_worker_canceler in
           Lwt.return_unit))
     canceler ;
-  let get_valid_blocks_stream =
-    let*! vbs =
-      Node_rpc.monitor_valid_proposals
-        cctxt
-        ~cache
-        ~dal_included_attestations_cache:
-          initial_state.global_state.dal_included_attestations_cache
-        ~chain
-        ()
-    in
-    match vbs with
-    | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
-    | Ok (vbs, _) -> Lwt.return vbs
-  in
-  let forge_event_stream =
-    initial_state.global_state.forge_worker_hooks.get_forge_event_stream ()
-  in
-  let loop_state =
-    create_loop_state
-      ~get_valid_blocks_stream
-      ~forge_event_stream
-      ~heads_stream
-      ~on_head_proposal_callback:revelation_worker_push_proposal
-      initial_state.automaton_state.operation_worker
-  in
   let on_error err =
     let*! () = Events.(emit error_while_baking err) in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7393
@@ -389,23 +389,58 @@ let run cctxt ~extra_nodes:_ ?dal_node_rpc_ctxt ?canceler
     (* let retries = config.Baking_configuration.retries_on_failure in *)
     on_error err
   in
-  let*? initial_event = compute_bootstrap_event initial_state in
+  let multi_node_setup = extra_nodes <> [] in
+  let run_automaton cctxt =
+    let* initial_state, initial_event, loop_state =
+      initialize_automaton
+        ?canceler
+        ~multi_node_setup
+        ~chain
+        ~cache
+        ~on_head_proposal_callback:revelation_worker_push_proposal
+        global_state
+        delegates
+        cctxt
+    in
+    automaton_loop
+      ~stop_on_event
+      ~config
+      ~on_error
+      loop_state
+      initial_state
+      initial_event
+  in
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
-  let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8258
+  let[@warning "-26"] profiler_section =
+    New_valid_proposal initial_state.level_state.latest_proposal
+  in
   () [@profiler.stop] ;
   () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
+*)
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in
       Lwt.return_error err)
     (fun () ->
-      let* _ignored_event =
-        automaton_loop
-          ~stop_on_event
-          ~config
-          ~on_error
-          loop_state
-          initial_state
-          initial_event
-      in
-      return_unit)
+      match extra_nodes with
+      | [] ->
+          let* _event = run_automaton cctxt in
+          return_unit
+      | _ ->
+          let* () =
+            (* sanity check: all nodes must target the same chain *)
+            List.iter_es
+              (fun cctxt ->
+                let* cctxt_chain_id = Node_rpc.chain_id ~chain cctxt in
+                fail_unless
+                  (Chain_id.equal cctxt_chain_id global_state.chain_id)
+                  (Baking_errors.Inconsistent_chain_id
+                     {
+                       uri = Uri.to_string cctxt#base;
+                       expected = global_state.chain_id;
+                       found = cctxt_chain_id;
+                     }))
+              extra_nodes
+          in
+          Supervisor.run ~run_automaton (cctxt :: extra_nodes))
