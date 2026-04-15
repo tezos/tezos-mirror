@@ -429,15 +429,6 @@ let () =
     ] ;
   ()
 
-(* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
-   we test only on Debian stable. Returns a triplet, the first element is
-   the list of all jobs, the second is the job building ubuntu packages artifats
-   and the third debian packages artifacts *)
-let jobs ?(manual = false)
-    (_pipeline_type : Common.Packaging.repository_pipeline) =
-  ignore manual ;
-  []
-
 let register ~auto ~description pipeline_type =
   let pipeline_name =
     match (pipeline_type, auto) with
@@ -446,11 +437,10 @@ let register ~auto ~description pipeline_type =
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
   in
-  let jobs = jobs pipeline_type @ Cacio.get_jobs Debian_partial in
   Pipeline.register_child
     pipeline_name
     ~description
-    ~jobs:(job_datadog_pipeline_trace :: jobs)
+    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Debian_partial)
 
 let child_pipeline_partial =
   register

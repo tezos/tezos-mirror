@@ -16,7 +16,6 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
-  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
