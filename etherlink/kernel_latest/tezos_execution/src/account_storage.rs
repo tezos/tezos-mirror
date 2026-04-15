@@ -14,7 +14,7 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::{RuntimeError, ValueType},
+    host::ValueType,
     types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::OwnedPath;
@@ -61,22 +61,22 @@ pub trait TezlinkAccount {
     }
 
     /// Add amount (in Mutez) to the **balance** held by the account.
+    ///
+    /// Delegates to `self.balance()` and `self.set_balance()` so that
+    /// implementations overriding those methods (e.g. TezosX RLP storage)
+    /// get correct behavior without needing to override `add_balance` too.
+    ///
+    /// TODO: In TezosX, this causes two storage reads + two RLP decodes
+    /// (one in balance(), one in set_balance()). If add_balance becomes
+    /// a hot path, TezosX should override it with a single
+    /// read-modify-write on the RLP blob.
     fn add_balance(
         &self,
         host: &mut impl StorageV1,
         amount: u64,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = context::account::balance_path(self)?;
-        let balance: Narith = match read_nom_value(host, &path) {
-            Ok(balance) => balance,
-            Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)) => {
-                0.into()
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        };
-        self.set_balance(host, &Narith(balance.0 + amount))
+        let current = self.balance(host)?;
+        self.set_balance(host, &Narith(current.0 + amount))
     }
 }
 
