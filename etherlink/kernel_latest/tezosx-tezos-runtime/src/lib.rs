@@ -68,8 +68,13 @@ pub mod url;
 
 /// Build an HTTP response from the result of [`execute_request`].
 ///
+/// `frame_result` carries the `%collect_result` payload deposited on the
+/// topmost CRAC frame (peeked by the caller before REVM commits or reverts
+/// the frame). It is only surfaced on 2xx responses — on 4xx/5xx the frame
+/// is about to be reverted, so the payload is discarded.
+///
 /// Request-level errors are turned into HTTP error responses:
-/// - `Ok` → 200
+/// - `Ok` → 200, body = `frame_result` (or empty), `Content-Type: application/octet-stream`
 /// - `BadRequest` → 400
 /// - `NotFound` → 404
 ///
@@ -82,13 +87,16 @@ pub mod url;
 fn build_response(
     result: Result<TransferSuccess, TezosXRuntimeError>,
     consumed_milligas: u64,
+    frame_result: Option<Vec<u8>>,
 ) -> http::Response<Vec<u8>> {
     let gas_header = consumed_milligas.to_string();
+    let mut builder = http::Response::builder().header(X_TEZOS_GAS_CONSUMED, &gas_header);
     let (status, body) = match result {
-        Ok(response) => (
-            StatusCode::OK,
-            response.storage.map(|s| s.0).unwrap_or_default(),
-        ),
+        Ok(_) => {
+            builder =
+                builder.header(http::header::CONTENT_TYPE, "application/octet-stream");
+            (StatusCode::OK, frame_result.unwrap_or_default())
+        }
         Err(TezosXRuntimeError::BadRequest(msg)) => {
             (StatusCode::BAD_REQUEST, msg.into_bytes())
         }
@@ -103,13 +111,9 @@ fn build_response(
             format!("{e:?}").into_bytes(),
         ),
     };
-    // Safe to unwrap: status is a predefined constant, header name is a
-    // static ASCII string, and the value is a decimal u64.
-    http::Response::builder()
-        .status(status)
-        .header(X_TEZOS_GAS_CONSUMED, &gas_header)
-        .body(body)
-        .unwrap()
+    // Safe to unwrap: status is a predefined constant, header names are
+    // static ASCII strings, and the values are ASCII-only.
+    builder.status(status).body(body).unwrap()
 }
 
 /// Build a serialized two-step receipt for an incoming CRAC (EVM → Michelson).
@@ -694,7 +698,11 @@ impl RuntimeInterface for TezosRuntime {
             request,
             &mut consumed_milligas,
         );
-        build_response(result, consumed_milligas)
+        // Peek the topmost frame's %collect_result payload before REVM
+        // unwinds the checkpoint on commit/revert. `build_response` only
+        // surfaces it on 2xx; on 4xx/5xx it is discarded.
+        let frame_result = journal.michelson.frame_result().map(|b| b.to_vec());
+        build_response(result, consumed_milligas, frame_result)
     }
 
     fn host(&self) -> &'static str {
@@ -782,16 +790,13 @@ mod tests {
         }
     }
 
-    fn make_success(storage: Option<Vec<u8>>) -> TransferSuccess {
-        make_success_with_milligas(storage, 0)
+    fn make_success() -> TransferSuccess {
+        make_success_with_milligas(0)
     }
 
-    fn make_success_with_milligas(
-        storage: Option<Vec<u8>>,
-        milligas: u64,
-    ) -> TransferSuccess {
+    fn make_success_with_milligas(milligas: u64) -> TransferSuccess {
         TransferSuccess {
-            storage: storage.map(Into::into),
+            storage: None,
             balance_updates: vec![],
             ticket_receipt: vec![],
             originated_contracts: vec![],
@@ -805,31 +810,82 @@ mod tests {
     }
 
     #[test]
-    fn build_response_success() {
-        let resp = build_response(Ok(make_success(Some(b"hello".to_vec()))), 0);
+    fn build_response_success_uses_frame_result() {
+        let resp = build_response(Ok(make_success()), 0, Some(b"collected".to_vec()));
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), b"hello");
+        assert_eq!(resp.body(), b"collected");
+        assert_eq!(
+            resp.headers()
+                .get(http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/octet-stream")
+        );
     }
 
     #[test]
-    fn build_response_success_empty_body() {
-        let resp = build_response(Ok(make_success(None)), 0);
+    fn build_response_success_no_frame_result() {
+        let resp = build_response(Ok(make_success()), 0, None);
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
+        assert_eq!(
+            resp.headers()
+                .get(http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/octet-stream")
+        );
+    }
+
+    #[test]
+    fn build_response_success_empty_frame_result() {
+        let resp = build_response(Ok(make_success()), 0, Some(vec![]));
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.body().is_empty());
+        assert_eq!(
+            resp.headers()
+                .get(http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/octet-stream")
+        );
+    }
+
+    #[test]
+    fn build_response_error_discards_frame_result() {
+        // On revert, the %collect_result payload must not surface.
+        let resp = build_response(
+            Err(TezosXRuntimeError::BadRequest("invalid URL".into())),
+            0,
+            Some(b"leaked".to_vec()),
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
+        assert!(
+            !resp.body().windows(6).any(|w| w == b"leaked"),
+            "frame_result bytes must not appear in error body"
+        );
+        assert!(
+            resp.headers().get(http::header::CONTENT_TYPE).is_none(),
+            "Content-Type must not be set on error responses"
+        );
     }
 
     #[test]
     fn build_response_bad_request() {
-        let resp =
-            build_response(Err(TezosXRuntimeError::BadRequest("invalid URL".into())), 0);
+        let resp = build_response(
+            Err(TezosXRuntimeError::BadRequest("invalid URL".into())),
+            0,
+            None,
+        );
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert!(String::from_utf8_lossy(resp.body()).contains("invalid URL"));
     }
 
     #[test]
     fn build_response_not_found() {
-        let resp =
-            build_response(Err(TezosXRuntimeError::NotFound("KT1 not found".into())), 0);
+        let resp = build_response(
+            Err(TezosXRuntimeError::NotFound("KT1 not found".into())),
+            0,
+            None,
+        );
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(String::from_utf8_lossy(resp.body()).contains("KT1 not found"));
     }
@@ -837,7 +893,7 @@ mod tests {
     #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(make_success(None)), 0);
+        let resp = build_response(Ok(make_success()), 0, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -849,7 +905,7 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp = build_response(Ok(make_success_with_milligas(None, 5000)), 5000);
+        let resp = build_response(Ok(make_success_with_milligas(5000)), 5000, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -860,7 +916,8 @@ mod tests {
 
     #[test]
     fn build_response_error_has_no_gas_consumed_header() {
-        let resp = build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0);
+        let resp =
+            build_response(Err(TezosXRuntimeError::BadRequest("err".into())), 0, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -1411,5 +1468,43 @@ mod tests {
             panic!("expected Transfer");
         };
         assert!(transfer.result.is_failed(), "transfer must be failed");
+    }
+
+    // `serve` must peek `frame_result` before REVM unwinds, but
+    // `build_response` must drop it on 4xx/5xx. This test threads both
+    // through the full `serve` path: pre-seed the journal, issue a
+    // request that parses but fails at URL-host validation, and verify
+    // the seeded bytes never appear in the error body.
+    #[test]
+    fn serve_error_does_not_leak_frame_result() {
+        let mut host = MockKernelHost::default();
+        let runtime = test_runtime();
+        let registry = StubRegistry;
+
+        let mut journal = TezosXJournal::default();
+        journal.michelson.push_external_checkpoint();
+        journal
+            .michelson
+            .set_frame_result(b"TOP-SECRET".to_vec())
+            .unwrap();
+
+        // `http://evm/...` has the wrong authority for the Tezos runtime;
+        // the URL parser maps it to `NotFound` (HTTP 404). This fails
+        // before any account lookup, so no storage setup is needed.
+        let request = http::Request::builder()
+            .uri("http://evm/KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT")
+            .body(vec![])
+            .unwrap();
+        let resp = runtime.serve(&registry, &mut host, &mut journal, request);
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(
+            !resp.body().windows(10).any(|w| w == b"TOP-SECRET"),
+            "seeded frame_result must not appear in error body"
+        );
+        assert!(
+            resp.headers().get(http::header::CONTENT_TYPE).is_none(),
+            "Content-Type must not be set on error responses"
+        );
     }
 }

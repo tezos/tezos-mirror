@@ -203,7 +203,6 @@ where
                 // can later surface it as the HTTP response body to the
                 // EVM gateway, giving EVM callers a synchronous return
                 // value.
-                // TODO: L2-1174 HTTP surfacing is tracked separately
                 // TODO: L2-1224 define a gas model for %collect_result
                 // and charge it here.
                 let TypedValue::Bytes(payload) = typed else {
