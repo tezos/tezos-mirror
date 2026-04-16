@@ -178,14 +178,7 @@ where
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
                 let (request, callback) = extract_http_call_request(typed)?;
-                let target_host = request.uri().host().map(str::to_string);
-                let request = inject_context_headers(request, ctx, journal, registry)?;
-                let response = registry.serve(ctx.host(), journal, request);
-                let body = classify_and_charge_crac_response(
-                    response,
-                    target_host.as_deref(),
-                    ctx.operation_gas(),
-                )?;
+                let body = dispatch_crac_call(registry, journal, ctx, request)?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result allows a Michelson adapter to deposit
