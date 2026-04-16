@@ -408,7 +408,7 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
   (* Lookup the PVM of the rollup. *)
   let* ctxt, Packed (module PVM) =
     let+ ctxt, kind = Sc_rollup.kind ctxt rollup in
-    (ctxt, Sc_rollup.Kind.pvm_of kind)
+    (ctxt, Sc_rollup.Kind.pvm_of ~config:[] kind)
   in
   let output_proof_length = String.length output_proof in
   let*? ctxt =
@@ -666,7 +666,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
             ~outbox_level
             ~message_index
         else tzfail Sc_rollup_errors.Sc_rollup_whitelist_disabled
-    | Sc_rollup_management_protocol.Canonical_rollup_signal _signal -> (
+    | Sc_rollup_management_protocol.Canonical_rollup_signal signal -> (
         let noop ctxt =
           ( {
               paid_storage_size_diff = Z.zero;
@@ -679,7 +679,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
         match Constants.canonical_rollup ctxt with
         | Some canonical_rollup_address
           when Smart_rollup.Address.equal canonical_rollup_address rollup ->
-            (* TODO *)
+            let* ctxt = Sc_rollup.enable_signal ctxt signal in
             return (noop ctxt)
         | Some _ | None ->
             (* Only the canonical rollup can send such a signal *)

@@ -640,10 +640,16 @@ module V2_0_0 = struct
     let get_current_level = get_current_level
   end
 
-  module Protocol_implementation = Make_pvm (struct
-    include Wasm_2_0_0.Wasm_pvm_machine
+  let protocol_implementation ~config =
+    let (module Wasm_pvm_machine) = Wasm_2_0_0.wasm_pvm_machine ~config in
+    let module Impl = Make_pvm (struct
+      include Wasm_pvm_machine
 
-    (* TODO: L2-908 - Refactor Make_pvm to not require produce_proof *)
-    let produce_proof _ctx _state _step = Lwt.return_none
-  end)
+      (* TODO: L2-908 - Refactor Make_pvm to not require produce_proof *)
+      let produce_proof _ctx _state _step = Lwt.return_none
+    end) in
+    (module Impl : Sc_rollup_PVM_sig.PROTO_VERIFICATION
+      with type context = Wasm_2_0_0.wasm_pvm_machine_context
+       and type state = Wasm_2_0_0.wasm_pvm_machine_state
+       and type proof = Wasm_2_0_0.wasm_pvm_machine_proof)
 end

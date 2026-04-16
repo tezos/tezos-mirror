@@ -1037,6 +1037,11 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
+  module Signals :
+    Single_data_storage
+      with type value = (string * Raw_level_repr.t) list
+       and type t = Raw_context.t
+
   module Past_commitment_periods :
     Single_data_storage
       with type value = Sc_rollup_repr.Past_commitment_period.t list

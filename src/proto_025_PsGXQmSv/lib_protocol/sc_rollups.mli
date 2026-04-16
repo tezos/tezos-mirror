@@ -64,7 +64,7 @@ module Kind : sig
   val equal : t -> t -> bool
 
   (** [pvm_of kind] returns the [PVM] of the given [kind]. *)
-  val pvm_of : t -> PVM.t
+  val pvm_of : config:Wasm_2_0_0.config -> t -> PVM.t
 
   (** [all] returns all implemented PVMs. *)
   val all : t list

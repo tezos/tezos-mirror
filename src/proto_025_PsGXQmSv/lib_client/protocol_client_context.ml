@@ -141,6 +141,10 @@ let register_error_kind category ~id ~title ~description ?pp encoding from_error
     protocol encodings. *)
 let () =
   let open Data_encoding.Registration in
+  let (module Protocol_implementation) =
+    Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM.protocol_implementation
+      ~config:[]
+  in
   register Protocol.Alpha_context.Lazy_storage.encoding ;
   register ~pp:Protocol.Alpha_context.Fitness.pp
   @@ Protocol.Alpha_context.Fitness.encoding ;
@@ -324,8 +328,7 @@ let () =
   @@ def
        "smart_rollup"
        ["wasm_2_0_0"; "output"; "proof"]
-       Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation
-       .output_proof_encoding ;
+       Protocol_implementation.output_proof_encoding ;
   register
   @@ def
        "smart_rollup"

@@ -57,6 +57,14 @@ module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
 
+  module Internal_for_tests = struct
+    include Internal_for_tests
+
+    let is_signal_enable = Sc_rollup_storage.is_signal_enable
+
+    let signals = Sc_rollup_storage.signals
+  end
+
   module Whitelist = struct
     include Sc_rollup_whitelist_storage
     include Sc_rollup_whitelist_repr
@@ -915,4 +923,6 @@ end
 
 module Internal_for_tests = struct
   let to_raw x = x
+
+  let patch_constants = Raw_context.patch_constants
 end

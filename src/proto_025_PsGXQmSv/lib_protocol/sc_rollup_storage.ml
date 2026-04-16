@@ -233,6 +233,28 @@ let get_past_commitment_periods ctxt =
   let+ cell = Store.Past_commitment_periods.find ctxt in
   Option.value ~default:[] cell
 
+let signals ctxt =
+  let open Lwt_result_syntax in
+  let+ cell = Store.Signals.find ctxt in
+  Option.value ~default:[] cell
+
+let is_signal_enable ctxt signal =
+  let open Lwt_result_syntax in
+  let+ enabled_signals = signals ctxt in
+  List.mem_assoc ~equal:String.equal signal enabled_signals
+
+let enable_signal ctxt signal =
+  let open Lwt_result_syntax in
+  let* enabled_signals = signals ctxt in
+  if List.mem_assoc ~equal:String.equal signal enabled_signals then return ctxt
+  else
+    let*! ctxt =
+      Store.Signals.add
+        ctxt
+        ((signal, (Raw_context.current_level ctxt).level) :: enabled_signals)
+    in
+    return ctxt
+
 let save_commitment_period ctxt previous_commitment_period
     next_protocol_activation =
   let open Lwt_result_syntax in
