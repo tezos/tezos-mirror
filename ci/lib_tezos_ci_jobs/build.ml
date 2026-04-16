@@ -137,7 +137,6 @@ let job_build_exp =
     ~dune_cache:(match arch with Amd64 -> true | Arm64 -> false)
 
 let job_build_layer1_profiling =
-  Cacio.parameterize @@ fun mode ->
   let profiled_binaries =
     ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]
   in
@@ -159,17 +158,12 @@ let job_build_layer1_profiling =
     ~description:
       "Build some layer1 executables with the profiler PPX enabled, to check \
        that it can still be built."
-    ~stage:(match mode with `test -> Test | `octez_monitoring -> Build)
+    ~stage:Test
     ~image:Tezos_ci.Images.CI.build
     ~cpu:Very_high
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~expire_in:
-           (match mode with
-           | `test -> Duration (Days 1)
-           | `octez_monitoring -> Never)
-         binaries)
+      (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Days 1)) binaries)
     ~variables:[("PROFILE", "static")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -278,7 +272,7 @@ let register () =
       (Auto, job_build_released Amd64);
       (Auto, job_build_extra_dev Amd64);
       (Auto, job_build_exp Amd64);
-      (Auto, job_build_layer1_profiling `test);
+      (Auto, job_build_layer1_profiling);
       (Auto, job_build_static_linux_released_binaries Amd64 `test);
       (Auto, job_build_static_linux_experimental_binaries Amd64);
     ] ;
@@ -292,7 +286,7 @@ let register () =
       (Auto, job_build_released Arm64);
       (Auto, job_build_extra_dev Arm64);
       (Auto, job_build_exp Arm64);
-      (Auto, job_build_layer1_profiling `test);
+      (Auto, job_build_layer1_profiling);
       (Auto, job_build_static_linux_released_binaries Arm64 `test);
       (Auto, job_build_static_linux_experimental_binaries Arm64);
     ] ;
@@ -307,7 +301,4 @@ let register () =
       (Auto, job_build_static_linux_experimental_binaries Amd64);
       (Auto, job_build_static_linux_experimental_binaries Arm64);
     ] ;
-  Cacio.register_jobs
-    Octez_monitoring
-    [(Auto, job_build_layer1_profiling `octez_monitoring)] ;
   ()
