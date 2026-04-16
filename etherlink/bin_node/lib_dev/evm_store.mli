@@ -220,6 +220,16 @@ module Blocks : sig
     Ethereum_types.block_hash ->
     Ethereum_types.quantity option tzresult Lwt.t
 
+  (** [find_hashes_of_number conn level] returns, for the block stored at
+      [level], a pair [(hash, tez_hash)] where [hash] is the EVM block hash
+      and [tez_hash] is the hash of the associated Tezos block produced by
+      the TezosX runtime. [tez_hash] is [None] when no Tezos block is
+      associated with [level] — in particular, for levels before the
+      Michelson runtime sunrise level. Returns [None] if no block is
+      stored at [level]. *)
+  val find_hashes_of_number :
+    conn -> Ethereum_types.quantity -> Meta_block.hashes option tzresult Lwt.t
+
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
   (** [tezosx_find_tez_block_with_level conn level] returns the Tezos block
