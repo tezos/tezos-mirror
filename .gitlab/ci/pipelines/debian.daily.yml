@@ -29,7 +29,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build-debian:
+oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
   stage: build
   tags:
@@ -38,6 +38,33 @@ oc.build-debian:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DISTRIBUTION: debian
+    RELEASE: trixie
+    TAGS: gcp
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+
+oc.build-debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -72,86 +99,17 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
-  stage: build
-  tags:
-  - $TAGS
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh zcash
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    DISTRIBUTION: debian
-    RELEASE: trixie
-    TAGS: gcp
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-
-oc.build-ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
-  stage: build
-  tags:
-  - $TAGS
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export CARGO_NET_OFFLINE=false
-  - ./scripts/ci/build-debian-packages.sh binaries
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    DISTRIBUTION: ubuntu
-    DUNE_BUILD_JOBS: -j 12
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    paths:
-    - packages/$DISTRIBUTION/$RELEASE
-  parallel:
-    matrix:
-    - RELEASE:
-      - "22.04"
-      - "24.04"
-      TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
-
 apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   dependencies:
-  - oc.build-debian
   - oc.build-data_packages
+  - oc.build-debian
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -256,17 +214,59 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: ""
 
+oc.build-ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  stage: build
+  tags:
+  - $TAGS
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - export CARGO_NET_OFFLINE=false
+  - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    DISTRIBUTION: ubuntu
+    DUNE_BUILD_JOBS: -j 12
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+  artifacts:
+    paths:
+    - packages/$DISTRIBUTION/$RELEASE
+  parallel:
+    matrix:
+    - RELEASE:
+      - "22.04"
+      - "24.04"
+      TAGS:
+      - gcp_very_high_cpu_ramfs
+      - gcp_arm64
+
 apt_repo_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-ubuntu
   - oc.build-data_packages
+  - oc.build-ubuntu
   dependencies:
-  - oc.build-ubuntu
   - oc.build-data_packages
+  - oc.build-ubuntu
   timeout: 60 minutes
   interruptible: false
   before_script:

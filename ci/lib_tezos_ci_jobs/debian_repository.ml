@@ -58,40 +58,6 @@ let build_dependency_image =
          "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-%s"
          Tezos_ci.Images.Base_images.debian_version)
 
-let make_job_build_packages ~__POS__ ~name ~matrix ~distribution ~script
-    ~dependencies ?(manual = false) () =
-  job
-    ~__POS__
-    ~name
-    ~image:build_dependency_image
-    ~stage:Stages.build
-    ?rules:
-      (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
-    ~variables:[("DISTRIBUTION", distribution); ("DUNE_BUILD_JOBS", "-j 12")]
-    ~parallel:(Matrix matrix)
-    ~dependencies
-    ~tag:Dynamic
-    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-    [
-      (* This is a hack to enable Cargo networking for jobs in child pipelines.
-
-         Global variables of the parent pipeline
-         are passed to the child pipeline. Inside the child
-         pipeline, variables received from the parent pipeline take
-         precedence over job-level variables. It's bit strange. So
-         to override the default [CARGO_NET_OFFLINE=true], we cannot
-         just set it in the job-level variables of this job.
-
-         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
-
-         See
-         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
-         for more info. *)
-      "export CARGO_NET_OFFLINE=false";
-      script;
-    ]
-  |> Tezos_ci.Cache.enable_sccache
-
 let make_debian_variables distribution image_kind release version =
   ( "DEP_IMAGE",
     sf
@@ -144,29 +110,53 @@ let job_build_data_packages ~manual : tezos_job =
       "./scripts/ci/build-debian-packages.sh zcash";
     ]
 
+(* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+   Global variables of the parent pipeline
+   are passed to the child pipeline. Inside the child
+   pipeline, variables received from the parent pipeline take
+   precedence over job-level variables. It's bit strange. So
+   to override the default [CARGO_NET_OFFLINE=true], we cannot
+   just set it in the job-level variables of this job.
+
+   [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+   See
+   {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+   for more info. *)
+let cargo_network_hack = "export CARGO_NET_OFFLINE=false"
+
 (* These jobs build the packages in a matrix using the
    build dependencies images *)
-let job_build_debian_package ~manual pipeline_type : tezos_job =
-  make_job_build_packages
+let job_build_debian_package =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.build-debian"
     ~__POS__
-    ~name:"oc.build-debian"
-    ~distribution:"debian"
-    ~dependencies:(Dependent [])
-    ~script:"./scripts/ci/build-debian-packages.sh binaries"
-    ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
-    ~manual
-    ()
+    ~description:"Build the Debian packages for Debian."
+    ~image:build_dependency_image
+    ~stage:Build
+    ~variables:[("DISTRIBUTION", "debian"); ("DUNE_BUILD_JOBS", "-j 12")]
+    ~parallel:(Matrix (debian_package_release_matrix ~ramfs:true pipeline_type))
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~sccache:(Cacio.sccache ())
+    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
 
-let job_build_ubuntu_package ~manual pipeline_type : tezos_job =
-  make_job_build_packages
+let job_build_ubuntu_package =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "oc.build-ubuntu"
     ~__POS__
-    ~name:"oc.build-ubuntu"
-    ~distribution:"ubuntu"
-    ~dependencies:(Dependent [])
-    ~script:"./scripts/ci/build-debian-packages.sh binaries"
-    ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
-    ~manual
-    ()
+    ~description:"Build the Debian packages for Ubuntu."
+    ~image:build_dependency_image
+    ~stage:Build
+    ~variables:[("DISTRIBUTION", "ubuntu"); ("DUNE_BUILD_JOBS", "-j 12")]
+    ~parallel:(Matrix (ubuntu_package_release_matrix ~ramfs:true pipeline_type))
+    ~tag:Dynamic
+    ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+    ~sccache:(Cacio.sccache ())
+    [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
 
 let job_apt_repo_debian =
   Cacio.parameterize @@ fun manual ->
@@ -176,11 +166,8 @@ let job_apt_repo_debian =
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs_legacy:
-      [
-        (Artifacts, job_build_debian_package ~manual pipeline_type);
-        (Artifacts, job_build_data_packages ~manual);
-      ]
+    ~needs:[(Artifacts, job_build_debian_package pipeline_type)]
+    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -201,11 +188,8 @@ let job_apt_repo_ubuntu =
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs_legacy:
-      [
-        (Artifacts, job_build_ubuntu_package ~manual pipeline_type);
-        (Artifacts, job_build_data_packages ~manual);
-      ]
+    ~needs:[(Artifacts, job_build_ubuntu_package pipeline_type)]
+    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -219,14 +203,13 @@ let job_apt_repo_ubuntu =
     ]
 
 let job_lintian_ubuntu =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.lintian_ubuntu"
     ~__POS__
     ~stage:Test_publication
     ~description:"Run lintian on Debian packages."
-    ~needs_legacy:[(Artifacts, job_build_ubuntu_package ~manual pipeline_type)]
+    ~needs:[(Artifacts, job_build_ubuntu_package pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     [
       ". ./scripts/version.sh";
@@ -237,14 +220,13 @@ let job_lintian_ubuntu =
     ]
 
 let job_lintian_debian =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.lintian_debian"
     ~__POS__
     ~stage:Test_publication
     ~description:"Run lintian on Debian packages."
-    ~needs_legacy:[(Artifacts, job_build_debian_package ~manual pipeline_type)]
+    ~needs:[(Artifacts, job_build_debian_package pipeline_type)]
     ~image:Images.Base_images.debian_bookworm
     [
       ". ./scripts/version.sh";
@@ -430,7 +412,7 @@ let () =
     Debian_partial
     [
       (Auto, job_apt_repo_debian false Partial);
-      (Auto, job_lintian_debian false Partial);
+      (Auto, job_lintian_debian Partial);
       (Auto, job_install_bin_debian_bookworm false Partial);
       (Auto, job_install_bin_debian_bookworm_systemd false Partial);
       (Auto, job_upgrade_bin_debian_bookworm_systemd false Partial);
@@ -440,8 +422,8 @@ let () =
     [
       (Auto, job_apt_repo_debian false Full);
       (Auto, job_apt_repo_ubuntu false Full);
-      (Auto, job_lintian_ubuntu false Full);
-      (Auto, job_lintian_debian false Full);
+      (Auto, job_lintian_ubuntu Full);
+      (Auto, job_lintian_debian Full);
       (Auto, job_install_bin_ubuntu_22_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04 false Full);
       (Auto, job_install_bin_ubuntu_24_04_systemd false Full);
@@ -457,18 +439,9 @@ let () =
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs ?(manual = false) pipeline_type =
-  let debian_jobs =
-    [
-      job_build_debian_package ~manual pipeline_type;
-      job_build_data_packages ~manual;
-    ]
-  in
-  let ubuntu_jobs = [job_build_ubuntu_package ~manual pipeline_type] in
-  match pipeline_type with
-  | Partial -> debian_jobs
-  | Full -> debian_jobs @ ubuntu_jobs
-  | Release -> debian_jobs @ ubuntu_jobs
+let jobs ?(manual = false)
+    (_pipeline_type : Common.Packaging.repository_pipeline) =
+  [job_build_data_packages ~manual]
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =
