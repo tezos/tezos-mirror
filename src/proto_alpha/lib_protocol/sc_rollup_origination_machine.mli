@@ -36,6 +36,6 @@ end
 
 module Arith : S
 
-module Wasm : S
+val wasm : config:Wasm_2_0_0.config -> (module S)
 
 module Riscv : S

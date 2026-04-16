@@ -1012,6 +1012,16 @@ let get_previous_protocol_constants ctxt =
 
 (* End of code to remove at next automatic protocol snapshot *)
 
+let mainnet = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"
+
+let mainnet_canonical_rollup =
+  Smart_rollup.Address.of_b58check_exn "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
+
+let shadownet = Chain_id.of_b58check_exn "NetXsqzbfFenSTS"
+
+let shadownet_canonical_rollup =
+  Smart_rollup.Address.of_b58check_exn "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg"
+
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
    constants is modified, is changed from the previous protocol, then
@@ -1026,6 +1036,11 @@ let get_previous_protocol_constants ctxt =
 let prepare_first_block ~level ~timestamp chain_id ctxt =
   let open Lwt_result_syntax in
   let* previous_proto, ctxt = check_and_update_protocol_version ctxt in
+  let canonical_rollup_address =
+    if Chain_id.(mainnet = chain_id) then Some mainnet_canonical_rollup
+    else if Chain_id.(shadownet = chain_id) then Some shadownet_canonical_rollup
+    else None
+  in
   let* ctxt, previous_proto_constants =
     match previous_proto with
     | Genesis param ->
@@ -1122,6 +1137,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  reveal_activation_level = _;
                  private_enable;
                  riscv_pvm_enable;
+                 canonical_rollup_address = _;
                }
                 : Previous.sc_rollup) =
             c.sc_rollup
@@ -1143,6 +1159,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               reveal_activation_level;
               private_enable;
               riscv_pvm_enable;
+              canonical_rollup_address;
             }
         in
         let zk_rollup =
@@ -1452,6 +1469,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               reveal_activation_level;
               private_enable;
               riscv_pvm_enable;
+              canonical_rollup_address;
             }
         in
         let zk_rollup =

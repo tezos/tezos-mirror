@@ -32,10 +32,6 @@ open Tezos_scoru_wasm_helpers.Wasm_utils
 
 module Prover = Pvm_in_memory.Wasm
 
-module Verifier =
-  Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Wasm_2_0_0PVM
-  .Protocol_implementation
-
 let version_name = function
   | Wasm_pvm_state.V0 -> "v0"
   | V1 -> "v1"

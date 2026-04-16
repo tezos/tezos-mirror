@@ -17,6 +17,11 @@ Environment Version
 Smart Rollups
 -------------
 
+- The protocol can now designate a canonical rollup per chain, which
+  can send signals to activate rollup-specific features without
+  requiring a protocol amendment. The first supported signal,
+  ``WASM_PVM_ENABLE_NEW_DURABLE_STORAGE``, enables the WASM PVM to use
+  a new backend for its durable storage. (MR :gl:`!21634`)
 
 Data Availability Layer
 -----------------------
@@ -45,7 +50,8 @@ Errors
 Protocol parameters
 -------------------
 
-
+- Added ``smart_rollup_canonical_rollup_address``, identifying the
+  canonical rollup for the current chain. (MR :gl:`!21634`)
 
 Bug Fixes
 ---------

@@ -101,6 +101,16 @@ val parameters_type :
 val must_exist :
   Raw_context.t -> Sc_rollup_repr.t -> Raw_context.t tzresult Lwt.t
 
+(** [enable_signal ctxt signal] toggles the activation switch
+    for [signal]. Does nothing if [signal] has already been activated. *)
+val enable_signal : Raw_context.t -> string -> Raw_context.t tzresult Lwt.t
+
+val signals : Raw_context.t -> (string * Raw_level_repr.t) list tzresult Lwt.t
+
+(** [is_signal_enable ctxt signal] returns true iff [signal] has already been
+    sent by the canonical rollup. *)
+val is_signal_enable : Raw_context.t -> string -> bool tzresult Lwt.t
+
 (** [save_commitment_period ctxt previous_commitment_period next_protocol_activation]
     records that before level [next_protocol_activation], the commitment period
     to use is [previous_commitment_period]. *)

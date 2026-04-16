@@ -133,6 +133,7 @@ type t =
   | Atomic_transaction_batch of {transactions : transaction list}
   | Atomic_transaction_batch_typed of {transactions : typed_transaction list}
   | Whitelist_update of Sc_rollup_whitelist_repr.t option
+  | Canonical_rollup_signal of string
 
 let encoding =
   let open Data_encoding in
@@ -177,6 +178,15 @@ let encoding =
              | Whitelist_update whitelist_opt -> Some (whitelist_opt, ())
              | _ -> None)
            (fun (whitelist_opt, ()) -> Whitelist_update whitelist_opt);
+         case
+           (Tag 3)
+           ~title:"Canonical_rollup_signal"
+           (obj2
+              (req "payload" (string Plain))
+              (req "kind" (constant "canonical_rollup_signal")))
+           (function
+             | Canonical_rollup_signal signal -> Some (signal, ()) | _ -> None)
+           (fun (signal, ()) -> Canonical_rollup_signal signal);
        ])
 
 let pp fmt = function
@@ -194,6 +204,7 @@ let pp fmt = function
         transactions
   | Whitelist_update whitelist_opt ->
       Format.pp_print_option Sc_rollup_whitelist_repr.pp fmt whitelist_opt
+  | Canonical_rollup_signal signal -> Format.fprintf fmt "Signal %s" signal
 
 type serialized = string
 

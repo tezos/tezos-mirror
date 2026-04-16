@@ -3667,6 +3667,151 @@ let test_whitelist_update_make_rollup_public () =
   in
   return_unit
 
+(** Sets the canonical rollup address in the protocol constants. *)
+let set_canonical_rollup_address block rollup =
+  let open Lwt_result_syntax in
+  let* incr = Incremental.begin_construction block in
+  let*! alpha_ctxt =
+    Alpha_context.Internal_for_tests.patch_constants
+      (Incremental.alpha_ctxt incr)
+      (fun c ->
+        {
+          c with
+          sc_rollup = {c.sc_rollup with canonical_rollup_address = Some rollup};
+        })
+  in
+  let incr = Incremental.set_alpha_ctxt incr alpha_ctxt in
+  Incremental.finalize_block incr
+
+let make_canonical_rollup_signal_output ~outbox_level ~message_index signal =
+  make_output ~outbox_level ~message_index
+  @@ Sc_rollup.Outbox.Message.Canonical_rollup_signal signal
+
+(** Test that the canonical rollup can toggle the new durable storage flag
+    by sending a [Canonical_rollup_signal] outbox message. *)
+let test_canonical_rollup_signal_enables_signal () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Set this rollup as the canonical rollup. *)
+  let* block = set_canonical_rollup_address block rollup in
+  (* Verify the flag is initially disabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ initially_enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert (not initially_enabled) ;
+  (* Send the signal from the canonical rollup. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the flag is now enabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert enabled ;
+  return_unit
+
+(** Test that a non-canonical rollup sending a [Canonical_rollup_signal]
+    does not toggle the flag. *)
+let test_non_canonical_rollup_signal_is_ignored () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Do NOT set this rollup as canonical — the constant stays [None]. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the flag is still disabled. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ enabled =
+    Sc_rollup.Internal_for_tests.is_signal_enable
+      (Incremental.alpha_ctxt incr)
+      signal
+  in
+  assert (not enabled) ;
+  return_unit
+
+(** Test that sending the same signal twice does not update the activation
+    level recorded in storage. *)
+let test_duplicate_signal_preserves_activation_level () =
+  let open Lwt_result_wrap_syntax in
+  let signal = "FOOBAR" in
+  let* block, account = context_init Context.T1 in
+  let* block, rollup = sc_originate block account in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  (* Set this rollup as the canonical rollup. *)
+  let* block = set_canonical_rollup_address block rollup in
+  (* Send the signal a first time. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:1
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Record the signals after the first execution. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ signals_after_first =
+    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+  in
+  (* Send the same signal a second time, in a new block. *)
+  let output =
+    make_canonical_rollup_signal_output
+      ~outbox_level:Raw_level.(Int32.to_int @@ to_int32 @@ genesis_info.level)
+      ~message_index:2
+      signal
+  in
+  let* _res, block =
+    execute_outbox_message_without_proof_validation
+      block
+      rollup
+      ~cemented_commitment:genesis_info.commitment_hash
+      output
+  in
+  (* Verify the signals are unchanged. *)
+  let* incr = Incremental.begin_construction block in
+  let*@ signals_after_second =
+    Sc_rollup.Internal_for_tests.signals (Incremental.alpha_ctxt incr)
+  in
+  assert (signals_after_first = signals_after_second) ;
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -3845,6 +3990,18 @@ let tests =
       "Update the whitelist to make the rollup public"
       `Quick
       test_whitelist_update_make_rollup_public;
+    Tztest.tztest
+      "Canonical rollup signal enables new durable storage"
+      `Quick
+      test_canonical_rollup_signal_enables_signal;
+    Tztest.tztest
+      "Non-canonical rollup signal is ignored"
+      `Quick
+      test_non_canonical_rollup_signal_is_ignored;
+    Tztest.tztest
+      "Duplicate signal preserves activation level"
+      `Quick
+      test_duplicate_signal_preserves_activation_level;
   ]
 
 let () =

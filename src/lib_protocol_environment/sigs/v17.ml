@@ -12832,6 +12832,8 @@ type info = {
   input_request : input_request;
 }
 
+type config = (string * int32) list
+
 module type WASM_PVM_MACHINE = sig
   type state
 
@@ -12879,7 +12881,18 @@ module type WASM_PVM_MACHINE = sig
   end
 end
 
-module Wasm_pvm_machine : WASM_PVM_MACHINE
+type wasm_pvm_machine_context
+
+type wasm_pvm_machine_state
+
+type wasm_pvm_machine_proof
+
+val wasm_pvm_machine :
+  config:config ->
+  (module WASM_PVM_MACHINE
+     with type context = wasm_pvm_machine_context
+      and type state = wasm_pvm_machine_state
+      and type proof = wasm_pvm_machine_proof)
 end
 # 146 "v17.in.ml"
 

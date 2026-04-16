@@ -133,11 +133,11 @@ module type T = sig
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
-       and type Wasm_2_0_0.Wasm_pvm_machine.context =
+       and type Wasm_2_0_0.wasm_pvm_machine_context =
         Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.context
-       and type Wasm_2_0_0.Wasm_pvm_machine.state =
+       and type Wasm_2_0_0.wasm_pvm_machine_state =
         Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.state
-       and type Wasm_2_0_0.Wasm_pvm_machine.proof =
+       and type Wasm_2_0_0.wasm_pvm_machine_proof =
         Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.proof
        and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
@@ -1263,6 +1263,8 @@ struct
       input_request : input_request;
     }
 
+    type config = (string * int32) list
+
     type version = Tezos_scoru_wasm.Wasm_pvm_state.version
 
     let v6 = Tezos_scoru_wasm.Wasm_pvm_state.V6
@@ -1317,12 +1319,26 @@ struct
       end
     end
 
-    module Wasm_pvm_machine = struct
-      include Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory
+    type wasm_pvm_machine_context =
+      Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.context
 
-      let compute_step =
-        compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
-    end
+    type wasm_pvm_machine_state =
+      Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.state
+
+    type wasm_pvm_machine_proof =
+      Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.proof
+
+    let wasm_pvm_machine ~config:_ =
+      (module struct
+        include Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory
+
+        let compute_step =
+          compute_step
+            ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      end : WASM_PVM_MACHINE
+        with type context = wasm_pvm_machine_context
+         and type state = wasm_pvm_machine_state
+         and type proof = wasm_pvm_machine_proof)
   end
 
   module Lift (P : Updater.PROTOCOL) = struct

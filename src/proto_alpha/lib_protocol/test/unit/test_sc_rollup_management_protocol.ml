@@ -57,7 +57,8 @@ let check_encode_decode_outbox_message_untyped ctxt transactions =
   in
   let*?@ bytes' =
     match message' with
-    | Whitelist_update _ -> assert false (* its serialized transaction *)
+    | Whitelist_update _ | Canonical_rollup_signal _ ->
+        assert false (* its serialized transaction *)
     | Atomic_transaction_batch {transactions} ->
         Internal_for_tests.serialize_outbox_transactions_untyped transactions
   in
@@ -78,7 +79,8 @@ let check_encode_decode_outbox_message_typed ctxt transactions =
   in
   let*?@ bytes' =
     match message' with
-    | Whitelist_update _ -> assert false (* its serialized transaction *)
+    | Whitelist_update _ | Canonical_rollup_signal _ ->
+        assert false (* its serialized transaction *)
     | Atomic_transaction_batch {transactions} ->
         Internal_for_tests.serialize_outbox_transactions_typed transactions
   in

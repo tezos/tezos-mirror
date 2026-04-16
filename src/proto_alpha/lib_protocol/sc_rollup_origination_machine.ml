@@ -67,11 +67,18 @@ module Arith : S = struct
   let empty_state = empty_tree
 end
 
-module Wasm : S = struct
-  include Sc_rollup_wasm.V2_0_0.Protocol_implementation
+let wasm ~config =
+  let (module Wasm_machine) = Wasm_2_0_0.wasm_pvm_machine ~config in
+  let (module Protocol_implementation) =
+    Sc_rollup_wasm.V2_0_0.protocol_implementation ~config
+  in
 
-  let empty_state = Wasm_2_0_0.Wasm_pvm_machine.empty_state
-end
+  let module Wasm = struct
+    include Protocol_implementation
+
+    let empty_state = Wasm_machine.empty_state
+  end in
+  (module Wasm : S)
 
 module Riscv : S = struct
   include Sc_rollup_riscv.Protocol_implementation

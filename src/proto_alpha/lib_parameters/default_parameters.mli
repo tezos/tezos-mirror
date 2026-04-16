@@ -81,6 +81,7 @@ module Internal_for_tests : sig
   val bootstrap_balance : Tez.t
 
   val make_sc_rollup_parameter :
+    ?canonical_rollup:Tezos_crypto.Hashed.Smart_rollup_address.t ->
     dal_activation_level:Raw_level.t ->
     dal_attested_slots_validity_lag:int ->
     int ->

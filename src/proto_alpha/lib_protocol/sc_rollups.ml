@@ -87,26 +87,27 @@ module Kind = struct
   let example_arith_pvm =
     PVM.Packed (module Sc_rollup_arith.Protocol_implementation)
 
-  let wasm_2_0_0_pvm =
-    PVM.Packed (module Sc_rollup_wasm.V2_0_0.Protocol_implementation)
+  let wasm_2_0_0_pvm ~config =
+    let (module Wasm) = Sc_rollup_wasm.V2_0_0.protocol_implementation ~config in
+    PVM.Packed (module Wasm)
 
   let riscv_pvm = PVM.Packed (module Sc_rollup_riscv.Protocol_implementation)
 
-  let pvm_of = function
+  let pvm_of ~config = function
     | Example_arith -> example_arith_pvm
-    | Wasm_2_0_0 -> wasm_2_0_0_pvm
+    | Wasm_2_0_0 -> wasm_2_0_0_pvm ~config
     | Riscv -> riscv_pvm
 
-  let no_proof_machine_of : t -> (module Sc_rollup_origination_machine.S) =
-    function
+  let no_proof_machine_of ~config :
+      t -> (module Sc_rollup_origination_machine.S) = function
     | Example_arith -> (module Sc_rollup_origination_machine.Arith)
-    | Wasm_2_0_0 -> (module Sc_rollup_origination_machine.Wasm)
+    | Wasm_2_0_0 -> Sc_rollup_origination_machine.wasm ~config
     | Riscv -> (module Sc_rollup_origination_machine.Riscv)
 end
 
 let genesis_state_hash_of ~boot_sector kind =
   let open Lwt_syntax in
-  let (module Machine) = Kind.no_proof_machine_of kind in
+  let (module Machine) = Kind.no_proof_machine_of ~config:[] kind in
   let empty = Machine.empty_state () in
   let* tree = Machine.initial_state ~empty in
   let* tree = Machine.install_boot_sector tree boot_sector in

@@ -903,6 +903,7 @@ module Constants : sig
       reveal_activation_level : sc_rollup_reveal_activation_level;
       private_enable : bool;
       riscv_pvm_enable : bool;
+      canonical_rollup_address : Smart_rollup.Address.t option;
     }
 
     type zk_rollup = {
@@ -1112,6 +1113,8 @@ module Constants : sig
 
   val sc_rollup_riscv_pvm_enable : context -> bool
 
+  val canonical_rollup : context -> Smart_rollup.Address.t option
+
   val sc_rollup_origination_size : context -> int
 
   val sc_rollup_stake_amount : t -> Tez.t
@@ -1266,6 +1269,11 @@ end
     not be used otherwise. *)
 module Internal_for_tests : sig
   val to_raw : context -> Raw_context.t
+
+  val patch_constants :
+    context ->
+    (Constants.Parametric.t -> Constants.Parametric.t) ->
+    context Lwt.t
 end
 
 (** This module re-exports definitions from {!Level_repr} and
@@ -3657,6 +3665,8 @@ module Sc_rollup : sig
 
   type is_reveal_enabled = current_block_level:Raw_level.t -> reveal -> bool
 
+  val enable_signal : context -> string -> context tzresult Lwt.t
+
   val reveal_encoding : reveal Data_encoding.t
 
   val pp_reveal : Format.formatter -> reveal -> unit
@@ -3872,6 +3882,7 @@ module Sc_rollup : sig
             transactions : typed_transaction list;
           }
         | Whitelist_update of Whitelist.t option
+        | Canonical_rollup_signal of string
 
       val pp : Format.formatter -> t -> unit
 
@@ -4059,7 +4070,7 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val pvm_of : t -> PVM.t
+    val pvm_of : config:Wasm_2_0_0.config -> t -> PVM.t
 
     val all : t list
 
@@ -4151,11 +4162,12 @@ module Sc_rollup : sig
          and type state = WASM_machine.state
          and type proof = WASM_machine.proof
 
-    module Protocol_implementation :
-      PVM.PROTO_VERIFICATION
-        with type context = Wasm_2_0_0.Wasm_pvm_machine.context
-         and type state = Wasm_2_0_0.Wasm_pvm_machine.state
-         and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
+    val protocol_implementation :
+      config:Wasm_2_0_0.config ->
+      (module PVM.PROTO_VERIFICATION
+         with type context = Wasm_2_0_0.wasm_pvm_machine_context
+          and type state = Wasm_2_0_0.wasm_pvm_machine_state
+          and type proof = Wasm_2_0_0.wasm_pvm_machine_proof)
   end
 
   module Riscv_PVM : sig
@@ -4431,6 +4443,7 @@ module Sc_rollup : sig
 
     val play :
       Kind.t ->
+      config:Wasm_2_0_0.config ->
       dal_activation_level:Raw_level.t option ->
       find_dal_parameters:
         (Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t) ->
@@ -4611,6 +4624,10 @@ module Sc_rollup : sig
     must not be used otherwise. *)
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
+
+    val is_signal_enable : context -> string -> bool tzresult Lwt.t
+
+    val signals : context -> (string * Raw_level.t) list tzresult Lwt.t
   end
 end
 

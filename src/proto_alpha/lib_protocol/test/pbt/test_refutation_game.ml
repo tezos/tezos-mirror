@@ -1503,9 +1503,12 @@ let test_wasm_dissection name kind =
                ~our_stop_chunk:stop_chunk
                ~default_number_of_sections:32)
       in
+      let (module Protocol_implementation) =
+        Wasm_2_0_0PVM.protocol_implementation ~config:[]
+      in
       if kind <> `Kernel_run then assert (check_distribution dissection) ;
       match
-        Wasm_2_0_0PVM.Protocol_implementation.check_dissection
+        Protocol_implementation.check_dissection
           ~default_number_of_sections:32
           ~start_chunk
           ~stop_chunk:{stop_chunk with state_hash = Some State_hash.zero}
