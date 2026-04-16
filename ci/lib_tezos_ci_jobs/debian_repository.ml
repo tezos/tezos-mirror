@@ -147,7 +147,8 @@ let job_build_ubuntu =
 
 let make_apt_repo_job ~pipeline_type ~build_job ~distribution ~releases =
   CI.job
-    ~description:"Create the apt repository for Debian packages and sign it."
+    ~description:
+      (sf "Create the apt repository for %s packages and sign it." distribution)
     ~stage:Publish
     ~needs:
       [
@@ -194,7 +195,7 @@ let job_apt_repo_ubuntu =
 let make_lintian_job ~distribution ~releases =
   CI.job
     ~stage:Test_publication
-    ~description:"Run lintian on Debian packages."
+    ~description:(sf "Run lintian on %s packages." distribution)
     ~script:
       [
         ". ./scripts/version.sh";
@@ -230,7 +231,7 @@ let job_lintian_debian =
 let make_install_bin_job ~distribution ~release =
   CI.job
     ~stage:Test_publication
-    ~description:"Check that Debian packages can be installed."
+    ~description:(sf "Check that %s packages can be installed." distribution)
     ~variables:[("PREFIX", "")]
     ~script:
       ["./docs/introduction/install-bin-deb.sh " ^ distribution ^ " " ^ release]
@@ -289,7 +290,7 @@ let make_systemd_test_job ~script ~distribution ~release =
 
 let make_systemd_install_job =
   make_systemd_test_job
-    ~description:"Check that Debian packages that use systemd can be installed."
+    ~description:"Check that packages that use systemd can be installed."
     ~script:"scripts/packaging/tests/deb/install-bin-deb.sh"
 
 let make_systemd_upgrade_job =
