@@ -13,9 +13,15 @@ type content =
   | Apply of Ppxlib.expression * (Ppxlib.arg_label * Ppxlib.expression) list
   | Other of Ppxlib.expression
 
+(** How the profiler module is specified *)
+type profiler_module =
+  | Static of Longident.t  (** Static module path: Profiler, Foo.Bar *)
+  | First_class of Ppxlib.expression
+      (** First-class module expression: state.profiler, get_profiler () *)
+
 type t = {
   verbosity : string option;
-  profiler_module : string option;
+  profiler_module : profiler_module option;
   cpu_profiling : bool option;
   metadata : Ppxlib.expression option;
   content : content;
@@ -31,7 +37,9 @@ type t = {
 
 val get_verbosity : Ppxlib.Location.t -> t -> Ppxlib.expression option
 
-val get_profiler_module : t -> Longident.t
+(** Returns the profiler module specification, defaulting to
+    [Static (Lident "Profiler")] *)
+val get_profiler_module : t -> profiler_module
 
 val to_expression : Ppxlib.Location.t -> t -> Ppxlib.expression
 

@@ -13,9 +13,13 @@ type content =
   | Apply of Ppxlib.expression * (Ppxlib.arg_label * Ppxlib.expression) list
   | Other of Ppxlib.expression
 
+type profiler_module =
+  | Static of Longident.t
+  | First_class of Ppxlib.expression
+
 type t = {
   verbosity : string option;
-  profiler_module : string option;
+  profiler_module : profiler_module option;
   cpu_profiling : bool option;
   metadata : Ppxlib.expression option;
   content : content;
@@ -43,12 +47,10 @@ let get_verbosity loc {verbosity; _} =
            None)
   | None -> None
 
-(* This could return a module_expr instead but right now it works
-   and that's all we're asking *)
 let get_profiler_module {profiler_module; _} =
   match profiler_module with
-  | Some name -> Ppxlib.Lident name
-  | None -> Ppxlib.Lident "Profiler"
+  | Some pm -> pm
+  | None -> Static (Lident "Profiler")
 
 let to_expression loc {content; _} =
   match content with
@@ -94,11 +96,20 @@ let pp_content ppf {content; _} =
         expr_list
   | Other expr -> Format.fprintf ppf "Other %a" Ppxlib.Pprintast.expression expr
 
+let pp_profiler_module ppf = function
+  | Static lident ->
+      Format.fprintf ppf "Static %s" (Ppxlib.Longident.name lident)
+  | First_class expr ->
+      Format.fprintf ppf "First_class %a" Ppxlib.Pprintast.expression expr
+
 let pp ppf t =
   Format.fprintf
     ppf
     "@[<v 0>verbosity: %s;@,profiler_module: %s;@,content: %a@]"
     (Option.value ~default:"No verbosity" t.verbosity)
-    (Option.value ~default:"No profiler module" t.profiler_module)
+    (Option.fold
+       ~none:"No profiler module"
+       ~some:(Format.asprintf "%a" pp_profiler_module)
+       t.profiler_module)
     pp_content
     t

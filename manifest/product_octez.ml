@@ -2095,6 +2095,29 @@ let ppx_profiler =
 let ppx_profiler =
   make_ppx ~env_var:"TEZOS_PPX_PROFILER" ~preprocess:ppx_profiler
 
+(* Compilation tests for ppx_profiler - verify PPX generates valid OCaml *)
+let _ppx_profiler_test_compilation =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  private_lib
+    "ppx_profiler_test_compilation"
+    ~path:"src/lib_ppx_profiler/test"
+    ~opam:"octez-libs"
+    ~modules:["static_module"; "first_class_module"]
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:[lwt]
+
+(* Runtime tests for ppx_profiler - verify correct behavior *)
+let _ppx_profiler_tests =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  tezt
+    ["test_runtime"]
+    ~path:"src/lib_ppx_profiler/test"
+    ~opam:"octez-libs"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:[alcotezt]
+
 let octez_profiler_unix =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   octez_lib
