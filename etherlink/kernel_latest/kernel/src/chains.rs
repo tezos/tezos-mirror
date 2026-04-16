@@ -25,6 +25,7 @@ use crate::{
 };
 use anyhow::Context;
 use mir::ast::PublicKeyHash;
+use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
@@ -42,7 +43,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
-    wei::{eth_from_mutez, mutez_from_wei},
+    wei::{eth_from_mutez, gas_to_mutez, mutez_from_wei},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
@@ -146,8 +147,6 @@ impl ExperimentalFeatures {
         self.enabled_michelson_target_sunrise_level.is_some()
     }
 
-    // Used in the gas refund implementation (!21392).
-    #[allow(dead_code)]
     pub(crate) fn is_michelson_gas_refund_enabled(&self) -> bool {
         self.enable_michelson_gas_refund
     }
@@ -773,6 +772,7 @@ impl ChainConfigTrait for EvmChainConfig {
                     Some(outbox_queue),
                     Some(&block_constants.evm_runtime_block_constants),
                     &mut journal,
+                    self.experimental_features.is_michelson_gas_refund_enabled(),
                 )
             }
         }
@@ -905,6 +905,36 @@ where
     Ok(())
 }
 
+/// Compute the fee refund: surplus of declared fees beyond actual costs.
+///
+/// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
+/// where consumed_gas_fees = gas_to_mutez(base_fee, multiplier, consumed_gas)
+/// and consumed_gas = ceil(total_consumed_milligas / 1000).
+fn compute_fee_refund(
+    processed_operations: &[ProcessedOperation],
+    total_operation_fees: u64,
+    da_fees: u64,
+    base_fee_per_gas: U256,
+    michelson_to_evm_gas_multiplier: u64,
+) -> u64 {
+    // Sum consumed milligas from ProcessedOperation, which correctly tracks
+    // gas for all outcomes (Applied, BackTracked, Failed) via the gas tracker.
+    let consumed_milligas =
+        ProcessedOperation::total_consumed_milligas(processed_operations);
+    // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
+    let consumed_gas = consumed_milligas.div_ceil(1000);
+    let consumed_gas_fees = gas_to_mutez(
+        base_fee_per_gas,
+        michelson_to_evm_gas_multiplier,
+        consumed_gas,
+    );
+
+    // saturating_sub ensures the refund is non-negative. This only credits back
+    // a portion of fees already debited from the source, so it can never cause the
+    // source balance to exceed its pre-operation value.
+    total_operation_fees.saturating_sub(da_fees.saturating_add(consumed_gas_fees))
+}
+
 enum CreditDaFees {
     Skip,
     Execute {
@@ -914,6 +944,13 @@ enum CreditDaFees {
 }
 
 impl CreditDaFees {
+    fn da_fees(&self) -> u64 {
+        match self {
+            CreditDaFees::Skip => 0,
+            CreditDaFees::Execute { da_fees_mutez, .. } => *da_fees_mutez,
+        }
+    }
+
     fn apply<Host: StorageV1>(self, host: &mut Host) -> Result<(), anyhow::Error> {
         match self {
             CreditDaFees::Skip => Ok(()),
@@ -923,6 +960,16 @@ impl CreditDaFees {
             } => credit_da_fees(host, sequencer_pool_address, da_fees_mutez),
         }
     }
+}
+
+/// Fees computed from an operation before execution.
+struct FeesData {
+    /// Total required fees (DA + gas) to check against declared fees,
+    /// or `None` in simulation (skip_fees_check).
+    required_fees: Option<u64>,
+    /// Action to credit the sequencer pool with DA fees after execution.
+    /// Also carries the DA fees amount (via `da_fees()`).
+    credit_da_fees: CreditDaFees,
 }
 
 /// Returns the required fees if any and the function to execute
@@ -935,37 +982,38 @@ fn get_fees_data(
     base_fee_per_gas: U256,
     michelson_to_evm_gas_multiplier: u64,
     sequencer_pool_address: Option<H160>,
-) -> Result<(Option<u64>, CreditDaFees), anyhow::Error> {
+) -> Result<FeesData, anyhow::Error> {
     if skip_fees_check {
-        Ok((None, CreditDaFees::Skip))
+        Ok(FeesData {
+            required_fees: None,
+            credit_da_fees: CreditDaFees::Skip,
+        })
     } else {
         let required_da_fees = get_required_da_fees(operation, da_fee_per_byte_mutez)?;
 
-        let required_execution_gas_fees = {
-            let total_gas_limit: u64 = operation
-                .content
-                .iter()
-                .filter_map(|c| c.gas_limit().ok())
-                .filter_map(|gl| gl.0.to_u64())
-                .try_fold(0u64, |acc, x| acc.checked_add(x))
-                .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
-            let gas_fee_wei = base_fee_per_gas
-                * U256::from(michelson_to_evm_gas_multiplier)
-                * U256::from(total_gas_limit);
-            // NB: Convert back to mutez with a floor division.
-            // (precision loss if gas_fee_wei < 1 mutez)
-            (gas_fee_wei / U256::exp10(12)).low_u64()
-        };
+        let total_gas_limit: u64 = operation
+            .content
+            .iter()
+            .filter_map(|c| c.gas_limit().ok())
+            .filter_map(|gl| gl.0.to_u64())
+            .try_fold(0u64, |acc, x| acc.checked_add(x))
+            .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+
+        let required_execution_gas_fees = gas_to_mutez(
+            base_fee_per_gas,
+            michelson_to_evm_gas_multiplier,
+            total_gas_limit,
+        );
 
         let required_fees = required_da_fees.saturating_add(required_execution_gas_fees);
 
-        Ok((
-            Some(required_fees),
-            CreditDaFees::Execute {
+        Ok(FeesData {
+            required_fees: Some(required_fees),
+            credit_da_fees: CreditDaFees::Execute {
                 sequencer_pool_address,
                 da_fees_mutez: required_da_fees,
             },
-        ))
+        })
     }
 }
 
@@ -983,6 +1031,7 @@ pub fn apply_tezos_operation<Host>(
     outbox_queue: Option<&OutboxQueue<'_, impl Path>>,
     evm_block_constants: Option<&tezos_ethereum::block::BlockConstants>,
     external_journal: &mut TezosXJournal,
+    enable_gas_refund: bool,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1002,7 +1051,10 @@ where
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
-            let (fees, credit_da_fees) = get_fees_data(
+            let FeesData {
+                required_fees: fees,
+                credit_da_fees,
+            } = get_fees_data(
                 &operation,
                 skip_fees_check,
                 block_constants.da_fee_per_byte_mutez,
@@ -1010,6 +1062,16 @@ where
                 block_constants.michelson_to_evm_gas_multiplier,
                 sequencer_pool_address,
             )?;
+
+            // Sum declared fees (mutez) from all operation contents before
+            // `operation` is moved into validate_and_apply_operation.
+            let total_operation_fees: u64 = operation
+                .content
+                .iter()
+                .map(|c| &c.fee().0)
+                .sum::<BigUint>()
+                .to_u64()
+                .ok_or_else(|| anyhow::anyhow!("total fees do not fit in u64"))?;
 
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
@@ -1028,7 +1090,24 @@ where
                 skip_signature_check,
                 fees,
             ) {
-                Ok(result) => result,
+                Ok(mut receipt) => {
+                    if enable_gas_refund {
+                        let fee_refund = compute_fee_refund(
+                            &receipt,
+                            total_operation_fees,
+                            credit_da_fees.da_fees(),
+                            block_in_progress.base_fee_per_gas,
+                            block_constants.michelson_to_evm_gas_multiplier,
+                        );
+                        tezos_execution::apply_fee_refund(
+                            host,
+                            context,
+                            &mut receipt,
+                            fee_refund,
+                        )?;
+                    }
+                    receipt
+                }
                 Err(OperationError::Validation(err)) => {
                     log!(Error, "Found an invalid operation, dropping it: {:?}", err);
                     return Ok(crate::apply::ExecutionResult::Invalid);
@@ -1272,6 +1351,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
+                // Not supported in standalone Tezlink (no ExperimentalFeatures).
+                let enable_gas_refund = false;
                 apply_tezos_operation(
                     &self.chain_id,
                     block_in_progress,
@@ -1285,6 +1366,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     None::<&OutboxQueue<'_, RefPath>>,
                     None,
                     &mut journal,
+                    enable_gas_refund,
                 )
             }
         }

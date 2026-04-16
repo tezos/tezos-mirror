@@ -763,6 +763,14 @@ impl OperationResultSum {
         }
     }
 
+    pub fn push_balance_update(&mut self, update: BalanceUpdate) {
+        match self {
+            OperationResultSum::Reveal(r) => r.balance_updates.push(update),
+            OperationResultSum::Transfer(r) => r.balance_updates.push(update),
+            OperationResultSum::Origination(r) => r.balance_updates.push(update),
+        };
+    }
+
     pub fn transform_result_backtrack(&mut self) {
         match self {
             OperationResultSum::Transfer(op_result) => {
