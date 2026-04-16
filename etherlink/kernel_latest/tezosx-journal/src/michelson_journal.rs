@@ -1089,4 +1089,112 @@ mod tests {
         assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
         assert_eq!(receipt_id(&journal.pending_crac_receipts[1]), 2);
     }
+
+    // --- frame result slot ---
+
+    // With no active frame, `frame_result` observes nothing and
+    // `set_frame_result` refuses to write.
+    #[test]
+    fn test_frame_result_no_frame() {
+        let mut journal = MichelsonJournal::new();
+        assert_eq!(journal.frame_result(), None);
+        assert_eq!(
+            journal.set_frame_result(vec![1, 2, 3]),
+            Err(SetFrameResultError::NoFrame)
+        );
+    }
+
+    // A payload deposited on the top frame is visible to repeated reads
+    // until the frame is dropped.
+    #[test]
+    fn test_frame_result_set_is_observable() {
+        let mut journal = MichelsonJournal::new();
+        journal.push_external_checkpoint();
+        assert_eq!(journal.frame_result(), None);
+
+        journal.set_frame_result(vec![0xCA, 0xFE]).unwrap();
+        assert_eq!(journal.frame_result(), Some(&[0xCA, 0xFE][..]));
+        // Non-destructive: still there on re-read.
+        assert_eq!(journal.frame_result(), Some(&[0xCA, 0xFE][..]));
+    }
+
+    // `commit_frame` drops the slot: after commit, the parent frame's
+    // (absent) payload is what `frame_result` observes.
+    #[test]
+    fn test_frame_result_commit_drops_slot() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new();
+        write_data(&mut host, &world, b"v0");
+
+        journal.push_external_checkpoint();
+        journal.push_external_checkpoint();
+        journal.set_frame_result(vec![0xAA]).unwrap();
+        assert_eq!(journal.frame_result(), Some(&[0xAA][..]));
+
+        journal.commit_frame(&mut host).unwrap();
+        // Outer frame has no result of its own.
+        assert_eq!(journal.frame_result(), None);
+    }
+
+    // `revert_frame` drops the slot just like `commit_frame`.  A fresh
+    // frame pushed afterwards starts empty.
+    #[test]
+    fn test_frame_result_revert_drops_slot() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new();
+        write_data(&mut host, &world, b"v0");
+
+        journal.push_external_checkpoint();
+        journal.set_frame_result(vec![0xBB]).unwrap();
+        journal.revert_frame(&mut host, &world).unwrap();
+
+        journal.push_external_checkpoint();
+        assert_eq!(journal.frame_result(), None);
+    }
+
+    // Second call to `set_frame_result` on the same frame fails; the
+    // first value is kept intact.
+    #[test]
+    fn test_frame_result_double_set_fails() {
+        let mut journal = MichelsonJournal::new();
+        journal.push_external_checkpoint();
+        journal.set_frame_result(vec![0x01]).unwrap();
+        assert_eq!(
+            journal.set_frame_result(vec![0x02]),
+            Err(SetFrameResultError::AlreadySet)
+        );
+        assert_eq!(journal.frame_result(), Some(&[0x01][..]));
+    }
+
+    // Nested frames get independent slots: the inner payload is never
+    // observable from the outer frame, and vice versa.
+    #[test]
+    fn test_frame_result_nested_frames_independent() {
+        let mut host = MockHost::default();
+        let world = world_path();
+        let mut journal = MichelsonJournal::new();
+        write_data(&mut host, &world, b"v0");
+
+        // Outer frame sets its payload.
+        journal.push_external_checkpoint();
+        journal.set_frame_result(vec![0xAA]).unwrap();
+
+        // Inner frame starts empty and can hold its own payload.
+        journal.push_external_checkpoint();
+        assert_eq!(journal.frame_result(), None);
+        journal.set_frame_result(vec![0xBB]).unwrap();
+        assert_eq!(journal.frame_result(), Some(&[0xBB][..]));
+
+        // Committing the inner frame uncovers the outer's payload.
+        journal.commit_frame(&mut host).unwrap();
+        assert_eq!(journal.frame_result(), Some(&[0xAA][..]));
+
+        // Outer frame still refuses a second set.
+        assert_eq!(
+            journal.set_frame_result(vec![0xCC]),
+            Err(SetFrameResultError::AlreadySet)
+        );
+    }
 }
