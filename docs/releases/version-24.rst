@@ -129,6 +129,7 @@ If you are using Docker instead, use the ``octez-v24.4`` Docker images of Octez.
 Changelog
 ---------
 
+- `Version 24.4 <../CHANGES.html#version-24-4>`_
 - `Version 24.3 <../CHANGES.html#version-24-3>`_
 - `Version 24.2 <../CHANGES.html#version-24-2>`_
 - `Version 24.1 <../CHANGES.html#version-24-1>`_
