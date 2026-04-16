@@ -39,7 +39,7 @@ type error += TzCrashError
 
 exception RaisedExn
 
-let create_handlers (type a) ?on_completion ?on_error_extra ?on_close_extra () =
+let create_handlers (type a) ?on_completion ?on_error ?on_close () =
   (module struct
     type self = a Worker.t
 
@@ -65,7 +65,7 @@ let create_handlers (type a) ?on_completion ?on_error_extra ?on_close_extra () =
     let on_error (type a b) w _st (r : (a, b) Request.t) (errs : b) :
         [`Continue | `Shutdown] tzresult Lwt.t =
       let open Lwt_result_syntax in
-      let () = match on_error_extra with Some f -> f () | None -> () in
+      let () = match on_error with Some f -> f () | None -> () in
       let history = Worker.state w in
       let return_continue = return `Continue in
       match r with
@@ -99,7 +99,7 @@ let create_handlers (type a) ?on_completion ?on_error_extra ?on_close_extra () =
     let on_close _w =
       let open Lwt_syntax in
       let* () =
-        match on_close_extra with Some f -> f () | None -> Lwt.return_unit
+        match on_close with Some f -> f () | None -> Lwt.return_unit
       in
       Lwt.return_unit
   end : Worker.HANDLERS
@@ -109,11 +109,9 @@ let create_handlers (type a) ?on_completion ?on_error_extra ?on_close_extra () =
 let create table handlers ?timeout name =
   Worker.launch ?timeout table name 0 handlers
 
-let create_queue ?on_completion ?on_error_extra ?on_close_extra =
+let create_queue ?on_completion ?on_error ?on_close =
   let table = Worker.create_table Queue in
-  create
-    table
-    (create_handlers ?on_completion ?on_error_extra ?on_close_extra ())
+  create table (create_handlers ?on_completion ?on_error ?on_close ())
 
 let create_bounded ?on_completion =
   let table = Worker.create_table (Bounded {size = 2}) in
@@ -160,11 +158,9 @@ let make_stream () =
   in
   (push, read)
 
-let create_callback_worker ?on_completion ?on_error_extra ?on_close_extra read =
+let create_callback_worker ?on_completion ?on_error ?on_close read =
   let table = Worker.create_table (Callback read) in
-  create
-    table
-    (create_handlers ?on_completion ?on_error_extra ?on_close_extra ())
+  create table (create_handlers ?on_completion ?on_error ?on_close ())
 
 open Mocked_worker.Request
 
@@ -341,7 +337,7 @@ let test_shutdown_on_error () =
   assert_status w "Closed" ;
   return_unit
 
-(** Regression test for d31bdd72.
+(** Regression test for !21626.
     A Callback worker whose [on_error] returns [`Continue] on a read that
     resolves immediately (simulating a TCP fd that has already been closed)
     must not starve the Lwt scheduler: [Worker.shutdown] must complete in
@@ -370,7 +366,7 @@ let test_shutdown_after_continue_spin () =
   let*! () = Worker.shutdown w in
   return_unit
 
-(** Regression test for d31bdd72 — success path.
+(** Regression test for !21626 — success path.
     A Callback worker whose [read] resolves immediately with a successful
     request, and whose [on_request] and [on_completion] also resolve
     synchronously, loops via the success path: [read] → [on_request Ok] →
@@ -415,7 +411,7 @@ let test_scheduler_fairness () =
   with_alarm
     2
     "test_scheduler_fairness: background task did not complete — worker \
-     monopolised the Lwt scheduler (regression of d31bdd72)"
+     monopolised the Lwt scheduler (regression of !21626)"
     (fun () ->
       let* w = create_callback_worker read "fairness_worker" in
       let*! () = background () in
@@ -440,7 +436,7 @@ let test_two_concurrent_spin_workers () =
   with_alarm
     2
     "test_two_concurrent_spin_workers: Worker.shutdown timed out — one worker \
-     starved the other (regression of d31bdd72)"
+     starved the other (regression of !21626)"
     (fun () ->
       let* w1 = create_callback_worker read "spin_worker_1" in
       let* w2 = create_callback_worker read "spin_worker_2" in
@@ -508,8 +504,8 @@ let test_deactivate_once_on_error_path () =
   in
   let* w =
     create_queue
-      ~on_error_extra:(fun () -> deactivate_once ())
-      ~on_close_extra:(fun () ->
+      ~on_error:(fun () -> deactivate_once ())
+      ~on_close:(fun () ->
         deactivate_once () ;
         Lwt.return_unit)
       "deactivate_once_error_worker"
@@ -537,7 +533,7 @@ let test_deactivate_once_on_close_path () =
   in
   let* w =
     create_queue
-      ~on_close_extra:(fun () ->
+      ~on_close:(fun () ->
         deactivate_once () ;
         Lwt.return_unit)
       "deactivate_once_close_worker"
@@ -559,17 +555,8 @@ let _test_raise_exn () =
   (* Define the right behavior when exception is raised *)
   return_unit
 
-(** On dropbox mode, checks that asynchronous requests are merged when the
-    worker is busy processing an earlier request.
-
-    The test uses [t_processing] as a handshake: the worker fires it (via
-    [Lwt.wakeup_later]) from inside the first [on_completion] callback,
-    signalling that it has taken the first request and the dropbox slot is
-    free.  Only then does the test push the [n] additional requests, which
-    are guaranteed to land on an empty slot and be merged into one [RqA n].
-
-    This is robust regardless of how many [Lwt.pause ()] steps separate
-    worker launch from the worker's first [Lwt_dropbox.take]. *)
+(* On dropbox mode, checks that asynchronous requests are merged when the
+   worker is busy processing an earlier request. *)
 let test_async_dropbox () =
   with_alarm 2 "test_async_dropbox: timed out" @@ fun () ->
   let open Lwt_result_syntax in
@@ -670,11 +657,11 @@ let tests_status =
       Tztest.tztest "Crashing requests" `Quick test_push_crashing_request;
       Tztest.tztest "Shutdown on error" `Quick test_shutdown_on_error;
       Tztest.tztest
-        "Shutdown after Continue spin (regression d31bdd72)"
+        "Shutdown after Continue spin (regression !21626)"
         `Quick
         test_shutdown_after_continue_spin;
       Tztest.tztest
-        "Shutdown after success spin (regression d31bdd72)"
+        "Shutdown after success spin (regression !21626)"
         `Quick
         test_shutdown_after_success_spin;
     ] )
