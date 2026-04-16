@@ -643,6 +643,17 @@ struct
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
     let open Lwt_syntax in
     let rec loop () =
+      (* Yield at the top of every iteration so the Lwt scheduler always gets
+         at least one scheduling step between iterations, regardless of how
+         the previous iteration ended.
+
+         Without this yield, a Callback worker whose [pop]/[read] resolves
+         immediately (e.g. on a closed TCP fd) and whose [on_error] or
+         [on_request] also returns without yielding will spin in a tight loop
+         that starves [Worker.shutdown] and every other Lwt promise
+         indefinitely.  The yield here makes that impossible: no matter which
+         path led back to [loop ()], other promises get a chance to run. *)
+      let* () = Lwt.pause () in
       let* popped = protect_result (fun () -> pop w) in
       match popped with
       | Error exn -> raise exn
