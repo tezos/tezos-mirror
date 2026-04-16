@@ -479,6 +479,64 @@ module EvmCracHttpCall = struct
     unit
 end
 
+(** EVM contract that calls a Michelson contract via the generic [call]
+ *  precompile and stores the returned HTTP response body.  Used to
+ *  verify that [%collect_result] bytes deposited on the Michelson side
+ *  surface as the EVM precompile's return value. *)
+module EvmCollectResult = struct
+  open EvmContract
+
+  let deploy =
+    deploy_solidity_contract ~contract:Solidity_contracts.crac_collect_result
+
+  (** Initialises the contract.  [tez_contract_target_address] is the
+   *  KT1 address that will be called on [run()]. *)
+  let init ~sequencer ~sender ~nonce ~value ~tez_contract_target_address
+      contract =
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"initialize(string)"
+        ~arguments:[tez_contract_target_address]
+        ()
+    in
+    unit
+
+  let call_run ?expected_status ~sequencer ~sender ~nonce ~value contract =
+    let* receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"run()"
+        ~arguments:[]
+        ?expected_status
+        ()
+    in
+    return receipt.gasUsed
+
+  (** Assert that the contract's [result] getter returns bytes whose hex
+   *  representation equals [expected_hex] (lowercase, no [0x] prefix). *)
+  let check_result ~sequencer ~expected_hex contract =
+    let endpoint = Evm_node.endpoint sequencer in
+    (* [cast call <addr> "result()(bytes)"] returns the decoded bytes
+       as [0x<hex>] — no manual ABI offset/length parsing needed. *)
+    let* raw = Cast.call "result()(bytes)" ~endpoint ~address:contract in
+    let strip_0x s = Test_helpers.remove_0x s in
+    Check.(
+      (String.lowercase_ascii (strip_0x raw)
+      = String.lowercase_ascii expected_hex)
+        string
+        ~error_msg:"Expected result bytes %R but got %L") ;
+    unit
+end
+
 (** EVM contract that iterates [run()] over its [callees].  Before
  *  each call, increments [counter].  If a callee's revert is caught,
  *  increments [catches] instead of propagating.  After all calls,
@@ -962,6 +1020,34 @@ module Gateway = struct
       ()
 end
 
+(** Tezos contract whose [%default] entrypoint deposits a fixed bytes
+ *  payload into the current CRAC frame by calling the gateway's
+ *  [%collect_result] entrypoint.  Used to verify that the payload is
+ *  surfaced as the Michelson server's HTTP response body. *)
+module TezCollectResult = struct
+  open TezContract
+
+  (** Originates [gateway_collect_result.tz] with storage
+   *  [Pair gateway_address 0x<payload_hex>].  [payload_hex] is the
+   *  bytes payload deposited via [%collect_result] (no [0x] prefix). *)
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+    let script_name = ["mini_scenarios"; "gateway_collect_result"] in
+    let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -1026,6 +1112,15 @@ module CracRunnerWrapper = struct
         unit Lwt.t
     end
 
+    module EvmCollectResult : sig
+      val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
+
+      val call_run :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
+
+      val check_result : expected_hex:string -> evm_runner -> unit Lwt.t
+    end
+
     module EvmMultiRunCaller : sig
       val deploy_and_init :
         ?value:Wei.t ->
@@ -1075,6 +1170,11 @@ module CracRunnerWrapper = struct
         tez_runner Lwt.t
 
       val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezCollectResult : sig
+      val originate :
+        ?init_balance:int -> payload_hex:string -> unit -> tez_runner Lwt.t
     end
 
     module TezGasBurner : sig
@@ -1287,6 +1387,46 @@ module CracRunnerWrapper = struct
             runner
       end
 
+      module EvmCollectResult = struct
+        let deploy_and_init ?(value = Wei.zero) (`Tez_runner (_, address)) =
+          let* addr =
+            EvmCollectResult.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmCollectResult.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~tez_contract_target_address:address
+              addr
+          in
+          return (`Evm_runner addr)
+
+        let call_run ?expected_status ?(value = Wei.zero) (`Evm_runner runner) =
+          let* gas_used =
+            EvmCollectResult.call_run
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
+
+        let check_result ~expected_hex (`Evm_runner runner) =
+          EvmCollectResult.check_result ~sequencer ~expected_hex runner
+      end
+
       module EvmMultiRunCaller = struct
         let deploy_and_init ?(value = Wei.zero) ?(revert = false)
             ?(callees = []) () =
@@ -1438,6 +1578,25 @@ module CracRunnerWrapper = struct
             ~sc_rollup_node
             ~expected_counter
             (runner_hex, runner_address)
+      end
+
+      module TezCollectResult = struct
+        let originate ?init_balance ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResult.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
       end
 
       module TezGasBurner = struct
@@ -7615,6 +7774,26 @@ let test_crac_gas_oog_path_reporting =
          error path reports consumed gas via X-Tezos-Gas-Consumed") ;
   unit
 
+(** End-to-end happy-path check: the Michelson contract deposits bytes
+    via [%collect_result]; the server surfaces them as the HTTP response
+    body; the EVM caller recovers them via the [call] precompile. *)
+let test_crac_collect_result_surfaces_in_response_body =
+  register_crac_runner_test
+    ~title:"CRAC: %collect_result bytes surface in HTTP response body"
+    ~tags:["collect_result"; "http_call"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let payload_hex = "cafebabe" in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate Michelson contract that calls %%collect_result" ;
+  let* tez_collector = TezCollectResult.originate ~payload_hex () in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_collector in
+  Log.debug ~prefix "Run: EVM → Michelson → gateway %%collect_result" ;
+  let* _ = EvmCollectResult.call_run evm_reader in
+  Log.debug ~prefix "Verify the returned bytes" ;
+  EvmCollectResult.check_result ~expected_hex:payload_hex evm_reader
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -7703,4 +7882,5 @@ let () =
   test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
   test_crac_gas_accounting_investigation [Alpha] ;
   test_crac_gas_error_path_reporting [Alpha] ;
-  test_crac_gas_oog_path_reporting [Alpha]
+  test_crac_gas_oog_path_reporting [Alpha] ;
+  test_crac_collect_result_surfaces_in_response_body [Alpha]

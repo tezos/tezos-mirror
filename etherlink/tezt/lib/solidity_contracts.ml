@@ -509,6 +509,12 @@ let crac_http_call =
     ~label:"crac_http_call"
     ~contract:"CracHttpCall"
 
+let crac_collect_result =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_collect_result.sol")
+    ~label:"crac_collect_result"
+    ~contract:"CracCollectResult"
+
 let store_and_return =
   compile_contract
     ~source:(solidity_contracts_path ^ "/store_and_return.sol")
