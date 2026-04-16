@@ -181,7 +181,7 @@ mod tests {
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());
-        assert!(istack.len() == 1 && istack[0].as_ref() == &TypedValue::int(55));
+        assert!(istack.len() == 1 && istack.get(0).unwrap().as_ref() == &TypedValue::int(55));
     }
 
     #[test]
