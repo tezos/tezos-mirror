@@ -414,6 +414,16 @@ type l1_block_l2_levels = {
 module Get_finalized_blocks_of_l1_level :
   METHOD with type input = int32 and type output = l1_block_l2_levels
 
+module Get_meta_block_by_number :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.t
+     and type output = Meta_block.t
+
+module Get_meta_block_by_hash :
+  METHOD
+    with type input = Meta_block.block_hash_identifier
+     and type output = Meta_block.t
+
 type map_result =
   | Method :
       ('input, 'output) method_
