@@ -26,12 +26,16 @@
 
 let init_identity_file configuration =
   let open Lwt_result_syntax in
-  let check_data_dir ~data_dir:_ =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5566
-
-       Do some checks about the shape of the node's data dir as done for Octez
-       node ? *)
-    return_unit
+  let check_data_dir ~data_dir =
+    let*! exists = Lwt_unix.file_exists data_dir in
+    if not exists then
+      let*! () = Lwt_utils_unix.create_dir data_dir in
+      return_unit
+    else
+      let*! {Lwt_unix.st_kind; _} = Lwt_unix.stat data_dir in
+      match st_kind with
+      | Unix.S_DIR -> return_unit
+      | _ -> failwith "%s is not a directory" data_dir
   in
   let identity_file = Configuration_file.identity_file configuration in
   Identity_file.init
