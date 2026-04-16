@@ -3195,6 +3195,7 @@ let octez_scoru_wasm =
         octez_webassembly_interpreter;
         octez_lwt_result_stdlib;
         data_encoding;
+        octez_riscv_nds_common |> open_;
       ]
 
 let octez_smart_rollup_wasm_in_memory =
