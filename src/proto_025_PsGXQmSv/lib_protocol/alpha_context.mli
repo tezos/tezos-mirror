@@ -903,6 +903,7 @@ module Constants : sig
       reveal_activation_level : sc_rollup_reveal_activation_level;
       private_enable : bool;
       riscv_pvm_enable : bool;
+      canonical_rollup_address : Smart_rollup.Address.t option;
     }
 
     type zk_rollup = {

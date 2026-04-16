@@ -246,6 +246,7 @@ type sc_rollup = {
   reveal_activation_level : sc_rollup_reveal_activation_level;
   private_enable : bool;
   riscv_pvm_enable : bool;
+  canonical_rollup_address : Smart_rollup.Address.t option;
 }
 
 type zk_rollup = {
@@ -358,7 +359,8 @@ let sc_rollup_encoding =
           c.max_number_of_parallel_games,
           c.reveal_activation_level,
           c.private_enable,
-          c.riscv_pvm_enable ) ))
+          c.riscv_pvm_enable,
+          c.canonical_rollup_address ) ))
     (fun ( ( sc_rollup_arith_pvm_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
@@ -373,7 +375,8 @@ let sc_rollup_encoding =
              sc_rollup_max_number_of_parallel_games,
              sc_rollup_reveal_activation_level,
              sc_rollup_private_enable,
-             sc_rollup_riscv_pvm_enable ) )
+             sc_rollup_riscv_pvm_enable,
+             sc_rollup_canonical_rollup_address ) )
        ->
       {
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
@@ -393,6 +396,7 @@ let sc_rollup_encoding =
         reveal_activation_level = sc_rollup_reveal_activation_level;
         private_enable = sc_rollup_private_enable;
         riscv_pvm_enable = sc_rollup_riscv_pvm_enable;
+        canonical_rollup_address = sc_rollup_canonical_rollup_address;
       })
     (merge_objs
        (obj8
@@ -404,7 +408,7 @@ let sc_rollup_encoding =
           (req "smart_rollup_max_lookahead_in_blocks" int32)
           (req "smart_rollup_max_active_outbox_levels" int32)
           (req "smart_rollup_max_outbox_messages_per_level" int31))
-       (obj7
+       (obj8
           (req "smart_rollup_number_of_sections_in_dissection" uint8)
           (req "smart_rollup_timeout_period_in_blocks" int31)
           (req "smart_rollup_max_number_of_cemented_commitments" int31)
@@ -413,7 +417,10 @@ let sc_rollup_encoding =
              "smart_rollup_reveal_activation_level"
              sc_rollup_reveal_activation_level_encoding)
           (req "smart_rollup_private_enable" bool)
-          (req "smart_rollup_riscv_pvm_enable" bool)))
+          (req "smart_rollup_riscv_pvm_enable" bool)
+          (opt
+             "smart_rollup_canonical_rollup_address"
+             Smart_rollup.Address.encoding)))
 
 let zk_rollup_encoding =
   let open Data_encoding in
@@ -850,6 +857,7 @@ let update_sc_rollup_parameter ratio_i32 c =
     reveal_activation_level = c.reveal_activation_level;
     private_enable = c.private_enable;
     riscv_pvm_enable = c.riscv_pvm_enable;
+    canonical_rollup_address = c.canonical_rollup_address;
   }
 
 let update_sc_rollup_parameter_with_block_time block_time c =
@@ -892,6 +900,7 @@ let update_sc_rollup_parameter_with_block_time block_time c =
     reveal_activation_level = c.reveal_activation_level;
     private_enable = c.private_enable;
     riscv_pvm_enable = c.riscv_pvm_enable;
+    canonical_rollup_address = c.canonical_rollup_address;
   }
 
 module Internal_for_tests = struct
