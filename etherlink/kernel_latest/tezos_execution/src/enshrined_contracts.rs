@@ -174,13 +174,7 @@ where
                 calldata.extend_from_slice(&abi_params);
                 let response_body =
                     tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)?;
-                match callback {
-                    Some(destination) => {
-                        dispatch_callback(ctx, destination, response_body)
-                            .map_err(Into::into)
-                    }
-                    None => Ok(vec![]),
-                }
+                dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
                 let (mut request, callback) = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
@@ -197,12 +191,7 @@ where
                     target_host.as_deref(),
                     ctx.operation_gas(),
                 )?;
-                match callback {
-                    Some(destination) => {
-                        dispatch_callback(ctx, destination, body).map_err(Into::into)
-                    }
-                    None => Ok(vec![]),
-                }
+                dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result allows a Michelson adapter to deposit
                 // a result payload into the current CRAC frame so the
@@ -255,13 +244,17 @@ where
 // TODO: L2-1187 validate with benchmarks before mainnet.
 const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
 
-/// Deduct gas and return a `TRANSFER_TOKENS` operation that sends
-/// `response_body` as `bytes` to the callback contract.
+/// If `destination` is `Some`, deduct gas and return a `TRANSFER_TOKENS`
+/// operation that sends `response_body` as `bytes` to the callback contract.
+/// If `None`, return an empty operation list (no callback requested).
 fn dispatch_callback<'a>(
     ctx: &mut (impl CtxTrait<'a> + HasOperationGas),
-    destination: Address,
+    destination: Option<Address>,
     response_body: Vec<u8>,
 ) -> Result<Vec<OperationInfo<'a>>, TransferError> {
+    let Some(destination) = destination else {
+        return Ok(vec![]);
+    };
     ctx.operation_gas()
         .cast_and_consume_milligas(CALLBACK_DISPATCH_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)?;
@@ -2145,7 +2138,8 @@ mod tests {
         let mut ctx = MockCtx::new(&mut host, source, 0);
         let destination = make_test_address();
         let body = vec![0xDE, 0xAD];
-        let ops = dispatch_callback(&mut ctx, destination.clone(), body.clone()).unwrap();
+        let ops =
+            dispatch_callback(&mut ctx, Some(destination.clone()), body.clone()).unwrap();
         assert_eq!(ops.len(), 1);
         let op = &ops[0];
         assert_eq!(
@@ -2177,7 +2171,7 @@ mod tests {
         ctx.operation_gas().remaining.consume(to_consume).unwrap();
 
         let destination = make_test_address();
-        let result = dispatch_callback(&mut ctx, destination, vec![]);
+        let result = dispatch_callback(&mut ctx, Some(destination), vec![]);
         assert!(matches!(result, Err(TransferError::OutOfGas)));
     }
 
@@ -2194,7 +2188,7 @@ mod tests {
         let _ = ctx.operation_counter(); // 1
         let _ = ctx.operation_counter(); // 2
         let destination = make_test_address();
-        let ops = dispatch_callback(&mut ctx, destination, vec![]).unwrap();
+        let ops = dispatch_callback(&mut ctx, Some(destination), vec![]).unwrap();
         assert_eq!(
             ops[0].counter, 3,
             "counter should follow previously consumed values"
