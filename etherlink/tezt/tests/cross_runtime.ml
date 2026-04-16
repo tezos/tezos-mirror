@@ -521,6 +521,38 @@ module EvmCollectResult = struct
     in
     return receipt.gasUsed
 
+  (** Call [runCatch()] which wraps the precompile call in try/catch so
+   *  the outer tx commits even when the CRAC call reverts. *)
+  let call_run_catch ?expected_status ~sequencer ~sender ~nonce ~value contract
+      =
+    let* receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"runCatch()"
+        ~arguments:[]
+        ?expected_status
+        ()
+    in
+    return receipt.gasUsed
+
+  (** Assert whether the precompile call reverted, as recorded by
+   *  [runCatch()]. *)
+  let check_caught ~sequencer ~expected contract =
+    let caught_storage_pos = "0x02" in
+    let*@ caught =
+      Rpc.get_storage_at ~address:contract ~pos:caught_storage_pos sequencer
+    in
+    let bit = int_of_string caught in
+    Check.(
+      (bit = if expected then 1 else 0)
+        int
+        ~error_msg:"Expected EvmCollectResult `caught` %R but got %L") ;
+    unit
+
   (** Assert that the contract's [result] getter returns bytes whose hex
    *  representation equals [expected_hex] (lowercase, no [0x] prefix). *)
   let check_result ~sequencer ~expected_hex contract =
@@ -1048,6 +1080,55 @@ module TezCollectResult = struct
       protocol
 end
 
+(** Tezos contract that FAILWITHs on any call (unit parameter). *)
+module TezAlwaysFailsUnit = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "always_fails_unit"]
+      ~init_storage_data:"Unit"
+      ?init_balance
+      protocol
+end
+
+(** Tezos contract that emits two internal operations:  a call to the
+ *  gateway's [%collect_result] with a fixed payload, and a call to a
+ *  failing contract.  Used to verify that bytes deposited by the first
+ *  internal op do not leak as the HTTP response body when a later
+ *  internal op triggers a 4xx. *)
+module TezCollectResultThenFail = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~failing_kt1
+      ~payload_hex () =
+    let script_name = ["mini_scenarios"; "gateway_collect_result_then_fail"] in
+    let init_storage_data =
+      sf {|Pair "%s" (Pair "%s" 0x%s)|} gateway_address failing_kt1 payload_hex
+    in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -1118,7 +1199,12 @@ module CracRunnerWrapper = struct
       val call_run :
         ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
 
+      val call_run_catch :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
+
       val check_result : expected_hex:string -> evm_runner -> unit Lwt.t
+
+      val check_caught : expected:bool -> evm_runner -> unit Lwt.t
     end
 
     module EvmMultiRunCaller : sig
@@ -1175,6 +1261,19 @@ module CracRunnerWrapper = struct
     module TezCollectResult : sig
       val originate :
         ?init_balance:int -> payload_hex:string -> unit -> tez_runner Lwt.t
+    end
+
+    module TezAlwaysFailsUnit : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
+    end
+
+    module TezCollectResultThenFail : sig
+      val originate :
+        ?init_balance:int ->
+        failing:tez_runner ->
+        payload_hex:string ->
+        unit ->
+        tez_runner Lwt.t
     end
 
     module TezGasBurner : sig
@@ -1423,8 +1522,27 @@ module CracRunnerWrapper = struct
           in
           return gas_used
 
+        let call_run_catch ?expected_status ?(value = Wei.zero)
+            (`Evm_runner runner) =
+          let* gas_used =
+            EvmCollectResult.call_run_catch
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
+
         let check_result ~expected_hex (`Evm_runner runner) =
           EvmCollectResult.check_result ~sequencer ~expected_hex runner
+
+        let check_caught ~expected (`Evm_runner runner) =
+          EvmCollectResult.check_caught ~sequencer ~expected runner
       end
 
       module EvmMultiRunCaller = struct
@@ -1593,6 +1711,45 @@ module CracRunnerWrapper = struct
               ~counter:(tez_counter ())
               ~protocol
               ?init_balance
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezAlwaysFailsUnit = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezAlwaysFailsUnit.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultThenFail = struct
+        let originate ?init_balance ~failing:(`Tez_runner (_, failing_kt1))
+            ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultThenFail.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~failing_kt1
               ~payload_hex
               ()
           in
@@ -7794,6 +7951,36 @@ let test_crac_collect_result_surfaces_in_response_body =
   Log.debug ~prefix "Verify the returned bytes" ;
   EvmCollectResult.check_result ~expected_hex:payload_hex evm_reader
 
+(** End-to-end revert-path check: the Michelson contract deposits bytes
+    via [%collect_result] then triggers a failure via a second internal
+    op.  The server must return 4xx with no bytes leaking, so the EVM
+    precompile call reverts and [result] stays empty even after the
+    outer tx completes via [runCatch()]. *)
+let test_crac_collect_result_revert_discards_bytes =
+  register_crac_runner_test
+    ~title:"CRAC: revert discards %collect_result bytes"
+    ~tags:["collect_result"; "http_call"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let payload_hex = "cafebabe" in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Originate always_fails_unit.tz" ;
+  let* failing = TezAlwaysFailsUnit.originate () in
+  Log.debug
+    ~prefix
+    "Originate Michelson contract that calls %%collect_result then fails" ;
+  let* tez_contract =
+    TezCollectResultThenFail.originate ~failing ~payload_hex ()
+  in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_contract in
+  Log.debug ~prefix "Run (catching): CRAC should revert, no bytes leaked" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -7883,4 +8070,5 @@ let () =
   test_crac_gas_accounting_investigation [Alpha] ;
   test_crac_gas_error_path_reporting [Alpha] ;
   test_crac_gas_oog_path_reporting [Alpha] ;
-  test_crac_collect_result_surfaces_in_response_body [Alpha]
+  test_crac_collect_result_surfaces_in_response_body [Alpha] ;
+  test_crac_collect_result_revert_discards_bytes [Alpha]

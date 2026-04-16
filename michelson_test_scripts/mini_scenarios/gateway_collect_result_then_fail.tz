@@ -1,0 +1,38 @@
+# Deposits a bytes payload via the gateway's %collect_result entrypoint,
+# then causes the overall operation to fail by calling a failing contract.
+# Used to verify that bytes collected on a frame that ends up reverting
+# never leak as the HTTP response body.
+#
+# Storage: pair address (pair address bytes)
+#   1st address = gateway KT1 (target of %collect_result)
+#   2nd address = failing contract KT1 (always fails on unit)
+#   bytes       = payload to deposit
+parameter unit;
+storage (pair address (pair address bytes));
+code {
+       CDR;
+       DUP;
+       CAR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       DUP 2;
+       CDR;
+       CDR;
+       AMOUNT;
+       SWAP;
+       TRANSFER_TOKENS;
+       DUP 2;
+       CDR;
+       CAR;
+       CONTRACT unit;
+       ASSERT_SOME;
+       PUSH mutez 0;
+       UNIT;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       SWAP;
+       CONS;
+       PAIR
+     };
