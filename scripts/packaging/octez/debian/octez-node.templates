@@ -5,3 +5,10 @@ Description: Remove all node data
  This operation will remove all node data, including the configuration and
  associated files. If you choose not to proceed, the node data will remain
  intact, and only the packages will be removed.
+
+Template: octez-node/deprecation_notice
+Type: note
+Description: Deprecation notice for octez-node
+ The Octez Debian packages are deprecated and will be removed in a future
+ release. Users are advised to migrate to an alternative installation
+ method. Please refer to https://octez.tezos.com/docs/introduction/howtoget.html for more information.
