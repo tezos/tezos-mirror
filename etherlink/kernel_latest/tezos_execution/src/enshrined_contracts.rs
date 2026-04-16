@@ -760,12 +760,29 @@ where
     })
 }
 
-fn tezosx_cross_runtime_call<'a, Host>(
+/// Build an HTTP POST request targeting the Ethereum runtime at `dest`
+/// with `data` as the body.
+fn build_ethereum_request(
+    dest: &str,
+    data: &[u8],
+) -> Result<http::Request<Vec<u8>>, TransferError> {
+    let url = format!("http://ethereum/{dest}");
+    http::Request::builder()
+        .method(http::Method::POST)
+        .uri(&url)
+        .body(data.to_vec())
+        .map_err(|e| {
+            TransferError::GatewayError(format!("Failed to build HTTP request: {e}"))
+        })
+}
+
+/// Dispatch a CRAC call: inject context headers, serve the request,
+/// classify the response, and debit the gateway balance.
+fn dispatch_crac_call<'a, Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
-    dest: &str,
-    data: &[u8],
+    request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where
     Host: StorageV1,
@@ -774,23 +791,13 @@ where
         return Err(TransferError::GatewayError("Negative amount".into()).into());
     }
 
-    // Build an HTTP POST request targeting the Ethereum runtime.
-    let url = format!("http://ethereum/{dest}");
-    let request = http::Request::builder()
-        .method(http::Method::POST)
-        .uri(&url)
-        .body(data.to_vec())
-        .map_err(|e| {
-            TransferError::GatewayError(format!("Failed to build HTTP request: {e}"))
-        })?;
-
-    // Inject trusted X-Tezos-* context headers (sender alias, amount, etc.).
+    let target_host = request.uri().host().map(str::to_string);
     let request = inject_context_headers(request, ctx, journal, registry)?;
 
     let response = registry.serve(ctx.host(), journal, request);
     let response_body = classify_and_charge_crac_response(
         response,
-        Some("ethereum"),
+        target_host.as_deref(),
         ctx.operation_gas(),
     )?;
 
@@ -802,6 +809,20 @@ where
         .set_balance(host, &0u64.into())
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
     Ok(response_body)
+}
+
+fn tezosx_cross_runtime_call<'a, Host>(
+    registry: &impl Registry,
+    journal: &mut TezosXJournal,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
+    dest: &str,
+    data: &[u8],
+) -> Result<Vec<u8>, CracError>
+where
+    Host: StorageV1,
+{
+    let request = build_ethereum_request(dest, data)?;
+    dispatch_crac_call(registry, journal, ctx, request)
 }
 
 fn bigint_to_u256(value: &num_bigint::BigInt) -> Result<U256, TransferError> {
