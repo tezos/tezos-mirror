@@ -237,7 +237,15 @@ let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
   in
   match res with
   | Ok (rev_shards, count_elts) ->
-      if needed > count_elts then return_none
+      if needed > count_elts then
+        let*! () =
+          Event.emit_not_enough_shards_for_reconstruction
+            ~published_level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+            ~provided:count_elts
+            ~required:needed
+        in
+        return_none
       else List.take_n needed rev_shards |> List.to_seq |> return_some
   | Error _ -> return_none
 

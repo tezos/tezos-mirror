@@ -425,6 +425,20 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
 
+  let not_enough_shards_for_reconstruction =
+    declare_4
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"not_enough_shards_for_reconstruction"
+      ~msg:
+        "Not enough shards to reconstruct slot at level {published_level}, \
+         index {slot_index}: {provided} shards available, {required} needed"
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("provided", Data_encoding.int31)
+      ("required", Data_encoding.int31)
+
   let slot_header_status_not_found =
     declare_2
       ~section
@@ -1545,6 +1559,12 @@ let emit_upgrading_configuration ~from ~into =
 
 let emit_stored_slot_content ~published_level ~slot_index =
   emit stored_slot_content (published_level, slot_index)
+
+let emit_not_enough_shards_for_reconstruction ~published_level ~slot_index
+    ~provided ~required =
+  emit
+    not_enough_shards_for_reconstruction
+    (published_level, slot_index, provided, required)
 
 let emit_stored_slot_shard ~published_level ~slot_index ~shard_index =
   emit stored_slot_shard (published_level, slot_index, shard_index)
