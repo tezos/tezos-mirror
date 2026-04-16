@@ -60,6 +60,7 @@ type atomic_transaction_batch = private {transactions : transaction list}
 type outbox_message = private
   | Atomic_transaction_batch of atomic_transaction_batch
   | Whitelist_update of Sc_rollup.Whitelist.t option
+  | Canonical_rollup_signal of string
 
 (** [make_internal_transfer ctxt ty ~payload ~sender ~source ~destination]
     constructs a smart rollup's [inbox message] (an L1 to L2 message)
