@@ -24,21 +24,6 @@ module CI = Cacio.Shared
    result in publishing the same artifact twice. *)
 let no_retry = Gitlab_ci.Types.{max = 0; when_ = []}
 
-let monitoring_child_pipeline =
-  (* Using lazy lets us define the pipeline at toplevel,
-     but actually execute the code after the jobs have been defined with Cacio
-     (they have not yet been defined when this toplevel definition is executed),
-     and only once (there are multiple pipelines with a trigger job for octez_monitoring,
-     but a pipeline cannot be registered more than once). *)
-  lazy
-    (Pipeline.register_child
-       "octez_monitoring"
-       ~description:"Octez monitoring jobs"
-       ~inherit_:
-         (Gitlab_ci.Types.Variable_list
-            ["ci_image_name"; "ci_image_name_protected"])
-       ~jobs:([job_datadog_pipeline_trace] @ Cacio.get_jobs Octez_monitoring))
-
 let job_docker = Docker.job_docker `released
 
 let job_docker_merge_manifests = Docker.job_docker_merge_manifests `released
@@ -397,20 +382,12 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  let job_trigger_monitoring =
-    trigger_job
-      ~__POS__
-      ~dependencies:(Dependent [])
-      ~stage:Stages.build
-      (Lazy.force monitoring_child_pipeline)
-  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
     (* Stage: build *)
     job_build_homebrew_release;
   ]
-  @ [job_trigger_monitoring]
   @ Cacio.get_jobs pipeline_type
 
 let job_docker_promote_to_version =
