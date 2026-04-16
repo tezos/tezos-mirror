@@ -515,6 +515,14 @@ where
     Host: StorageV1,
 {
     let target_host = request.uri().host().map(str::to_string);
+    let target_runtime = target_host
+        .as_deref()
+        .and_then(RuntimeId::from_host)
+        .ok_or_else(|| {
+            TransferError::GatewayError(
+                "http_call: unknown or missing target runtime in URL host".into(),
+            )
+        })?;
     let sender = ctx.sender();
     let source = AddressHash::from(ctx.source());
     let amount_mutez: u64 = ctx
@@ -541,9 +549,9 @@ where
     //   storage lookup. This is always paid, whether the alias exists or not.
     //
     // Phase 2 (generation): if the alias does not exist, get_or_create_alias
-    //   forwards the remaining gas (converted to EVM units) to the EVM
-    //   runtime's generate_alias, which consumes gas internally. The consumed
-    //   EVM gas is returned, converted back to milligas, and charged.
+    //   forwards the remaining gas (converted to target runtime units) to the
+    //   target runtime's generate_alias, which consumes gas internally. The
+    //   consumed gas is returned, converted back to milligas, and charged.
     //   On cache hit, phase 2 costs nothing (consumed = 0).
 
     // --- sender alias ---
@@ -551,21 +559,21 @@ where
         .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)?;
     let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-    // Convert remaining milligas to EVM gas: this caps the budget that
-    // get_or_create_alias may spend on alias generation.
-    let evm_budget =
-        convert_gas(RuntimeId::Tezos, RuntimeId::Ethereum, remaining_milligas)
-            .ok_or(TransferError::OutOfGas)?;
-    let (sender_alias, sender_evm_consumed) = get_or_create_alias(
+    // Convert remaining milligas to target runtime gas: this caps the budget
+    // that get_or_create_alias may spend on alias generation.
+    let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+        .ok_or(TransferError::OutOfGas)?;
+    let (sender_alias, sender_target_consumed) = get_or_create_alias(
         ctx.host(),
         journal,
         &sender,
         context.clone(),
         registry,
-        evm_budget,
+        target_runtime,
+        target_budget,
     )?;
     let sender_milligas =
-        convert_gas(RuntimeId::Ethereum, RuntimeId::Tezos, sender_evm_consumed)
+        convert_gas(target_runtime, RuntimeId::Tezos, sender_target_consumed)
             .ok_or(TransferError::OutOfGas)?;
     ctx.operation_gas()
         .cast_and_consume_milligas(sender_milligas)
@@ -576,13 +584,19 @@ where
         .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
         .map_err(|_| TransferError::OutOfGas)?;
     let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-    let evm_budget =
-        convert_gas(RuntimeId::Tezos, RuntimeId::Ethereum, remaining_milligas)
-            .ok_or(TransferError::OutOfGas)?;
-    let (source_alias, source_evm_consumed) =
-        get_or_create_alias(ctx.host(), journal, &source, context, registry, evm_budget)?;
+    let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+        .ok_or(TransferError::OutOfGas)?;
+    let (source_alias, source_target_consumed) = get_or_create_alias(
+        ctx.host(),
+        journal,
+        &source,
+        context,
+        registry,
+        target_runtime,
+        target_budget,
+    )?;
     let source_milligas =
-        convert_gas(RuntimeId::Ethereum, RuntimeId::Tezos, source_evm_consumed)
+        convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
             .ok_or(TransferError::OutOfGas)?;
     ctx.operation_gas()
         .cast_and_consume_milligas(source_milligas)
@@ -590,14 +604,6 @@ where
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
     // forwarded limit reflects gas already consumed by alias resolution.
-    let target_runtime = target_host
-        .as_deref()
-        .and_then(RuntimeId::from_host)
-        .ok_or_else(|| {
-            TransferError::GatewayError(
-                "http_call: unknown or missing target runtime in URL host".into(),
-            )
-        })?;
     let remaining_after_aliases =
         ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
     let gas_limit =
@@ -697,38 +703,40 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
     [hash[0], hash[1], hash[2], hash[3]]
 }
 
-/// Look up the Ethereum alias for `address`. If none exists, generate one
-/// via `registry`, passing `gas_remaining` (EVM gas) as budget.
+/// Look up the alias for `address` on the given `target_runtime`. If none
+/// exists, generate one via `registry`, passing `gas_remaining` (in target
+/// runtime units) as budget.
 ///
-/// Returns `(alias, generation_gas_consumed)` where the gas is in EVM gas
-/// units (0 on cache hit).
+/// Returns `(alias, generation_gas_consumed)` where the gas is in the
+/// target runtime's units (0 on cache hit).
 fn get_or_create_alias<Host>(
     host: &mut Host,
     journal: &mut TezosXJournal,
     address: &AddressHash,
     context: CrossRuntimeContext,
     registry: &impl Registry,
-    gas_remaining_evm: u64,
+    target_runtime: RuntimeId,
+    gas_remaining: u64,
 ) -> Result<(String, u64), TransferError>
 where
     Host: StorageV1,
 {
-    if let Some(alias) = get_alias(host, address, RuntimeId::Ethereum)? {
+    if let Some(alias) = get_alias(host, address, target_runtime)? {
         return Ok((alias, 0));
     }
     let address_b58 = address.to_base58_check();
-    let (alias_str, evm_gas_remaining_after) = registry
+    let (alias_str, gas_remaining_after) = registry
         .generate_alias(
             host,
             journal,
             &address_b58,
-            RuntimeId::Ethereum,
+            target_runtime,
             context,
-            gas_remaining_evm,
+            gas_remaining,
         )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    let consumed = gas_remaining_evm - evm_gas_remaining_after;
-    store_alias(host, address, RuntimeId::Ethereum, &alias_str)?;
+    let consumed = gas_remaining - gas_remaining_after;
+    store_alias(host, address, target_runtime, &alias_str)?;
     Ok((alias_str, consumed))
 }
 
