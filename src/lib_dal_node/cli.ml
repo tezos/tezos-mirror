@@ -863,6 +863,14 @@ module Run = struct
           allow_publication_regularly
       else return_unit
     in
+    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let lock_file = Filename.concat data_dir "lock" in
+    Lwt_lock_file.with_lock
+      ~when_locked:
+        (`Fail
+           (Exn (Failure "DAL node data directory is locked by another process")))
+      ~filename:lock_file
+    @@ fun () ->
     Daemon.run
       ~disable_shard_validation
       ~ignore_pkhs
