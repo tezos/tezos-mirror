@@ -198,24 +198,23 @@ where
                 let body = dispatch_crac_call(registry, journal, ctx, request)?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
-                // %collect_result allows a Michelson adapter to deposit
-                // a result payload into the current CRAC frame so the
-                // kernel can return it as the HTTP response body to
-                // the EVM gateway, giving EVM callers a synchronous
-                // return value.
-                //
-                // For now we accept the bytes but discard them.
-                // Storing the value in the CRAC frame is handled in a
-                // follow-up issue.
-                //
+                // %collect_result lets a Michelson adapter deposit a
+                // result payload on the current CRAC frame so the kernel
+                // can later surface it as the HTTP response body to the
+                // EVM gateway, giving EVM callers a synchronous return
+                // value.
+                // TODO: L2-1174 HTTP surfacing is tracked separately
                 // TODO: L2-1224 define a gas model for %collect_result
                 // and charge it here.
-                let TypedValue::Bytes(_payload) = typed else {
+                let TypedValue::Bytes(payload) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
                     )
                     .into());
                 };
+                journal.michelson.set_frame_result(payload).map_err(|e| {
+                    TransferError::GatewayError(format!("collect_result: {e}"))
+                })?;
                 Ok(vec![])
             } else {
                 Err(TransferError::GatewayError(format!(
