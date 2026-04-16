@@ -159,38 +159,6 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
-apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.build-debian
-  - oc.build-data_packages
-  dependencies:
-  - oc.build-debian
-  - oc.build-data_packages
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: ""
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
-
 oc.build-ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
   stage: build
@@ -234,38 +202,6 @@ oc.build-ubuntu:
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
-
-apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - oc.build-ubuntu
-  - oc.build-data_packages
-  dependencies:
-  - oc.build-ubuntu
-  - oc.build-data_packages
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - apt-get install -y --update apt-utils debsigs
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    ARCHITECTURES: amd64 arm64
-    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
-    PREFIX: ""
-  id_tokens:
-    GCP_ID_TOKEN:
-      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
-  retry: 0
 
 oc.build:static-arm64-linux-released-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -473,6 +409,72 @@ docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  retry: 0
+
+apt_repo_ubuntu:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-ubuntu
+  - oc.build-data_packages
+  dependencies:
+  - oc.build-ubuntu
+  - oc.build-data_packages
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
+  retry: 0
+
+apt_repo_debian:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - oc.build-debian
+  - oc.build-data_packages
+  dependencies:
+  - oc.build-debian
+  - oc.build-data_packages
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - apt-get install -y --update apt-utils debsigs
+  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    ARCHITECTURES: amd64 arm64
+    GNUPGHOME: $CI_PROJECT_DIR/.gnupg
+    PREFIX: ""
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
 gitlab:create_package:
