@@ -3175,6 +3175,13 @@ let octez_context_brassaia_memory =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+let octez_riscv_nds_common =
+  octez_lib
+    "riscv-nds-common"
+    ~internal_name:"octez_riscv_nds_common"
+    ~path:"src/lib_riscv_nds/common"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+
 let octez_scoru_wasm =
   octez_lib
     "scoru-wasm"
@@ -3795,13 +3802,6 @@ let octez_riscv_api =
     ~link_deps:lib_wasmer_riscv
     ~modules:["octez_riscv_api"]
     ~dune:Dune.[[S "copy_files"; S "../../riscv/api/octez_riscv_api.*"]]
-
-let octez_riscv_nds_common =
-  public_lib
-    "octez-riscv-nds.common"
-    ~path:"src/lib_riscv_nds/common"
-    ~synopsis:"RISC-V new durable storage"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
 
 let octez_riscv_durable_storage_in_memory_api =
   public_lib

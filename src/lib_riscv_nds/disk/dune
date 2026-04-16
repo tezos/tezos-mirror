@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  octez-riscv-nds.common
+  octez-libs.riscv-nds-common
   octez-riscv-nds-disk-api)
  (flags
   (:standard)
