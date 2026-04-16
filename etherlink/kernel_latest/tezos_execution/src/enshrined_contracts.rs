@@ -176,15 +176,9 @@ where
                     tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
-                let (mut request, callback) = extract_http_call_request(typed)?;
+                let (request, callback) = extract_http_call_request(typed)?;
                 let target_host = request.uri().host().map(str::to_string);
-                inject_context_headers(
-                    request.headers_mut(),
-                    target_host.as_deref(),
-                    ctx,
-                    journal,
-                    registry,
-                )?;
+                let request = inject_context_headers(request, ctx, journal, registry)?;
                 let response = registry.serve(ctx.host(), journal, request);
                 let body = classify_and_charge_crac_response(
                     response,
@@ -511,21 +505,21 @@ fn inject_context_headers_raw(
     Ok(())
 }
 
-/// Inject trusted X-Tezos-* context headers derived from `ctx` into `headers`.
+/// Inject trusted X-Tezos-* context headers derived from `ctx` into `request`.
 ///
-/// `target_host` is the URL host of the destination runtime (e.g. `"ethereum"`,
+/// The target runtime is derived from the request URI host (e.g. `"ethereum"`,
 /// `"tezos"`). Gas is converted from Tezos milligas to the target runtime's
 /// units before being written to `X-Tezos-Gas-Limit`.
 fn inject_context_headers<'a, Host>(
-    headers: &mut http::HeaderMap,
-    target_host: Option<&str>,
+    mut request: http::Request<Vec<u8>>,
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasOperationGas),
     journal: &mut TezosXJournal,
     registry: &impl Registry,
-) -> Result<(), TransferError>
+) -> Result<http::Request<Vec<u8>>, TransferError>
 where
     Host: StorageV1,
 {
+    let target_host = request.uri().host().map(str::to_string);
     let sender = ctx.sender();
     let source = AddressHash::from(ctx.source());
     let amount_mutez: u64 = ctx
@@ -601,11 +595,14 @@ where
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
     // forwarded limit reflects gas already consumed by alias resolution.
-    let target_runtime = target_host.and_then(RuntimeId::from_host).ok_or_else(|| {
-        TransferError::GatewayError(
-            "http_call: unknown or missing target runtime in URL host".into(),
-        )
-    })?;
+    let target_runtime = target_host
+        .as_deref()
+        .and_then(RuntimeId::from_host)
+        .ok_or_else(|| {
+            TransferError::GatewayError(
+                "http_call: unknown or missing target runtime in URL host".into(),
+            )
+        })?;
     let remaining_after_aliases =
         ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
     let gas_limit =
@@ -616,7 +613,7 @@ where
                 )
             })?;
     inject_context_headers_raw(
-        headers,
+        request.headers_mut(),
         &sender_alias,
         &source_alias,
         amount_mutez,
@@ -624,7 +621,8 @@ where
         timestamp_u64,
         block_number_u32,
         &journal.crac_id().to_string(),
-    )
+    )?;
+    Ok(request)
 }
 
 /// Extract (evm_contract, address_bytes, value) from a typed
@@ -778,7 +776,7 @@ where
 
     // Build an HTTP POST request targeting the Ethereum runtime.
     let url = format!("http://ethereum/{dest}");
-    let mut request = http::Request::builder()
+    let request = http::Request::builder()
         .method(http::Method::POST)
         .uri(&url)
         .body(data.to_vec())
@@ -787,13 +785,7 @@ where
         })?;
 
     // Inject trusted X-Tezos-* context headers (sender alias, amount, etc.).
-    inject_context_headers(
-        request.headers_mut(),
-        Some("ethereum"),
-        ctx,
-        journal,
-        registry,
-    )?;
+    let request = inject_context_headers(request, ctx, journal, registry)?;
 
     let response = registry.serve(ctx.host(), journal, request);
     let response_body = classify_and_charge_crac_response(
