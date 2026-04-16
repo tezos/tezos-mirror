@@ -122,8 +122,17 @@ impl TezBlock {
             next_protocol,
             operations: OperationsWithReceipts { list: operations },
         };
+        let hash = block.hash()?;
+        // Genesis convention: the first Tezos block is its own predecessor.
+        let previous_hash =
+            if previous_hash == primitive_types::H256(*Self::genesis_block_hash()) {
+                BlockHash::from(*hash)
+            } else {
+                block.previous_hash
+            };
         Ok(Self {
-            hash: block.hash()?,
+            hash,
+            previous_hash,
             ..block
         })
     }
