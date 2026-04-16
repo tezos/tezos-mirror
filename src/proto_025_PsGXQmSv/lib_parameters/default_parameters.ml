@@ -242,6 +242,9 @@ let constants_mainnet : Constants.Parametric.t =
   in
   let sc_rollup =
     make_sc_rollup_parameter
+      ~canonical_rollup:
+        (Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
+           "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf")
       ~dal_activation_level
       ~dal_attested_slots_validity_lag
       block_time
