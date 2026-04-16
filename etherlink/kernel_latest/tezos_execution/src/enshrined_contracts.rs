@@ -163,7 +163,8 @@ where
                     )
                     .into());
                 };
-                tezosx_cross_runtime_call(registry, journal, ctx, &dest, &[])?;
+                let request = build_ethereum_request(&dest, &[])?;
+                dispatch_crac_call(registry, journal, ctx, request)?;
                 Ok(vec![])
             } else if entrypoint.as_str() == "call_evm" {
                 let (dest, method_sig, abi_params, callback) =
@@ -172,8 +173,8 @@ where
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
                 calldata.extend_from_slice(&abi_params);
-                let response_body =
-                    tezosx_cross_runtime_call(registry, journal, ctx, &dest, &calldata)?;
+                let request = build_ethereum_request(&dest, &calldata)?;
+                let response_body = dispatch_crac_call(registry, journal, ctx, request)?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
                 let (request, callback) = extract_http_call_request(typed)?;
@@ -225,7 +226,8 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
-            tezosx_cross_runtime_call(registry, journal, ctx, &evm_contract, &calldata)?;
+            let request = build_ethereum_request(&evm_contract, &calldata)?;
+            dispatch_crac_call(registry, journal, ctx, request)?;
             Ok(vec![])
         }
     }
@@ -811,20 +813,6 @@ where
     Ok(response_body)
 }
 
-fn tezosx_cross_runtime_call<'a, Host>(
-    registry: &impl Registry,
-    journal: &mut TezosXJournal,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
-    dest: &str,
-    data: &[u8],
-) -> Result<Vec<u8>, CracError>
-where
-    Host: StorageV1,
-{
-    let request = build_ethereum_request(dest, data)?;
-    dispatch_crac_call(registry, journal, ctx, request)
-}
-
 fn bigint_to_u256(value: &num_bigint::BigInt) -> Result<U256, TransferError> {
     let (_, bytes) = value.to_bytes_le();
     if bytes.len() > 32 {
@@ -1059,7 +1047,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tezosx_cross_runtime_call_passes_calldata() {
+    fn test_dispatch_crac_call_passes_calldata() {
         let mut host = MockKernelHost::default();
         let registry = MockRegistry::new("KT1_mock_alias".to_string());
 
@@ -1080,8 +1068,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &calldata);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &calldata).unwrap(),
+        );
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -1121,8 +1113,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount as i64);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_ok());
 
         // Verify generate_alias was called for both sender and source
@@ -1158,13 +1154,21 @@ mod tests {
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First transfer creates aliases (sender + source)
-        let result1 =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result1 = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result1.is_ok());
 
         // Second transfer should reuse aliases
-        let result2 =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result2 = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result2.is_ok());
 
         // generate_alias should have been called twice (sender + source on first call)
@@ -1193,8 +1197,12 @@ mod tests {
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         let gas_before = ctx.operation_gas().remaining.milligas().unwrap();
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_ok());
         let gas_after = ctx.operation_gas().remaining.milligas().unwrap();
 
@@ -1228,14 +1236,22 @@ mod tests {
         let mut ctx = MockCtx::new(&mut host, source, amount);
 
         // First call: aliases are generated (expensive)
-        let result1 =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result1 = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result1.is_ok());
         let gas_after_first = ctx.operation_gas().remaining.milligas().unwrap();
 
         // Second call: aliases are cached (cheaper)
-        let result2 =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result2 = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result2.is_ok());
         let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
 
@@ -1471,8 +1487,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -1495,8 +1515,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1628,8 +1652,12 @@ mod tests {
         let amount = 100i64;
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1656,8 +1684,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, 0);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1958,8 +1990,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
@@ -1982,8 +2018,12 @@ mod tests {
 
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         let mut ctx = MockCtx::new(&mut host, source, amount);
-        let result =
-            tezosx_cross_runtime_call(&registry, &mut journal, &mut ctx, dest, &[]);
+        let result = dispatch_crac_call(
+            &registry,
+            &mut journal,
+            &mut ctx,
+            build_ethereum_request(dest, &[]).unwrap(),
+        );
         assert!(result.is_ok());
 
         let serve_calls = registry.serve_calls.borrow();
