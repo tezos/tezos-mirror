@@ -43,6 +43,10 @@ General
   ``octez-accuser-PtSeouLo`` executables have been removed. The ``--network
   seoulnet`` alias has also been removed.
 
+- Fixed Prometheus metrics output to include spaces after ``#`` in ``# HELP``
+  and ``# TYPE`` comment lines, as required by the text format.
+  this restores compatibility with scrapers. (MR :gl:`!20469`)
+
 Node
 ----
 
