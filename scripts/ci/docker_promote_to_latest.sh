@@ -56,3 +56,22 @@ for docker_image in ${docker_images}; do
   echo "### Verifying signature for docker image: ${docker_image}"
   ./scripts/ci/docker_verify_signature.sh "${docker_image}:${target_tag}"
 done
+
+# Vulnerability attestation: attach a signed in-toto vuln predicate
+# produced by the container_scanning job (passed via VULN_PREDICATE artifact).
+if [ -n "${VULN_PREDICATE:-}" ] && [ -f "${VULN_PREDICATE}" ]; then
+  echo "### Attaching vulnerability attestations"
+
+  # Re-create GCP credentials for cosign attest
+  # (cosign is already installed by docker_sign.sh above)
+  echo "${GCP_SIGNER_SERVICE_ACCOUNT}" | base64 -d > signer_sa.json
+  trap 'rm -f signer_sa.json' EXIT
+  export GOOGLE_APPLICATION_CREDENTIALS=signer_sa.json
+
+  for docker_image in ${docker_images}; do
+    IMAGE_DIGEST="${docker_image}@$(docker buildx imagetools inspect "${docker_image}:${target_tag}" --format '{{json .Manifest}}' | jq -r '.digest')"
+    echo "==> Attesting ${IMAGE_DIGEST}"
+    cosign attest --predicate "${VULN_PREDICATE}" --type vuln \
+      --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y
+  done
+fi
