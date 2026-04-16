@@ -137,26 +137,14 @@ let create_dropbox ?on_completion =
   in
   create table (create_handlers ?on_completion ())
 
-(* Simulates a stream of data with a blocking [pop] function.
-   Items are buffered so pushes are never lost regardless of whether the
-   worker has reached its [read] call yet.  This is necessary because
-   [Lwt.pause ()] in [worker.ml]'s [loop ()] means the worker may not be
-   waiting on the condition at the moment the test broadcasts. *)
 let make_stream () =
-  let buf = Queue.create () in
-  let avail = Lwt_condition.create () in
-  let push x =
-    Queue.push x buf ;
-    Lwt_condition.broadcast avail ()
+  let stream, push_to_stream = Lwt_stream.create () in
+  let push_to_stream value = push_to_stream (Some value) in
+  let read_from_stream () =
+    let* value_opt = Lwt_stream.get stream in
+    match value_opt with None -> assert false | Some value -> Lwt.return value
   in
-  let rec read () =
-    let open Lwt_syntax in
-    if Queue.is_empty buf then
-      let* () = Lwt_condition.wait avail in
-      read ()
-    else Lwt.return (Queue.pop buf)
-  in
-  (push, read)
+  (push_to_stream, read_from_stream)
 
 let create_callback_worker ?on_completion ?on_error ?on_close read =
   let table = Worker.create_table (Callback read) in
@@ -560,17 +548,22 @@ let _test_raise_exn () =
 let test_async_dropbox () =
   with_alarm 2 "test_async_dropbox: timed out" @@ fun () ->
   let open Lwt_result_syntax in
+  let t_first, u_first = Lwt.task () in
   let t_end, u_end = Lwt.task () in
+  let t_each, u_each = Lwt.task () in
   (* Fired by the first [on_completion] to tell the test the dropbox slot
      is free (worker has taken the first request). *)
-  let t_processing, u_processing = Lwt.task () in
   let nb_completion = ref 0 in
   let* w =
     create_dropbox
       ~on_completion:(fun () ->
         incr nb_completion ;
-        if !nb_completion = 1 then Lwt.wakeup_later u_processing () ;
-        if !nb_completion = 2 then Lwt.wakeup_later u_end () ;
+        (* once the first message is popped, we can start pushing other messages*)
+        if !nb_completion = 1 then Lwt.wakeup u_first () ;
+        (* Waiting for all messages to be pushed in the dropbox before unlocking the worker loop *)
+        let*! () = t_each in
+        (* Second turn, processing the merged messages *)
+        if !nb_completion = 2 then Lwt.wakeup u_end () ;
         Lwt.return_unit)
       "dropbox_worker"
   in
@@ -580,12 +573,13 @@ let test_async_dropbox () =
   Worker.Dropbox.put_request w rq ;
   (* Wait until the worker is inside [on_completion] for the first request:
      at that point the dropbox slot is free. *)
-  let*! () = t_processing in
-  (* Queue [n] more requests while the worker is still processing the first.
-     They all land on the free slot and are merged into a single [RqA n]. *)
+  let*! () = t_first in
+  (* While the blocking request is handled, n other requests are sent *)
+  (* There requests should be merged into one *)
   for _i = 1 to n do
     Worker.Dropbox.put_request w rq
   done ;
+  Lwt.wakeup u_each () ;
   let*! () = t_end in
   (* Expected: two completions — [RqA 1] first, then the merged [RqA n]. *)
   let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
