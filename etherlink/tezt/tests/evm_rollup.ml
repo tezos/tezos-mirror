@@ -3301,20 +3301,17 @@ let test_kernel_upgrade_activates_michelson_runtime =
       string)
     ~error_msg:"Block 5 (pre-sunrise) should not be found, got %L" ;
   (* Block 6 is the activation/sunrise block: the first Tezos block produced.
-     It has a particular hash and its predecessor is itself (genesis
-     convention). *)
-  (* TODO https://linear.app/tezos/issue/L2-1182: adapt test with the correct
-     genesis hash and the fact that predecessor = own hash. *)
+     Its predecessor is itself (genesis convention). *)
   let* block6 = get_block_header 6 in
   let block6_level = JSON.(block6 |-> "level" |> as_int) in
   Check.((block6_level = 6) int)
     ~error_msg:"Block 6 should have level %R, got %L" ;
   let block6_hash = JSON.(block6 |-> "hash" |> as_string) in
   let block6_predecessor = JSON.(block6 |-> "predecessor" |> as_string) in
-  Check.((block6_predecessor <> block6_hash) string)
+  Check.((block6_predecessor = block6_hash) string)
     ~error_msg:
-      "Block 6 (genesis Tezos block) is not yet its own predecessor: expected \
-       something different than %R" ;
+      "Block 6 (genesis Tezos block) should be its own predecessor: expected \
+       %R, got %L" ;
   (* Block 7: one block after the sunrise block. *)
   let* block7 = get_block_header 7 in
   let block7_level = JSON.(block7 |-> "level" |> as_int) in
