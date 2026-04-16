@@ -1156,6 +1156,17 @@ let test_create_mockup_config_show_init_roundtrip protocols =
             JSON.(value |> as_string_opt)
         in
         `String value'
+    | "#/definitions/smart_rollup_address" ->
+        let value' =
+          distinct_sample_list
+            ~equal:String.equal
+            [
+              "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf";
+              "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg";
+            ]
+            JSON.(value |> as_string_opt)
+        in
+        `String value'
     | "array" -> (
         let array_items = JSON.(value |> as_list) in
         match array_items with

@@ -42,7 +42,7 @@ let seconds_in_a_day = 60 * 60 * 24
 
 let seconds_in_a_week = seconds_in_a_day * 7
 
-let make_sc_rollup_parameter ~dal_activation_level
+let make_sc_rollup_parameter ?canonical_rollup ~dal_activation_level
     ~dal_attested_slots_validity_lag block_time =
   (* Maximum number of outbox messages per level.
 
@@ -139,6 +139,7 @@ let make_sc_rollup_parameter ~dal_activation_level
         };
       private_enable = true;
       riscv_pvm_enable = false;
+      canonical_rollup_address = canonical_rollup;
     }
 
 let default_cryptobox_parameters =
@@ -241,6 +242,9 @@ let constants_mainnet : Constants.Parametric.t =
   in
   let sc_rollup =
     make_sc_rollup_parameter
+      ~canonical_rollup:
+        (Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
+           "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf")
       ~dal_activation_level
       ~dal_attested_slots_validity_lag
       block_time
@@ -491,6 +495,8 @@ let constants_sandbox =
     allow_tz4_delegate_enable = true;
     native_contracts_enable = true;
     tz5_account_enable = true;
+    sc_rollup =
+      {constants_mainnet.sc_rollup with canonical_rollup_address = None};
   }
 
 let constants_test =
@@ -534,6 +540,8 @@ let constants_test =
     max_operations_time_to_live = 8;
     native_contracts_enable = true;
     tz5_account_enable = true;
+    sc_rollup =
+      {constants_mainnet.sc_rollup with canonical_rollup_address = None};
   }
 
 let test_commitments =

@@ -151,6 +151,7 @@ type sc_rollup = {
   private_enable : bool;
   (* Activates the RISC-V pvm. *)
   riscv_pvm_enable : bool;
+  canonical_rollup_address : Smart_rollup.Address.t option;
 }
 
 type zk_rollup = {
