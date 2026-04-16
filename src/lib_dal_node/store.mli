@@ -268,6 +268,11 @@ val init :
   Types.proto_parameters ->
   t tzresult Lwt.t
 
+(** [close t] closes all storage backends (KVS shards and slots stores,
+    SQLite skip-list cells, and single-value stores). Pending writes are
+    flushed before handles are released. *)
+val close : t -> unit tzresult Lwt.t
+
 (** [add_slot_headers ~number_of_slots ~block_level slot_headers store]
     processes the [slot_headers] published at [block_level]. Concretely, for
     each slot header successfully applied in the L1 block,
