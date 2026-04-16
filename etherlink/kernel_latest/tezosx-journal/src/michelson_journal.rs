@@ -16,7 +16,31 @@ struct ExternalCheckpoint {
     /// Length of `pending_crac_receipts` at the time the checkpoint was
     /// created.  On revert, receipts are truncated back to this count.
     receipt_count: usize,
+    /// Payload deposited by Michelson via `%collect_result` during this
+    /// frame.  Populated at most once per frame; dropped (alongside the
+    /// checkpoint) on `commit_frame`/`revert_frame`.
+    frame_result: Option<Vec<u8>>,
 }
+
+/// Error returned by [`MichelsonJournal::set_frame_result`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum SetFrameResultError {
+    /// No external checkpoint is active — there is no frame to write to.
+    NoFrame,
+    /// The current frame already holds a result (once-per-frame invariant).
+    AlreadySet,
+}
+
+impl core::fmt::Display for SetFrameResultError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoFrame => f.write_str("no active external checkpoint"),
+            Self::AlreadySet => f.write_str("frame result already set"),
+        }
+    }
+}
+
+impl std::error::Error for SetFrameResultError {}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct MichelsonJournal {
@@ -78,7 +102,35 @@ impl MichelsonJournal {
         self.external_checkpoints.push(ExternalCheckpoint {
             snapshot_watermark: self.snapshots.len(),
             receipt_count: self.pending_crac_receipts.len(),
+            frame_result: None,
         });
+    }
+
+    /// Returns the current frame's `%collect_result` payload, if one has
+    /// been set.  Non-destructive: repeated calls observe the same value
+    /// until the frame is committed or reverted.
+    pub fn frame_result(&self) -> Option<&[u8]> {
+        self.external_checkpoints.last()?.frame_result.as_deref()
+    }
+
+    /// Deposit the `%collect_result` payload on the topmost frame.
+    ///
+    /// Fails with [`SetFrameResultError::NoFrame`] if called outside an
+    /// external checkpoint, or [`SetFrameResultError::AlreadySet`] if the
+    /// current frame already holds a result (once-per-frame invariant).
+    pub fn set_frame_result(
+        &mut self,
+        bytes: Vec<u8>,
+    ) -> Result<(), SetFrameResultError> {
+        let top = self
+            .external_checkpoints
+            .last_mut()
+            .ok_or(SetFrameResultError::NoFrame)?;
+        if top.frame_result.is_some() {
+            return Err(SetFrameResultError::AlreadySet);
+        }
+        top.frame_result = Some(bytes);
+        Ok(())
     }
 
     // Called by EVM journal on checkpoint commit.
@@ -97,6 +149,7 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
+                frame_result: None,
             });
         let drain_from = if self.external_checkpoints.is_empty() {
             checkpoint.snapshot_watermark
@@ -128,6 +181,7 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
+                frame_result: None,
             });
         // Drop CRAC receipts pushed during this frame.
         self.pending_crac_receipts

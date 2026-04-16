@@ -10,5 +10,5 @@ mod tezosx_journal;
 
 pub use evm_journal::{CracTransactionInfo, EvmJournal};
 pub use layered_state::LayeredState;
-pub use michelson_journal::MichelsonJournal;
+pub use michelson_journal::{MichelsonJournal, SetFrameResultError};
 pub use tezosx_journal::{CracId, HttpTrace, TezosXJournal};
