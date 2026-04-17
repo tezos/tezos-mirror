@@ -1009,7 +1009,12 @@ let apply_manager_operation : type kind.
            should be solved by forking out [validate_operation] from
            [apply_operation]. *)
         let* () = Contract.must_be_allocated ctxt source_contract in
-        (* Check proof *)
+        (* Cryptographic verification of the BLS proof of possession.
+           The gas budget for this check was reserved during validation
+           (see {!Validate.check_bls_proof_for_manager_pk}); here we
+           consume the gas and perform the actual [pop_verify]. If the
+           proof is invalid the operation fails, is backtracked, and
+           fees are collected — the block remains valid. *)
         let* ctxt =
           match (public_key, proof) with
           | Bls bls_public_key, Some proof ->
@@ -1457,7 +1462,8 @@ let apply_manager_operation : type kind.
             is_registered
             (Update_consensus_key_on_unregistered_delegate (source, kind))
         in
-        (* Check proof *)
+        (* Cryptographic verification of the BLS proof of possession.
+           See the comment in the Reveal case above. *)
         let* ctxt =
           match (public_key, proof) with
           | Bls bls_public_key, Some proof ->

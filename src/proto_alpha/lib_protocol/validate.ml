@@ -3183,8 +3183,17 @@ module Manager = struct
           (Validate_errors.Manager.Missing_bls_proof
              {kind = Manager_pk; source; public_key})
     | Bls bls_public_key, Some _ ->
-        (* Compute the gas cost to encode the manager public key and
-           check the proof. *)
+        (* Check that the operation's gas budget is sufficient to cover
+           the [pop_verify] that will be performed at apply time (in
+           {!Apply.apply_manager_operation}). This is a reservation
+           check only: the actual cryptographic verification and gas
+           consumption happen during block application, following the
+           standard validate/apply split. An operation carrying an
+           invalid proof will pass validation, enter the mempool, and
+           may be included in a block, but it will fail at apply time.
+           This is harmless: failed manager operations are backtracked,
+           fees are still collected by the baker, and the block remains
+           valid. *)
         let gas_cost_for_sig_check =
           let open Saturation_repr.Syntax in
           let size = Bls.Public_key.size bls_public_key in
@@ -3223,8 +3232,9 @@ module Manager = struct
                  public_key;
                })
       | Bls bls_public_key, Some _, _kind ->
-          (* Compute the gas cost to encode the consensus public key and
-             check the proof. *)
+          (* Gas budget reservation for the [pop_verify] performed at
+             apply time. See the comment in
+             {!check_bls_proof_for_manager_pk} above for rationale. *)
           let gas_cost_for_sig_check =
             let open Saturation_repr.Syntax in
             let size = Bls.Public_key.size bls_public_key in
