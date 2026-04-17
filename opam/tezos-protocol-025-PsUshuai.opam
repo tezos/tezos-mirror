@@ -10,12 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-proto-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-libs" { = version }
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
-  "octez-libs" { = version }
-  "tezos-protocol-025-PsGXQmSv" { = version }
-  "octez-protocol-025-PsGXQmSv-libs" { = version }
-  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
@@ -23,4 +22,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: baker binary"
+synopsis: "Tezos protocol 025-PsUshuai package"

@@ -8,9 +8,9 @@
   bls12-381.archive
   octez-libs.base
   octez-shell-libs.client-base
-  octez-protocol-025-PsGXQmSv-libs.client
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.baking.tenderbrute)
+  octez-protocol-025-PsUshuai-libs.client
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.baking.tenderbrute)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -20,6 +20,6 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_client_base
-  -open Tezos_client_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tenderbrute_025_PsGXQmSv))
+  -open Tezos_client_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai
+  -open Tenderbrute_025_PsUshuai))

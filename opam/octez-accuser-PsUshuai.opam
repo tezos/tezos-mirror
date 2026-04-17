@@ -10,16 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rust-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
-  "tezos-micheline-rewriting" { = version }
-  "tezos-benchmark" { = version }
-  "tezos-benchmark-type-inference-025-PsGXQmSv" { = version }
-  "tezos-protocol-025-PsGXQmSv" { = version }
-  "hashcons"
-  "octez-protocol-025-PsGXQmSv-libs" { = version }
-  "prbnmcn-stats" { = "0.0.6" }
-  "octez-rust-deps" { with-test & = version }
-  "bls12-381" { with-test & = version }
+  "tezos-protocol-025-PsUshuai" { = version }
+  "octez-protocol-025-PsUshuai-libs" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
@@ -27,4 +23,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"
+synopsis: "Tezos/Protocol: accuser binary"

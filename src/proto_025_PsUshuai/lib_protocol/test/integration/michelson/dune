@@ -3,7 +3,7 @@
 
 (library
  (name
-  src_proto_025_PsGXQmSv_lib_protocol_test_integration_michelson_tezt_lib)
+  src_proto_025_PsUshuai_lib_protocol_test_integration_michelson_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -16,8 +16,8 @@
   octez-protocol-025-PsUshuai-libs.client
   tezos-benchmark
   octez-libs.micheline
-  tezos-benchmark-025-PsGXQmSv
-  tezos-benchmark-type-inference-025-PsGXQmSv
+  tezos-benchmark-025-PsUshuai
+  tezos-benchmark-type-inference-025-PsUshuai
   octez-protocol-025-PsUshuai-libs.plugin
   tezos-protocol-025-PsUshuai.parameters)
  (library_flags (:standard -linkall))
@@ -28,13 +28,13 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_025_PsUshuai
-  -open Tezos_025_PsGXQmSv_test_helpers
+  -open Tezos_025_PsUshuai_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_micheline
-  -open Tezos_benchmark_025_PsGXQmSv
-  -open Tezos_benchmark_type_inference_025_PsGXQmSv
-  -open Tezos_protocol_plugin_025_PsGXQmSv)
+  -open Tezos_benchmark_025_PsUshuai
+  -open Tezos_benchmark_type_inference_025_PsUshuai
+  -open Tezos_protocol_plugin_025_PsUshuai)
  (modules
   test_annotations
   test_block_time_instructions
@@ -64,7 +64,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_025_PsGXQmSv_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_025_PsUshuai_lib_protocol_test_integration_michelson_tezt_lib
   tezt)
  (link_flags
   (:standard)

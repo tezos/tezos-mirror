@@ -1,18 +1,18 @@
-{0 Octez-protocol-025-PsGXQmSv-libs: octez protocol 025-PsGXQmSv libraries}
+{0 Octez-protocol-025-PsUshuai-libs: octez protocol 025-PsUshuai libraries}
 
-This is a package containing some libraries related to the Tezos 025-PsGXQmSv protocol.
+This is a package containing some libraries related to the Tezos 025-PsUshuai protocol.
 
 It contains the following libraries:
 
-- {{!module-Tezos_025_PsGXQmSv_test_helpers}Tezos_025_PsGXQmSv_test_helpers}: Protocol testing framework
-- {{!module-Tezos_025_PsGXQmSv_test_migration}Tezos_025_PsGXQmSv_test_migration}: Protocol migration testing checks
-- {{!module-Tezos_agnostic_baker_025_PsGXQmSv}Tezos_agnostic_baker_025_PsGXQmSv}: Protocol specific library for the Agnostic Baker
-- {{!module-Tezos_baking_025_PsGXQmSv}Tezos_baking_025_PsGXQmSv}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_025_PsGXQmSv_commands}Tezos_baking_025_PsGXQmSv_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_025_PsGXQmSv}Tezos_client_025_PsGXQmSv}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dal_025_PsGXQmSv}Tezos_dal_025_PsGXQmSv}: Protocol specific library for the Data availability Layer
-- {{!module-Tezos_layer2_utils_025_PsGXQmSv}Tezos_layer2_utils_025_PsGXQmSv}: Protocol specific library for Layer 2 utils
-- {{!module-Tezos_protocol_plugin_025_PsGXQmSv}Tezos_protocol_plugin_025_PsGXQmSv}: Protocol plugin
-- {{!module-Tezos_protocol_plugin_025_PsGXQmSv_registerer}Tezos_protocol_plugin_025_PsGXQmSv_registerer}: Protocol plugin registerer
-- {{!module-Tezos_smart_rollup_025_PsGXQmSv}Tezos_smart_rollup_025_PsGXQmSv}: Protocol specific library of helpers for `tezos-smart-rollup`
-- {{!module-Tezos_smart_rollup_layer2_025_PsGXQmSv}Tezos_smart_rollup_layer2_025_PsGXQmSv}: Protocol specific library for `tezos-smart-rollup`
+- {{!module-Tezos_025_PsUshuai_test_helpers}Tezos_025_PsUshuai_test_helpers}: Protocol testing framework
+- {{!module-Tezos_025_PsUshuai_test_migration}Tezos_025_PsUshuai_test_migration}: Protocol migration testing checks
+- {{!module-Tezos_agnostic_baker_025_PsUshuai}Tezos_agnostic_baker_025_PsUshuai}: Protocol specific library for the Agnostic Baker
+- {{!module-Tezos_baking_025_PsUshuai}Tezos_baking_025_PsUshuai}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_025_PsUshuai_commands}Tezos_baking_025_PsUshuai_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_025_PsUshuai}Tezos_client_025_PsUshuai}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_025_PsUshuai}Tezos_dal_025_PsUshuai}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_025_PsUshuai}Tezos_layer2_utils_025_PsUshuai}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_025_PsUshuai}Tezos_protocol_plugin_025_PsUshuai}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_025_PsUshuai_registerer}Tezos_protocol_plugin_025_PsUshuai_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_025_PsUshuai}Tezos_smart_rollup_025_PsUshuai}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_025_PsUshuai}Tezos_smart_rollup_layer2_025_PsUshuai}: Protocol specific library for `tezos-smart-rollup`

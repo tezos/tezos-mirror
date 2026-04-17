@@ -11,9 +11,9 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-025-PsGXQmSv" { = version }
+  "tezos-protocol-025-PsUshuai" { = version }
   "octez-injector" { = version }
-  "octez-protocol-025-PsGXQmSv-libs" { = version }
+  "octez-protocol-025-PsUshuai-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [

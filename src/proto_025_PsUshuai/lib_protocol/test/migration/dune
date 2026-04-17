@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_025_PsGXQmSv_test_migration)
+ (name tezos_025_PsUshuai_test_migration)
  (public_name octez-protocol-025-PsUshuai-libs.test-migration)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -20,7 +20,7 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_025_PsUshuai
-  -open Tezos_025_PsGXQmSv_test_helpers
+  -open Tezos_025_PsUshuai_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_025_PsUshuai_parameters
-  -open Tezos_protocol_plugin_025_PsGXQmSv))
+  -open Tezos_protocol_plugin_025_PsUshuai))

@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_baker_025_PsGXQmSv)
- (public_name octez-baker-PsGXQmSv)
- (package octez-baker-PsGXQmSv)
+ (name main_baker_025_PsUshuai)
+ (public_name octez-baker-PsUshuai)
+ (package octez-baker-PsUshuai)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.clic
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.client
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-025-PsGXQmSv-libs.baking-commands
+  octez-protocol-025-PsUshuai-libs.baking-commands
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
   octez-libs.octez-profiler.backends)
@@ -25,10 +25,10 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_client_025_PsUshuai
   -open Tezos_client_commands
-  -open Tezos_baking_025_PsGXQmSv_commands
+  -open Tezos_baking_025_PsUshuai_commands
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
   -open Tezos_profiler_backends))

@@ -13,11 +13,11 @@
   octez-libs.base
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   tezos-benchmark
-  tezos-benchmark-type-inference-025-PsGXQmSv
-  tezos-benchmark-025-PsGXQmSv
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  tezos-benchmark-type-inference-025-PsUshuai
+  tezos-benchmark-025-PsUshuai
+  octez-protocol-025-PsUshuai-libs.test-helpers
   octez-libs.error-monad
   prbnmcn-stats)
  (link_flags
@@ -26,11 +26,11 @@
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_025_PsGXQmSv
-  -open Tezos_benchmark_025_PsGXQmSv
-  -open Tezos_025_PsGXQmSv_test_helpers))
+  -open Tezos_benchmark_type_inference_025_PsUshuai
+  -open Tezos_benchmark_025_PsUshuai
+  -open Tezos_025_PsUshuai_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

@@ -2,12 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_smart_rollup_025_PsGXQmSv)
- (public_name octez-protocol-025-PsGXQmSv-libs.smart-rollup)
+ (name tezos_smart_rollup_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.smart-rollup)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   octez-libs.smart-rollup-wasm-in-memory)
  (inline_tests
   (flags -verbose)
@@ -19,4 +19,4 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv))
+  -open Tezos_protocol_025_PsUshuai))

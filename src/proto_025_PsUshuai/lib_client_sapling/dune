@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_sapling_025_PsGXQmSv)
- (public_name octez-protocol-025-PsGXQmSv-libs.client.sapling)
+ (name tezos_client_sapling_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.client.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -12,17 +12,17 @@
   octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.signer-backends
-  octez-protocol-025-PsGXQmSv-libs.client
-  octez-protocol-025-PsGXQmSv-libs.client.commands
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.plugin)
+  octez-protocol-025-PsUshuai-libs.client
+  octez-protocol-025-PsUshuai-libs.client.commands
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_client_base
-  -open Tezos_client_025_PsGXQmSv
-  -open Tezos_client_025_PsGXQmSv_commands
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_protocol_plugin_025_PsGXQmSv))
+  -open Tezos_client_025_PsUshuai
+  -open Tezos_client_025_PsUshuai_commands
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_protocol_plugin_025_PsUshuai))

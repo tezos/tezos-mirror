@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Get_delegates = struct
-  open Tezos_protocol_025_PsGXQmSv
+  open Tezos_protocol_025_PsUshuai
   open Protocol
 
   type context = Alpha_context.t

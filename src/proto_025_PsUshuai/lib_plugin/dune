@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_plugin_025_PsGXQmSv)
- (public_name octez-protocol-025-PsGXQmSv-libs.plugin)
+ (name tezos_protocol_plugin_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.smart-rollup)
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_smart_rollup_025_PsGXQmSv)
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_smart_rollup_025_PsUshuai)
  (modules (:standard \ Plugin_registerer)))
 
-(documentation (package octez-protocol-025-PsGXQmSv-libs))
+(documentation (package octez-protocol-025-PsUshuai-libs))
 
 (rule
  (targets signature.ml)
@@ -26,18 +26,18 @@
    "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\nmodule Mldsa44 = Tezos_crypto.Signature.Mldsa44\n  include Tezos_crypto.Signature.V3")))
 
 (library
- (name tezos_protocol_plugin_025_PsGXQmSv_registerer)
- (public_name octez-protocol-025-PsGXQmSv-libs.plugin-registerer)
+ (name tezos_protocol_plugin_025_PsUshuai_registerer)
+ (public_name octez-protocol-025-PsUshuai-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.embedded-protocol
-  octez-protocol-025-PsGXQmSv-libs.plugin
+  tezos-protocol-025-PsUshuai.embedded-protocol
+  octez-protocol-025-PsUshuai-libs.plugin
   octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_embedded_protocol_025_PsGXQmSv
-  -open Tezos_protocol_plugin_025_PsGXQmSv
+  -open Tezos_embedded_protocol_025_PsUshuai
+  -open Tezos_protocol_plugin_025_PsUshuai
   -open Tezos_validation)
  (modules Plugin_registerer))

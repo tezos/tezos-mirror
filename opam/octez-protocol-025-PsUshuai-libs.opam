@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs" { = version }
-  "tezos-protocol-025-PsGXQmSv" { = version }
+  "tezos-protocol-025-PsUshuai" { = version }
   "bls12-381" { with-test & = version }
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
@@ -42,4 +42,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Octez protocol 025-PsGXQmSv libraries"
+synopsis: "Octez protocol 025-PsUshuai libraries"

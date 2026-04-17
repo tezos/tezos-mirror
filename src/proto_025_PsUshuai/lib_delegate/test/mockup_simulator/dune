@@ -2,34 +2,34 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_025_PsGXQmSv_mockup_simulator)
- (public_name octez-protocol-025-PsGXQmSv-libs.bakings.mockup-simulator)
+ (name tezos_025_PsUshuai_mockup_simulator)
+ (public_name octez-protocol-025-PsUshuai-libs.bakings.mockup-simulator)
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.client
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-025-PsGXQmSv-libs.baking
+  octez-protocol-025-PsUshuai-libs.baking
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
-  tezos-protocol-025-PsGXQmSv.parameters
+  tezos-protocol-025-PsUshuai.parameters
   octez-shell-libs.mockup
   octez-shell-libs.mockup-proxy
   octez-shell-libs.mockup-commands
-  octez-protocol-025-PsGXQmSv-libs.baking.tenderbrute
+  octez-protocol-025-PsUshuai-libs.baking.tenderbrute
   tezt.core)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv.Protocol
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai.Protocol
+  -open Tezos_client_025_PsUshuai
   -open Tezos_client_commands
-  -open Tezos_baking_025_PsGXQmSv
+  -open Tezos_baking_025_PsUshuai
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
-  -open Tezos_protocol_025_PsGXQmSv_parameters
-  -open Tenderbrute_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai_parameters
+  -open Tenderbrute_025_PsUshuai
   -open Tezt_core))
 
 (rule

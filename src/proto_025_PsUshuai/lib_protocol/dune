@@ -2,20 +2,20 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_environment_025_PsGXQmSv)
+ (name tezos_protocol_environment_025_PsUshuai)
  (public_name tezos-protocol-025-PsUshuai.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
- (modules Tezos_protocol_environment_025_PsGXQmSv))
+ (modules Tezos_protocol_environment_025_PsUshuai))
 
 (rule
- (targets tezos_protocol_environment_025_PsGXQmSv.ml)
+ (targets tezos_protocol_environment_025_PsUshuai.ml)
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"025-PsGXQmSv\" end\ninclude Tezos_protocol_environment.V16.Make(Name)()\n")))
+   "module Name = struct let name = \"025-PsUshuai\" end\ninclude Tezos_protocol_environment.V16.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_025_PsUshuai)
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_025_PsGXQmSv
-  -open Tezos_protocol_environment_025_PsGXQmSv.Pervasives
-  -open Tezos_protocol_environment_025_PsGXQmSv.Error_monad)
+  -open Tezos_protocol_environment_025_PsUshuai
+  -open Tezos_protocol_environment_025_PsUshuai.Pervasives
+  -open Tezos_protocol_environment_025_PsUshuai.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -331,14 +331,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC\"\nlet name = Tezos_protocol_environment_025_PsGXQmSv.Name.name\ninclude Tezos_raw_protocol_025_PsUshuai\ninclude Tezos_raw_protocol_025_PsGXQmSv.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY\"\nlet name = Tezos_protocol_environment_025_PsUshuai.Name.name\ninclude Tezos_raw_protocol_025_PsUshuai\ninclude Tezos_raw_protocol_025_PsUshuai.Main\n")))
 
 (rule
  (targets tezos_protocol_025_PsUshuai.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_025_PsGXQmSv\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_025_PsUshuai\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -1246,4 +1246,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 025_PsGXQmSv)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 025_PsUshuai)))))

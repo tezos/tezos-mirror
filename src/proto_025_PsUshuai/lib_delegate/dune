@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_baking_025_PsGXQmSv)
- (public_name octez-protocol-025-PsGXQmSv-libs.baking)
+ (name tezos_baking_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.baking)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
   octez-version.value
-  tezos-protocol-025-PsGXQmSv.protocol
-  tezos-protocol-025-PsGXQmSv.protocol.lifted
-  octez-protocol-025-PsGXQmSv-libs.plugin
+  tezos-protocol-025-PsUshuai.protocol
+  tezos-protocol-025-PsUshuai.protocol.lifted
+  octez-protocol-025-PsUshuai-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-node-config
   octez-shell-libs.client-base
-  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsUshuai-libs.client
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
@@ -40,12 +40,12 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv_lifted
-  -open Tezos_protocol_plugin_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai_lifted
+  -open Tezos_protocol_plugin_025_PsUshuai
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
@@ -69,60 +69,60 @@
  (action (write-file %{targets} "include Tezos_client_base.Client_keys_v3")))
 
 (library
- (name tezos_baking_025_PsGXQmSv_commands)
- (public_name octez-protocol-025-PsGXQmSv-libs.baking-commands)
+ (name tezos_baking_025_PsUshuai_commands)
+ (public_name octez-protocol-025-PsUshuai-libs.baking-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  tezos-protocol-025-PsGXQmSv.parameters
+  tezos-protocol-025-PsUshuai.protocol
+  tezos-protocol-025-PsUshuai.parameters
   octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsUshuai-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-025-PsGXQmSv-libs.baking
+  octez-protocol-025-PsUshuai-libs.baking
   octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv_parameters
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_client_commands
-  -open Tezos_baking_025_PsGXQmSv)
+  -open Tezos_baking_025_PsUshuai)
  (modules Baking_commands))
 
 (library
- (name tezos_baking_025_PsGXQmSv_commands_registration)
- (public_name octez-protocol-025-PsGXQmSv-libs.baking-commands.registration)
+ (name tezos_baking_025_PsUshuai_commands_registration)
+ (public_name octez-protocol-025-PsUshuai-libs.baking-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsUshuai-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-025-PsGXQmSv-libs.baking
-  octez-protocol-025-PsGXQmSv-libs.baking-commands
+  octez-protocol-025-PsUshuai-libs.baking
+  octez-protocol-025-PsUshuai-libs.baking-commands
   octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_client_commands
-  -open Tezos_baking_025_PsGXQmSv
-  -open Tezos_baking_025_PsGXQmSv_commands)
+  -open Tezos_baking_025_PsUshuai
+  -open Tezos_baking_025_PsUshuai_commands)
  (modules Baking_commands_registration))

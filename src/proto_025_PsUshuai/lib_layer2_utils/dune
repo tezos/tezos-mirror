@@ -2,13 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_layer2_utils_025_PsGXQmSv)
- (public_name octez-protocol-025-PsGXQmSv-libs.layer2-utils)
+ (name tezos_layer2_utils_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.client)
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.client)
  (inline_tests
   (flags -verbose)
   (modes native)
@@ -19,5 +19,5 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_client_025_PsGXQmSv))
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_client_025_PsUshuai))

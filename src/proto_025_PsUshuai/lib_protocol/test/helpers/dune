@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_025_PsGXQmSv_test_helpers)
+ (name tezos_025_PsUshuai_test_helpers)
  (public_name octez-protocol-025-PsUshuai-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -31,12 +31,12 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_025_PsUshuai
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_protocol_025_PsUshuai_parameters
-  -open Tezos_protocol_plugin_025_PsGXQmSv
+  -open Tezos_protocol_plugin_025_PsUshuai
   -open Tezos_shell_services
   -open Tezos_crypto_dal
-  -open Tezos_smart_rollup_025_PsGXQmSv))
+  -open Tezos_smart_rollup_025_PsUshuai))
 
 (rule
  (targets signature.ml)

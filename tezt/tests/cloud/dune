@@ -15,7 +15,7 @@
   etherlink_benchmark_lib
   octez-libs.stdlib-unix
   octez-protocol-alpha-libs.test-migration
-  octez-protocol-025-PsGXQmSv-libs.test-migration
+  octez-protocol-025-PsUshuai-libs.test-migration
   octez-protocol-024-PtTALLiN-libs.test-migration)
  (link_flags
   (:standard)
@@ -29,5 +29,5 @@
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_cloud
   -open Tezos_alpha_test_migration
-  -open Tezos_025_PsGXQmSv_test_migration
+  -open Tezos_025_PsUshuai_test_migration
   -open Tezos_024_PtTALLiN_test_migration))

@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_025_PsGXQmSv)
- (public_name tezos-benchmark-025-PsGXQmSv)
+ (name tezos_benchmark_025_PsUshuai)
+ (public_name tezos-benchmark-025-PsUshuai)
  (libraries
   octez-libs.stdlib
   octez-libs.base
@@ -11,12 +11,12 @@
   octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark
-  tezos-benchmark-type-inference-025-PsGXQmSv
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-benchmark-type-inference-025-PsUshuai
+  tezos-protocol-025-PsUshuai.protocol
   octez-libs.crypto
-  tezos-protocol-025-PsGXQmSv.parameters
+  tezos-protocol-025-PsUshuai.parameters
   hashcons
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  octez-protocol-025-PsUshuai-libs.test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags
@@ -27,9 +27,9 @@
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv
-  -open Tezos_025_PsGXQmSv_test_helpers)
+  -open Tezos_benchmark_type_inference_025_PsUshuai
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_025_PsUshuai_test_helpers)
  (private_modules kernel rules state_space))
 
 (rule

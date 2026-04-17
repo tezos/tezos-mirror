@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_025_PsGXQmSv_lib_protocol_test_pbt_tezt_lib)
+ (name src_proto_025_PsUshuai_lib_protocol_test_pbt_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -17,8 +17,8 @@
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
-  tezos-benchmark-025-PsGXQmSv
-  tezos-benchmark-type-inference-025-PsGXQmSv
+  tezos-benchmark-025-PsUshuai
+  tezos-benchmark-type-inference-025-PsUshuai
   octez-protocol-025-PsUshuai-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
@@ -31,18 +31,18 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_protocol_025_PsUshuai
   -open Tezos_test_helpers
-  -open Tezos_025_PsGXQmSv_test_helpers
+  -open Tezos_025_PsUshuai_test_helpers
   -open Octez_alcotezt
-  -open Tezos_benchmark_025_PsGXQmSv
-  -open Tezos_benchmark_type_inference_025_PsGXQmSv
-  -open Tezos_smart_rollup_025_PsGXQmSv
+  -open Tezos_benchmark_025_PsUshuai
+  -open Tezos_benchmark_type_inference_025_PsUshuai
+  -open Tezos_smart_rollup_025_PsUshuai
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
   -open Tezos_protocol_025_PsUshuai_parameters
-  -open Tezos_protocol_plugin_025_PsGXQmSv)
+  -open Tezos_protocol_plugin_025_PsUshuai)
  (modules
   liquidity_baking_pbt
   saturation_fuzzing
@@ -69,7 +69,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_025_PsGXQmSv_lib_protocol_test_pbt_tezt_lib
+  src_proto_025_PsUshuai_lib_protocol_test_pbt_tezt_lib
   tezt)
  (link_flags
   (:standard)

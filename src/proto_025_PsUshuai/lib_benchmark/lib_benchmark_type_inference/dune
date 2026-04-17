@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_type_inference_025_PsGXQmSv)
- (public_name tezos-benchmark-type-inference-025-PsGXQmSv)
+ (name tezos_benchmark_type_inference_025_PsUshuai)
+ (public_name tezos-benchmark-type-inference-025-PsUshuai)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
@@ -11,7 +11,7 @@
   octez-libs.crypto
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   hashcons)
  (flags
   (:standard)
@@ -20,4 +20,4 @@
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
-  -open Tezos_protocol_025_PsGXQmSv))
+  -open Tezos_protocol_025_PsUshuai))

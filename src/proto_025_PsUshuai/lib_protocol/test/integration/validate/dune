@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_025_PsGXQmSv_lib_protocol_test_integration_validate_tezt_lib)
+ (name src_proto_025_PsUshuai_lib_protocol_test_integration_validate_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -23,12 +23,12 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_025_PsUshuai
-  -open Tezos_client_025_PsGXQmSv
+  -open Tezos_client_025_PsUshuai
   -open Tezos_test_helpers
-  -open Tezos_025_PsGXQmSv_test_helpers
+  -open Tezos_025_PsUshuai_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_025_PsUshuai_parameters
-  -open Tezos_protocol_plugin_025_PsGXQmSv)
+  -open Tezos_protocol_plugin_025_PsUshuai)
  (modules
   generator_descriptors
   generators
@@ -47,7 +47,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_025_PsGXQmSv_lib_protocol_test_integration_validate_tezt_lib
+  src_proto_025_PsUshuai_lib_protocol_test_integration_validate_tezt_lib
   tezt)
  (link_flags
   (:standard)

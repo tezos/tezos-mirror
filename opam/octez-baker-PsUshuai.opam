@@ -13,8 +13,8 @@ depends: [
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
-  "tezos-protocol-025-PsGXQmSv" { = version }
-  "octez-protocol-025-PsGXQmSv-libs" { = version }
+  "tezos-protocol-025-PsUshuai" { = version }
+  "octez-protocol-025-PsUshuai-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [
@@ -23,4 +23,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: accuser binary"
+synopsis: "Tezos/Protocol: baker binary"

@@ -75,8 +75,8 @@ depopts: [
   "octez-protocol-022-PsRiotum-libs"
   "tezos-protocol-023-PtSeouLo"
   "octez-protocol-023-PtSeouLo-libs"
-  "tezos-protocol-025-PsGXQmSv"
-  "octez-protocol-025-PsGXQmSv-libs"
+  "tezos-protocol-025-PsUshuai"
+  "octez-protocol-025-PsUshuai-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -126,8 +126,8 @@ conflicts: [
   "octez-protocol-022-PsRiotum-libs" { != version }
   "tezos-protocol-023-PtSeouLo" { != version }
   "octez-protocol-023-PtSeouLo-libs" { != version }
-  "tezos-protocol-025-PsGXQmSv" { != version }
-  "octez-protocol-025-PsGXQmSv-libs" { != version }
+  "tezos-protocol-025-PsUshuai" { != version }
+  "octez-protocol-025-PsUshuai-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]

@@ -25,7 +25,7 @@ depopts: [
   "octez-smart-rollup-node-PsQuebec"
   "octez-smart-rollup-node-PsRiotum"
   "octez-smart-rollup-node-PtSeouLo"
-  "octez-smart-rollup-node-PsGXQmSv"
+  "octez-smart-rollup-node-PsUshuai"
   "octez-smart-rollup-node-alpha"
 ]
 conflicts: [
@@ -35,7 +35,7 @@ conflicts: [
   "octez-smart-rollup-node-PsQuebec" { != version }
   "octez-smart-rollup-node-PsRiotum" { != version }
   "octez-smart-rollup-node-PtSeouLo" { != version }
-  "octez-smart-rollup-node-PsGXQmSv" { != version }
+  "octez-smart-rollup-node-PsUshuai" { != version }
   "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [
