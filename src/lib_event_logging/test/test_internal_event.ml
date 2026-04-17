@@ -99,8 +99,7 @@ let () =
   @@ fun () ->
   Lwt.bind (activate_sink "test-canceled-fail-sink") @@ fun () ->
   Lwt.bind
-    (with_captured_stderr (fun () ->
-         Internal_event.Simple.emit test_event ()))
+    (with_captured_stderr (fun () -> Internal_event.Simple.emit test_event ()))
   @@ fun output ->
   Lwt.bind (Internal_event.All_sinks.close ()) @@ fun _ ->
   if output <> "" then
@@ -115,8 +114,7 @@ let () =
   @@ fun () ->
   Lwt.bind (activate_sink "test-failing-sink") @@ fun () ->
   Lwt.bind
-    (with_captured_stderr (fun () ->
-         Internal_event.Simple.emit test_event ()))
+    (with_captured_stderr (fun () -> Internal_event.Simple.emit test_event ()))
   @@ fun output ->
   Lwt.bind (Internal_event.All_sinks.close ()) @@ fun _ ->
   if output = "" then
