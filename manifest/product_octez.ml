@@ -2598,6 +2598,13 @@ let tree_encoding =
         data_encoding;
       ]
 
+let octez_riscv_nds_common =
+  octez_lib
+    "riscv-nds-common"
+    ~internal_name:"octez_riscv_nds_common"
+    ~path:"src/lib_riscv_nds/common"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
+
 let lazy_containers =
   octez_lib
     "lazy-containers"
@@ -2606,7 +2613,7 @@ let lazy_containers =
     ~synopsis:
       "A collection of lazy containers whose contents is fetched from \
        arbitrary backend on-demand"
-    ~deps:[zarith; tree_encoding]
+    ~deps:[zarith; tree_encoding; octez_riscv_nds_common]
 
 let _lazy_containers_tests =
   tezt
@@ -3189,13 +3196,6 @@ let octez_context_brassaia_memory =
         octez_context_brassaia_helpers;
       ]
     ~conflicts:[Conflicts.checkseum]
-
-let octez_riscv_nds_common =
-  octez_lib
-    "riscv-nds-common"
-    ~internal_name:"octez_riscv_nds_common"
-    ~path:"src/lib_riscv_nds/common"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"]
 
 let octez_scoru_wasm =
   octez_lib
@@ -6139,6 +6139,7 @@ let _octez_scoru_wasm_tests =
       "test_get_set";
       "test_hash_consistency";
       "test_host_functions_ticks";
+      "test_nds_host_func_crash";
       "test_init";
       "test_input";
       "test_output";

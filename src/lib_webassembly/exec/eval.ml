@@ -5,6 +5,8 @@ open Instance
 open Ast
 open Source
 
+exception Nds_host_func_without_nds_storage
+
 (* Kontinuations *)
 
 type ('a, 'b) map_kont = {
@@ -497,13 +499,13 @@ let block_type inst bt =
 
 let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
-let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
+let invoke_step ~init ~host_funcs ~(storage : Eval_storage.t)
     (module_reg : module_reg) buffers frame at = function
   | Inv_stop {remaining_ticks; _} when remaining_ticks <= Z.zero ->
       raise (Evaluation_step_error (Invoke_step "Inv_stop cannot reduce"))
   | Inv_stop stop ->
       Lwt.return
-        ( durable,
+        ( storage,
           Inv_stop {stop with remaining_ticks = Z.pred stop.remaining_ticks} )
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
@@ -514,7 +516,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
       match func with
       | Func.AstFunc (_, inst', f) ->
           Lwt.return
-            ( durable,
+            ( storage,
               Inv_prepare_locals
                 {
                   arity = n2;
@@ -538,7 +540,8 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
               in
               match host_func with
               | Host_func f ->
-                  let+ durable, res, remaining_ticks =
+                  let durable = Eval_storage.durable_of storage in
+                  let+ (durable' : Durable_storage.t), res, remaining_ticks =
                     f
                       buffers.input
                       buffers.output
@@ -547,15 +550,37 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
                       args
                   in
                   let vs' = Vector.prepend_list res vs' in
-                  ( durable,
+                  ( Eval_storage.update_durable storage durable',
                     Inv_stop
                       {code = (vs', es); fresh_frame = None; remaining_ticks} )
+              | Nds_host_func f -> (
+                  match storage with
+                  | Dual {nds; _} ->
+                      let+ ( (nds' : Octez_riscv_nds_common.Nds.t),
+                             res,
+                             remaining_ticks ) =
+                        f
+                          buffers.input
+                          buffers.output
+                          nds
+                          available_memories
+                          args
+                      in
+                      let vs' = Vector.prepend_list res vs' in
+                      ( Eval_storage.update_nds storage nds',
+                        Inv_stop
+                          {
+                            code = (vs', es);
+                            fresh_frame = None;
+                            remaining_ticks;
+                          } )
+                  | Durable_only _ -> raise Nds_host_func_without_nds_storage)
               | Reveal_func f -> (
                   let* result = f available_memories args in
                   match result with
                   | Ok (reveal, {base; max_bytes}) ->
                       Lwt.return
-                        ( durable,
+                        ( storage,
                           Inv_reveal_tick
                             {
                               reveal;
@@ -567,7 +592,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
                       let err_code = Num (I32 err_code) in
                       let vs' = Vector.prepend_list [err_code] vs' in
                       Lwt.return
-                        ( durable,
+                        ( storage,
                           Inv_stop
                             {
                               code = (vs', es);
@@ -588,7 +613,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
       }
     when map_completed locals_kont ->
       Lwt.return
-        ( durable,
+        ( storage,
           Inv_prepare_args
             {
               arity = n2;
@@ -602,13 +627,13 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
   | Inv_prepare_locals {arity; args; vs; instructions; inst; func; locals_kont}
     ->
       let+ locals_kont = map_step locals_kont default_value in
-      ( durable,
+      ( storage,
         Inv_prepare_locals
           {arity; args; vs; instructions; inst; func; locals_kont} )
   | Inv_prepare_args {arity; vs; instructions; inst; func; locals; args_kont}
     when map_completed args_kont ->
       Lwt.return
-        ( durable,
+        ( storage,
           Inv_concat
             {
               arity;
@@ -620,7 +645,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
             } )
   | Inv_prepare_args tick ->
       let+ args_kont = map_rev_step tick.args_kont Fun.id in
-      (durable, Inv_prepare_args {tick with args_kont})
+      (storage, Inv_prepare_args {tick with args_kont})
   | Inv_concat
       {
         arity = n2;
@@ -633,7 +658,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
     when concat_completed concat_kont ->
       let frame' = {inst = inst'; locals = concat_kont.res} in
       Lwt.return
-        ( durable,
+        ( storage,
           Inv_stop
             {
               code = (vs', es);
@@ -663,7 +688,7 @@ let invoke_step ~init ~host_funcs ?(durable = Durable_storage.empty)
            (Invoke_step "The reveal tick cannot be evaluated as is"))
   | Inv_concat tick ->
       let+ concat_kont = concat_step tick.concat_kont in
-      (durable, Inv_concat {tick with concat_kont})
+      (storage, Inv_concat {tick with concat_kont})
 
 (* Evaluation *)
 
@@ -1331,13 +1356,13 @@ let push_admin_instr label es vs instr next stack =
 let label_step :
     init:bool ->
     host_funcs:Host_funcs.registry ->
-    Durable_storage.t ->
+    storage:Eval_storage.t ->
     module_reg ->
     buffers ->
     frame ->
     label_step_kont ->
-    (Durable_storage.t * label_step_kont) Lwt.t =
- fun ~init ~host_funcs durable module_reg buffers frame label_kont ->
+    (Eval_storage.t * label_step_kont) Lwt.t =
+ fun ~init ~host_funcs ~storage module_reg buffers frame label_kont ->
   match label_kont with
   | LS_Push_frame _ | LS_Modify_top _ ->
       raise (Evaluation_step_error Label_step)
@@ -1442,50 +1467,50 @@ let label_step :
               let instr, next = memory_copy_meta_instr idx d s n case e.at in
               Lwt.return (push_admin_instr label es vs instr next stack)
         in
-        (durable, kont)
+        (storage, kont)
       else if Vector.num_elements stack = 0l then
-        Lwt.return (durable, LS_Modify_top (Label_result vs))
+        Lwt.return (storage, LS_Modify_top (Label_result vs))
       else
         let+ label', stack = Vector.pop stack in
         let vs', es' = label'.label_code in
-        (durable, LS_Consolidate_top (label', concat_kont vs vs', es', stack))
+        (storage, LS_Consolidate_top (label', concat_kont vs vs', es', stack))
   | LS_Consolidate_top (label', tick, es', stack) when concat_completed tick ->
       Lwt.return
-        ( durable,
+        ( storage,
           LS_Modify_top
             (Label_stack ({label' with label_code = (tick.res, es')}, stack)) )
   | LS_Consolidate_top (label', tick, es', stack) ->
       let+ tick = concat_step tick in
-      (durable, LS_Consolidate_top (label', tick, es', stack))
+      (storage, LS_Consolidate_top (label', tick, es', stack))
   | LS_Craft_frame
       (Label_stack (label, stack), Inv_stop {code; fresh_frame; remaining_ticks})
     when remaining_ticks <= Z.zero ->
       let label_kont = Label_stack ({label with label_code = code}, stack) in
       Lwt.return
-        ( durable,
+        ( storage,
           match fresh_frame with
           | Some frame_stack -> LS_Push_frame (label_kont, frame_stack)
           | None -> LS_Modify_top label_kont )
   | LS_Craft_frame (label, istep) ->
-      let+ durable, istep =
+      let+ storage, istep =
         invoke_step
           ~init
           ~host_funcs
-          ~durable
+          ~storage
           module_reg
           buffers
           frame
           no_region
           istep
       in
-      (durable, LS_Craft_frame (label, istep))
+      (storage, LS_Craft_frame (label, istep))
 
 (** [dup_frame frame] copies [frame], such as the two copies do not
     share mutable fields. *)
 let dup_frame {frame_arity; frame_specs = {inst; locals}; frame_label_kont} =
   {frame_arity; frame_specs = {inst; locals}; frame_label_kont}
 
-let frame_step ~init ~host_funcs durable module_reg c buffers = function
+let frame_step ~init ~host_funcs ~storage module_reg c buffers = function
   | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Frame_step)
   | SK_Start (frame, stack) ->
       let+ kont =
@@ -1523,60 +1548,61 @@ let frame_step ~init ~host_funcs durable module_reg c buffers = function
         | Label_stack _ as label ->
             Lwt.return (SK_Next (frame, stack, LS_Start label))
       in
-      (durable, kont)
+      (storage, kont)
   | SK_Consolidate_label_result (frame', stack, label, tick, es, lstack)
     when concat_completed tick ->
       let label_kont =
         Label_stack ({label with label_code = (tick.res, es)}, lstack)
       in
       Lwt.return
-        (durable, SK_Start ({frame' with frame_label_kont = label_kont}, stack))
+        (storage, SK_Start ({frame' with frame_label_kont = label_kont}, stack))
   | SK_Consolidate_label_result (frame', stack, label, tick, es, lstack) ->
       let+ tick = concat_step tick in
-      ( durable,
+      ( storage,
         SK_Consolidate_label_result (frame', stack, label, tick, es, lstack) )
   | SK_Next (frame, stack, LS_Modify_top label_kont) ->
       let frame = {frame with frame_label_kont = label_kont} in
-      Lwt.return (durable, SK_Start (frame, stack))
+      Lwt.return (storage, SK_Start (frame, stack))
   | SK_Next (frame, stack, LS_Push_frame (label_kont, frame')) ->
       let stack_size = Int32.(succ (Vector.num_elements stack) |> to_int) in
       if c.stack_size_limit <= stack_size then
         Exhaustion.error no_region "call stack exhausted" ;
       let frame = {frame with frame_label_kont = label_kont} in
-      Lwt.return (durable, SK_Start (frame', Vector.cons frame stack))
+      Lwt.return (storage, SK_Start (frame', Vector.cons frame stack))
   | SK_Next (frame, stack, istep) ->
-      let+ durable, istep =
+      let+ storage, istep =
         label_step
           ~init
           ~host_funcs
-          durable
+          ~storage
           module_reg
           buffers
           frame.frame_specs
           istep
       in
-      (durable, SK_Next (frame, stack, istep))
+      (storage, SK_Next (frame, stack, istep))
 
-let step ?(init = false) ?(durable = Durable_storage.empty) ~host_funcs
+let step ?(init = false)
+    ?(storage = Eval_storage.Durable_only Durable_storage.empty) ~host_funcs
     module_reg c buffers =
   match c.step_kont with
   | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Eval_step)
   | kont ->
-      let+ durable, step_kont =
-        frame_step ~init ~host_funcs durable module_reg c buffers kont
+      let+ storage, step_kont =
+        frame_step ~init ~host_funcs ~storage module_reg c buffers kont
       in
-      (durable, {c with step_kont})
+      (storage, {c with step_kont})
 
-let rec eval ?(init = false) ~host_funcs durable module_reg (c : config) buffers
-    : (Durable_storage.t * value list) Lwt.t =
+let rec eval ?(init = false) ~host_funcs ~storage module_reg (c : config)
+    buffers : (Eval_storage.t * value list) Lwt.t =
   match c.step_kont with
   | SK_Result vs ->
       let+ values = Vector.to_list vs in
-      (durable, values)
+      (storage, values)
   | SK_Trapped {it = msg; at} -> Trap.error at msg
   | _ ->
-      let* durable, c = step ~init ~host_funcs ~durable module_reg c buffers in
-      eval ~init ~host_funcs durable module_reg c buffers
+      let* storage, c = step ~init ~host_funcs ~storage module_reg c buffers in
+      eval ~init ~host_funcs ~storage module_reg c buffers
 
 type reveal_error =
   | Reveal_step
@@ -1637,9 +1663,9 @@ let reveal_step reveal module_reg payload =
 
 let invoke ?(stack_size_limit = 300) ~module_reg ~caller
     ?(input = Input_buffer.alloc ()) ?(output = default_output_buffer ())
-    ?(durable = Durable_storage.empty) ?(init = false) host_funcs
-    (func : func_inst) (vs : value list) :
-    (Durable_storage.t * value list) Lwt.t =
+    ?(storage = Eval_storage.Durable_only Durable_storage.empty) ?(init = false)
+    host_funcs (func : func_inst) (vs : value list) :
+    (Eval_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
   let* ins_l = Lazy_vector.Int32Vector.to_list ins in
@@ -1667,10 +1693,10 @@ let invoke ?(stack_size_limit = 300) ~module_reg ~caller
   let buffers = buffers ~input ~output () in
   Lwt.catch
     (fun () ->
-      let+ durable, values =
-        eval ~init ~host_funcs durable module_reg c buffers
+      let+ storage, values =
+        eval ~init ~host_funcs ~storage module_reg c buffers
       in
-      (durable, List.rev values))
+      (storage, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
       | exn -> Lwt.reraise exn)

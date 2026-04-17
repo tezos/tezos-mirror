@@ -58,7 +58,8 @@ let register_new_write_debug ~version added_ticks =
           return (durable, res, Z.add ticks (Z.of_int added_ticks))
         in
         Tezos_webassembly_interpreter.Host_funcs.Host_func write_debug
-    | Reveal_func _ -> Stdlib.failwith "write_debug is not a reveal function"
+    | Nds_host_func _ | Reveal_func _ ->
+        Stdlib.failwith "write_debug is not a durable host function"
   in
   let register impl () =
     Tezos_webassembly_interpreter.Host_funcs.register

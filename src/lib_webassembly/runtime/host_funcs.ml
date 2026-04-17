@@ -21,6 +21,13 @@ type host_func =
       available_memories ->
       Values.value list ->
       (Durable_storage.t * Values.value list * ticks) Lwt.t)
+  | Nds_host_func of
+      (Input_buffer.t ->
+      Output_buffer.t ->
+      Octez_riscv_nds_common.Nds.t ->
+      available_memories ->
+      Values.value list ->
+      (Octez_riscv_nds_common.Nds.t * Values.value list * ticks) Lwt.t)
   | Reveal_func of reveal_func
 
 module Registry = Map.Make (String)
