@@ -3183,8 +3183,17 @@ module Manager = struct
           (Validate_errors.Manager.Missing_bls_proof
              {kind = Manager_pk; source; public_key})
     | Bls bls_public_key, Some _ ->
-        (* Compute the gas cost to encode the manager public key and
-           check the proof. *)
+        (* Check that the operation's gas budget is sufficient to cover
+           the [pop_verify] that will be performed at apply time (in
+           {!Apply.apply_manager_operation}). This is a reservation
+           check only: the actual cryptographic verification and gas
+           consumption happen during block application, following the
+           standard validate/apply split. An operation carrying an
+           invalid proof will pass validation, enter the mempool, and
+           may be included in a block, but it will fail at apply time.
+           This is harmless: failed manager operations are backtracked,
+           fees are still collected by the baker, and the block remains
+           valid. *)
         let gas_cost_for_sig_check =
           let open Saturation_repr.Syntax in
           let size = Bls.Public_key.size bls_public_key in
@@ -3223,8 +3232,9 @@ module Manager = struct
                  public_key;
                })
       | Bls bls_public_key, Some _, _kind ->
-          (* Compute the gas cost to encode the consensus public key and
-             check the proof. *)
+          (* Gas budget reservation for the [pop_verify] performed at
+             apply time. See the comment in
+             {!check_bls_proof_for_manager_pk} above for rationale. *)
           let gas_cost_for_sig_check =
             let open Saturation_repr.Syntax in
             let size = Bls.Public_key.size bls_public_key in
@@ -3471,6 +3481,26 @@ module Manager = struct
           ~consume_gas_for_sig_check:None
           remaining_gas
 
+  (** [check_manager_operation vi ~check_signature operation
+      remaining_block_gas] validates a manager operation for mempool
+      admission.
+
+      [vi] is the validation info carrying the context, chain id, and mode.
+      [remaining_block_gas] is the gas still available for the current block.
+
+      This is a lightweight precheck: it verifies structural properties
+      (counter, gas limit, source allocation, batch consistency, etc.)
+      and reserves gas budgets for expensive checks (e.g. BLS
+      [pop_verify]) that will be performed at apply time. It does {e not}
+      execute the operation's effects and does not call cryptographic
+      verification routines beyond the operation signature.
+
+      An operation that passes validation may still fail during
+      application (e.g. invalid BLS proof, script failure, insufficient
+      balance after fee payment). This is by design: failed manager
+      operations are backtracked, fees are collected, and the block
+      remains valid. See {!Apply.apply_manager_operations} for the full
+      apply-time pipeline. *)
   let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
     let open Lwt_result_syntax in
