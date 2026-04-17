@@ -4130,7 +4130,12 @@ let global_options = Tezos_clic.no_options
 
 let executable_name = Filename.basename Sys.executable_name
 
-let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
+let argv () =
+  match Array.to_list Sys.argv with
+  | _ :: args -> args
+  | [] ->
+      (* [Sys.argv] always contains at least the executable name. *)
+      assert false
 
 let dispatch args =
   let open Lwt_result_syntax in
