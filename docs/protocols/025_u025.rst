@@ -15,7 +15,7 @@ protocol U025 can be found :ref:`here <ushuaia_breaking_changes>`. These
 changes are also listed below in their respective topical section,
 tagged with **Breaking change** or **Deprecation**.
 
-The code is available in directory :src:`src/proto_025_PsGXQmSv` of
+The code is available in directory :src:`src/proto_025_PsUshuai` of
 the ``master`` branch of Octez and the full documentation in
 :doc:`this page <../u025/index>`.
 
@@ -155,7 +155,7 @@ Breaking Changes
   used in the DAL payload of consensus attestation operation, and
   protocol-attested DAL slots, used in a block metadata's field
   ``"dal_attestation"``. The format is described in the header of the file
-  ``src/proto_025_PsGXQmSv/lib_protocol/dal_attestations_repr.mli``. (MRs :gl:`!20734`
+  ``src/proto_025_PsUshuai/lib_protocol/dal_attestations_repr.mli``. (MRs :gl:`!20734`
   and :gl:`!20731`)
 
 RPC Changes
