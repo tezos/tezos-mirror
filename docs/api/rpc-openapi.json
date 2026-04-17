@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 24.4 (33545a33)"
+    "version": "Octez 24.4 (56bd3e33)"
   },
   "paths": {
     "/bls/aggregate_proofs": {
