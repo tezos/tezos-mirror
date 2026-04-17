@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
+    "version": "Octez 24.0~rc1+dev (build: 0) (991d8266)"
   },
   "paths": {
     "/bls/aggregate_proofs": {
@@ -1480,29 +1480,59 @@
                               "maximum": 1073741823
                             },
                             "read-queue-size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              ]
                             },
                             "write-queue-size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              ]
                             },
                             "incoming-app-message-queue-size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              ]
                             },
                             "incoming-message-queue-size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              ]
                             },
                             "outgoing-message-queue-size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              ]
                             },
                             "max_known_points": {
                               "description": "The max and target size for the known address table.",
@@ -1824,6 +1854,13 @@
                           "type": "string",
                           "enum": [
                             "ghostnet"
+                          ]
+                        },
+                        {
+                          "title": "shadownet",
+                          "type": "string",
+                          "enum": [
+                            "shadownet"
                           ]
                         },
                         {
@@ -2214,6 +2251,38 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gc/full": {
+      "post": {
+        "description": "Trigger a full OCaml garbage collection cycle. This endpoint must be used with care.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -9102,6 +9171,11 @@
                           "minimum": -1073741824,
                           "maximum": 1073741823
                         },
+                        "build": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
                         "additional_info": {
                           "oneOf": [
                             {
@@ -9180,6 +9254,7 @@
                       "required": [
                         "major",
                         "minor",
+                        "build",
                         "additional_info"
                       ]
                     },
