@@ -3481,6 +3481,26 @@ module Manager = struct
           ~consume_gas_for_sig_check:None
           remaining_gas
 
+  (** [check_manager_operation vi ~check_signature operation
+      remaining_block_gas] validates a manager operation for mempool
+      admission.
+
+      [vi] is the validation info carrying the context, chain id, and mode.
+      [remaining_block_gas] is the gas still available for the current block.
+
+      This is a lightweight precheck: it verifies structural properties
+      (counter, gas limit, source allocation, batch consistency, etc.)
+      and reserves gas budgets for expensive checks (e.g. BLS
+      [pop_verify]) that will be performed at apply time. It does {e not}
+      execute the operation's effects and does not call cryptographic
+      verification routines beyond the operation signature.
+
+      An operation that passes validation may still fail during
+      application (e.g. invalid BLS proof, script failure, insufficient
+      balance after fee payment). This is by design: failed manager
+      operations are backtracked, fees are collected, and the block
+      remains valid. See {!Apply.apply_manager_operations} for the full
+      apply-time pipeline. *)
   let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
     let open Lwt_result_syntax in

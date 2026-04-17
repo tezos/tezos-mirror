@@ -2588,6 +2588,52 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
       let+ ctxt = Lazy_storage.cleanup_temporaries ctxt in
       (ctxt, results)
 
+(** {1 Manager operation application pipeline}
+
+    A manager operation goes through two protocol phases:
+
+    {2 Validation}
+
+    ({!Validate.Manager.check_manager_operation}): a
+    lightweight precheck performed at mempool admission time. It verifies
+    structural well-formedness (counter, gas limit, signature, etc.) and
+    reserves gas budgets for expensive checks that will be performed here
+    at apply time. Validation does {e not} execute the operation's effects
+    and does not guarantee the operation will succeed during application.
+
+    {2 Application}
+
+    {!apply_manager_operations}: runs during block construction or
+    block validation. The pipeline is:
+    {ol
+      {li {b Fee collection} ([take_fees]): fees are transferred from the
+          source to the baker {e before} any operation logic runs. This
+          transfer is unconditional — fees are paid whether the operation
+          succeeds or fails.}
+      {li {b Execution} ([apply_manager_contents_list]): each operation in
+          the batch is applied sequentially. If any operation fails (e.g.
+          script error, insufficient balance, invalid BLS proof, etc.),
+          execution stops and subsequent operations in the batch are
+          {e skipped}.}
+      {li {b On failure}: all state changes from step 2 are {e backtracked}
+          (reverted to the pre-execution context). The failed and skipped
+          operations are included in the block with [Failed] / [Skipped]
+          status. Crucially, the block itself remains valid — a failed
+          manager operation never causes block rejection.}
+      {li {b On success}: state changes are committed and the operation is
+          included with [Applied] status.}}
+
+    This design means that an operation passing validation may still fail
+    at apply time. This is expected: the validate/apply separation is an
+    intentional trade-off between mempool efficiency (fast precheck) and
+    execution correctness (full application). The fee mechanism ensures
+    that submitting failing operations is never free. *)
+
+(** [apply_manager_operations ctxt ~payload_producer chain_id
+    ~mempool_mode ~source ~operation contents_list] applies a batch of
+    manager operations during block construction or validation.
+    See the pipeline description above for the full validate/apply
+    split semantics. *)
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     ~source ~operation contents_list =
   let open Lwt_result_syntax in
