@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol tallinn RPC",
     "description": "The RPC API for protocol tallinn served by the Octez node.",
-    "version": "Octez 24.3 (8f64dace)"
+    "version": "Octez 24.4 (33545a33)"
   },
   "paths": {
     "/": {

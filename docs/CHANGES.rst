@@ -3,6 +3,16 @@
 Changelog
 '''''''''
 
+Version 24.4
+============
+
+Nodes
+-----
+
+- Fixed a bug that made the node unresponsible. (:gl:`!21643`)
+
+- Fixed a gas-limit computation error in run-code RPC. (:gl:`!21595`)
+
 Version 24.3
 ============
 
