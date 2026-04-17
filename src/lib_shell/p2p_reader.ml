@@ -108,6 +108,9 @@ type t = {
   conn_lost : unit Lwt.t;
       (** Resolves when the underlying TCP connection is lost (either the read
           or the write side fails). *)
+  mutable deactivated : bool;
+      (** Set to [true] once [deactivate]/[unregister] have been called,
+          so that [on_close] does not repeat them. *)
 }
 
 let make_entry ~threshold ~window_s ~cooldown_s =
@@ -690,15 +693,25 @@ let handle_msg (state : t) msg =
       [@profiler.span_s {verbosity = Notice} ["Predecessor_header"]]
 
 let on_error state =
-  if Lwt.is_sleeping state.conn_lost then
-    (* Protocol-level error unrelated to a disconnect: shut the worker down. *)
-    Lwt_result.return `Shutdown
+  if Lwt.is_sleeping state.conn_lost then Lwt_result.return `Shutdown
   else
-    (* TCP connection already dropped; Worker.shutdown is already scheduled
-       via Lwt.on_success on conn_lost. Return Continue to avoid racing with
-       the upcoming shutdown (which would cause Lwt.Resolution_loop.Canceled
-       when the terminated event is emitted). *)
+    (* TCP connection already dropped.
+       Worker.shutdown is en route via [Lwt.on_success conn_lost / dont_wait].
+       Return [`Continue] so the worker loop drives itself to termination via
+       the canceler rather than calling [close] here and racing with the
+       already-scheduled shutdown.  The unconditional [Lwt.pause ()] at the
+       top of [Worker.loop ()] guarantees the scheduler gets a turn before the
+       next [pop_from_callback] call, so [Worker.shutdown] can be scheduled. *)
     Lwt_result.return `Continue
+
+(** Call [deactivate] and [unregister] at most once per connection.
+    Guards against double-calls when both [on_error] (protocol-error path)
+    and [on_close] (conn_lost / normal shutdown path) execute. *)
+let deactivate_once state =
+  if not state.deactivated then (
+    state.deactivated <- true ;
+    Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
+    state.unregister ())
 
 type (_, _) req = Message : Message.t tzresult -> (unit, tztrace) req
 [@@ocaml.unboxed]
@@ -787,6 +800,7 @@ let on_launch (_ : worker) gid
       conn_lost =
         Lwt.choose [P2p.wait_reader_closed conn; P2p.wait_writer_closed conn];
       throttle = make_throttle_state ();
+      deactivated = false;
     }
   in
   Chain_id.Table.iter
@@ -836,8 +850,9 @@ module Handlers = struct
 
   let on_close self =
     let state = Worker.state self in
-    Chain_id.Table.iter (fun _ -> deactivate state.gid) state.peer_active_chains ;
-    state.unregister () ;
+    (* No-op if already called from on_error (protocol-error path).
+       Runs for real on the conn_lost / normal-shutdown path. *)
+    deactivate_once state ;
     Lwt.return_unit
 
   let on_error : type res err.
