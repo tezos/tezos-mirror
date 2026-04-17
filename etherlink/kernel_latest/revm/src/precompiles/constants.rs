@@ -64,9 +64,9 @@ pub const FA12_WRAPPER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
 pub const ALIAS_FORWARDER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
     code: include_bytes!("../../contracts/predeployed/alias_forwarder.bin"),
     code_hash: FixedBytes::new([
-        0xda, 0xe4, 0xd3, 0x3c, 0x5d, 0x96, 0x16, 0xbb, 0xed, 0x37, 0x6c, 0xb1, 0xa4,
-        0xc9, 0xf0, 0xbb, 0x8a, 0xa1, 0x77, 0xc8, 0x47, 0x83, 0x34, 0xcb, 0x86, 0x28,
-        0x70, 0x64, 0xe8, 0x9e, 0x56, 0x2d,
+        0xcb, 0x74, 0x28, 0x61, 0x61, 0xd1, 0x14, 0x05, 0xcd, 0x08, 0x55, 0xbd, 0x08,
+        0xa7, 0x7c, 0x44, 0x73, 0xa4, 0x07, 0x84, 0x4f, 0xc3, 0x75, 0x31, 0x9d, 0xdd,
+        0x74, 0x12, 0xb8, 0x41, 0xf2, 0xfe,
     ]),
 };
 
@@ -126,6 +126,12 @@ pub const FA12_WRAPPER_SOL_ADDR: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0xff, 0xff, 0x09,
 ]));
 
+pub(crate) const VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS: Address =
+    Address(FixedBytes::new([
+        0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
+    ]));
+
 /// Dedicated caller address for TezosX internal transactions.
 ///
 /// This address is used when the actual caller doesn't have an Ethereum-format
@@ -149,7 +155,7 @@ pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0xde, 0xad,
 ]));
 
-pub(crate) const CUSTOMS: [Address; 9] = [
+pub(crate) const CUSTOMS: [Address; 10] = [
     XTZ_BRIDGE_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
@@ -159,7 +165,18 @@ pub(crate) const CUSTOMS: [Address; 9] = [
     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
     ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
     FA12_WRAPPER_SOL_ADDR,
+    VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
 ];
+
+// Rationale regarding the cost:
+// Worst-case across Ed25519, secp256k1, and P-256. Dominated by the
+// P-256 verification (RIP-7212 native cost is 6 900 scaled 2-3x for
+// a non-native impl). The remainder covers ABI decode, pubkey and
+// signature parsing, blake2, low-S malleability check.
+//
+// TODO: benchmark to confirm
+// TODO: when integrating BLS (tz4), this value should be significantly increased
+pub(crate) const VERIFY_TEZOS_SIGNATURE_BASE_COST: u64 = 20_000;
 
 // Rationale regarding the cost:
 // A few decoding/encoding functions.
