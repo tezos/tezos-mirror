@@ -103,7 +103,7 @@ let _octez_baker_tallinn =
   Uses.make ~tag:"baker_psd5wvtj" ~path:"./octez-baker-PtTALLiN" ()
 
 let _octez_baker_ushuaia =
-  Uses.make ~tag:"baker_psgxqmsv" ~path:"./octez-baker-PsGXQmSv" ()
+  Uses.make ~tag:"baker_psgxqmsv" ~path:"./octez-baker-PsUshuai" ()
 
 let _octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
