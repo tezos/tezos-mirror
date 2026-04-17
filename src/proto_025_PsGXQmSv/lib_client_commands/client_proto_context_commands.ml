@@ -3579,7 +3579,9 @@ let commands_rw () =
          ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let (Packed (module R) as pvm) = Sc_rollup.Kind.pvm_of kind in
+        let (Packed (module R) as pvm) =
+          Sc_rollup.Kind.pvm_of ~config:[] kind
+        in
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
         let parameters_ty = Script.lazy_expr expanded in
         let* boot_sector = boot_sector pvm in

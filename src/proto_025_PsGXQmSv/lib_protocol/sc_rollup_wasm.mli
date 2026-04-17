@@ -81,11 +81,12 @@ module V2_0_0 : sig
        and type proof = WASM_machine.proof
 
   (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
-  module Protocol_implementation :
-    Sc_rollup_PVM_sig.PROTO_VERIFICATION
-      with type context = Wasm_2_0_0.Wasm_pvm_machine.context
-       and type state = Wasm_2_0_0.Wasm_pvm_machine.state
-       and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
+  val protocol_implementation :
+    config:Wasm_2_0_0.config ->
+    (module Sc_rollup_PVM_sig.PROTO_VERIFICATION
+       with type context = Wasm_2_0_0.wasm_pvm_machine_context
+        and type state = Wasm_2_0_0.wasm_pvm_machine_state
+        and type proof = Wasm_2_0_0.wasm_pvm_machine_proof)
 
   (** Number of ticks between snapshotable states, chosen low enough
       to maintain refutability.

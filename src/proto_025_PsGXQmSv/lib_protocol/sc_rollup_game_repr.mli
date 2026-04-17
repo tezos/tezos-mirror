@@ -390,6 +390,7 @@ val status_encoding : status Data_encoding.t
 *)
 val play :
   Sc_rollups.Kind.t ->
+  config:Wasm_2_0_0.config ->
   dal_activation_level:Raw_level_repr.t option ->
   find_dal_parameters:
     (Raw_level_repr.t -> Constants_parametric_repr.dal tzresult Lwt.t) ->

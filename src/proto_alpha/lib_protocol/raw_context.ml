@@ -1448,6 +1448,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  reveal_activation_level = _;
                  private_enable;
                  riscv_pvm_enable;
+                 canonical_rollup_address = _;
                }
                 : Previous.sc_rollup) =
             c.sc_rollup

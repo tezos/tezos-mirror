@@ -893,10 +893,11 @@ let cost_play ~step ~choice =
       scale10 @@ Gas_limit_repr.atomic_step_cost
       @@ Michelson_v1_gas_costs.cost_N_IBlake2b overapproximated_hashing_size
 
-let play kind ~dal_activation_level ~find_dal_parameters ~stakers metadata game
-    ~step ~choice ~is_reveal_enabled ~dal_attested_slots_validity_lag =
+let play kind ~config ~dal_activation_level ~find_dal_parameters ~stakers
+    metadata game ~step ~choice ~is_reveal_enabled
+    ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
-  let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of kind in
+  let (Packed ((module PVM) as pvm)) = Sc_rollups.Kind.pvm_of ~config kind in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
     Either.Left (Loser {loser; reason = Conflict_resolved})

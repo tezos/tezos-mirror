@@ -79,7 +79,7 @@
         "dynamic_lag_enable": true,
         "number_of_slots": 160,
         "attestation_lag": 5,
-        "attestation_lags": [ 1, 2, 3, 4, 5 ],
+        "attestation_lags": [1, 2, 3, 4, 5],
         "attestation_threshold": 66,
         "minimal_participation_ratio": {
             "numerator": "16",

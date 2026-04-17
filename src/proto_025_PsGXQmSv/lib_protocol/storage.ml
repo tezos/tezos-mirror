@@ -2151,6 +2151,18 @@ module Sc_rollup = struct
           Data_encoding.(list Sc_rollup_repr.Past_commitment_period.encoding)
       end)
 
+  module Signals =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["signals"]
+      end)
+      (struct
+        type t = (string * Raw_level_repr.t) list
+
+        let encoding =
+          Data_encoding.(list (tup2 (string Plain) Raw_level_repr.encoding))
+      end)
+
   module Inbox = struct
     include
       Make_single_data_storage (Registered) (Raw_context)

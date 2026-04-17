@@ -165,6 +165,8 @@ let outbox_message_summary (output : Sc_rollup.output) =
           List.map outbox_typed_transaction_summary transactions
         in
         Transaction_batch transactions
+    | {message = Canonical_rollup_signal signal; _} ->
+        Canonical_rollup_signal signal
   in
   (Z.to_int output.output_info.message_index, summary)
 
