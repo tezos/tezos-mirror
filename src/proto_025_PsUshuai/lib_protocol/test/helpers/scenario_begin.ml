@@ -313,7 +313,7 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
         Account.make_bootstrap_accounts_packed bootstrap_accounts_packed
       in
       let parameters =
-        Tezos_protocol_025_PsGXQmSv_parameters.Default_parameters
+        Tezos_protocol_025_PsUshuai_parameters.Default_parameters
         .parameters_of_constants
           ~bootstrap_accounts
           constants

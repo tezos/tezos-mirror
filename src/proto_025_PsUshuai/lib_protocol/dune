@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_025_PsGXQmSv)
- (public_name tezos-protocol-025-PsGXQmSv.protocol.environment)
+ (public_name tezos-protocol-025-PsUshuai.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
@@ -18,11 +18,11 @@
    "module Name = struct let name = \"025-PsGXQmSv\" end\ninclude Tezos_protocol_environment.V16.Make(Name)()\n")))
 
 (library
- (name tezos_raw_protocol_025_PsGXQmSv)
- (public_name tezos-protocol-025-PsGXQmSv.protocol.raw)
+ (name tezos_raw_protocol_025_PsUshuai)
+ (public_name tezos-protocol-025-PsUshuai.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-025-PsGXQmSv.protocol.environment)
+  tezos-protocol-025-PsUshuai.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -309,20 +309,20 @@
   Main))
 
 (library
- (name tezos_protocol_025_PsGXQmSv)
- (public_name tezos-protocol-025-PsGXQmSv.protocol)
+ (name tezos_protocol_025_PsUshuai)
+ (public_name tezos-protocol-025-PsUshuai.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-025-PsGXQmSv.protocol.raw)
+  tezos-protocol-025-PsUshuai.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol Tezos_protocol_025_PsGXQmSv))
+ (modules Protocol Tezos_protocol_025_PsUshuai))
 
 (install
- (package tezos-protocol-025-PsGXQmSv)
+ (package tezos-protocol-025-PsUshuai)
  (section lib)
  (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
@@ -331,10 +331,10 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC\"\nlet name = Tezos_protocol_environment_025_PsGXQmSv.Name.name\ninclude Tezos_raw_protocol_025_PsGXQmSv\ninclude Tezos_raw_protocol_025_PsGXQmSv.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC\"\nlet name = Tezos_protocol_environment_025_PsGXQmSv.Name.name\ninclude Tezos_raw_protocol_025_PsUshuai\ninclude Tezos_raw_protocol_025_PsGXQmSv.Main\n")))
 
 (rule
- (targets tezos_protocol_025_PsGXQmSv.ml)
+ (targets tezos_protocol_025_PsUshuai.ml)
  (action
   (write-file
    %{targets}
@@ -627,17 +627,17 @@
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
- (name tezos_protocol_025_PsGXQmSv_lifted)
- (public_name tezos-protocol-025-PsGXQmSv.protocol.lifted)
+ (name tezos_protocol_025_PsUshuai_lifted)
+ (public_name tezos-protocol-025-PsUshuai.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-025-PsGXQmSv.protocol)
+  tezos-protocol-025-PsUshuai.protocol)
  (flags
   (:standard)
   -nopervasives
-  -open Tezos_protocol_025_PsGXQmSv)
+  -open Tezos_protocol_025_PsUshuai)
  (modules Lifted_protocol))
 
 (rule
@@ -648,7 +648,7 @@
    "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
- (name tezos_protocol_025_PsGXQmSv_functor)
+ (name tezos_protocol_025_PsUshuai_functor)
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs)
@@ -948,11 +948,11 @@
     (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
- (name tezos_embedded_protocol_025_PsGXQmSv)
- (public_name tezos-protocol-025-PsGXQmSv.embedded-protocol)
+ (name tezos_embedded_protocol_025_PsUshuai)
+ (public_name tezos-protocol-025-PsUshuai.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))

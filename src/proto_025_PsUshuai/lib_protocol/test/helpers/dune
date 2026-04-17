@@ -3,7 +3,7 @@
 
 (library
  (name tezos_025_PsGXQmSv_test_helpers)
- (public_name octez-protocol-025-PsGXQmSv-libs.test-helpers)
+ (public_name octez-protocol-025-PsUshuai-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -14,15 +14,15 @@
   octez-libs.base
   octez-libs.micheline
   octez-libs.stdlib-unix
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.client
-  tezos-protocol-025-PsGXQmSv.parameters
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.client
+  tezos-protocol-025-PsUshuai.parameters
   octez-proto-libs.protocol-environment
-  octez-protocol-025-PsGXQmSv-libs.plugin
+  octez-protocol-025-PsUshuai-libs.plugin
   octez-shell-libs.shell-services
   octez-libs.plompiler
   octez-libs.crypto-dal
-  octez-protocol-025-PsGXQmSv-libs.smart-rollup)
+  octez-protocol-025-PsUshuai-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezt_core
@@ -30,9 +30,9 @@
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_stdlib_unix
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_client_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv_parameters
+  -open Tezos_protocol_025_PsUshuai_parameters
   -open Tezos_protocol_plugin_025_PsGXQmSv
   -open Tezos_shell_services
   -open Tezos_crypto_dal

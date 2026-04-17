@@ -468,7 +468,7 @@ struct
 end
 
 let tests =
-  let open Tezos_protocol_025_PsGXQmSv_parameters.Default_parameters in
+  let open Tezos_protocol_025_PsUshuai_parameters.Default_parameters in
   let module Test = Make (struct
     let name = "test"
 

@@ -925,7 +925,7 @@ module Interpreter_tests = struct
           List.exists
             (function
               | Environment.Ecoproto_error
-                  (Tezos_protocol_025_PsGXQmSv.Protocol.Script_tc_errors
+                  (Tezos_protocol_025_PsUshuai.Protocol.Script_tc_errors
                    .Unexpected_forged_value
                      _) ->
                   true

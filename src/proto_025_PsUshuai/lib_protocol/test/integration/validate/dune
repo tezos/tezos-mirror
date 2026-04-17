@@ -8,26 +8,26 @@
   tezt.core
   bls12-381.archive
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
+  tezos-protocol-025-PsUshuai.protocol
   qcheck-alcotest
-  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsUshuai-libs.client
   octez-libs.test-helpers
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  octez-protocol-025-PsUshuai-libs.test-helpers
   octez-libs.base-test-helpers
-  tezos-protocol-025-PsGXQmSv.parameters
-  octez-protocol-025-PsGXQmSv-libs.plugin)
+  tezos-protocol-025-PsUshuai.parameters
+  octez-protocol-025-PsUshuai-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_client_025_PsGXQmSv
   -open Tezos_test_helpers
   -open Tezos_025_PsGXQmSv_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_025_PsGXQmSv_parameters
+  -open Tezos_protocol_025_PsUshuai_parameters
   -open Tezos_protocol_plugin_025_PsGXQmSv)
  (modules
   generator_descriptors
@@ -56,7 +56,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-025-PsGXQmSv-tests)
+ (package tezos-protocol-025-PsUshuai-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

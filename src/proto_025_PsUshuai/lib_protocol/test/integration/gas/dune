@@ -9,8 +9,8 @@
   bls12-381.archive
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.test-helpers
   octez-libs.base-test-helpers)
  (library_flags (:standard -linkall))
  (flags
@@ -19,7 +19,7 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_025_PsGXQmSv_test_helpers
   -open Tezos_base_test_helpers)
  (modules test_gas_costs test_gas_levels))
@@ -38,7 +38,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-025-PsGXQmSv-tests)
+ (package tezos-protocol-025-PsUshuai-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

@@ -10,16 +10,16 @@
   bls12-381.archive
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-025-PsGXQmSv.protocol
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  tezos-protocol-025-PsUshuai.protocol
+  octez-protocol-025-PsUshuai-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-025-PsGXQmSv-libs.client
+  octez-protocol-025-PsUshuai-libs.client
   tezos-benchmark
   octez-libs.micheline
   tezos-benchmark-025-PsGXQmSv
   tezos-benchmark-type-inference-025-PsGXQmSv
-  octez-protocol-025-PsGXQmSv-libs.plugin
-  tezos-protocol-025-PsGXQmSv.parameters)
+  octez-protocol-025-PsUshuai-libs.plugin
+  tezos-protocol-025-PsUshuai.parameters)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -27,7 +27,7 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_025_PsGXQmSv_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_client_025_PsGXQmSv
@@ -73,7 +73,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-025-PsGXQmSv-tests)
+ (package tezos-protocol-025-PsUshuai-tests)
  (deps
   (glob_files contracts/*)
   (glob_files patched_contracts/*)

@@ -9,21 +9,21 @@
   bls12-381.archive
   octez-libs.base
   octez-libs.micheline
-  octez-protocol-025-PsGXQmSv-libs.client
-  tezos-protocol-025-PsGXQmSv.protocol
+  octez-protocol-025-PsUshuai-libs.client
+  tezos-protocol-025-PsUshuai.protocol
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.test-helpers
-  octez-protocol-025-PsGXQmSv-libs.test-helpers
+  octez-protocol-025-PsUshuai-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-025-PsGXQmSv
   tezos-benchmark-type-inference-025-PsGXQmSv
-  octez-protocol-025-PsGXQmSv-libs.smart-rollup
+  octez-protocol-025-PsUshuai-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
-  tezos-protocol-025-PsGXQmSv.parameters
-  octez-protocol-025-PsGXQmSv-libs.plugin)
+  tezos-protocol-025-PsUshuai.parameters
+  octez-protocol-025-PsUshuai-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -32,7 +32,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_client_025_PsGXQmSv
-  -open Tezos_protocol_025_PsGXQmSv
+  -open Tezos_protocol_025_PsUshuai
   -open Tezos_test_helpers
   -open Tezos_025_PsGXQmSv_test_helpers
   -open Octez_alcotezt
@@ -41,7 +41,7 @@
   -open Tezos_smart_rollup_025_PsGXQmSv
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_025_PsGXQmSv_parameters
+  -open Tezos_protocol_025_PsUshuai_parameters
   -open Tezos_protocol_plugin_025_PsGXQmSv)
  (modules
   liquidity_baking_pbt
@@ -78,7 +78,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-025-PsGXQmSv-tests)
+ (package tezos-protocol-025-PsUshuai-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
