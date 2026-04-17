@@ -835,6 +835,21 @@ let octez_event_logging_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
 
+let _octez_event_logging_test =
+  tezt
+    ["test_internal_event"]
+    ~path:"src/lib_event_logging/test"
+    ~opam:"octez-libs"
+    ~deps:
+      [
+        octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
+        octez_event_logging |> open_;
+        octez_test_helpers |> open_;
+        alcotezt;
+        uri;
+        lwt;
+      ]
+
 let octez_libcrux_ml_dsa =
   public_lib
     "octez-libcrux-ml-dsa"
