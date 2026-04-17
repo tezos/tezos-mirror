@@ -359,12 +359,12 @@ opam:all_1:
     - package:
       - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtTALLiN
+      - octez-smart-rollup-node-PsUshuai
       - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
-      - octez-smart-rollup-node-PsGXQmSv
       - octez-smart-rollup-node-Proxford
       - octez-protocol-alpha-libs
-      - octez-protocol-025-PsGXQmSv-libs
+      - octez-protocol-025-PsUshuai-libs
       - octez-protocol-024-PtTALLiN-libs
 
 opam:all_3:
@@ -642,7 +642,7 @@ opam:all_5:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-protocol-025-PsGXQmSv
+      - tezos-protocol-025-PsUshuai
       - tezos-protocol-024-PtTALLiN
       - tezos-protocol-023-PtSeouLo
       - tezos-protocol-022-PsRiotum

@@ -1393,8 +1393,8 @@ oc.build_x86_64-exp:
     - octez-evm-node
     - octez-accuser-alpha
     - octez-baker-alpha
-    - octez-accuser-PsGXQmSv
-    - octez-baker-PsGXQmSv
+    - octez-accuser-PsUshuai
+    - octez-baker-PsUshuai
     - octez-teztale-snitch
     - octez-teztale-archiver
     - octez-teztale-server
@@ -4683,8 +4683,8 @@ oc.build_arm64-exp:
     - octez-evm-node
     - octez-accuser-alpha
     - octez-baker-alpha
-    - octez-accuser-PsGXQmSv
-    - octez-baker-PsGXQmSv
+    - octez-accuser-PsUshuai
+    - octez-baker-PsUshuai
     - octez-teztale-snitch
     - octez-teztale-archiver
     - octez-teztale-server
