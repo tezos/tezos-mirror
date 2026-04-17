@@ -8,17 +8,18 @@
 
 let is_tracing_root_indexed_by_hash hash state =
   let open Lwt_result_syntax in
-  let*! exists =
-    Evm_state.exists
+  let* exists =
+    Durable_storage.exists
+      (Raw_path
+         (Durable_storage_path.Trace.root_indexed_by_hash
+            ~transaction_hash:(Some hash)))
       state
-      (Durable_storage_path.Trace.root_indexed_by_hash
-         ~transaction_hash:(Some hash))
   in
   if exists then return @@ Some hash else return None
 
 let read_value ?default state path =
   let open Lwt_result_syntax in
-  let*! value = Evm_state.inspect state path in
+  let* value = Durable_storage.read_opt (Raw_path path) state in
   match value with
   | Some value -> return value
   | None -> (
@@ -28,13 +29,7 @@ let read_value ?default state path =
 
 let check_tracer_activation ~state ~version =
   let open Lwt_result_syntax in
-  let* storage_version =
-    let read key =
-      let*! res = Evm_state.inspect state key in
-      return res
-    in
-    Durable_storage.storage_version read
-  in
+  let* storage_version = Durable_storage.storage_version state in
   if storage_version < version then tzfail Tracer_types.Tracer_not_activated
   else return_unit
 
@@ -307,8 +302,11 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
         ~state
         ~version:Tracer_types.(tracer_version_activation config.tracer)
     in
-    let*! state =
-      Evm_state.modify ~key:Durable_storage_path.Trace.input ~value:input state
+    let* state =
+      Durable_storage.write
+        (Raw_path Durable_storage_path.Trace.input)
+        (Bytes.of_string input)
+        state
     in
     return state
   in
@@ -354,10 +352,10 @@ let trace_block (module Exe : Evm_execution.S)
           ~state
           ~version:Tracer_types.(tracer_version_activation config.tracer)
       in
-      let*! state =
-        Evm_state.modify
-          ~key:Durable_storage_path.Trace.input
-          ~value:input
+      let* state =
+        Durable_storage.write
+          (Raw_path Durable_storage_path.Trace.input)
+          (Bytes.of_string input)
           state
       in
       return state
@@ -392,10 +390,10 @@ let trace_call (module Exe : Evm_execution.S) ~call ~block ~config =
         ~state
         ~version:Tracer_types.(tracer_version_activation config.tracer)
     in
-    let*! state =
-      Evm_state.modify
-        ~key:Durable_storage_path.Trace.input
-        ~value:config_rlp
+    let* state =
+      Durable_storage.write
+        (Raw_path Durable_storage_path.Trace.input)
+        (Bytes.of_string config_rlp)
         state
     in
     return state

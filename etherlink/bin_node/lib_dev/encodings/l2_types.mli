@@ -21,7 +21,11 @@ module Chain_id : sig
 
   val decode_le : bytes -> chain_id
 
+  val encode_le : chain_id -> string
+
   val decode_be : bytes -> chain_id
+
+  val encode_be : chain_id -> string
 
   val compare : chain_id -> chain_id -> int
 
@@ -80,6 +84,8 @@ module Chain_family : sig
       @raise Invalid_argument if [s] does not correspond to a recognized chain family.
   *)
   val of_string_exn : string -> ex_chain_family
+
+  val of_bytes : bytes -> ex_chain_family tzresult
 
   val to_string : _ chain_family -> string
 

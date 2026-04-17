@@ -356,14 +356,24 @@ module State = struct
     return_unit
 
   let modify_in_place ctxt ~key ~value =
-    let open Lwt_syntax in
-    let* evm_state = Evm_state.modify ~key ~value ctxt.session.evm_state in
+    let open Lwt_result_syntax in
+    let* evm_state =
+      Durable_storage.write
+        (Raw_path key)
+        (Bytes.of_string value)
+        ctxt.session.evm_state
+    in
     ctxt.session.evm_state <- evm_state ;
     return_unit
 
   let delete_in_place ctxt ~kind key =
-    let open Lwt_syntax in
-    let* evm_state = Evm_state.delete ~kind ctxt.session.evm_state key in
+    let open Lwt_result_syntax in
+    let delete_f =
+      match kind with
+      | Tezos_scoru_wasm.Durable.Directory -> Durable_storage.delete_dir
+      | Value -> Durable_storage.delete
+    in
+    let* evm_state = delete_f (Raw_path key) ctxt.session.evm_state in
     ctxt.session.evm_state <- evm_state ;
     return_unit
 
@@ -524,11 +534,6 @@ module State = struct
     ctxt.session.context <- context ;
     return_unit
 
-  let read_from_state evm_state path =
-    let open Lwt_result_syntax in
-    let*! res = Evm_state.inspect evm_state path in
-    return res
-
   let on_new_delayed_transaction ctxt ~delayed_transaction =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
@@ -552,7 +557,7 @@ module State = struct
                   (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
            ])
     else
-      let*! () =
+      let* () =
         modify_in_place
           ctxt
           ~key:
@@ -607,8 +612,8 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Evm_state.storage_version evm_state in
-    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () = Tx_queue.clear () in
     (* Clear the store. *)
@@ -740,19 +745,14 @@ module State = struct
     | Some
         Evm_store.{kernel_upgrade = Evm_events.Upgrade.{hash = root_hash; _}; _}
       ->
-        let*! bytes =
-          Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
-        in
-        let new_hash_candidate =
-          Option.map
-            (fun bytes ->
-              let (`Hex hex) = Hex.of_bytes bytes in
-              Ethereum_types.hash_of_string hex)
-            bytes
+        let* new_hash_candidate =
+          Durable_storage.read_opt Kernel_root_hash evm_state
         in
 
         let*! () =
-          match new_hash_candidate with
+          match
+            Option.map (fun h -> Ethereum_types.Hash h) new_hash_candidate
+          with
           | Some current_root_hash when root_hash = current_root_hash ->
               Events.applied_upgrade
                 root_hash
@@ -769,7 +769,7 @@ module State = struct
       Evm_events.Sequencer_upgrade.{sequencer = new_sequencer; _} =
     let open Lwt_result_syntax in
     let* current_sequencer =
-      Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
     if new_sequencer = current_sequencer then
       let*! () =
@@ -805,21 +805,19 @@ module State = struct
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        let* storage_version =
-          Durable_storage.storage_version (read_from_state evm_state)
-        in
+        let* storage_version = Durable_storage.storage_version evm_state in
         if not (Storage_version.legacy_storage_compatible ~storage_version) then
           let* receipts =
             Etherlink_durable_storage.current_transactions_receipts
               block.hash
               storage_version
-              (read_from_state evm_state)
+              evm_state
           in
           let* transaction_objects =
             Etherlink_durable_storage.current_transactions_objects
               ~block_hash:block.hash
               storage_version
-              (read_from_state evm_state)
+              evm_state
           in
           let mismatch_error =
             error_of_fmt
@@ -865,7 +863,7 @@ module State = struct
               let* receipt =
                 let* receipt_opt =
                   Etherlink_durable_storage.transaction_receipt
-                    (read_from_state evm_state)
+                    evm_state
                     ~block_hash:block.hash
                     hash
                 in
@@ -879,9 +877,7 @@ module State = struct
               in
               let* object_ =
                 let* object_opt =
-                  Etherlink_durable_storage.transaction_object
-                    (read_from_state evm_state)
-                    hash
+                  Etherlink_durable_storage.transaction_object evm_state hash
                 in
                 match object_opt with
                 | Some object_ -> return object_
@@ -1017,12 +1013,10 @@ module State = struct
       handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
     in
     let* da_fee_per_byte =
-      Etherlink_durable_storage.da_fee_per_byte
-        (read_from_state ctxt.session.evm_state)
+      Etherlink_durable_storage.da_fee_per_byte ctxt.session.evm_state
     in
     let* (Ethereum_types.Qty base_fee_per_gas) =
-      Etherlink_durable_storage.base_fee_per_gas
-        (read_from_state ctxt.session.evm_state)
+      Etherlink_durable_storage.base_fee_per_gas ctxt.session.evm_state
     in
     return
     @@ Executing
@@ -1226,13 +1220,12 @@ module State = struct
        level has been reached (i.e. the runtime started producing Tezos
        blocks). *)
     let* tezosx_tez_block =
-      let* runtimes =
-        Durable_storage.list_runtimes (read_from_state evm_state)
+      let* tezos_enabled =
+        Durable_storage.exists (Tezosx_feature_flag Tezos) evm_state
       in
-      if List.mem ~equal:( = ) Tezosx.Tezos runtimes then
+      if tezos_enabled then
         let* sunrise_level =
-          Durable_storage.michelson_runtime_sunrise_level
-            (read_from_state evm_state)
+          Durable_storage.read_opt Michelson_runtime_sunrise_level evm_state
         in
         let past_sunrise =
           match sunrise_level with
@@ -1269,12 +1262,10 @@ module State = struct
         match block with
         | Eth block ->
             let* da_fee_per_byte =
-              Etherlink_durable_storage.da_fee_per_byte
-                (read_from_state evm_state)
+              Etherlink_durable_storage.da_fee_per_byte evm_state
             in
             let* (Qty base_fee_per_gas) =
-              Etherlink_durable_storage.base_fee_per_gas
-                (read_from_state evm_state)
+              Etherlink_durable_storage.base_fee_per_gas evm_state
             in
             store_block_unsafe
               ?tez_block:tezosx_tez_block
@@ -1288,7 +1279,7 @@ module State = struct
             (* TODO: support extracting the execution gas *)
             (Z.zero, receipts)
       in
-      let*! evm_state =
+      let* evm_state =
         Evm_state.clear_block_storage chain_family block evm_state
       in
       return (evm_state, receipts, execution_gas)
@@ -1320,7 +1311,7 @@ module State = struct
 
     let* evm_state =
       if ctxt.session.storage_version >= 43 then return evm_state
-      else Lwt_result.ok (Evm_state.clear_events evm_state)
+      else Evm_state.clear_events evm_state
     in
 
     return
@@ -1502,8 +1493,8 @@ module State = struct
       ctxt.session.pending_sequencer_upgrade <- None ;
     let* () =
       if kernel_change then (
-        let* storage_version = Evm_state.storage_version evm_state in
-        let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+        let* storage_version = Durable_storage.storage_version evm_state in
+        let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
         ctxt.session.kernel_change <- No ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
@@ -1574,16 +1565,14 @@ module State = struct
     in
 
     let* sequencer =
-      Durable_storage.sequencer
-        ~storage_version:ctxt.session.storage_version
-        (read_from_state ctxt.session.evm_state)
+      Durable_storage.read Sequencer_key ctxt.session.evm_state
     in
     let*? signer = Signer.get_signer signer sequencer in
     return (chunks, sign ~signer chunks)
 
   let clear_head_delayed_inbox ctxt =
     let open Lwt_result_syntax in
-    let*! cleaned_evm_state =
+    let* cleaned_evm_state =
       Evm_state.clear_delayed_inbox ctxt.session.evm_state
     in
     ctxt.session.evm_state <- cleaned_evm_state ;
@@ -1678,7 +1667,7 @@ module State = struct
             } ;
         background_preemptive_download ctxt.configuration upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
-        let*! () =
+        let* () =
           modify_in_place
             ctxt
             ~key:Durable_storage_path.kernel_upgrade
@@ -1703,7 +1692,7 @@ module State = struct
           Evm_events.Sequencer_upgrade.to_bytes sequencer_upgrade
           |> String.of_bytes
         in
-        let*! () =
+        let* () =
           modify_in_place
             ctxt
             ~key:
@@ -2065,10 +2054,10 @@ module State = struct
     match patch_sequencer_key with
     | Some pk ->
         let*! () = Events.patched_sequencer_key pk in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:sequencer_key_path
-            ~value:(Signature.Public_key.to_b58check pk)
+        let* evm_state =
+          Durable_storage.write
+            (Raw_path sequencer_key_path)
+            (Bytes.of_string (Signature.Public_key.to_b58check pk))
             evm_state
         in
         return (evm_state, true)
@@ -2080,7 +2069,7 @@ module State = struct
   let load_existing_state ~sequencer_key_source ~next_blueprint_number context =
     let open Lwt_result_syntax in
     let*! evm_state = Pvm.State.get context in
-    let* storage_version = Evm_state.storage_version evm_state in
+    let* storage_version = Durable_storage.storage_version evm_state in
     let sequencer_key_path =
       Durable_storage_path.sequencer_key ~storage_version
     in
@@ -2149,28 +2138,26 @@ module State = struct
         evm_state
         (`Inbox [])
     in
-    let* storage_version = Evm_state.storage_version evm_state in
-    let*! evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
     (* Now that the storage version is known, remove whichever
        key path is not canonical for this version, so no stale
        entry is left in the state. *)
-    let*! evm_state =
+    let* evm_state =
       if
         sequencer_key_patched
         && String.equal
              Durable_storage_path.sequencer_key_world_state
              (Durable_storage_path.sequencer_key ~storage_version)
       then
-        Evm_state.delete
-          ~kind:Value
+        Durable_storage.delete
+          (Raw_path Durable_storage_path.sequencer_key_legacy)
           evm_state
-          Durable_storage_path.sequencer_key_legacy
       else if sequencer_key_patched then
-        Evm_state.delete
-          ~kind:Value
+        Durable_storage.delete
+          (Raw_path Durable_storage_path.sequencer_key_world_state)
           evm_state
-          Durable_storage_path.sequencer_key_world_state
-      else Lwt.return evm_state
+      else return evm_state
     in
     let (Qty next) = next_blueprint_number in
     let* context = commit conn context evm_state (Qty Z.(pred next)) in
@@ -2288,7 +2275,7 @@ module State = struct
              initial kernel"
     in
 
-    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+    let* tezosx_runtimes = Durable_storage.list_runtimes evm_state in
 
     let* last_split_block =
       match history_mode with
@@ -2406,14 +2393,16 @@ module State = struct
                 block_number)
     in
     if key = "/kernel/boot.wasm" then ctxt.session.kernel_change <- Force_change ;
-    let*! previous_value = Evm_state.inspect ctxt.session.evm_state key in
+    let* previous_value =
+      Durable_storage.read_opt (Raw_path key) ctxt.session.evm_state
+    in
     let new_value = patch (Option.map Bytes.to_string previous_value) in
-    let*! () =
+    let* () =
       match new_value with
       | Some value -> modify_in_place ctxt ~key ~value
       | None when Option.is_some previous_value ->
           delete_in_place ctxt ~kind:Value key
-      | None -> Lwt.return_unit
+      | None -> return_unit
     in
     let* (Qty number) =
       match block_number with
@@ -2441,7 +2430,7 @@ module State = struct
     let* () =
       if commit then (
         let* tezosx_runtimes =
-          Evm_state.tezosx_runtimes ctxt.session.evm_state
+          Durable_storage.list_runtimes ctxt.session.evm_state
         in
         ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
         return_unit)
@@ -2466,9 +2455,7 @@ module State = struct
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
         let* sequencer =
-          Durable_storage.sequencer
-            ~storage_version:ctxt.session.storage_version
-            (read_from_state ctxt.session.evm_state)
+          Durable_storage.read Sequencer_key ctxt.session.evm_state
         in
         let*? chunks =
           Sequencer_blueprint.chunks_of_external_messages
@@ -2538,9 +2525,7 @@ module State = struct
          if we agree with it.
       *)
       let* sequencer =
-        Durable_storage.sequencer
-          ~storage_version:ctxt.session.storage_version
-          (read_from_state ctxt.session.evm_state)
+        Durable_storage.read Sequencer_key ctxt.session.evm_state
       in
       let*? blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
@@ -2995,34 +2980,26 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     ~irmin_context =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* storage_version = Evm_state.storage_version evm_state in
+  let* storage_version = Durable_storage.storage_version evm_state in
   (* Tell the kernel that it is executed by an EVM node *)
-  let*! evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
+  let* evm_state = Evm_state.flag_local_exec evm_state ~storage_version in
   (* We remove the delayed inbox from the EVM state. Its contents will be
      retrieved by the sequencer by inspecting the evm events. *)
-  let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
+  let* evm_state = Evm_state.clear_delayed_inbox evm_state in
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
   let*! evm_node_context = Pvm.State.set irmin_context evm_state in
   let*! checkpoint = Pvm.Context.commit evm_node_context in
 
   (* Assert we can read the current blueprint number *)
-  let* current_blueprint_number =
-    let*! current_blueprint_number_opt =
-      Evm_state.inspect
-        evm_state
-        (Durable_storage_path.Block.current_number ~root)
-    in
-    match current_blueprint_number_opt with
-    | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
-    | None -> failwith "The blueprint number was not found"
+  let* (Qty current_blueprint_number) =
+    Durable_storage.read (Current_block_number chain_family) evm_state
   in
 
   (* Read the current block *)
   let* block =
     Etherlink_durable_storage.current_block
-      (Evm_state.read evm_state)
+      evm_state
       ~full_transaction_object:true
   in
   (* Init the store *)
@@ -3041,8 +3018,10 @@ let reset = State.reset
 let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let open Lwt_result_syntax in
   let* kernel_upgrade =
-    let*! kernel_upgrade_payload =
-      Evm_state.inspect evm_state Durable_storage_path.kernel_upgrade
+    let* kernel_upgrade_payload =
+      Durable_storage.read_opt
+        (Raw_path Durable_storage_path.kernel_upgrade)
+        evm_state
     in
     Option.bind kernel_upgrade_payload Evm_events.Upgrade.of_bytes
     |> Option.map (fun e -> Evm_events.Upgrade_event e)
@@ -3050,11 +3029,11 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   in
 
   let* sequencer_upgrade =
-    let* storage_version = Evm_state.storage_version evm_state in
-    let*! sequencer_upgrade_payload =
-      Evm_state.inspect
+    let* storage_version = Durable_storage.storage_version evm_state in
+    let* sequencer_upgrade_payload =
+      Durable_storage.read_opt
+        (Raw_path (Durable_storage_path.sequencer_upgrade ~storage_version))
         evm_state
-        (Durable_storage_path.sequencer_upgrade ~storage_version)
     in
     Option.bind sequencer_upgrade_payload Evm_events.Sequencer_upgrade.of_bytes
     |> Option.map (fun e -> Evm_events.Sequencer_upgrade_event e)
@@ -3064,7 +3043,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let* new_delayed_transactions =
     if omit_delayed_tx_events then return []
     else
-      let*! hashes = Evm_state.delayed_inbox_hashes evm_state in
+      let* hashes = Evm_state.delayed_inbox_hashes evm_state in
       let* events =
         List.map_es
           (fun hash ->
@@ -3145,10 +3124,7 @@ let apply_blueprint ?events ?expected_block_hash timestamp payload
     | Some {sequencer; timestamp = upgrade_timestamp; _}
       when Time.Protocol.(timestamp >= upgrade_timestamp) ->
         return sequencer
-    | _ ->
-        Durable_storage.sequencer
-          ~storage_version:head.storage_version
-          (State.read_from_state head.evm_state)
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? chunks = Sequencer_blueprint.chunks_of_external_messages payload in
   let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
@@ -3173,10 +3149,7 @@ let apply_chunks ~signer timestamp chunks delayed_transactions =
         (* If we are this is the first block after the sequencer upgrade, the sequencer key in the state will still be the previous one. before applying the chunks, the sequencer key will change for the new one.
 In order to still be able to sign the chunks, we need to use the next sequencer key instead of the one in the state. *)
         return sequencer
-    | _ ->
-        Durable_storage.sequencer
-          ~storage_version:head.storage_version
-          (State.read_from_state head.evm_state)
+    | _ -> Durable_storage.read Sequencer_key head.evm_state
   in
   let*? signer = Signer.get_signer signer expected_sequencer in
   let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in

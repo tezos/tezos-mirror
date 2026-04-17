@@ -250,7 +250,7 @@ let take_delayed_transactions evm_state maximum_number_of_chunks =
   let maximum_delayed_transactions =
     maximum_cumulative_size / maximum_delayed_transaction_size
   in
-  let*! delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
+  let* delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
   let delayed_transactions =
     List.take_n maximum_delayed_transactions delayed_transactions
   in
@@ -360,25 +360,27 @@ let validate_tezlink_op ~maximum_cumulative_size
 
 let init_validation_state (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
-  let read = Evm_state.read head_info.evm_state in
+  let state = head_info.evm_state in
   let data_model =
     if List.mem ~equal:( = ) Tezosx.Tezos head_info.tezosx_runtimes then
       Tezlink_durable_storage.Rlp
     else Tezlink_durable_storage.Path
   in
   let michelson_config =
-    let get_counter = Tezlink_durable_storage.counter read ~data_model in
-    let get_balance = Tezlink_durable_storage.balance_z read ~data_model in
+    let get_counter = Tezlink_durable_storage.counter state ~data_model in
+    let get_balance = Tezlink_durable_storage.balance_z state ~data_model in
     Validation_types.{get_balance; get_counter}
   in
   let* minimum_base_fee_per_gas =
-    Etherlink_durable_storage.minimum_base_fee_per_gas_opt read
+    Etherlink_durable_storage.minimum_base_fee_per_gas_opt state
   in
-  let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas_opt read in
+  let* base_fee_per_gas =
+    Etherlink_durable_storage.base_fee_per_gas_opt state
+  in
   let* maximum_gas_limit =
-    Etherlink_durable_storage.maximum_gas_per_transaction read
+    Etherlink_durable_storage.maximum_gas_per_transaction state
   in
-  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
+  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte state in
   (* TODO #8236 / L2-862
    Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
    is a temporary work around. In the context of Tezlink, no EVM block
@@ -399,8 +401,8 @@ let init_validation_state (head_info : Evm_context.head) =
             base_fee_per_gas;
         maximum_gas_limit;
         da_fee_per_byte;
-        next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
-        balance = (fun addr -> Etherlink_durable_storage.balance read addr);
+        next_nonce = (fun addr -> Etherlink_durable_storage.nonce state addr);
+        balance = (fun addr -> Etherlink_durable_storage.balance state addr);
       }
   in
   return (Validation_types.empty_validation_state ~michelson_config ~evm_config)

@@ -204,11 +204,11 @@ end
 module Kernel_root_hash = struct
   type input = unit
 
-  type output = string option
+  type output = Ethereum_types.hex option
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Data_encoding.(option (string' Hex))
+  let output_encoding = Data_encoding.(option Ethereum_types.hex_encoding_no0x)
 
   let method_ = "tez_kernelRootHash"
 

@@ -77,14 +77,15 @@ module Etherlink = struct
   *)
   let simulation_version simulation_state =
     let open Lwt_result_syntax in
-    let read = Evm_ro_context.read_state simulation_state in
-    let* storage_version = Durable_storage.storage_version read in
+    let* storage_version = Durable_storage.storage_version simulation_state in
     if Storage_version.simulation_v0 ~storage_version then return `V0
     else if Storage_version.simulation_v2 ~storage_version then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
-      let* kernel_version = Durable_storage.kernel_version read in
+      let* kernel_version =
+        Durable_storage.read Kernel_version simulation_state
+      in
       (* This is supposed to be the only version where STORAGE_VERSION is 12,
          but with_da_fees isn't enabled. *)
       if kernel_version = "ec7c3b349624896b269e179384d0a45cf39e1145" then
@@ -100,12 +101,12 @@ module Etherlink = struct
     let* simulation_version = simulation_version simulation_state in
     let* simulation_state =
       if overwrite_tick_limit then
-        let*! state =
-          Evm_state.modify
-            ~key:"/evm/maximum_allowed_ticks"
-            ~value:
-              Data_encoding.(
-                Binary.to_string_exn Little_endian.int64 1_000_000_000_000L)
+        let* state =
+          Durable_storage.write
+            (Raw_path "/evm/maximum_allowed_ticks")
+            (Bytes.of_string
+               Data_encoding.(
+                 Binary.to_string_exn Little_endian.int64 1_000_000_000_000L))
             simulation_state
         in
         return state
@@ -160,23 +161,19 @@ module Etherlink = struct
   let da_fees_gas_limit_overhead (call : Ethereum_types.call) simulation_state :
       (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
-    let read = Evm_ro_context.read_state simulation_state in
-    let read_qty path =
-      let+ bytes = read path in
-      Option.map Ethereum_types.decode_number_le bytes
+    let* da_fee_per_byte =
+      Etherlink_durable_storage.da_fee_per_byte simulation_state
     in
-    let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
     let* (Qty minimum_base_fee_per_gas) =
-      (* In future iterations of the kernel, the default value will be
-         written to the storage. This default value will no longer need to
-         be declared here. *)
-      let path = Durable_storage_path.minimum_base_fee_per_gas in
-      let* minimum_base_feer_per_gas_opt = read_qty path in
+      let* minimum_base_feer_per_gas_opt =
+        Etherlink_durable_storage.minimum_base_fee_per_gas_opt simulation_state
+      in
       match minimum_base_feer_per_gas_opt with
       | None ->
           return
             (Ethereum_types.quantity_of_z Fees.default_minimum_base_fee_per_gas)
-      | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
+      | Some minimum_base_feer_per_gas ->
+          return (Ethereum_types.Qty minimum_base_feer_per_gas)
     in
     let tx_data =
       match call.data with
@@ -289,9 +286,8 @@ module Etherlink = struct
       Evm_ro_context.get_state ctxt ~block:block_param ()
     in
     let timestamp = Misc.now () in
-    let read = Evm_ro_context.read_state simulation_state in
     let* (Qty maximum_gas_per_transaction) =
-      Etherlink_durable_storage.maximum_gas_per_transaction read
+      Etherlink_durable_storage.maximum_gas_per_transaction simulation_state
     in
     let* simulation_version = simulation_version simulation_state in
     let* res =

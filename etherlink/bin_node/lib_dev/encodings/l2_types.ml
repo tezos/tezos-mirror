@@ -22,7 +22,11 @@ module Chain_id = struct
 
   let decode_le bytes = Chain_id (Helpers.decode_z_le bytes)
 
+  let encode_le (Chain_id z) = Z.to_bits z
+
   let decode_be bytes = Chain_id (Helpers.decode_z_be bytes)
+
+  let encode_be (Chain_id z) = Helpers.encode_z_be z
 
   let compare (Chain_id c1) (Chain_id c2) = Z.compare c1 c2
 
@@ -50,6 +54,12 @@ module Chain_family = struct
     | "evm" -> Ex_chain_family EVM
     | "michelson" -> Ex_chain_family Michelson
     | _ -> invalid_arg "Chain_family.of_string"
+
+  let of_bytes bytes =
+    match String.lowercase_ascii (Bytes.to_string bytes) with
+    | "evm" -> Ok (Ex_chain_family EVM)
+    | "michelson" -> Ok (Ex_chain_family Michelson)
+    | s -> error_with "Chain_family.of_bytes: invalid chain family %s" s
 
   let encoding =
     Data_encoding.string_enum

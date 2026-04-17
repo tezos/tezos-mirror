@@ -63,10 +63,12 @@ val michelson_runtime_chain_id : t -> L2_types.chain_id tzresult Lwt.t
     Michelson runtime was activated, or [None] if it has not been activated. *)
 val michelson_activation_level : t -> int64 option tzresult Lwt.t
 
-(** [current_block_number_durable ctxt ~root] returns the current block
-    number of the L2 chain prefixed by [root] from durable storage. *)
+(** [current_block_number_durable ctxt ~chain_family] returns the current block
+    number of the L2 chain for the given [chain_family] from durable storage. *)
 val current_block_number_durable :
-  t -> root:string -> Ethereum_types.quantity tzresult Lwt.t
+  t ->
+  chain_family:_ L2_types.chain_family ->
+  Ethereum_types.quantity tzresult Lwt.t
 
 (** [storage_version ctxt] returns the latest storage version known to the
     current kernel. *)
@@ -76,7 +78,7 @@ val storage_version : t -> int tzresult Lwt.t
 val kernel_version : t -> string tzresult Lwt.t
 
 (** [kernel_root_hash ctxt] returns the internal kernel root hash. *)
-val kernel_root_hash : t -> string option tzresult Lwt.t
+val kernel_root_hash : t -> Ethereum_types.hex option tzresult Lwt.t
 
 (** [list_runtimes ctxt] returns the list of runtimes activated in the kernel. *)
 val list_runtimes : t -> Tezosx.runtime list tzresult Lwt.t
@@ -148,7 +150,7 @@ val get_state :
   Evm_state.t tzresult Lwt.t
 
 (** [read_state state path] reads a value from the durable storage at [path]
-    in the given [state]. Alias for {!Evm_state.inspect} wrapped in a result. *)
+    in the given [state]. Uses {!Durable_storageV2.read_opt} internally. *)
 val read_state :
   Evm_state.t -> Durable_storage_path.path -> bytes option tzresult Lwt.t
 

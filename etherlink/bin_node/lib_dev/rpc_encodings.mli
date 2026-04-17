@@ -141,7 +141,7 @@ module Sequencer :
 module Kernel_version : METHOD with type input = unit and type output = string
 
 module Kernel_root_hash :
-  METHOD with type input = unit and type output = string option
+  METHOD with type input = unit and type output = Ethereum_types.hex option
 
 module Michelson_activation_level :
   METHOD with type input = unit and type output = int64 option

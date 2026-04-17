@@ -1123,11 +1123,10 @@ let dispatch_request (type f) ~websocket
                 Configuration.retrieve_chain_family
                   ~l2_chains:config.experimental_features.l2_chains
               in
-              let root =
-                Durable_storage_path.root_of_chain_family chain_family
-              in
               let* block_number =
-                Evm_ro_context.current_block_number_durable ro_ctxt ~root
+                Evm_ro_context.current_block_number_durable
+                  ro_ctxt
+                  ~chain_family
               in
               rpc_ok block_number
             in
@@ -1663,9 +1662,7 @@ let dispatch_request (type f) ~websocket
                   block_param
               in
               let* state = Evm_ro_context.get_state ro_ctxt ~block () in
-              let* pk =
-                Durable_storage.sequencer (Evm_ro_context.read_state state)
-              in
+              let* pk = Durable_storage.read Sequencer_key state in
               rpc_ok pk
             in
             build ~f module_ parameters
