@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (preattestation)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/consensus/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/consensus/main.exe \
                  -- --file test_preattestation.ml
 *)
 

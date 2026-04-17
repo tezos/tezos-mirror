@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (validate manager)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/validate/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/validate/main.exe \
                   -- --file test_validation_batch.ml
     Subject:    Validation of batched manager operation.
 

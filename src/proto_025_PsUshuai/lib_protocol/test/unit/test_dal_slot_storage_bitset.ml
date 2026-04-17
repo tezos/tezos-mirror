@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (DAL slot storage - bitset utilities)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/unit/main.exe \
                   -- --file test_dal_slot_storage_bitset.ml
     Subject:    Unit tests for DAL bitset-based attestation storage utilities.
                 Tests the conversion between Set(public_key_hash) and Bitset

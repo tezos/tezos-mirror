@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Michelson translator
-    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_025_PsUshuai/lib_protocol/test/pbt/main.exe \
                   -- --file test_script_normalization.ml
     Subject:      PBT that normalization defined in plugin is consistent with the protocol.
 *)

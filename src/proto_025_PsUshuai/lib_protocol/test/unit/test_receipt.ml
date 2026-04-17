@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/unit/main.exe \
                   -- --file test_receipt.ml
     Subject:    Test receipt endocings.
 *)

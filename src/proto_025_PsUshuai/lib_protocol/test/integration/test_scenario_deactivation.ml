@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Protocol, Consensus, Deactivation
-    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/main.exe \
                    -- --file test_scenario_deactivation.ml
     Subject:      Test deactivation in the protocol.
 *)

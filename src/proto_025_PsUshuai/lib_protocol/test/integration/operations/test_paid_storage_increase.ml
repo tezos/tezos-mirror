@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (increase_paid_storage)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_paid_storage_increase.ml
     Subject:    On increasing a paid amount of contract storage.
 *)

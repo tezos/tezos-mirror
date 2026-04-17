@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Protocol (interpretation)
-    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_025_PsUshuai/lib_protocol/test/unit/main.exe \
                   -- --file test_native_contracts.ml
     Subject:      Native contracts typechecking and interpretation
 *)

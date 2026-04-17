@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (temporary big maps)
-    Invocation: dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_temp_big_maps.ml
     Subject:    On temporary big maps.
 *)

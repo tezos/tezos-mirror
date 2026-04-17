@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Transfer_ticket logic
-    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_protocol/test/integration/operations/main.exe \
+    Invocation:   dune exec src/proto_025_PsUshuai/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_transfer_ticket.ml
     Subject:      Test ticket transfers
 *)

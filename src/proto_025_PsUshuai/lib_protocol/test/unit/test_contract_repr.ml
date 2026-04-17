@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Contract_repr
-    Invocation:   dune exec src/proto_025_PsGXQmSv/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_025_PsUshuai/lib_protocol/test/unit/main.exe \
                   -- --file test_contract_repr.ml
     Dependencies: contract_hash.ml
     Subject:      To test the modules (including the top-level)
