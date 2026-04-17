@@ -23,12 +23,14 @@ use crate::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, CUSTOMS,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+            VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
         },
         global_counter::global_counter_precompile,
         guard::{out_of_gas, revert},
         runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
+        verify_tezos_signature::verify_tezos_signature_precompile,
     },
     storage::version::EVMVersion,
 };
@@ -98,6 +100,9 @@ impl EtherlinkPrecompiles {
             }
             RUNTIME_GATEWAY_PRECOMPILE_ADDRESS => {
                 runtime_gateway_precompile(&calldata, context, inputs)
+            }
+            VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS => {
+                verify_tezos_signature_precompile(&calldata, inputs)
             }
             _ => return Ok(None),
         };
