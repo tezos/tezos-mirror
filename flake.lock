@@ -110,16 +110,15 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1761601209,
-        "narHash": "sha256-XBRhyGnN0JfX+raQfY3vDWl2T+iPEG+/DevnHJekdjo=",
-        "owner": "vapourismo",
+        "lastModified": 1771067167,
+        "narHash": "sha256-XSw8dQIkdr+6eLvbUHo3cJPtTU7o5SMODz3qlnzmGpQ=",
+        "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "019ce8d06c90f3fea0cb08ea71e9df2d7482cb21",
+        "rev": "2e20bbbe8130d1880338291446fd4e710a4db9a1",
         "type": "github"
       },
       "original": {
-        "owner": "vapourismo",
-        "ref": "fix/no-broken-symlinks-hidapi",
+        "owner": "tweag",
         "repo": "opam-nix",
         "type": "github"
       }
