@@ -32,7 +32,7 @@ use tezosx_journal::TezosXJournal;
 use crate::alias::{get_alias, store_alias};
 
 use crate::account_storage::TezlinkAccount;
-use crate::mir_ctx::{HasContractAccount, HasHost, HasOperationGas};
+use crate::mir_ctx::{HasContractAccount, HasHost, HasOperationGas, HasSourcePublicKey};
 
 /// Errors from CRAC-capable operations. The two variants have fundamentally
 /// different semantics and must be handled at different levels.
@@ -146,7 +146,11 @@ pub(crate) fn execute_enshrined_contract<'a, Host>(
     contract: EnshrinedContracts,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
+    ctx: &mut (impl CtxTrait<'a>
+              + HasHost<Host>
+              + HasContractAccount
+              + HasOperationGas
+              + HasSourcePublicKey),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<Vec<OperationInfo<'a>>, CracError>
@@ -550,7 +554,7 @@ fn inject_context_headers_raw(
 /// units before being written to `X-Tezos-Gas-Limit`.
 fn inject_context_headers<'a, Host>(
     mut request: http::Request<Vec<u8>>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasOperationGas),
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasOperationGas + HasSourcePublicKey),
     journal: &mut TezosXJournal,
     registry: &impl Registry,
 ) -> Result<http::Request<Vec<u8>>, TransferError>
@@ -566,6 +570,7 @@ where
                 "http_call: unknown or missing target runtime in URL host".into(),
             )
         })?;
+    let source_public_key = ctx.source_public_key().to_vec();
     let sender = ctx.sender();
     let source = AddressHash::from(ctx.source());
     let amount_mutez: u64 = ctx
@@ -606,10 +611,19 @@ where
     // that get_or_create_alias may spend on alias generation.
     let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
         .ok_or(TransferError::OutOfGas)?;
+    // When sender == source (the common case for implicit account
+    // transfers), pass the source pubkey so the alias is created with
+    // the credential attached.
+    let sender_pubkey: Option<&[u8]> = if sender == source {
+        Some(&source_public_key)
+    } else {
+        None
+    };
     let (sender_alias, sender_target_consumed) = get_or_create_alias(
         ctx.host(),
         journal,
         &sender,
+        sender_pubkey,
         context.clone(),
         registry,
         target_runtime,
@@ -633,6 +647,7 @@ where
         ctx.host(),
         journal,
         &source,
+        Some(&source_public_key),
         context,
         registry,
         target_runtime,
@@ -752,10 +767,12 @@ fn compute_selector(method_signature: &str) -> [u8; 4] {
 ///
 /// Returns `(alias, generation_gas_consumed)` where the gas is in the
 /// target runtime's units (0 on cache hit).
+#[allow(clippy::too_many_arguments)]
 fn get_or_create_alias<Host>(
     host: &mut Host,
     journal: &mut TezosXJournal,
     address: &AddressHash,
+    native_public_key: Option<&[u8]>,
     context: CrossRuntimeContext,
     registry: &impl Registry,
     target_runtime: RuntimeId,
@@ -773,6 +790,7 @@ where
             host,
             journal,
             &address_b58,
+            native_public_key,
             target_runtime,
             context,
             gas_remaining,
@@ -822,7 +840,11 @@ fn build_ethereum_request(
 fn dispatch_crac_call<'a, Host>(
     registry: &impl Registry,
     journal: &mut TezosXJournal,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
+    ctx: &mut (impl CtxTrait<'a>
+              + HasHost<Host>
+              + HasContractAccount
+              + HasOperationGas
+              + HasSourcePublicKey),
     request: http::Request<Vec<u8>>,
 ) -> Result<Vec<u8>, CracError>
 where

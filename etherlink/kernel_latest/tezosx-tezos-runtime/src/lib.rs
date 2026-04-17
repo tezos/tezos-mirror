@@ -453,6 +453,7 @@ where
         level: &hdrs.block_number,
         now: &hdrs.timestamp,
         chain_id,
+        source_public_key: &[],
     };
     let parser = mir::parser::Parser::new();
 
@@ -615,6 +616,7 @@ impl RuntimeInterface for TezosRuntime {
         host: &mut Host,
         _journal: &mut TezosXJournal,
         native_address: &str,
+        _native_public_key: Option<&[u8]>,
         _context: CrossRuntimeContext,
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
@@ -881,6 +883,7 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _native_address: &str,
+            _native_public_key: Option<&[u8]>,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
             _gas_remaining: u64,
@@ -939,6 +942,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 "0x1234567890abcdef1234567890abcdef12345678",
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -965,6 +969,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 evm_address,
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1001,6 +1006,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 evm_address,
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1029,6 +1035,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 evm_address,
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1054,6 +1061,7 @@ mod tests {
                 &mut host1,
                 &mut journal,
                 evm_address,
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1064,6 +1072,7 @@ mod tests {
                 &mut host2,
                 &mut journal,
                 evm_address,
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1084,6 +1093,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 "0x1111111111111111111111111111111111111111",
+                None,
                 test_context(),
                 1_000_000,
             )
@@ -1094,6 +1104,7 @@ mod tests {
                 &mut host,
                 &mut journal,
                 "0x2222222222222222222222222222222222222222",
+                None,
                 test_context(),
                 1_000_000,
             )
