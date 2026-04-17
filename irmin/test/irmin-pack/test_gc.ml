@@ -1133,6 +1133,52 @@ module Concurrent_gc = struct
     let _killed = kill_gc t in
     S.Repo.close t.repo
 
+  (** Regression test for TOCTOU race in gc.ml:finalise.
+
+      Two concurrent [finalise_exn ~wait:true] calls on the same GC both
+      yield at [Task.Async.await]. Without the [finalization_started] guard,
+      both enter [go] when the worker completes, causing double
+      [swap_and_purge] and double [Lwt.wakeup_later] (which raises
+      [Invalid_argument "Lwt.wakeup_later"]). *)
+  let test_concurrent_finalise () =
+    let* t = init () in
+    let* t, c1 = commit_1 t in
+    let* t = checkout_exn t c1 in
+    let* t, c2 = commit_2 t in
+    let* () = start_gc t c2 in
+    (* Launch two concurrent wait:true finalisations. Both enter
+       gc.ml:finalise before either completes: the first sets
+       finalization_started, the second sees it and waits on the
+       promise instead of entering [go] a second time. *)
+    let p1 =
+      Lwt.catch
+        (fun () ->
+          let+ r = S.Gc.finalise_exn ~wait:true t.repo in
+          Ok r)
+        (fun exn -> Lwt.return (Error exn))
+    in
+    let p2 =
+      Lwt.catch
+        (fun () ->
+          let+ r = S.Gc.finalise_exn ~wait:true t.repo in
+          Ok r)
+        (fun exn -> Lwt.return (Error exn))
+    in
+    let* r1 = p1 in
+    let* r2 = p2 in
+    let check_ok label = function
+      | Ok (`Finalised _ | `Idle) -> ()
+      | Ok `Running -> Alcotest.failf "%s: unexpected `Running" label
+      | Error exn ->
+          Alcotest.failf "%s: raised %s" label (Printexc.to_string exn)
+    in
+    check_ok "p1" r1;
+    check_ok "p2" r2;
+    (* Verify store integrity after concurrent finalisation *)
+    let* () = check_not_found t c1 "removed c1" in
+    let* () = check_2 t c2 in
+    S.Repo.close t.repo
+
   let tests =
     [
       tc "Test find_running_gc" find_running_gc;
@@ -1150,6 +1196,7 @@ module Concurrent_gc = struct
       tc "Test kill gc and finalise" test_kill_gc_and_finalise;
       tc "Test kill gc and close" test_kill_gc_and_close;
       tc "Test gc cancel cleanup" test_cancel_cleanup;
+      tc "Test concurrent finalise" test_concurrent_finalise;
     ]
 end
 
