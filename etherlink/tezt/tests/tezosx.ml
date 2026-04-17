@@ -3725,6 +3725,217 @@ let test_michelson_chain_id_in_crac ~runtime () =
          contains %L") ;
   unit
 
+(** tz2 (secp256k1) test account generated with octez-client. *)
+let tz2_bootstrap : Account.key =
+  {
+    alias = "tz2_bootstrap";
+    public_key_hash = "tz2GpnbHg8Hg64pWp42hhJmSaUUWWuHw9xjX";
+    public_key = "sppk7axNHeFvBJbCSAySkyABv8VwuyxwVvFwWK1p49myMkSyRWFXTjX";
+    secret_key =
+      Account.Unencrypted
+        "spsk1k4A9FYh378QPYDa6RCMiGoo797h7JStrNcvFh1ouWbphHMZyG";
+  }
+
+(** tz3 (P256) test account generated with octez-client. *)
+let tz3_bootstrap : Account.key =
+  {
+    alias = "tz3_bootstrap";
+    public_key_hash = "tz3QjAwKfmeUi74PwGjy77ZbwCb3xXtA2woa";
+    public_key = "p2pk67vm51Cd59hXf8hmXPW9cwsHR1bLE5WC1WaSVVgyDH1oPkqigT8";
+    secret_key =
+      Account.Unencrypted
+        "p2sk2rmHAdX9dDPrVSS4JJQK4i3cA3gRAERXEpWHZuSb7idjeMFD2U";
+  }
+
+(** Test EIP-1271 isValidSignature for a single account: create alias,
+    sign a hash, assert valid signature returns the magic value,
+    and assert wrong hash returns failure. *)
+let check_eip1271_for_account ~setup ~counter (account : Account.key) =
+  let label = account.alias in
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let eip1271_magic =
+    "0x1626ba7e00000000000000000000000000000000000000000000000000000000"
+  in
+  let eip1271_failure =
+    "0xffffffff00000000000000000000000000000000000000000000000000000000"
+  in
+  (* Create alias via cross-runtime transfer *)
+  let* () =
+    michelson_to_evm_transfer
+      ~source:account
+      ~evm_destination
+      ~transfer_amount:(Tez.of_int 1)
+      ~counter
+      setup
+  in
+  let*@ alias_address =
+    Rpc.Tezosx.tez_getTezosEthereumAddress
+      account.public_key_hash
+      setup.sequencer
+  in
+  Log.info "[%s] alias EVM address: %s" label alias_address ;
+  (* Sign and verify *)
+  let hash_hex =
+    "0x64b58ce5683684531652feb45eb41f30ef7ebae57a440d942ca0579b7309ff83"
+  in
+  let hash_bytes =
+    Hex.to_bytes
+      (`Hex "64b58ce5683684531652feb45eb41f30ef7ebae57a440d942ca0579b7309ff83")
+  in
+  let signature = Account.sign_bytes ~signer:account hash_bytes in
+  let (`Hex sig_hex) = Tezos_crypto.Signature.to_hex signature in
+  let sig_with_prefix = "0x" ^ sig_hex in
+  let* calldata =
+    Cast.calldata
+      ~args:[hash_hex; sig_with_prefix]
+      "isValidSignature(bytes32,bytes)"
+  in
+  let*@ call_result =
+    Rpc.call ~to_:alias_address ~data:calldata setup.sequencer
+  in
+  Check.(
+    (call_result = eip1271_magic)
+      string
+      ~error_msg:(sf "[%s] Expected isValidSignature %%R but got %%L" label)) ;
+  Log.info "[%s] valid signature returns magic" label ;
+  (* Wrong hash should always fail *)
+  let wrong_hash =
+    "0x0000000000000000000000000000000000000000000000000000000000000001"
+  in
+  let* bad_calldata =
+    Cast.calldata
+      ~args:[wrong_hash; sig_with_prefix]
+      "isValidSignature(bytes32,bytes)"
+  in
+  let*@ bad_result =
+    Rpc.call ~to_:alias_address ~data:bad_calldata setup.sequencer
+  in
+  Check.(
+    (bad_result = eip1271_failure)
+      string
+      ~error_msg:(sf "[%s] wrong hash: expected %%R but got %%L" label)) ;
+  Log.info "[%s] wrong hash → failure" label ;
+  unit
+
+(** EIP-1271 signature verification across tz1, tz2 and tz3 key types *)
+let test_eip1271_signature_verification =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"EIP-1271 isValidSignature on tz1, tz2 and tz3 aliases"
+    ~tags:["eip1271"; "signature"; "alias"; "cross_runtime"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun setup _protocol ->
+  let Tezt_etherlink.Setup.
+        {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      =
+    setup
+  in
+  (* Fund and reveal tz2/tz3 accounts via delayed inbox since the
+     config tool only supports Ed25519 bootstrap accounts. *)
+  let fund_and_reveal ~source_counter account =
+    (* Transfer from bootstrap5 to fund the account *)
+    let* transfer =
+      Operation.Manager.(
+        operation
+          [
+            make
+              ~fee:1000
+              ~counter:source_counter
+              ~source:Constant.bootstrap5
+              (transfer ~dest:account ~amount:100_000_000 ());
+          ])
+        client
+    in
+    let* () =
+      send_tezos_op_to_delayed_inbox_and_wait
+        ~sc_rollup_address
+        ~sc_rollup_node
+        ~client
+        ~l1_contracts
+        ~sequencer
+        transfer
+    in
+    (* Reveal the account's public key *)
+    let* reveal =
+      Operation.Manager.(
+        operation
+          [make ~fee:1000 ~counter:1 ~source:account (reveal account ())])
+        client
+    in
+    send_tezos_op_to_delayed_inbox_and_wait
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      reveal
+  in
+  let* () = fund_and_reveal ~source_counter:1 tz2_bootstrap in
+  let* () = fund_and_reveal ~source_counter:2 tz3_bootstrap in
+  (* tz1: Ed25519 *)
+  let* () = check_eip1271_for_account ~setup ~counter:1 Constant.bootstrap1 in
+  (* tz2: secp256k1 *)
+  let* () = check_eip1271_for_account ~setup ~counter:2 tz2_bootstrap in
+  (* tz3: P256 *)
+  check_eip1271_for_account ~setup ~counter:2 tz3_bootstrap
+
+(** Regression test: a well-formed signature signed over a different hash
+    than the one submitted must be rejected by isValidSignature. *)
+let test_eip1271_wrong_signature_rejected =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"EIP-1271 isValidSignature rejects a wrong signature"
+    ~tags:["eip1271"; "signature"; "alias"; "wrong_signature"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun setup _protocol ->
+  let account = Constant.bootstrap1 in
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let eip1271_failure =
+    "0xffffffff00000000000000000000000000000000000000000000000000000000"
+  in
+  let* () =
+    michelson_to_evm_transfer
+      ~source:account
+      ~evm_destination
+      ~transfer_amount:(Tez.of_int 1)
+      ~counter:1
+      setup
+  in
+  let*@ alias_address =
+    Rpc.Tezosx.tez_getTezosEthereumAddress
+      account.public_key_hash
+      setup.sequencer
+  in
+  (* The signature is produced over [signed_hash] but we submit
+     [claimed_hash] to [isValidSignature]. The two are distinct so
+     verification must fail. *)
+  let claimed_hash =
+    "0x0000000000000000000000000000000000000000000000000000000000000001"
+  in
+  let signed_hash_bytes =
+    Hex.to_bytes
+      (`Hex "0000000000000000000000000000000000000000000000000000000000000002")
+  in
+  let wrong_sig = Account.sign_bytes ~signer:account signed_hash_bytes in
+  let (`Hex wrong_sig_hex) = Tezos_crypto.Signature.to_hex wrong_sig in
+  let* calldata =
+    Cast.calldata
+      ~args:[claimed_hash; "0x" ^ wrong_sig_hex]
+      "isValidSignature(bytes32,bytes)"
+  in
+  let*@ call_result =
+    Rpc.call ~to_:alias_address ~data:calldata setup.sequencer
+  in
+  Check.(
+    (call_result = eip1271_failure)
+      string
+      ~error_msg:
+        "isValidSignature on a wrong signature returned %L; expected the \
+         EIP-1271 failure magic %R") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -3783,4 +3994,6 @@ let () =
     ~evm_chain_id:42793
     ~expected_chain_id:"NetXohUVN5QWR4f"
     () ;
-  test_michelson_chain_id_in_crac ~runtime:Tezos ()
+  test_michelson_chain_id_in_crac ~runtime:Tezos () ;
+  test_eip1271_signature_verification [Alpha] ;
+  test_eip1271_wrong_signature_rejected [Alpha]
