@@ -131,13 +131,6 @@ let create_dropbox ?on_completion =
   in
   create table (create_handlers ?on_completion ())
 
-(* Simulates a stream of data with a blocking `pop` function. *)
-let make_stream () =
-  let stream = Lwt_condition.create () in
-  let push = Lwt_condition.broadcast stream in
-  let read () = Lwt_condition.wait stream in
-  (push, read)
-
 let create_callback_worker ?on_completion read =
   let table = Worker.create_table (Callback read) in
   create table (create_handlers ?on_completion ())
@@ -310,6 +303,7 @@ let _test_raise_exn () =
    completion takes time *)
 let test_async_dropbox () =
   let open Lwt_result_syntax in
+  let t_first, u_first = Lwt.task () in
   let t_end, u_end = Lwt.task () in
   let t_each, u_each = Lwt.task () in
   let nb_completion = ref 0 in
@@ -318,6 +312,7 @@ let test_async_dropbox () =
       ~on_completion:(fun () ->
         let open Lwt_syntax in
         incr nb_completion ;
+        if !nb_completion = 1 then Lwt.wakeup u_first () ;
         let* () = t_each in
         if !nb_completion = 2 then Lwt.wakeup u_end () ;
         Lwt.return_unit)
@@ -329,6 +324,7 @@ let test_async_dropbox () =
   Worker.Dropbox.put_request w rq ;
   (* While the blocking request is handled, n other requests are sent *)
   (* There requests should be merged into one *)
+  let*! () = t_first in
   for _i = 1 to n do
     Worker.Dropbox.put_request w rq
   done ;
@@ -352,7 +348,12 @@ let test_callback_worker () =
   (* The worker doesn't have a request buffer: it will take a function that
      tries to read a value from somewhere, and is expected to block until
      something is read. *)
-  let push_to_stream, read_from_stream = make_stream () in
+  let stream, push_to_stream = Lwt_stream.create () in
+  let push_to_stream value = push_to_stream (Some value) in
+  let read_from_stream () =
+    let*! value_opt = Lwt_stream.get stream in
+    match value_opt with None -> assert false | Some value -> Lwt.return value
+  in
   let* w =
     create_callback_worker
       ~on_completion:(fun () ->
