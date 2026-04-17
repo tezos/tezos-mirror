@@ -55,7 +55,7 @@ let number = function S023 -> 023 | T024 -> 024 | U025 -> 025 | Alpha -> 026
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | U025 -> "proto_025_PsGXQmSv"
+  | U025 -> "proto_025_PsUshuai"
   | T024 -> "proto_024_PtTALLiN"
   | S023 -> "proto_023_PtSeouLo"
 
@@ -66,7 +66,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | S023 -> "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
   | T024 -> "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
-  | U025 -> "PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC"
+  | U025 -> "PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =

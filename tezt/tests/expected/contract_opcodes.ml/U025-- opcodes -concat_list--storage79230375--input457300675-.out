@@ -1,5 +1,5 @@
 
-./octez-client --protocol PsGXQmSv1UDDm2brdEFsuJCHjajS9Cv8mp44w93wNS2TpXFSvTC --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{}' --level 1 --trace-stack
+./octez-client --protocol PsUshuai9QapM5TGj1JpuVGkdxz5GykdnEvS6Rh8SUVrARvZLCY --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/concat_list.tz on storage '""' and input '{}' --level 1 --trace-stack
 storage
   ""
 emitted operations

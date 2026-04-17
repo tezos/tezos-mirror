@@ -18,7 +18,7 @@ depends: [
   "tezt-cloud"
   "tezt-etherlink"
   "octez-protocol-alpha-libs"
-  "octez-protocol-025-PsGXQmSv-libs"
+  "octez-protocol-025-PsUshuai-libs"
   "octez-protocol-024-PtTALLiN-libs"
 ]
 build: [

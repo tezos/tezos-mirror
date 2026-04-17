@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tenderbrute_025_PsUshuai)
+ (public_name octez-protocol-025-PsUshuai-libs.baking.tenderbrute)
+ (libraries
+  octez-libs.data-encoding
+  octez-libs.base
+  octez-libs.base.unix
+  tezos-protocol-025-PsUshuai.protocol
+  octez-shell-libs.client-base
+  octez-protocol-025-PsUshuai-libs.client)
+ (flags
+  (:standard)
+  -open Data_encoding
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_protocol_025_PsUshuai
+  -open Tezos_client_base
+  -open Tezos_client_025_PsUshuai))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\nmodule Mldsa44 = Tezos_crypto.Signature.Mldsa44\n  include Tezos_crypto.Signature.V3")))

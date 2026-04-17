@@ -18,10 +18,10 @@
   re
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-024-PtTALLiN.embedded-protocol
-  tezos-protocol-025-PsGXQmSv.embedded-protocol
+  tezos-protocol-025-PsUshuai.embedded-protocol
   tezos-protocol-alpha.embedded-protocol
   octez-protocol-024-PtTALLiN-libs.plugin-registerer
-  octez-protocol-025-PsGXQmSv-libs.plugin-registerer
+  octez-protocol-025-PsUshuai-libs.plugin-registerer
   octez-protocol-alpha-libs.plugin-registerer)
  (link_flags
   (:standard)

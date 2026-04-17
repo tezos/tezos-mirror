@@ -39,7 +39,7 @@ those available to end-users on Tezos Mainnet. The complete list of
 operations, including those corresponding to features in development
 or available only on test networks, is given in the
 :package-api:`OCaml Documentation
-<tezos-protocol-025-PsGXQmSv/Tezos_raw_protocol_025_PsGXQmSv/Operation_repr/index.html>`.
+<tezos-protocol-025-PsUshuai/Tezos_raw_protocol_025_PsUshuai/Operation_repr/index.html>`.
 
 .. _validation_passes_u025:
 

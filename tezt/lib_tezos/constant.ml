@@ -103,7 +103,7 @@ let _octez_baker_tallinn =
   Uses.make ~tag:"baker_psd5wvtj" ~path:"./octez-baker-PtTALLiN" ()
 
 let _octez_baker_ushuaia =
-  Uses.make ~tag:"baker_psgxqmsv" ~path:"./octez-baker-PsGXQmSv" ()
+  Uses.make ~tag:"baker_psgxqmsv" ~path:"./octez-baker-PsUshuai" ()
 
 let _octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
@@ -121,7 +121,7 @@ let _octez_accuser_tallinn =
   Uses.make ~tag:"accuser_tallinn" ~path:"./octez-accuser-PtTALLiN" ()
 
 let _octez_accuser_ushuaia =
-  Uses.make ~tag:"accuser_ushuaia" ~path:"./octez-accuser-PsGXQmSv" ()
+  Uses.make ~tag:"accuser_ushuaia" ~path:"./octez-accuser-PsUshuai" ()
 
 let _octez_accuser_alpha =
   Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
