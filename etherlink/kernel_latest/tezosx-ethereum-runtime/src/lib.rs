@@ -33,7 +33,7 @@ use tezosx_interfaces::{
 use tezosx_journal::TezosXJournal;
 
 alloy_sol_types::sol! {
-    function init_tezosx_alias(string nativeAddress) external payable;
+    function init_tezosx_alias(string nativeAddress, bytes nativePublicKey) external payable;
 }
 
 pub struct EthereumRuntime {
@@ -323,6 +323,7 @@ impl RuntimeInterface for EthereumRuntime {
         // Encode the init_tezosx_alias call
         let call_data = init_tezosx_aliasCall {
             nativeAddress: native_address.to_string(),
+            nativePublicKey: native_public_key.unwrap_or_default().to_vec().into(),
         }
         .abi_encode();
 

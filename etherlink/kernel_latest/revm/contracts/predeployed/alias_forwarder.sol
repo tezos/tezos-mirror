@@ -21,20 +21,24 @@ contract AliasForwarder {
     /// @notice Whether the alias has been initialized
     bool public initialized;
 
+    /// @notice The native public key of the Tezos account (raw bytes from storage)
+    bytes public nativePublicKey;
+
     /// @notice Emitted when funds are forwarded to the native address
     event Forwarded(string indexed nativeAddress, uint256 amount);
 
     /// @notice Emitted when the alias is initialized
-    event Initialized(string nativeAddress, uint256 forwardedBalance);
+    event Initialized(string nativeAddress, bytes nativePublicKey, uint256 forwardedBalance);
 
     error AlreadyInitialized();
     error NotAuthorized();
     error TransferFailed();
 
-    /// @notice Initialize the alias with its native address
+    /// @notice Initialize the alias with its native address and public key
     /// @dev Can only be called once by the TezosX internal address
     /// @param _nativeAddress The Tezos address (e.g., "tz1...") to forward funds to
-    function init_tezosx_alias(string calldata _nativeAddress) external payable {
+    /// @param _nativePublicKey Binary-encoded public key of the Tezos source account
+    function init_tezosx_alias(string calldata _nativeAddress, bytes calldata _nativePublicKey) external payable {
         if (initialized) {
             revert AlreadyInitialized();
         }
@@ -43,6 +47,7 @@ contract AliasForwarder {
         }
 
         nativeAddress = _nativeAddress;
+        nativePublicKey = _nativePublicKey;
         initialized = true;
 
         // Forward any pre-existing balance (sent before alias was created)
@@ -51,7 +56,7 @@ contract AliasForwarder {
             _forwardBalance(balance);
         }
 
-        emit Initialized(_nativeAddress, balance);
+        emit Initialized(_nativeAddress, _nativePublicKey, balance);
     }
 
     /// @notice Receive function to accept plain tez transfers
