@@ -1050,6 +1050,9 @@ let blacklisted_rpcs_arg =
          Lwt_result_syntax.return
            (Configuration.Blacklist (String.split ',' raw))))
 
+(** Pick the single [--restricted-rpcs], [--whitelisted-rpcs] or
+    [--blacklisted-rpcs] argument provided on the command line. Fail when
+    more than one is used simultaneously, return [None] when none is given. *)
 let pick_restricted_rpcs r w b =
   match (r, w, b) with
   | None, None, None -> Lwt_result_syntax.return_none
@@ -1231,12 +1234,17 @@ module Groups = struct
   let debug = Tezos_clic.{name = "debug"; title = "Debug commands"}
 end
 
+(** Emit a warning when websockets are enabled while the RPC server backend
+    is Dream, since Dream's websocket support is known to be unstable. *)
 let websocket_checks config =
   match (config.websockets, config.experimental_features) with
   | Some _, {rpc_server = Dream; _} ->
       Internal_event.Simple.emit Event.buggy_dream_websocket () |> Lwt_result.ok
   | _ -> Lwt_result_syntax.return_unit
 
+(** Build an internal event configuration. When [daily_logs_path] is set,
+    attach a daily log sink that filters out the noisy [rpc_server] events
+    below [Notice] and rotates after 7 days. *)
 let make_event_config ~verbosity ?daily_logs_path () =
   let open Tezos_event_logging.Internal_event in
   let open Tezos_base_unix.Internal_event_unix in
@@ -1274,6 +1282,10 @@ let make_event_config ~verbosity ?daily_logs_path () =
       add_uri_to_config uri config
   | None -> config
 
+(** Initialise the internal event logger for the running node. When
+    [daily_logs] is [true], a daily log file is written inside the data
+    directory; [rpc_mode_port] disambiguates the log directory when several
+    RPC-mode nodes share the same data directory. *)
 let init_logs ~daily_logs ?rpc_mode_port configuration =
   let open Tezos_base_unix.Internal_event_unix in
   let daily_logs_path =
@@ -1301,6 +1313,9 @@ let init_logs ~daily_logs ?rpc_mode_port configuration =
 *)
 let performance_gc_params = (8388608 (* 8M *), 120)
 
+(** Apply the OCaml GC parameters matching [config.performance_profile].
+    When the user already overrode [s=] or [o=] through [OCAMLRUNPARAM] the
+    function emits a warning and leaves the parameters untouched. *)
 let set_gc_parameters (config : Configuration.t) =
   let open Lwt_syntax in
   match
@@ -1317,6 +1332,8 @@ let set_gc_parameters (config : Configuration.t) =
           let minor_heap_size, space_overhead = performance_gc_params in
           Gc.set {params with minor_heap_size; space_overhead})
 
+(** Build an [io_wallet] rooted at [wallet_dir] and register it as the
+    default signer for the client library. *)
 let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
     new Client_context_unix.unix_io_wallet
@@ -1329,6 +1346,8 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+(** Resolve the sequencer [keys] through [wallet_ctxt], or generate a fresh
+    unencrypted Ed25519 key when [keys] is [None] or empty. *)
 let get_keys_or_generate_one wallet_ctxt keys =
   let open Lwt_result_syntax in
   let get key =
@@ -1349,6 +1368,10 @@ let get_keys_or_generate_one wallet_ctxt keys =
       [key]
   | Some keys -> List.map_es get keys
 
+(** Downgrade [native_execution_policy] from [Always] to [Rpcs_only] in
+    sequencer mode, since native execution is not supported for block
+    application. Emits a warning when the policy is effectively changed,
+    and is a no-op otherwise. *)
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
   match configuration.kernel_execution.native_execution_policy with
@@ -1366,6 +1389,8 @@ let sequencer_disable_native_execution configuration =
       }
   | Rpcs_only | Never -> return configuration
 
+(** Fall back to the network's bundled kernel when no explicit [kernel] was
+    provided on the command line. Returns [None] when neither is available. *)
 let kernel_from_args network kernel =
   let open Evm_node_lib_dev.Pvm_types in
   Option.either
@@ -1375,6 +1400,9 @@ let kernel_from_args network kernel =
       | Testnet -> None
       | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)))
 
+(** Inject a default tezlink L2 chain and [spawn_rpc] port into
+    [configuration.experimental_features], without overriding any user-provided
+    values. *)
 let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   let open Configuration in
   let experimental_features =
@@ -1396,6 +1424,9 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   in
   {configuration with experimental_features}
 
+(** Read or create the configuration, patch it for sequencer or sandbox
+    mode (including the tezlink sandbox), initialise the logger and GC
+    parameters, then hand control over to {!Evm_node_lib_dev.Sequencer.main}. *)
 let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
@@ -1614,6 +1645,8 @@ let rpc_command =
         ~config
         ())
 
+(** Read or create the configuration, initialise the logger and GC
+    parameters, then hand control over to {!Evm_node_lib_dev.Observer.main}. *)
 let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?private_rpc_port ?cors_origins ?cors_headers
     ?enable_websocket ~verbose ?profiling ?preimages ?preimages_endpoint
@@ -1674,6 +1707,9 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ~sandbox
     ()
 
+(** Encode [data] as inbox messages, either as a signed blueprint or as
+    raw chunked transactions, depending on [kind]. Returns the hex-encoded
+    external payloads ready to be injected. *)
 let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
@@ -1716,6 +1752,9 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
+(** Parse a [file:PATH] or [data:RAW] CLI argument. When a file is given,
+    its content is read and split on whitespace; the raw form is returned
+    as a singleton list. *)
 let from_data_or_file data_for_file =
   let open Lwt_result_syntax in
   Client_aliases.parse_alternatives
@@ -2543,6 +2582,8 @@ let check_config_command =
       else Format.printf "Configuration has been parsed successfully.\n" ;
       return_unit)
 
+(** Build a CLI argument that maps [--name-with-dashes VALUE] to the
+    [(name, VALUE)] tuple used by the installer config machinery. *)
 let config_key_arg ~name ~placeholder =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
@@ -2550,6 +2591,8 @@ let config_key_arg ~name ~placeholder =
   Tezos_clic.arg ~long ~doc ~placeholder
   @@ Tezos_clic.parameter (fun _ s -> return (name, s))
 
+(** Build a CLI switch that maps [--name-with-dashes] to the [(name, "")]
+    tuple used to enable boolean flags in the installer config. *)
 let config_key_flag ~name =
   let open Lwt_result_syntax in
   let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
@@ -3493,6 +3536,8 @@ let import_snapshot_command =
       in
       return_unit)
 
+(** Pretty-print the Etherlink network name corresponding to
+    [rollup_address], or nothing when the address is not recognised. *)
 let pp_snapshot_rollup fmt rollup_address =
   let open Evm_node_lib_dev in
   match
@@ -3506,6 +3551,8 @@ let pp_snapshot_rollup fmt rollup_address =
       Format.fprintf fmt "Etherlink:       %s@," (Constants.network_name net)
   | None -> ()
 
+(** Pretty-print a snapshot's history mode together with the earliest
+    block it retains. A no-op when no history information is provided. *)
 let pp_snapshot_history fmt history_info =
   match history_info with
   | None -> ()
@@ -3568,9 +3615,13 @@ let snapshot_info_command =
         history_info ;
       return_unit)
 
+(** Default location of the desync snapshot store, inside the node's data
+    directory. *)
 let default_desync_store_dir ~data_dir =
   Filename.concat data_dir ".snapshots_store"
 
+(** Pretty-print a size in bytes using an automatically chosen SI-like
+    unit (B, KB, MB, GB or TB). *)
 let pp_size fmt bytes =
   let bytes = float_of_int bytes in
   let units = [|"B"; "KB"; "MB"; "GB"; "TB"|] in
