@@ -1063,6 +1063,14 @@ let pick_restricted_rpcs r w b =
         "Can only use one CLI argument among --restricted-rpcs, \
          --blacklisted-rpcs and --whitelisted-rpcs"
 
+(** Translate the [--dont-track-rollup-node] switch into a configuration
+    override: [Some true] when the switch is present, [None] otherwise so
+    that the value from the configuration file is preserved when the flag
+    is omitted on the command line. *)
+let dont_track_rollup_node_from_flag = function
+  | true -> Some true
+  | false -> None
+
 let dal_slots_arg =
   Tezos_clic.arg
     ~long:"dal-slots"
@@ -1671,10 +1679,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
       ?enable_websocket
       ?rollup_node_endpoint
       ?dont_track_rollup_node:
-        (* If `dont_track_rollup_node` is false, it means the argument was
-           omitted from the command-line. As a consequence, we default to
-           the config value by passing [None]. *)
-        (if dont_track_rollup_node then Some true else None)
+        (dont_track_rollup_node_from_flag dont_track_rollup_node)
       ~verbose
       ?profiling
       ?preimages
@@ -2517,10 +2522,7 @@ let init_config_command =
           ?rpc_timeout
           ?rollup_node_endpoint
           ?dont_track_rollup_node:
-            (* If `dont_track_rollup_node` is false, it means the argument was
-               omitted from the command-line. As a consequence, we default to
-               the config value by passing [None]. *)
-            (if dont_track_rollup_node then Some true else None)
+            (dont_track_rollup_node_from_flag dont_track_rollup_node)
           ?tx_queue_max_lifespan
           ?tx_queue_max_size
           ?tx_queue_tx_per_addr_limit
