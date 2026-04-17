@@ -12,15 +12,15 @@ evm_kernel: evm_kernel.wasm
 watchtower: fa-bridge-watchtower
 michelson_test_scripts: michelson_test_scripts
 accuser: octez-accuser
-accuser_ushuaia: octez-accuser-PsGXQmSv
 accuser_psriotum: octez-accuser-PsRiotum
+accuser_ushuaia: octez-accuser-PsUshuai
 accuser_ptseoulo: octez-accuser-PtSeouLo
 accuser_tallinn: octez-accuser-PtTALLiN
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
 agnostic_baker: octez-baker
-baker_psgxqmsv: octez-baker-PsGXQmSv
 baker_psriotum: octez-baker-PsRiotum
+baker_psgxqmsv: octez-baker-PsUshuai
 baker_ptseoulo: octez-baker-PtSeouLo
 baker_psd5wvtj: octez-baker-PtTALLiN
 baker_alpha: octez-baker-alpha
