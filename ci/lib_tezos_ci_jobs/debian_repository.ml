@@ -92,17 +92,15 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
       ]
 
 (* data packages. we build them once *)
-let job_build_data_packages ~manual : tezos_job =
-  job
+let job_build_data_packages =
+  CI.job
+    "oc.build-data_packages"
     ~__POS__
-    ~name:"oc.build-data_packages"
+    ~description:"Build the Debian packages that contain Tezos data."
     ~image:build_dependency_image
-    ~stage:Stages.build
-    ?rules:
-      (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()] else None)
+    ~stage:Build
     ~variables:
       [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")]
-    ~dependencies:(Dependent [])
     ~tag:Dynamic
     ~artifacts:(Gitlab_ci.Util.artifacts ["packages/$DISTRIBUTION/$RELEASE"])
     [
@@ -159,15 +157,17 @@ let job_build_ubuntu_package =
     [cargo_network_hack; "./scripts/ci/build-debian-packages.sh binaries"]
 
 let job_apt_repo_debian =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "apt_repo_debian"
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs:[(Artifacts, job_build_debian_package pipeline_type)]
-    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
+    ~needs:
+      [
+        (Artifacts, job_build_data_packages);
+        (Artifacts, job_build_debian_package pipeline_type);
+      ]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -181,15 +181,17 @@ let job_apt_repo_debian =
     ]
 
 let job_apt_repo_ubuntu =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "apt_repo_ubuntu"
     ~__POS__
     ~stage:Publish
     ~description:"Create the apt repository for Debian packages and sign it."
-    ~needs:[(Artifacts, job_build_ubuntu_package pipeline_type)]
-    ~needs_legacy:[(Artifacts, job_build_data_packages ~manual)]
+    ~needs:
+      [
+        (Artifacts, job_build_data_packages);
+        (Artifacts, job_build_ubuntu_package pipeline_type);
+      ]
     ~variables:
       (Common.Packaging.archs_variables pipeline_type
       @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg"); ("PREFIX", "")])
@@ -237,40 +239,37 @@ let job_lintian_debian =
     ]
 
 let job_install_bin_ubuntu_22_04 =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.install_bin_ubuntu_22_04"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages can be installed."
-    ~needs:[(Job, job_apt_repo_ubuntu manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_22_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"]
 
 let job_install_bin_ubuntu_24_04 =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.install_bin_ubuntu_24_04"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages can be installed."
-    ~needs:[(Job, job_apt_repo_ubuntu manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.ubuntu_24_04
     ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"]
 
 let job_install_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.install_bin_ubuntu_24_04_systemd"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages that use systemd can be installed."
-    ~needs:[(Job, job_apt_repo_ubuntu manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -288,14 +287,13 @@ let job_install_bin_ubuntu_24_04_systemd =
     ]
 
 let job_upgrade_bin_ubuntu_22_04_systemd =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.upgrade_bin_ubuntu_22_04_systemd"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages that use systemd can be upgraded."
-    ~needs:[(Job, job_apt_repo_ubuntu manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -313,14 +311,13 @@ let job_upgrade_bin_ubuntu_22_04_systemd =
     ]
 
 let job_upgrade_bin_ubuntu_24_04_systemd =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.upgrade_bin_ubuntu_24_04_systemd"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check that Debian packages that use systemd can be upgraded."
-    ~needs:[(Job, job_apt_repo_ubuntu manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_ubuntu pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -338,20 +335,18 @@ let job_upgrade_bin_ubuntu_24_04_systemd =
     ]
 
 let job_install_bin_debian_bookworm =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.install_bin_debian_bookworm"
     ~__POS__
     ~description:"Check that Debian packages can be installed."
     ~stage:Test_publication
-    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~variables:[("PREFIX", "")]
     ~image:Images.Base_images.debian_bookworm
     ["./docs/introduction/install-bin-deb.sh debian bookworm"]
 
 let job_install_bin_debian_bookworm_systemd =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.install_bin_debian_bookworm_systemd"
@@ -359,7 +354,7 @@ let job_install_bin_debian_bookworm_systemd =
     ~stage:Test_publication
     ~description:
       "Check the installation process in a systemd enabled Docker image."
-    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -381,14 +376,13 @@ let job_install_bin_debian_bookworm_systemd =
    Ideally we would build the images in the build stage, test them in the test stage,
    and only then publish them in the publish stage. *)
 let job_upgrade_bin_debian_bookworm_systemd =
-  Cacio.parameterize @@ fun manual ->
   Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "oc.upgrade_bin_debian_bookworm-systemd"
     ~__POS__
     ~stage:Test_publication
     ~description:"Check the upgrade process in a systemd enabled Docker image."
-    ~needs:[(Job, job_apt_repo_debian manual pipeline_type)]
+    ~needs:[(Job, job_apt_repo_debian pipeline_type)]
     ~image:Images_external.docker
     ~variables:
       ([("DOCKER_VERSION", Docker.version)]
@@ -411,37 +405,29 @@ let () =
   Cacio.register_jobs
     Debian_partial
     [
-      (Auto, job_apt_repo_debian false Partial);
+      (Auto, job_apt_repo_debian Partial);
       (Auto, job_lintian_debian Partial);
-      (Auto, job_install_bin_debian_bookworm false Partial);
-      (Auto, job_install_bin_debian_bookworm_systemd false Partial);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd false Partial);
+      (Auto, job_install_bin_debian_bookworm Partial);
+      (Auto, job_install_bin_debian_bookworm_systemd Partial);
+      (Auto, job_upgrade_bin_debian_bookworm_systemd Partial);
     ] ;
   Cacio.register_jobs
     Debian_daily
     [
-      (Auto, job_apt_repo_debian false Full);
-      (Auto, job_apt_repo_ubuntu false Full);
+      (Auto, job_apt_repo_debian Full);
+      (Auto, job_apt_repo_ubuntu Full);
       (Auto, job_lintian_ubuntu Full);
       (Auto, job_lintian_debian Full);
-      (Auto, job_install_bin_ubuntu_22_04 false Full);
-      (Auto, job_install_bin_ubuntu_24_04 false Full);
-      (Auto, job_install_bin_ubuntu_24_04_systemd false Full);
-      (Auto, job_upgrade_bin_ubuntu_22_04_systemd false Full);
-      (Auto, job_upgrade_bin_ubuntu_24_04_systemd false Full);
-      (Auto, job_install_bin_debian_bookworm false Full);
-      (Auto, job_install_bin_debian_bookworm_systemd false Full);
-      (Auto, job_upgrade_bin_debian_bookworm_systemd false Full);
+      (Auto, job_install_bin_ubuntu_22_04 Full);
+      (Auto, job_install_bin_ubuntu_24_04 Full);
+      (Auto, job_install_bin_ubuntu_24_04_systemd Full);
+      (Auto, job_upgrade_bin_ubuntu_22_04_systemd Full);
+      (Auto, job_upgrade_bin_ubuntu_24_04_systemd Full);
+      (Auto, job_install_bin_debian_bookworm Full);
+      (Auto, job_install_bin_debian_bookworm_systemd Full);
+      (Auto, job_upgrade_bin_debian_bookworm_systemd Full);
     ] ;
   ()
-
-(* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
-   we test only on Debian stable. Returns a triplet, the first element is
-   the list of all jobs, the second is the job building ubuntu packages artifats
-   and the third debian packages artifacts *)
-let jobs ?(manual = false)
-    (_pipeline_type : Common.Packaging.repository_pipeline) =
-  [job_build_data_packages ~manual]
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =
@@ -451,11 +437,10 @@ let register ~auto ~description pipeline_type =
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
   in
-  let jobs = jobs pipeline_type @ Cacio.get_jobs Debian_partial in
   Pipeline.register_child
     pipeline_name
     ~description
-    ~jobs:(job_datadog_pipeline_trace :: jobs)
+    ~jobs:(job_datadog_pipeline_trace :: Cacio.get_jobs Debian_partial)
 
 let child_pipeline_partial =
   register

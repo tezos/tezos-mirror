@@ -241,8 +241,8 @@ let () =
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Major_release_tag_test
@@ -252,8 +252,8 @@ let () =
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
       (Auto, job_docker_promote_to_latest `test_wait);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Minor *)
   Cacio.register_jobs
@@ -264,8 +264,8 @@ let () =
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_opam_release `real);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Minor_release_tag_test
@@ -275,8 +275,8 @@ let () =
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
       (Auto, job_docker_promote_to_latest `test_wait);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Beta *)
   Cacio.register_jobs
@@ -286,8 +286,8 @@ let () =
       (Auto, job_gitlab_release `real);
       (Manual, job_release_page `real `wait_for_build);
       (Auto, job_dispatch_call);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Beta_release_tag_test
@@ -295,8 +295,8 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Non-release *)
   Cacio.register_jobs
@@ -304,16 +304,16 @@ let () =
     [
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_publish `non_release_tag);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Non_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_publish `non_release_tag);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Scheduled *)
   Cacio.register_jobs
@@ -321,8 +321,8 @@ let () =
     [
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_publish `scheduled_test);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   (* Release page *)
   Cacio.register_jobs
@@ -343,7 +343,6 @@ let () =
 (** Create an Octez release tag pipeline of type {!pipeline_type},
     which is expected to be a release pipeline type. *)
 let octez_jobs (pipeline_type : Cacio.global_pipeline) =
-  let jobs_debian_repository = Debian_repository.jobs Release in
   let job_trigger_monitoring =
     trigger_job
       ~__POS__
@@ -357,7 +356,7 @@ let octez_jobs (pipeline_type : Cacio.global_pipeline) =
     (* Stage: build *)
     job_build_homebrew_release;
   ]
-  @ [job_trigger_monitoring] @ jobs_debian_repository
+  @ [job_trigger_monitoring]
   @ Cacio.get_jobs pipeline_type
 
 let job_docker_promote_to_version =
@@ -460,10 +459,11 @@ let () =
       (Auto, job_docker_merge_manifests `real);
       (Manual, job_docker_promote_to_version `real);
       (Manual, job_release_page_packaging_revision `real);
+      (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian_package Release);
       (Manual, Debian_repository.job_build_ubuntu_package Release);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   Cacio.register_jobs
     Packaging_revision_test
@@ -475,22 +475,21 @@ let () =
       (Auto, job_docker_merge_manifests `test);
       (Manual, job_docker_promote_to_version `test);
       (Manual, job_release_page_packaging_revision `test);
+      (Manual, Debian_repository.job_build_data_packages);
       (Manual, Debian_repository.job_build_debian_package Release);
       (Manual, Debian_repository.job_build_ubuntu_package Release);
-      (Auto, Debian_repository.job_apt_repo_debian false Release);
-      (Auto, Debian_repository.job_apt_repo_ubuntu false Release);
+      (Auto, Debian_repository.job_apt_repo_debian Release);
+      (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
   ()
 
 let octez_packaging_revision_jobs ?(test = false) () =
-  let jobs_debian_repository = Debian_repository.jobs ~manual:true Release in
   (* We want to be able to trigger each "batch" of jobs manually.
      There are two batches: one with the static jobs, and one that publishes.
      The static jobs are independent so they are both manual,
      but [job_update_gitlab_release] depends on [job_create_gitlab_package]
      so it does not have to be manual, only [job_create_gitlab_package] does. *)
   [(* Stage: start *) job_datadog_pipeline_trace]
-  @ jobs_debian_repository
   @
   if test then Cacio.get_jobs Packaging_revision_test
   else Cacio.get_jobs Packaging_revision
