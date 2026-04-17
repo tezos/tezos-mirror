@@ -194,7 +194,7 @@ module Params = struct
            | None ->
                trace
                  (error_of_fmt
-                    "%s in neither a known kernel nor a valid root hash"
+                    "%s is neither a known kernel nor a valid root hash"
                     str)
                  (let open Lwt_result_syntax in
                   let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
@@ -427,7 +427,7 @@ let rpc_port_arg =
 let rpc_batch_limit_arg =
   Tezos_clic.arg
     ~long:"rpc-batch-limit"
-    ~placeholder:"PORT"
+    ~placeholder:"unlimited|N"
     ~doc:
       "A limit on the number of requests allowed in a single batch. Can either \
        be `unlimited` or a positive integer."
@@ -869,7 +869,7 @@ let max_number_of_chunks_arg =
   Tezos_clic.arg
     ~long:"max-number-of-chunks"
     ~doc:"Maximum number of chunks per blueprint."
-    ~placeholder:"10."
+    ~placeholder:"10"
     Params.int
 
 let keep_alive_arg =
@@ -947,8 +947,8 @@ let tx_pool_addr_limit_arg =
     ~long:"tx-pool-addr-limit"
     ~placeholder:"4_000"
     ~doc:
-      "DEPRECATED and not used anymore : Use `tx-pool-max-txs` instead. \
-       Maximum allowed addresses inside the transaction pool."
+      "DEPRECATED and not used anymore: Use `tx-pool-max-txs` instead. Maximum \
+       allowed addresses inside the transaction pool."
     Params.int
 
 let tx_queue_tx_per_addr_limit_arg =
@@ -1018,7 +1018,7 @@ let finalized_view_arg =
 let restricted_rpcs_arg =
   Tezos_clic.arg
     ~doc:
-      "Disable methods that matches the given Perl-like regular expression. \
+      "Disable methods that match the given Perl-like regular expression. \
        Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs."
     ~long:"restricted-rpcs"
     ~placeholder:"regexp"
@@ -1954,7 +1954,7 @@ let init_from_rollup_node_command =
   let rollup_node_data_dir_param =
     Tezos_clic.param
       ~name:"rollup-node-data-dir"
-      ~desc:(Format.sprintf "The path to the rollup node data directory.")
+      ~desc:"The path to the rollup node data directory."
       Params.string
   in
   command
@@ -2037,7 +2037,7 @@ let reset_command =
        (force_arg
           ~doc:
             "Force suppression of data to reset state of sequencer to a \
-             specified l2 level."))
+             specified L2 level."))
     (prefixes ["reset"; "at"]
     @@ Tezos_clic.param
          ~name:"level"
@@ -2377,7 +2377,7 @@ let init_config_command =
           evm_node_endpoint_arg
           history_arg
           fail_on_divergence_arg
-          (* others option *)
+          (* other options *)
           dont_track_rollup_node_arg
           wallet_dir_arg
           (Tezos_clic.switch
@@ -2552,16 +2552,12 @@ let config_key_flag ~name =
 
 let eth_bootstrap_account_arg =
   let long = "eth-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add an etherlink bootstrap account in the installer config."
-  in
+  let doc = "Add an etherlink bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let tez_bootstrap_account_arg =
   let long = "tez-bootstrap-account" in
-  let doc =
-    Format.sprintf "Add a tezlink bootstrap account in the installer config."
-  in
+  let doc = "Add a tezlink bootstrap account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
 let tez_bootstrap_contract_arg =
@@ -2611,7 +2607,7 @@ let michelson_runtime_chain_id_arg =
 
 let set_account_code =
   let long = "set-code" in
-  let doc = Format.sprintf "Add code to an account in the installer config." in
+  let doc = "Add code to an account in the installer config." in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x...,0x...."
   @@ Tezos_clic.parameter (fun _ address_code ->
          let open Lwt_result_syntax in
@@ -2625,7 +2621,7 @@ let set_account_code =
 
 let evm_version_arg =
   let long = "evm-version" in
-  let doc = Format.sprintf "Value for evm_version in the installer config." in
+  let doc = "Value for evm_version in the installer config." in
   Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai|prague|osaka"
   @@ Tezos_clic.parameter (fun _ evm_version ->
          let open Lwt_result_syntax in
@@ -2942,9 +2938,8 @@ let sandbox_config_args =
 let tezlink_fund_arg =
   let long = "fund" in
   let doc =
-    Format.sprintf
-      "The address of an account to provide with funds in Tezlink sandbox (can \
-       be repeated to fund multiple accounts)"
+    "The address of an account to provide with funds in Tezlink sandbox (can \
+     be repeated to fund multiple accounts)"
   in
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
 
