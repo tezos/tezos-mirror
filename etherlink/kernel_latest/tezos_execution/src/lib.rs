@@ -18,11 +18,14 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
+use num_traits::ToPrimitive;
+use primitive_types::U256;
 use std::collections::{BTreeMap, HashMap};
 use std::vec::IntoIter;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
+use tezos_ethereum::wei::gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
@@ -96,6 +99,39 @@ impl ProcessedOperation {
     pub fn into_receipts(ops: Vec<Self>) -> Vec<OperationWithMetadata> {
         ops.into_iter().map(|p| p.operation_with_metadata).collect()
     }
+}
+
+/// Fee pricing parameters for computing refunds inside
+/// `validate_and_apply_operation`.
+pub struct FeeRefundConfig {
+    pub da_fees: u64,
+    pub base_fee_per_gas: U256,
+    pub michelson_to_evm_gas_multiplier: u64,
+}
+
+/// Compute the fee refund: surplus of declared fees beyond actual costs.
+///
+/// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
+/// where consumed_gas_fees = gas_to_mutez(base_fee, multiplier, consumed_gas)
+/// and consumed_gas = ceil(total_consumed_milligas / 1000).
+fn compute_fee_refund(
+    total_operation_fees: u64,
+    processed_operations: &[ProcessedOperation],
+    config: &FeeRefundConfig,
+) -> u64 {
+    let consumed_milligas =
+        ProcessedOperation::total_consumed_milligas(processed_operations);
+    // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
+    let consumed_gas = consumed_milligas.div_ceil(1000);
+    let consumed_gas_fees = gas_to_mutez(
+        config.base_fee_per_gas,
+        config.michelson_to_evm_gas_multiplier,
+        consumed_gas,
+    );
+
+    // saturating_sub ensures the refund is non-negative and smaller than the fees
+    // paid by the source account at the beginning of the application.
+    total_operation_fees.saturating_sub(config.da_fees.saturating_add(consumed_gas_fees))
 }
 
 extern crate alloc;
@@ -1265,10 +1301,28 @@ pub fn validate_and_apply_operation<Host, C: Context>(
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
     required_fees: Option<u64>,
+    fee_refund_config: Option<FeeRefundConfig>,
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1,
 {
+    // Sum declared fees (mutez) from all operation contents before
+    // `operation` is moved into validation.
+    let fee_refund_config = if let Some(config) = fee_refund_config {
+        let total_fees: u64 = operation
+            .content
+            .iter()
+            .map(|c| &c.fee().0)
+            .sum::<BigUint>()
+            .to_u64()
+            .ok_or_else(|| {
+                OperationError::BlockAbort("total fees do not fit in u64".into())
+            })?;
+        Some((config, total_fees))
+    } else {
+        None
+    };
+
     let mut safe_host = SafeStorage {
         host,
         world_states: vec![context.path()],
@@ -1303,7 +1357,9 @@ where
     // assigned at block finalization by renumber_nonces().
     let mut nonce_counter: u16 = 0;
     let mut origination_nonce = OriginationNonce::initial(hash);
-    let (processed_ops, applied) = apply_batch(
+    // We use `mut` here because apply_batch does not handle fee refund,
+    // so we append the refund balance updates to processed_ops afterwards.
+    let (mut processed_ops, applied) = apply_batch(
         &mut safe_host,
         registry,
         journal,
@@ -1334,6 +1390,16 @@ where
         // JournalInner. Without this, commit_evm_journal_from_external()
         // would persist EVM state changes from a backtracked operation.
         journal.evm.clear();
+    }
+
+    // Apply fee refund after all transactional work is done.
+    // This runs outside the SafeStorage transaction (after promote/revert)
+    // so that the refund applies in both cases: applied and failed operations.
+    // Uses safe_host.host directly since the transactional phase is complete.
+    if let Some((config, total_fees)) = fee_refund_config {
+        let fee_refund = compute_fee_refund(total_fees, &processed_ops, &config);
+        apply_fee_refund(safe_host.host, context, &mut processed_ops, fee_refund)
+            .map_err(|e| OperationError::BlockAbort(format!("Fee refund: {e}")))?;
     }
 
     Ok(processed_ops)
@@ -2238,6 +2304,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         );
 
         let expected_error =
@@ -2274,6 +2341,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         );
 
         let expected_error =
@@ -2309,6 +2377,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
             None,
         );
 
@@ -2359,6 +2428,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -2429,6 +2499,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2493,6 +2564,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -2537,6 +2609,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -2616,6 +2689,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -2699,6 +2773,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -2796,6 +2871,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -2918,6 +2994,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
@@ -3059,6 +3136,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3179,6 +3257,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3264,6 +3343,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3333,6 +3413,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -3421,6 +3502,7 @@ mod tests {
                 batch.clone(),
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .unwrap(),
@@ -3610,6 +3692,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         );
 
         let expected_error =
@@ -3707,6 +3790,7 @@ mod tests {
                 batch,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .unwrap(),
@@ -3825,6 +3909,7 @@ mod tests {
             operation.clone(),
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -4052,6 +4137,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -4219,6 +4305,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4284,6 +4371,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -4354,6 +4442,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -4436,6 +4525,7 @@ mod tests {
                 operation.clone(),
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -4637,6 +4727,7 @@ mod tests {
                 operation.clone(),
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -4868,6 +4959,7 @@ mod tests {
                 batch.clone(),
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .unwrap(),
@@ -5150,6 +5242,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5230,6 +5323,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5275,6 +5369,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -5322,6 +5417,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -5377,6 +5473,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -5476,6 +5573,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5572,6 +5670,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -5682,6 +5781,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect(
@@ -5985,6 +6085,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -6235,6 +6336,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -6303,6 +6405,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -6382,6 +6485,7 @@ mod tests {
             &block_ctx!(),
             false,
             None,
+            None,
         );
 
         assert!(
@@ -6434,6 +6538,7 @@ mod tests {
             &block_ctx!(),
             false,
             Some(required_da_fees),
+            None,
         );
 
         assert!(result.is_ok(), "Batch with sufficient fees should succeed");
@@ -6487,6 +6592,7 @@ mod tests {
             &block_ctx!(),
             false,
             Some(required_da_fees),
+            None,
         );
 
         assert!(
@@ -6541,6 +6647,7 @@ mod tests {
             &block_ctx!(),
             false,
             Some(required_da_fees),
+            None,
         );
 
         assert_eq!(
@@ -6593,6 +6700,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect("validate_and_apply_operation should not fail"),
@@ -6671,6 +6779,7 @@ mod tests {
                 operation,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect("validate_and_apply_operation should not fail"),
@@ -6776,6 +6885,7 @@ mod tests {
                 &block_ctx!(),
                 false,
                 None,
+                None,
             )
             .expect("validate_and_apply_operation should not fail at the protocol level"),
         );
@@ -6869,6 +6979,7 @@ mod tests {
             operation,
             &block_ctx!(),
             false,
+            None,
             None,
         )
         .expect(
@@ -7013,6 +7124,7 @@ mod tests {
                 op,
                 &block_ctx!(),
                 false,
+                None,
                 None,
             )
             .expect("should not fail with a kernel error")

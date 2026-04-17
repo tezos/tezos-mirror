@@ -1089,6 +1089,7 @@ where
                 &block_ctx,
                 skip_signature_check,
                 fees,
+                None, // Fee refund handled by caller
             ) {
                 Ok(mut receipt) => {
                     if enable_gas_refund {
@@ -1505,6 +1506,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             &block_ctx,
             skip_signature_check,
             None,
+            None, // No fee refund in Tezlink
         )?;
         let operations = ProcessedOperation::into_receipts(processed_operations);
         let result = AppliedOperation {
