@@ -1408,7 +1408,7 @@ where
 /// Credit the source with a fee refund and record balance updates in the receipt.
 ///
 /// Returns Ok(()) with no effect when `fee_refund == 0`.
-pub fn apply_fee_refund<Host, C>(
+fn apply_fee_refund<Host, C>(
     host: &mut Host,
     context: &C,
     processed_operations: &mut [ProcessedOperation],
