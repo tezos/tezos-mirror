@@ -898,7 +898,9 @@ let timestamp_arg =
   Params.timestamp
   |> Tezos_clic.default_arg
        ~long:"timestamp"
-       ~doc:""
+       ~doc:
+         "Timestamp used for the blueprint being chunked. Defaults to the \
+          epoch (i.e. 0 seconds since 1970-01-01)."
        ~placeholder:"1970-01-01T00:00:00Z"
        ~default:"0"
 
@@ -1082,8 +1084,14 @@ let num_download_retries =
 let history_arg =
   Tezos_clic.arg
     ~long:"history"
-    ~doc:"History mode for the EVM node. ':n' means n days of history."
-    ~placeholder:"archive | rolling:n | full:n"
+    ~doc:
+      "History mode for the EVM node. `archive`: keeps all data indefinitely. \
+       `full:N`: prunes Irmin context older than N days, keeps all SQL data \
+       (blocks, transactions, blueprints). `rolling:N`: prunes everything \
+       older than N days (context, blocks, transactions, blueprints). \
+       `seed:N`: minimal mode for sequencers — prunes context, blocks and \
+       transactions older than N days, keeps only blueprints and their events."
+    ~placeholder:"archive|full:N|rolling:N|seed:N"
     Params.history_param
 
 let profiling_arg =
@@ -3188,6 +3196,8 @@ let sandbox_command =
         ~finalized_view
         config_file)
 
+(* Default L2 chain id assigned to the tezlink sandbox when no other
+   chain id is provided. *)
 let tezlink_sandbox_chain_id = 12
 
 let tezlink_sandbox_command =
