@@ -397,13 +397,6 @@ let () =
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
-  register
-    "opam.daily"
-    opam_daily
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Opam.jobs_opam_packages ()
-      |> List.map (with_interruptible false))
-    ~description:"Daily pipeline containing all OPAM jobs." ;
 
   (* The "custom extended test" pipelines test the codebase with some particular options.
      This allows testing behaviors that are not enabled by default on the node,
