@@ -43,6 +43,38 @@ let job_docker = Docker.job_docker `released
 
 let job_docker_merge_manifests = Docker.job_docker_merge_manifests `released
 
+let vuln_predicate = "vuln-predicate.json"
+
+let scanning_report = "gl-container-scanning-report.json"
+
+let job_docker_container_scanning =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "docker:container_scanning"
+    ~__POS__
+    ~description:
+      "Scan released Docker images for vulnerabilities using GCP Artifact \
+       Registry scanning"
+    ~stage:Publish
+    ~image:Images_external.docker
+    ~needs:[(Job, job_docker_merge_manifests mode)]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~reports:
+           (Gitlab_ci.Util.reports ~container_scanning:scanning_report ())
+         [vuln_predicate])
+    ~variables:
+      [("CI_DOCKER_HUB", match mode with `test -> "false" | `real -> "true")]
+    [
+      "./scripts/ci/docker_image_names.sh";
+      ". ./scripts/ci/docker.env";
+      ". ./scripts/ci/docker.sh";
+      sf
+        "./scripts/ci/container_scanning_gcp.sh %s %s"
+        scanning_report
+        vuln_predicate;
+    ]
+
 (* This job normally runs in the {!Octez_latest_release} pipeline
    that is triggered manually after a release is made.
    However, to make release testing easier, we include it in other test release pipelines.
@@ -61,9 +93,13 @@ let job_docker_promote_to_latest =
     ~needs:
       (match mode with
       | `test_wait ->
-          (* In pipelines other than latest release pipelines,
-             we want to wait for the Docker image to exist. *)
-          [(Job, job_docker_merge_manifests `test)]
+          (* [test_wait] is used in tag test pipelines where the Docker
+             image is built in the same pipeline.  We wait for the image
+             build and vulnerability scan to finish before promoting. *)
+          [
+            (Job, job_docker_merge_manifests `test);
+            (Artifacts, job_docker_container_scanning `test);
+          ]
       | `test | `real ->
           (* In latest release pipelines, the Docker image already exists,
              as it was created by another pipeline (the tag pipeline). *)
@@ -71,11 +107,19 @@ let job_docker_promote_to_latest =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     ~variables:
-      [
-        ("DOCKER_VERSION", Docker.version);
-        ( "CI_DOCKER_HUB",
-          match mode with `test | `test_wait -> "false" | `real -> "true" );
-      ]
+      ([
+         ("DOCKER_VERSION", Docker.version);
+         ( "CI_DOCKER_HUB",
+           match mode with `test | `test_wait -> "false" | `real -> "true" );
+       ]
+      @
+      match mode with
+      | `test_wait -> [("VULN_PREDICATE", vuln_predicate)]
+      | `test | `real ->
+          (* TODO: wire VULN_PREDICATE for real/test modes once the
+             container_scanning job is added to production release
+             pipelines (Major, Minor, Beta/RC; octez_latest_release.ml). *)
+          [])
     [
       "./scripts/ci/docker_initialize.sh";
       "./scripts/ci/docker_promote_to_latest.sh";
@@ -233,6 +277,11 @@ let job_dispatch_call =
 
 let () =
   (* Major *)
+  (* TODO: add (Auto, job_docker_container_scanning `real) and
+     (Auto, job_docker_promote_to_latest `real) with VULN_PREDICATE
+     to production release pipelines (Major, Minor, Beta/RC) once the
+     scanning job is validated in test pipelines. Same for
+     octez_latest_release.ml. *)
   Cacio.register_jobs
     Major_release_tag
     [
@@ -248,6 +297,7 @@ let () =
     Major_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -271,6 +321,7 @@ let () =
     Minor_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, job_opam_release `test);
@@ -293,6 +344,7 @@ let () =
     Beta_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_release `test);
       (Manual, job_release_page `test `wait_for_build);
       (Auto, Debian_repository.job_apt_repo_debian Release);
@@ -311,6 +363,7 @@ let () =
     Non_release_tag_test
     [
       (Auto, job_docker_merge_manifests `test);
+      (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `non_release_tag);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
@@ -320,6 +373,7 @@ let () =
     Scheduled_test_release
     [
       (Auto, job_docker_merge_manifests `test);
+      (Auto, job_docker_container_scanning `test);
       (Auto, job_gitlab_publish `scheduled_test);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);

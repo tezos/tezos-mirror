@@ -59,4 +59,4 @@ COPY --from=gcloud /google-cloud-sdk/ /usr/local/gcloud/google-cloud-sdk/
 ENV PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
 # Initialize the Google Cloud SDK
-RUN gcloud components install --quiet core gsutil kubectl
+RUN gcloud components install --quiet core gsutil kubectl local-extract
