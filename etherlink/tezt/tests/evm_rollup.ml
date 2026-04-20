@@ -3146,7 +3146,11 @@ let test_kernel_upgrade_activates_michelson_runtime =
   let config =
     Sc_rollup_helpers.Installer_kernel_config.
       [
-        Set {value = ""; to_ = Tezosx_runtime.feature_flag Tezosx_runtime.Tezos};
+        Set
+          {
+            value = "";
+            to_ = Tezosx_runtime.feature_flag Kernel.Latest Tezosx_runtime.Tezos;
+          };
         Set
           {
             value = activation_target;
@@ -3197,7 +3201,7 @@ let test_kernel_upgrade_activates_michelson_runtime =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind
          ~operation:Sc_rollup_rpc.Value
-         ~key:(Tezosx_runtime.feature_flag Tezosx_runtime.Tezos)
+         ~key:(Tezosx_runtime.feature_flag Kernel.Latest Tezosx_runtime.Tezos)
          ()
   in
   Check.((flag_value = Some "") (option string))

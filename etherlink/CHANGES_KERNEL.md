@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 53.
+Its storage version is 54.
 
 ### Features
 
@@ -30,6 +30,12 @@ Its storage version is 53.
 
 ### Internal
 
+- Consolidate all feature flags under `/base/feature_flags/`. Moves the 5
+  flags at `/evm/feature_flags/` and drops the dead `enable_revm`,
+  `enable_fast_withdrawal` and `enable_fast_fa_withdrawal` flags from
+  `/evm/world_state/feature_flags/`, none of them is read by
+  kernel_latest (revm and fast-withdrawal code paths are now
+  unconditional). Storage version bumped to V54. (!21668)
 - Migrate governance, DAL, blueprints, delayed inbox, chain configurations and
   kernel events from `/evm/...` to `/base/...`. Storage version bumped to V53.
   (!21565)

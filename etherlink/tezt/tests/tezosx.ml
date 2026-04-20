@@ -96,20 +96,15 @@ let test_runtime_feature_flag ~runtime () =
     ~tags:["feature_flag"]
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
-  let* rpc_result =
-    Rpc.state_value sandbox (Tezosx_runtime.feature_flag runtime)
-  in
+  let path = Tezosx_runtime.feature_flag Kernel.Latest runtime in
+  let* rpc_result = Rpc.state_value sandbox path in
   match rpc_result with
   | Ok (Some _) -> unit
   | Ok None ->
       Test.fail
         "Feature flag for the %s runtime was not set"
         (String.capitalize_ascii (Tezosx_runtime.to_string runtime))
-  | Error err ->
-      Test.fail
-        "Could not read feature flag %s: %s"
-        (Tezosx_runtime.feature_flag runtime)
-        err.message
+  | Error err -> Test.fail "Could not read feature flag %s: %s" path err.message
 
 let test_gas_refund_feature_flag () =
   Setup.register_sandbox_test
@@ -119,7 +114,7 @@ let test_gas_refund_feature_flag () =
     ~enable_michelson_gas_refund:true
   @@ fun sandbox ->
   let* rpc_result =
-    Rpc.state_value sandbox "/tezlink/feature_flags/enable_michelson_gas_refund"
+    Rpc.state_value sandbox "/base/feature_flags/enable_michelson_gas_refund"
   in
   match rpc_result with
   | Ok (Some _) -> unit

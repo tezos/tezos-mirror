@@ -122,12 +122,20 @@ let reveal_config = function
   | Kernel.Latest -> base "/__tmp/reveal_config"
   | Kernel.Mainnet | Kernel.Tezlink_shadownet -> "/__tmp/reveal_config"
 
-let enable_fa_bridge = evm "/feature_flags/enable_fa_bridge"
+let enable_fa_bridge = function
+  | Kernel.Latest -> base "/feature_flags/enable_fa_bridge"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/feature_flags/enable_fa_bridge"
 
-let enable_multichain = evm "/feature_flags/enable_multichain"
+let enable_multichain = function
+  | Kernel.Latest -> base "/feature_flags/enable_multichain"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/feature_flags/enable_multichain"
 
-let enable_fast_withdrawal =
-  evm "/world_state/feature_flags/enable_fast_withdrawal"
+let enable_fast_withdrawal = function
+  | Kernel.Latest -> base "/feature_flags/enable_fast_withdrawal"
+  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+      evm "/world_state/feature_flags/enable_fast_withdrawal"
 
 let storage_version = function
   | Kernel.Latest -> base "/storage_version"

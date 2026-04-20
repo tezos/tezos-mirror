@@ -9040,17 +9040,13 @@ let test_fa_bridge_feature_flag =
     ~tags:["fa_bridge"; "feature_flag"]
     ~title:"FA bridge feature is set in storage"
     ~enable_fa_bridge:true
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; kernel; _} _protocol ->
   (* We simply check that the flag is set in the storage. *)
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_fa_bridge
-  in
+  let path = Durable_storage_path.enable_fa_bridge kernel in
+  let*@ flag = Rpc.state_value sequencer path in
   Check.is_true
     (Option.is_some flag)
-    ~error_msg:
-      (sf
-         "Expected to have a value at %s"
-         Durable_storage_path.enable_fa_bridge) ;
+    ~error_msg:(sf "Expected to have a value at %s" path) ;
   unit
 
 let test_multichain_feature_flag =
@@ -9058,33 +9054,13 @@ let test_multichain_feature_flag =
     ~__FILE__
     ~tags:["multichain"; "feature_flag"]
     ~title:"Check the multichain feature value in storage"
-  @@ fun {sequencer; enable_multichain; _} _protocol ->
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_multichain
-  in
+  @@ fun {sequencer; enable_multichain; kernel; _} _protocol ->
+  let path = Durable_storage_path.enable_multichain kernel in
+  let*@ flag = Rpc.state_value sequencer path in
   Check.(Option.is_some flag = enable_multichain)
     Check.bool
     ~error_msg:
       "Multichain feature flag in the durable storage is %L, expected %R" ;
-  unit
-
-let test_fast_withdrawal_feature_flag =
-  register_all
-    ~__FILE__
-    ~tags:["fast_withdrawal"; "feature_flag"]
-    ~title:"Fast withdrawal feature is set in storage"
-    ~enable_fast_withdrawal:true
-  @@ fun {sequencer; _} _protocol ->
-  (* We simply check that the flag is set in the storage. *)
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_fast_withdrawal
-  in
-  Check.is_true
-    (Option.is_some flag)
-    ~error_msg:
-      (sf
-         "Expected to have a value at %s"
-         Durable_storage_path.enable_fast_withdrawal) ;
   unit
 
 let test_evm_node_flag =
@@ -16435,7 +16411,6 @@ let () =
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;
   test_mainnet_kernel_name_matches_root_hash () ;
-  test_fast_withdrawal_feature_flag protocols ;
   test_deposit_and_fast_withdraw protocols ;
   test_deposit_and_fa_fast_withdraw protocols ;
   test_fast_withdrawal_l2_caller protocols ;

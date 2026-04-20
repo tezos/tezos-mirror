@@ -9,7 +9,12 @@ type t = Tezos
 
 let to_string = function Tezos -> "tezos"
 
-let feature_flag = function Tezos -> "/evm/feature_flags/enable_tezos_runtime"
+let feature_flag kernel = function
+  | Tezos -> (
+      match kernel with
+      | Kernel.Latest -> "/base/feature_flags/enable_tezos_runtime"
+      | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
+          "/evm/feature_flags/enable_tezos_runtime")
 
 let target_sunrise_level = function
   | Tezos -> "/evm/michelson_runtime/target_sunrise_level"
