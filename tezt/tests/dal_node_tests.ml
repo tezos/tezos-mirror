@@ -2502,6 +2502,9 @@ let dal_slots_retrievability =
            ~expected_error:"No_commitment_found_for_slot_id"
     in
 
+    (* Terminate invalid fetcher — no longer needed. *)
+    let* () = Dal_node.terminate invalid_dal_fetcher_bad_uri in
+
     (* C.10 No slot published at level 0: expect 404 *)
     let* () =
       Log.info "C.10: no slot published at level 0: no cryptobox" ;
