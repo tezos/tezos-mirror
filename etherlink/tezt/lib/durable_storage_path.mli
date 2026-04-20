@@ -119,13 +119,13 @@ val delayed_inbox_min_levels : Kernel.t -> path
 val reveal_config : Kernel.t -> path
 
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
-val enable_fa_bridge : path
+val enable_fa_bridge : Kernel.t -> path
 
 (** [enable_multichain] is the path to the feature flag to activate multichain functions *)
-val enable_multichain : path
+val enable_multichain : Kernel.t -> path
 
 (** [enable_fast_withdrawal] is the path to the feature flag to activate fast withdrawals. *)
-val enable_fast_withdrawal : path
+val enable_fast_withdrawal : Kernel.t -> path
 
 (** [storage_version] is the path to the version of the storage used
     by the kernel to detect if a storage migration is required. *)

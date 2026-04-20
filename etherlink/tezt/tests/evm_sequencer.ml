@@ -9040,17 +9040,13 @@ let test_fa_bridge_feature_flag =
     ~tags:["fa_bridge"; "feature_flag"]
     ~title:"FA bridge feature is set in storage"
     ~enable_fa_bridge:true
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; kernel; _} _protocol ->
   (* We simply check that the flag is set in the storage. *)
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_fa_bridge
-  in
+  let path = Durable_storage_path.enable_fa_bridge kernel in
+  let*@ flag = Rpc.state_value sequencer path in
   Check.is_true
     (Option.is_some flag)
-    ~error_msg:
-      (sf
-         "Expected to have a value at %s"
-         Durable_storage_path.enable_fa_bridge) ;
+    ~error_msg:(sf "Expected to have a value at %s" path) ;
   unit
 
 let test_multichain_feature_flag =
@@ -9058,10 +9054,9 @@ let test_multichain_feature_flag =
     ~__FILE__
     ~tags:["multichain"; "feature_flag"]
     ~title:"Check the multichain feature value in storage"
-  @@ fun {sequencer; enable_multichain; _} _protocol ->
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_multichain
-  in
+  @@ fun {sequencer; enable_multichain; kernel; _} _protocol ->
+  let path = Durable_storage_path.enable_multichain kernel in
+  let*@ flag = Rpc.state_value sequencer path in
   Check.(Option.is_some flag = enable_multichain)
     Check.bool
     ~error_msg:
@@ -9074,17 +9069,13 @@ let test_fast_withdrawal_feature_flag =
     ~tags:["fast_withdrawal"; "feature_flag"]
     ~title:"Fast withdrawal feature is set in storage"
     ~enable_fast_withdrawal:true
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; kernel; _} _protocol ->
   (* We simply check that the flag is set in the storage. *)
-  let*@ flag =
-    Rpc.state_value sequencer Durable_storage_path.enable_fast_withdrawal
-  in
+  let path = Durable_storage_path.enable_fast_withdrawal kernel in
+  let*@ flag = Rpc.state_value sequencer path in
   Check.is_true
     (Option.is_some flag)
-    ~error_msg:
-      (sf
-         "Expected to have a value at %s"
-         Durable_storage_path.enable_fast_withdrawal) ;
+    ~error_msg:(sf "Expected to have a value at %s" path) ;
   unit
 
 let test_evm_node_flag =
