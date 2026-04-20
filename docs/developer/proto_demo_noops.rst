@@ -117,7 +117,7 @@ parameters of this command:
   the protocol to be activated. The protocol must be registered.
 - ``activator`` is an alias for an activation *secret* key. In this
   example, the corresponding public key has been passed as a parameter
-  to ``tezos-node`` at startup (using the ``--sandbox`` argument). The
+  to ``octez-node`` at startup (using the ``--sandbox`` argument). The
   alias is known to the client because it is added by default in sandbox
   mode.
 - ``5`` is the fitness of the activation block (more details below). It
@@ -161,7 +161,7 @@ protocol and the list of OCaml modules.
    $ cat src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL
 
    {
-       "expected_env_version": 15,
+       "expected_env_version": 17,
        "hash": "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp",
        "modules": ["Main"]
    }
@@ -186,7 +186,7 @@ following two ways.
 
 - It must define a module ``Main`` which implements the interface
   ``Updater.PROTOCOL`` from
-  :src:`src/lib_protocol_environment/sigs/v1/updater.mli`.
+  :src:`src/lib_protocol_environment/sigs/v17/updater.mli`.
   The shell interacts with the protocol through this interface.
 
 In addition, just like any other node component, the protocol can define
@@ -198,7 +198,7 @@ Environment
 -----------
 
 The environment of the protocol is a fixed set of OCaml modules (their
-signatures are declared in :src:`src/lib_protocol_environment/sigs/v1/`),
+signatures are declared in :src:`src/lib_protocol_environment/sigs/v17/`),
 consisting in a carefully chosen subset of the OCaml standard library,
 plus specialized utility modules. This form of sandboxing the protocol
 ensures that the protocol code does not use unsafe functions. :doc:`../shell/protocol_environment`

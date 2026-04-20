@@ -146,7 +146,7 @@ provided by a user through a file argument, e.g.,
 ``protocol_parameters.json``, to the activation command. The
 ``demo_noops`` protocol did not take advantage of this feature, but
 ``demo_counter`` uses a JSON value of the form
-``{'init_a': A, 'init_b': B}``, where ``A`` and ``B`` are the initial
+``{"init_a": A, "init_b": B}``, where ``A`` and ``B`` are the initial
 values of the counters.
 
 The type of the protocol parameters and their encoding are defined in
@@ -197,7 +197,7 @@ in ``TEZOS_PROTOCOL``.
 
    > cat src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL
    {
-       "expected_env_version": 15,
+       "expected_env_version": 17,
        "hash": "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT",
        "modules": ["Error", "Proto_params", "Header", "State",
                    "Proto_operation", "Receipt", "Apply", "Services", "Main"]
@@ -412,7 +412,7 @@ defined as
 
 ::
 
-   {'init_a': 100, 'init_b': 100}
+   {"init_a": 100, "init_b": 100}
 
 ::
 
