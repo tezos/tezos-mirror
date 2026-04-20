@@ -7577,6 +7577,14 @@ mod tests {
         let expected_refund = ctx.expected_refund(fee, da_fees);
         assert!(expected_refund > 0, "Test expects a positive refund");
 
+        // IMPORTANT: Failed operations MUST consume gas, even though the transfer reverted.
+        // This validates that the refund calculation properly accounts for gas consumption.
+        assert!(
+            ctx.total_consumed_milligas > 0,
+            "Failed operation MUST consume gas; got {} milligas",
+            ctx.total_consumed_milligas
+        );
+
         assert_eq!(bus[2], bu_refund_credit(&ctx.src.pkh, expected_refund));
         assert_eq!(bus[3], bu_refund_debit(expected_refund));
 
