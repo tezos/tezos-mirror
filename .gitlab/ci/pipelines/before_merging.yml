@@ -350,6 +350,7 @@ images.ubuntu:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -680,6 +681,7 @@ images.ubuntu-build:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -734,6 +736,7 @@ images.ubuntu-build.merge:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -830,6 +833,7 @@ images.ubuntu-systemd:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-jsonnet:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

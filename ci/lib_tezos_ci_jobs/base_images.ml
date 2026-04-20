@@ -161,7 +161,7 @@ module Distribution = struct
 
   let releases = function
     | Debian -> ["unstable"; "bookworm"; "trixie"]
-    | Ubuntu -> ["22.04"; "24.04"; "25.10"]
+    | Ubuntu -> ["22.04"; "24.04"; "25.10"; "26.04"]
     | Fedora -> ["39"; "42"]
     | Rockylinux -> ["9"; "10"]
 
