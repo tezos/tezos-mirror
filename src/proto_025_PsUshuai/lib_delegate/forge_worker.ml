@@ -255,6 +255,12 @@ let handle_forge_block (state : Types.state) automaton_state
                   err
               in
               if state.baking_state.config.multi_node && is_already_baked then
+                let level = Int32.succ block_to_bake.predecessor.shell.level in
+                let round = block_to_bake.round in
+                let*! () =
+                  Events.(
+                    emit skipping_outdated_block_forge_request (level, round))
+                in
                 Lwt.return_unit
               else
                 let*! () =

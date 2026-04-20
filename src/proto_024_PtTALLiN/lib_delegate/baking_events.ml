@@ -888,28 +888,22 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let consensus_vote_already_signed =
-    declare_2
+  let skipping_outdated_consensus_vote =
+    declare_1
       ~section
-      ~name:"consensus_vote_already_signed"
+      ~name:"skipping_outdated_consensus_vote"
       ~level:Info
-      ~msg:
-        "consensus vote already signed by another node, skipping \
-         {operation_information} -- {trace}"
+      ~msg:"skipping outdated consensus vote for {operation_information}"
       ~pp1:pp_unsigned_consensus_vote
       ( "operation_information",
         unsigned_consensus_vote_encoding_for_logging__cannot_decode )
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
 
-  let block_already_signed =
+  let skipping_outdated_block_forge_request =
     declare_2
       ~section
-      ~name:"block_already_signed"
+      ~name:"skipping_outdated_block_forge_request"
       ~level:Info
-      ~msg:
-        "block already signed by another node at level {level}, round {round}, \
-         skipping"
+      ~msg:"skipping outdated block forge request for (l{level}, r{round})"
       ~pp1:pp_int32
       ~pp2:Round.pp
       ("level", Data_encoding.int32)

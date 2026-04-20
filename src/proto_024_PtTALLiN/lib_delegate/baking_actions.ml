@@ -270,7 +270,8 @@ let sign_block_header (cctxt : Protocol_client_context.full) round_duration
         | false ->
             let*! () =
               if global_state.config.multi_node then
-                Events.(emit block_already_signed (level, round))
+                Events.(
+                  emit skipping_outdated_block_forge_request (level, round))
               else Events.(emit potential_double_baking (level, round))
             in
             return force)
@@ -694,8 +695,7 @@ let authorized_consensus_votes (automaton_state : automaton_state)
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
         if global_state.config.multi_node then
-          Events.(
-            emit consensus_vote_already_signed (unsigned_consensus_vote, [error]))
+          Events.(emit skipping_outdated_consensus_vote unsigned_consensus_vote)
         else
           Events.(
             emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
