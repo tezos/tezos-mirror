@@ -1,0 +1,6 @@
+Template: octez-smart-rollup-node/deprecation_notice
+Type: note
+Description: Deprecation notice for octez-smart-rollup-node
+ The Octez Debian packages are deprecated and will be removed in a future
+ release. Users are advised to migrate to an alternative installation
+ method. Please refer to https://octez.tezos.com/docs/introduction/howtoget.html for more information.
