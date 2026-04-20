@@ -30,7 +30,7 @@ Access the documentation:
 Run commands:
 
   run sandbox [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -39,7 +39,7 @@ Run commands:
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
-      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees] [--kernel-verbosity <info>]
@@ -55,8 +55,8 @@ Run commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -72,7 +72,7 @@ Run commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -80,7 +80,7 @@ Run commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -99,7 +99,7 @@ Run commands:
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty
       block by default. If set to `none`, blocks are produced on demand only (see private
       method produceBlock).
-    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --max-number-of-chunks <10>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --sequencer-key <edsk...>: Key to sign the blueprints.
     --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses
@@ -135,7 +135,7 @@ Run commands:
       Ethereum runtime of Etherlink
   
   run tezlink sandbox [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -144,7 +144,7 @@ Run commands:
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
-      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees] [--kernel-verbosity <info>]
@@ -159,8 +159,8 @@ Run commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -176,7 +176,7 @@ Run commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -184,7 +184,7 @@ Run commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -203,7 +203,7 @@ Run commands:
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty
       block by default. If set to `none`, blocks are produced on demand only (see private
       method produceBlock).
-    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --max-number-of-chunks <10>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --sequencer-key <edsk...>: Key to sign the blueprints.
     --genesis-timestamp <[TIMESTAMP]>: Timestamp used for the genesis block, uses
@@ -222,7 +222,7 @@ Run commands:
       be repeated to fund multiple accounts)
   
   run sequencer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -230,13 +230,12 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose] [--restricted-rpcs <regexp>]
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
-      [--preimages-endpoint <url>] [--time-between-blocks <10.>]
-      [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
-      [--maximum-blueprints-lag <LAG>] [--maximum-blueprints-ahead <AHEAD>]
-      [--maximum-blueprints-catch-up <CATCH_UP>] [--catch-up-cooldown <COOLDOWN>]
-      [--genesis-timestamp <[TIMESTAMP]>] [--initial-kernel <evm_installer.wasm>]
-      [-d --wallet-dir <path>] [-f --password-filename <filename>]
-      [--dal-slots <slot indices>] [--sunset-sec <SEC>]
+      [--preimages-endpoint <url>] [--time-between-blocks <10.>] [--max-number-of-chunks <10>]
+      [--private-rpc-port <PORT>] [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
+      [--maximum-blueprints-ahead <AHEAD>] [--maximum-blueprints-catch-up <CATCH_UP>]
+      [--catch-up-cooldown <COOLDOWN>] [--genesis-timestamp <[TIMESTAMP]>]
+      [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
+      [-f --password-filename <filename>] [--dal-slots <slot indices>] [--sunset-sec <SEC>]
     Start the EVM node in sequencer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -246,8 +245,8 @@ Run commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -263,7 +262,7 @@ Run commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -271,7 +270,7 @@ Run commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -288,7 +287,7 @@ Run commands:
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty
       block by default. If set to `none`, blocks are produced on demand only (see private
       method produceBlock).
-    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --max-number-of-chunks <10>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --sequencer-key <edsk...>: Key to sign the blueprints.
     --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts
@@ -316,7 +315,7 @@ Run commands:
       `$EVM_NODE_SEQUENCER_SUNSET_SEC`.
   
   run observer [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -328,7 +327,7 @@ Run commands:
       [-n --native-execution-policy <policy>] [--initial-kernel <evm_installer.wasm>]
       [--dont-track-rollup-node] [--no-sync]
       [--init-from-snapshot [snapshot url or file path]]
-      [--history <archive | rolling:n | full:n>] [--network <network>] [--sandbox]
+      [--history <archive|full:N|rolling:N|seed:N>] [--network <network>] [--sandbox]
     Start the EVM node in observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -338,8 +337,8 @@ Run commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -355,7 +354,7 @@ Run commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -363,7 +362,7 @@ Run commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -395,8 +394,12 @@ Run commands:
       and %% by %. Also accepts a path to an existing snapshot.
       Defaults to
       `https://storage.googleapis.com/nl-sandboxes-etherlink--snapshots/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
-    --history <archive | rolling:n | full:n>: History mode for the EVM node. ':n' means n days
-      of history.
+    --history <archive|full:N|rolling:N|seed:N>: History mode for the EVM node. `archive`:
+      keeps all data indefinitely. `full:N`: prunes Irmin context older than N days, keeps all
+      SQL data (blocks, transactions, blueprints). `rolling:N`: prunes everything older than N
+      days (context, blocks, transactions, blueprints). `seed:N`: minimal mode for sequencers
+      — prunes context, blocks and transactions older than N days, keeps only blueprints and
+      their events.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
       `testnet` or `shadownet`. If set, additional sanity checks are performed on the node’s
       startup.
@@ -406,7 +409,7 @@ Run commands:
       and patch its local state accordingly.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -425,8 +428,8 @@ Run commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -442,7 +445,7 @@ Run commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -450,7 +453,7 @@ Run commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -486,7 +489,7 @@ Run commands:
 Configuration commands:
 
   init config [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
-      [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]
+      [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
       [--cors-headers <ALLOWED_HEADERS>] [--ws [BOOL?]] [--max-number-blocks <100>]
       [--max-number-logs <1000>] [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
       [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
@@ -495,11 +498,11 @@ Configuration commands:
       [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
-      [--time-between-blocks <10.>] [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
+      [--time-between-blocks <10.>] [--max-number-of-chunks <10>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
       [--maximum-blueprints-ahead <AHEAD>] [--maximum-blueprints-catch-up <CATCH_UP>]
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
-      [--history <archive | rolling:n | full:n>] [--fail-on-divergence]
+      [--history <archive|full:N|rolling:N|seed:N>] [--fail-on-divergence]
       [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
       [--dal-slots <slot indices>] [--network <network>] [--sunset-sec <SEC>]
     Create an initial config with default value.
@@ -513,8 +516,8 @@ Configuration commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
-    --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a single batch. Can
-      either be `unlimited` or a positive integer.
+    --rpc-batch-limit <unlimited|N>: A limit on the number of requests allowed in a single
+      batch. Can either be `unlimited` or a positive integer.
     --cors-origins <ALLOWED_ORIGINS>: List of accepted cors origins.
     --cors-headers <ALLOWED_HEADERS>: List of accepted cors headers.
     --ws [BOOL?]: Enable websockets server when present or set to true.
@@ -530,7 +533,7 @@ Configuration commands:
       rollup node.
     --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use `tx-pool-max-txs`
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore: Use `tx-pool-max-txs`
       instead. Maximum allowed addresses inside the transaction pool.
     --tx-pool-timeout-limit <4>: Transaction timeout limit inside the transaction pool (in
       seconds).
@@ -538,7 +541,7 @@ Configuration commands:
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user address inside the
       transaction pool.
     -v --verbose: Sets logging level to debug. Beware, it is highly verbose.
-    --restricted-rpcs <regexp>: Disable methods that matches the given Perl-like regular
+    --restricted-rpcs <regexp>: Disable methods that match the given Perl-like regular
       expression. Cannot be used with --whitelisted-rpcs or --blacklisted-rpcs.
     --blacklisted-rpcs <blacklist>: Disable the RPC methods which are part of the provided
       list. Cannot be used with --restricted-rpcs or --whitelisted-rpcs.
@@ -557,7 +560,7 @@ Configuration commands:
     --time-between-blocks <10.>: Interval (in seconds) at which the sequencer creates an empty
       block by default. If set to `none`, blocks are produced on demand only (see private
       method produceBlock).
-    --max-number-of-chunks <10.>: Maximum number of chunks per blueprint.
+    --max-number-of-chunks <10>: Maximum number of chunks per blueprint.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --sequencer-key <edsk...>: Key to sign the blueprints.
     --maximum-blueprints-lag <LAG>: The maximum advance (in blueprints) the Sequencer accepts
@@ -569,8 +572,12 @@ Configuration commands:
     --catch-up-cooldown <COOLDOWN>: The maximum number of Layer 1 blocks the Sequencer waits
       after resending its blueprints before trying to catch-up again.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
-    --history <archive | rolling:n | full:n>: History mode for the EVM node. ':n' means n days
-      of history.
+    --history <archive|full:N|rolling:N|seed:N>: History mode for the EVM node. `archive`:
+      keeps all data indefinitely. `full:N`: prunes Irmin context older than N days, keeps all
+      SQL data (blocks, transactions, blueprints). `rolling:N`: prunes everything older than N
+      days (context, blocks, transactions, blueprints). `seed:N`: minimal mode for sequencers
+      — prunes context, blocks and transactions older than N days, keeps only blueprints and
+      their events.
     --fail-on-divergence: Instant confirmation observer hard fails on block hash divergence
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state
       of a rollup node allows to confirm the blocks received from the upstream EVM node.
@@ -748,7 +755,8 @@ Kernel commands:
       chunked messages.
       Defaults to `[SMART_ROLLUP_HASH]`.
     --as-blueprint: Chunk the data into a blueprint usable in sequencer mode.
-    --timestamp <[TIMESTAMP]>: 
+    --timestamp <[TIMESTAMP]>: Timestamp used for the blueprint being chunked.
+      Defaults to the epoch (i.e. 0 seconds since 1970-01-01).
       Defaults to `0`.
     --number <0>: Level of the blueprint.
       Defaults to `0`.
@@ -986,7 +994,7 @@ Debug commands:
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
-    -f --force: Force suppression of data to reset state of sequencer to a specified l2 level.
+    -f --force: Force suppression of data to reset state of sequencer to a specified L2 level.
   
   replay blueprints from <level> to <level> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
