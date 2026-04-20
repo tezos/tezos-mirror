@@ -7508,4 +7508,23 @@ mod tests {
             (100 - fee - amount).into(),
         );
     }
+
+    // Transfer without fee refund config (None): no refund entries.
+    #[test]
+    fn apply_transfer_without_fee_refund_config() {
+        let fee: u64 = 1000;
+        let amount: u64 = 30;
+
+        let ctx = run_refund_transfer(fee, amount, 2000, None);
+        let bus = ctx.balance_updates();
+
+        // Without refund config: only 2 entries (fee debit/credit).
+        assert_eq!(bus.len(), 2, "Expected 2 balance_updates, got {:?}", bus);
+
+        // Source balance = initial - fee - amount.
+        assert_eq!(
+            ctx.source.balance(&ctx.host).unwrap(),
+            (2000 - fee - amount).into(),
+        );
+    }
 }
