@@ -4142,6 +4142,117 @@ let test_gas_refund_on_out_of_gas =
         "Expected consumed (%L) < fee (%R), fee surplus should be refunded") ;
   unit
 
+(** Verify gas refund balance_updates in an operation metadata.
+    [expected_refund]: if [Some n], assert that a refund of exactly [n] mutez
+    is present. If [None], assert that no refund entries exist.
+    [source]: the source public_key_hash.
+    [metadata]: the JSON metadata from contents[0].metadata. *)
+let check_gas_refund_balance_updates ?expected_refund ~source ~metadata () =
+  (* Parse balance_updates from metadata (fee-level, where refund appears).
+     - Without refund: 2 entries (fee debit from source, credit to block fees).
+     - With refund: 4 entries (fee debit/credit + refund credit/debit). *)
+  let expected_bu_count = if Option.is_some expected_refund then 4 else 2 in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  Check.(
+    (List.length balance_updates = expected_bu_count)
+      int
+      ~error_msg:"Expected %R balance_updates entries, got %L") ;
+  (* Verify token conservation: sum of all changes must be zero. *)
+  let total_change =
+    List.fold_left
+      (fun acc bu -> acc + JSON.(bu |-> "change" |> as_int))
+      0
+      balance_updates
+  in
+  Check.(
+    (total_change = 0) int ~error_msg:"Balance updates do not sum to zero: %L") ;
+  (* Helper: find a balance_update matching kind/contract and sign. *)
+  let find_bu ~kind ?contract ~positive bus =
+    List.find_opt
+      (fun bu ->
+        let k = JSON.(bu |-> "kind" |> as_string) in
+        if k <> kind then false
+        else
+          let c = JSON.(bu |-> "change" |> as_int) in
+          let sign_ok = if positive then c > 0 else c < 0 in
+          let contract_ok =
+            match contract with
+            | None -> true
+            | Some addr -> JSON.(bu |-> "contract" |> as_string) = addr
+          in
+          sign_ok && contract_ok)
+      bus
+  in
+  (* Fee entries: debit from source (negative) and credit to block fees (positive). *)
+  let fee_debit =
+    find_bu ~kind:"contract" ~contract:source ~positive:false balance_updates
+  in
+  Check.(
+    (fee_debit <> None)
+      (option json)
+      ~error_msg:"Missing fee debit (kind=contract, change<0) for source") ;
+  let fee_credit = find_bu ~kind:"accumulator" ~positive:true balance_updates in
+  Check.(
+    (fee_credit <> None)
+      (option json)
+      ~error_msg:"Missing fee credit (kind=accumulator, change>0)") ;
+  match expected_refund with
+  | Some expected_refund ->
+      Check.((expected_refund > 0) int ~error_msg:"Expected refund (%L) > 0") ;
+      (* Refund credit: source gets +refund (kind=contract, positive). *)
+      let refund_credit =
+        find_bu ~kind:"contract" ~contract:source ~positive:true balance_updates
+      in
+      Check.(
+        (refund_credit <> None)
+          (option json)
+          ~error_msg:
+            "Missing refund credit (kind=contract, change>0) for source") ;
+      let actual_refund =
+        JSON.(Option.get refund_credit |-> "change" |> as_int)
+      in
+      Check.(
+        (actual_refund = expected_refund)
+          int
+          ~error_msg:"Refund credit mismatch: got %L, expected %R") ;
+      (* Refund debit: block fees gets -refund (kind=accumulator, negative). *)
+      let refund_debit =
+        find_bu ~kind:"accumulator" ~positive:false balance_updates
+      in
+      Check.(
+        (refund_debit <> None)
+          (option json)
+          ~error_msg:
+            "Missing refund debit (kind=accumulator, change<0) in block fees") ;
+      let actual_debit =
+        JSON.(Option.get refund_debit |-> "change" |> as_int)
+      in
+      Check.(
+        (actual_debit = -expected_refund)
+          int
+          ~error_msg:"Refund debit mismatch: got %L, expected %R") ;
+      ()
+  | None ->
+      (* No refund entries should exist: no positive credit to source,
+         no negative debit in block fees. *)
+      let spurious_credit =
+        find_bu ~kind:"contract" ~contract:source ~positive:true balance_updates
+      in
+      Check.(
+        (spurious_credit = None)
+          (option json)
+          ~error_msg:
+            "Expected no refund credit in balance_updates (refund is disabled)") ;
+      let spurious_debit =
+        find_bu ~kind:"accumulator" ~positive:false balance_updates
+      in
+      Check.(
+        (spurious_debit = None)
+          (option json)
+          ~error_msg:
+            "Expected no refund debit in balance_updates (refund is disabled)") ;
+      ()
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
