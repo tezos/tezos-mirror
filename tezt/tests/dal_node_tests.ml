@@ -2193,6 +2193,8 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
        - Each dal_pubX publishes one slot at the same published_level.
        - A few blocks are baked to reach finality and ensure the slots are
          attested and commitments are available in memory, sqlite, and L1 context.
+       - Publishers are then terminated to free memory (their store
+         directories remain on disk for file:// backup URI reads).
 
     C. Retrieval and validation checks:
        C.1 - Fetch valid slots via memory cache
@@ -2406,6 +2408,12 @@ let dal_slots_retrievability =
 
     let* () = bake_for ~count:3 ~delegates:(`For rest_pkhs) client in
     let* () = wait_for_dal_nodes in
+
+    (* Terminate publishers to free memory — their store directories
+       remain on disk for file:// backup URI reads. *)
+    let* () = Dal_node.terminate dal_pub1 in
+    let* () = Dal_node.terminate dal_pub2 in
+    let* () = Dal_node.terminate dal_pub3 in
 
     (* C. RETRIEVAL & VALIDATION *)
     let check_valid_dal_fetcher_1_2 ~__LOC__ =
