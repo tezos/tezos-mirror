@@ -204,7 +204,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
         Process.check ~expect_failure:true process)
       [
         RPC.get_chain_block_context_contract_delegate;
-        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_entrypoints ?normalize_types:None;
         RPC.get_chain_block_context_contract_script;
         RPC.get_chain_block_context_contract_storage;
       ]
@@ -247,7 +247,7 @@ let test_contracts _test_mode_tag protocol ?endpoint client =
         in
         Process.check ~expect_failure:true process)
       [
-        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_entrypoints ?normalize_types:None;
         RPC.get_chain_block_context_contract_script;
         RPC.get_chain_block_context_contract_storage;
       ]

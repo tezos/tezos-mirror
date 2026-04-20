@@ -1079,9 +1079,11 @@ let get_chain_block_context_contract_delegate ?(chain = "main")
     Fun.id
 
 let get_chain_block_context_contract_entrypoints ?(chain = "main")
-    ?(block = "head") ~id () =
+    ?(block = "head") ?normalize_types ~id () =
+  let query_string = Query_arg.opt_bool "normalize_types" normalize_types in
   make
     GET
+    ~query_string
     [
       "chains"; chain; "blocks"; block; "context"; "contracts"; id; "entrypoints";
     ]
@@ -2029,6 +2031,8 @@ let get_monitor_heads_chain ?(chain = "main") () =
 
 let get_monitor_validated_blocks =
   make GET ["monitor"; "validated_blocks"] Fun.id
+
+let get_monitor_bootstrapped = make GET ["monitor"; "bootstrapped"] Fun.id
 
 let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
 
