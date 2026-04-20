@@ -4337,6 +4337,94 @@ let test_gas_refund_in_run_operation ~enable_refund =
   check_gas_refund_balance_updates ?expected_refund ~source ~metadata () ;
   unit
 
+(** Gas refund in preapply/operations (preapplication) receipts.
+    Same checks as run_operation but through the preapply RPC which
+    validates signatures and fees (skip_signature_check = false). *)
+let test_gas_refund_in_preapply ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund in preapply (%s)" label)
+    ~tags:["gas_refund"; "preapply"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let fee = 1_000_000 in
+  let gas_limit = 10_000 in
+  let amount = 10 in
+  let source = Constant.bootstrap1 in
+  (* Fetch branch and counter from the tezlink endpoint (the kernel's view).
+     mk_single_transfer would use the client's default endpoint which may
+     differ from the kernel's internal state. *)
+  let* branch =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_hash ()
+  in
+  let* counter =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee
+      ~gas_limit
+      ~amount
+      ~counter
+      ~branch
+      ~dest:Constant.bootstrap2
+      client
+  in
+  let* signature = Operation.sign op client in
+  (* Get the Tezlink protocol hash (different from Alpha). *)
+  let* protocols =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_protocols ()
+  in
+  let protocol_hash = JSON.(protocols |-> "protocol" |> as_string) in
+  (* Build the preapply JSON: take the operation's fields, add protocol
+     and signature. Operation.json returns a JSON.u (`O fields). *)
+  let preapply_input =
+    match Operation.json op with
+    | `O fields ->
+        `O
+          (("protocol", `String protocol_hash)
+          :: ( "signature",
+               `String (Tezos_crypto.Signature.to_b58check signature) )
+          :: fields)
+    | _ -> Test.fail "Unexpected operation JSON format"
+  in
+  let* result =
+    Client.RPC.call ~endpoint client
+    @@ RPC.post_chain_block_helpers_preapply_operations
+         ~version:"1"
+         ~data:(Data (`A [preapply_input]))
+         ()
+  in
+  (* preapply returns an array of operations, each with "contents". *)
+  let metadata = JSON.(result |=> 0 |-> "contents" |=> 0 |-> "metadata") in
+  let status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.((status = "applied") string ~error_msg:"Expected %R but got %L") ;
+  let expected_refund =
+    if enable_refund then
+      let consumed_milligas =
+        JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
+      in
+      let consumed_gas = (consumed_milligas + 999) / 1000 in
+      let consumed_gas_fees = consumed_gas / 100 in
+      Some (fee - consumed_gas_fees)
+    else None
+  in
+  check_gas_refund_balance_updates
+    ?expected_refund
+    ~source:source.public_key_hash
+    ~metadata
+    () ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -5060,6 +5148,8 @@ let () =
   test_gas_refund_on_out_of_gas [Alpha] ;
   test_gas_refund_in_run_operation ~enable_refund:true [Alpha] ;
   test_gas_refund_in_run_operation ~enable_refund:false [Alpha] ;
+  test_gas_refund_in_preapply ~enable_refund:true [Alpha] ;
+  test_gas_refund_in_preapply ~enable_refund:false [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
