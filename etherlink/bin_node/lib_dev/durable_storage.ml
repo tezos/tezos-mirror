@@ -90,9 +90,25 @@ type ('a, 'cap) resolution =
   | Static of ('a, 'cap) resolved
   | Versioned of (storage_version:int -> ('a, 'cap) resolved)
 
-let resolve : type a cap. (a, cap) path -> (a, cap) resolution =
-  let infallible_decode decode bytes = Ok (decode bytes) in
-  function
+let infallible_decode decode bytes = Ok (decode bytes)
+
+(** Empty-body presence flags: the value on disk is an (empty) marker; we only
+    care about existence. *)
+let unit_flag_codec ~path : (unit, rw) resolved =
+  Read_write {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
+
+(** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits]. *)
+let qty_le_codec ~path : (Ethereum_types.quantity, rw) resolved =
+  Read_write
+    {
+      path;
+      decode =
+        infallible_decode (fun bytes ->
+            Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
+      encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
+    }
+
+let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
   | Raw_path key ->
       Static
         (Read_write
@@ -140,12 +156,7 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution =
             })
   | Multichain_flag ->
       Static
-        (Read_write
-           {
-             path = Durable_storage_path.Feature_flags.multichain;
-             decode = (fun _bytes -> Ok ());
-             encode = (fun () -> "");
-           })
+        (unit_flag_codec ~path:Durable_storage_path.Feature_flags.multichain)
   | Sequencer_key ->
       Versioned
         (fun ~storage_version ->
@@ -172,34 +183,15 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution =
                   L2_types.Chain_family.to_string cf);
             })
   | Tezosx_feature_flag runtime ->
-      Static
-        (Read_write
-           {
-             path = Tezosx.feature_flag runtime;
-             decode = (fun _bytes -> Ok ());
-             encode = (fun () -> "");
-           })
+      Static (unit_flag_codec ~path:(Tezosx.feature_flag runtime))
   | Michelson_runtime_sunrise_level ->
       Static
-        (Read_write
-           {
-             path = Durable_storage_path.michelson_runtime_sunrise_level;
-             decode =
-               infallible_decode (fun bytes ->
-                   Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
-             encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
-           })
+        (qty_le_codec
+           ~path:Durable_storage_path.michelson_runtime_sunrise_level)
   | Current_block_number chain_family ->
       let root = Durable_storage_path.root_of_chain_family chain_family in
       Static
-        (Read_write
-           {
-             path = Durable_storage_path.Block.current_number ~root;
-             decode =
-               infallible_decode (fun bytes ->
-                   Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
-             encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
-           })
+        (qty_le_codec ~path:(Durable_storage_path.Block.current_number ~root))
 
 let storage_version state =
   let open Lwt_result_syntax in
