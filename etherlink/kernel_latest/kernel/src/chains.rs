@@ -25,7 +25,6 @@ use crate::{
 };
 use anyhow::Context;
 use mir::ast::PublicKeyHash;
-use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
@@ -52,7 +51,7 @@ use tezos_execution::{
     context::{self, Context as _, TezlinkContext},
     get_required_da_fees,
     mir_ctx::BlockCtx,
-    ProcessedOperation,
+    FeeRefundConfig, ProcessedOperation,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -905,36 +904,6 @@ where
     Ok(())
 }
 
-/// Compute the fee refund: surplus of declared fees beyond actual costs.
-///
-/// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
-/// where consumed_gas_fees = gas_to_mutez(base_fee, multiplier, consumed_gas)
-/// and consumed_gas = ceil(total_consumed_milligas / 1000).
-fn compute_fee_refund(
-    processed_operations: &[ProcessedOperation],
-    total_operation_fees: u64,
-    da_fees: u64,
-    base_fee_per_gas: U256,
-    michelson_to_evm_gas_multiplier: u64,
-) -> u64 {
-    // Sum consumed milligas from ProcessedOperation, which correctly tracks
-    // gas for all outcomes (Applied, BackTracked, Failed) via the gas tracker.
-    let consumed_milligas =
-        ProcessedOperation::total_consumed_milligas(processed_operations);
-    // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
-    let consumed_gas = consumed_milligas.div_ceil(1000);
-    let consumed_gas_fees = gas_to_mutez(
-        base_fee_per_gas,
-        michelson_to_evm_gas_multiplier,
-        consumed_gas,
-    );
-
-    // saturating_sub ensures the refund is non-negative. This only credits back
-    // a portion of fees already debited from the source, so it can never cause the
-    // source balance to exceed its pre-operation value.
-    total_operation_fees.saturating_sub(da_fees.saturating_add(consumed_gas_fees))
-}
-
 enum CreditDaFees {
     Skip,
     Execute {
@@ -1063,15 +1032,16 @@ where
                 sequencer_pool_address,
             )?;
 
-            // Sum declared fees (mutez) from all operation contents before
-            // `operation` is moved into validate_and_apply_operation.
-            let total_operation_fees: u64 = operation
-                .content
-                .iter()
-                .map(|c| &c.fee().0)
-                .sum::<BigUint>()
-                .to_u64()
-                .ok_or_else(|| anyhow::anyhow!("total fees do not fit in u64"))?;
+            let fee_refund_config = if enable_gas_refund {
+                Some(FeeRefundConfig {
+                    da_fees: credit_da_fees.da_fees(),
+                    base_fee_per_gas: block_in_progress.base_fee_per_gas,
+                    michelson_to_evm_gas_multiplier: block_constants
+                        .michelson_to_evm_gas_multiplier,
+                })
+            } else {
+                None
+            };
 
             let branch = operation.branch.clone();
             let signature = operation.signature.clone();
@@ -1089,25 +1059,9 @@ where
                 &block_ctx,
                 skip_signature_check,
                 fees,
+                fee_refund_config,
             ) {
-                Ok(mut receipt) => {
-                    if enable_gas_refund {
-                        let fee_refund = compute_fee_refund(
-                            &receipt,
-                            total_operation_fees,
-                            credit_da_fees.da_fees(),
-                            block_in_progress.base_fee_per_gas,
-                            block_constants.michelson_to_evm_gas_multiplier,
-                        );
-                        tezos_execution::apply_fee_refund(
-                            host,
-                            context,
-                            &mut receipt,
-                            fee_refund,
-                        )?;
-                    }
-                    receipt
-                }
+                Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
                     log!(Error, "Found an invalid operation, dropping it: {:?}", err);
                     return Ok(crate::apply::ExecutionResult::Invalid);
@@ -1505,6 +1459,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             &block_ctx,
             skip_signature_check,
             None,
+            None, // No fee refund in Tezlink
         )?;
         let operations = ProcessedOperation::into_receipts(processed_operations);
         let result = AppliedOperation {

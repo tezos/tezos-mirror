@@ -3950,20 +3950,18 @@ let test_mempool_filter_fields =
    With defaults (base_fee_per_gas = 10^9, multiplier = 10):
      execution_gas_fees = gas_to_mutez(10^9, 10, 10_000) = 100 mutez. *)
 
-let gas_refund_endpoint sequencer = tezlink_endpoint_from_evm_node sequencer
-
-let gas_refund_balance ~endpoint client =
-  Client.get_balance_for
-    ~endpoint
-    ~account:Constant.bootstrap1.public_key_hash
-    client
-
 (** Execute [f], produce a block, return mutez consumed by bootstrap1. *)
 let gas_refund_measure_consumed ~endpoint ~sequencer client f =
-  let* before = gas_refund_balance ~endpoint client in
+  let balance client =
+    Client.get_balance_for
+      ~endpoint
+      ~account:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let* before = balance client in
   let* () = f () in
   let*@ _ = Rpc.produce_block sequencer in
-  let* after = gas_refund_balance ~endpoint client in
+  let* after = balance client in
   Check.((Tez.to_mutez before >= Tez.to_mutez after) int)
     ~error_msg:"balance increased unexpectedly (before=%L, after=%R)" ;
   return (Tez.to_mutez before - Tez.to_mutez after)
@@ -4007,7 +4005,7 @@ let test_gas_refund_on_transfer ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let amount = Tez.one in
   let fee = Tez.one in
   let gas_limit = 10_000 in
@@ -4050,7 +4048,7 @@ let test_gas_refund_on_failwith ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
@@ -4105,7 +4103,7 @@ let test_gas_refund_on_out_of_gas =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:true
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
@@ -4142,6 +4140,289 @@ let test_gas_refund_on_out_of_gas =
       int
       ~error_msg:
         "Expected consumed (%L) < fee (%R), fee surplus should be refunded") ;
+  unit
+
+(** Verify gas refund balance_updates in an operation metadata.
+    [expected_refund]: if [Some n], assert that a refund of exactly [n] mutez
+    is present. If [None], assert that no refund entries exist.
+    [source]: the source public_key_hash.
+    [metadata]: the JSON metadata from contents[0].metadata. *)
+let check_gas_refund_balance_updates ?expected_refund ~source ~metadata () =
+  (* Parse balance_updates from metadata (fee-level, where refund appears).
+     - Without refund: 2 entries (fee debit from source, credit to block fees).
+     - With refund: 4 entries (fee debit/credit + refund credit/debit). *)
+  let expected_bu_count = if Option.is_some expected_refund then 4 else 2 in
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  Check.(
+    (List.length balance_updates = expected_bu_count)
+      int
+      ~error_msg:"Expected %R balance_updates entries, got %L") ;
+  (* Verify token conservation: sum of all changes must be zero. *)
+  let total_change =
+    List.fold_left
+      (fun acc bu -> acc + JSON.(bu |-> "change" |> as_int))
+      0
+      balance_updates
+  in
+  Check.(
+    (total_change = 0) int ~error_msg:"Balance updates do not sum to zero: %L") ;
+  (* Helper: find a balance_update matching kind/contract and sign. *)
+  let find_bu ~kind ?contract ~positive bus =
+    List.find_opt
+      (fun bu ->
+        let k = JSON.(bu |-> "kind" |> as_string) in
+        if k <> kind then false
+        else
+          let c = JSON.(bu |-> "change" |> as_int) in
+          let sign_ok = if positive then c > 0 else c < 0 in
+          let contract_ok =
+            match contract with
+            | None -> true
+            | Some addr -> JSON.(bu |-> "contract" |> as_string) = addr
+          in
+          sign_ok && contract_ok)
+      bus
+  in
+  (* Fee entries: debit from source (negative) and credit to block fees (positive). *)
+  let fee_debit =
+    find_bu ~kind:"contract" ~contract:source ~positive:false balance_updates
+  in
+  Check.(
+    (fee_debit <> None)
+      (option json)
+      ~error_msg:"Missing fee debit (kind=contract, change<0) for source") ;
+  let fee_credit = find_bu ~kind:"accumulator" ~positive:true balance_updates in
+  Check.(
+    (fee_credit <> None)
+      (option json)
+      ~error_msg:"Missing fee credit (kind=accumulator, change>0)") ;
+  match expected_refund with
+  | Some expected_refund ->
+      Check.((expected_refund > 0) int ~error_msg:"Expected refund (%L) > 0") ;
+      (* Refund credit: source gets +refund (kind=contract, positive). *)
+      let refund_credit =
+        find_bu ~kind:"contract" ~contract:source ~positive:true balance_updates
+      in
+      Check.(
+        (refund_credit <> None)
+          (option json)
+          ~error_msg:
+            "Missing refund credit (kind=contract, change>0) for source") ;
+      let actual_refund =
+        JSON.(Option.get refund_credit |-> "change" |> as_int)
+      in
+      Check.(
+        (actual_refund = expected_refund)
+          int
+          ~error_msg:"Refund credit mismatch: got %L, expected %R") ;
+      (* Refund debit: block fees gets -refund (kind=accumulator, negative). *)
+      let refund_debit =
+        find_bu ~kind:"accumulator" ~positive:false balance_updates
+      in
+      Check.(
+        (refund_debit <> None)
+          (option json)
+          ~error_msg:
+            "Missing refund debit (kind=accumulator, change<0) in block fees") ;
+      let actual_debit =
+        JSON.(Option.get refund_debit |-> "change" |> as_int)
+      in
+      Check.(
+        (actual_debit = -expected_refund)
+          int
+          ~error_msg:"Refund debit mismatch: got %L, expected %R") ;
+      ()
+  | None ->
+      (* No refund entries should exist: no positive credit to source,
+         no negative debit in block fees. *)
+      let spurious_credit =
+        find_bu ~kind:"contract" ~contract:source ~positive:true balance_updates
+      in
+      Check.(
+        (spurious_credit = None)
+          (option json)
+          ~error_msg:
+            "Expected no refund credit in balance_updates (refund is disabled)") ;
+      let spurious_debit =
+        find_bu ~kind:"accumulator" ~positive:false balance_updates
+      in
+      Check.(
+        (spurious_debit = None)
+          (option json)
+          ~error_msg:
+            "Expected no refund debit in balance_updates (refund is disabled)") ;
+      ()
+
+(** Gas refund in run_operation (simulation) receipts.
+    With refund enabled, the metadata-level balance_updates should contain
+    4 entries: fee debit/credit + refund credit/debit, all summing to zero.
+    The refund amount should match: fee - da_fees - consumed_gas_fees
+    (da_fees = 0 in simulation).
+    Without refund, only the 2 fee debit/credit entries should appear. *)
+let test_gas_refund_in_run_operation ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund in run_operation (%s)" label)
+    ~tags:["gas_refund"; "run_operation"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let* branch =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_hash ()
+  in
+  let* chain_id =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_chain_id ()
+  in
+  (* 1 tez = 1_000_000 mutez, deliberately high to produce a large refund. *)
+  let fee = 1_000_000 in
+  let gas_limit = 10_000 in
+  let amount = 10 in
+  let source = Constant.bootstrap1.public_key_hash in
+  let op_json =
+    `O
+      [
+        ( "operation",
+          `O
+            [
+              ("branch", `String branch);
+              ( "contents",
+                `A
+                  [
+                    `O
+                      [
+                        ("kind", `String "transaction");
+                        ("source", `String source);
+                        ("fee", `String (string_of_int fee));
+                        (* Counter and signature are not checked in simulation mode. *)
+                        ("counter", `String "1");
+                        ("gas_limit", `String (string_of_int gas_limit));
+                        ("storage_limit", `String "0");
+                        ("amount", `String (string_of_int amount));
+                        ( "destination",
+                          `String Constant.bootstrap2.public_key_hash );
+                      ];
+                  ] );
+              (* Dummy signature: ignored in simulation mode. *)
+              ( "signature",
+                `String
+                  "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
+              );
+            ] );
+        ("chain_id", `String chain_id);
+      ]
+  in
+  let* result =
+    Client.RPC.call ~endpoint client
+    @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
+  in
+  let metadata = JSON.(result |-> "contents" |=> 0 |-> "metadata") in
+  (* Check status is applied *)
+  let status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.((status = "applied") string ~error_msg:"Expected %R but got %L") ;
+  let expected_refund =
+    if enable_refund then
+      (* refund = fee - da_fees - consumed_gas_fees.
+         da_fees = 0 in simulation, consumed_gas_fees = ceil(consumed_milligas/1000) / 100. *)
+      let consumed_milligas =
+        JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
+      in
+      let consumed_gas = (consumed_milligas + 999) / 1000 in
+      let consumed_gas_fees = consumed_gas / 100 in
+      Some (fee - consumed_gas_fees)
+    else None
+  in
+  check_gas_refund_balance_updates ?expected_refund ~source ~metadata () ;
+  unit
+
+(** Gas refund in preapply/operations (preapplication) receipts.
+    Same checks as run_operation but through the preapply RPC which
+    validates signatures and fees (skip_signature_check = false). *)
+let test_gas_refund_in_preapply ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund in preapply (%s)" label)
+    ~tags:["gas_refund"; "preapply"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let fee = 1_000_000 in
+  let gas_limit = 10_000 in
+  let amount = 10 in
+  let source = Constant.bootstrap1 in
+  (* Fetch branch and counter from the tezlink endpoint (the kernel's view).
+     mk_single_transfer would use the client's default endpoint which may
+     differ from the kernel's internal state. *)
+  let* branch =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_hash ()
+  in
+  let* counter =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.public_key_hash
+         ()
+  in
+  let counter = JSON.as_int counter + 1 in
+  let* op =
+    Operation.Manager.mk_single_transfer
+      ~source
+      ~fee
+      ~gas_limit
+      ~amount
+      ~counter
+      ~branch
+      ~dest:Constant.bootstrap2
+      client
+  in
+  let* signature = Operation.sign op client in
+  (* Get the Tezlink protocol hash (different from Alpha). *)
+  let* protocols =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_protocols ()
+  in
+  let protocol_hash = JSON.(protocols |-> "protocol" |> as_string) in
+  (* Build the preapply JSON: take the operation's fields, add protocol
+     and signature. Operation.json returns a JSON.u (`O fields). *)
+  let preapply_input =
+    match Operation.json op with
+    | `O fields ->
+        `O
+          (("protocol", `String protocol_hash)
+          :: ( "signature",
+               `String (Tezos_crypto.Signature.to_b58check signature) )
+          :: fields)
+    | _ -> Test.fail "Unexpected operation JSON format"
+  in
+  let* result =
+    Client.RPC.call ~endpoint client
+    @@ RPC.post_chain_block_helpers_preapply_operations
+         ~version:"1"
+         ~data:(Data (`A [preapply_input]))
+         ()
+  in
+  (* preapply returns an array of operations, each with "contents". *)
+  let metadata = JSON.(result |=> 0 |-> "contents" |=> 0 |-> "metadata") in
+  let status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.((status = "applied") string ~error_msg:"Expected %R but got %L") ;
+  let expected_refund =
+    if enable_refund then
+      let consumed_milligas =
+        JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
+      in
+      let consumed_gas = (consumed_milligas + 999) / 1000 in
+      let consumed_gas_fees = consumed_gas / 100 in
+      Some (fee - consumed_gas_fees)
+    else None
+  in
+  check_gas_refund_balance_updates
+    ?expected_refund
+    ~source:source.public_key_hash
+    ~metadata
+    () ;
   unit
 
 let test_tezlink_gas_vs_l1 =
@@ -4865,6 +5146,10 @@ let () =
   test_gas_refund_on_failwith ~enable_refund:true [Alpha] ;
   test_gas_refund_on_failwith ~enable_refund:false [Alpha] ;
   test_gas_refund_on_out_of_gas [Alpha] ;
+  test_gas_refund_in_run_operation ~enable_refund:true [Alpha] ;
+  test_gas_refund_in_run_operation ~enable_refund:false [Alpha] ;
+  test_gas_refund_in_preapply ~enable_refund:true [Alpha] ;
+  test_gas_refund_in_preapply ~enable_refund:false [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;

@@ -1217,6 +1217,7 @@ where
                 },
                 skip_signature_check,
                 None,
+                None, // No fee refund for delayed inbox operations
             ) {
                 Ok(processed_operations) => {
                     log!(
