@@ -1881,8 +1881,8 @@ mod tests {
         ProcessedOperation,
     };
     use crate::{get_required_da_fees, TcCtx};
-    use primitive_types::U256;
     use crate::{make_default_ctx, COST_PER_BYTES};
+    use primitive_types::U256;
     use tezosx_interfaces::{
         CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
@@ -7525,6 +7525,63 @@ mod tests {
         assert_eq!(
             ctx.source.balance(&ctx.host).unwrap(),
             (2000 - fee - amount).into(),
+        );
+    }
+
+    // Failed transfer with fee refund: refund still applies after revert.
+    // The operation fails (BalanceTooLow) but the source still gets refunded
+    // because fee refund runs after promote/revert, outside the transaction.
+    #[test]
+    fn apply_failed_transfer_with_fee_refund() {
+        let fee: u64 = 1000;
+        let initial_balance: u64 = 2000;
+        let da_fees: u64 = 50;
+        // amount > balance after fee deduction → BalanceTooLow
+        let amount: u64 = initial_balance;
+
+        let ctx = run_refund_transfer(fee, amount, initial_balance, Some(da_fees));
+
+        // The operation should have failed.
+        assert!(
+            matches!(
+                &ctx.receipt[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "Expected a Failed transfer result"
+        );
+
+        let bus = ctx.balance_updates();
+
+        // Even though the transfer failed, fee refund still produces 4 entries.
+        assert_eq!(bus.len(), 4, "Expected 4 balance_updates, got {:?}", bus);
+
+        assert_eq!(bus[0], bu_fee_debit(&ctx.src.pkh, fee));
+        assert_eq!(bus[1], bu_fee_credit(fee));
+
+        let expected_refund = ctx.expected_refund(fee, da_fees);
+        assert!(expected_refund > 0, "Test expects a positive refund");
+
+        assert_eq!(bus[2], bu_refund_credit(&ctx.src.pkh, expected_refund));
+        assert_eq!(bus[3], bu_refund_debit(expected_refund));
+
+        // Token conservation.
+        let total: i64 = bus.iter().map(|bu| bu.changes).sum();
+        assert_eq!(total, 0, "Fee-level balance updates must sum to zero");
+
+        // Source paid fees but got refund; transfer was reverted so amount not deducted.
+        assert_eq!(
+            ctx.source.balance(&ctx.host).unwrap(),
+            (initial_balance - fee + expected_refund).into(),
+            "Source should pay fee minus refund, transfer amount reverted"
+        );
+        // Destination unchanged: transfer was reverted.
+        assert_eq!(
+            ctx.destination.balance(&ctx.host).unwrap(),
+            50_u64.into(),
+            "Destination should be unchanged after failed transfer"
         );
     }
 }
