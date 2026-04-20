@@ -474,23 +474,47 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
            ))
     else []
   in
-  let with_runtimes =
-    List.map
-      (fun runtime ->
-        Installer_config.make ~key:(Tezosx.feature_flag runtime) ~value:"")
-      with_runtimes
-  in
   (* Phase 2 of the durable storage reorganization (storage version V53)
      moves governance / sequencing / config installer-set paths from
-     /evm/ to /base/. When [kernel_compat] is Latest (the dev kernel
-     including the V53 migration) we install them under /base/, otherwise
-     under the legacy /evm/ prefix. *)
-  let governance_in_base =
+     /evm/ to /base/. Phase 3 (storage version V54) moves all feature
+     flags to /base/feature_flags/. Both ship on the same dev kernel, so
+     a single gate against [FarfadetR2] selects the new paths. *)
+  let newer_than_farfadet_r2 =
     Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat)
   in
+  let governance_in_base = newer_than_farfadet_r2 in
+  let feature_flags_in_base = newer_than_farfadet_r2 in
   let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
   let make_governance_instr ?convert arg =
     make_instr ?convert ~path_prefix:base_or_evm_prefix arg
+  in
+  (* Path prefix for feature flags according to the target kernel's version. *)
+  let feature_flag_prefix_base = ["base"; "feature_flags"] in
+  let feature_flag_prefix_evm = ["evm"; "feature_flags"] in
+  let feature_flag_prefix_world_state =
+    ["evm"; "world_state"; "feature_flags"]
+  in
+  let feature_flag_prefix_tezlink = ["tezlink"; "feature_flags"] in
+  let make_feature_flag_instr ?convert ~legacy_prefix arg =
+    let path_prefix =
+      if feature_flags_in_base then feature_flag_prefix_base else legacy_prefix
+    in
+    make_instr ?convert ~path_prefix arg
+  in
+  let with_runtimes =
+    List.map
+      (fun runtime ->
+        let path =
+          let prefix =
+            if feature_flags_in_base then feature_flag_prefix_base
+            else feature_flag_prefix_evm
+          in
+          match runtime with
+          | Tezosx.Tezos ->
+              String.concat "/" (("" :: prefix) @ ["enable_tezos_runtime"])
+        in
+        Installer_config.make ~key:path ~value:"")
+      with_runtimes
   in
   let instrs =
     (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
@@ -546,20 +570,30 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
     @ set_first_big_map_id @ set_account_code
     @ make_governance_instr remove_whitelist
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
-    @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_revm
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal
-    @ make_instr
-        ~path_prefix:["evm"; "feature_flags"]
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
+        enable_fa_bridge
+    (* enable_revm is only consumed by pre-V54 kernels — V54+ kernels
+       unconditionally enable revm and ignore the flag. *)
+    @ (if feature_flags_in_base then []
+       else make_instr ~path_prefix:feature_flag_prefix_world_state enable_revm)
+    @ make_feature_flag_instr ~legacy_prefix:feature_flag_prefix_evm enable_dal
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
         disable_legacy_dal_signals
-    @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_fast_withdrawal
-    @ make_instr
-        ~path_prefix:["evm"; "world_state"; "feature_flags"]
-        enable_fast_fa_withdrawal
+    (* enable_fast_withdrawal and enable_fast_fa_withdrawal are only
+       consumed by pre-Farfadet kernels — Farfadet+ kernels run the
+       corresponding code paths unconditionally and ignore these flags. *)
+    @ (if feature_flags_in_base then []
+       else
+         make_instr
+           ~path_prefix:feature_flag_prefix_world_state
+           enable_fast_withdrawal)
+    @ (if feature_flags_in_base then []
+       else
+         make_instr
+           ~path_prefix:feature_flag_prefix_world_state
+           enable_fast_fa_withdrawal)
     @ make_governance_instr ~convert:decimal_list_to_bytes dal_slots
     @ make_instr
         ~convert:(fun s ->
@@ -590,9 +624,11 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           Bytes.to_string (encode rlp_item))
         ~path_prefix:base_or_evm_prefix
         dal_publishers_whitelist
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
-    @ make_instr
-        ~path_prefix:["tezlink"; "feature_flags"]
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_evm
+        enable_multichain
+    @ make_feature_flag_instr
+        ~legacy_prefix:feature_flag_prefix_tezlink
         enable_michelson_gas_refund
     @ make_governance_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))

@@ -17,7 +17,8 @@ let runtime_of_string_opt, string_of_runtime, known_runtimes =
 let pp_runtime fmt runtime =
   Format.pp_print_string fmt (string_of_runtime runtime)
 
-let feature_flag = function Tezos -> "/evm/feature_flags/enable_tezos_runtime"
+let feature_flag = function
+  | Tezos -> Durable_storage_path.Feature_flags.tezos_runtime
 
 let runtime_encoding : runtime Data_encoding.t =
   let open Data_encoding in

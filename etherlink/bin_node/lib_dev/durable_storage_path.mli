@@ -260,4 +260,6 @@ end
 
 module Feature_flags : sig
   val multichain : path
+
+  val tezos_runtime : path
 end

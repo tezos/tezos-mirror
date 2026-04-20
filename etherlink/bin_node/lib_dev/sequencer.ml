@@ -171,7 +171,7 @@ let activate_tezlink ~storage_version chain_id =
   let open Lwt_result_syntax in
   let* () =
     Evm_context.patch_state
-      ~key:"/evm/feature_flags/enable_multichain"
+      ~key:Durable_storage_path.Feature_flags.multichain
       ~value:""
       ()
   in

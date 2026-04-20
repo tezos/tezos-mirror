@@ -419,7 +419,9 @@ module Chain_configuration = struct
 end
 
 module Feature_flags = struct
-  let root = EVM.make "/feature_flags"
+  let root = BASE.make "/feature_flags"
 
   let multichain = root ^ "/enable_multichain"
+
+  let tezos_runtime = root ^ "/enable_tezos_runtime"
 end
