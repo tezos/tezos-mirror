@@ -1877,9 +1877,11 @@ mod tests {
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        context, validate_and_apply_operation, OperationError, ProcessedOperation,
+        context, validate_and_apply_operation, FeeRefundConfig, OperationError,
+        ProcessedOperation,
     };
     use crate::{get_required_da_fees, TcCtx};
+    use primitive_types::U256;
     use crate::{make_default_ctx, COST_PER_BYTES};
     use tezosx_interfaces::{
         CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
@@ -7304,6 +7306,184 @@ mod tests {
         assert_eq!(
             skipped[1].operation_consumed_milligas, 0,
             "Skipped op should consume 0 gas"
+        );
+    }
+
+    // --- Fee refund test helpers ---
+
+    /// Balance update: fee debited from source account.
+    fn bu_fee_debit(pkh: &PublicKeyHash, fee: u64) -> BalanceUpdate {
+        BalanceUpdate {
+            balance: Balance::Account(Contract::Implicit(pkh.clone())),
+            changes: -(fee as i64),
+            update_origin: UpdateOrigin::BlockApplication,
+        }
+    }
+
+    /// Balance update: fee credited to block fees accumulator.
+    fn bu_fee_credit(fee: u64) -> BalanceUpdate {
+        BalanceUpdate {
+            balance: Balance::BlockFees,
+            changes: fee as i64,
+            update_origin: UpdateOrigin::BlockApplication,
+        }
+    }
+
+    /// Balance update: refund credited back to source account.
+    fn bu_refund_credit(pkh: &PublicKeyHash, amount: u64) -> BalanceUpdate {
+        BalanceUpdate {
+            balance: Balance::Account(Contract::Implicit(pkh.clone())),
+            changes: amount as i64,
+            update_origin: UpdateOrigin::BlockApplication,
+        }
+    }
+
+    /// Balance update: refund debited from block fees accumulator.
+    fn bu_refund_debit(amount: u64) -> BalanceUpdate {
+        BalanceUpdate {
+            balance: Balance::BlockFees,
+            changes: -(amount as i64),
+            update_origin: UpdateOrigin::BlockApplication,
+        }
+    }
+
+    /// Standard base_fee_per_gas for fee refund tests.
+    const TEST_BASE_FEE_PER_GAS: u64 = 10u64.pow(9);
+    /// Standard Michelson-to-EVM gas multiplier for fee refund tests.
+    const TEST_GAS_MULTIPLIER: u64 = 10;
+
+    /// Result of a fee refund test setup.
+    struct RefundTestCtx {
+        host: MockKernelHost,
+        src: Bootstrap,
+        source: TezlinkImplicitAccount,
+        destination: TezlinkImplicitAccount,
+        receipt: Vec<OperationWithMetadata>,
+        total_consumed_milligas: u64,
+    }
+
+    impl RefundTestCtx {
+        /// Extract balance_updates from the first receipt (must be a Transfer).
+        fn balance_updates(&self) -> &[BalanceUpdate] {
+            match &self.receipt[0].receipt {
+                OperationResultSum::Transfer(op_result) => &op_result.balance_updates,
+                other => panic!("Expected Transfer receipt, got {other:?}"),
+            }
+        }
+
+        /// Compute the expected refund: fee - da_fees - gas_to_mutez(consumed).
+        fn expected_refund(&self, fee: u64, da_fees: u64) -> u64 {
+            let consumed_gas = self.total_consumed_milligas.div_ceil(1000);
+            let consumed_gas_fees = (U256::from(TEST_BASE_FEE_PER_GAS)
+                * U256::from(TEST_GAS_MULTIPLIER)
+                * U256::from(consumed_gas)
+                / U256::exp10(12))
+            .low_u64();
+            fee.saturating_sub(da_fees.saturating_add(consumed_gas_fees))
+        }
+    }
+
+    /// Set up accounts, build a transfer operation, run it through
+    /// `validate_and_apply_operation`, and return the context for assertions.
+    ///
+    /// `da_fees`: if `Some`, a `FeeRefundConfig` is passed; if `None`, no config.
+    fn run_refund_transfer(
+        fee: u64,
+        amount: u64,
+        initial_src_balance: u64,
+        da_fees: Option<u64>,
+    ) -> RefundTestCtx {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+        let dst = bootstrap2();
+
+        let source = init_account(&mut host, &src.pkh, initial_src_balance);
+        reveal_account(&mut host, &src);
+        let destination = init_account(&mut host, &dst.pkh, 50);
+
+        let operation = make_transfer_operation(
+            fee,
+            1,
+            21040,
+            5,
+            src.clone(),
+            amount.into(),
+            Contract::Implicit(dst.pkh.clone()),
+            Parameters::default(),
+        );
+
+        let refund_config = da_fees.map(|da| FeeRefundConfig {
+            da_fees: da,
+            base_fee_per_gas: U256::from(TEST_BASE_FEE_PER_GAS),
+            michelson_to_evm_gas_multiplier: TEST_GAS_MULTIPLIER,
+        });
+
+        let processed = validate_and_apply_operation(
+            &mut host,
+            &MockRegistry,
+            &mut TezosXJournal::default(),
+            &context::TezlinkContext::init_context(),
+            OperationHash::default(),
+            operation,
+            &block_ctx!(),
+            false,
+            None,
+            refund_config,
+        )
+        .expect("validate_and_apply_operation should succeed");
+
+        let total_consumed_milligas =
+            ProcessedOperation::total_consumed_milligas(&processed);
+        let receipt = ProcessedOperation::into_receipts(processed);
+
+        RefundTestCtx {
+            host,
+            src,
+            source,
+            destination,
+            receipt,
+            total_consumed_milligas,
+        }
+    }
+
+    // Transfer with fee refund enabled: surplus fees are credited back to source.
+    #[test]
+    fn apply_transfer_with_fee_refund() {
+        let fee: u64 = 1000;
+        let amount: u64 = 30;
+        let initial_balance: u64 = 2000;
+        let da_fees: u64 = 50;
+
+        let ctx = run_refund_transfer(fee, amount, initial_balance, Some(da_fees));
+        let bus = ctx.balance_updates();
+
+        // With refund: 4 entries (fee debit/credit + refund credit/debit).
+        assert_eq!(bus.len(), 4, "Expected 4 balance_updates, got {:?}", bus);
+
+        assert_eq!(bus[0], bu_fee_debit(&ctx.src.pkh, fee));
+        assert_eq!(bus[1], bu_fee_credit(fee));
+
+        let expected_refund = ctx.expected_refund(fee, da_fees);
+        assert!(expected_refund > 0, "Test expects a positive refund");
+
+        assert_eq!(bus[2], bu_refund_credit(&ctx.src.pkh, expected_refund));
+        assert_eq!(bus[3], bu_refund_debit(expected_refund));
+
+        // Token conservation: all fee-level balance updates sum to zero.
+        let total: i64 = bus.iter().map(|bu| bu.changes).sum();
+        assert_eq!(total, 0, "Fee-level balance updates must sum to zero");
+
+        // Verify final balances.
+        assert_eq!(
+            ctx.source.balance(&ctx.host).unwrap(),
+            (initial_balance - fee + expected_refund - amount).into(),
+            "Source balance should reflect fee, refund, and transfer"
+        );
+        assert_eq!(
+            ctx.destination.balance(&ctx.host).unwrap(),
+            (50 + amount).into(),
+            "Destination balance should increase by transfer amount"
         );
     }
 }
