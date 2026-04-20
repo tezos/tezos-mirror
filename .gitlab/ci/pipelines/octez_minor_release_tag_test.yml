@@ -109,20 +109,6 @@ oc.create-homebrew-formula:
     - public/homebrew/*
     when: on_success
 
-trigger:octez_monitoring:
-  stage: build
-  variables:
-    PIPELINE_TYPE: octez_monitoring
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  inherit:
-    variables:
-    - ci_image_name
-    - ci_image_name_protected
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/octez_monitoring.yml
-    strategy: depend
-
 oc.build-data_packages:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
   stage: build

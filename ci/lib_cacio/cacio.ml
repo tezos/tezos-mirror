@@ -843,7 +843,6 @@ type global_pipeline =
   | Scheduled_test_release
   | Publish_release_page
   | Test_publish_release_page
-  | Octez_monitoring
   (* Release tag pipelines *)
   | Major_release_tag
   | Major_release_tag_test
