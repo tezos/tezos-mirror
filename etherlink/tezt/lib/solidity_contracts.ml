@@ -515,6 +515,12 @@ let store_and_return =
     ~label:"store_and_return"
     ~contract:"StoreAndReturn"
 
+let gas_burner =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/gas_burner.sol")
+    ~label:"gas_burner"
+    ~contract:"GasBurner"
+
 module Precompile = struct
   let xtz_bridge = "0xff00000000000000000000000000000000000001"
 

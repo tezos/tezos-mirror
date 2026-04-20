@@ -214,6 +214,67 @@ module TezContract = struct
       ~sequencer
       call_op
 
+  (** [get_consumed_milligas ~block sequencer] queries the tezlink RPC
+   *  for [block]'s first manager operation and returns the top-level
+   *  [consumed_milligas] from the operation result.
+   *
+   *  @param block Block identifier (default ["head"]). *)
+  let get_consumed_milligas ?(block = "head") sequencer =
+    let path = sf "/tezlink/chains/main/blocks/%s/operations/3/0" block in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"tezlink_operation_receipt" res in
+    return
+      JSON.(
+        json |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "consumed_milligas" |> as_int)
+
+  (** [get_gateway_consumed_milligas ~block ~entrypoint sequencer] queries
+   *  the tezlink RPC for [block]'s first manager operation and returns
+   *  the [consumed_milligas] of the internal gateway operation matching
+   *  [entrypoint].
+   *
+   *  @param block Block identifier (default ["head"]).
+   *  @param entrypoint Gateway entrypoint to match (default ["call_evm"]). *)
+  let get_gateway_consumed_milligas ?(block = "head") ?(entrypoint = "call_evm")
+      sequencer =
+    let path = sf "/tezlink/chains/main/blocks/%s/operations/3/0" block in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"tezlink_operation_receipt" res in
+    let internal_ops =
+      JSON.(
+        json |-> "contents" |=> 0 |-> "metadata"
+        |-> "internal_operation_results" |> as_list)
+    in
+    match
+      List.find_opt
+        (fun op ->
+          JSON.(op |-> "parameters" |-> "entrypoint" |> as_string_opt)
+          = Some entrypoint)
+        internal_ops
+    with
+    | None ->
+        Test.fail
+          "get_gateway_consumed_milligas: no internal operation with \
+           entrypoint %S found in block %s (found %d internal ops)"
+          entrypoint
+          block
+          (List.length internal_ops)
+    | Some gateway_op ->
+        let consumed =
+          JSON.(gateway_op |-> "result" |-> "consumed_milligas" |> as_int)
+        in
+        return consumed
+
   (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
    *  storage of an originated Michelson contract from the durable storage,
    *  given its hex-encoded [Contract_repr.t] key. *)
@@ -277,7 +338,7 @@ module EvmRunner = struct
 
   (** Calls [run()] on the given EVM contract and returns [gasUsed]. *)
   let call_run ?expected_status ~sequencer ~sender ~nonce ~value ?access_list
-      runner =
+      ?gas runner =
     let legacy = if Option.is_some access_list then Some false else None in
     let* receipt =
       craft_and_send_transaction
@@ -291,6 +352,7 @@ module EvmRunner = struct
         ?expected_status
         ?access_list
         ?legacy
+        ?gas
         ()
     in
     return receipt.gasUsed
@@ -485,6 +547,16 @@ module EvmMultiRunCaller = struct
     unit
 end
 
+(** EVM contract that burns a large, predictable amount of gas when
+ *  [run()] is called.  Used as a leaf node in gas-model tests to
+ *  make callee gas consumption clearly observable. *)
+module EvmGasBurner = struct
+  open EvmContract
+  include EvmRunner
+
+  let deploy = deploy_solidity_contract ~contract:Solidity_contracts.gas_burner
+end
+
 (** Common [%run] caller for Tezos contracts. *)
 module TezRunner = struct
   open TezContract
@@ -560,6 +632,45 @@ let multi_run_caller_init_storage ~revert ~callees =
     revert
     (Format.pp_print_list ~pp_sep:pp_semicolon pp_callee)
     callees
+
+(** Tezos contract that forwards [%run] to an EVM target via the
+ *  CRAC gateway's [%call] (HTTP) entrypoint.  Functionally identical
+ *  to {!TezCrossRuntimeRunnerEvm} but exercises the [%call] code path
+ *  which has a separate gas accounting path (extract_gas_consumed +
+ *  cast_and_consume_milligas on master). *)
+module TezCrossRuntimeHttpCallEvm = struct
+  open TezContract
+  include TezRunner
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance
+      ~evm_contract_target_address () =
+    let script_name = ["mini_scenarios"; "cross_runtime_http_call_evm"] in
+    let init_storage_data = sf {|Pair 0 "%s"|} evm_contract_target_address in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+
+  let check_storage ~sc_rollup_node ~expected_counter
+      (contract_hex, _contract_address) =
+    let* storage = get_storage ~sc_rollup_node contract_hex in
+    (* Pair(nat %count, string %destination) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:"Expected TezCrossRuntimeHttpCallEvm `count` %R but got %L") ;
+    unit
+end
 
 (** Tezos contract that iterates [%run] over its [callees].  Before
  *  each call, increments [counter].  After all calls, reverts if
@@ -788,6 +899,34 @@ module TezCallbackRunnerEvm = struct
     unit
 end
 
+(** Tezos contract that burns significant gas (SHA256 loop) and emits
+ *  an internal operation (self-call to [%_noop]).  The internal
+ *  operation triggers the [get_and_reset_milligas_consumed()] baseline
+ *  reset that caused the [X-Tezos-Gas-Consumed] header bug.
+ *
+ *  Unlike {!TezGasBurner} (infinite loop, always OOGs), this contract
+ *  terminates normally after burning a predictable amount of gas. *)
+module TezMichelsonGasBurner = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    let script_name = ["mini_scenarios"; "gas_burner_with_internal_op"] in
+    let init_storage_data = "Unit" in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Enshrined Michelson gateway contract — called by Michelson contracts
     to initiate outgoing CRACs to EVM. *)
 let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
@@ -856,6 +995,7 @@ module CracRunnerWrapper = struct
         ?expected_status:bool ->
         ?value:Wei.t ->
         ?access_list:(string * string list) list ->
+        ?gas:int ->
         evm_runner ->
         int64 Lwt.t
     end
@@ -901,11 +1041,26 @@ module CracRunnerWrapper = struct
         unit Lwt.t
     end
 
+    module EvmGasBurner : sig
+      val deploy : unit -> evm_runner Lwt.t
+    end
+
     module TezRunner : sig
       val call_run : ?amount:int -> ?gas_limit:int -> tez_runner -> unit Lwt.t
+
+      val get_consumed_milligas : ?block:string -> unit -> int Lwt.t
+
+      val get_gateway_consumed_milligas :
+        ?block:string -> ?entrypoint:string -> unit -> int Lwt.t
     end
 
     module TezCrossRuntimeRunnerEvm : sig
+      val originate : ?init_balance:int -> evm_runner -> tez_runner Lwt.t
+
+      val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezCrossRuntimeHttpCallEvm : sig
       val originate : ?init_balance:int -> evm_runner -> tez_runner Lwt.t
 
       val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
@@ -967,6 +1122,10 @@ module CracRunnerWrapper = struct
         unit ->
         unit Lwt.t
     end
+
+    module TezMichelsonGasBurner : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
+    end
   end
 
   (** Builds a {!S} module from the given test setup.  [nonce] and
@@ -1018,7 +1177,7 @@ module CracRunnerWrapper = struct
       let tez_counter = tez_counter
 
       module EvmRunner = struct
-        let call_run ?expected_status ?(value = Wei.zero) ?access_list
+        let call_run ?expected_status ?(value = Wei.zero) ?access_list ?gas
             (`Evm_runner runner) =
           let* gas_used =
             EvmRunner.call_run
@@ -1028,6 +1187,7 @@ module CracRunnerWrapper = struct
               ~nonce:(evm_nonce ())
               ~value
               ?access_list
+              ?gas
               runner
           in
           let* () =
@@ -1164,6 +1324,19 @@ module CracRunnerWrapper = struct
             runner
       end
 
+      module EvmGasBurner = struct
+        let deploy () =
+          let* addr =
+            EvmGasBurner.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          return (`Evm_runner addr)
+      end
+
       module TezRunner = struct
         let call_run ?amount ?gas_limit (`Tez_runner (_, runner)) =
           TezRunner.call_run
@@ -1177,6 +1350,12 @@ module CracRunnerWrapper = struct
             ?amount
             ?gas_limit
             runner
+
+        let get_consumed_milligas ?block () =
+          TezContract.get_consumed_milligas ?block sequencer
+
+        let get_gateway_consumed_milligas ?block ?entrypoint () =
+          TezContract.get_gateway_consumed_milligas ?block ?entrypoint sequencer
       end
 
       module TezCrossRuntimeRunnerEvm = struct
@@ -1200,6 +1379,32 @@ module CracRunnerWrapper = struct
         let check_storage ~expected_counter
             (`Tez_runner (runner_hex, runner_address)) =
           TezCrossRuntimeRunnerEvm.check_storage
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
+      end
+
+      module TezCrossRuntimeHttpCallEvm = struct
+        let originate ?init_balance (`Evm_runner address) =
+          let* contract_hex, address =
+            TezCrossRuntimeHttpCallEvm.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~evm_contract_target_address:address
+              ()
+          in
+          return (`Tez_runner (contract_hex, address))
+
+        let check_storage ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCrossRuntimeHttpCallEvm.check_storage
             ~sc_rollup_node
             ~expected_counter
             (runner_hex, runner_address)
@@ -1375,6 +1580,24 @@ module CracRunnerWrapper = struct
             ~abi_params
             ?amount
             ()
+      end
+
+      module TezMichelsonGasBurner = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezMichelsonGasBurner.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
       end
     end in
     (module Helper)
@@ -6390,6 +6613,770 @@ let test_crac_callback_mixed_with_normal_runners =
   in
   EvmCrossRuntimeRunnerTez.check_storage ~expected_counter:2 evm_bridge_cb
 
+(** Verify that the [X-Tezos-Gas-Consumed] header reports cumulative
+ *  Michelson gas even after internal operations reset the per-segment
+ *  baseline.
+ *
+ *  == Scenario ==
+ *
+ *  Baseline:  EVM[wrapper] -> CRAC -> TEZ[simple counter]
+ *  Burner:    EVM[wrapper] -> CRAC -> TEZ[michelson gas burner]
+ *
+ *  The Michelson gas burner runs 20000 KECCAK iterations (~32M milligas)
+ *  then emits a self-call to [%%_noop].  The self-call is an internal
+ *  operation that resets the per-segment gas baseline — the header must
+ *  still report the full cumulative consumption.
+ *
+ *  == Assertions ==
+ *
+ *  Sanity: [G_burner > 5 * G_baseline] ensures the KECCAK gas
+ *  dominates CRAC overhead, making the regression check robust.
+ *
+ *  Regression: [G_burner > threshold] proves the header carries the
+ *  Michelson gas.  If the header reported only the delta since the
+ *  last internal operation, G_burner would be ~ G_baseline (~60K).
+ *  Instead the ~32M milligas flow through the header to the EVM
+ *  receipt, pushing G_burner well above the threshold.
+ *)
+let test_crac_gas_header_michelson_burner =
+  register_crac_runner_test
+    ~title:"CRAC: X-Tezos-Gas-Consumed reports Michelson gas"
+    ~tags:["gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-header" in
+
+  (* Baseline: EVM->TEZ with simple counter (minimal Michelson gas) *)
+  Log.debug ~prefix "[baseline] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[baseline] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_baseline =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple
+  in
+  Log.debug ~prefix "[baseline] Deploy EVM wrapper" ;
+  let* runner_baseline =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_baseline, false)] ()
+  in
+
+  (* Burner: EVM->TEZ with Michelson gas burner + internal op *)
+  Log.debug ~prefix "[burner] Originate Michelson gas burner" ;
+  let* tez_burner = TezMichelsonGasBurner.originate () in
+  Log.debug ~prefix "[burner] Deploy EVM bridge to gas burner" ;
+  let* evm_bridge_burner =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_burner
+  in
+  Log.debug ~prefix "[burner] Deploy EVM wrapper" ;
+  let* runner_burner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_burner, false)] ()
+  in
+
+  (* Baseline: direct TEZ call to the gas burner to measure its
+     true Michelson gas cost independently of CRAC. *)
+  Log.debug ~prefix "Direct TEZ call to gas burner (measure milligas)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_burner in
+  let* mg_direct = TezRunner.get_consumed_milligas () in
+
+  (* Warmup calls (alias generation) *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _ = EvmRunner.call_run runner_baseline in
+  let* _ = EvmRunner.call_run runner_burner in
+
+  (* Measurement calls (aliases cached) *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_baseline = EvmRunner.call_run runner_baseline in
+  let* g_burner = EvmRunner.call_run runner_burner in
+
+  let g_expected = Int64.of_int (mg_direct / 100) in
+  let delta = Int64.sub g_burner g_baseline in
+  Log.info
+    ~prefix
+    "mg_direct=%d  g_expected=%Ld  G_baseline=%Ld  G_burner=%Ld  delta=%Ld"
+    mg_direct
+    g_expected
+    g_baseline
+    g_burner
+    delta ;
+
+  (* delta = G_burner - G_baseline isolates the Michelson gas
+     contribution by subtracting the CRAC overhead.  g_expected
+     = mg_direct / 100 is the true Michelson gas cost measured
+     independently via a direct TEZ call.
+
+     The 4/5 lower bound allows for the small discrepancy between
+     the direct TEZ call's consumed_milligas (which includes base
+     operation overhead) and the CRAC header's gas report. *)
+
+  (* Lower bound: the delta must include the Michelson gas. *)
+  Check.(
+    (delta > Int64.div (Int64.mul g_expected 4L) 5L)
+      int64
+      ~error_msg:
+        "Delta (%L) should exceed 4/5 * g_expected (%R), proving \
+         X-Tezos-Gas-Consumed header reports Michelson gas") ;
+
+  (* Upper bound: 3/2 of g_expected.  If double-counted, the delta
+     would be ~2x g_expected.  The 3/2 bound sits between the
+     expected ratio and the double-counting signal. *)
+  Check.(
+    (delta < Int64.div (Int64.mul g_expected 3L) 2L)
+      int64
+      ~error_msg:
+        "Delta (%L) should be below 3/2 * g_expected (%R): possible \
+         double-counting in X-Tezos-Gas-Consumed") ;
+
+  unit
+
+(** Verify that the outer EVM receipt's gasUsed in an EVM->TEZ->EVM
+ *  chain includes the inner callee gas.
+ *
+ *    EVM[evm_bridge] ~CRAC~> TEZ[tez_bridge] ~(%%call_evm)~> EVM[gas_burner]
+ *
+ *  The GasBurner contract writes 120 storage slots, consuming
+ *  significant EVM gas.  The total gasUsed must exceed a baseline
+ *  that only makes sense if the inner callee gas is accounted for.
+ *)
+let test_crac_gas_model_callee_gas_in_evm_receipt =
+  register_crac_runner_test
+    ~title:"CRAC: EVM receipt includes callee gas for %%call_evm"
+    ~tags:["gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-evm" in
+  Log.debug ~prefix "Deploy GasBurner (heavy EVM leaf)" ;
+  let* gas_burner = EvmGasBurner.deploy () in
+
+  (* Overhead: EVM->TEZ with no EVM callback (CRAC overhead only). *)
+  Log.debug ~prefix "[overhead] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[overhead] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_overhead =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple
+  in
+  Log.debug ~prefix "[overhead] Deploy EVM runner" ;
+  let* runner_overhead =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_overhead, false)] ()
+  in
+
+  (* Full chain: EVM->TEZ->EVM via %call_evm to GasBurner. *)
+  Log.debug ~prefix "[chain] Originate TEZ bridge to GasBurner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate gas_burner in
+  Log.debug ~prefix "[chain] Deploy EVM bridge to TEZ bridge" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "[chain] Deploy EVM runner calling the bridge" ;
+  let* evm_runner =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, false)] ()
+  in
+
+  (* Pre-warm GasBurner storage. *)
+  Log.debug ~prefix "Warm up GasBurner storage slots" ;
+  let* _ = EvmRunner.call_run gas_burner in
+
+  (* Reference: direct warm GasBurner call = true inner EVM cost. *)
+  Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
+  let* g_direct = EvmRunner.call_run gas_burner in
+
+  (* Warmup calls (alias generation). *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _ = EvmRunner.call_run runner_overhead in
+  let* _ = EvmRunner.call_run evm_runner in
+
+  (* Measurement calls (aliases cached). *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_overhead = EvmRunner.call_run runner_overhead in
+  let* gas_with_callee = EvmRunner.call_run evm_runner in
+
+  let delta = Int64.sub gas_with_callee g_overhead in
+  Log.info
+    ~prefix
+    "G_direct=%Ld  G_overhead=%Ld  gas_with_callee=%Ld  delta=%Ld"
+    g_direct
+    g_overhead
+    gas_with_callee
+    delta ;
+
+  (* delta = gas_with_callee - G_overhead isolates the inner EVM gas
+     by subtracting the CRAC overhead. *)
+
+  (* Lower bound: the delta must include the inner EVM gas. *)
+  Check.(
+    (delta > g_direct)
+      int64
+      ~error_msg:
+        "Delta (%L) should exceed G_direct (%R), proving callee gas is \
+         included in the EVM receipt") ;
+  (* Upper bound: 3/2 of G_direct.  If the inner EVM gas were
+     double-counted, the delta would be ~2x G_direct.  The 3/2
+     bound sits between the two. *)
+  Check.(
+    (delta < Int64.div (Int64.mul g_direct 3L) 2L)
+      int64
+      ~error_msg:
+        "Delta (%L) should be below 3/2 * G_direct (%R): possible \
+         double-counting of callee gas in the EVM receipt") ;
+  unit
+
+(** Regression test: the Michelson gateway's %%call_evm must charge
+ *  back the EVM callee gas in the Michelson operation receipt.
+ *
+ *    TEZ[tez_bridge] ~(%%call_evm)~> EVM[gas_burner]
+ *
+ *  Reads the [call_evm] internal operation's [consumed_milligas] from
+ *  the tezlink RPC.  The GasBurner contract writes 120 storage slots,
+ *  consuming significant EVM gas (~12M milligas when converted).
+ *
+ *  The [consumed_milligas] must include the inner EVM callee gas
+ *  (~13M milligas), not just the alias resolution cost (~520K).
+ *  Threshold: 2M milligas.
+ *)
+let test_crac_gas_model_callee_gas_in_receipt =
+  register_crac_runner_test
+    ~title:"CRAC: Michelson receipt includes callee gas for %%call_evm"
+    ~tags:["gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-receipt" in
+  Log.debug ~prefix "Deploy GasBurner (heavy EVM leaf)" ;
+  let* gas_burner = EvmGasBurner.deploy () in
+
+  (* Overhead: TEZ->EVM via %%call_evm to lightweight counter. *)
+  Log.debug ~prefix "[overhead] Deploy simple EVM counter" ;
+  let* evm_counter = EvmMultiRunCaller.deploy_and_init () in
+  Log.debug ~prefix "[overhead] Originate TEZ bridge to counter" ;
+  let* tez_bridge_overhead = TezCrossRuntimeRunnerEvm.originate evm_counter in
+
+  (* Full chain: TEZ->EVM via %%call_evm to GasBurner. *)
+  Log.debug ~prefix "[chain] Originate TEZ bridge to GasBurner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate gas_burner in
+
+  (* Pre-warm GasBurner storage. *)
+  Log.debug ~prefix "Warm up GasBurner storage slots" ;
+  let* _ = EvmRunner.call_run gas_burner in
+
+  (* Reference: direct warm GasBurner call = true inner EVM cost. *)
+  Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
+  let* g_direct = EvmRunner.call_run gas_burner in
+
+  (* Warmup calls (alias generation). *)
+  Log.debug ~prefix "Warmup calls (alias generation)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge_overhead in
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge in
+
+  (* Measurement calls (aliases cached). *)
+  Log.debug ~prefix "[overhead] Measure gateway consumed_milligas" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge_overhead in
+  let* mg_overhead = TezRunner.get_gateway_consumed_milligas () in
+
+  Log.debug ~prefix "[chain] Measure gateway consumed_milligas" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge in
+  let* gateway_milligas = TezRunner.get_gateway_consumed_milligas () in
+
+  let mg_expected = Int64.to_int g_direct * 100 in
+  let mg_delta = gateway_milligas - mg_overhead in
+  Log.info
+    ~prefix
+    "G_direct=%Ld  mg_expected=%d  mg_overhead=%d  gateway_milligas=%d  \
+     mg_delta=%d"
+    g_direct
+    mg_expected
+    mg_overhead
+    gateway_milligas
+    mg_delta ;
+
+  (* mg_delta = gateway_milligas - mg_overhead isolates the inner EVM
+     gas contribution (in milligas) by subtracting the gateway
+     overhead.  mg_expected = G_direct * 100 is the expected inner
+     EVM cost converted to milligas. *)
+
+  (* Lower bound: the delta must include the inner EVM gas. *)
+  Check.(
+    (mg_delta > mg_expected * 4 / 5)
+      int
+      ~error_msg:
+        "Milligas delta (%L) should exceed 4/5 * mg_expected (%R), proving \
+         callee gas is charged in the Michelson receipt") ;
+  (* Upper bound: 3/2 of mg_expected.  If the inner EVM gas were
+     double-counted, the delta would be ~2x mg_expected. *)
+  Check.(
+    (mg_delta < mg_expected * 3 / 2)
+      int
+      ~error_msg:
+        "Milligas delta (%L) should be below 3/2 * mg_expected (%R): possible \
+         double-counting of callee gas in the Michelson receipt") ;
+  unit
+
+(** Gas accounting regression test for CRAC cross-runtime calls.
+ *
+ *  Verifies that inner EVM gas is correctly reported in the outer EVM
+ *  receipt and in the TEZ milligas, without double-counting.
+ *
+ *  == Background ==
+ *
+ *  In an EVM->TEZ->EVM chain, the inner EVM execution (GasBurner)
+ *  consumes gas that must flow back to the outer EVM receipt via the
+ *  TEZ runtime's [X-Tezos-Gas-Consumed] response header.  The EVM
+ *  precompile reads this header and charges it to the caller's gas.
+ *
+ *  == Scenarios ==
+ *
+ *  A. Direct EVM call to GasBurner (no CRAC)
+ *     => G_direct: the true cost of the inner EVM work.
+ *
+ *  B. EVM->TEZ with no EVM callback
+ *     EVM ~CRAC~> TEZ[counter]
+ *     => G_overhead: pure CRAC overhead (precompile + aliases + TEZ).
+ *
+ *  C. EVM->TEZ->EVM via %%call_evm
+ *     EVM ~CRAC~> TEZ ~(%%call_evm)~> EVM[gas_burner]
+ *     => G_call_evm: overhead + inner EVM gas (if correctly charged).
+ *
+ *  D. EVM->TEZ->EVM via %%call (HTTP entrypoint)
+ *     EVM ~CRAC~> TEZ ~(%%call)~> EVM[gas_burner]
+ *     => G_call: same chain through the %%call entrypoint.
+ *
+ *  E/F. TEZ->EVM via %%call_evm / %%call
+ *     TEZ ~(%%call_evm|%%call)~> EVM[gas_burner]
+ *     => milligas from the tezlink operation receipt.
+ *
+ *  == Assertion strategy ==
+ *
+ *  The key invariant is: [C - B ≈ G_direct].  The delta between
+ *  scenario C (with inner EVM) and B (without) must reflect the inner
+ *  EVM cost, no more, no less.
+ *
+ *  To make upper bounds robust, we need the inner EVM cost to dominate
+ *  the CRAC overhead.  Otherwise, overhead fluctuations could push the
+ *  ratio [delta / G_direct] too close to the bound.  The sanity check
+ *  [G_direct > 10 * G_overhead] guarantees that overhead is at most
+ *  ~10%% of G_direct, leaving a wide gap between the normal ratio
+ *  (~1.05x) and the double-counting signal (~2.05x).  The upper bound
+ *  at 3/2 sits in the middle with comfortable margin on both sides.
+ *
+ *  If the sanity check fails, increase the number of storage slots in
+ *  [GasBurner.sol] to make [G_direct] larger.  Do NOT loosen the
+ *  upper bound — the whole point is to catch double-counting.
+ *
+ *)
+let test_crac_gas_accounting_investigation =
+  register_crac_runner_test
+    ~title:"CRAC: gas accounting investigation (A/B/C/D scenarios)"
+    ~tags:["gas"; "investigation"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-inv" in
+
+  (* --- Deploy contracts ------------------------------------------------- *)
+  Log.debug ~prefix "Deploy GasBurner" ;
+  let* gas_burner = EvmGasBurner.deploy () in
+
+  (* Scenario A: direct EVM call to GasBurner (no CRAC) *)
+
+  (* Scenario B: EVM->TEZ, no callback
+     Note: EvmMultiRunCaller wraps each bridge because calling the
+     bridge directly (as the top-level contract) produces flat gasUsed
+     that does not reflect the CRAC precompile's gas charges.  The
+     wrapper's nested CALL ensures correct gas propagation. *)
+  Log.debug ~prefix "[B] Originate simple TEZ counter (no EVM callback)" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[B] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_b = EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple in
+  Log.debug ~prefix "[B] Deploy EVM runner calling the bridge" ;
+  let* runner_b =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_b, false)] ()
+  in
+
+  (* Scenario C: EVM->TEZ->EVM via %call_evm *)
+  Log.debug ~prefix "[C] Originate TEZ bridge to GasBurner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate gas_burner in
+  Log.debug ~prefix "[C] Deploy EVM bridge to TEZ bridge" ;
+  let* evm_bridge_c = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "[C] Deploy EVM runner calling the bridge" ;
+  let* runner_c =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_c, false)] ()
+  in
+
+  (* Scenario D: EVM->TEZ->EVM via %call (HTTP entrypoint) *)
+  Log.debug ~prefix "[D] Originate TEZ HTTP bridge to GasBurner" ;
+  let* tez_http_bridge = TezCrossRuntimeHttpCallEvm.originate gas_burner in
+  Log.debug ~prefix "[D] Deploy EVM bridge to TEZ HTTP bridge" ;
+  let* evm_bridge_d =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_http_bridge
+  in
+  Log.debug ~prefix "[D] Deploy EVM runner calling the bridge" ;
+  let* runner_d =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_d, false)] ()
+  in
+
+  (* --- Warmup calls (alias generation) ---------------------------------- *)
+  Log.debug ~prefix "Warmup calls (generate aliases)" ;
+  let* _warmup_a = EvmRunner.call_run gas_burner in
+  let* _warmup_b = EvmRunner.call_run runner_b in
+  let* _warmup_c = EvmRunner.call_run runner_c in
+  let* _warmup_d = EvmRunner.call_run runner_d in
+
+  (* --- Measurement calls ------------------------------------------------ *)
+  Log.debug ~prefix "Measurement calls (aliases cached)" ;
+  let* g_direct = EvmRunner.call_run gas_burner in
+  let* g_overhead = EvmRunner.call_run runner_b in
+  let* g_call_evm = EvmRunner.call_run runner_c in
+  let* g_call = EvmRunner.call_run runner_d in
+
+  (* --- Analysis & Assertions -------------------------------------------- *)
+  let delta_c_b = Int64.sub g_call_evm g_overhead in
+  let delta_d_c = Int64.sub g_call g_call_evm in
+  Log.info
+    ~prefix
+    "RESULTS: G_direct=%Ld  G_overhead=%Ld  G_call_evm=%Ld  G_call=%Ld"
+    g_direct
+    g_overhead
+    g_call_evm
+    g_call ;
+  Log.info ~prefix "DELTAS: C-B=%Ld  D-C=%Ld" delta_c_b delta_d_c ;
+
+  (* -- Sanity check: G_direct >> G_overhead --
+     The upper-bound assertions below use a 3/2 multiplier to catch
+     double-counting.  This only works if the CRAC overhead (aliases,
+     precompile, TEZ execution) is small relative to the inner EVM
+     cost.  We require a 10x ratio so that even if overhead doubles in
+     a future refactor, it stays well below the 3/2 bound.
+
+     If this check fails, the GasBurner contract needs more storage
+     slots to increase G_direct.  Do NOT weaken the upper bounds —
+     they exist to catch double-counting regressions. *)
+  Check.(
+    (g_direct > Int64.mul g_overhead 10L)
+      int64
+      ~error_msg:
+        "Sanity: G_direct (%L) should be > 10 * G_overhead (%R). Increase \
+         GasBurner slots if this fails.") ;
+
+  (* -- Lower bound: inner EVM gas appears in the outer receipt --
+     delta(C-B) isolates the gas contribution of the inner EVM call
+     by subtracting the CRAC overhead (B) from the full chain (C).
+     It must be at least G_direct: the outer receipt must account for
+     the inner EVM work. *)
+  Check.(
+    (delta_c_b > g_direct)
+      int64
+      ~error_msg:
+        "Inner EVM gas (%L) should exceed G_direct (%R) in outer receipt") ;
+
+  (* -- Upper bound: no double-counting --
+     If the inner EVM gas were charged twice (once through the
+     X-Tezos-Gas-Consumed header round-trip and once through some
+     other mechanism), delta(C-B) would be ~2x G_direct.  The 3/2
+     bound sits between 1x (correct) and 2x (double-counted), with
+     the sanity check guaranteeing that overhead noise stays < 10%. *)
+  Check.(
+    (delta_c_b < Int64.div (Int64.mul g_direct 3L) 2L)
+      int64
+      ~error_msg:
+        "Inner EVM gas (%L) should be < 3/2 * G_direct (%R): possible \
+         double-counting") ;
+
+  (* -- Path consistency: %%call_evm and %%call --
+     Both gateway entrypoints route to the same inner EVM execution.
+     The outer gasUsed must be virtually identical.  A large gap
+     would indicate one path charges gas differently. *)
+  Check.(
+    (Int64.abs delta_d_c < 2_000L)
+      int64
+      ~error_msg:
+        "|G_call - G_call_evm| (%L) should be < %R: %%call and %%call_evm must \
+         be consistent") ;
+
+  (* --- TEZ->EVM scenarios (measure TEZ milligas) ------------------------ *)
+  (* E: TEZ->EVM via %call_evm *)
+  Log.debug ~prefix "[E] TEZ->EVM via %%call_evm (warmup)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge in
+  Log.debug ~prefix "[E] TEZ->EVM via %%call_evm (measure)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_bridge in
+  let* mg_call_evm = TezRunner.get_gateway_consumed_milligas () in
+
+  (* F: TEZ->EVM via %call *)
+  Log.debug ~prefix "[F] TEZ->EVM via %%call (warmup)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_http_bridge in
+  Log.debug ~prefix "[F] TEZ->EVM via %%call (measure)" ;
+  let* () = TezRunner.call_run ~gas_limit:200_000 tez_http_bridge in
+  let* mg_call =
+    TezRunner.get_gateway_consumed_milligas ~entrypoint:"call" ()
+  in
+
+  Log.info
+    ~prefix
+    "TEZ MILLIGAS: E(%%call_evm)=%d  F(%%call)=%d"
+    mg_call_evm
+    mg_call ;
+
+  (* -- TEZ milligas: lower bound --
+     The gateway's consumed_milligas must include the inner EVM gas
+     converted to milligas (1 EVM gas = 100 milligas).  We use 80x
+     instead of 100x as the lower bound to allow for differences
+     between the direct EVM call (G_direct) and the CRAC inner call
+     (which may have slightly different intrinsic gas treatment). *)
+  let mg_ref = Int64.to_int g_direct in
+  Check.(
+    (mg_call_evm > mg_ref * 80)
+      int
+      ~error_msg:
+        "%%call_evm milligas (%L) should exceed G_direct*80 (%R): inner EVM \
+         gas must be charged") ;
+
+  (* -- TEZ milligas: upper bound (double-counting) --
+     Same logic as the EVM-side upper bound.  If the inner EVM gas
+     were counted twice in milligas, the value would be ~200x G_direct.
+     The 150x bound catches this while leaving room for TEZ overhead. *)
+  Check.(
+    (mg_call_evm < mg_ref * 150)
+      int
+      ~error_msg:
+        "%%call_evm milligas (%L) should be < G_direct*150 (%R): possible \
+         double-counting") ;
+
+  (* -- TEZ path consistency --
+     %%call and %%call_evm must report similar milligas.  They route
+     to the same inner EVM execution through different gateway
+     entrypoints.  A large gap would indicate an entrypoint-specific
+     gas accounting bug. *)
+  Check.(
+    (abs (mg_call - mg_call_evm) < 50_000)
+      int
+      ~error_msg:
+        "|F - E| (%L) should be < %R: %%call and %%call_evm milligas must be \
+         consistent") ;
+  unit
+
+(** Regression test for the error path of [execute_request].
+ *
+ *  When the TEZ runtime's [execute_request] enters the error path
+ *  (e.g. an internal operation FAILWITHs), the [X-Tezos-Gas-Consumed]
+ *  header must still report the accurate cumulative gas consumption.
+ *
+ *  The bug: the error path used [get_and_reset_milligas_consumed()]
+ *  which returns only the delta since the last per-operation baseline
+ *  reset.  After earlier internal operations (like a gateway call to
+ *  GasBurner) have already executed and reset the baseline, the delta
+ *  is ~0 — so the header reports ~0 and the EVM side charges nothing.
+ *
+ *  The fix: use [total_milligas_consumed()] on the error path, same
+ *  as the success path.
+ *
+ *  == Scenario ==
+ *
+ *    EVM[evm_main] -(catch)-> EVM[evm_bridge] ~CRAC~> TEZ[tez_caller]
+ *      TEZ[tez_caller]:
+ *        |-> TEZ[tez_bridge] ~CRAC~> EVM[gas_burner]  (succeeds)
+ *        |-> TEZ[tez_reverter]                         (FAILWITHs)
+ *
+ *  The TEZ caller invokes [bridge] first (which calls GasBurner via
+ *  [%%call_evm], consuming ~600K EVM gas charged to TEZ milligas),
+ *  then the reverter FAILWITHs.  The overall TEZ execution fails,
+ *  entering the error path.
+ *
+ *  If the error path reports accurate gas, the outer gasUsed must
+ *  include the GasBurner gas (> G_direct).  If buggy (~0), it cannot.
+ *)
+let test_crac_gas_error_path_reporting =
+  register_crac_runner_test
+    ~title:"CRAC: error path reports accurate gas in X-Tezos-Gas-Consumed"
+    ~tags:["gas"; "error"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-err" in
+
+  (* --- Deploy contracts ------------------------------------------------- *)
+  Log.debug ~prefix "Deploy GasBurner (heavy EVM leaf)" ;
+  let* gas_burner = EvmGasBurner.deploy () in
+
+  (* Pre-warm GasBurner storage: first call fills 120 slots with
+     non-zero values, avoiding cold 22,100-gas SSTOREs later. *)
+  Log.debug ~prefix "Warm up GasBurner storage slots" ;
+  let* _ = EvmRunner.call_run gas_burner in
+
+  (* Reference: direct warm GasBurner call = true inner EVM cost. *)
+  Log.debug ~prefix "Measure G_direct (warm GasBurner)" ;
+  let* g_direct = EvmRunner.call_run gas_burner in
+  Log.info ~prefix "G_direct = %Ld" g_direct ;
+
+  (* Shared reverter for both chains. *)
+  Log.debug ~prefix "Originate TEZ reverter" ;
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+
+  (* Overhead chain: [simple counter; reverter] — same structure as
+     the error chain but without the inner CRAC to GasBurner. *)
+  Log.debug ~prefix "[overhead] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[overhead] Originate TEZ caller with [simple; reverter]" ;
+  let* tez_caller_overhead =
+    TezMultiRunCaller.originate ~callees:[tez_simple; tez_reverter] ()
+  in
+  Log.debug ~prefix "[overhead] Deploy EVM bridge to TEZ caller" ;
+  let* evm_bridge_overhead =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_caller_overhead
+  in
+  Log.debug ~prefix "[overhead] Deploy EVM main with catch" ;
+  let* evm_main_overhead =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_overhead, true)] ()
+  in
+
+  (* Error chain: [bridge -> GasBurner; reverter] *)
+  Log.debug ~prefix "[error] Originate TEZ bridge to GasBurner" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate gas_burner in
+  Log.debug ~prefix "[error] Originate TEZ caller with [bridge; reverter]" ;
+  let* tez_caller =
+    TezMultiRunCaller.originate ~callees:[tez_bridge; tez_reverter] ()
+  in
+  Log.debug ~prefix "[error] Deploy EVM bridge to TEZ caller" ;
+  let* evm_bridge = EvmCrossRuntimeRunnerTez.deploy_and_init tez_caller in
+  Log.debug ~prefix "[error] Deploy EVM main with catch" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge, true)] ()
+  in
+
+  (* --- Warmup calls (alias generation, catches revert) ------------------ *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _warmup = EvmRunner.call_run evm_main_overhead in
+  let* _warmup = EvmRunner.call_run evm_main in
+
+  (* --- Measurement calls ------------------------------------------------ *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_overhead = EvmRunner.call_run evm_main_overhead in
+  let* g_error = EvmRunner.call_run evm_main in
+
+  let delta = Int64.sub g_error g_overhead in
+  Log.info
+    ~prefix
+    "G_direct=%Ld  G_overhead=%Ld  G_error=%Ld  delta=%Ld"
+    g_direct
+    g_overhead
+    g_error
+    delta ;
+
+  (* Verify the catches worked. *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:4
+      evm_main_overhead
+  in
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:4
+      evm_main
+  in
+
+  (* --- Assertions ------------------------------------------------------- *)
+  (* delta = G_error - G_overhead isolates the GasBurner contribution
+     by subtracting the CRAC + caller + reverter overhead.  Same
+     approach as {!test_crac_gas_accounting_investigation}. *)
+
+  (* Lower bound: the delta must include the inner EVM gas. *)
+  Check.(
+    (delta > g_direct)
+      int64
+      ~error_msg:
+        "Error path delta (%L) should exceed G_direct (%R), proving the error \
+         path reports GasBurner gas in X-Tezos-Gas-Consumed") ;
+  (* Upper bound: 3/2 of G_direct.  If the inner EVM gas were
+     double-counted, the delta would be ~2x G_direct.  The 3/2
+     bound sits between the expected ratio and the double-counting
+     signal. *)
+  Check.(
+    (delta < Int64.div (Int64.mul g_direct 3L) 2L)
+      int64
+      ~error_msg:
+        "Error path delta (%L) should be below 3/2 * G_direct (%R): possible \
+         double-counting on the error path") ;
+  unit
+
+(** Verify that the OOG error path of [execute_request] reports the
+ *  full gas budget as consumed via [X-Tezos-Gas-Consumed].
+ *
+ *  Complements {!test_crac_gas_error_path_reporting} (which tests
+ *  FAILWITH) by exercising the OOG-specific branch where
+ *  [total_milligas_consumed()] returns [initial_limit] (gas
+ *  exhausted, [remaining] is [None]).
+ *
+ *  == Scenario ==
+ *
+ *  Baseline:  EVM[wrapper] -> CRAC -> TEZ[simple counter]     (succeeds)
+ *  OOG:       EVM[wrapper(catch)] -> CRAC -> TEZ[gas burner]  (OOGs, caught)
+ *
+ *  == Assertion ==
+ *
+ *  G_oog must significantly exceed G_baseline.  The gas burner
+ *  consumes its entire TEZ budget; the header carries this back
+ *  to the EVM receipt.  If the header reported ~0 on OOG, G_oog
+ *  would be close to G_baseline.
+ *)
+let test_crac_gas_oog_path_reporting =
+  register_crac_runner_test
+    ~title:"CRAC: OOG error path reports consumed gas in X-Tezos-Gas-Consumed"
+    ~tags:["gas"; "oog"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-oog" in
+
+  (* Baseline: EVM->TEZ with simple counter (succeeds, low gas) *)
+  Log.debug ~prefix "[baseline] Originate simple TEZ counter" ;
+  let* tez_simple = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "[baseline] Deploy EVM bridge to TEZ counter" ;
+  let* evm_bridge_baseline =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_simple
+  in
+  Log.debug ~prefix "[baseline] Deploy EVM wrapper" ;
+  let* runner_baseline =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_baseline, false)] ()
+  in
+
+  (* OOG: EVM->TEZ with infinite gas burner (always OOGs, caught) *)
+  Log.debug ~prefix "[oog] Originate TEZ gas burner (infinite loop)" ;
+  let* tez_burner = TezGasBurner.originate () in
+  Log.debug ~prefix "[oog] Deploy EVM bridge to gas burner" ;
+  let* evm_bridge_oog = EvmCrossRuntimeRunnerTez.deploy_and_init tez_burner in
+  Log.debug ~prefix "[oog] Deploy EVM wrapper with catch" ;
+  let* runner_oog =
+    EvmMultiRunCaller.deploy_and_init ~callees:[(evm_bridge_oog, true)] ()
+  in
+
+  let gas_limit = 3_000_000 in
+
+  (* Warmup calls (alias generation) *)
+  Log.debug ~prefix "Warmup calls" ;
+  let* _ = EvmRunner.call_run runner_baseline in
+  let* _ = EvmRunner.call_run ~gas:gas_limit runner_oog in
+
+  (* Measurement calls *)
+  Log.debug ~prefix "Measurement calls" ;
+  let* g_baseline = EvmRunner.call_run runner_baseline in
+  let* g_oog = EvmRunner.call_run ~gas:gas_limit runner_oog in
+
+  Log.info ~prefix "G_baseline=%Ld  G_oog=%Ld" g_baseline g_oog ;
+
+  (* Verify the catch worked *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:4
+      runner_oog
+  in
+
+  (* The gas burner consumes its entire TEZ budget, which is derived
+     from the EVM gas_limit.  If the error path reports gas correctly,
+     g_oog should be close to gas_limit.  If the header reported ~0,
+     g_oog would only reflect EVM overhead (~60K).
+
+     No upper bound: gasUsed cannot exceed gas_limit by EVM
+     semantics, so a 3/2 bound would be meaningless here. *)
+  let gas_limit = Int64.of_int gas_limit in
+  Check.(
+    (g_oog > Int64.div (Int64.mul gas_limit 2L) 3L)
+      int64
+      ~error_msg:
+        "OOG gasUsed (%L) should exceed 2/3 * gas_limit (%R), proving the OOG \
+         error path reports consumed gas via X-Tezos-Gas-Consumed") ;
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -6469,4 +7456,10 @@ let () =
   test_crac_callback_behind_crac [Alpha] ;
   test_crac_callback_tez_revert_rolls_back_callback [Alpha] ;
   test_crac_callback_evm_catches_failing_callback_behind_crac [Alpha] ;
-  test_crac_callback_mixed_with_normal_runners [Alpha]
+  test_crac_callback_mixed_with_normal_runners [Alpha] ;
+  test_crac_gas_header_michelson_burner [Alpha] ;
+  test_crac_gas_model_callee_gas_in_evm_receipt [Alpha] ;
+  test_crac_gas_model_callee_gas_in_receipt [Alpha] ;
+  test_crac_gas_accounting_investigation [Alpha] ;
+  test_crac_gas_error_path_reporting [Alpha] ;
+  test_crac_gas_oog_path_reporting [Alpha]

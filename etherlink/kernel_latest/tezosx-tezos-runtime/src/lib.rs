@@ -490,10 +490,7 @@ where
             // Report consumed gas even on failure so the caller doesn't
             // see u64::MAX (which would exhaust the EVM gas budget and
             // prevent try/catch from working).
-            *consumed_milligas = gas
-                .get_and_reset_milligas_consumed()
-                .map(|n| n.0.try_into().unwrap_or(u64::MAX))
-                .unwrap_or(u64::MAX);
+            *consumed_milligas = gas.total_milligas_consumed().into();
 
             // Map CracError to the TezosXRuntimeError HTTP status bearing equivalent.
             // User-facing errors become 400/429 (catchable revert).
@@ -573,15 +570,7 @@ where
         }
     };
 
-    *consumed_milligas = gas
-        .get_and_reset_milligas_consumed()
-        .map_err(|_| TezosXRuntimeError::OutOfGas)?
-        .0
-        .clone()
-        .try_into()
-        .map_err(|_| {
-            TezosXRuntimeError::Custom("consumed milligas overflows u64".to_string())
-        })?;
+    *consumed_milligas = gas.total_milligas_consumed().into();
 
     // For cross-runtime calls (CRAC), build the two-step receipt
     // structure per RFC: CRAC Derived Block Contents and store it
