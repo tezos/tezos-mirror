@@ -3950,20 +3950,18 @@ let test_mempool_filter_fields =
    With defaults (base_fee_per_gas = 10^9, multiplier = 10):
      execution_gas_fees = gas_to_mutez(10^9, 10, 10_000) = 100 mutez. *)
 
-let gas_refund_endpoint sequencer = tezlink_endpoint_from_evm_node sequencer
-
-let gas_refund_balance ~endpoint client =
-  Client.get_balance_for
-    ~endpoint
-    ~account:Constant.bootstrap1.public_key_hash
-    client
-
 (** Execute [f], produce a block, return mutez consumed by bootstrap1. *)
 let gas_refund_measure_consumed ~endpoint ~sequencer client f =
-  let* before = gas_refund_balance ~endpoint client in
+  let balance client =
+    Client.get_balance_for
+      ~endpoint
+      ~account:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let* before = balance client in
   let* () = f () in
   let*@ _ = Rpc.produce_block sequencer in
-  let* after = gas_refund_balance ~endpoint client in
+  let* after = balance client in
   Check.((Tez.to_mutez before >= Tez.to_mutez after) int)
     ~error_msg:"balance increased unexpectedly (before=%L, after=%R)" ;
   return (Tez.to_mutez before - Tez.to_mutez after)
@@ -4007,7 +4005,7 @@ let test_gas_refund_on_transfer ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} _protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let amount = Tez.one in
   let fee = Tez.one in
   let gas_limit = 10_000 in
@@ -4050,7 +4048,7 @@ let test_gas_refund_on_failwith ~enable_refund =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:enable_refund
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
@@ -4105,7 +4103,7 @@ let test_gas_refund_on_out_of_gas =
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~enable_michelson_gas_refund:true
   @@ fun {sequencer; client; _} protocol ->
-  let endpoint = gas_refund_endpoint sequencer in
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* contract =
     gas_refund_originate
       ~endpoint
