@@ -1510,6 +1510,99 @@ let test_cross_runtime_transfer_to_evm =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
+(** Same as [test_cross_runtime_transfer_to_evm] but using the generic
+    %call entrypoint instead of %default. Verifies that value transfer
+    works through the %call path (HTTP POST to the EVM runtime) and
+    that the gateway balance is zeroed after forwarding. *)
+let test_cross_runtime_transfer_to_evm_via_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime transfer from Tezos to EVM via gateway %call"
+    ~tags:["cross_runtime"; "transfer"; "call"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup _protocol ->
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let amount = Tez.of_int 100 in
+  let amount_mutez = Tez.to_mutez amount in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address:setup.sc_rollup_address
+      ~sc_rollup_node:setup.sc_rollup_node
+      ~client:setup.client
+      ~l1_contracts:setup.l1_contracts
+      ~sequencer:setup.sequencer
+      ~source:Constant.bootstrap1
+      ~counter:1
+      ~dest:gateway_address
+      ~entrypoint:"call"
+      ~amount:amount_mutez
+      ~arg_data:
+        (sf
+           {|Pair "http://ethereum/%s" (Pair {} (Pair 0x (Pair 1 None)))|}
+           evm_destination)
+      ()
+  in
+  (* Check the EVM balance of the destination. *)
+  let*@ balance = Rpc.get_balance ~address:evm_destination setup.sequencer in
+  let expected_balance = Wei.of_tez amount in
+  Check.(
+    (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  (* Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client setup.sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
+(** Same as [test_cross_runtime_transfer_to_evm] but using the
+    %call_evm entrypoint with an empty calldata instead of %default.
+    Verifies that value transfer works through %call_evm and that the
+    gateway balance is zeroed after forwarding. *)
+let test_cross_runtime_transfer_to_evm_via_call_evm =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime transfer from Tezos to EVM via gateway %call_evm"
+    ~tags:["cross_runtime"; "transfer"; "call_evm"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup _protocol ->
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let amount = Tez.of_int 100 in
+  let amount_mutez = Tez.to_mutez amount in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address:setup.sc_rollup_address
+      ~sc_rollup_node:setup.sc_rollup_node
+      ~client:setup.client
+      ~l1_contracts:setup.l1_contracts
+      ~sequencer:setup.sequencer
+      ~source:Constant.bootstrap1
+      ~counter:1
+      ~dest:gateway_address
+      ~entrypoint:"call_evm"
+      ~amount:amount_mutez
+      ~arg_data:(sf {|Pair "%s" (Pair "" (Pair 0x None))|} evm_destination)
+      ()
+  in
+  (* Check the EVM balance of the destination. *)
+  let*@ balance = Rpc.get_balance ~address:evm_destination setup.sequencer in
+  let expected_balance = Wei.of_tez amount in
+  Check.(
+    (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  (* Check that the gateway did not retain any funds. *)
+  let* tez_client = tezos_client setup.sequencer in
+  let* gateway_balance =
+    Client.get_balance_for ~account:gateway_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance 0 but got %L") ;
+  unit
+
 (* This test exercises nested cross-runtime calls:
      Tezos Runtime (tz1 transfer) -> EVM Runtime (CRAC contract) -> Tezos Runtime (KT1 destination).
      The goal is to see a modification in the storage of the KT1 destination in the Tezos runtime. *)
@@ -3644,6 +3737,8 @@ let () =
   test_transfer [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
   test_cross_runtime_transfer_to_evm [Alpha] ;
+  test_cross_runtime_transfer_to_evm_via_call [Alpha] ;
+  test_cross_runtime_transfer_to_evm_via_call_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_cross_runtime_call_failwith [Alpha] ;
