@@ -1193,13 +1193,9 @@ let test_dal_node_invalid_config ~__FILE__ () =
    fun dal_node ->
     Process.spawn
       (Dal_node.path dal_node)
-      [
-        "run";
-        "--data-dir";
-        Dal_node.data_dir dal_node;
-        "--config-file";
-        config_file;
-      ]
+      ((if Dal_node.use_baker_to_start_dal_node then ["dal"; "run"] else ["run"])
+      @ ["--data-dir"; Dal_node.data_dir dal_node; "--config-file"; config_file]
+      )
   in
   let* () =
     (* running on malformed json fails *)

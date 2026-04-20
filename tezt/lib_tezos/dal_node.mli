@@ -137,6 +137,10 @@ val pid : t -> int option
 (** Return the path of the daemon. *)
 val path : t -> string
 
+(** Whether the baker should be used to start the DAL node, as determined by the
+    [TZ_SCHEDULE_KIND] environment variable, evaluated at compile time. *)
+val use_baker_to_start_dal_node : bool
+
 (** Send SIGTERM and wait for the process to terminate.
 
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)

@@ -472,6 +472,15 @@ module Dal = struct
         ~prefix:"init"
         Cli.Action.config_init
     in
+    let config_reset =
+      mk_config_command
+        ~desc:
+          "This command replaces the existing configuration file in the \
+           specified or default location with the parameters provided on the \
+           command-line. This configuration is then used by the run command."
+        ~prefix:"reset"
+        Cli.Action.config_reset
+    in
     let config_update =
       mk_config_command
         ~desc:
@@ -484,6 +493,7 @@ module Dal = struct
     [
       run;
       config_init;
+      config_reset;
       config_update;
       snapshot_export;
       snapshot_import;

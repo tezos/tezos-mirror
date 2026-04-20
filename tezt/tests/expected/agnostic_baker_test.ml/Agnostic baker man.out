@@ -194,6 +194,11 @@ Commands related to the DAL daemon.:
     location. Otherwise, the command-line parameters override the existing ones, and old
     parameters are lost. This configuration is then used by the run command.
   
+  dal config reset 
+    This command replaces the existing configuration file in the specified or default location
+    with the parameters provided on the command-line. This configuration is then used by the
+    run command.
+  
   dal config update 
     This command updates the configuration file with the parameters provided on the
     command-line. If no configuration file exists already, the command will fail.

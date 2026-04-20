@@ -76,9 +76,8 @@ let check_error ?exit_code ?msg dal_node =
 
 let use_baker_to_start_dal_node =
   match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
-  | Some "EXTENDED_DAL_USE_BAKER" -> Some true
-  | Some _ -> Some false
-  | _ -> None
+  | Some "EXTENDED_DAL_USE_BAKER" -> true
+  | _ -> false
 
 let wait dal_node =
   match dal_node.status with
@@ -140,8 +139,7 @@ let spawn_config_init_or_reset ~subcommand ?(expected_pow = 0.) ?(peers = [])
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
   spawn_command dal_node
-  @@ (if use_baker_to_start_dal_node = Some true then ["dal"; "config"]
-      else ["config"])
+  @@ (if use_baker_to_start_dal_node then ["dal"; "config"] else ["config"])
   @ [
       subcommand;
       "--data-dir";
@@ -197,8 +195,7 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
   spawn_command dal_node
-  @@ (if use_baker_to_start_dal_node = Some true then
-        ["dal"; "config"; "update"]
+  @@ (if use_baker_to_start_dal_node then ["dal"; "config"; "update"]
       else ["config"; "update"])
   @ [
       "--data-dir";
@@ -400,7 +397,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
     Option.value
       path
       ~default:
-        (if use_baker_to_start_dal_node = Some true then
+        (if use_baker_to_start_dal_node then
            Uses.path Constant.octez_agnostic_baker
          else Uses.path Constant.octez_dal_node)
   in
@@ -527,8 +524,7 @@ let run ?env ?event_level node =
     ?env
     ?event_level
     node
-    ((if use_baker_to_start_dal_node = Some true then ["dal"; "run"]
-      else ["run"])
+    ((if use_baker_to_start_dal_node then ["dal"; "run"] else ["run"])
     @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
 
 let run ?(wait_ready = true) ?env ?event_level node =
@@ -584,14 +580,14 @@ let load_last_finalized_processed_level dal_node =
 
 let debug_print_store_schemas ?path ?hooks () =
   let args =
-    (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    (if use_baker_to_start_dal_node then ["dal"] else [])
     @ ["debug"; "print"; "store"; "schemas"]
   in
   let path =
     Option.value
       path
       ~default:
-        (if use_baker_to_start_dal_node = Some true then
+        (if use_baker_to_start_dal_node then
            Uses.path Constant.octez_agnostic_baker
          else Uses.path Constant.octez_dal_node)
   in
@@ -623,13 +619,12 @@ let spawn_snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
         ["--slots"; String.concat "," (List.map string_of_int indices)]
   in
   let args =
-    (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    (if use_baker_to_start_dal_node then ["dal"] else [])
     @ ["snapshot"; cmd] @ ["--data-dir"; data_dir] @ endpoint_args
     @ min_level_args @ max_level_args @ slot_args @ extra @ [output_file]
   in
   let path =
-    if use_baker_to_start_dal_node = Some true then
-      Uses.path Constant.octez_agnostic_baker
+    if use_baker_to_start_dal_node then Uses.path Constant.octez_agnostic_baker
     else Uses.path Constant.octez_dal_node
   in
   Process.spawn path args
