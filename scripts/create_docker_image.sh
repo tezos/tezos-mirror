@@ -25,6 +25,7 @@ rust_toolchain_image_name="us-central1-docker.pkg.dev/nl-gitlab-runner/protected
 rust_toolchain_image_tag="master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
+sccache_bucket=""
 
 # usage and help
 usage() {
@@ -42,6 +43,7 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
+  [--sccache-bucket <BUCKET> ]
 
 DESCRIPTION
     Builds the Octez Docker distribution.
@@ -125,6 +127,12 @@ OPTIONS
         --commit-tag COMMIT_TAG
             Git tags for the Octez version string.
 
+    Compilation cache
+        --sccache-bucket BUCKET
+            GCS bucket for sccache Rust compilation caching. When set,
+            RUSTC_WRAPPER=sccache is activated in build.Dockerfile,
+            caching Rust artifacts in GCS across builds.
+
 CURRENT VALUES
     IMAGE_NAME: $image_name
     IMAGE_VERSION: $image_version
@@ -138,6 +146,7 @@ CURRENT VALUES
     COMMIT_SHORT_SHA: $commit_short_sha
     COMMIT_DATETIME: $commit_datetime
     COMMIT_TAG: $commit_tag
+    SCCACHE_BUCKET: $sccache_bucket
 
 SEE ALSO
     For more information, see 'images/README.md' and
@@ -146,7 +155,7 @@ EOF
 }
 
 options=$(getopt -o h \
-  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag: -- "$@")
+  -l help,image-name:,image-version:,ci-image-name:,ci-image-version:,executables:,commit-short-sha:,variants:,docker-target:,rust-toolchain-image-name:,rust-toolchain-image-tag:,commit-datetime:,commit-tag:,sccache-bucket: -- "$@")
 eval set - "$options"
 # parse options and flags
 while true; do
@@ -208,6 +217,10 @@ while true; do
   --commit-tag)
     shift
     commit_tag="$1"
+    ;;
+  --sccache-bucket)
+    shift
+    sccache_bucket="$1"
     ;;
   -h | --help)
     usage
@@ -274,6 +287,8 @@ docker buildx build \
   --build-arg "GIT_VERSION=${commit_tag}" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
+  ${sccache_bucket:+--build-arg "SCCACHE_GCS_BUCKET=${sccache_bucket}"} \
+  ${sccache_bucket:+--allow network.host} \
   --target "$docker_target" \
   --tag "$build_image_name:$image_version" \
   -f build.Dockerfile \
