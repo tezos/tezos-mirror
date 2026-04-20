@@ -220,8 +220,6 @@ let check_publish_crosses_migration ctxt ~published_level =
       else return_false
 
 module Tests = struct
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8249
-     Fails at protocol migration *)
   let publish_slot_using_client ctxt cctxt block_level slot_index secret_key
       slot_content (module Plugin : Dal_plugin.T) =
     let open Lwt_result_syntax in

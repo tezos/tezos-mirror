@@ -157,7 +157,7 @@ let () =
 (* Say that [plugins = [(level_1, plugin_1); ... ; (level_n, plugin_n)]]. We
    have [level_1 > ... > level_n]. We return the plugin [plugin_i] with the
    smallest [i] such that [level_i <= level]. *)
-let get_plugin_and_parameters_for_level plugins ~level =
+let find_for_level plugins ~level =
   let open Result_syntax in
   let plugin_opt =
     Plugins.LevelMap.to_seq plugins
@@ -165,8 +165,17 @@ let get_plugin_and_parameters_for_level plugins ~level =
   in
   match plugin_opt with
   | None -> tzfail @@ No_plugin_for_level {level}
-  | Some (_first_level, Plugins.{plugin; proto_level = _; proto_parameters}) ->
-      return (plugin, proto_parameters)
+  | Some (_first_level, proto_plugin) -> return proto_plugin
+
+let get_plugin_and_parameters_for_level plugins ~level =
+  let open Result_syntax in
+  let* Plugins.{plugin; proto_parameters; _} = find_for_level plugins ~level in
+  return (plugin, proto_parameters)
+
+let get_proto_level_for_level plugins ~level =
+  let open Result_syntax in
+  let* Plugins.{proto_level; _} = find_for_level plugins ~level in
+  return proto_level
 
 include Plugins
 
