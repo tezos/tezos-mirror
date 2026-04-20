@@ -93,7 +93,6 @@ let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
     ?additional_uses
     ?rollup_history_mode
     ~enable_dal:false
-    ~enable_multichain:false
     ~title:(title ^ " in eth_call and eth_estimateGas")
     ~tags:(tags @ ["evm"; "state_override"; "eth_call"; "eth_estimategas"])
     body

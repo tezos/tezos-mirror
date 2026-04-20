@@ -121,9 +121,6 @@ val reveal_config : Kernel.t -> path
 (** [enable_fa_bridge] is the path to the feature flag to activate the FA bridge. *)
 val enable_fa_bridge : Kernel.t -> path
 
-(** [enable_multichain] is the path to the feature flag to activate multichain functions *)
-val enable_multichain : Kernel.t -> path
-
 (** [enable_fast_withdrawal] is the path to the feature flag to activate fast withdrawals. *)
 val enable_fast_withdrawal : Kernel.t -> path
 

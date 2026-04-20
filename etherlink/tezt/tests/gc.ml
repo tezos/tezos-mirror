@@ -449,7 +449,6 @@ let test_seed_history_mode_gc_with_deposit =
     ~time_between_blocks:Nothing
     ~history_mode:(Seed retention_period)
     ~use_dal:Register_without_feature
-    ~use_multichain:Register_without_feature
   @@
   fun {sequencer; sc_rollup_node; client; l1_contracts; sc_rollup_address; _}
       _protocol

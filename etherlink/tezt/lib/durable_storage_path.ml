@@ -127,11 +127,6 @@ let enable_fa_bridge = function
   | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
       evm "/feature_flags/enable_fa_bridge"
 
-let enable_multichain = function
-  | Kernel.Latest -> base "/feature_flags/enable_multichain"
-  | Kernel.Mainnet | Kernel.Tezlink_shadownet ->
-      evm "/feature_flags/enable_multichain"
-
 let enable_fast_withdrawal = function
   | Kernel.Latest -> base "/feature_flags/enable_fast_withdrawal"
   | Kernel.Mainnet | Kernel.Tezlink_shadownet ->

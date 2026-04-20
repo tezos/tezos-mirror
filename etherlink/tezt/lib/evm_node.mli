@@ -203,7 +203,6 @@ type kernel_setup = {
   disable_legacy_dal_signals : bool option;
   enable_fast_withdrawal : bool option;
   enable_fast_fa_withdrawal : bool option;
-  enable_multichain : bool option;
   enable_michelson_gas_refund : bool option;
   evm_version : Evm_version.t option;
   with_runtimes : Tezosx_runtime.t list option;
@@ -254,7 +253,6 @@ val make_kernel_setup :
   ?disable_legacy_dal_signals:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
-  ?enable_multichain:bool ->
   ?enable_michelson_gas_refund:bool ->
   ?evm_version:Evm_version.t ->
   ?with_runtimes:Tezosx_runtime.t list ->

@@ -456,7 +456,7 @@ let _etherlink_tezts =
       "dal_sequencer";
       "eth_call";
       "gc";
-      "tezlink";
+      "michelson_runtime";
       "preconfirmation";
       "tezosx";
       "dev_commands";

@@ -694,7 +694,6 @@ let test_patch_state =
     ~__FILE__
     ~kernel:Kernel.Latest
     ~enable_dal:false
-    ~enable_multichain:false
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
@@ -872,33 +871,16 @@ let test_snapshots_import_empty ~desync =
          (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
-  @@
-  fun ({sequencer; sc_rollup_node = _; l2_chains; enable_multichain; _} as setup)
-      _protocol
-    ->
+  @@ fun ({sequencer; sc_rollup_node = _; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup ~desync setup
   in
   Log.info "Create new sequencer from snapshot." ;
-  (* patch sequencer config if multichain *)
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer in
-    Evm_node.create ~node_setup:(Evm_node.make_setup ?spawn_rpc ()) ~mode ()
+    Evm_node.create ~node_setup:(Evm_node.make_setup ()) ~mode ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update new_sequencer patch_config
-    | false -> unit
-  in
   let*! () = Evm_node.import_snapshot ~desync new_sequencer ~snapshot_file in
   Log.info "Start new sequencer." ;
   let* () = Evm_node.run new_sequencer in
@@ -2337,16 +2319,7 @@ let test_delayed_deposit_from_init_rollup_node =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
     ~title:"Delayed inbox is populated at init from rollup node"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
@@ -2377,26 +2350,13 @@ let test_delayed_deposit_from_init_rollup_node =
 
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
-      ~node_setup:(Evm_node.make_setup ?spawn_rpc ())
+      ~node_setup:(Evm_node.make_setup ())
       ~mode:(Evm_node.mode sequencer)
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update new_sequencer patch_config
-    | false -> unit
-  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
@@ -2440,18 +2400,7 @@ let test_init_from_rollup_node_data_dir =
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~rollup_history_mode:Archive
-  @@
-  fun {
-        sc_rollup_node;
-        sequencer;
-        observer;
-        client;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
-      _protocol
-    ->
+  @@ fun {sc_rollup_node; sequencer; observer; client; _} _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -2461,26 +2410,13 @@ let test_init_from_rollup_node_data_dir =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.terminate observer in
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let evm_node' =
     Evm_node.create
-      ~node_setup:(Evm_node.make_setup ?spawn_rpc ())
+      ~node_setup:(Evm_node.make_setup ())
       ~mode:(Evm_node.mode sequencer)
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update evm_node' patch_config
-    | false -> unit
-  in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
@@ -2521,8 +2457,6 @@ let test_init_from_rollup_node_with_delayed_inbox =
         client;
         l1_contracts;
         sc_rollup_address;
-        l2_chains;
-        enable_multichain;
         _;
       }
       _protocol
@@ -2554,26 +2488,13 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Start a new sequencer, the previous sequencer is doomed. *)
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let sequencer =
     Evm_node.create
-      ~node_setup:(Evm_node.make_setup ?spawn_rpc ())
+      ~node_setup:(Evm_node.make_setup ())
       ~mode:(Evm_node.mode sequencer)
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update sequencer patch_config
-    | false -> unit
-  in
   let* () = Evm_node.init_from_rollup_node_data_dir sequencer sc_rollup_node in
   let* () = Evm_node.run sequencer in
   (* The sequencer should have items in its delayed inbox. *)
@@ -2592,15 +2513,6 @@ let test_init_from_rollup_node_with_delayed_inbox =
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
-        in
-        Evm_node.Config_file.update observer patch_config
-    | false -> unit
-  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~omit_delayed_tx_events:true
@@ -2812,10 +2724,7 @@ let test_get_balance_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
-  @@
-  fun {sequencer; sc_rollup_node; client; enable_multichain; l2_chains; _}
-      _protocol
-    ->
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
@@ -2865,15 +2774,6 @@ let test_get_balance_block_param =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
   in
   let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
-        in
-        Evm_node.Config_file.update observer_partial_history patch_config
-    | false -> unit
-  in
-  let* () =
     Evm_node.init_from_rollup_node_data_dir
       observer_partial_history
       sc_rollup_node
@@ -2917,18 +2817,7 @@ let test_get_block_by_number_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
-  @@
-  fun {
-        sequencer;
-        observer;
-        sc_rollup_node;
-        client;
-        enable_multichain;
-        l2_chains;
-        _;
-      }
-      _protocols
-    ->
+  @@ fun {sequencer; observer; sc_rollup_node; client; _} _protocols ->
   let observer_offset = 3l in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
@@ -2958,15 +2847,6 @@ let test_get_block_by_number_block_param =
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
-  in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
-        in
-        Evm_node.Config_file.update observer_partial_history patch_config
-    | false -> unit
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
@@ -3786,7 +3666,6 @@ let test_delayed_inbox_flushing_event =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"]
     ~title:"Flush delayed inbox event"
     ~use_dal:Register_without_feature
-    ~use_multichain:Register_without_feature
     ~kernels:[Latest]
   @@
   fun {
@@ -3856,9 +3735,6 @@ let test_flushed_blueprint_reorg =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
     ~title:"Flush delayed inbox event leads to reorg"
     ~use_dal:Register_without_feature
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~kernels:[Latest]
   @@
   fun {
@@ -4132,9 +4008,6 @@ let test_observer_reorg_on_blueprint_stream =
     ~title:
       "Observer tracking a rollup node reorganizes after blueprint on stream"
     ~use_dal:Register_without_feature
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~kernels:[Latest]
   @@
   fun {
@@ -4378,9 +4251,6 @@ let test_flushed_blueprint_reorg_late =
       ["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"; "late"]
     ~title:"Flush delayed inbox event leads to reorg, including late delayed tx"
     ~use_dal:Register_without_feature
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~kernels:[Latest]
   @@
   fun {
@@ -4514,9 +4384,6 @@ let test_flushed_blueprint_reorg_done_late =
       "Flush delayed inbox event leads to reorg, including delayed tx included \
        too late"
     ~use_dal:Register_without_feature
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~kernels:[Latest]
   @@
   fun {
@@ -4788,9 +4655,6 @@ let test_upgrade_activated_after_flush_level =
       ]
     ~title:
       "Upgrade injected and activated after flushed level (on invalid branch)"
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@
   fun {
         client;
@@ -4943,9 +4807,6 @@ let test_upgrade_injected_after_flush_level =
         "after";
       ]
     ~title:"Upgrade injected after flushed level (on invalid branch)"
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@
   fun {
         client;
@@ -5095,9 +4956,6 @@ let test_flushed_blueprint_reorg_upgrade =
         "at";
       ]
     ~title:"Flush delayed inbox event leads to reorg, including upgrade"
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@
   fun {
         client;
@@ -5885,9 +5743,6 @@ let test_sequencer_sunset =
     ~sequencer:sequencer_key
     ~time_between_blocks:Nothing
     ~sequencer_sunset_sec:sunset
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
   @@
   fun {sequencer; sc_rollup_address; l1_contracts; client; sc_rollup_node; _}
@@ -5967,9 +5822,6 @@ let test_sequencer_upgrade =
     ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
     ~title:
       "Rollup-node sequencer upgrade is applied to the sequencer local state."
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
   @@
   fun {
@@ -6339,7 +6191,6 @@ let test_duplicate_sequencer_upgrade =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
     ~title:"Duplicated sequencer upgrade."
-    ~use_multichain:Register_without_feature
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
   @@
   fun {
@@ -6472,18 +6323,7 @@ let test_sequencer_diverge =
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
   @@
-  fun {
-        sc_rollup_node;
-        client;
-        sequencer;
-        observer;
-        enable_dal;
-        enable_multichain;
-        l2_chains;
-        _;
-      }
-      _protocol
-    ->
+  fun {sc_rollup_node; client; sequencer; observer; enable_dal; _} _protocol ->
   let* () =
     repeat 4 (fun () ->
         let*@ _l2_level =
@@ -6505,12 +6345,10 @@ let test_sequencer_diverge =
   let* snapshot_file =
     Runnable.run @@ Evm_node.export_snapshot ~desync:true sequencer
   in
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let sequencer_bis =
     Evm_node.create
       ~node_setup:
         (Evm_node.make_setup
-           ?spawn_rpc
            ?initial_kernel:(Evm_node.initial_kernel sequencer)
            ~preimages_dir:(Evm_node.preimages_dir sequencer)
            ())
@@ -6518,18 +6356,6 @@ let test_sequencer_diverge =
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update sequencer_bis patch_config
-    | false -> unit
-  in
   let* () =
     Runnable.run
     @@ Evm_node.import_snapshot ~desync:true sequencer_bis ~snapshot_file
@@ -6902,9 +6728,6 @@ let test_stage_one_reboot =
     ~title:
       "Checks the stage one reboots when reading too much chunks in a single \
        L1 level"
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@ fun {sc_rollup_node; client; sc_rollup_address; _} _protocol ->
   let* chunks =
     Lwt_list.map_s (fun i ->
@@ -7263,8 +7086,6 @@ let test_preimages_endpoint =
         client;
         sequencer;
         observer = _;
-        l2_chains;
-        enable_multichain;
         _;
       }
       _protocol
@@ -7278,26 +7099,10 @@ let test_preimages_endpoint =
     | Evm_node.Sequencer config -> Evm_node.Sequencer config
     | _ -> assert false
   in
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
-    Evm_node.create
-      ~node_setup:(Evm_node.make_setup ?spawn_rpc ())
-      ~mode:sequencer_mode
-      ()
+    Evm_node.create ~node_setup:(Evm_node.make_setup ()) ~mode:sequencer_mode ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update new_sequencer patch_config
-    | false -> unit
-  in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
   let observer_mode evm_node_endpoint =
@@ -7312,18 +7117,6 @@ let test_preimages_endpoint =
 
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer in
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer2 in
-
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
-        in
-        let* () = Evm_node.Config_file.update new_observer patch_config in
-        let* () = Evm_node.Config_file.update new_observer2 patch_config in
-        Lwt.return_unit
-    | false -> Lwt.return_unit
-  in
 
   let* () =
     repeat 2 (fun () ->
@@ -7412,20 +7205,8 @@ let test_preimages_endpoint_retry =
     ~kernels:[Mainnet]
     ~additional_uses:[Constant.WASM.evm_kernel]
     ~genesis_timestamp
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@
-  fun {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        l2_chains;
-        enable_multichain;
-        _;
-      }
+  fun {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
@@ -7440,26 +7221,10 @@ let test_preimages_endpoint_retry =
     | Evm_node.Sequencer config -> Evm_node.Sequencer config
     | _ -> assert false
   in
-  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
-    Evm_node.create
-      ~node_setup:(Evm_node.make_setup ?spawn_rpc ())
-      ~mode:sequencer_mode
-      ()
+    Evm_node.create ~node_setup:(Evm_node.make_setup ()) ~mode:sequencer_mode ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature
-            ~l2_chains
-            ?spawn_rpc
-            ()
-        in
-        Evm_node.Config_file.update new_sequencer patch_config
-    | false -> unit
-  in
   let* () = finalizeL1 () in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
@@ -9049,27 +8814,12 @@ let test_fa_bridge_feature_flag =
     ~error_msg:(sf "Expected to have a value at %s" path) ;
   unit
 
-let test_multichain_feature_flag =
-  register_all
-    ~__FILE__
-    ~tags:["multichain"; "feature_flag"]
-    ~title:"Check the multichain feature value in storage"
-  @@ fun {sequencer; enable_multichain; kernel; _} _protocol ->
-  let path = Durable_storage_path.enable_multichain kernel in
-  let*@ flag = Rpc.state_value sequencer path in
-  Check.(Option.is_some flag = enable_multichain)
-    Check.bool
-    ~error_msg:
-      "Multichain feature flag in the durable storage is %L, expected %R" ;
-  unit
-
 let test_evm_node_flag =
   register_all
     ~__FILE__
     ~tags:["evm_node"; "flag"]
     ~title:"EVM node flag is set in durable storage"
     ~use_dal:Register_without_feature
-    ~use_multichain:Register_without_feature
   @@ fun {sequencer; kernel; _} _protocol ->
   let key = Durable_storage_path.evm_node_flag kernel in
   let*@ flag = Rpc.state_value sequencer key in
@@ -10354,8 +10104,6 @@ let test_batch_limit_size_rpc =
     ~title:"Test batch size limit"
     ~tags:["rpc"; "batch_limit"]
     ~time_between_blocks:Nothing
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   (* We restart the sequencer to impose a batch limit on the sequencer. *)
   let* () = Evm_node.terminate sequencer in
@@ -10448,8 +10196,6 @@ let test_relay_restricted_rpcs =
     ~tags:["evm"; "rpc"; "relay"]
     ~title:"Relay restricted RPC only accept eth_sendRawTransaction"
     ~da_fee:Wei.zero
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   let* () = Evm_node.terminate sequencer in
   let* () =
@@ -10820,7 +10566,7 @@ let test_configuration_service =
       ])
   @@ fun protocol ->
   let* {sequencer; observer; _} =
-    Setup.setup_sequencer ~enable_dal:false ~enable_multichain:false protocol
+    Setup.setup_sequencer ~enable_dal:false protocol
   in
   let* sequencer_config = Rpc.configuration sequencer in
   let* observer_config = Rpc.configuration observer in
@@ -11042,9 +10788,6 @@ let test_websocket_newHeads_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@ fun {sequencer; observer; _} _protocol ->
   let scenario evm_node nb_websockets =
     let* websockets =
@@ -11384,9 +11127,6 @@ let test_websocket_newPendingTransactions_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@ fun {sequencer; sc_rollup_node; _} _protocol ->
   let* observer =
     run_new_observer_node
@@ -11456,9 +11196,6 @@ let test_websocket_logs_event =
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
   @@ fun {sequencer; observer; evm_version; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
@@ -11565,7 +11302,6 @@ let test_websocket_logs_event =
   let* () = scenario rpc_node in
   unit
 
-(* TODO #7843: Adapt this test to multichain context *)
 let test_websocket_tez_newIncludedTransactions_event =
   register_test
     ~__FILE__
@@ -11582,7 +11318,6 @@ let test_websocket_tez_newIncludedTransactions_event =
     ~kernel:Latest
     ~websockets:true
     ~enable_dal:false
-    ~enable_multichain:false
   @@ fun {sequencer; observer; _} _protocol ->
   (*
     To avoid updating all the tooling.
@@ -11653,7 +11388,6 @@ let test_websocket_tez_newIncludedTransactions_event =
   in
   unit
 
-(* TODO #7843: Adapt this test to multichain context *)
 let test_websocket_tez_newPreconfirmedReceipts_event =
   register_test
     ~__FILE__
@@ -11670,7 +11404,6 @@ let test_websocket_tez_newPreconfirmedReceipts_event =
     ~kernel:Latest
     ~websockets:true
     ~enable_dal:false
-    ~enable_multichain:false
   @@ fun {sequencer; observer; _} _protocol ->
   (*
     To avoid updating all the tooling.
@@ -11738,7 +11471,6 @@ let test_node_correctly_uses_batcher_heap =
     ~__FILE__
     ~kernel:Kernel.Latest
     ~enable_dal:false
-    ~enable_multichain:false
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -12571,8 +12303,6 @@ let test_tx_queue =
         tx_per_addr_limit = 100000;
       }
     ~title:"Submits a transaction to an observer with a tx queue."
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
     let*@ _ = produce_block sequencer in
@@ -12687,8 +12417,6 @@ let test_tx_queue_clear =
     ~kernels:[Latest]
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@
   fun {
         client;
@@ -12790,8 +12518,6 @@ let test_tx_queue_nonce =
     ~title:
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
     let*@ _ = produce_block sequencer in
@@ -13015,8 +12741,7 @@ let test_observer_init_from_snapshot =
     ~__FILE__
     ~tags:["observer"; "init"; "from"; "snapshot"]
     ~title:"Observer successfully inits from a rolling snapshot"
-  @@
-  fun {sequencer; sc_rollup_node; l2_chains; enable_multichain; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
   (* Restart the sequencer in rolling:3 *)
   let* () = Evm_node.terminate sequencer in
   let*! () = Evm_node.switch_history_mode sequencer (Rolling 2) in
@@ -13050,15 +12775,6 @@ let test_observer_init_from_snapshot =
       ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
-  let* () =
-    match enable_multichain with
-    | true ->
-        let patch_config =
-          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
-        in
-        Evm_node.Config_file.update observer patch_config
-    | false -> unit
-  in
   let extra_arguments =
     ["--init-from-snapshot"; snapshot_file; "--history"; "rolling:5"]
   in
@@ -13089,8 +12805,6 @@ let test_tx_queue_limit =
     ~title:
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
     let*@ _ = produce_block sequencer in
@@ -13186,7 +12900,6 @@ let test_observer_periodic_snapshot =
     ~tags:["evm"; "observer"; "periodic"; "snapshot"]
     ~title:"Can export periodic snapshots"
     ~use_dal:Register_without_feature
-    ~use_multichain:Register_without_feature
     ~websockets:false
     ~kernels:[Latest]
   @@ fun {sequencer; observer; sc_rollup_node = _; _} _protocol ->
@@ -13294,7 +13007,6 @@ let test_deposit_event =
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
       ~enable_dal:false
-      ~enable_multichain:false
       protocol
   in
   (* Send a deposit to the delayed inbox *)
@@ -13351,7 +13063,6 @@ let test_withdrawal_events =
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
       ~enable_dal:false
-      ~enable_multichain:false
       ~enable_fast_withdrawal:true
       ~instant_confirmations:true
       protocol
@@ -13438,7 +13149,6 @@ let test_fa_deposit_and_withdrawals_events =
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
       ~enable_dal:false
-      ~enable_multichain:false
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       ~instant_confirmations:true
@@ -13552,7 +13262,6 @@ let test_block_producer_validation () =
     ~__FILE__
     ~tags:["observer"; "tx_queue"; "validation"]
     ~title:"Test part of the validation is done when producing blocks."
-  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sandbox; observer} ->
   let send_and_wait_sequencer_receive ~raw_tx =
     let wait_sequencer_see_tx =
@@ -13988,7 +13697,6 @@ let test_fa_deposit_can_be_claimed_and_withdrawn =
     ~time_between_blocks:Nothing
     ~use_dal:Register_without_feature
     ~enable_fa_bridge:true
-    ~use_multichain:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
     ~title:"FA deposit can be claimed and withdrawn"
     ~additional_uses:[Constant.octez_codec]
@@ -14070,7 +13778,6 @@ let test_fast_fa_deposit_can_be_claimed_and_withdrawn =
     ~time_between_blocks:Nothing
     ~use_dal:Register_without_feature
     ~enable_fa_bridge:true
-    ~use_multichain:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
     ~title:"Fast FA deposit can be claimed and withdrawn"
     ~additional_uses:[Constant.octez_codec]
@@ -14139,7 +13846,6 @@ let test_claim_deposit_event =
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
       ~enable_dal:false
-      ~enable_multichain:false
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol
@@ -14644,7 +14350,6 @@ let test_deposits_on_eip7702_accounts =
   register_all
     ~__FILE__
     ~kernels:[Latest]
-    ~use_multichain:Register_without_feature
     ~tags:["evm"; "eip7702"; "deposit"]
     ~title:"Check that deposit do not break EIP-7702 accounts semantic."
     ~da_fee:Wei.zero
@@ -15177,7 +14882,6 @@ let test_fa_deposit_watchtower =
     ~tags:["evm"; "fa_deposit"; "watchtower"]
     ~title:"FA deposit is claimed by the watchtower"
     ~enable_fa_bridge:true
-    ~enable_multichain:false
     ~enable_dal:false
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
@@ -15288,7 +14992,6 @@ let test_xtz_deposit_watchtower =
     ~tags:["evm"; "xtz_deposit"; "watchtower"]
     ~title:"XTZ deposit is claimed by the watchtower"
     ~enable_fa_bridge:true
-    ~enable_multichain:false
     ~enable_dal:false
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
@@ -15456,7 +15159,6 @@ let test_xtz_deposit_watchtower_with_fa_whitelist =
       "XTZ deposit is claimed by the watchtower even when an FA whitelist is \
        configured"
     ~enable_fa_bridge:true
-    ~enable_multichain:false
     ~enable_dal:false
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
@@ -16406,7 +16108,6 @@ let () =
   test_trace_transaction_call protocols ;
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
-  test_multichain_feature_flag protocols ;
   test_evm_node_flag [Alpha] ;
   test_make_l2_kernel_installer_config "EVM" ;
   test_make_l2_kernel_installer_config "Michelson" ;

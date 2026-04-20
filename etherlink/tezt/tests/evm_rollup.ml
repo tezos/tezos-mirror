@@ -324,8 +324,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
-    ?dal_slots ?(enable_multichain = false) ?websockets
-    ?(enable_fa_bridge = false) ?(enable_fast_withdrawal = false) protocol =
+    ?dal_slots ?websockets ?(enable_fa_bridge = false)
+    ?(enable_fast_withdrawal = false) protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -397,7 +397,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
         ~enable_dal
-        ~enable_multichain
         ~enable_fa_bridge
         ~enable_fast_withdrawal
         ?dal_slots
@@ -568,8 +567,7 @@ let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
     ?maximum_gas_per_transaction ?restricted_rpcs ?tx_queue_max_size
     ?tx_queue_tx_per_addr_limit ?max_number_of_chunks ?sequencer_admin
     ~setup_mode ~enable_dal ?(dal_slots = if enable_dal then Some [4] else None)
-    ~enable_multichain ?websockets ?enable_fast_withdrawal ?evm_version f
-    protocols =
+    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -592,18 +590,15 @@ let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
         ~__FILE__
         ~tags:
           ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
-          @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
-             else [])
           @ (kernel_tag :: extra_tag :: tags))
         ~uses
         ~title:
           (sf
-             "%s (%s, %s, %s, %s)"
+             "%s (%s, %s, %s)"
              title
              extra_tag
              kernel_tag
-             (if enable_dal then "with dal" else "without dal")
-             (if enable_multichain then "multichain" else "single chain"))
+             (if enable_dal then "with dal" else "without dal"))
         (fun protocol ->
           let* evm_setup : common_setup * mode_setup =
             setup_evm_kernel
@@ -627,7 +622,6 @@ let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
               ~setup_mode
               ~enable_dal
               ?dal_slots
-              ~enable_multichain
               ?websockets
               ?enable_fast_withdrawal
               ?evm_version
@@ -642,7 +636,7 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
     ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
-  let register ~enable_dal ~enable_multichain : unit =
+  let register ~enable_dal : unit =
     let f ~protocol ~evm_setup:((common, mode) : common_setup * mode_setup) =
       match mode with
       | Proxy -> f ~protocol ~evm_setup:common
@@ -671,13 +665,10 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       f
       protocols
       ~enable_dal
-      ~enable_multichain
       ~setup_mode:Setup_proxy
   in
-  register ~enable_dal:false ~enable_multichain:false ;
-  register ~enable_dal:true ~enable_multichain:false ;
-  register ~enable_dal:false ~enable_multichain:true ;
-  register ~enable_dal:true ~enable_multichain:true
+  register ~enable_dal:false ;
+  register ~enable_dal:true
 
 let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
@@ -686,9 +677,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
     ?genesis_timestamp ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ?max_number_of_chunks ?sequencer_admin ?(dal = true) ?(multichain = true) f
-    protocols =
-  let register ~enable_dal ~enable_multichain : unit =
+    ?max_number_of_chunks ?sequencer_admin ?(dal = true) f protocols =
+  let register ~enable_dal : unit =
     let f ~protocol
         ~evm_setup:
           (( {
@@ -754,7 +744,6 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       f
       protocols
       ~enable_dal
-      ~enable_multichain
       ~setup_mode:
         (Setup_sequencer
            {
@@ -765,10 +754,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              genesis_timestamp;
            })
   in
-  register ~enable_dal:false ~enable_multichain:false ;
-  if dal then register ~enable_dal:true ~enable_multichain:false ;
-  if multichain then register ~enable_dal:false ~enable_multichain:true ;
-  if dal && multichain then register ~enable_dal:true ~enable_multichain:true
+  register ~enable_dal:false ;
+  if dal then register ~enable_dal:true
 
 let deploy ~contract ~sender {produce_block; evm_node; _} =
   let evm_node_endpoint = Evm_node.endpoint evm_node in
@@ -1221,7 +1208,6 @@ let test_consistent_block_hashes =
     ~tags:["evm"; "l2_blocks"]
     ~title:"Check L2 blocks consistency of hashes"
     ~dal:false
-    ~multichain:false
     ~time_between_blocks:Nothing
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   let endpoint = Evm_node.endpoint evm_node in
@@ -4726,7 +4712,6 @@ let test_l2_call_inter_contract =
     ~tags:["evm"; "l2_deploy"; "l2_call"; "inter_contract"]
     ~title:"Check L2 inter contract call"
     ~dal:false
-    ~multichain:false
     ~time_between_blocks:Nothing
     ~return_sequencer:true
   @@
@@ -5191,7 +5176,6 @@ let test_keep_alive =
     ~tags:["keep_alive"; "node"]
     ~title:"EVM Node keep alive argument"
     ~dal:false
-    ~multichain:false
     ~return_sequencer:true
     ~time_between_blocks:Nothing
     (fun
@@ -5446,7 +5430,6 @@ let test_estimate_gas_out_of_gas =
 let test_l2_call_selfdetruct_contract_in_same_transaction =
   register_sequencer
     ~dal:false
-    ~multichain:false
     ~tags:["evm"; "l2_call"; "selfdestruct"]
     ~title:"Check destruct contract in same transaction can be called"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5653,7 +5636,6 @@ let test_call_recursive_contract_estimate_gas =
     ~tags:["evm"; "l2_call"; "estimate_gas"; "recursive"]
     ~title:"Check recursive contract gasLimit is high enough"
     ~dal:false
-    ~multichain:false
   @@
   fun ~protocol:_
       ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
@@ -5728,7 +5710,6 @@ let test_reveal_storage =
     ~tags:["evm"; "sequencer"; "reveal_storage"]
     ~title:"Reveal storage"
     ~dal:false
-    ~multichain:false
     ~additional_uses:[Constant.WASM.evm_kernel]
   @@ fun ~protocol ~evm_setup ->
   let* () =
@@ -6081,7 +6062,6 @@ let test_tx_pool_address_boundaries =
     ~tx_queue_tx_per_addr_limit:1
     ~time_between_blocks:Nothing
     ~dal:false
-    ~multichain:false
   @@ fun ~protocol:_ ~evm_setup:{evm_node = sequencer_node; produce_block; _} ->
   let* tx =
     Cast.craft_tx
@@ -6167,7 +6147,6 @@ let test_tx_pool_transaction_size_exceeded =
     ~max_number_of_chunks:1
     ~time_between_blocks:Nothing
     ~dal:false
-    ~multichain:false
   @@ fun ~protocol:_ ~evm_setup:{evm_node = sequencer_node; _} ->
   let* tx =
     Cast.craft_tx

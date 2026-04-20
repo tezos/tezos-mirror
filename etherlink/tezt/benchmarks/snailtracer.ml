@@ -226,7 +226,6 @@ let test_snailtracer () =
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts
     ~websockets:true
-    ~use_multichain:Register_without_feature
     ~use_dal:Register_without_feature
     ~da_fee:Wei.zero
     ~minimum_base_fee_per_gas:Wei.one
@@ -332,7 +331,6 @@ let test_full_image_raytracing () =
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts:[sender.address]
     ~websockets:true
-    ~use_multichain:Register_without_feature
     ~use_dal:Register_without_feature
     ~da_fee:Wei.zero
     ~minimum_base_fee_per_gas:Wei.one

@@ -249,14 +249,8 @@ let check_block_consistency ~left ~right ?error_msg ~block () =
 let check_head_consistency ~left ~right ?error_msg () =
   check_block_consistency ~left ~right ?error_msg ~block:`Latest ()
 
-type network = Etherlink | Tezlink
-
-let rollup_level_opt ?(network = Etherlink) sc_rollup_node =
-  let key =
-    match network with
-    | Etherlink -> "/evm/world_state/blocks/current/number"
-    | Tezlink -> "/tezlink/blocks/current/number"
-  in
+let rollup_level_opt sc_rollup_node =
+  let key = "/evm/world_state/blocks/current/number" in
   let* block_number =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
@@ -273,8 +267,8 @@ let rollup_level_opt ?(network = Etherlink) sc_rollup_node =
            (Hex.to_bytes (`Hex bytes)
            |> Bytes.to_string |> Z.of_bits |> Z.to_int32))
 
-let rollup_level ?(network = Etherlink) sc_rollup_node =
-  let* level_opt = rollup_level_opt ~network sc_rollup_node in
+let rollup_level sc_rollup_node =
+  let* level_opt = rollup_level_opt sc_rollup_node in
   match level_opt with
   | None ->
       return (Error Rpc.{code = 404; message = "Level not found"; data = None})
@@ -347,17 +341,15 @@ let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
   | Some x -> return x
   | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
 
-let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ?(network = Etherlink)
-    ~sc_rollup_node ~sequencer ~client () =
+let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node
+    ~sequencer ~client () =
   let bake () =
     let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let result_f () =
     let open Rpc.Syntax in
-    let* sc_rollup_node_block_number_opt =
-      rollup_level_opt ~network sc_rollup_node
-    in
+    let* sc_rollup_node_block_number_opt = rollup_level_opt sc_rollup_node in
     let*@ sequencer_level = Rpc.generic_block_number sequencer in
     match sc_rollup_node_block_number_opt with
     | None -> Lwt.return_none
@@ -372,16 +364,14 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ?(network = Etherlink)
   bake_until ?__LOC__ ?timeout_in_blocks ?timeout ~bake ~result_f ()
 
 let bake_until_blueprint_forced ?__LOC__ ?timeout_in_blocks ?timeout
-    ?(network = Etherlink) ~sc_rollup_node ~evm_node ~client () =
+    ~sc_rollup_node ~evm_node ~client () =
   let bake () =
     let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let result_f () =
     let open Rpc.Syntax in
-    let* sc_rollup_node_block_number_opt =
-      rollup_level_opt ~network sc_rollup_node
-    in
+    let* sc_rollup_node_block_number_opt = rollup_level_opt sc_rollup_node in
     let*@ evm_level = Rpc.generic_block_number evm_node in
     match sc_rollup_node_block_number_opt with
     | None -> Lwt.return_none
