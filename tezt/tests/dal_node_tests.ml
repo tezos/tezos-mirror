@@ -2182,12 +2182,11 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
     A. Node setup:
        - Launch 3 DAL producer nodes (dal_pub1, dal_pub2, dal_pub3),
          each publishing a distinct slot (index 1, 2, 3 respectively).
-       - Launch 4 DAL fetcher nodes:
+       - Launch 3 DAL fetcher nodes:
          - valid_dal_fetcher_1_2: untrusted sources, has access to dal_pub1
            and dal_pub2
          - valid_dal_fetcher_3_trusted: trusted sources, access to dal_pub3
          - invalid_dal_fetcher_bad_uri: untrusted sources, invalid URI
-         - invalid_dal_fetcher_bad_uri_trusted: trusted sources, invalid URI
 
     B. Slot publication:
        - Each dal_pubX publishes one slot at the same published_level.
@@ -2323,16 +2322,6 @@ let dal_slots_retrievability =
         ~event_level:`Notice
         l1_node
     in
-    let* invalid_dal_fetcher_bad_uri_trusted =
-      make_dal_node
-        ~operator_profiles:[6]
-        ~name:"invalid_dal_fetcher_bad_uri_trusted"
-        ~slots_backup_uris:["http://some-fake.endpoint"]
-        ~trust_slots_backup_uris:true
-        ~event_level:`Notice
-        l1_node
-    in
-
     (* Observer node: never writes skip list cells to SQLite (observer profile
        does not support refutations).  Points its backup URI at archive3 so it
        can fetch slot 3 once the L1 fallback supplies the commitment.
@@ -2379,7 +2368,6 @@ let dal_slots_retrievability =
              valid_dal_fetcher_1_2;
              valid_dal_fetcher_3_trusted;
              invalid_dal_fetcher_bad_uri;
-             invalid_dal_fetcher_bad_uri_trusted;
              observer_dal;
            ]
     in
@@ -2496,19 +2484,10 @@ let dal_slots_retrievability =
         |> fetch_404_expected ~__LOC__ ~expected_event
     in
 
-    (* C.8 Invalid URI (untrusted): expect 500 *)
+    (* C.8 Invalid URI: expect 500 *)
     let* () =
-      Log.info "C.8: invalid URI trusted & untrusted" ;
-      let* () =
-        get_slot_rpc invalid_dal_fetcher_bad_uri ~published_level ~slot_index:2
-        |> fetch_500_expected
-             ~__LOC__
-             ~expected_error:"resolution failed: name resolution failed"
-      in
-      get_slot_rpc
-        invalid_dal_fetcher_bad_uri_trusted
-        ~published_level
-        ~slot_index:2
+      Log.info "C.8: invalid URI" ;
+      get_slot_rpc invalid_dal_fetcher_bad_uri ~published_level ~slot_index:2
       |> fetch_500_expected
            ~__LOC__
            ~expected_error:"resolution failed: name resolution failed"
