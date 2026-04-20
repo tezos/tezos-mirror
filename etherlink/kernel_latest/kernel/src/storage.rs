@@ -90,6 +90,7 @@ pub enum StorageVersion {
     V51,
     V52,
     V53,
+    V54,
 }
 
 impl From<StorageVersion> for u64 {
@@ -104,7 +105,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V53;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V54;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/base/remove_whitelist");
 
@@ -148,10 +149,10 @@ const MICHELSON_RUNTIME_CHAIN_ID: RefPath = RefPath::assert_from(b"/tezlink/chai
 // a single chain is used.
 #[allow(dead_code)]
 pub const ENABLE_MULTICHAIN: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_multichain");
+    RefPath::assert_from(b"/base/feature_flags/enable_multichain");
 
 pub const ENABLE_TEZOS_RUNTIME: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_tezos_runtime");
+    RefPath::assert_from(b"/base/feature_flags/enable_tezos_runtime");
 
 // Target EVM block number for the Michelson runtime sunrise. Written by the
 // installer when scheduling a future activation.
@@ -164,7 +165,7 @@ const MICHELSON_RUNTIME_SUNRISE_LEVEL: RefPath =
     RefPath::assert_from(b"/evm/michelson_runtime/sunrise_level");
 
 pub const ENABLE_MICHELSON_GAS_REFUND: RefPath =
-    RefPath::assert_from(b"/tezlink/feature_flags/enable_michelson_gas_refund");
+    RefPath::assert_from(b"/base/feature_flags/enable_michelson_gas_refund");
 
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
@@ -217,14 +218,14 @@ pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/base/keep_rollup_events
 
 // Path to the DAL feature flag. If there is nothing at this path, DAL
 // is not used.
-pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_dal");
+pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/base/feature_flags/enable_dal");
 
 // Path to the flag that disables legacy DAL slot import signals.
 // If there is something at this path, the kernel ignores DalSlotImportSignals
 // external messages and instead relies on DalAttestedSlots internal messages
 // from the protocol.
 pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/disable_legacy_dal_signals");
+    RefPath::assert_from(b"/base/feature_flags/disable_legacy_dal_signals");
 
 // Path to the DAL slot indices to use.
 pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/base/dal_slots");
@@ -240,7 +241,7 @@ const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 
 // If this path contains a value, the fa bridge is enabled in the kernel.
 pub const ENABLE_FA_BRIDGE: RefPath =
-    RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
+    RefPath::assert_from(b"/base/feature_flags/enable_fa_bridge");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/base/max_blueprint_lookahead_in_seconds");

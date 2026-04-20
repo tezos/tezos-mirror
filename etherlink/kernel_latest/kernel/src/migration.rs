@@ -932,6 +932,37 @@ where
 
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V54 => {
+            // Phase 3 of the durable storage reorganization: consolidate
+            // all feature flags under /base/feature_flags/.
+            //
+            // - Move the 5 flags at /evm/feature_flags/* (outside safe
+            //   storage) by moving the whole subtree.
+            // - Drop the 3 flags at /evm/world_state/feature_flags/
+            //   (enable_revm, enable_fast_withdrawal,
+            //   enable_fast_fa_withdrawal): none is read by
+            //   kernel_latest. revm and the fast-withdrawal code paths
+            //   became unconditional in pre-Farfadet kernels, so there
+            //   is no live data worth migrating.
+
+            // Move the /evm/feature_flags subtree wholesale.
+            allow_path_not_found(host.store_move(
+                &RefPath::assert_from(b"/evm/feature_flags"),
+                &RefPath::assert_from(b"/base/feature_flags"),
+            ))?;
+
+            // Drop dead flags rather than migrating them.
+            let legacy_drops: &[&[u8]] = &[
+                b"/evm/world_state/feature_flags/enable_revm",
+                b"/evm/world_state/feature_flags/enable_fast_withdrawal",
+                b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal",
+            ];
+            for path in legacy_drops {
+                allow_path_not_found(host.store_delete(&RefPath::assert_from(path)))?;
+            }
+
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
