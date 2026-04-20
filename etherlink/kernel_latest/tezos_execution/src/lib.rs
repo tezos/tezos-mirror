@@ -7486,4 +7486,26 @@ mod tests {
             "Destination balance should increase by transfer amount"
         );
     }
+
+    // Transfer with fee refund where costs exceed fee: saturating_sub yields refund = 0.
+    #[test]
+    fn apply_transfer_with_zero_refund() {
+        // Use a very small fee so that da_fees + consumed_gas_fees >= fee,
+        // making the refund saturate to 0.
+        let fee: u64 = 31;
+        let amount: u64 = 5;
+        let da_fees: u64 = 10;
+
+        let ctx = run_refund_transfer(fee, amount, 100, Some(da_fees));
+        let bus = ctx.balance_updates();
+
+        // With zero refund: only 2 entries (fee debit/credit), no refund entries.
+        assert_eq!(bus.len(), 2, "Expected 2 balance_updates, got {:?}", bus);
+
+        // Source balance = initial - fee - amount (no refund).
+        assert_eq!(
+            ctx.source.balance(&ctx.host).unwrap(),
+            (100 - fee - amount).into(),
+        );
+    }
 }
