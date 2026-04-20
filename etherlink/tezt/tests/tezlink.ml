@@ -4253,6 +4253,90 @@ let check_gas_refund_balance_updates ?expected_refund ~source ~metadata () =
             "Expected no refund debit in balance_updates (refund is disabled)") ;
       ()
 
+(** Gas refund in run_operation (simulation) receipts.
+    With refund enabled, the metadata-level balance_updates should contain
+    4 entries: fee debit/credit + refund credit/debit, all summing to zero.
+    The refund amount should match: fee - da_fees - consumed_gas_fees
+    (da_fees = 0 in simulation).
+    Without refund, only the 2 fee debit/credit entries should appear. *)
+let test_gas_refund_in_run_operation ~enable_refund =
+  let label = if enable_refund then "enabled" else "disabled" in
+  register_tezosx_test
+    ~title:(sf "Gas refund in run_operation (%s)" label)
+    ~tags:["gas_refund"; "run_operation"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~enable_michelson_gas_refund:enable_refund
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  let* branch =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_block_hash ()
+  in
+  let* chain_id =
+    Client.RPC.call ~endpoint client @@ RPC.get_chain_chain_id ()
+  in
+  (* 1 tez = 1_000_000 mutez, deliberately high to produce a large refund. *)
+  let fee = 1_000_000 in
+  let gas_limit = 10_000 in
+  let amount = 10 in
+  let source = Constant.bootstrap1.public_key_hash in
+  let op_json =
+    `O
+      [
+        ( "operation",
+          `O
+            [
+              ("branch", `String branch);
+              ( "contents",
+                `A
+                  [
+                    `O
+                      [
+                        ("kind", `String "transaction");
+                        ("source", `String source);
+                        ("fee", `String (string_of_int fee));
+                        (* Counter and signature are not checked in simulation mode. *)
+                        ("counter", `String "1");
+                        ("gas_limit", `String (string_of_int gas_limit));
+                        ("storage_limit", `String "0");
+                        ("amount", `String (string_of_int amount));
+                        ( "destination",
+                          `String Constant.bootstrap2.public_key_hash );
+                      ];
+                  ] );
+              (* Dummy signature: ignored in simulation mode. *)
+              ( "signature",
+                `String
+                  "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
+              );
+            ] );
+        ("chain_id", `String chain_id);
+      ]
+  in
+  let* result =
+    Client.RPC.call ~endpoint client
+    @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
+  in
+  let metadata = JSON.(result |-> "contents" |=> 0 |-> "metadata") in
+  (* Check status is applied *)
+  let status =
+    JSON.(metadata |-> "operation_result" |-> "status" |> as_string)
+  in
+  Check.((status = "applied") string ~error_msg:"Expected %R but got %L") ;
+  let expected_refund =
+    if enable_refund then
+      (* refund = fee - da_fees - consumed_gas_fees.
+         da_fees = 0 in simulation, consumed_gas_fees = ceil(consumed_milligas/1000) / 100. *)
+      let consumed_milligas =
+        JSON.(metadata |-> "operation_result" |-> "consumed_milligas" |> as_int)
+      in
+      let consumed_gas = (consumed_milligas + 999) / 1000 in
+      let consumed_gas_fees = consumed_gas / 100 in
+      Some (fee - consumed_gas_fees)
+    else None
+  in
+  check_gas_refund_balance_updates ?expected_refund ~source ~metadata () ;
+  unit
+
 let test_tezlink_gas_vs_l1 =
   register_tezlink_regression_test
     ~title:"Test Tezlink gas vs L1 operations"
@@ -4974,6 +5058,8 @@ let () =
   test_gas_refund_on_failwith ~enable_refund:true [Alpha] ;
   test_gas_refund_on_failwith ~enable_refund:false [Alpha] ;
   test_gas_refund_on_out_of_gas [Alpha] ;
+  test_gas_refund_in_run_operation ~enable_refund:true [Alpha] ;
+  test_gas_refund_in_run_operation ~enable_refund:false [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
