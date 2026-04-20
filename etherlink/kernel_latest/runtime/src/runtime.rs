@@ -33,7 +33,7 @@ use tezos_smart_rollup_keyspace::{KeySpaceLoader, KeySpaceLoaderError, Name};
 use tezos_smart_rollup_mock::MockHost;
 
 // Set by the node, contains the verbosity for the logs
-pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/evm/logging_verbosity");
+pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/base/logging_verbosity");
 
 pub trait IsEvmNode {
     fn is_evm_node(&self) -> bool;

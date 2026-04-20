@@ -36,7 +36,7 @@ use tezos_storage::{read_rlp, store_read_slice, store_rlp};
 use tezos_tezlink::block::TezBlock;
 use tezos_tezlink::protocol::{Protocol, INITIAL_PROTOCOL};
 
-pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
+pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/base/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
@@ -48,7 +48,7 @@ const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
-    RefPath::assert_from(b"/evm/current_block_header");
+    RefPath::assert_from(b"/base/current_block_header");
 
 const EVM_CURRENT_TEZ_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos/current_chain_header");

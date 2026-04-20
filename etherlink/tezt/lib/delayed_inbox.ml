@@ -54,10 +54,11 @@ let subkeys path = function
       let*@! list = Rpc.state_subkeys evm_node path in
       return list
 
-let content = subkeys Durable_storage_path.delayed_inbox
+let content ?(kernel = Kernel.Latest) endpoint =
+  subkeys (Durable_storage_path.delayed_inbox kernel) endpoint
 
-let data endpoint hash =
-  let path = sf "%s/%s/data" Durable_storage_path.delayed_inbox hash in
+let data ?(kernel = Kernel.Latest) endpoint hash =
+  let path = sf "%s/%s/data" (Durable_storage_path.delayed_inbox kernel) hash in
   match endpoint with
   | Sc_rollup_node sc_rollup_node ->
       Sc_rollup_node.RPC.call sc_rollup_node
@@ -70,21 +71,21 @@ let data endpoint hash =
       let*@ res = Rpc.state_value evm_node path in
       return res
 
-let assert_mem endpoint hash =
-  let* delayed_transactions_hashes = content endpoint in
+let assert_mem ?kernel endpoint hash =
+  let* delayed_transactions_hashes = content ?kernel endpoint in
   Check.(list_mem string hash delayed_transactions_hashes)
     ~error_msg:"hash %L should be present in the delayed inbox %R" ;
   unit
 
-let assert_empty endpoint =
-  let* delayed_transactions_hashes = content endpoint in
+let assert_empty ?kernel endpoint =
+  let* delayed_transactions_hashes = content ?kernel endpoint in
   Check.is_true
     (List.length delayed_transactions_hashes <= 1)
     ~error_msg:"Expected empty delayed inbox" ;
   unit
 
-let size endpoint =
-  let* delayed_transactions_hashes = content endpoint in
+let size ?kernel endpoint =
+  let* delayed_transactions_hashes = content ?kernel endpoint in
   let size = List.length delayed_transactions_hashes - 1 in
   if size < 0 then
     (* /meta is removed, if the delayed inbox was empty it would be (-1) here. *)

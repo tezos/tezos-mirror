@@ -26,6 +26,10 @@
 
 ### Storage changes
 
+- Read governance, sequencing, DAL, blueprints, delayed inbox, chain
+  configurations and kernel events from `/base/...` on V53+ kernels,
+  and from `/evm/...` on older kernels. (!21565)
+
 - Store all-zero `logs_bloom` values as empty bytes instead of the
   full 514-byte ASCII hex representation. This saves ~514 bytes per
   simple-transfer receipt (the majority of transactions). Backward

@@ -94,22 +94,24 @@ let resolve : type a. a path -> a resolution =
           encode = L2_types.Chain_id.encode_be;
         }
   | Kernel_version ->
-      Static
-        {
-          path = Durable_storage_path.kernel_version;
-          decode = infallible_decode Bytes.to_string;
-          encode = Fun.id;
-        }
+      Versioned
+        (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_version ~storage_version;
+            decode = infallible_decode Bytes.to_string;
+            encode = Fun.id;
+          })
   | Kernel_root_hash ->
-      Static
-        {
-          path = Durable_storage_path.kernel_root_hash;
-          decode =
-            (fun bytes ->
-              let (`Hex s) = Hex.of_bytes bytes in
-              Ok (Ethereum_types.Hex s));
-          encode = Ethereum_types.hex_to_string;
-        }
+      Versioned
+        (fun ~storage_version ->
+          {
+            path = Durable_storage_path.kernel_root_hash ~storage_version;
+            decode =
+              (fun bytes ->
+                let (`Hex s) = Hex.of_bytes bytes in
+                Ok (Ethereum_types.Hex s));
+            encode = Ethereum_types.hex_to_string;
+          })
   | Multichain_flag ->
       Static
         {
@@ -128,14 +130,18 @@ let resolve : type a. a path -> a resolution =
             encode = (fun pk -> Signature.Public_key.to_b58check pk);
           })
   | Chain_config_family cid ->
-      Static
-        {
-          path = Durable_storage_path.Chain_configuration.chain_family cid;
-          decode = L2_types.Chain_family.of_bytes;
-          encode =
-            (fun (L2_types.Ex_chain_family cf) ->
-              L2_types.Chain_family.to_string cf);
-        }
+      Versioned
+        (fun ~storage_version ->
+          {
+            path =
+              Durable_storage_path.Chain_configuration.chain_family
+                ~storage_version
+                cid;
+            decode = L2_types.Chain_family.of_bytes;
+            encode =
+              (fun (L2_types.Ex_chain_family cf) ->
+                L2_types.Chain_family.to_string cf);
+          })
   | Tezosx_feature_flag runtime ->
       Static
         {
@@ -276,26 +282,41 @@ let inspect_durable_and_decode state path decode =
   | None -> failwith "No value found under %s" path
 
 let l2_minimum_base_fee_per_gas state chain_id =
+  let open Lwt_result_syntax in
+  let* sv = storage_version state in
   inspect_durable_and_decode
     state
-    (Durable_storage_path.Chain_configuration.minimum_base_fee_per_gas chain_id)
+    (Durable_storage_path.Chain_configuration.minimum_base_fee_per_gas
+       ~storage_version:sv
+       chain_id)
     Helpers.decode_z_le
 
 let l2_da_fee_per_byte state chain_id =
+  let open Lwt_result_syntax in
+  let* sv = storage_version state in
   inspect_durable_and_decode
     state
-    (Durable_storage_path.Chain_configuration.da_fee_per_byte chain_id)
+    (Durable_storage_path.Chain_configuration.da_fee_per_byte
+       ~storage_version:sv
+       chain_id)
     Helpers.decode_z_le
 
 let l2_maximum_gas_per_transaction state chain_id =
+  let open Lwt_result_syntax in
+  let* sv = storage_version state in
   inspect_durable_and_decode
     state
     (Durable_storage_path.Chain_configuration.maximum_gas_per_transaction
+       ~storage_version:sv
        chain_id)
     Helpers.decode_z_le
 
 let world_state state chain_id =
+  let open Lwt_result_syntax in
+  let* sv = storage_version state in
   inspect_durable_and_decode
     state
-    (Durable_storage_path.Chain_configuration.world_state chain_id)
+    (Durable_storage_path.Chain_configuration.world_state
+       ~storage_version:sv
+       chain_id)
     Bytes.to_string

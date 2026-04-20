@@ -50,13 +50,13 @@ end
 open Test_helpers
 open Setup
 
-let get_rollup_kernel_version ~sc_rollup_node =
+let get_rollup_kernel_version ?(kernel = Kernel.Latest) ~sc_rollup_node () =
   let* kernel_version =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:"/evm/kernel_version"
+         ~key:(Durable_storage_path.kernel_version kernel)
          ()
   in
   match kernel_version with
@@ -1308,7 +1308,9 @@ let test_send_transaction_to_delayed_inbox =
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol ->
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; kernel; _}
+      _protocol
+    ->
   let* raw_transfer =
     Cast.craft_tx
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -1338,7 +1340,9 @@ let test_send_transaction_to_delayed_inbox =
   let* hash = send ~amount:Tez.one ~expect_failure:false () in
   (* Assert that the expected transaction hash is found in the delayed inbox
      durable storage path. *)
-  let* () = Delayed_inbox.assert_mem (Sc_rollup_node sc_rollup_node) hash in
+  let* () =
+    Delayed_inbox.assert_mem ~kernel (Sc_rollup_node sc_rollup_node) hash
+  in
   (* Test that paying more than 1XTZ is allowed. *)
   let* _hash =
     send ~amount:(Tez.parse_floating "1.1") ~expect_failure:false ()
@@ -1352,7 +1356,9 @@ let test_send_deposit_to_delayed_inbox =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"]
     ~title:"Send a deposit to the delayed inbox"
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol ->
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; kernel; _}
+      _protocol
+    ->
   let amount = Tez.of_int 16 in
   let depositor = Constant.bootstrap5 in
   let receiver =
@@ -1377,10 +1383,11 @@ let test_send_deposit_to_delayed_inbox =
       client
   in
   let* delayed_transactions_hashes =
-    Delayed_inbox.content (Sc_rollup_node sc_rollup_node)
+    Delayed_inbox.content ~kernel (Sc_rollup_node sc_rollup_node)
   in
   let* deposit =
     Delayed_inbox.data
+      ~kernel
       (Sc_rollup_node sc_rollup_node)
       (List.hd delayed_transactions_hashes)
   in
@@ -3714,7 +3721,7 @@ let test_clean_bps =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Subkeys
-         ~key:"/evm/blueprints/42"
+         ~key:"/base/blueprints/42"
          ()
   in
   Check.(
@@ -3742,7 +3749,7 @@ let test_clean_bps =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:"/evm/blueprints/42/generation"
+         ~key:"/base/blueprints/42/generation"
          ()
   in
   let generation =
@@ -3755,7 +3762,7 @@ let test_clean_bps =
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:"/evm/blueprints/generation"
+         ~key:"/base/blueprints/generation"
          ()
   in
   let current_generation =
@@ -5494,7 +5501,7 @@ let test_force_kernel_upgrade_too_early =
 
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node () in
   Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
@@ -5519,7 +5526,9 @@ let test_force_kernel_upgrade_too_early =
 
   (* Assert the kernel version are still the same. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let* new_rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  let* new_rollup_kernelVersion =
+    get_rollup_kernel_version ~sc_rollup_node ()
+  in
   Check.((sequencer_kernelVersion = new_rollup_kernelVersion) string)
     ~error_msg:"The force kernel upgrade should have failed" ;
   unit
@@ -5546,7 +5555,7 @@ let test_force_kernel_upgrade =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   (* Assert the kernel version is the same at start up. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node () in
   Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same at start up" ;
 
@@ -5575,7 +5584,7 @@ let test_force_kernel_upgrade =
   (* Assert the kernel version is the same, it proves the upgrade did not
       happen. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
-  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node in
+  let* rollup_kernelVersion = get_rollup_kernel_version ~sc_rollup_node () in
   Check.((sequencer_kernelVersion = rollup_kernelVersion) string)
     ~error_msg:"Kernel versions should be the same even after the message" ;
 
@@ -5853,7 +5862,7 @@ let test_timestamp_from_the_future =
   Check.(
     kernel_log
     =~ rex
-         "Deleting invalid blueprint at path /evm/blueprints/2, error: \
+         "Deleting invalid blueprint at path /base/blueprints/2, error: \
           TimestampFromFuture")
     ~error_msg:"The blueprint should have been refused by TimestampFromFuture" ;
 
@@ -9287,7 +9296,7 @@ let execute_payout ~service_provider_pkh ~exchanger
     ~storage_limit:Int.max_int
     ~burn_cap:(Tez.of_int 100)
     ~amount:withdraw_amount
-    ~giver:Constant.bootstrap1.public_key_hash
+    ~giver:Constant.bootstrap3.public_key_hash
     ~receiver:service_provider_proxy
     ~entrypoint:(if fa_tokens then "payout_proxy_fa" else "payout_proxy_tez")
     ~arg:
@@ -9419,7 +9428,7 @@ let test_deposit_and_fast_withdraw =
     Client.originate_contract
       ~alias:"service_provider"
       ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src:Constant.bootstrap3.public_key_hash
       ~init:
         "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
          \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
@@ -9605,7 +9614,7 @@ let test_deposit_and_fa_fast_withdraw =
     Client.originate_contract
       ~alias:"service_provider"
       ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src:Constant.bootstrap3.public_key_hash
       ~init:
         "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
          \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
@@ -15599,7 +15608,7 @@ let test_evm_events_cleanup () =
     ~tags:["events"]
   @@ fun sandbox ->
   let*@ _ = Rpc.produce_block sandbox in
-  let*@ rpc_result = Rpc.state_subkeys sandbox "/evm/events" in
+  let*@ rpc_result = Rpc.state_subkeys sandbox "/base/rollup_events" in
   match rpc_result with
   | None | Some [] -> unit
   | Some l ->

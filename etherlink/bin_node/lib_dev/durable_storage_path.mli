@@ -44,21 +44,21 @@ val da_fee_per_byte : path
 
 val michelson_to_evm_gas_multiplier : path
 
-val kernel_version : path
+val kernel_version : storage_version:int -> path
 
-val kernel_verbosity : path
+val kernel_verbosity : storage_version:int -> path
 
 val storage_version_base : path
 
 val storage_version_legacy : path
 
-val kernel_root_hash : path
+val kernel_root_hash : storage_version:int -> path
 
-val kernel_upgrade : path
+val kernel_upgrade : storage_version:int -> path
 
 val sequencer_upgrade : storage_version:int -> path
 
-val delayed_inbox : path
+val delayed_inbox : storage_version:int -> path
 
 val sequencer_pool_address : path
 
@@ -71,6 +71,8 @@ val sequencer_key : storage_version:int -> path
 val maximum_gas_per_transaction : path
 
 val michelson_runtime_sunrise_level : path
+
+val maximum_allowed_ticks : storage_version:int -> path
 
 (** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
@@ -132,13 +134,14 @@ module Code : sig
 end
 
 module Blueprint : sig
-  val current_generation : path
+  val current_generation : storage_version:int -> path
 
-  val chunk : blueprint_number:Z.t -> chunk_index:int -> path
+  val chunk :
+    storage_version:int -> blueprint_number:Z.t -> chunk_index:int -> path
 
-  val nb_chunks : blueprint_number:Z.t -> path
+  val nb_chunks : storage_version:int -> blueprint_number:Z.t -> path
 
-  val generation : blueprint_number:Z.t -> path
+  val generation : storage_version:int -> blueprint_number:Z.t -> path
 end
 
 (** Paths related to blocks. *)
@@ -168,7 +171,7 @@ end
 (** Paths related to block headers. *)
 module BlockHeader : sig
   (** Path to the current block header. *)
-  val current : path
+  val current : storage_version:int -> path
 end
 
 (** Can't be used if storage version >= 41 *)
@@ -195,21 +198,21 @@ end
 
 module Delayed_transaction : sig
   (** Path to the list of hashes of the delayed inbox. *)
-  val hashes : path
+  val hashes : storage_version:int -> path
 
   (** Path to the delayed transaction. *)
-  val transaction : hash -> path
+  val transaction : storage_version:int -> hash -> path
 end
 
 module Evm_events : sig
   (** Path to the list of events of the kernel. *)
-  val events : path
+  val events : storage_version:int -> path
 
   (** Path to the length. *)
-  val length : path
+  val length : storage_version:int -> path
 
   (** Path to the nth event of the kernel. *)
-  val nth_event : int -> path
+  val nth_event : storage_version:int -> int -> path
 end
 
 module Trace : sig
@@ -242,15 +245,17 @@ module Trace : sig
 end
 
 module Chain_configuration : sig
-  val minimum_base_fee_per_gas : L2_types.chain_id -> path
+  val minimum_base_fee_per_gas :
+    storage_version:int -> L2_types.chain_id -> path
 
-  val da_fee_per_byte : L2_types.chain_id -> path
+  val da_fee_per_byte : storage_version:int -> L2_types.chain_id -> path
 
-  val maximum_gas_per_transaction : L2_types.chain_id -> path
+  val maximum_gas_per_transaction :
+    storage_version:int -> L2_types.chain_id -> path
 
-  val chain_family : L2_types.chain_id -> path
+  val chain_family : storage_version:int -> L2_types.chain_id -> path
 
-  val world_state : L2_types.chain_id -> path
+  val world_state : storage_version:int -> L2_types.chain_id -> path
 end
 
 module Feature_flags : sig

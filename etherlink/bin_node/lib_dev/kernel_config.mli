@@ -61,6 +61,7 @@ val make :
     generates a configuration file located at [output] for the chain [l2_chain_id],
     where [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
 val make_l2 :
+  ?kernel_compat:Constants.kernel ->
   eth_bootstrap_balance:Z.t ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->

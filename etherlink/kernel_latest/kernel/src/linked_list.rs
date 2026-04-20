@@ -229,11 +229,15 @@ where
     /// If the list does not exist, a new empty list is created.
     /// Otherwise the existing list is read from the storage.
     pub fn new(path: &impl Path, host: &impl StorageV1) -> Result<Self> {
-        let list = Self::read(host, path)?.unwrap_or(Self {
+        let mut list = Self::read(host, path)?.unwrap_or(Self {
             path: path.into(),
             pointers: None,
             _type: PhantomData,
         });
+        // Always use the caller-supplied path. The serialised metadata
+        // may contain a stale path when the subtree has been relocated
+        // (e.g. /evm/delayed-inbox → /base/delayed-inbox by V53).
+        list.path = path.into();
         Ok(list)
     }
 

@@ -27,7 +27,7 @@ use tezos_tezlink::operation::Operation;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
-pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/evm/delayed-inbox");
+pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/base/delayed-inbox");
 
 // Maximum number of transaction included in a blueprint when
 // forcing timed-out transactions from the delayed inbox.
@@ -35,7 +35,7 @@ pub const DEFAULT_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH: u16 = 1000;
 
 // Path to override the default value.
 pub const MAX_DELAYED_INBOX_BLUEPRINT_LENGTH_PATH: RefPath =
-    RefPath::assert_from(b"/evm/max_delayed_inbox_blueprint_length");
+    RefPath::assert_from(b"/base/max_delayed_inbox_blueprint_length");
 
 // Tag that indicates the delayed transaction is a eth transaction.
 pub const DELAYED_TRANSACTION_TAG: u8 = 0x01;

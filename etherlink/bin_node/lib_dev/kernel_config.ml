@@ -17,9 +17,10 @@ let make_instr ?(path_prefix = ["evm"]) ?(convert = Fun.id) arg_opt =
          Installer_config.make ~key:(path_prefix ^ key) ~value:(convert value))
   |> Option.to_list
 
-let make_l2_config_instr ?(convert = Fun.id) ~l2_chain_id config =
+let make_l2_config_instr ?(convert = Fun.id) ?(root = "evm") ~l2_chain_id config
+    =
   make_instr
-    ~path_prefix:["evm"; "chain_configurations"; l2_chain_id]
+    ~path_prefix:[root; "chain_configurations"; l2_chain_id]
     ~convert
     config
 
@@ -82,11 +83,26 @@ let clean_path path =
     []
     (List.rev path)
 
-let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
-    ?eth_bootstrap_accounts ?tez_bootstrap_accounts ?tez_bootstrap_contracts
-    ?minimum_base_fee_per_gas ?michelson_to_evm_gas_multiplier ?da_fee_per_byte
-    ?sequencer_pool_address ?maximum_gas_per_transaction ?set_account_code
-    ?world_state_path ~l2_chain_id ~l2_chain_family ~output () =
+let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
+    ~tez_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+    ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
+    ?michelson_to_evm_gas_multiplier ?da_fee_per_byte ?sequencer_pool_address
+    ?maximum_gas_per_transaction ?set_account_code ?world_state_path
+    ~l2_chain_id ~l2_chain_family ~output () =
+  (* Phase 2 of the durable storage reorganization (storage version V53)
+     moves /evm/chain_configurations/<id>/* to /base/chain_configurations/<id>/*.
+     Match the same gate used by [make] for governance/config keys. *)
+  let chain_configurations_root =
+    if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then "base"
+    else "evm"
+  in
+  let make_l2_config_instr ?convert ~l2_chain_id config =
+    make_l2_config_instr
+      ?convert
+      ~root:chain_configurations_root
+      ~l2_chain_id
+      config
+  in
   let world_state_prefix =
     match world_state_path with
     | None -> ["evm"; "world_state"; l2_chain_id]
@@ -464,6 +480,18 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         Installer_config.make ~key:(Tezosx.feature_flag runtime) ~value:"")
       with_runtimes
   in
+  (* Phase 2 of the durable storage reorganization (storage version V53)
+     moves governance / sequencing / config installer-set paths from
+     /evm/ to /base/. When [kernel_compat] is Latest (the dev kernel
+     including the V53 migration) we install them under /base/, otherwise
+     under the legacy /evm/ prefix. *)
+  let governance_in_base =
+    Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat)
+  in
+  let base_or_evm_prefix = if governance_in_base then ["base"] else ["evm"] in
+  let make_governance_instr ?convert arg =
+    make_instr ?convert ~path_prefix:base_or_evm_prefix arg
+  in
   let instrs =
     (if Constants.(kernel_is_newer ~than:Mainnet_beta kernel_compat) then
        make_instr ~path_prefix:["evm"; "world_state"] ticketer
@@ -471,7 +499,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ (if Constants.(kernel_is_newer ~than:FarfadetR2 kernel_compat) then
          make_instr ~path_prefix:["evm"; "world_state"] sequencer
        else make_instr sequencer)
-    @ make_instr
+    @ make_governance_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
@@ -484,10 +512,11 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
              |> Bytes.to_string
              |> fun s -> ("chain_id", s))
            michelson_runtime_chain_id)
-    @ make_instr delayed_bridge @ make_instr admin
+    @ make_governance_instr delayed_bridge
+    @ make_governance_instr admin
     @ make_instr sequencer_governance
-    @ make_instr kernel_governance
-    @ make_instr kernel_security_governance
+    @ make_governance_instr kernel_governance
+    @ make_governance_instr kernel_security_governance
     @ make_instr evm_version
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "fees"]
@@ -501,20 +530,22 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         ~path_prefix:["evm"; "world_state"; "fees"]
         ~convert:parse_z_to_padded_32_le_int_bytes
         da_fee_per_byte
-    @ make_instr ~convert:le_int64_bytes delayed_inbox_timeout
-    @ make_instr ~convert:le_int64_bytes delayed_inbox_min_levels
+    @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_timeout
+    @ make_governance_instr ~convert:le_int64_bytes delayed_inbox_min_levels
     @ make_instr
         ~convert:(fun addr ->
           match Misc.normalize_hex addr with
           | Ok hex -> Hex.to_bytes_exn hex |> String.of_bytes
           | Error _ -> raise (Invalid_argument "sequencer_pool_address"))
         sequencer_pool_address
-    @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
+    @ make_governance_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
-    @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
+    @ make_governance_instr
+        ~convert:le_int64_bytes
+        max_blueprint_lookahead_in_seconds
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
     @ set_first_big_map_id @ set_account_code
-    @ make_instr remove_whitelist
+    @ make_governance_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "feature_flags"]
@@ -529,7 +560,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "feature_flags"]
         enable_fast_fa_withdrawal
-    @ make_instr ~convert:decimal_list_to_bytes dal_slots
+    @ make_governance_instr ~convert:decimal_list_to_bytes dal_slots
     @ make_instr
         ~convert:(fun s ->
           let open Evm_node_lib_dev_encoding.Rlp in
@@ -557,12 +588,13 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           (* RLP-encode the list *)
           let rlp_item = List encoded_list in
           Bytes.to_string (encode rlp_item))
+        ~path_prefix:base_or_evm_prefix
         dal_publishers_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
     @ make_instr
         ~path_prefix:["tezlink"; "feature_flags"]
         enable_michelson_gas_refund
-    @ make_instr
+    @ make_governance_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
     @ chain_ids_instr @ with_runtimes

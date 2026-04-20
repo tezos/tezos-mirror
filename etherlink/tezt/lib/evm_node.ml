@@ -1913,7 +1913,7 @@ let make_kernel_installer_config (kernel_setup : kernel_setup) ~output () =
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
 
-let make_l2_kernel_installer_config ?chain_id ?chain_family
+let make_l2_kernel_installer_config ?kernel_compat ?chain_id ?chain_family
     ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
     ?michelson_to_evm_gas_multiplier ?(da_fee_per_byte = Wei.zero)
@@ -1928,6 +1928,7 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
   in
   let cmd =
     ["make"; "l2"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_compat
     @ Cli_arg.optional_arg "l2-chain-id" string_of_int chain_id
     @ Cli_arg.optional_arg "l2-chain-family" Fun.id chain_family
     @ Cli_arg.optional_arg

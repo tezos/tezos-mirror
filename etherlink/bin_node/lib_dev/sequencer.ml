@@ -167,7 +167,7 @@ let loop_sequencer multichain ?sandbox_config ~rpc_timeout
           in
           loop Misc.(now ()))
 
-let activate_tezlink chain_id =
+let activate_tezlink ~storage_version chain_id =
   let open Lwt_result_syntax in
   let* () =
     Evm_context.patch_state
@@ -185,7 +185,10 @@ let activate_tezlink chain_id =
   in
   let* () =
     Evm_context.patch_state
-      ~key:(Format.sprintf "/evm/chain_configurations/%d/chain_family" chain_id)
+      ~key:
+        (Durable_storage_path.Chain_configuration.chain_family
+           ~storage_version
+           (L2_types.Chain_id.of_string_exn (string_of_int chain_id)))
       ~value:"Michelson"
       ()
   in
@@ -324,9 +327,14 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         let* () =
           Option.iter_es
             (fun kernel_verbosity ->
+              let value =
+                Events.string_from_kernel_log_level kernel_verbosity
+              in
               Evm_context.patch_state
-                ~key:Durable_storage_path.kernel_verbosity
-                ~value:(Events.string_from_kernel_log_level kernel_verbosity)
+                ~key:
+                  (Durable_storage_path.kernel_verbosity
+                     ~storage_version:head.storage_version)
+                ~value
                 ())
             kernel_verbosity
         in
@@ -341,7 +349,11 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         let* () =
           Option.iter_es
             (fun (tezlink : tezlink_sandbox) ->
-              let* () = activate_tezlink tezlink.chain_id in
+              let* () =
+                activate_tezlink
+                  ~storage_version:head.storage_version
+                  tezlink.chain_id
+              in
               let bootstrap_balances =
                 Data_encoding.Binary.to_string_exn
                   Tezos_types.Tez.encoding

@@ -34,13 +34,13 @@ val normalize : string -> string
 (** Path in the Wasm PVM durable storage. *)
 type path = string
 
-val delayed_inbox : path
+val delayed_inbox : Kernel.t -> path
 
 (** [kernel_root_hash] is the path to the current kernel root hash. *)
-val kernel_root_hash : path
+val kernel_root_hash : Kernel.t -> path
 
 (** [kernel_version] is the path to the current kernel version. *)
-val kernel_version : path
+val kernel_version : Kernel.t -> path
 
 (** [indexes] is the directory with all indexes category. *)
 val indexes : path
@@ -70,13 +70,13 @@ val code : string -> path
 val storage : string -> ?key:string -> unit -> path
 
 (** [admin] is the path to the administrator contract. *)
-val admin : path
+val admin : Kernel.t -> path
 
 (** [kernel_governance] is the path to the kernel governance contract. *)
-val kernel_governance : path
+val kernel_governance : Kernel.t -> path
 
 (** [kernel_security_governance] is the path to the security governance contract. *)
-val kernel_security_governance : path
+val kernel_security_governance : Kernel.t -> path
 
 (** [sequencer_governance] is the path to the governance contract
     administrating the sequencer. *)
@@ -93,13 +93,13 @@ val sequencer : Kernel.t -> path
 val sequencer_pool_address : path
 
 (** [dal_publishers_whitelist] is the path to the whitelist of authorized DAL publishers. *)
-val dal_publishers_whitelist : path
+val dal_publishers_whitelist : Kernel.t -> path
 
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
 
 (** [delayed_bridge_path] is the path to the delayed transaction bridge contract. *)
-val delayed_bridge_path : path
+val delayed_bridge_path : Kernel.t -> path
 
 (** [da_fee_per_byte_path] is the path to the da fee per byte, charged on every transaction. *)
 val da_fee_per_byte_path : path
@@ -109,11 +109,11 @@ val minimum_base_fee_per_gas : path
 
 (** [delayed_inbox_timeout] is the path to the timeout for
     delayed transactions. *)
-val delayed_inbox_timeout : path
+val delayed_inbox_timeout : Kernel.t -> path
 
 (** [delayed_inbox_min_levels] is the path to the minimum number of L1 levels
     needed to have passed to consider a timeout. *)
-val delayed_inbox_min_levels : path
+val delayed_inbox_min_levels : Kernel.t -> path
 
 (** [reveal_config] is the path to the storage configuration. *)
 val reveal_config : Kernel.t -> path

@@ -2645,7 +2645,8 @@ let make_l2_kernel_config_command =
     ~desc:
       "Produce a file containing the part of the kernel configuration \
        instructions related to a particular L2 chain."
-    (args13
+    (args14
+       kernel_compat_arg
        (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
        (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
@@ -2679,7 +2680,8 @@ let make_l2_kernel_config_command =
          ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
-    (fun ( minimum_base_fee_per_gas,
+    (fun ( kernel_compat,
+           minimum_base_fee_per_gas,
            da_fee_per_byte,
            sequencer_pool_address,
            maximum_gas_per_transaction,
@@ -2704,6 +2706,7 @@ let make_l2_kernel_config_command =
         | Some l2_chain_id -> return (Chain_id.to_string l2_chain_id)
       in
       Evm_node_lib_dev.Kernel_config.make_l2
+        ?kernel_compat
         ~eth_bootstrap_balance
         ~tez_bootstrap_balance
         ?eth_bootstrap_accounts

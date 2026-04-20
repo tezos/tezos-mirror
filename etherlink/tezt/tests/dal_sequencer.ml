@@ -167,7 +167,7 @@ let test_publish_blueprints_on_dal_with_whitelist ~dal_slot
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
            ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/dal_publishers_whitelist"
+           ~key:(Durable_storage_path.dal_publishers_whitelist Kernel.Latest)
            ()
     in
     match whitelist_hex with

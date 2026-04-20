@@ -262,12 +262,13 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
   in
   return values
 
-let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
-    =
+let store_blueprint_chunk ~storage_version evm_state
+    (chunk : Sequencer_blueprint.unsigned_chunk) =
   let open Lwt_result_syntax in
   let (Qty number) = chunk.number in
   let key =
     Durable_storage_path.Blueprint.chunk
+      ~storage_version
       ~blueprint_number:number
       ~chunk_index:chunk.chunk_index
   in
@@ -286,25 +287,37 @@ let store_blueprint_chunks ~blueprint_number evm_state
   let open Lwt_result_syntax in
   let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
   let nb_chunks = List.length chunks in
-  let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
+  let* version = Durable_storage.storage_version evm_state in
+  let* evm_state =
+    List.fold_left_es
+      (store_blueprint_chunk ~storage_version:version)
+      evm_state
+      chunks
+  in
   let* evm_state =
     Durable_storage.write
-      (Raw_path (Durable_storage_path.Blueprint.nb_chunks ~blueprint_number))
+      (Raw_path
+         (Durable_storage_path.Blueprint.nb_chunks
+            ~storage_version:version
+            ~blueprint_number))
       (Bytes.of_string (Z.to_bits (Z.of_int nb_chunks)))
       evm_state
   in
-  let* version = Durable_storage.storage_version evm_state in
   if version >= 39 then
     let* current_generation =
       Durable_storage.inspect_durable_and_decode_default
         ~default:Qty.zero
         evm_state
-        Durable_storage_path.Blueprint.current_generation
+        (Durable_storage_path.Blueprint.current_generation
+           ~storage_version:version)
         Ethereum_types.decode_number_le
     in
     let* evm_state =
       Durable_storage.write
-        (Raw_path (Durable_storage_path.Blueprint.generation ~blueprint_number))
+        (Raw_path
+           (Durable_storage_path.Blueprint.generation
+              ~storage_version:version
+              ~blueprint_number))
         (encode_u256_le current_generation)
         evm_state
     in
@@ -582,8 +595,10 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =
+  let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   Durable_storage.delete_dir
-    (Raw_path Durable_storage_path.delayed_inbox)
+    (Raw_path (Durable_storage_path.delayed_inbox ~storage_version))
     evm_state
 
 let wasm_pvm_version state = Pvm.Kernel.get_wasm_version state
@@ -605,9 +620,13 @@ let preload_kernel ~pool evm_state =
 
 let get_delayed_inbox_item evm_state hash =
   let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   let* bytes =
     Durable_storage.read_opt
-      (Raw_path (Durable_storage_path.Delayed_transaction.transaction hash))
+      (Raw_path
+         (Durable_storage_path.Delayed_transaction.transaction
+            ~storage_version
+            hash))
       evm_state
   in
   let*? bytes =
@@ -629,8 +648,10 @@ let get_delayed_inbox_item evm_state hash =
   | _ -> failwith "invalid delayed inbox item"
 
 let clear_events evm_state =
+  let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   Durable_storage.delete_dir
-    (Raw_path Durable_storage_path.Evm_events.events)
+    (Raw_path (Durable_storage_path.Evm_events.events ~storage_version))
     evm_state
 
 let clear_block_storage chain_family block evm_state =
@@ -692,9 +713,11 @@ let clear_block_storage chain_family block evm_state =
 
 let delayed_inbox_hashes evm_state =
   let open Lwt_result_syntax in
+  let* storage_version = Durable_storage.storage_version evm_state in
   let* keys =
     Durable_storage.subkeys
-      (Raw_path Durable_storage_path.Delayed_transaction.hashes)
+      (Raw_path
+         (Durable_storage_path.Delayed_transaction.hashes ~storage_version))
       evm_state
   in
   let hashes =
