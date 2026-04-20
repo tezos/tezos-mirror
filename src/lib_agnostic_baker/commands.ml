@@ -144,6 +144,13 @@ module Dal = struct
       ~long:"no-check"
       ()
 
+  let compress =
+    Tezos_clic.switch
+      ~doc:
+        "Export as a compressed tar archive instead of a plain data directory."
+      ~long:"compress"
+      ()
+
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -173,13 +180,14 @@ module Dal = struct
     let snapshot_export =
       let open Tezos_clic in
       let args =
-        args6
+        args7
           data_dir
           config_file
           endpoint
           min_published_level
           max_published_level
           slots
+          compress
       in
       command
         ~group
@@ -197,7 +205,8 @@ module Dal = struct
                endpoint,
                min_published_level,
                max_published_level,
-               slots )
+               slots,
+               compress )
              path_list
              _cctxt
            ->
@@ -214,6 +223,7 @@ module Dal = struct
           let min_level = Option.map Int32.of_int min_published_level in
           let max_level = Option.map Int32.of_int max_published_level in
           Snapshot.export
+            ~compress
             ~data_dir
             ~config_file
             ~endpoint
