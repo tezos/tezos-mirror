@@ -26,6 +26,11 @@
 
 ### Storage changes
 
+- Read the `enable_multichain` and `enable_tezos_runtime` feature flags
+  unconditionally from `/base/feature_flags/`. Installer configuration
+  still writes all feature flags to their legacy locations when the
+  target kernel predates V54. (!21668)
+
 - Read governance, sequencing, DAL, blueprints, delayed inbox, chain
   configurations and kernel events from `/base/...` on V53+ kernels,
   and from `/evm/...` on older kernels. (!21565)
