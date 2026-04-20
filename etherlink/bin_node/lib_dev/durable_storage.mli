@@ -13,38 +13,61 @@
     modeled in the GADT. New code should add typed constructors
     instead of using [Raw_path]. *)
 
-(** {2 Typed path GADT} *)
+(** {2 Typed path GADT}
 
-type _ path =
-  | Raw_path : string -> bytes path
-  | Chain_id : L2_types.chain_id path
-  | Michelson_runtime_chain_id : L2_types.chain_id path
-  | Kernel_version : string path
-  | Kernel_root_hash : Ethereum_types.hex path
-  | Multichain_flag : unit path
-  | Sequencer_key : Signature.Public_key.t path
-  | Chain_config_family : L2_types.chain_id -> L2_types.ex_chain_family path
-  | Tezosx_feature_flag : Tezosx.runtime -> unit path
-  | Michelson_runtime_sunrise_level : Ethereum_types.quantity path
+    A path carries two phantom parameters: the decoded value type ['a]
+    and a capability row ['cap] made of the polymorphic-variant tags
+    [`Read] and [`Write]. The alias {!rw} (read+write) names the row
+    every current path uses. [Raw_path] is the escape hatch that
+    decodes to raw bytes; new code should add typed constructors with
+    the precise capability row instead. *)
+
+(** Phantom capability marker for [path]: [rw] is read+write. *)
+type rw = [`Read | `Write]
+
+type ('a, 'cap) path =
+  | Raw_path : string -> (bytes, rw) path
+  | Chain_id : (L2_types.chain_id, rw) path
+  | Michelson_runtime_chain_id : (L2_types.chain_id, rw) path
+  | Kernel_version : (string, rw) path
+  | Kernel_root_hash : (Ethereum_types.hex, rw) path
+  | Multichain_flag : (unit, rw) path
+  | Sequencer_key : (Signature.Public_key.t, rw) path
+  | Chain_config_family :
+      L2_types.chain_id
+      -> (L2_types.ex_chain_family, rw) path
+  | Tezosx_feature_flag : Tezosx.runtime -> (unit, rw) path
+  | Michelson_runtime_sunrise_level : (Ethereum_types.quantity, rw) path
   | Current_block_number :
       _ L2_types.chain_family
-      -> Ethereum_types.quantity path
+      -> (Ethereum_types.quantity, rw) path
 
 (** {2 Typed operations} *)
 
+(** [storage_version state] reads the kernel storage-version integer from
+    [state], or [0] if no version marker is present. *)
 val storage_version : Pvm.State.t -> int tzresult Lwt.t
 
-val read : 'a path -> Pvm.State.t -> 'a tzresult Lwt.t
+(** [read p state] decodes the value at path [p] from [state] and fails if
+    no value is present. *)
+val read : ('a, [> `Read]) path -> Pvm.State.t -> 'a tzresult Lwt.t
 
-val read_opt : 'a path -> Pvm.State.t -> 'a option tzresult Lwt.t
+(** [read_opt p state] is [Some v] when a value is present at [p], and [None]
+    otherwise. *)
+val read_opt : ('a, [> `Read]) path -> Pvm.State.t -> 'a option tzresult Lwt.t
 
-val write : 'a path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
+(** [write p value state] encodes [value] and stores it at [p]. *)
+val write : ('a, rw) path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
-val delete : 'a path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
+(** [delete p state] removes the value stored at [p]. *)
+val delete : ('a, rw) path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
-val exists : 'a path -> Pvm.State.t -> bool tzresult Lwt.t
+(** [exists p state] is [true] iff a value is stored at the exact leaf
+    path [p]. For directory checks, use {!exists_dir} on a {!dir}. *)
+val exists : ('a, 'cap) path -> Pvm.State.t -> bool tzresult Lwt.t
 
-
+(** [list_runtimes state] enumerates the TezosX runtimes whose feature
+    flag is set in [state]. *)
 val list_runtimes : Pvm.State.t -> Tezosx.runtime list tzresult Lwt.t
 
 (** Directory paths in the durable storage. Unlike {!path}, a [dir] does
