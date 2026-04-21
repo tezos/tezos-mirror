@@ -6147,6 +6147,7 @@ let _octez_scoru_wasm_tests =
       "test_protocol_migration";
       "test_reveal";
       "test_wasm_encoding";
+      "test_wasm_pvm_config";
       "test_wasm_pvm_encodings";
       "test_wasm_pvm";
       "test_wasm_vm";
