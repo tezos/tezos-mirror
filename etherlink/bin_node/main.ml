@@ -118,12 +118,31 @@ module Params = struct
         if uri = "" then return_none else return_some (Uri.of_string uri))
 
   let runtime =
-    Tezos_clic.parameter (fun _ ->
+    Tezos_clic.parameter (fun _ s ->
         let open Lwt_result_syntax in
         let open Evm_node_lib_dev.Tezosx in
-        function
+        let name, _target_sunrise_level =
+          match String.index_opt s ':' with
+          | None -> (s, None)
+          | Some i ->
+              let name = String.sub s 0 i in
+              let level_str = String.sub s (i + 1) (String.length s - i - 1) in
+              (name, Some level_str)
+        in
+        let* _target_sunrise_level =
+          match _target_sunrise_level with
+          | None -> return_none
+          | Some level_str -> (
+              match int_of_string_opt level_str with
+              | Some n -> return_some n
+              | None ->
+                  failwith
+                    "Invalid target sunrise level '%s', expected an integer"
+                    level_str)
+        in
+        match name with
         | "tezos" -> return Tezos
-        | name ->
+        | _ ->
             let open Format in
             failwith
               "Unexpected runtime name '%s', supported values are %a"
@@ -842,10 +861,11 @@ let enable_runtime_arg =
   Tezos_clic.multiple_arg
     ~doc:
       "Enable a Tezos X experimental runtime alongside the default Ethereum \
-       runtime of Etherlink"
+       runtime of Etherlink. An optional target sunrise level can be provided \
+       with the syntax RUNTIME:TARGET_SUNRISE_LEVEL."
     ~long:"with-runtime"
     ~short:'r'
-    ~placeholder:"RUNTIME"
+    ~placeholder:"RUNTIME[:TARGET_SUNRISE_LEVEL]"
     Params.runtime
 
 let evm_node_private_endpoint_arg =
