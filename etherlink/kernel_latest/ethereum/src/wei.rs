@@ -29,7 +29,7 @@ pub enum ErrorMutezFromWei {
 ///
 /// Units: base_fee_per_gas (wei/evm_gas) * multiplier (evm_gas/michelson_gas)
 ///        * gas (michelson_gas) = wei, then / 10^12 (wei/mutez) = mutez.
-pub fn gas_to_mutez(base_fee_per_gas: U256, multiplier: u64, gas: u64) -> u64 {
+pub fn michelson_gas_to_mutez(base_fee_per_gas: U256, multiplier: u64, gas: u64) -> u64 {
     let wei = base_fee_per_gas * U256::from(multiplier) * U256::from(gas);
     // NB: Convert back to mutez with a floor division.
     // (precision loss if gas_fee_wei < 1 mutez)

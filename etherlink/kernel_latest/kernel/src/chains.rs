@@ -42,7 +42,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
-    wei::{eth_from_mutez, gas_to_mutez, mutez_from_wei},
+    wei::{eth_from_mutez, michelson_gas_to_mutez, mutez_from_wei},
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_tezlink::operation::ManagerOperationField;
@@ -999,7 +999,7 @@ fn get_fees_data(
             .try_fold(0u64, |acc, x| acc.checked_add(x))
             .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
 
-        let required_execution_gas_fees = gas_to_mutez(
+        let required_execution_gas_fees = michelson_gas_to_mutez(
             base_fee_per_gas,
             michelson_to_evm_gas_multiplier,
             total_gas_limit,
