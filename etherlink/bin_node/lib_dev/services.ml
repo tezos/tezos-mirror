@@ -737,7 +737,9 @@ let get_fee_history block_count block_parameter config ro_ctxt =
           (Z.to_float @@ Qty.to_z block.gasLimit)
         :: history_acc.gas_used_ratio
       in
-      (* 0 for block pre EIP-1559 *)
+      (* Fallback to 0 if [baseFeePerGas] is absent. v0 blocks now carry
+         the kernel's default 1 Gwei, so this default only applies to
+         decoded blocks where the field is genuinely missing. *)
       let block_base_fee_per_gas =
         Option.value block.baseFeePerGas ~default:Qty.zero
       in

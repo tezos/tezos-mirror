@@ -110,6 +110,11 @@ val pp_quantity : Format.formatter -> quantity -> unit
 
 val quantity_of_z : Z.t -> quantity
 
+(** Default minimum base fee per gas, set to 1 Gwei.
+    This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
+    the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
+val default_minimum_base_fee_per_gas : Z.t
+
 val decode_number_le : bytes -> quantity
 
 val decode_number_be : bytes -> quantity
