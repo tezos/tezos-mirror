@@ -157,6 +157,7 @@ where
     match contract {
         EnshrinedContracts::TezosXGateway => {
             if entrypoint.is_default() {
+                charge_gateway_base_cost(ctx)?;
                 let TypedValue::String(dest) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected string for default entrypoint".into(),
@@ -167,8 +168,12 @@ where
                 dispatch_crac_call(registry, journal, ctx, request)?;
                 Ok(vec![])
             } else if entrypoint.as_str() == "call_evm" {
+                charge_gateway_base_cost(ctx)?;
                 let (dest, method_sig, abi_params, callback) =
                     extract_call_params(typed)?;
+                ctx.operation_gas()
+                    .cast_and_consume_milligas(SELECTOR_COMPUTATION_MILLIGAS)
+                    .map_err(|_| TransferError::OutOfGas)?;
                 let selector = compute_selector(&method_sig);
                 let mut calldata = Vec::with_capacity(4 + abi_params.len());
                 calldata.extend_from_slice(&selector);
@@ -177,7 +182,15 @@ where
                 let response_body = dispatch_crac_call(registry, journal, ctx, request)?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
+                charge_gateway_base_cost(ctx)?;
                 let (request, callback) = extract_http_call_request(typed)?;
+                let num_user_headers = request.headers().len() as u64;
+                ctx.operation_gas()
+                    .cast_and_consume_milligas(
+                        num_user_headers
+                            .saturating_mul(HEADER_VALIDATION_PER_HEADER_MILLIGAS),
+                    )
+                    .map_err(|_| TransferError::OutOfGas)?;
                 let body = dispatch_crac_call(registry, journal, ctx, request)?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
@@ -190,6 +203,9 @@ where
                 // For now we accept the bytes but discard them.
                 // Storing the value in the CRAC frame is handled in a
                 // follow-up issue.
+                //
+                // TODO: L2-1224 define a gas model for %collect_result
+                // and charge it here.
                 let TypedValue::Bytes(_payload) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
@@ -226,12 +242,39 @@ where
     }
 }
 
-// Callback dispatch gas costs in milligas (estimated, not benchmarked):
-// ~100 for Micheline Bytes payload assembly + ~120 for TRANSFER_TOKENS
-// operation allocation. The `contract bytes` typing cost is NOT included —
-// it is paid when the operation executes.
-// TODO: L2-1187 validate with benchmarks before mainnet.
+// ── Gateway gas constants (milligas) ─────────────────────────────────
+
+/// Fixed overhead for all gateway entrypoints (value extraction, HTTP
+/// construction, header injection, gas conversion, response parsing).
+/// Micheline typechecking is metered separately by the MIR typechecker.
+const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
+
+/// Surcharge when amount > 0 (balance reset after value transfer).
+/// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
+const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 = 500_000;
+
+/// Per user-supplied header validation in %call (string prefix check).
+const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 1_000;
+
+/// Keccak256 selector computation in %call_evm.
+const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
+
+/// Callback TRANSFER_TOKENS dispatch (~100 Micheline Bytes assembly
+/// + ~120 operation allocation).
 const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
+
+/// Durable storage read for alias lookup, equivalent to cold SLOAD
+/// (2,100 EVM gas × 100).
+pub(crate) const ALIAS_CACHE_HIT_MILLIGAS: u64 = 210_000;
+
+/// Charge the fixed per-call overhead for gateway entrypoints that
+/// cross into another runtime (HTTP request construction, header
+/// injection, response parsing).
+fn charge_gateway_base_cost(ctx: &mut impl HasOperationGas) -> Result<(), TransferError> {
+    ctx.operation_gas()
+        .cast_and_consume_milligas(TEZOSX_GATEWAY_BASE_COST_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)
+}
 
 /// If `destination` is `Some`, deduct gas and return a `TRANSFER_TOKENS`
 /// operation that sends `response_body` as `bytes` to the callback contract.
@@ -740,11 +783,6 @@ where
     Ok((alias_str, consumed))
 }
 
-// Alias gas costs in Tezos milligas.
-// Cache hit: durable storage read, equivalent to cold SLOAD (2,100 EVM gas
-// * 100 milligas/gas).
-pub(crate) const ALIAS_CACHE_HIT_MILLIGAS: u64 = 210_000;
-
 /// Build a `CrossRuntimeContext` from the current execution context.
 fn cross_runtime_ctx_from_ctx<'a, Host>(
     ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
@@ -792,6 +830,12 @@ where
 {
     if ctx.amount() < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()).into());
+    }
+
+    if ctx.amount() > 0 {
+        ctx.operation_gas()
+            .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
+            .map_err(|_| TransferError::OutOfGas)?;
     }
 
     let target_host = request.uri().host().map(str::to_string);
@@ -1257,13 +1301,14 @@ mod tests {
         let gas_after_second = ctx.operation_gas().remaining.milligas().unwrap();
 
         let second_call_cost = u64::from(gas_after_first - gas_after_second);
-        // Second call should cost at most 2 * ALIAS_CACHE_HIT_MILLIGAS for aliases
-        // (plus some overhead for context headers, etc.)
+        // Second call should cost at most 2 * ALIAS_CACHE_HIT_MILLIGAS for
+        // aliases + VALUE_TRANSFER_SURCHARGE_MILLIGAS (amount > 0).
+        let expected_max =
+            2 * ALIAS_CACHE_HIT_MILLIGAS + VALUE_TRANSFER_SURCHARGE_MILLIGAS;
         assert!(
-            second_call_cost <= 2 * ALIAS_CACHE_HIT_MILLIGAS,
-            "Second call consumed {} milligas, expected at most {} (2x cache hit cost)",
-            second_call_cost,
-            2 * ALIAS_CACHE_HIT_MILLIGAS
+            second_call_cost <= expected_max,
+            "Second call consumed {second_call_cost} milligas, expected at most \
+             {expected_max} (2x cache hit + value transfer surcharge)",
         );
     }
 
