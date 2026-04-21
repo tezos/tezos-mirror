@@ -180,6 +180,9 @@ let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 let michelson_runtime_sunrise_level =
   EVM.make "/michelson_runtime/sunrise_level"
 
+let michelson_runtime_target_sunrise_level =
+  EVM.make "/michelson_runtime/target_sunrise_level"
+
 let maximum_allowed_ticks ~storage_version =
   if Storage_version.governance_config_moved_to_base ~storage_version then
     BASE.make "/maximum_allowed_ticks"

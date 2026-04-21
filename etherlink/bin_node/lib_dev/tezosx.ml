@@ -20,6 +20,13 @@ let pp_runtime fmt runtime =
 let feature_flag = function
   | Tezos -> Durable_storage_path.Feature_flags.tezos_runtime
 
+let target_sunrise_level_path = function
+  | Tezos -> Durable_storage_path.michelson_runtime_target_sunrise_level
+
+let encode_target_sunrise_level n =
+  Bytes.unsafe_to_string
+    (Ethereum_types.encode_u256_le (Ethereum_types.Qty (Z.of_int n)))
+
 let runtime_encoding : runtime Data_encoding.t =
   let open Data_encoding in
   (* FIXME: use string_enum instead once we have more than one runtime *)

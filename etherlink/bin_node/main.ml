@@ -121,7 +121,7 @@ module Params = struct
     Tezos_clic.parameter (fun _ s ->
         let open Lwt_result_syntax in
         let open Evm_node_lib_dev.Tezosx in
-        let name, _target_sunrise_level =
+        let name, raw_level =
           match String.index_opt s ':' with
           | None -> (s, None)
           | Some i ->
@@ -129,8 +129,8 @@ module Params = struct
               let level_str = String.sub s (i + 1) (String.length s - i - 1) in
               (name, Some level_str)
         in
-        let* _target_sunrise_level =
-          match _target_sunrise_level with
+        let* target_sunrise_level =
+          match raw_level with
           | None -> return_none
           | Some level_str -> (
               match int_of_string_opt level_str with
@@ -141,7 +141,7 @@ module Params = struct
                     level_str)
         in
         match name with
-        | "tezos" -> return Tezos
+        | "tezos" -> return (Tezos, target_sunrise_level)
         | _ ->
             let open Format in
             failwith
