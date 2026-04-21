@@ -25,31 +25,43 @@
 
 open Wasm_pvm_state.Internal_state
 
-include Wasm_vm_sig.S
+module type S = sig
+  include Wasm_vm_sig.S
 
-(** [eval_has_finished tick_state] returns [true] if the evaluation phase has
-    finished successfully. *)
-val eval_has_finished : tick_state -> bool
+  (** [eval_has_finished tick_state] returns [true] if the evaluation phase
+      has finished successfully. *)
+  val eval_has_finished : tick_state -> bool
 
-(** [patch_flags_on_eval_successful durable] clears flags set by
-    previous attempted runs of kernel_run. Once an evaluation has
-    succeeded, these can be safely deleted. *)
-val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
+  (** [patch_flags_on_eval_successful durable] clears flags set by
+      previous attempted runs of kernel_run. Once an evaluation has
+      succeeded, these can be safely deleted. *)
+  val patch_flags_on_eval_successful : Durable.t -> Durable.t Lwt.t
 
-(** [should_compute pvm_state] probes whether it is possible to continue with
-    more computational steps. *)
-val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
+  (** [should_compute pvm_state] probes whether it is possible to continue
+      with more computational steps. *)
+  val should_compute : ?reveal_builtins:Builtins.reveals -> pvm_state -> bool
 
-(** [has_reboot_flag durable] checks if the reboot flag is set in the durable storage. *)
-val has_reboot_flag : Durable.t -> bool Lwt.t
+  (** [has_reboot_flag durable] checks if the reboot flag is set in the
+      durable storage. *)
+  val has_reboot_flag : Durable.t -> bool Lwt.t
 
-(** [mark_for_reboot reboot_counter durable] figures out the computational
-    status with respect to what the PVM shall do next. E.g. schedule a reboot. *)
-val mark_for_reboot : pvm_state -> [`Forcing_yield | `Reboot | `Yielding] Lwt.t
+  (** [mark_for_reboot reboot_counter durable] figures out the computational
+      status with respect to what the PVM shall do next. *)
+  val mark_for_reboot :
+    pvm_state -> [`Forcing_yield | `Reboot | `Yielding] Lwt.t
 
-(** [next_reboot_counter pvm_state status] computes the next reboot counter. *)
-val next_reboot_counter : pvm_state -> computation_status -> Z.t
+  (** [next_reboot_counter pvm_state status] computes the next reboot
+      counter. *)
+  val next_reboot_counter : pvm_state -> computation_status -> Z.t
 
-(** [save_fallback_kernel durable] stores the current kernel as a fallback
-    kernel. *)
-val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
+  (** [save_fallback_kernel durable] stores the current kernel as a fallback
+      kernel. *)
+  val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
+end
+
+(** [Make_vm (Config)] is the WASM VM parameterised by a
+    {!Wasm_pvm_config.t}. The config is closed over by the VM body so
+    evaluator code can consult it via [Config.config]. *)
+module Make_vm (Config : sig
+  val config : Wasm_pvm_config.t
+end) : S

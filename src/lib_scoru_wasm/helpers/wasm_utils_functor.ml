@@ -7,6 +7,11 @@
 
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
+
+module Wasm_vm = Wasm_vm.Make_vm (struct
+  let config = Wasm_pvm_config.empty
+end)
+
 open Tezos_lazy_containers
 
 let parse_module code =

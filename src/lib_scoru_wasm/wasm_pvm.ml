@@ -268,7 +268,11 @@ module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) (S : Wasm_pvm_sig.STATE) :
   end
 end
 
-module Make_machine = Make_machine_with_vm (Wasm_vm)
+module Empty_config = struct
+  let config = Wasm_pvm_config.empty
+end
+
+module Make_machine = Make_machine_with_vm (Wasm_vm.Make_vm (Empty_config))
 
 module Make_pvm_machine_with_vm
     (Wasm_vm : Wasm_vm_sig.S)
@@ -281,4 +285,5 @@ module Make_pvm_machine_with_vm
   include Make_machine_with_vm (Wasm_vm) (State)
 end
 
-module Make_pvm_machine = Make_pvm_machine_with_vm (Wasm_vm)
+module Make_pvm_machine =
+  Make_pvm_machine_with_vm (Wasm_vm.Make_vm (Empty_config))

@@ -25,6 +25,11 @@
 
 open Tezos_scoru_wasm_helpers
 open Tezos_scoru_wasm
+
+module Wasm_vm = Wasm_vm.Make_vm (struct
+  let config = Wasm_pvm_config.empty
+end)
+
 open Wasm_pvm_state.Internal_state
 open Pvm_instance
 
