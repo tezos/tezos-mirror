@@ -201,6 +201,30 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_re
 pub const SIMULATION_HTTP_TRACES: RefPath =
     RefPath::assert_from(b"/evm/simulation_http_traces");
 
+/// Flag path enabling per-transaction HTTP trace capture during block
+/// replay. The `__` prefix follows the existing convention for node-driven
+/// control keys — cf. `/base/__evm_node`, `/base/__simulation/...`,
+/// `/base/__delayed_input`: the node writes the key via `alter_evm_state`
+/// just before the replay and the kernel reads it exactly once at the top
+/// of `block::produce` (outside the `SafeStorage` wrapper), then threads
+/// the resulting boolean through `compute_bip` → `compute` →
+/// `ChainConfigTrait::apply_transaction` → the three apply sites. The
+/// flag therefore has no lifetime beyond a single replay and nothing
+/// else in the kernel touches this path.
+pub const HTTP_TRACE_ENABLED: RefPath =
+    RefPath::assert_from(b"/base/__http_trace_enabled");
+
+/// Storage root under which traces are persisted per transaction.
+///
+/// This subtree *does* need to live under `/evm/world_state/` because the
+/// writes happen through the `SafeStorage`-wrapped host (the apply sites
+/// have no direct access to the underlying host): a path outside
+/// `storage_root_paths` would land in `/tmp/` and be discarded at promote
+/// instead of moved back to the real subtree. See
+/// `tezos_evm_runtime::safe_storage` for the mirror/promote mechanism.
+const HTTP_TRACES_ROOT: RefPath =
+    RefPath::assert_from(b"/evm/world_state/__http_trace/traces");
+
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
     RefPath::assert_from(b"/base/delayed_inbox_timeout");
@@ -275,6 +299,81 @@ pub fn store_simulation_http_traces(
     let encoded = stream.out();
     host.store_write(&SIMULATION_HTTP_TRACES, &encoded, 0)
         .context("Failed to write the simulation HTTP traces.")
+}
+
+/// Returns whether per-transaction HTTP trace capture is enabled for the
+/// current kernel run. Called exactly once per block, at the top of
+/// `block::produce` (and of `sub_block::handle_run_transaction`) before
+/// any `SafeStorage` wrapping, so the lookup is a single host call per
+/// block and the result is passed down through the apply chain as a
+/// plain boolean. A missing key (the common case) returns `false`; an
+/// error is treated as "flag absent" so a transient storage failure
+/// cannot crash the replay.
+pub fn is_http_trace_enabled(host: &impl StorageV1) -> bool {
+    matches!(host.store_has(&HTTP_TRACE_ENABLED), Ok(Some(_)))
+}
+
+/// Returns the durable storage path under which the HTTP traces for the
+/// transaction `tx_hash` are written when HTTP trace capture is enabled.
+pub fn http_traces_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
+    let raw_suffix: Vec<u8> = format!("/{}", hex::encode(tx_hash)).into();
+    let suffix = OwnedPath::try_from(raw_suffix)?;
+    concat(&HTTP_TRACES_ROOT, &suffix).map_err(Error::from)
+}
+
+/// Store the HTTP traces collected for a single transaction during a replay
+/// driven by the `http_trace*` RPCs. The traces are RLP-encoded as a list,
+/// using the same shape as [`store_simulation_http_traces`] so both outputs
+/// share the EVM-node-side decoder.
+pub fn store_http_traces_for_tx(
+    host: &mut impl StorageV1,
+    tx_hash: &TransactionHash,
+    traces: &[tezosx_journal::HttpTrace],
+) -> Result<(), anyhow::Error> {
+    let path = http_traces_path(tx_hash)?;
+    let mut stream = rlp::RlpStream::new_list(traces.len());
+    for trace in traces {
+        stream.append(trace);
+    }
+    let encoded = stream.out();
+    host.store_write_all(&path, &encoded)
+        .context("Failed to write the per-transaction HTTP traces.")
+}
+
+/// When `enabled` is set and the journal captured at least one HTTP
+/// exchange, persist the traces for `tx_hash`. `enabled` comes from a
+/// single read of [`HTTP_TRACE_ENABLED`] done once per block outside the
+/// `SafeStorage` wrap (see `block::produce`), so the apply sites do not
+/// re-read the flag per transaction and the flag itself does not need
+/// to live inside the world-state subtree.
+///
+/// Transactions that performed no cross-runtime HTTP call write nothing
+/// — the EVM node side treats a missing key as the empty list, so there
+/// is no observable difference and we avoid filling the trace subtree
+/// with empty-list entries on blocks where only a minority of
+/// transactions perform CRACs. Failures are logged but never
+/// propagated, so instrumentation cannot break the replay itself.
+pub fn maybe_store_http_traces_for_tx(
+    host: &mut impl StorageV1,
+    enabled: bool,
+    tx_hash: &TransactionHash,
+    journal: &tezosx_journal::TezosXJournal,
+) {
+    if !enabled {
+        return;
+    }
+    let traces = journal.http_traces();
+    if traces.is_empty() {
+        return;
+    }
+    if let Err(err) = store_http_traces_for_tx(host, tx_hash, traces) {
+        log!(
+            Error,
+            "Failed to store HTTP traces for tx {}: {:?}",
+            hex::encode(tx_hash),
+            err
+        );
+    }
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
@@ -1085,6 +1184,8 @@ pub fn read_delayed_transaction_bridge(host: &impl StorageV1) -> Option<Contract
 #[cfg(test)]
 mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::storage::StorageV1;
+    use tezosx_journal::{CracId, TezosXJournal};
 
     #[test]
     fn update_burned_fees() {
@@ -1104,5 +1205,150 @@ mod tests {
 
         let burned = super::read_burned_fees(&mut host);
         assert_eq!(fst + snd, burned);
+    }
+
+    #[test]
+    fn http_trace_flag_default_off() {
+        let host = MockKernelHost::default();
+        assert!(!super::is_http_trace_enabled(&host));
+    }
+
+    #[test]
+    fn http_trace_flag_on_once_written() {
+        let mut host = MockKernelHost::default();
+        host.store_write_all(&super::HTTP_TRACE_ENABLED, &[1u8])
+            .unwrap();
+        assert!(super::is_http_trace_enabled(&host));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_is_noop_when_disabled() {
+        let mut host = MockKernelHost::default();
+        let tx_hash = [7u8; 32];
+        let journal = TezosXJournal::new(CracId::new(0, 0));
+        super::maybe_store_http_traces_for_tx(&mut host, false, &tx_hash, &journal);
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        assert!(matches!(host.store_has(&path), Ok(None)));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_is_noop_when_journal_empty() {
+        // When the flag is on but the journal captured no HTTP exchange,
+        // we write nothing — a missing key is equivalent to the empty list
+        // on the reader side, and skipping avoids writing one RLP-encoded
+        // empty list per non-CRAC transaction on every replayed block.
+        let mut host = MockKernelHost::default();
+        let tx_hash = [42u8; 32];
+        let journal = TezosXJournal::new(CracId::new(0, 0));
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        assert!(matches!(host.store_has(&path), Ok(None)));
+    }
+
+    #[test]
+    fn maybe_store_http_traces_persists_rlp_when_journal_has_trace() {
+        // Happy path: enabled, journal captured one HTTP exchange.
+        // [maybe_store_http_traces_for_tx] writes an RLP-encoded
+        // one-element list under [http_traces_path(tx_hash)], which is what
+        // the EVM node expects to decode through [Simulation.decode_http_traces].
+        let mut host = MockKernelHost::default();
+
+        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+        let request = http::Request::builder()
+            .method("GET")
+            .uri("http://tezos/KT1abc/default")
+            .header("X-Tezos-Sender", "KT1sender")
+            .body(b"hello".to_vec())
+            .unwrap();
+        journal.record_request(&request);
+        let response = http::Response::builder()
+            .status(200)
+            .header("X-Tezos-Gas-Consumed", "42")
+            .body(b"world".to_vec())
+            .unwrap();
+        journal.record_response(response);
+        assert_eq!(journal.http_traces().len(), 1);
+
+        let tx_hash = [0xABu8; 32];
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        let bytes = host.store_read_all(&path).unwrap();
+        // Non-empty: the empty-list RLP encoding is a single 0xc0 byte.
+        assert!(
+            bytes.len() > 1,
+            "expected a non-trivial RLP payload, got {bytes:?}"
+        );
+
+        // Decoding the payload as an RLP list of [HttpTrace] yields the one
+        // exchange we recorded.
+        let rlp = rlp::Rlp::new(&bytes);
+        assert!(rlp.is_list());
+        let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].method, "GET");
+        assert_eq!(decoded[0].url, "http://tezos/KT1abc/default");
+        assert_eq!(decoded[0].response_status, 200);
+        assert_eq!(decoded[0].response_body, b"world".to_vec());
+    }
+
+    #[test]
+    fn maybe_store_http_traces_preserves_order_on_multi_trace_journal() {
+        // A realistic CRAC-heavy transaction performs several sequential
+        // HTTP calls in the same journal. Exercise the
+        // [RlpStream::new_list(traces.len())] path with two top-level
+        // exchanges and confirm the persisted list round-trips through RLP
+        // while preserving the order in which the journal recorded them
+        // (first call first).
+        let mut host = MockKernelHost::default();
+
+        let mut journal = TezosXJournal::new(CracId::new(0, 0));
+
+        // First exchange: GET /first.
+        let req1 = http::Request::builder()
+            .method("GET")
+            .uri("http://tezos/KT1abc/first")
+            .body(b"".to_vec())
+            .unwrap();
+        journal.record_request(&req1);
+        let resp1 = http::Response::builder()
+            .status(200)
+            .body(b"r1".to_vec())
+            .unwrap();
+        journal.record_response(resp1);
+
+        // Second exchange: POST /second.
+        let req2 = http::Request::builder()
+            .method("POST")
+            .uri("http://tezos/KT1abc/second")
+            .body(b"payload".to_vec())
+            .unwrap();
+        journal.record_request(&req2);
+        let resp2 = http::Response::builder()
+            .status(204)
+            .body(b"r2".to_vec())
+            .unwrap();
+        journal.record_response(resp2);
+
+        assert_eq!(journal.http_traces().len(), 2);
+
+        let tx_hash = [0xCDu8; 32];
+        super::maybe_store_http_traces_for_tx(&mut host, true, &tx_hash, &journal);
+
+        let path = super::http_traces_path(&tx_hash).unwrap();
+        let bytes = host.store_read_all(&path).unwrap();
+        let rlp = rlp::Rlp::new(&bytes);
+        let decoded: Vec<tezosx_journal::HttpTrace> = rlp.as_list().unwrap();
+
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded[0].method, "GET");
+        assert_eq!(decoded[0].url, "http://tezos/KT1abc/first");
+        assert_eq!(decoded[0].response_status, 200);
+        assert_eq!(decoded[0].response_body, b"r1".to_vec());
+        assert_eq!(decoded[1].method, "POST");
+        assert_eq!(decoded[1].url, "http://tezos/KT1abc/second");
+        assert_eq!(decoded[1].response_status, 204);
+        assert_eq!(decoded[1].request_body, b"payload".to_vec());
+        assert_eq!(decoded[1].response_body, b"r2".to_vec());
     }
 }

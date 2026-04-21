@@ -111,6 +111,13 @@ pub fn compute<Host, ChainConfig: ChainConfigTrait>(
     block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
+    // Per-replay flag threaded down from [produce] / [handle_run_transaction]:
+    // when [true], each transaction's HTTP CRAC traces are persisted under
+    // [HTTP_TRACES_ROOT] via [maybe_store_http_traces_for_tx]. Plumbed as a
+    // parameter (rather than read from durable storage inside apply_*) so the
+    // flag doesn't need to live inside the [SafeStorage]-mirrored world state
+    // subtree, and so the check happens exactly once per replay.
+    http_trace_enabled: bool,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error>
 where
     Host: StorageV1 + WithGas,
@@ -158,6 +165,7 @@ where
                 tracer_input,
                 skip_signature_check,
                 skip_fees_check,
+                http_trace_enabled,
             )?
         ) {
             ExecutionResult::Valid(execution_info) => {
@@ -300,6 +308,7 @@ pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
     da_fee_per_byte: U256,
     coinbase: H160,
     chain_header: ChainConfig::ChainHeader,
+    http_trace_enabled: bool,
 ) -> anyhow::Result<BlockComputationResult>
 where
     Host: StorageV1 + WithGas,
@@ -315,6 +324,7 @@ where
         &constants,
         sequencer_pool_address,
         tracer_input,
+        http_trace_enabled,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
@@ -432,6 +442,14 @@ where
 {
     let da_fee_per_byte = crate::retrieve_da_fee(host)?;
 
+    // Read the HTTP-trace replay flag once, before any [SafeStorage]
+    // wrapping, and thread the resulting boolean through [compute_bip] →
+    // [compute] → apply sites. The flag therefore doesn't need to live in
+    // the [SafeStorage]-mirrored world state subtree, and the common
+    // (unset) case costs a single [store_has] per block instead of one
+    // per transaction.
+    let http_trace_enabled = crate::storage::is_http_trace_enabled(host);
+
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
     // If there's a pool address, the coinbase in block constants and miner
@@ -506,6 +524,7 @@ where
         da_fee_per_byte,
         coinbase,
         chain_header,
+        http_trace_enabled,
     );
 
     match computation_result {
@@ -1961,6 +1980,7 @@ mod tests {
             &block_constants,
             None,
             None,
+            false,
         )
         .expect("Should safely ask for a reboot");
 

@@ -573,6 +573,7 @@ fn apply_ethereum_transaction_common<Host>(
     spec_id: &SpecId,
     limits: &EvmLimits,
     crac_id: CracId,
+    http_trace_enabled: bool,
 ) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error>
 where
     Host: StorageV1,
@@ -634,7 +635,7 @@ where
     log_transaction_type(to, &call_data);
     let value = transaction.value;
     let mut journal = TezosXJournal::new(crac_id);
-    let execution_outcome = match revm_run_transaction(
+    let run_result = revm_run_transaction(
         host,
         registry,
         &mut journal,
@@ -656,7 +657,20 @@ where
                 transaction.access_list.clone(),
             ),
         },
-    ) {
+    );
+
+    // Capture HTTP traces before branching on the execution outcome so that
+    // partial traces from a transaction that failed mid-execution remain
+    // observable through the [http_trace*] RPCs. Matches the behavior of the
+    // other two journal sites (Tezos / TezosDelayed).
+    crate::storage::maybe_store_http_traces_for_tx(
+        host,
+        http_trace_enabled,
+        &transaction_hash,
+        &journal,
+    );
+
+    let execution_outcome = match run_result {
         Ok(outcome) => outcome,
         Err(err) => {
             return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
@@ -1115,6 +1129,7 @@ pub fn apply_transaction<Host>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
+    http_trace_enabled: bool,
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1135,6 +1150,7 @@ where
             spec_id,
             limits,
             crac_id,
+            http_trace_enabled,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -1147,6 +1163,7 @@ where
             spec_id,
             limits,
             crac_id,
+            http_trace_enabled,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(Benchmarking, "Transaction type: DEPOSIT");
@@ -1196,7 +1213,7 @@ where
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
             let mut tezosx_journal = TezosXJournal::new(crac_id);
-            match tezos_execution::validate_and_apply_operation(
+            let validation_result = tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
                 &mut tezosx_journal,
@@ -1218,7 +1235,20 @@ where
                 skip_signature_check,
                 None,
                 None, // No fee refund for delayed inbox operations
-            ) {
+            );
+
+            // Persist HTTP traces collected in [tezosx_journal] regardless of
+            // the validation outcome so that operations that failed
+            // mid-execution still expose their captured CRAC exchanges.
+            // Matches the Tezos / Ethereum apply sites.
+            crate::storage::maybe_store_http_traces_for_tx(
+                host,
+                http_trace_enabled,
+                &transaction.tx_hash,
+                &tezosx_journal,
+            );
+
+            match validation_result {
                 Ok(processed_operations) => {
                     log!(
                         Debug,
