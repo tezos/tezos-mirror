@@ -443,6 +443,18 @@ type websocket_response = {
 type websocket_handler = JSONRPC.request -> websocket_response Lwt.t
 
 module Tezosx : sig
+  (** Shared wire shape for the three [http_trace*] replay RPCs. The
+      [Http_trace_transaction] response is a single [http_trace_entry],
+      and the two block-level variants return a list of them. All three
+      share the same JSON encoding so any future change to the
+      per-transaction wire format happens in one place. *)
+  type http_trace_entry = {
+    tx_hash : Ethereum_types.hash;
+    traces : Simulation.http_trace list;
+  }
+
+  val http_trace_entry_encoding : http_trace_entry Data_encoding.t
+
   module Get_tezos_ethereum_address :
     METHOD
       with type input = Tezos_types.Contract.t
@@ -476,4 +488,35 @@ module Tezosx : sig
 
     include METHOD with type input := input and type output := output
   end
+
+  (** Implements [http_traceTransaction]: re-runs the block containing the
+      given transaction with HTTP trace capture enabled and returns the
+      collected HTTP exchanges.
+
+      TODO: https://linear.app/tezos/issue/L2-1243
+      The [input] is currently restricted to an [Ethereum_types.hash] so
+      Tezos-originated CRACs submitted through Tezlink are not reachable
+      by this RPC (their traces are indexed under the Tezos operation
+      hash, not the fake Ethereum hash that surfaces in the EVM block).
+      Once the Tezos operation hash → block-level mapping is indexed in
+      the SQLite store we can widen [input] to accept a Tezos operation
+      hash as well and resolve it to the containing block before replay. *)
+  module Http_trace_transaction :
+    METHOD
+      with type input = Ethereum_types.hash
+       and type output = http_trace_entry
+
+  (** Implements [http_traceBlockByNumber]: re-runs the block at the given
+      block number with HTTP trace capture enabled and returns one entry per
+      transaction, in transaction order. *)
+  module Http_trace_block_by_number :
+    METHOD
+      with type input = Ethereum_types.Block_parameter.t
+       and type output = http_trace_entry list
+
+  (** Same as {!Http_trace_block_by_number} but indexed by block hash. *)
+  module Http_trace_block_by_hash :
+    METHOD
+      with type input = Ethereum_types.block_hash
+       and type output = http_trace_entry list
 end

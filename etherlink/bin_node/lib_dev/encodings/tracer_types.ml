@@ -23,6 +23,9 @@ type error +=
   | Not_supported
   | Transaction_not_found of Ethereum_types.hash
   | Block_not_found of Ethereum_types.quantity
+  | Block_hash_not_found of Ethereum_types.block_hash
+        (** Emitted by tracers that look up a block by hash (e.g.
+            [http_traceBlockByHash]) when the hash is unknown to the node. *)
   | Trace_not_found
   | Tracer_not_activated  (** Tracer only activated after a certain level *)
   | Tracer_not_implemented of string
@@ -69,6 +72,20 @@ let () =
     Data_encoding.(obj1 (req "block" Ethereum_types.quantity_encoding))
     (function Block_not_found tx -> Some tx | _ -> None)
     (fun tx -> Block_not_found tx) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_dev_block_hash_not_found"
+    ~title:"Block hash not found"
+    ~description:"The tracer failed to find a block by hash"
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "The tracer failed to find the block %a"
+        Ethereum_types.pp_block_hash
+        hash)
+    Data_encoding.(obj1 (req "block_hash" Ethereum_types.block_hash_encoding))
+    (function Block_hash_not_found hash -> Some hash | _ -> None)
+    (fun hash -> Block_hash_not_found hash) ;
   register_error_kind
     `Permanent
     ~id:"evm_node_dev_trace_not_found"

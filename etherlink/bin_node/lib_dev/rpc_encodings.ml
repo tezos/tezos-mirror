@@ -1238,6 +1238,25 @@ module Unsubscribe = struct
 end
 
 module Tezosx = struct
+  (* Shared record shape for the [http_trace*] replay RPCs. Used both as
+     the [Http_trace_transaction] response and as the list element of the
+     [Http_trace_block_by_number] / [Http_trace_block_by_hash] responses,
+     so the three methods keep identical wire shapes without maintaining
+     three independently-evolvable encoders. *)
+  type http_trace_entry = {
+    tx_hash : Ethereum_types.hash;
+    traces : Simulation.http_trace list;
+  }
+
+  let http_trace_entry_encoding =
+    Data_encoding.(
+      conv
+        (fun {tx_hash; traces} -> (tx_hash, traces))
+        (fun (tx_hash, traces) -> {tx_hash; traces})
+        (obj2
+           (req "txHash" Ethereum_types.hash_encoding)
+           (req "traces" (list Simulation.http_trace_encoding))))
+
   module Get_tezos_ethereum_address = struct
     open Ethereum_types
 
@@ -1354,6 +1373,49 @@ module Tezosx = struct
 
     type ('input, 'output) method_ += Method : (input, output) method_
   end
+
+  module Http_trace_transaction = struct
+    type input = Ethereum_types.hash
+
+    type output = http_trace_entry
+
+    let input_encoding = Data_encoding.tup1 Ethereum_types.hash_encoding
+
+    let output_encoding = http_trace_entry_encoding
+
+    let method_ = "http_traceTransaction"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Http_trace_block_by_number = struct
+    type input = Ethereum_types.Block_parameter.t
+
+    type output = http_trace_entry list
+
+    let input_encoding =
+      Data_encoding.tup1 Ethereum_types.Block_parameter.encoding
+
+    let output_encoding = Data_encoding.list http_trace_entry_encoding
+
+    let method_ = "http_traceBlockByNumber"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Http_trace_block_by_hash = struct
+    type input = Ethereum_types.block_hash
+
+    type output = http_trace_entry list
+
+    let input_encoding = Data_encoding.tup1 Ethereum_types.block_hash_encoding
+
+    let output_encoding = Data_encoding.list http_trace_entry_encoding
+
+    let method_ = "http_traceBlockByHash"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
 end
 
 type map_result =
@@ -1430,6 +1492,9 @@ let evm_supported_methods : (module METHOD) list =
     (module Tezosx.Get_tezos_ethereum_address);
     (module Tezosx.Get_ethereum_tezos_address);
     (module Tezosx.Trace_call);
+    (module Tezosx.Http_trace_transaction);
+    (module Tezosx.Http_trace_block_by_number);
+    (module Tezosx.Http_trace_block_by_hash);
     (module Send_raw_tezlink_operation);
   ]
 

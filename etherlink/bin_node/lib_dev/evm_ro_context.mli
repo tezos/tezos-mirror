@@ -126,6 +126,19 @@ val block_by_hash :
   Ethereum_types.block_hash ->
   Transaction_object.t Ethereum_types.block tzresult Lwt.t
 
+(** Same as {!block_by_hash} but returns [None] for the not-found case
+    and propagates any other error from the store unchanged, instead of
+    collapsing "hash unknown" into a generic error message. Callers that
+    need to distinguish "unknown hash" from any other failure — e.g. to
+    map the former to a structured RPC error while letting storage or
+    migration errors surface with their original trace — should use this
+    variant. *)
+val block_by_hash_opt :
+  t ->
+  full_transaction_object:bool ->
+  Ethereum_types.block_hash ->
+  Transaction_object.t Ethereum_types.block option tzresult Lwt.t
+
 val block_receipts : t -> Z.t -> Transaction_receipt.t list tzresult Lwt.t
 
 val block_range_receipts :
@@ -222,6 +235,49 @@ module Etherlink : sig
     t ->
     Ethereum_types.quantity ->
     Ethereum_types.legacy_transaction_object Ethereum_types.block tzresult Lwt.t
+end
+
+(** {2 HTTP trace operations (replay-based)} *)
+
+module Http_tracer : sig
+  (** [trace_transaction ctxt tx_hash] re-executes the block containing the
+      transaction [tx_hash] with HTTP trace capture enabled, and returns the
+      list of HTTP exchanges performed by that transaction. A transaction
+      that performed no cross-runtime HTTP call returns the empty list
+      rather than an error.
+
+      Fails with:
+      - [Tracer_types.Transaction_not_found] if the hash is unknown to the
+        node;
+      - [Tracer_types.Trace_not_found] if the replay of the containing block
+        itself failed. *)
+  val trace_transaction :
+    t -> Ethereum_types.hash -> Simulation.http_trace list tzresult Lwt.t
+
+  (** [trace_block ctxt block_number] re-executes the block at [block_number]
+      with HTTP trace capture enabled, and returns one [(tx_hash, traces)]
+      entry per transaction of the block, in block order. Transactions that
+      performed no HTTP call come back with the empty list. Blocks with no
+      transactions return the empty list without running a replay.
+
+      Fails with [Tracer_types.Trace_not_found] if the replay itself failed,
+      and propagates the underlying error if [block_number] is unknown. *)
+  val trace_block :
+    t ->
+    Ethereum_types.quantity ->
+    (Ethereum_types.hash * Simulation.http_trace list) list tzresult Lwt.t
+
+  (** Same as {!trace_block}, but resolves the block by hash.
+
+      Fails with:
+      - [Tracer_types.Block_hash_not_found] if [block_hash] is unknown to
+        the node (the same error surface as {!trace_block} for unknown
+        block numbers);
+      - [Tracer_types.Trace_not_found] if the replay itself failed. *)
+  val trace_block_by_hash :
+    t ->
+    Ethereum_types.block_hash ->
+    (Ethereum_types.hash * Simulation.http_trace list) list tzresult Lwt.t
 end
 
 (** {2 Tracer operations} *)

@@ -107,6 +107,13 @@ let trace_block_not_found block_number =
        Ethereum_types.pp_quantity
        block_number)
 
+let trace_block_hash_not_found block_hash =
+  resource_unavailable
+    (Format.asprintf
+       "Block %a unavailable for replay"
+       Ethereum_types.pp_block_hash
+       block_hash)
+
 let trace_not_found = internal_error "Trace not available"
 
 let tracer_not_implemented s =
