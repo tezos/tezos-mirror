@@ -33,7 +33,7 @@ use tezosx_interfaces::{
 use tezosx_journal::TezosXJournal;
 
 alloy_sol_types::sol! {
-    function init_tezosx_alias(string nativeAddress) external payable;
+    function init_tezosx_alias(string nativeAddress, bytes nativePublicKey) external payable;
 }
 
 pub struct EthereumRuntime {
@@ -265,6 +265,7 @@ impl RuntimeInterface for EthereumRuntime {
         host: &mut Host,
         journal: &mut TezosXJournal,
         native_address: &str,
+        native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>
@@ -322,6 +323,7 @@ impl RuntimeInterface for EthereumRuntime {
         // Encode the init_tezosx_alias call
         let call_data = init_tezosx_aliasCall {
             nativeAddress: native_address.to_string(),
+            nativePublicKey: native_public_key.unwrap_or_default().to_vec().into(),
         }
         .abi_encode();
 
@@ -449,6 +451,7 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _native_address: &str,
+            _native_public_key: Option<&[u8]>,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
             _gas_remaining: u64,

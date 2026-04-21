@@ -59,7 +59,8 @@ use crate::gas::Cost;
 pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx,
-    HasContractAccount, HasHost, HasOperationGas, OperationCtx, TcCtx,
+    HasContractAccount, HasHost, HasOperationGas, HasSourcePublicKey, OperationCtx,
+    TcCtx,
 };
 
 /// Result of applying a single operation within a batch.
@@ -1241,7 +1242,11 @@ fn execute_smart_contract<'a, Host>(
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut (impl CtxTrait<'a> + HasHost<Host> + HasContractAccount + HasOperationGas),
+    ctx: &mut (impl CtxTrait<'a>
+              + HasHost<Host>
+              + HasContractAccount
+              + HasOperationGas
+              + HasSourcePublicKey),
     registry: &impl Registry,
     journal: &mut TezosXJournal,
 ) -> Result<ExecutionResult<'a, impl Iterator<Item = OperationInfo<'a>>>, CracError>
@@ -1478,6 +1483,7 @@ where
 {
     let validate::ValidatedBatch {
         source_account,
+        source_public_key,
         validated_operations,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
@@ -1510,6 +1516,7 @@ where
                 context,
                 origination_nonce,
                 &source_account,
+                &source_public_key,
                 validated_operation,
                 &mut next_temporary_id,
                 block_ctx,
@@ -1567,6 +1574,7 @@ fn apply_operation<Host, C: Context>(
     context: &C,
     origination_nonce: &mut OriginationNonce,
     source_account: &C::ImplicitAccountType,
+    source_public_key: &[u8],
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
@@ -1608,6 +1616,7 @@ where
                 level: block_ctx.level,
                 now: block_ctx.now,
                 chain_id: block_ctx.chain_id,
+                source_public_key,
             };
             let transfer_result = transfer_external(
                 &mut tc_ctx,
@@ -1719,6 +1728,7 @@ pub(crate) mod test_utils {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             native_address: &str,
+            _native_public_key: Option<&[u8]>,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
             gas_remaining: u64,
@@ -1789,6 +1799,7 @@ pub(crate) mod test_utils {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _native_address: &str,
+            _native_public_key: Option<&[u8]>,
             _runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
             gas_remaining: u64,
@@ -1896,6 +1907,7 @@ mod tests {
             _host: &mut Host,
             _journal: &mut TezosXJournal,
             _native_address: &str,
+            _native_public_key: Option<&[u8]>,
             runtime_id: RuntimeId,
             _context: CrossRuntimeContext,
             _gas_remaining: u64,
@@ -6816,6 +6828,7 @@ mod tests {
                 _host: &mut Host,
                 _journal: &mut TezosXJournal,
                 _native_address: &str,
+                _native_public_key: Option<&[u8]>,
                 _runtime_id: RuntimeId,
                 _context: CrossRuntimeContext,
                 gas_remaining: u64,

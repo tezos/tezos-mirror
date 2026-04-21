@@ -5,6 +5,7 @@
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
+use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_protocol::contract::Contract;
@@ -213,6 +214,8 @@ pub struct ValidatedOperation {
 
 pub struct ValidatedBatch<A: TezosImplicitAccount> {
     pub source_account: A,
+    // Used in TezosX to produce aliases
+    pub source_public_key: Vec<u8>,
     pub validated_operations: Vec<ValidatedOperation>,
 }
 
@@ -345,8 +348,13 @@ where
         .increment_counter(host, validated_operations.len())
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
+    let mut source_public_key = Vec::new();
+    pk.bin_write(&mut source_public_key)
+        .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+
     Ok(ValidatedBatch {
         source_account,
+        source_public_key,
         validated_operations,
     })
 }

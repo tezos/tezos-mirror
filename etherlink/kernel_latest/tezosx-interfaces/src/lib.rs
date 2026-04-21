@@ -80,11 +80,13 @@ pub trait Registry {
     /// budget is exceeded.
     ///
     /// Returns `(alias, gas_remaining_after)`.
+    #[allow(clippy::too_many_arguments)]
     fn generate_alias<Host>(
         &self,
         host: &mut Host,
         journal: &mut TezosXJournal,
         native_address: &str,
+        native_public_key: Option<&[u8]>,
         runtime_id: RuntimeId,
         context: CrossRuntimeContext,
         gas_remaining: u64,
@@ -115,12 +117,14 @@ pub trait RuntimeInterface {
     /// `gas_remaining` is the caller's remaining budget in this runtime's
     /// native gas units. Returns `(alias, gas_remaining_after)`. Fails if
     /// the budget is exceeded.
+    #[allow(clippy::too_many_arguments)]
     fn generate_alias<Host>(
         &self,
         registry: &impl Registry,
         host: &mut Host,
         journal: &mut TezosXJournal,
         native_address: &str,
+        native_public_key: Option<&[u8]>,
         context: CrossRuntimeContext,
         gas_remaining: u64,
     ) -> Result<(String, u64), TezosXRuntimeError>

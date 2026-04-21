@@ -59,6 +59,8 @@ pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     pub level: &'operation BlockNumber,
     pub now: &'operation Timestamp,
     pub chain_id: &'operation ChainId,
+    /// Raw bytes of the source account's public key (from validation).
+    pub source_public_key: &'operation [u8],
 }
 
 pub struct ExecCtx {
@@ -319,6 +321,10 @@ pub trait HasOperationGas {
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas;
 }
 
+pub trait HasSourcePublicKey {
+    fn source_public_key(&self) -> &[u8];
+}
+
 impl<'a, 'operation, Host: StorageV1, C: Context> HasContractAccount
     for Ctx<'a, 'operation, Host, C>
 {
@@ -339,6 +345,12 @@ impl<'a, 'operation, Host: StorageV1, C: Context> HasHost<Host>
 impl<Host: StorageV1, C: Context> HasOperationGas for Ctx<'_, '_, Host, C> {
     fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
         self.tc_ctx.operation_gas
+    }
+}
+
+impl<Host: StorageV1, C: Context> HasSourcePublicKey for Ctx<'_, '_, Host, C> {
+    fn source_public_key(&self) -> &[u8] {
+        self.operation_ctx.source_public_key
     }
 }
 
@@ -1140,6 +1152,12 @@ pub(crate) mod mock {
     impl<'a, Host: StorageV1> HasOperationGas for MockCtx<'a, Host> {
         fn operation_gas(&mut self) -> &mut crate::gas::TezlinkOperationGas {
             &mut self.operation_gas
+        }
+    }
+
+    impl<'a, Host: StorageV1> HasSourcePublicKey for MockCtx<'a, Host> {
+        fn source_public_key(&self) -> &[u8] {
+            &[]
         }
     }
 
