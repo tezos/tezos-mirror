@@ -451,4 +451,27 @@ module Tezosx : sig
     ?block:string ->
     Evm_node.t ->
     (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceTransaction tx_hash] and return its [{txHash, traces}]
+      result (or the JSON-RPC error). *)
+  val http_traceTransaction :
+    ?websocket:Websocket.t ->
+    tx_hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceBlockByNumber block] where [block] is either a tag
+      ([latest], [earliest], [finalized]) or a hex-encoded block number. *)
+  val http_traceBlockByNumber :
+    ?websocket:Websocket.t ->
+    block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  (** Call [http_traceBlockByHash block_hash]. *)
+  val http_traceBlockByHash :
+    ?websocket:Websocket.t ->
+    block_hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
 end

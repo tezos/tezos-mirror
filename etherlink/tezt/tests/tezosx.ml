@@ -3313,6 +3313,205 @@ let test_trace_call_evm ~runtime () =
   Log.info "First trace URL: %s" trace_url ;
   unit
 
+(** End-to-end test for the replay-based HTTP trace RPCs
+    [http_traceTransaction], [http_traceBlockByNumber] and
+    [http_traceBlockByHash].
+
+    1. Originate a Michelson [store_input.tz] contract.
+    2. Send an EVM transaction to the gateway precompile that triggers a
+       cross-runtime call to the Michelson contract. This produces a block
+       containing the CRAC transaction.
+    3. Call [http_traceTransaction] with the tx hash — expect a non-empty
+       [traces] list and a matching [txHash].
+    4. Call [http_traceBlockByNumber] with the containing block's number —
+       expect one entry matching the CRAC tx with non-empty traces.
+    5. Call [http_traceBlockByHash] with the containing block's hash — expect
+       the same entries as [http_traceBlockByNumber].
+    6. Call [http_traceTransaction] on a bogus hash — expect an error.
+    7. Call [http_traceBlockByNumber] on an empty (no-tx) block — expect the
+       empty list, not an error. *)
+let test_http_trace_replay ~runtime () =
+  Setup.register_sandbox_with_oberver_test
+    ~title:
+      "http_traceTransaction and http_traceBlock* replay EVM-to-Michelson CRAC"
+    ~tags:["rpc"; "cross_runtime"; "http_trace"; "replay"]
+    ~with_runtimes:[runtime]
+    ~uses_client:true
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~eth_bootstrap_accounts:[Eth_account.bootstrap_accounts.(0).address]
+  @@ fun {sandbox; observer = _} ->
+  (* Step 1: originate a Michelson contract that will be the CRAC target. *)
+  let* tez_client = tezos_client sandbox in
+  let script_path =
+    Michelson_script.(
+      find ["opcodes"; "store_input"] Michelson_contracts.tezlink_protocol
+      |> path)
+  in
+  let* kt1_address =
+    Client.originate_contract
+      ~alias:"store_input_http_trace"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:{|""|}
+      ~prg:script_path
+      ~burn_cap:Tez.one
+      tez_client
+  in
+  let*@ _ = Rpc.produce_block sandbox in
+  (* Produce an extra, empty block up-front so we have a known no-CRAC block
+     to exercise the empty-traces path in step 7. *)
+  let*@ empty_block_number = Rpc.produce_block sandbox in
+  (* Step 2: send an EVM tx that triggers a CRAC. This bakes a new block
+     which contains the traced transaction. *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let url = sf "http://tezos/%s/default" kt1_address in
+  let micheline_hello = "0x010000000e48656c6c6f2066726f6d2045564d" in
+  let* receipt =
+    craft_and_send_evm_transaction
+      ~sequencer:sandbox
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_hello; "1"]
+      ()
+  in
+  let tx_hash = receipt.transactionHash in
+  let block_hash = receipt.blockHash in
+  let block_number = Printf.sprintf "0x%lx" receipt.blockNumber in
+  (* Step 3: http_traceTransaction. *)
+  let*@ result = Rpc.Tezosx.http_traceTransaction ~tx_hash sandbox in
+  let returned_tx_hash = JSON.(result |-> "txHash" |> as_string) in
+  Check.(
+    (returned_tx_hash = tx_hash)
+      string
+      ~error_msg:"http_traceTransaction returned txHash %L, expected %R") ;
+  let traces = JSON.(result |-> "traces" |> as_list) in
+  Check.(
+    (traces <> [])
+      (list json)
+      ~error_msg:"Expected at least one HTTP trace on the CRAC tx but got %L") ;
+  (* Content assertions on the first trace: the CRAC is an EVM→Michelson
+     call going through the gateway precompile, so we expect the URL to
+     end with the [store_input_http_trace] KT1 we originated followed by
+     the [default] entrypoint, and the response status to be a 2xx. *)
+  let first_trace = List.hd traces in
+  let first_url = JSON.(first_trace |-> "url" |> as_string) in
+  let first_status = JSON.(first_trace |-> "responseStatus" |> as_int) in
+  let expected_url_suffix = sf "/%s/default" kt1_address in
+  let has_expected_suffix =
+    let n = String.length first_url in
+    let m = String.length expected_url_suffix in
+    n >= m && String.sub first_url (n - m) m = expected_url_suffix
+  in
+  if not has_expected_suffix then
+    Test.fail
+      "Expected the CRAC trace URL to end with %S, got %S"
+      expected_url_suffix
+      first_url ;
+  Check.(
+    (first_status >= 200)
+      int
+      ~error_msg:"Expected the CRAC trace response status to be >= 200, got %L") ;
+  Check.(
+    (first_status < 300)
+      int
+      ~error_msg:"Expected the CRAC trace response status to be < 300, got %L") ;
+  (* Step 4: http_traceBlockByNumber. *)
+  let*@ by_number_result =
+    Rpc.Tezosx.http_traceBlockByNumber ~block:block_number sandbox
+  in
+  let entries = JSON.(by_number_result |> as_list) in
+  let matching_entry =
+    List.find_opt
+      (fun e -> JSON.(e |-> "txHash" |> as_string) = tx_hash)
+      entries
+  in
+  let entry =
+    match matching_entry with
+    | Some e -> e
+    | None -> Test.fail "http_traceBlockByNumber is missing the CRAC tx entry"
+  in
+  let entry_traces = JSON.(entry |-> "traces" |> as_list) in
+  Check.(
+    (entry_traces <> [])
+      (list json)
+      ~error_msg:
+        "Expected non-empty traces on the CRAC tx in http_traceBlockByNumber \
+         response, got %L") ;
+  (* Step 5: http_traceBlockByHash returns the same entries as
+     http_traceBlockByNumber — assert on the full JSON content so a
+     regression that returns the right count with wrong txHash/traces would
+     still fail the test. *)
+  let*@ by_hash_result = Rpc.Tezosx.http_traceBlockByHash ~block_hash sandbox in
+  let by_hash_encoded = JSON.encode by_hash_result in
+  let by_number_encoded = JSON.encode by_number_result in
+  Check.(
+    (by_hash_encoded = by_number_encoded)
+      string
+      ~error_msg:
+        "http_traceBlockByHash and http_traceBlockByNumber must return \
+         identical bodies. by_hash=%L by_number=%R") ;
+  (* Step 6: http_traceTransaction on an unknown hash returns a JSON-RPC
+     error with the "transaction not found" message the RPC is supposed to
+     emit, rather than a generic internal error or a silent empty result. *)
+  let bogus_hash =
+    "0x0000000000000000000000000000000000000000000000000000000000000042"
+  in
+  let* bogus_result =
+    Rpc.Tezosx.http_traceTransaction ~tx_hash:bogus_hash sandbox
+  in
+  (match bogus_result with
+  | Ok _ ->
+      Test.fail
+        "http_traceTransaction on an unknown tx hash should fail, got a \
+         successful response"
+  | Error err ->
+      (* Match the specific [Transaction ... not found] wording emitted by
+         [Rpc_errors.trace_transaction_not_found] rather than a bare "not
+         found" substring, so an unrelated "config file not found" style
+         error would fail the assertion. *)
+      Check.(err.message =~ rex "Transaction .* not found")
+        ~error_msg:
+          "http_traceTransaction on an unknown tx hash should report the \
+           [Transaction ... not found] error, got message: %L") ;
+  (* Step 7: a block with no transactions returns the empty list. Verify the
+     block we target is actually empty through eth_getBlockByNumber before
+     asserting on its trace result — otherwise the assertion could pass for
+     the wrong reason (e.g. the produced block happened to contain an
+     implicit transaction). *)
+  let empty_block_number_hex = Printf.sprintf "0x%x" empty_block_number in
+  let*@ empty_block =
+    Rpc.get_block_by_number ~block:empty_block_number_hex sandbox
+  in
+  let empty_block_tx_count =
+    match empty_block.transactions with
+    | Empty -> 0
+    | Hash hashes -> List.length hashes
+    | Full objs -> List.length objs
+  in
+  Check.(
+    (empty_block_tx_count = 0)
+      int
+      ~error_msg:
+        "Test setup: expected block %L to contain 0 transactions to exercise \
+         the empty-traces path, but it contains %R") ;
+  let*@ empty_result =
+    Rpc.Tezosx.http_traceBlockByNumber ~block:empty_block_number_hex sandbox
+  in
+  let empty_entries = JSON.(empty_result |> as_list) in
+  Check.(
+    (empty_entries = [])
+      (list json)
+      ~error_msg:
+        "Expected empty list for a block with no transactions, got %L entries") ;
+  Log.info
+    "http_traceTransaction ok (%d traces); http_traceBlockBy* ok (%d entries)"
+    (List.length traces)
+    (List.length entries) ;
+  unit
+
 (** Test RPC/kernel consistency over Michelson aliases of EVM address.
     Uses a Michelson contract that stores the sender and perform a cross-runtime
     call. Compare the storage contents with the result of the RPC. *)
@@ -3981,6 +4180,7 @@ let () =
   test_entrypoints_enshrined () ;
   test_script_coherency_enshrined () ;
   test_trace_call_evm ~runtime:Tezos () ;
+  test_http_trace_replay ~runtime:Tezos () ;
   test_cross_runtime_evm_sender_is_alias [Alpha] ;
   test_cross_runtime_michelson_sender_is_alias [Alpha] ;
   test_alias_forwarder_forwards_to_evm [Alpha] ;
