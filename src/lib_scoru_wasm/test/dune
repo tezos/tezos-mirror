@@ -13,6 +13,7 @@
   octez-libs.base-test-helpers
   octez-libs.test-helpers
   octez-libs.scoru-wasm
+  octez-libs.smart-rollup-wasm-in-memory
   qcheck-alcotest
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers

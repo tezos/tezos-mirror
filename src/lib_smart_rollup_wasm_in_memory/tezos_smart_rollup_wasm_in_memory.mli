@@ -27,9 +27,15 @@ module State_in_memory :
       Tezos_context_memory.Context_binary.Proof.tree
       Tezos_context_memory.Context_binary.Proof.t
 
-(** Full WASM PVM machine instantiated over {!State_in_memory}. *)
-module Wasm_pvm_in_memory :
-  Tezos_scoru_wasm.Wasm_pvm_sig.S
-    with type context = State_in_memory.context
-     and type state = State_in_memory.state
-     and type proof = State_in_memory.proof
+(** [wasm_pvm_machine ~config] returns a WASM PVM machine over
+    {!State_in_memory}, closing over the supplied [config]. The env
+    implementation builds the config via
+    {!Tezos_scoru_wasm.Wasm_pvm_config.of_signals}. Non-protocol
+    consumers (node, benchmarks, tests) pass
+    {!Tezos_scoru_wasm.Wasm_pvm_config.empty}. *)
+val wasm_pvm_machine :
+  config:Tezos_scoru_wasm.Wasm_pvm_config.t ->
+  (module Tezos_scoru_wasm.Wasm_pvm_sig.S
+     with type context = State_in_memory.context
+      and type state = State_in_memory.state
+      and type proof = State_in_memory.proof)

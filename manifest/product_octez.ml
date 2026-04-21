@@ -6162,6 +6162,7 @@ let _octez_scoru_wasm_tests =
         octez_base_test_helpers |> open_;
         octez_test_helpers |> open_;
         octez_scoru_wasm;
+        octez_smart_rollup_wasm_in_memory;
         qcheck_alcotest;
         alcotezt;
         octez_scoru_wasm_helpers |> open_;

@@ -89,7 +89,9 @@ module Wasm_context = struct
 end
 
 module Full_Wasm = Sc_rollup_wasm.V2_0_0.Make_pvm (struct
-  include Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory
+  include
+    (val Tezos_smart_rollup_wasm_in_memory.wasm_pvm_machine
+           ~config:Tezos_scoru_wasm.Wasm_pvm_config.empty)
 
   let compute_step =
     compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
