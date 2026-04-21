@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+# pre-set hook: validates workflow rules before any cue set operation
+set -euo pipefail
+
+TASK_NAME="$1"
+shift 2
+ASSIGNMENTS=("$@")
+
+# --- Constants ---
+
+VALID_STATUSES="triage design poc decomposition estimation test execution documentation agent-review human-review learning done"
+VALID_TRACKS="question workflow test-only doc-only code"
+VALID_CRITICALITIES="critical behind-feature-flag non-critical"
+
+# --- Helpers ---
+
+get_field() {
+    local field="$1"
+    cue get "$TASK_NAME" "$field" 2>/dev/null || true
+}
+
+field_in_list() {
+    local value="$1"
+    local list="$2"
+    for item in $list; do
+        if [[ "$value" == "$item" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+task_description_contains() {
+    local section="$1"
+    local description
+    description=$(cue show --description "$TASK_NAME" 2>/dev/null) || return 1
+    grep -q "^## $section$" <<<"$description"
+}
+
+# Path to the main repository (the hook lives at
+# <repo>/.cue-store/.cue-hooks/pre-set).
+main_repo() {
+    cd "$(dirname "$0")/../.." && pwd
+}
+
+check_git_clean_and_rebased() {
+    local from="$1"
+    case "$from" in
+        test|execution|documentation|agent-review) ;;
+        *) return 0 ;;
+    esac
+
+    local repo
+    repo="$(main_repo)"
+
+    if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+        echo "cue: cannot transition out of '$from' with an unclean git repository; commit, stash, or discard pending changes first" >&2
+        return 1
+    fi
+
+    if ! git -C "$repo" rev-parse --verify --quiet origin/master >/dev/null; then
+        echo "cue: cannot transition out of '$from' without an 'origin/master' ref in the main repository" >&2
+        return 1
+    fi
+
+    if ! git -C "$repo" merge-base --is-ancestor origin/master HEAD; then
+        echo "cue: cannot transition out of '$from' without rebasing the current branch on top of origin/master" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+# Parse assignments
+TARGET_STATUS=""
+NEW_TRACK=""
+NEW_CRITICALITY=""
+SETS_RUN_ID_FIELD=0
+for assignment in "${ASSIGNMENTS[@]}"; do
+    case "$assignment" in
+        status=*) TARGET_STATUS="${assignment#status=}" ;;
+        track=*) NEW_TRACK="${assignment#track=}" ;;
+        criticality=*) NEW_CRITICALITY="${assignment#criticality=}" ;;
+        last-transition-run-id=*) SETS_RUN_ID_FIELD=1 ;;
+    esac
+done
+
+# Only the post-set hook is allowed to update 'last-transition-run-id';
+# agents must not tamper with it to bypass the one-transition-per-run rule.
+if [[ $SETS_RUN_ID_FIELD -eq 1 && "${CUE_HOOK_INTERNAL:-}" != "1" ]]; then
+    echo "cue: field 'last-transition-run-id' is managed by the post-set hook" >&2
+    exit 1
+fi
+
+# --- Validate field values ---
+
+if [[ -n "$NEW_TRACK" ]] && ! field_in_list "$NEW_TRACK" "$VALID_TRACKS"; then
+    echo "cue: invalid track '$NEW_TRACK' (valid: $VALID_TRACKS)" >&2
+    exit 1
+fi
+
+if [[ -n "$NEW_CRITICALITY" ]] && ! field_in_list "$NEW_CRITICALITY" "$VALID_CRITICALITIES"; then
+    echo "cue: invalid criticality '$NEW_CRITICALITY' (valid: $VALID_CRITICALITIES)" >&2
+    exit 1
+fi
+
+# If no status change, allow field-only updates
+if [[ -z "$TARGET_STATUS" ]]; then
+    exit 0
+fi
+
+# --- Validate status value ---
+
+if ! field_in_list "$TARGET_STATUS" "$VALID_STATUSES"; then
+    echo "cue: invalid status '$TARGET_STATUS' (valid: $VALID_STATUSES)" >&2
+    exit 1
+fi
+
+# --- Read current state ---
+
+CURRENT_STATUS="$(get_field status)"
+TRACK="$(get_field track)"
+CRITICALITY="$(get_field criticality)"
+TASK_AUTHOR="$(get_field author)"
+
+# Apply pending changes to track/criticality for transition validation
+if [[ -n "$NEW_TRACK" ]]; then
+    TRACK="$NEW_TRACK"
+fi
+if [[ -n "$NEW_CRITICALITY" ]]; then
+    CRITICALITY="$NEW_CRITICALITY"
+fi
+
+# --- Validate transitions ---
+
+# If no current status, only triage is allowed
+if [[ -z "$CURRENT_STATUS" ]]; then
+    if [[ "$TARGET_STATUS" != "triage" ]]; then
+        echo "cue: first transition must be to 'triage'" >&2
+        exit 1
+    fi
+    exit 0
+fi
+
+# Author bypass: allow any transition if the current agent is the task author.
+# The running agent identifier comes from CUE_AGENT_ID (set by cue-ralph).
+if [[ -n "$TASK_AUTHOR" && "$TASK_AUTHOR" == "${CUE_AGENT_ID:-}" ]]; then
+    exit 0
+fi
+
+# One-transition-per-run: reject a second status change within the same run.
+# The run identifier comes from CUE_RUN_ID (set by cue-ralph). The field
+# 'last-transition-run-id' on the task records the run that performed the
+# most recent status transition (updated by the post-set hook). This check
+# is only active when CUE_RUN_ID is set (i.e. under cue-ralph).
+if [[ -n "${CUE_RUN_ID:-}" ]]; then
+    LAST_TRANSITION_RUN_ID="$(get_field last-transition-run-id)"
+    if [[ "$LAST_TRANSITION_RUN_ID" == "$CUE_RUN_ID" ]]; then
+        echo "cue: a status transition has already been performed in this run; the agent must now stop and output a message explaining what it did and what remains to be done in the next runs" >&2
+        exit 1
+    fi
+fi
+
+# Validate transitions based on current status, target status, and track
+validate_transition() {
+    local from="$1"
+    local to="$2"
+
+    case "$from:$to" in
+        triage:design)
+            [[ -n "$TRACK" && -n "$CRITICALITY" ]] && return 0
+            echo "cue: transition triage→design requires 'track' and 'criticality'" >&2
+            return 1
+            ;;
+        design:estimation)
+            case "$TRACK" in
+                workflow|test-only|doc-only) return 0 ;;
+                *) echo "cue: transition design→estimation not allowed for track '$TRACK'" >&2; return 1 ;;
+            esac
+            ;;
+        design:decomposition)
+            [[ "$TRACK" == "code" ]] && return 0
+            echo "cue: transition design→decomposition only allowed for 'code' track" >&2
+            return 1
+            ;;
+        design:poc)
+            [[ "$TRACK" == "code" ]] && return 0
+            echo "cue: transition design→poc only allowed for 'code' track" >&2
+            return 1
+            ;;
+        design:done)
+            [[ "$TRACK" == "question" ]] && return 0
+            echo "cue: transition design→done only allowed for 'question' track" >&2
+            return 1
+            ;;
+        poc:decomposition|decomposition:estimation)
+            return 0
+            ;;
+        estimation:execution)
+            [[ "$TRACK" == "code" || "$TRACK" == "workflow" ]] && return 0
+            echo "cue: transition estimation→execution only allowed for 'code' or 'workflow' tracks" >&2
+            return 1
+            ;;
+        estimation:documentation)
+            [[ "$TRACK" == "doc-only" ]] && return 0
+            echo "cue: transition estimation→documentation only allowed for 'doc-only' track" >&2
+            return 1
+            ;;
+        estimation:test)
+            [[ "$TRACK" == "code" || "$TRACK" == "test-only" ]] && return 0
+            echo "cue: transition estimation→test only allowed for 'code' or 'test-only' tracks" >&2
+            return 1
+            ;;
+        test:agent-review)
+            [[ "$TRACK" == "test-only" ]] && return 0
+            echo "cue: transition test→agent-review only allowed for 'test-only' track" >&2
+            return 1
+            ;;
+        test:execution)
+            [[ "$TRACK" == "code" ]] && return 0
+            echo "cue: transition test→execution only allowed for 'code' track" >&2
+            return 1
+            ;;
+        execution:documentation)
+            [[ "$TRACK" == "code" || "$TRACK" == "workflow" ]] && return 0
+            echo "cue: transition execution→documentation only allowed for 'code' or 'workflow' tracks" >&2
+            return 1
+            ;;
+        documentation:agent-review)
+            return 0
+            ;;
+        agent-review:test)
+            [[ "$TRACK" == "code" || "$TRACK" == "test-only" ]] && return 0
+            echo "cue: transition agent-review→test only allowed for 'code' or 'test-only' tracks" >&2
+            return 1
+            ;;
+        agent-review:execution)
+            [[ "$TRACK" == "code" || "$TRACK" == "workflow" ]] && return 0
+            echo "cue: transition agent-review→execution only allowed for 'code' or 'workflow' tracks" >&2
+            return 1
+            ;;
+        agent-review:documentation)
+            [[ "$TRACK" == "code" || "$TRACK" == "doc-only" || "$TRACK" == "workflow" ]] && return 0
+            echo "cue: transition agent-review→documentation only allowed for 'code', 'doc-only', or 'workflow' tracks" >&2
+            return 1
+            ;;
+        agent-review:human-review)
+            [[ "$TRACK" == "doc-only" || "$TRACK" == "workflow" ]] && return 0
+            echo "cue: transition agent-review→human-review only allowed for 'doc-only' or 'workflow' tracks" >&2
+            return 1
+            ;;
+        agent-review:learning)
+            case "$TRACK" in
+                test-only) return 0 ;;
+                code) [[ "$CRITICALITY" == "non-critical" ]] && return 0 ;;
+            esac
+            echo "cue: transition agent-review→learning not allowed for track '$TRACK' criticality '$CRITICALITY'" >&2
+            return 1
+            ;;
+        human-review:agent-review)
+            return 0
+            ;;
+        *)
+            echo "cue: invalid transition '$from'→'$to'" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Check if this is a done transition (only author can transition to done)
+if [[ "$TARGET_STATUS" == "done" ]]; then
+    echo "cue: transition to 'done' only allowed by task author (branch must be merged)" >&2
+    exit 1
+fi
+
+# Validate the transition
+if ! validate_transition "$CURRENT_STATUS" "$TARGET_STATUS"; then
+    exit 1
+fi
+
+# When transitioning out of a status in which the agent may have
+# modified files (test, execution, documentation, agent-review),
+# the main git repository must be clean and the current branch
+# rebased on top of origin/master.
+if ! check_git_clean_and_rebased "$CURRENT_STATUS"; then
+    exit 1
+fi
+
+# Validate required sections in description based on target status
+case "$TARGET_STATUS" in
+    design)
+        if ! cue show "$TASK_NAME" 2>/dev/null | grep -q "^---$"; then
+            echo "cue: cannot transition to 'design' without a task description" >&2
+            exit 1
+        fi
+        ;;
+    estimation)
+        if ! task_description_contains "Deliverables"; then
+            echo "cue: cannot transition to 'estimation' without 'Deliverables' section" >&2
+            exit 1
+        fi
+        ;;
+    execution)
+        if [[ "$TRACK" == "code" || "$TRACK" == "workflow" ]]; then
+            if ! task_description_contains "Deliverables"; then
+                echo "cue: cannot transition to 'execution' without 'Deliverables' section" >&2
+                exit 1
+            fi
+        fi
+        ;;
+esac
+
+exit 0

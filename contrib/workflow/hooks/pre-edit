@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pre-edit hook: prevents editing task description in statuses where editing
+# is not expected
+set -euo pipefail
+
+TASK_NAME="$1"
+
+STATUS="$(cue get "$TASK_NAME" status)"
+
+case "$STATUS" in
+    design|decomposition) exit 0 ;;
+esac
+
+echo "cue: cannot edit task description while in '$STATUS' status" >&2
+exit 1

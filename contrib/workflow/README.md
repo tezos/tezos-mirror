@@ -7,6 +7,9 @@ directory documents their workflow. The workflow consists in hooks
 (Markdown documents specifying in a declarative style how agents
 behave when working on a task).
 
+The hooks and their installation procedure are documented in
+[hooks.md](./hooks.md).
+
 ## Common cue commands
 
 The most commonly used `cue` commands are:
@@ -16,7 +19,9 @@ The most commonly used `cue` commands are:
   author
 - `cue set status=<new_status>`: attempt a status transition
 - `echo "<task-description>" | cue edit`: edit the description of the task
-- `echo "<task-description>" | cue add <task-name>`: create a new task
+- `echo "<task-description>" | cue add <task-name>`:
+  create a new task (the `post-add` hook initializes its author from
+  the currently-claimed task and sets its status to `triage`)
 - `cue --help`: list all available `cue` commands and their options
 
 ## Fields
