@@ -2528,6 +2528,140 @@ let test_instant_confirmations ~runtime () =
       ~error_msg:"ETH balances should match: IC=%L, non-IC=%R") ;
   unit
 
+(** Blueprint-uniqueness invariant for EVM [state_root].
+
+    Two different blueprints at the same level must produce different
+    [state_root] values. Since [blueprint_hash] factors the timestamp,
+    two blocks at the same level produced with distinct timestamps must
+    diverge on [state_root]. *)
+let test_state_root_blueprint_uniqueness ~runtime () =
+  Test.register
+    ~__FILE__
+    ~title:"State root differs across distinct blueprints at same level"
+    ~tags:
+      (["tezosx"; "state_root"; "invariant"]
+      @ runtime_tags [runtime]
+      @ [Kernel.to_uses_and_tags Kernel.Latest |> fst])
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let make_sandbox () =
+    Test_helpers.init_sequencer_sandbox
+      ~kernel:Kernel.Latest
+      ~genesis_timestamp:Test_helpers.genesis_timestamp
+      ~with_runtimes:[runtime]
+      ~tez_bootstrap_accounts:[Constant.bootstrap1]
+      ~sequencer_keys:[Constant.bootstrap1]
+      ()
+  in
+  let* sandbox_a = make_sandbox () in
+  let* sandbox_b = make_sandbox () in
+  (* Same level, different timestamps => different blueprints. *)
+  let ts_a = Test_helpers.get_timestamp 0 in
+  let ts_b = Test_helpers.get_timestamp 1 in
+  let*@ _ = Rpc.produce_block ~timestamp:ts_a sandbox_a in
+  let*@ _ = Rpc.produce_block ~timestamp:ts_b sandbox_b in
+  let*@ block_a = Rpc.get_block_by_number ~block:"latest" sandbox_a in
+  let*@ block_b = Rpc.get_block_by_number ~block:"latest" sandbox_b in
+  Check.(
+    (block_a.number = block_b.number)
+      int32
+      ~error_msg:"Sanity: blocks should be at the same level (A=%L, B=%R)") ;
+  Check.(
+    (block_a.stateRoot <> block_b.stateRoot)
+      string
+      ~error_msg:
+        "Blueprint-uniqueness invariant broken: state_root identical across \
+         distinct blueprints at the same level (A=%L, B=%R)") ;
+  unit
+
+(** Pure-Michelson divergence invariant for EVM [state_root].
+
+    Two blueprints at the same level with identical EVM contents, identical
+    timestamps, but distinct pure-Michelson ops must produce different
+    EVM [state_root] values. Exercises the [michelson_ops_commitment] term
+    of [blueprint_hash] — without it, post-Phase-5 the EVM side would not
+    observe pure-Michelson divergence once Michelson data moves out of
+    [/evm/world_state/eth_accounts].
+
+    Before Phase 5 this test still passes via the [h(eth_accounts)]
+    factor (Michelson writes under [eth_accounts/tezos]); it serves as a
+    durable guardrail that remains meaningful once the keyspace split
+    lands. *)
+let test_state_root_pure_michelson_divergence () =
+  Test.register
+    ~__FILE__
+    ~title:"State root differs for pure-Michelson divergence"
+    ~tags:
+      (["tezosx"; "state_root"; "invariant"; "michelson"]
+      @ runtime_tags [Tezos]
+      @ [Kernel.to_uses_and_tags Kernel.Latest |> fst])
+    ~uses_admin_client:true
+    ~uses_client:true
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let make_sandbox () =
+    Test_helpers.init_sequencer_sandbox
+      ~kernel:Kernel.Latest
+      ~genesis_timestamp:Test_helpers.genesis_timestamp
+      ~with_runtimes:[Tezos]
+      ~tez_bootstrap_accounts:[Constant.bootstrap1]
+      ()
+  in
+  let* sandbox_a = make_sandbox () in
+  let* sandbox_b = make_sandbox () in
+  let* client_a = tezos_client sandbox_a in
+  let* client_b = tezos_client sandbox_b in
+  let giver = Constant.bootstrap1.alias in
+  let receiver = Constant.bootstrap2.alias in
+  (* Same timestamp, same level, same (empty) EVM txs, but distinct
+     Michelson transfers (different amounts). *)
+  let ts = Test_helpers.get_timestamp 0 in
+  let wait_a = Evm_node.wait_for_tx_queue_add_transaction sandbox_a in
+  let* () =
+    Client.transfer ~amount:Tez.one ~giver ~receiver ~burn_cap:Tez.one client_a
+  in
+  let* _ = wait_a in
+  let wait_b = Evm_node.wait_for_tx_queue_add_transaction sandbox_b in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 2)
+      ~giver
+      ~receiver
+      ~burn_cap:Tez.one
+      client_b
+  in
+  let* _ = wait_b in
+  let*@ _ = Rpc.produce_block ~timestamp:ts sandbox_a in
+  let*@ _ = Rpc.produce_block ~timestamp:ts sandbox_b in
+  let*@ block_a = Rpc.get_block_by_number ~block:"latest" sandbox_a in
+  let*@ block_b = Rpc.get_block_by_number ~block:"latest" sandbox_b in
+  Check.(
+    (block_a.number = block_b.number)
+      int32
+      ~error_msg:"Sanity: blocks should be at the same level (A=%L, B=%R)") ;
+  Check.(
+    (block_a.stateRoot <> block_b.stateRoot)
+      string
+      ~error_msg:
+        "Pure-Michelson-divergence invariant broken: EVM state_root identical \
+         across distinct Michelson ops at same level and timestamp (A=%L, \
+         B=%R)") ;
+  unit
+
 (** Test cross-runtime call from a Michelson contract to EVM via the gateway.
 
     Unlike [test_cross_runtime_call_from_michelson_to_evm] which calls the
@@ -4173,6 +4307,8 @@ let () =
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
   test_manager_key_on_block_hash [Alpha] ;
   test_instant_confirmations ~runtime:Tezos () ;
+  test_state_root_blueprint_uniqueness ~runtime:Tezos () ;
+  test_state_root_pure_michelson_divergence () ;
   test_nested_crac [Alpha] ;
   test_call_from_evm_to_michelson ~runtime:Tezos () ;
   test_call_from_michelson_to_evm ~runtime:Tezos () ;
