@@ -1406,7 +1406,10 @@ module Images_external = struct
      The [datadog-ci] version should be consistent across all CI
      images that use it. At the moment it is installed in the
      external image below and the internal image [e2etest]. *)
-  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v4.1.0"
+  let datadog_ci =
+    Image.mk_external
+      ~image_path:
+        "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
 
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
