@@ -1937,7 +1937,6 @@ let register_crac_runner_test ~title ?(tags = []) body =
     ~kernel:Latest
     ~with_runtimes
     ~enable_dal:false
-    ~enable_multichain:false
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -6761,7 +6760,6 @@ let test_l1_vs_tezosx_nested_failwith_receipt =
     ~kernel:Latest
     ~with_runtimes
     ~enable_dal:false
-    ~enable_multichain:false
     ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
   @@ fun sequencer_setup protocol ->
   let client = sequencer_setup.client in

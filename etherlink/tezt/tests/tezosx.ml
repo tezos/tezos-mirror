@@ -86,7 +86,6 @@ module Setup = struct
       ~kernel:Latest
       ~with_runtimes
       ~enable_dal:false
-      ~enable_multichain:false
       ?tez_bootstrap_accounts
 end
 
@@ -557,7 +556,7 @@ let test_reveal =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_transfer =
+let test_delayed_inbox_transfer =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
     ~title:"Transfer on tezos native account"
@@ -4273,7 +4272,7 @@ let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
   test_reveal [Alpha] ;
-  test_transfer [Alpha] ;
+  test_delayed_inbox_transfer [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
   test_cross_runtime_transfer_to_evm [Alpha] ;
   test_cross_runtime_transfer_to_evm_via_call [Alpha] ;

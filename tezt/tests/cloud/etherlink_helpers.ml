@@ -274,7 +274,6 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
         ~enable_dal:(Option.is_some dal_slots)
         ~chain_id
         ?dal_slots
-        ~enable_multichain:tezlink
         ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
         ()
     in

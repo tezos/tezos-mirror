@@ -146,12 +146,9 @@ val check_block_consistency :
 val check_head_consistency :
   left:Evm_node.t -> right:Evm_node.t -> ?error_msg:string -> unit -> unit Lwt.t
 
-type network = Etherlink | Tezlink
-
 (** [rollup_level sc_rollup_node] returns the current level of the
     rollup node, or [None] if it has not processed any level yet. *)
-val rollup_level :
-  ?network:network -> Sc_rollup_node.t -> (int32, Rpc.error) result Lwt.t
+val rollup_level : Sc_rollup_node.t -> (int32, Rpc.error) result Lwt.t
 
 (** [check_rollup_head_consistency ~evm_node ~sc_rollup_node ?error_msg ()]
     checks that the latest block of [evm_node] and the block at the level
@@ -199,7 +196,6 @@ val bake_until_sync :
   ?__LOC__:string ->
   ?timeout_in_blocks:int ->
   ?timeout:float ->
-  ?network:network ->
   sc_rollup_node:Sc_rollup_node.t ->
   sequencer:Evm_node.t ->
   client:Client.t ->
@@ -213,7 +209,6 @@ val bake_until_blueprint_forced :
   ?__LOC__:string ->
   ?timeout_in_blocks:int ->
   ?timeout:float ->
-  ?network:network ->
   sc_rollup_node:Sc_rollup_node.t ->
   evm_node:Evm_node.t ->
   client:Client.t ->

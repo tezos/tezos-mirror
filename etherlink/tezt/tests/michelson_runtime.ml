@@ -29,62 +29,13 @@ let check_kernel_version ~evm_node ~equal expected =
       ~error_msg:"Expected kernelVersion to be different than %R" ;
   return kernel_version
 
-let register_tezlink_only_test ~title ~tags ?bootstrap_accounts
-    ?bootstrap_contracts ?genesis_timestamp
-    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
-    ?max_blueprints_catchup ?max_blueprints_lag ?catchup_cooldown
-    ?(kernels = [Kernel.Latest]) ?(wait_for_valid_block = true) ?da_fee
-    ?sequencer_pool_address scenario protocols =
-  (* Most of the RPCs tezt tests are RPC that are enable on a real Tezos protocol.
-       Now that block 0 and 1 are set on protocol Zero and Genesis, we produce two
-       blocks to skip the two first blocks. *)
-  let scenario setup protocol =
-    let* () =
-      if wait_for_valid_block then
-        match time_between_blocks with
-        | Evm_node.Nothing ->
-            (* Blocks are not produced automatically *)
-            let* () = produce_block_and_wait_for ~sequencer:setup.sequencer 1 in
-            produce_block_and_wait_for ~sequencer:setup.sequencer 2
-        | Time_between_blocks _ ->
-            Evm_node.wait_for_blueprint_applied setup.sequencer 2
-      else return ()
-    in
-    scenario setup protocol
-  in
-  register_all
-    ~__FILE__
-    ~kernels
-    ~title
-    ~tags:("tezlink" :: tags)
-    ~l2_setups:
-      [
-        {
-          (Evm_node.default_l2_setup ~l2_chain_id:2937611481) with
-          l2_chain_family = "Michelson";
-          tez_bootstrap_accounts = bootstrap_accounts;
-          tez_bootstrap_contracts = bootstrap_contracts;
-          da_fee_per_byte = da_fee;
-          sequencer_pool_address;
-        };
-      ]
-    ~use_multichain:Register_with_feature
-    ~rpc_server:Evm_node.Resto
-    ?genesis_timestamp
-    ~time_between_blocks
-    ?max_blueprints_catchup
-    ?max_blueprints_lag
-    ?catchup_cooldown
-    ?additional_uses
-    scenario
-    protocols
-
-let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
+let register_tezosx_test ~title ~tags ?(kernels = [Kernel.Latest])
     ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
     ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
     ?catchup_cooldown ?da_fee ?sequencer_pool_address
-    ?michelson_to_evm_gas_multiplier ?enable_michelson_gas_refund scenario =
+    ?michelson_to_evm_gas_multiplier ?enable_michelson_gas_refund scenario
+    protocols =
   let scenario setup protocol =
     let* () =
       if wait_for_valid_block then
@@ -99,72 +50,35 @@ let register_tezosx_test ~title ~tags ?(kernel = Kernel.Latest)
     in
     scenario setup protocol
   in
-  Setup.register_test
-    ~__FILE__
-    ~rpc_server:Evm_node.Resto
-    ?tez_bootstrap_accounts:bootstrap_accounts
-    ?tez_bootstrap_contracts:bootstrap_contracts
-    ~michelson_runtime_chain_id:"NetXH12DFfBVHi4"
-    ?genesis_timestamp
-    ?max_blueprints_lag
-    ?max_blueprints_catchup
-    ?catchup_cooldown
-    ~time_between_blocks
-    ?additional_uses
-    ?da_fee
-    ?sequencer_pool_address
-    ?michelson_to_evm_gas_multiplier
-    ~kernel
-    ~title
-    ~tags:("tezlink" :: "tezosx" :: tags)
-    ~with_runtimes:[Tezos]
-    ~enable_dal:false
-    ~enable_multichain:false
-    ~instant_confirmations:false
-    ?enable_michelson_gas_refund
-    scenario
+  List.iter
+    (fun kernel ->
+      Setup.register_test
+        ~__FILE__
+        ~rpc_server:Evm_node.Resto
+        ?tez_bootstrap_accounts:bootstrap_accounts
+        ?tez_bootstrap_contracts:bootstrap_contracts
+        ~michelson_runtime_chain_id:"NetXH12DFfBVHi4"
+        ?genesis_timestamp
+        ?max_blueprints_lag
+        ?max_blueprints_catchup
+        ?catchup_cooldown
+        ~time_between_blocks
+        ?additional_uses
+        ?da_fee
+        ?sequencer_pool_address
+        ?michelson_to_evm_gas_multiplier
+        ~kernel
+        ~title
+        ~tags:("tezlink" :: "tezosx" :: tags)
+        ~with_runtimes:[Tezos]
+        ~enable_dal:false
+        ~instant_confirmations:false
+        ?enable_michelson_gas_refund
+        scenario
+        protocols)
+    kernels
 
-let register_tezlink_test ~title ~tags ?(kernel = Kernel.Latest)
-    ?bootstrap_accounts ?bootstrap_contracts ?genesis_timestamp
-    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
-    ?(wait_for_valid_block = true) ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?da_fee ?sequencer_pool_address scenario protocols =
-  register_tezlink_only_test
-    ~title:(title ^ " (tezlink)")
-    ~tags
-    ~kernels:[kernel]
-    ?bootstrap_accounts
-    ?bootstrap_contracts
-    ?genesis_timestamp
-    ~time_between_blocks
-    ?max_blueprints_lag
-    ?max_blueprints_catchup
-    ?catchup_cooldown
-    ?additional_uses
-    ~wait_for_valid_block
-    ?da_fee
-    ?sequencer_pool_address
-    scenario
-    protocols ;
-  register_tezosx_test
-    ~title:(title ^ " (michelson runtime)")
-    ~tags
-    ~kernel
-    ?bootstrap_accounts
-    ?bootstrap_contracts
-    ?genesis_timestamp
-    ~time_between_blocks
-    ?max_blueprints_lag
-    ?max_blueprints_catchup
-    ?catchup_cooldown
-    ?additional_uses
-    ~wait_for_valid_block
-    ?da_fee
-    ?sequencer_pool_address
-    scenario
-    protocols
-
-let register_tezlink_only_upgrade_test ~title ~tags ~genesis_timestamp
+let register_tezosx_upgrade_test ~title ~tags ~genesis_timestamp
     ?(kernels = Kernel.tezlink_all) ?(upgrade_to = Kernel.upgrade_to)
     ?(additional_uses = []) scenario protocols =
   List.iter
@@ -172,7 +86,7 @@ let register_tezlink_only_upgrade_test ~title ~tags ~genesis_timestamp
       let from_tag, _ = Kernel.to_uses_and_tags from in
       let to_ = upgrade_to from in
       let to_tag, to_use = Kernel.to_uses_and_tags to_ in
-      register_tezlink_only_test
+      register_tezosx_test
         ~kernels:[from]
         ~genesis_timestamp
         ~time_between_blocks:Nothing
@@ -188,11 +102,11 @@ let register_tezlink_only_upgrade_test ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
+let register_tezosx_regression_test ~title ~tags ?bootstrap_accounts
     ?bootstrap_contracts ?(time_between_blocks = Evm_node.Nothing) scenario =
   Protocol.register_regression_test
     ~__FILE__
-    ~tags:("tezlink" :: tags)
+    ~tags:("tezlink" :: "tezosx" :: tags)
     ~title
     ~uses:(fun _protocol ->
       [
@@ -203,23 +117,19 @@ let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
         Constant.smart_rollup_installer;
       ])
   @@ fun protocol ->
-  let l2_chains =
-    [
-      {
-        (Evm_node.default_l2_setup ~l2_chain_id:12) with
-        l2_chain_family = "Michelson";
-        tez_bootstrap_accounts = bootstrap_accounts;
-        tez_bootstrap_contracts = bootstrap_contracts;
-      };
-    ]
+  let l2_chain =
+    {
+      (Evm_node.default_l2_setup ~l2_chain_id:12) with
+      tez_bootstrap_accounts = bootstrap_accounts;
+      tez_bootstrap_contracts = bootstrap_contracts;
+    }
   in
   let* setup =
     Setup.setup_sequencer
       ~enable_dal:false
-      ~enable_multichain:true
-      ~l2_chains
+      ~with_runtimes:[Tezos]
+      ~l2_chain
       ~rpc_server:Evm_node.Resto
-      ~spawn_rpc:(Port.fresh ())
       ~time_between_blocks
       protocol
   in
@@ -248,7 +158,7 @@ let parse_rpc_response ~origin response =
   | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
 
 let test_describe_endpoint =
-  register_tezlink_regression_test
+  register_tezosx_regression_test
     ~tags:["evm"; "rpc"; "describe"]
     ~title:"Test the /describe endpoint"
   @@ fun {sequencer; client; _} _ ->
@@ -272,8 +182,8 @@ let test_describe_endpoint =
   unit
 
 let test_observer_starts =
-  register_tezlink_test
-    ~title:"Test Tezlink observer does not crash at startup"
+  register_tezosx_test
+    ~title:"Test michelson runtime observer does not crash at startup"
     ~tags:["observer"]
   @@ fun {sequencer; observer; _} _protocol ->
   let observer_promise = Evm_node.wait_for_blueprint_applied observer 3 in
@@ -283,8 +193,8 @@ let test_observer_starts =
   and* () = observer_promise in
   unit
 
-let test_tezlink_current_level =
-  register_tezlink_test
+let test_current_level =
+  register_tezosx_test
     ~title:"Test of the current_level rpc"
     ~tags:["rpc"; "current_level"]
   @@ fun {sequencer; _} _protocol ->
@@ -370,8 +280,8 @@ let test_tezlink_current_level =
   let* () = check_current_level res 0 in
   unit
 
-let test_tezlink_protocols =
-  register_tezlink_test
+let test_protocols =
+  register_tezosx_test
     ~title:"Test of the protocols rpc"
     ~tags:["rpc"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
@@ -387,8 +297,8 @@ let test_tezlink_protocols =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_genesis_block_arg =
-  register_tezlink_test
+let test_genesis_block_arg =
+  register_tezosx_test
     ~title:"Test of the genesis block argument"
     ~tags:["rpc"; "genesis"; "protocols"]
   @@ fun {sequencer; _} _protocol ->
@@ -407,8 +317,8 @@ let test_tezlink_genesis_block_arg =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_expected_issuance =
-  register_tezlink_only_test
+let test_expected_issuance =
+  register_tezosx_test
     ~title:"Test the mocked expected issuance rpc"
     ~tags:["rpc"; "issuance"; "mock"]
   @@ fun {sequencer; _} _protocol ->
@@ -430,8 +340,8 @@ let test_tezlink_expected_issuance =
       ~error_msg:"Expected %R (consensus_rights_delay + 1) but got %L") ;
   unit
 
-let test_tezlink_balance =
-  register_tezlink_test
+let test_balance =
+  register_tezosx_test
     ~title:"Test of the balance rpc"
     ~tags:["rpc"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -453,9 +363,9 @@ let test_tezlink_balance =
   Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_storage_via_client =
+let test_storage_via_client =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of the storage rpc via client"
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -468,8 +378,8 @@ let test_tezlink_storage_via_client =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let test_tezlink_contract_info =
-  register_tezlink_test
+let test_contract_info =
+  register_tezosx_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -489,9 +399,9 @@ let test_tezlink_contract_info =
   Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_list_entrypoints =
+let test_list_entrypoints =
   let contract = Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of the contract entrypoint list"
     ~tags:["rpc"; "contract"; "info"; "list_entrypoints"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -511,9 +421,9 @@ let test_tezlink_list_entrypoints =
   Check.((entrypoints = expected) json ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_contract_info_script =
+let test_contract_info_script =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of the contract info rpc on smart contracts"
     ~tags:["rpc"; "contract"; "info"; "script"]
     ~bootstrap_contracts:[contract]
@@ -543,8 +453,8 @@ let test_tezlink_contract_info_script =
       ~error_msg:"Expected code with %R elements but got %L") ;
   unit
 
-let test_tezlink_manager_key =
-  register_tezlink_test
+let test_manager_key =
+  register_tezosx_test
     ~title:"Test of the manager_key rpc"
     ~tags:["rpc"; "manager_key"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -571,8 +481,8 @@ let test_tezlink_manager_key =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_counter =
-  register_tezlink_only_test
+let test_counter =
+  register_tezosx_test
     ~title:"Test of the counter rpc"
     ~tags:["evm"; "rpc"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -606,8 +516,8 @@ let test_tezlink_counter =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_contract_info_on_liquidity_baking =
-  register_tezlink_test
+let test_contract_info_on_liquidity_baking =
+  register_tezosx_test
     ~title:"Test of the contract info rpc on liquidity baking addresses"
     ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
   @@ fun {sequencer; _} _protocol ->
@@ -634,10 +544,8 @@ let test_tezlink_contract_info_on_liquidity_baking =
   let* () = verify_account_info_rpc lq_fallback_token in
   unit
 
-let test_tezlink_version =
-  register_tezlink_test
-    ~title:"Test of the version rpc"
-    ~tags:["rpc"; "version"]
+let test_version =
+  register_tezosx_test ~title:"Test of the version rpc" ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let* res = RPC_core.call tezlink_endpoint RPC.get_version in
@@ -647,7 +555,7 @@ let test_tezlink_version =
       ~error_msg:"Expected version %R but got %L") ;
   unit
 
-let test_tezlink_constants =
+let test_constants =
   Protocol.register_regression_test
     ~title:"Test of the constants rpc"
     ~tags:["tezlink"; "rpc"; "constants"]
@@ -661,21 +569,11 @@ let test_tezlink_constants =
         Constant.smart_rollup_installer;
       ])
   @@ fun protocol ->
-  let l2_chains =
-    [
-      {
-        (Evm_node.default_l2_setup ~l2_chain_id:12) with
-        l2_chain_family = "Michelson";
-      };
-    ]
-  in
   let* {sequencer; client; _} =
     Setup.setup_sequencer
       ~enable_dal:false
-      ~enable_multichain:true
-      ~l2_chains
+      ~with_runtimes:[Tezos]
       ~rpc_server:Evm_node.Resto
-      ~spawn_rpc:(Port.fresh ())
       protocol
   in
   let hooks = Tezos_regression.hooks in
@@ -686,8 +584,8 @@ let test_tezlink_constants =
   in
   unit
 
-let test_tezlink_storage_rpc =
-  register_tezlink_test
+let test_storage_rpc =
+  register_tezosx_test
     ~title:"Test of the /storage rpc"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -748,16 +646,12 @@ let test_tezlink_storage_rpc =
 
   unit
 
-let test_tezlink_chain_id =
-  register_tezlink_test
+let test_chain_id =
+  register_tezosx_test
     ~title:"Test of the chain_id rpc"
     ~tags:["rpc"; "chain_id"]
-  @@ fun {sequencer; client; l2_chains; _} _protocol ->
-  let expected_chain_id =
-    match l2_chains with
-    | [l2_chain] -> l2_chain.l2_chain_id
-    | _ -> Test.fail ~__LOC__ "Expected one l2 chain"
-  in
+  @@ fun {sequencer; client; l2_chain; _} _protocol ->
+  let expected_chain_id = l2_chain.l2_chain_id in
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
   let* chain_id =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_chain_id ()
@@ -765,8 +659,8 @@ let test_tezlink_chain_id =
   check_chain_id ~expected_chain_id ~chain_id ;
   unit
 
-let test_tezlink_contracts_rpc =
-  register_tezlink_test
+let test_contracts_rpc =
+  register_tezosx_test
     ~title:"Test of the contracts rpc"
     ~tags:["rpc"; "contracts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -867,16 +761,12 @@ let test_tezlink_contracts_rpc =
   check_contracts_eq expected_contracts contracts_final ;
   unit
 
-let test_tezlink_header =
-  register_tezlink_test
+let test_header =
+  register_tezosx_test
     ~title:"Test of the header rpc"
     ~tags:["rpc"; "header"; "offset"]
-  @@ fun {sequencer; client; l2_chains; _} _protocol ->
-  let chain_id =
-    match l2_chains with
-    | [l2_chain] -> Some l2_chain.l2_chain_id
-    | _ -> Test.fail ~__LOC__ "Expected one l2 chain"
-  in
+  @@ fun {sequencer; client; l2_chain; _} _protocol ->
+  let chain_id = Some l2_chain.l2_chain_id in
 
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
 
@@ -903,8 +793,8 @@ let test_tezlink_header =
        ~chain_id
        ~current_timestamp:(Some current_timestamp)
 
-let test_tezlink_block_metadata =
-  register_tezlink_test
+let test_block_metadata =
+  register_tezosx_test
     ~title:"Test of the metadata rpc"
     ~tags:["rpc"; "metadata"; "offset"]
   @@ fun {sequencer; client; _} _protocol ->
@@ -936,16 +826,12 @@ let test_tezlink_block_metadata =
   in
   check_current_block_metadata ()
 
-let test_tezlink_block_info =
-  register_tezlink_test
+let test_block_info =
+  register_tezosx_test
     ~title:"Test of the block_info rpc"
     ~tags:["rpc"; "block_info"]
-  @@ fun {sequencer; client; l2_chains; _} _protocol ->
-  let chain_id =
-    match l2_chains with
-    | [l2_chain] -> Some l2_chain.l2_chain_id
-    | _ -> Test.fail ~__LOC__ "Expected one l2 chain"
-  in
+  @@ fun {sequencer; client; l2_chain; _} _protocol ->
+  let chain_id = Some l2_chain.l2_chain_id in
 
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
 
@@ -973,8 +859,8 @@ let test_tezlink_block_info =
        ~current_timestamp:(Some current_timestamp)
        ~expected_operations:[[]; []; []; []]
 
-let test_tezlink_bootstrapped =
-  register_tezlink_test
+let test_bootstrapped =
+  register_tezosx_test
     ~title:"Test of the bootstrapped rpc"
     ~tags:["rpc"; "bootstrapped"]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1006,8 +892,8 @@ let test_tezlink_bootstrapped =
       ~error_msg:"Check timestamp is latest, Expected %R but got %L") ;
   unit
 
-let test_tezlink_monitor_heads =
-  register_tezlink_test
+let test_monitor_heads =
+  register_tezosx_test
     ~title:"Test of the monitor/heads RPC"
     ~tags:["evm"; "rpc"; "monitor_heads"]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1092,9 +978,9 @@ let test_tezlink_monitor_heads =
 
   unit
 
-let test_tezlink_produceBlock =
-  register_tezlink_test
-    ~title:"Test Tezlink production block"
+let test_produceBlock =
+  register_tezosx_test
+    ~title:"Test Michelson runtime production block"
     ~tags:["kernel"; "produce_block"]
   @@ fun {sequencer; _} _protocol ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
@@ -1114,8 +1000,10 @@ let test_tezlink_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
-let test_tezlink_hash_rpc =
-  register_tezlink_test ~title:"Test Tezlink hash rpc" ~tags:["rpc"; "hash"]
+let test_hash_rpc =
+  register_tezosx_test
+    ~title:"Test Michelson runtime hash rpc"
+    ~tags:["rpc"; "hash"]
   @@ fun {sequencer; _} _protocol ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
   let rpc_hash block =
@@ -1145,8 +1033,8 @@ let test_tezlink_hash_rpc =
       ~error_msg:"Block hash should be equal") ;
   unit
 
-let test_tezlink_script_rpc =
-  register_tezlink_test
+let test_script_rpc =
+  register_tezosx_test
     ~title:"Test of the script rpc"
     ~tags:["rpc"; "script"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1220,8 +1108,8 @@ let test_tezlink_script_rpc =
 
   unit
 
-let test_tezlink_blocks_list =
-  register_tezlink_test
+let test_blocks_list =
+  register_tezosx_test
     ~title:"Test of the blocks list rpc"
     ~tags:["rpc"; "blocks"; "list"]
   @@ fun {sequencer; _} _protocol ->
@@ -1401,7 +1289,7 @@ let test_tezlink_blocks_list =
 
 let test_contract_storage_normalization =
   let contract = Michelson_contracts.storage_normalization () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of the storage rpc with normalization"
     ~tags:["rpc"; "storage"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1445,7 +1333,7 @@ let test_contract_storage_normalization =
 
 let test_contract_counter =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test that smart contracts don't have any counter"
     ~tags:["rpc"; "counter"]
     ~bootstrap_contracts:[contract]
@@ -1461,9 +1349,9 @@ let test_contract_counter =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_raw_json_cycle =
-  register_tezlink_test
-    ~title:"Test Tezlink raw json cycle rpc"
+let test_raw_json_cycle =
+  register_tezosx_test
+    ~title:"Test Michelson runtime raw json cycle rpc"
     ~tags:["rpc"; "cycle"; "raw"]
   @@ fun {sequencer; _} _protocol ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
@@ -1482,10 +1370,10 @@ let test_tezlink_raw_json_cycle =
       ~error_msg:"Unexpected random_seed field") ;
   unit
 
-let test_tezlink_transfer =
+let test_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
-    ~title:"Test Tezlink transfer"
+  register_tezosx_test
+    ~title:"Test michelson runtime transfer"
     ~tags:["kernel"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1518,10 +1406,10 @@ let test_tezlink_transfer =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
-let test_tezlink_observer_transfer =
+let test_observer_transfer =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
-    ~title:"Test Tezlink transfer via an observer"
+  register_tezosx_test
+    ~title:"Test michelson runtime transfer via an observer"
     ~tags:["observer"; "transfer"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; observer; client; _} _protocol ->
@@ -1560,10 +1448,10 @@ let test_tezlink_observer_transfer =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
-let test_tezlink_transfer_and_wait =
+let test_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
-    ~title:"Test Tezlink transfer and wait for inclusion"
+  register_tezosx_test
+    ~title:"Test michelson runtime transfer and wait for inclusion"
     ~tags:["kernel"; "transfer"; "wait"]
     ~bootstrap_accounts:[Constant.bootstrap1]
     ~time_between_blocks:(Time_between_blocks 0.1)
@@ -1604,9 +1492,9 @@ let test_tezlink_transfer_and_wait =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
-let test_tezlink_reveal =
-  register_tezlink_test
-    ~title:"Test Tezlink reveal"
+let test_reveal =
+  register_tezosx_test
+    ~title:"Test michelson runtime reveal"
     ~tags:["kernel"; "reveal"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1643,12 +1531,12 @@ let test_tezlink_reveal =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_bootstrap_block_info =
+let test_bootstrap_block_info =
   (* This test just makes sure the block info call on block 4 does not fail
      catastrophically. We check block 4 in particular because at this level
      we mock information to index bootstrap accounts. *)
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of tezlink block info on block 4"
     ~tags:["bootstrap"; "block_info"]
     ~bootstrap_contracts:[contract]
@@ -1668,9 +1556,9 @@ let test_tezlink_bootstrap_block_info =
          level 4") ;
   unit
 
-let test_tezlink_execution =
+let test_execution =
   let contract = Michelson_contracts.concat_hello () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of tezlink execution"
     ~tags:["execution"; "hello"; "storage"]
     ~bootstrap_contracts:[contract]
@@ -1698,9 +1586,9 @@ let test_tezlink_execution =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let test_tezlink_bigmap_option =
+let test_bigmap_option =
   let option_contract = Michelson_contracts.big_map_option () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test which syntax is used for big maps in contract storages"
     ~tags:["syntax"; "big_map"; "option"; "storage"]
     ~bootstrap_contracts:[option_contract]
@@ -1727,9 +1615,9 @@ let test_tezlink_bigmap_option =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let test_tezlink_bigmap_counter =
+let test_bigmap_counter =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of tezlink big_map persistency"
     ~tags:["persistency"; "big_map"; "counter"; "storage"]
     ~bootstrap_contracts:[counter_contract]
@@ -1777,9 +1665,9 @@ let test_tezlink_bigmap_counter =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let test_tezlink_bigmap_rpcs =
+let test_bigmap_rpcs =
   let counter_contract = Michelson_contracts.big_map_counter () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Test of the big_map RPCs"
     ~tags:["rpc"; "big_map"]
     ~bootstrap_contracts:[counter_contract]
@@ -1823,8 +1711,8 @@ let test_tezlink_bigmap_rpcs =
       ~error_msg:"Expected value_type %R but got %L") ;
   unit
 
-let test_tezlink_pack_data =
-  register_tezlink_test
+let test_pack_data =
+  register_tezosx_test
     ~title:"Test of the pack_data RPC"
     ~tags:["rpc"; "pack_data"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1857,8 +1745,8 @@ let test_tezlink_pack_data =
   in
   Lwt_list.iter_s check_pack_data test_cases
 
-let test_tezlink_run_operation =
-  register_tezlink_test
+let test_run_operation =
+  register_tezosx_test
     ~title:"Test of the run_operation RPC"
     ~tags:["rpc"; "run_operation"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
@@ -1921,13 +1809,14 @@ let test_tezlink_run_operation =
   Check.(
     (tezlink_status = "applied")
       string
-      ~error_msg:"Tezlink run_operation status: expected %R but got %L") ;
+      ~error_msg:
+        "Michelson runtime run_operation status: expected %R but got %L") ;
   unit
 
-let test_tezlink_reveal_transfer_batch =
+let test_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  register_tezlink_test
-    ~title:"Test Tezlink reveal+transfer batch"
+  register_tezosx_test
+    ~title:"Test michelson runtime reveal+transfer batch"
     ~tags:["kernel"; "reveal"; "transfer"; "batch"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -2010,8 +1899,8 @@ let test_tezlink_reveal_transfer_batch =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
-let test_tezlink_batch =
-  register_tezlink_test
+let test_batch =
+  register_tezosx_test
     ~title:"Test of tezlink batches"
     ~tags:["batch"; "multiple_transfers"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2085,13 +1974,13 @@ let test_tezlink_batch =
 
 (* The goal of this test is twofold:
    - Test that long transfer batches are supported by Tezlink (see also
-     [test_tezlink_batch] for a test checking the balance changes on a batch of
+     [test_batch] for a test checking the balance changes on a batch of
      size 2),
    - Test that there is no regression for the counter RPC which used to return
      128 instead of 64 (see MR !19237).
 *)
-let test_tezlink_long_batch =
-  register_tezlink_test
+let test_long_batch =
+  register_tezosx_test
     ~title:"Long transaction batch"
     ~tags:["transaction"; "long"; "batch"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2132,101 +2021,10 @@ let test_tezlink_long_batch =
         "Wrong counter after batch application: expected: %L, actual: %R.") ;
   unit
 
-let test_tezlink_sandbox () =
-  Test.register
-    ~__FILE__
-    ~title:"Tezlink sandbox transfer test"
-    ~tags:["sequencer"; "sandbox"; "tezlink"]
-    ~uses_node:false
-    ~uses:
-      [
-        Constant.octez_evm_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ]
-  @@ fun () ->
-  let wallet_dir = Temp.dir "wallet" in
-  let preimages_dir = Temp.dir "wasm_2_0_0" in
-  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-  let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
-  let* {output; _} =
-    prepare_installer_kernel_with_arbitrary_file
-      ~preimages_dir
-      (Uses.path Constant.WASM.evm_kernel)
-  in
-  let sequencer_config : Evm_node.sequencer_config =
-    {
-      time_between_blocks = Some Nothing;
-      genesis_timestamp = None;
-      max_number_of_chunks = None;
-      wallet_dir = Some wallet_dir;
-    }
-  in
-  let sequencer_mode =
-    Evm_node.Tezlink_sandbox
-      {
-        sequencer_config;
-        funded_addresses =
-          [Constant.bootstrap1.public_key; Constant.bootstrap2.public_key];
-        verbose = false;
-      }
-  in
-
-  let* sequencer =
-    Evm_node.init
-      ~node_setup:
-        (Evm_node.make_setup
-           ~spawn_rpc:(Port.fresh ())
-           ~initial_kernel:output
-           ~preimages_dir
-           ())
-      ~mode:sequencer_mode
-      ()
-  in
-
-  (* Skip blocks 0 and 1 so that the transfer happens in the block 2 *)
-  let* () = produce_block_and_wait_for ~sequencer 0 in
-  let* () = produce_block_and_wait_for ~sequencer 1 in
-
-  let endpoint = tezlink_endpoint_from_evm_node sequencer in
-
-  let client = Client.create ~endpoint ~base_dir:wallet_dir () in
-
-  let amount = Tez.one in
-  let fee = Tez.one in
-  let* () =
-    Client.transfer
-      ~amount
-      ~fee
-      ~giver:Constant.bootstrap1.alias
-      ~receiver:Constant.bootstrap2.alias
-      ~burn_cap:Tez.one
-      client
-  in
-  let*@ _ = produce_block sequencer in
-  let* balance1 =
-    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
-  in
-  let* balance2 =
-    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
-  in
-
-  Check.(
-    (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
-      int)
-    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
-  Check.(
-    (Tez.to_mutez balance2
-    = Tez.to_mutez bootstrap_balance + Tez.to_mutez amount)
-      int)
-    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
-  unit
-
-let test_tezlink_internal_operation =
+let test_internal_operation =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Internal operation"
     ~tags:["internal"; "operation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2255,9 +2053,9 @@ let test_tezlink_internal_operation =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
-let test_tezlink_internal_receipts =
+let test_internal_receipts =
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Internal receipts"
     ~tags:["internal"; "operation"; "receipts"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2377,9 +2175,9 @@ let test_tezlink_internal_receipts =
     ~origin:"block" ;
   unit
 
-let test_tezlink_origination =
+let test_origination =
   let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Contract origination"
     ~tags:["origination"; "operation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2427,8 +2225,8 @@ let test_tezlink_origination =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
-let test_tezlink_operation_hashes_in_pass =
-  register_tezlink_test
+let test_operation_hashes_in_pass =
+  register_tezosx_test
     ~title:"Test /operation_hashes/<pass> rpc"
     ~tags:["rpc"; "operation_hashes"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2500,7 +2298,7 @@ let test_event =
   let emit_events_contract =
     Tezt_etherlink.Michelson_contracts.emit_events_contract ()
   in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Contract emits an event"
     ~tags:["operation"; "event"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -2589,8 +2387,8 @@ let test_event =
     = expected_event_gas_cost) ;
   unit
 
-let test_tezlink_forge_operations =
-  register_tezlink_test
+let test_forge_operations =
+  register_tezosx_test
     ~title:"Test of the forge/operations rpc"
     ~tags:["rpc"; "forge"; "operations"]
     ~additional_uses:[Constant.octez_codec]
@@ -2643,9 +2441,9 @@ let test_tezlink_forge_operations =
   Check.((res.body = expected_res) string ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_prevalidation =
-  register_tezlink_test
-    ~title:"Test Tezlink prevalidation"
+let test_prevalidation =
+  register_tezosx_test
+    ~title:"Test michelson runtime prevalidation"
     ~tags:["kernel"; "prevalidation"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
@@ -3045,9 +2843,10 @@ let test_tezlink_prevalidation =
   in
   unit
 
-let test_tezlink_prevalidation_gas_limit_lower_bound =
-  register_tezlink_test
-    ~title:"Test Tezlink prevalidation of operation gas limit lower bound"
+let test_prevalidation_gas_limit_lower_bound =
+  register_tezosx_test
+    ~title:
+      "Test michelson runtime prevalidation of operation gas limit lower bound"
     ~tags:["kernel"; "prevalidation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
@@ -3199,9 +2998,9 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
 
   unit
 
-let test_tezlink_validation_gas_limit =
-  register_tezlink_test
-    ~title:"Test Tezlink validation of block gas limit"
+let test_validation_gas_limit =
+  register_tezosx_test
+    ~title:"Test michelson runtime validation of block gas limit"
     ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
@@ -3286,9 +3085,9 @@ let test_tezlink_validation_gas_limit =
   in
   unit
 
-let test_tezlink_validation_counter =
-  register_tezlink_test
-    ~title:"Test Tezlink validation of counters"
+let test_validation_counter =
+  register_tezosx_test
+    ~title:"Test michelson runtime validation of counters"
     ~tags:["kernel"; "validation"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
@@ -3336,9 +3135,9 @@ let test_tezlink_validation_counter =
   in
   unit
 
-let test_tezlink_validation_balance =
-  register_tezlink_test
-    ~title:"Test Tezlink validation of balance"
+let test_validation_balance =
+  register_tezosx_test
+    ~title:"Test michelson runtime validation of balance"
     ~tags:["kernel"; "validation"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; _} _protocol ->
@@ -3459,8 +3258,8 @@ let test_tezlink_validation_balance =
 (** Sends a Michelson transfer with zero fees and verifies it is rejected.
     [Client.spawn_transfer] triggers a simulation that rejects the operation
     with [Insufficient_fees]. *)
-let test_tezlink_insufficient_da_fee =
-  register_tezlink_test
+let test_insufficient_da_fee =
+  register_tezosx_test
     ~title:"Michelson transfer with insufficient DA fee is rejected"
     ~tags:["kernel"; "validation"; "da_fee"; "insufficient"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3487,10 +3286,10 @@ let test_tezlink_insufficient_da_fee =
     ~error_msg:"Prevalidation should have failed with %R but got %L" ;
   unit
 
-let test_tezlink_da_fee_credited_to_pool =
+let test_da_fee_credited_to_pool =
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   let da_fee_eth_int = 4 in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"DA fees are credited to sequencer pool address"
     ~tags:["kernel"; "da_fee"; "sequencer_pool_address"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3539,8 +3338,8 @@ let test_tezlink_da_fee_credited_to_pool =
     [insufficient_fees]. Then, verifies that without the flag, the client
     fetches the correct DA fee from the mempool filter RPC and the
     transfer succeeds. *)
-let test_tezlink_simulation_with_da_fee =
-  register_tezlink_test
+let test_simulation_with_da_fee =
+  register_tezosx_test
     ~title:"Michelson transfer simulation succeeds with DA fees enabled"
     ~tags:["kernel"; "validation"; "da_fee"; "simulation"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -3819,7 +3618,7 @@ let test_michelson_execution_gas_fee =
     only 10k are available.  The operation is included in the block
     but fails with gas exhaustion, and the fee is fully consumed. *)
 let test_michelson_gas_exhaustion =
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Michelson gas exhaustion"
     ~tags:["gas"; "exhaustion"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -4425,9 +4224,9 @@ let test_gas_refund_in_preapply ~enable_refund =
     () ;
   unit
 
-let test_tezlink_gas_vs_l1 =
-  register_tezlink_regression_test
-    ~title:"Test Tezlink gas vs L1 operations"
+let test_gas_vs_l1 =
+  register_tezosx_regression_test
+    ~title:"Test michelson runtime gas vs L1 operations"
     ~tags:["kernel"; "gas"; "l1"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _ ->
@@ -4471,29 +4270,27 @@ let test_tezlink_gas_vs_l1 =
   in
 
   Regression.capture @@ sf "Gas used L1: %d\n" gas_used_l1 ;
-  Regression.capture @@ sf "Gas used Tezlink: %d\n" gas_used_tezlink ;
+  Regression.capture @@ sf "Gas used Michelson runtime: %d\n" gas_used_tezlink ;
 
   unit
 
-let test_node_catchup_on_multichain =
+let test_node_catchup =
   let max_blueprints_lag = 10 in
   let max_blueprints_catchup = 10 in
   let catchup_cooldown = 4 in
-  register_tezlink_only_test
+  register_tezosx_test
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
     ~tags:["blueprint"; "catchup"]
-    ~title:"EVM node catchup on multichain"
+    ~title:"EVM node catchup with the michelson runtime"
     ~time_between_blocks:Nothing
   @@
   fun {sequencer; sc_rollup_node; client; sc_rollup_address; node; _}
       _protocol
     ->
   let*@ _ = produce_block sequencer in
-  let* () =
-    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* l1_level = Node.get_level node in
   let wait_for_level_processed =
     Lwt.join
@@ -4595,7 +4392,7 @@ let test_node_catchup_on_multichain =
     Sc_rollup_node.wait_for_level sc_rollup_node l1_level_blueprints_processed
   in
 
-  let*@ rollup_level = rollup_level ~network:Tezlink sc_rollup_node in
+  let*@ rollup_level = rollup_level sc_rollup_node in
   (* Check that the rollup is at least about the expected catchup. *)
   Check.(
     (Int32.to_int rollup_level >= before_level + max_blueprints_catchup)
@@ -4643,10 +4440,11 @@ let test_node_catchup_on_multichain =
   unit
 
 let test_delayed_deposit_is_included =
-  register_tezlink_only_test
+  register_tezosx_test
     ~time_between_blocks:Nothing
+    ~bootstrap_accounts:[]
     ~tags:["sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
-    ~title:"Tezlink Delayed deposit is included"
+    ~title:"Michelson runtime delayed deposit is included"
   @@
   fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
@@ -4691,9 +4489,7 @@ let test_delayed_deposit_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () =
-    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
@@ -4703,21 +4499,13 @@ let test_delayed_deposit_is_included =
   unit
 
 let test_bridged_tez_transfer =
-  register_tezlink_test
+  register_tezosx_test
     ~time_between_blocks:Nothing
     ~bootstrap_accounts:[]
     ~tags:["deposit"; "transfer"]
-    ~title:"A Tezlink account that has only bridged tez can make a transfer"
+    ~title:"A Tezos account that has only bridged tez can make a transfer"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        enable_multichain;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
@@ -4771,10 +4559,7 @@ let test_bridged_tez_transfer =
       ~sc_rollup_node
       ~client
   in
-  (* Multichain primary is Michelson (block state lives under /tezlink/…);
-     Tezos X primary is EVM (block state lives under /evm/world_state/…). *)
-  let network = if enable_multichain then Tezlink else Etherlink in
-  let* () = bake_until_sync ~network ~sc_rollup_node ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   let* () =
@@ -4833,7 +4618,7 @@ let call_contract ~sequencer ~client ~endpoint ~address ~arg =
     transfer
 
 let test_big_map_transfer =
-  register_tezlink_regression_test
+  register_tezosx_regression_test
     ~title:"Test of the big_map transfers"
     ~tags:["big_map"; "compatibility"; "operations"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -4899,18 +4684,18 @@ let test_big_map_transfer =
 
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
-let test_tezlink_upgrade_kernel_auto_sync =
+let test_upgrade_kernel_auto_sync =
   (* Add a delay between first block and activation timestamp. *)
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
   let timestamp = "2020-01-01T00:00:05Z" in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_tezlink_only_upgrade_test
+  register_tezosx_upgrade_test
     ~genesis_timestamp
     ~tags:["sequencer"; "upgrade"; "auto"; "sync"; Tag.flaky]
     ~title:
-      "Tezlink rollup-node kernel upgrade is applied to the sequencer state."
+      "Tezos X rollup-node kernel upgrade is applied to the sequencer state."
   @@
   fun from
       to_
@@ -4959,9 +4744,7 @@ let test_tezlink_upgrade_kernel_auto_sync =
         let*@ _ = produce_block ~timestamp sequencer in
         unit)
   in
-  let* () =
-    bake_until_sync ~network:Tezlink ~sc_rollup_node ~client ~sequencer ()
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Produce a block after activation timestamp, both the rollup node
      and the sequencer will upgrade to latest kernel. *)
@@ -4970,9 +4753,7 @@ let test_tezlink_upgrade_kernel_auto_sync =
     unit
   and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
 
-  let* () =
-    bake_until_sync ~network:Tezlink ~sc_rollup_node ~client ~sequencer ()
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* () =
     match Kernel.commit_of to_ with
@@ -5004,7 +4785,7 @@ let get_entrypoints ?normalize_types tezlink_endpoint address =
     The faucet contract has a single [%fund : mutez] entrypoint. *)
 let test_entrypoints_originated =
   let faucet = Michelson_contracts.faucet_contract () in
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Entrypoints RPC for originated Michelson contract"
     ~tags:["rpc"; "entrypoints"; "originated"]
     ~bootstrap_contracts:[faucet]
@@ -5027,7 +4808,7 @@ let test_entrypoints_originated =
     whose [%transfer] entrypoint carries [:from], [:to] and [:value] variable
     annotations that are stripped when [normalize_types=true]. *)
 let test_entrypoints_normalize_types =
-  register_tezlink_test
+  register_tezosx_test
     ~title:"Entrypoints RPC normalize_types for originated Michelson contract"
     ~tags:["rpc"; "entrypoints"; "originated"; "normalize_types"]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -5088,64 +4869,63 @@ let test_entrypoints_normalize_types =
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
-  test_tezlink_current_level [Alpha] ;
-  test_tezlink_contract_info [Alpha] ;
-  test_tezlink_list_entrypoints [Alpha] ;
-  test_tezlink_contract_info_script [Alpha] ;
-  test_tezlink_balance [Alpha] ;
-  test_tezlink_manager_key [Alpha] ;
-  test_tezlink_contract_info_on_liquidity_baking [Alpha] ;
-  test_tezlink_counter [Alpha] ;
-  test_tezlink_protocols [Alpha] ;
-  test_tezlink_genesis_block_arg [Alpha] ;
-  test_tezlink_expected_issuance [Alpha] ;
-  test_tezlink_monitor_heads [Alpha] ;
-  test_tezlink_version [Alpha] ;
-  test_tezlink_contracts_rpc [Alpha] ;
-  test_tezlink_header [Alpha] ;
-  test_tezlink_block_metadata [Alpha] ;
-  test_tezlink_constants [Alpha] ;
-  test_tezlink_storage_rpc [Alpha] ;
-  test_tezlink_produceBlock [Alpha] ;
-  test_tezlink_hash_rpc [Alpha] ;
-  test_tezlink_script_rpc [Alpha] ;
-  test_tezlink_blocks_list [Alpha] ;
+  test_current_level [Alpha] ;
+  test_contract_info [Alpha] ;
+  test_list_entrypoints [Alpha] ;
+  test_contract_info_script [Alpha] ;
+  test_balance [Alpha] ;
+  test_manager_key [Alpha] ;
+  test_contract_info_on_liquidity_baking [Alpha] ;
+  test_counter [Alpha] ;
+  test_protocols [Alpha] ;
+  test_genesis_block_arg [Alpha] ;
+  test_expected_issuance [Alpha] ;
+  test_monitor_heads [Alpha] ;
+  test_version [Alpha] ;
+  test_contracts_rpc [Alpha] ;
+  test_header [Alpha] ;
+  test_block_metadata [Alpha] ;
+  test_constants [Alpha] ;
+  test_storage_rpc [Alpha] ;
+  test_produceBlock [Alpha] ;
+  test_hash_rpc [Alpha] ;
+  test_script_rpc [Alpha] ;
+  test_blocks_list [Alpha] ;
   test_contract_storage_normalization [Alpha] ;
   test_contract_counter [Alpha] ;
-  test_tezlink_raw_json_cycle [Alpha] ;
-  test_tezlink_chain_id [Alpha] ;
-  test_tezlink_bootstrapped [Alpha] ;
-  test_tezlink_transfer [Alpha] ;
-  test_tezlink_observer_transfer [Alpha] ;
-  test_tezlink_transfer_and_wait [Alpha] ;
-  test_tezlink_reveal [Alpha] ;
-  test_tezlink_block_info [Alpha] ;
-  test_tezlink_storage_via_client [Alpha] ;
-  test_tezlink_execution [Alpha] ;
-  test_tezlink_bigmap_option [Alpha] ;
-  test_tezlink_bigmap_counter [Alpha] ;
-  test_tezlink_bigmap_rpcs [Alpha] ;
-  test_tezlink_pack_data [Alpha] ;
-  test_tezlink_run_operation [Alpha] ;
-  test_tezlink_reveal_transfer_batch [Alpha] ;
-  test_tezlink_batch [Alpha] ;
-  test_tezlink_long_batch [Alpha] ;
-  test_tezlink_bootstrap_block_info [Alpha] ;
-  test_tezlink_sandbox () ;
-  test_tezlink_internal_operation [Alpha] ;
-  test_tezlink_internal_receipts [Alpha] ;
-  test_tezlink_operation_hashes_in_pass [Alpha] ;
+  test_raw_json_cycle [Alpha] ;
+  test_chain_id [Alpha] ;
+  test_bootstrapped [Alpha] ;
+  test_transfer [Alpha] ;
+  test_observer_transfer [Alpha] ;
+  test_transfer_and_wait [Alpha] ;
+  test_reveal [Alpha] ;
+  test_block_info [Alpha] ;
+  test_storage_via_client [Alpha] ;
+  test_execution [Alpha] ;
+  test_bigmap_option [Alpha] ;
+  test_bigmap_counter [Alpha] ;
+  test_bigmap_rpcs [Alpha] ;
+  test_pack_data [Alpha] ;
+  test_run_operation [Alpha] ;
+  test_reveal_transfer_batch [Alpha] ;
+  test_batch [Alpha] ;
+  test_long_batch [Alpha] ;
+  test_bootstrap_block_info [Alpha] ;
+  test_internal_operation [Alpha] ;
+  test_internal_receipts [Alpha] ;
+  test_operation_hashes_in_pass [Alpha] ;
   test_event [Alpha] ;
-  test_tezlink_prevalidation [Alpha] ;
-  test_tezlink_prevalidation_gas_limit_lower_bound [Alpha] ;
-  test_tezlink_validation_gas_limit [Alpha] ;
-  test_tezlink_validation_counter [Alpha] ;
-  test_tezlink_validation_balance [Alpha] ;
-  test_tezlink_insufficient_da_fee [Alpha] ;
-  test_tezlink_da_fee_credited_to_pool [Alpha] ;
-  test_tezlink_simulation_with_da_fee [Alpha] ;
-  test_tezlink_origination [Alpha] ;
-  test_tezlink_forge_operations [Alpha] ;
+  test_prevalidation [Alpha] ;
+  test_prevalidation_gas_limit_lower_bound [Alpha] ;
+  test_validation_gas_limit [Alpha] ;
+  test_validation_counter [Alpha] ;
+  test_validation_balance [Alpha] ;
+  test_insufficient_da_fee [Alpha] ;
+  test_da_fee_credited_to_pool [Alpha] ;
+  test_simulation_with_da_fee [Alpha] ;
+  test_origination [Alpha] ;
+  test_forge_operations [Alpha] ;
   test_michelson_gas_backlog [Alpha] ;
   test_michelson_gas_backlog_on_failed_op [Alpha] ;
   test_michelson_execution_gas_fee [Alpha] ;
@@ -5160,11 +4940,11 @@ let () =
   test_gas_refund_in_run_operation ~enable_refund:false [Alpha] ;
   test_gas_refund_in_preapply ~enable_refund:true [Alpha] ;
   test_gas_refund_in_preapply ~enable_refund:false [Alpha] ;
-  test_tezlink_gas_vs_l1 [Alpha] ;
-  test_node_catchup_on_multichain [Alpha] ;
+  test_gas_vs_l1 [Alpha] ;
+  test_node_catchup [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
   test_bridged_tez_transfer [Alpha] ;
   test_big_map_transfer [Alpha] ;
-  test_tezlink_upgrade_kernel_auto_sync [Alpha] ;
+  test_upgrade_kernel_auto_sync [Alpha] ;
   test_entrypoints_originated [Alpha] ;
   test_entrypoints_normalize_types [Alpha]
