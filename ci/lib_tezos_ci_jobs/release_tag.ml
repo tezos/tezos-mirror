@@ -491,8 +491,8 @@ let () =
       (Manual, job_docker_promote_to_version `real);
       (Manual, job_release_page_packaging_revision `real);
       (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian_package Release);
-      (Manual, Debian_repository.job_build_ubuntu_package Release);
+      (Manual, Debian_repository.job_build_debian Release);
+      (Manual, Debian_repository.job_build_ubuntu Release);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
@@ -507,8 +507,8 @@ let () =
       (Manual, job_docker_promote_to_version `test);
       (Manual, job_release_page_packaging_revision `test);
       (Manual, Debian_repository.job_build_data_packages);
-      (Manual, Debian_repository.job_build_debian_package Release);
-      (Manual, Debian_repository.job_build_ubuntu_package Release);
+      (Manual, Debian_repository.job_build_debian Release);
+      (Manual, Debian_repository.job_build_ubuntu Release);
       (Auto, Debian_repository.job_apt_repo_debian Release);
       (Auto, Debian_repository.job_apt_repo_ubuntu Release);
     ] ;
