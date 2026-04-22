@@ -36,9 +36,7 @@ module Normal : sig
   module Registry : sig
     include
       REGISTRY
-        with type invalid_argument_error =
-          Octez_riscv_nds_disk_api.Octez_riscv_durable_storage_on_disk_api
-          .invalid_argument_error
+        with type invalid_argument_error := Nds_errors.invalid_argument_error
 
     (** [create repo] creates a new, empty registry backed by [repo]. *)
     val create : Repo.t -> t
@@ -52,12 +50,7 @@ module Normal : sig
     val checkout : Repo.t -> bytes -> t
   end
 
-  (** Database key-value operations on a {!Registry.t}. See
-      {!Octez_riscv_nds_common.DATABASE} for the full specification. *)
-  module Database :
-    DATABASE
-      with type registry := Registry.t
-       and type invalid_argument_error := Registry.invalid_argument_error
+  include NORMAL with module Registry := Registry
 end
 
 (** Prove mode: registry, database, and proof lifecycle.
