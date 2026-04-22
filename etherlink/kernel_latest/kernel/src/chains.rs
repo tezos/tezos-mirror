@@ -1240,6 +1240,15 @@ impl ChainConfigTrait for MichelsonChainConfig {
         constants.michelson_to_evm_gas_multiplier
     }
 
+    // Tezlink (pure Michelson chain) does not use dynamic, EIP-1559-style
+    // pricing — its fee model follows Tezos L1 (flat mutez-per-gas-unit
+    // declared by the operation). Returning zero here disables the
+    // Etherlink-style dynamic base_fee and keeps fee computation in
+    // strict Tezos semantics.
+    //
+    // Tezos X (EVM primary with embedded Michelson runtime) uses
+    // `EvmChainConfig::base_fee_per_gas` instead, which does return the
+    // dynamic Etherlink base fee.
     fn base_fee_per_gas(&self, _host: &impl StorageV1, _timestamp: Timestamp) -> U256 {
         U256::zero()
     }
