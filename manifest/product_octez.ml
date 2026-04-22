@@ -3868,7 +3868,7 @@ let lib_rollup_node_rust_deps =
        ~path:"src/rollup_node_rust_deps"
        ~synopsis:"Rust dependencies for the smart rollup node"
        ~foreign_archives:["octez_rollup_node_rust_deps"]
-       ~c_library_flags:["-lc++"]
+       ~with_cpp_stdlib:true
        ~dune:
          Dune.
            [

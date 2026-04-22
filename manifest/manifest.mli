@@ -908,6 +908,7 @@ type 'a maker =
   ?license:string ->
   ?extra_authors:string list ->
   ?with_macos_security_framework:bool ->
+  ?with_cpp_stdlib:bool ->
   path:string ->
   ?enabled_if:Dune.s_expr ->
   'a ->
