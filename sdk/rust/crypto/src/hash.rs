@@ -703,6 +703,14 @@ impl PublicKeySignatureVerifier for PublicKeySecp256k1 {
     type Error = CryptoError;
 
     /// Verifies the correctness of `bytes` signed by Secp256k1 as the `signature`.
+    ///
+    /// High-S signatures are rejected. This mirrors the verification behaviour of
+    /// Octez's `src/lib_crypto`, which binds to the Bitcoin Core C library function
+    /// `secp256k1_ecdsa_verify`.
+    ///
+    /// It also matches the convention established for ECDSA by:
+    /// [EIP-2]: https://eips.ethereum.org/EIPS/eip-2
+    /// [BIP-146]: https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki
     fn verify_signature(
         &self,
         signature: &Self::Signature,
@@ -715,6 +723,10 @@ impl PublicKeySignatureVerifier for PublicKeySecp256k1 {
         .map_err(|_| CryptoError::InvalidPublicKey)?;
         let sig = libsecp256k1::Signature::parse_standard_slice(signature.as_ref())
             .map_err(|_| CryptoError::InvalidSignature)?;
+
+        if sig.s.is_high() {
+            return Ok(false);
+        }
 
         let payload = crate::blake2b::digest_256(bytes);
 
@@ -1183,6 +1195,23 @@ mod tests {
 
         let result = pk.verify_signature(&sig, msg).unwrap();
         assert!(result);
+    }
+
+    #[test]
+    fn test_secp256k1_high_s_signature_rejected() {
+        let pk = PublicKeySecp256k1::from_base58_check(
+            "sppk7a2WEfU54QzcQZ2EMjihtcxLeRtNTVxHw4FW2e8W5kEJ8ZargSb",
+        )
+        .unwrap();
+        let sig = Secp256k1Signature::from_base58_check("spsig1QLf7cczTbt4UHFGQKUrB2pS3ZTu9wdXR29zKxVPQkhBaiLez6hRcM142ms7HagQa3vuPstvMtYq44y4x4RPcrLu76ZuQ7").unwrap();
+        let msg = b"hello, test";
+
+        // Flip s -> n - s to produce the high-S twin
+        let mut parsed = libsecp256k1::Signature::parse_standard_slice(sig.as_ref()).unwrap();
+        parsed.s = -parsed.s;
+        let high_s = Secp256k1Signature::try_from(parsed.serialize().to_vec()).unwrap();
+
+        assert!(!pk.verify_signature(&high_s, msg).unwrap());
     }
 
     #[test]
