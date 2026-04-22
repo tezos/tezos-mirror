@@ -1430,10 +1430,15 @@ module Images_external = struct
      burden for fixing the code on the wrong dev (the devs who happen to open an
      MR coinciding with the semgrep update rather than the dev who wrote the
      infringing code in the first place).
+
+     https://hub.docker.com/layers/returntocorp/semgrep-agent/sha-c6cd7cf/images/sha256-431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
+
      Update the hash in scripts/semgrep/README.md too when updating it here
      Last update: 2022-01-03 *)
   let semgrep_agent =
-    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+    Image.mk_external
+      ~image_path:
+        "returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24"
 
   (* Image provided by GitLab. More details in the doc:
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images

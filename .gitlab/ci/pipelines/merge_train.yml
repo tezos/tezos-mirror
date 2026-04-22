@@ -1661,7 +1661,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 oc.semgrep:
-  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  image: returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
   stage: sanity
   tags:
   - gcp
