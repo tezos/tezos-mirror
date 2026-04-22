@@ -91,10 +91,6 @@ end
 module type Tezlink_protocol = sig
   include Tezos_shell_services.Block_services.PROTO
 
-  val activate_bootstraps_with_transfers :
-    (module Tezlink_backend_sig.S) ->
-    (operation_receipt * operation_data) trace tzresult Lwt.t
-
   val mock_block_header_data : chain_id:Chain_id.t -> block_header_data tzresult
 
   val mock_block_header_metadata :
@@ -174,22 +170,6 @@ let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info =
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Tezlink_SeouLo_protocol = struct
   include SeouLo_protocol
-
-  let activate_bootstraps_with_transfers
-      (module Backend : Tezlink_backend_sig.S) =
-    let open Lwt_result_syntax in
-    let* bootstrap_accounts = Backend.bootstrap_accounts () in
-    let*? ops =
-      List.map_e
-        (fun (account, balance) ->
-          let balance =
-            SeouLo_context.Tez.of_mutez_exn
-              (Imported_context.Tez.to_mutez balance)
-          in
-          Tezlink_mock.seoulo_bootstrap_transfer account balance)
-        bootstrap_accounts
-    in
-    return ops
 
   let contents : Block_header_repr.contents =
     {
@@ -273,18 +253,6 @@ end
 (** We add to Imported_protocol_024 the mocked protocol data used in headers *)
 module Tezlink_TALLiN_protocol = struct
   include TALLiN_protocol
-
-  let activate_bootstraps_with_transfers
-      (module Backend : Tezlink_backend_sig.S) =
-    let open Lwt_result_syntax in
-    let* bootstrap_accounts = Backend.bootstrap_accounts () in
-    let*? ops =
-      List.map_e
-        (fun (account, balance) ->
-          Tezlink_mock.tallin_bootstrap_transfer account balance)
-        bootstrap_accounts
-    in
-    return ops
 
   let contents : Block_header_repr.contents =
     {
@@ -475,9 +443,6 @@ module Current_block_services =
 module Tezlink_zero_protocol = struct
   include Tezos_shell_services.Block_services.Fake_protocol
 
-  let activate_bootstraps_with_transfers (module _ : Tezlink_backend_sig.S) =
-    Lwt.return (Ok [])
-
   let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
       ~name:"block_header_metadata"
@@ -495,9 +460,6 @@ end
 
 module Tezlink_genesis_protocol = struct
   include Tezos_protocol_000_Ps9mPmXa.Protocol
-
-  let activate_bootstraps_with_transfers (module _ : Tezlink_backend_sig.S) =
-    Lwt.return (Ok [])
 
   let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
