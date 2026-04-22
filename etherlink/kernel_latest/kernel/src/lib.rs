@@ -418,6 +418,21 @@ where
             .unwrap();
     }
 
+    let tez_world_state_subkeys = host
+        .host
+        .store_count_subkeys(&chains::TEZ_SAFE_STORAGE_ROOT_PATH)
+        .expect("The kernel failed to read the number of /tez/world_state subkeys");
+
+    if tez_world_state_subkeys == 0 {
+        host.host
+            .store_write(
+                &chains::TEZ_SAFE_STORAGE_ROOT_PATH,
+                b"Une sarabande de monades",
+                0,
+            )
+            .unwrap();
+    }
+
     if is_revealed_storage(&host) {
         reveal_storage(
             &mut host,

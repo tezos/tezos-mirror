@@ -276,7 +276,7 @@ where
                 cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
                 tezos_parent_hash: crate::block_storage::read_current_hash(
                     &safe_host,
-                    &crate::chains::TEZOS_BLOCKS_PATH,
+                    &crate::chains::TEZ_BLOCKS_PATH,
                 )
                 .unwrap_or_else(|_| {
                     H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())

@@ -143,7 +143,8 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
-const MICHELSON_RUNTIME_CHAIN_ID: RefPath = RefPath::assert_from(b"/tezlink/chain_id");
+const MICHELSON_RUNTIME_CHAIN_ID: RefPath =
+    RefPath::assert_from(b"/tez/world_state/chain_id");
 
 // Path to the Multichain feature flag. If there is nothing at this path,
 // a single chain is used.
