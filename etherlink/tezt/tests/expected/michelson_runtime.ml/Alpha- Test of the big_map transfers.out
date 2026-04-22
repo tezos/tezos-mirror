@@ -82,10 +82,10 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 5
+          Updated storage: 1
           Updated big_maps:
-            Copy temp(1) to map(5)
-            Clear map(4)
+            Copy temp(1) to map(1)
+            Clear map(0)
           Consumed gas: 104.085
 
 The operation has only been included 0 blocks ago.
@@ -131,12 +131,12 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 7
+          Updated storage: 3
           Updated big_maps:
-            Copy temp(1) to map(7)
-            Unset map(7)["d"]
-            Set map(7)["c"] to 0x1124
-            Clear map(6)
+            Copy temp(1) to map(3)
+            Unset map(3)["d"]
+            Set map(3)["c"] to 0x1124
+            Clear map(2)
           Consumed gas: 108.455
 
 The operation has only been included 0 blocks ago.
@@ -170,9 +170,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 8
+      Updated storage: 4
       Updated big_maps:
-        Copy map(8) to temp(1)
+        Copy map(4) to temp(1)
       Consumed gas: 183.689
       Internal operations:
         Internal Transaction:
@@ -215,9 +215,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 10
+      Updated storage: 6
       Updated big_maps:
-        Copy map(10) to temp(1)
+        Copy map(6) to temp(1)
       Consumed gas: 183.689
       Internal operations:
         Internal Transaction:
@@ -226,10 +226,10 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 11
+          Updated storage: 7
           Updated big_maps:
-            Copy temp(1) to map(11)
-            Clear map(9)
+            Copy temp(1) to map(7)
+            Clear map(5)
           Consumed gas: 104.085
 
 The operation has only been included 0 blocks ago.
@@ -263,9 +263,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 13
+      Updated storage: 9
       Updated big_maps:
-        Copy map(13) to temp(1)
+        Copy map(9) to temp(1)
       Consumed gas: 183.689
       Internal operations:
         Internal Transaction:
@@ -274,12 +274,12 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 14
+          Updated storage: 10
           Updated big_maps:
-            Copy temp(1) to map(14)
-            Unset map(14)["d"]
-            Set map(14)["c"] to 0x1124
-            Clear map(12)
+            Copy temp(1) to map(10)
+            Unset map(10)["d"]
+            Set map(10)["c"] to 0x1124
+            Clear map(8)
           Consumed gas: 108.455
 
 The operation has only been included 0 blocks ago.
@@ -313,9 +313,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 15
+      Updated storage: 11
       Updated big_maps:
-        Copy map(15) to temp(1)
+        Copy map(11) to temp(1)
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Consumed gas: 188.059
@@ -360,9 +360,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 17
+      Updated storage: 13
       Updated big_maps:
-        Copy map(17) to temp(1)
+        Copy map(13) to temp(1)
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Consumed gas: 188.059
@@ -373,10 +373,10 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 18
+          Updated storage: 14
           Updated big_maps:
-            Copy temp(1) to map(18)
-            Clear map(16)
+            Copy temp(1) to map(14)
+            Clear map(12)
           Consumed gas: 104.085
 
 The operation has only been included 0 blocks ago.
@@ -410,9 +410,9 @@ This sequence of operations was run:
       To: [CONTRACT_HASH]
       Parameter: "[CONTRACT_HASH]"
       This transaction was successfully applied
-      Updated storage: 20
+      Updated storage: 16
       Updated big_maps:
-        Copy map(20) to temp(1)
+        Copy map(16) to temp(1)
         Unset temp(1)["b"]
         Set temp(1)["a"] to 0x0010
       Consumed gas: 188.059
@@ -423,12 +423,12 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Parameter: -1
           This transaction was successfully applied
-          Updated storage: 21
+          Updated storage: 17
           Updated big_maps:
-            Copy temp(1) to map(21)
-            Unset map(21)["d"]
-            Set map(21)["c"] to 0x1124
-            Clear map(19)
+            Copy temp(1) to map(17)
+            Unset map(17)["d"]
+            Set map(17)["c"] to 0x1124
+            Clear map(15)
           Consumed gas: 108.455
 
 The operation has only been included 0 blocks ago.

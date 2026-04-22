@@ -516,34 +516,6 @@ let test_counter =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_contract_info_on_liquidity_baking =
-  register_tezosx_test
-    ~title:"Test of the contract info rpc on liquidity baking addresses"
-    ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
-  @@ fun {sequencer; _} _protocol ->
-  let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
-  (* call the balance rpc and check the result *)
-  let verify_account_info_rpc address =
-    let* json =
-      RPC_core.call tezlink_endpoint
-      @@ RPC.get_chain_block_context_contract ~id:address ()
-    in
-    (* Verify that the script field exists*)
-    let script = JSON.(json |-> "script") in
-    return
-      Check.(
-        (is_false @@ JSON.is_null script)
-          ~error_msg:"Expected script but found nothing")
-  in
-  let cpmm_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
-  let lqt_address = "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo" in
-  let lq_fallback_token = "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN" in
-
-  let* () = verify_account_info_rpc cpmm_address in
-  let* () = verify_account_info_rpc lqt_address in
-  let* () = verify_account_info_rpc lq_fallback_token in
-  unit
-
 let test_version =
   register_tezosx_test ~title:"Test of the version rpc" ~tags:["rpc"; "version"]
   @@ fun {sequencer; _} _protocol ->
@@ -1595,7 +1567,7 @@ let test_bigmap_option =
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint = tezlink_endpoint_from_evm_node sequencer in
-  let expected_result = "Some 4" in
+  let expected_result = "Some 0" in
   let* () =
     Client.transfer
       ~endpoint
@@ -1685,8 +1657,7 @@ let test_bigmap_rpcs =
       client
   in
   let*@ _ = produce_block sequencer in
-  (* Big_map ID 4 is the first user big_map (0-3 are reserved for Liquidity Baking) *)
-  let big_map_id = "4" in
+  let big_map_id = "0" in
   (* Test big_map get RPC *)
   let* hash_result = Client.hash_data ~data:"1" ~typ:"nat" client in
   let key_hash = hash_result.script_expr_hash in
@@ -4875,7 +4846,6 @@ let () =
   test_contract_info_script [Alpha] ;
   test_balance [Alpha] ;
   test_manager_key [Alpha] ;
-  test_contract_info_on_liquidity_baking [Alpha] ;
   test_counter [Alpha] ;
   test_protocols [Alpha] ;
   test_genesis_block_arg [Alpha] ;
