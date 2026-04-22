@@ -72,6 +72,7 @@ mod reveal_storage;
 mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
+mod state_hash;
 mod storage;
 mod sub_block;
 mod tick_model;

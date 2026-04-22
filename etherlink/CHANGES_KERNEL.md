@@ -46,6 +46,16 @@ Its storage version is 54.
 
 ### Tezos X Experimental Features
 
+- EVM block `state_root` now encodes a commitment to the blueprint that
+  produced the block in addition to the EVM world state:
+  `state_root = keccak256(h(/evm/world_state/eth_accounts) || blueprint_hash)`
+  where `blueprint_hash = keccak256(valid_tx_hashes || delayed_tx_hashes
+  || michelson_ops_commitment || timestamp_le_bytes)` and
+  `michelson_ops_commitment` is the Keccak-256 of Michelson op hashes in
+  execution order. Two distinct blueprints at the same level now yield
+  distinct `state_root` values independently of the durable-storage
+  layout, paving the way for the durable-storage reorganization to
+  proceed without breaking the blueprint-uniqueness invariant. (!21676)
 - Produce Tezos blocks in Etherlink (!20737). Storage version is 49.
 
 ## Version 6 (Farfadet)
