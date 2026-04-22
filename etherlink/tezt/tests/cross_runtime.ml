@@ -8258,6 +8258,69 @@ let test_crac_collect_result_revert_discards_bytes =
   Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
   EvmCollectResult.check_result ~expected_hex:"" evm_reader
 
+(** Size sweep for [%collect_result] gas carbonation: the
+    handler pre-charges [460 + 1.5 * size] milligas for the store +
+    result surfacing + response-body forward triptych. Run three
+    adapters with 256, 1024, and 4096-byte payloads through the CRAC
+    path and check that the measured handler cost matches the model
+    exactly, via the synthetic tezlink receipt's [collect_result]
+    internal op.
+
+    Per-internal-op the apply loop charges [Cost::manager_operation]
+    = 100_000 mgas; MIR then charges [VALUE_STEP] = 100 mgas for the
+    bytes typecheck; then the handler adds the size-dependent term.
+    Total: [100_560 + 1.5 * size] mgas. *)
+let test_crac_collect_result_size_sweep_matches_model =
+  register_crac_runner_test
+    ~title:"CRAC: %collect_result size sweep matches model"
+    ~tags:["collect_result"; "gas"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-gas-size" in
+  let hex_of_bytes n = String.make (2 * n) '0' in
+  let sizes = [256; 1024; 4096] in
+  Log.debug ~prefix "Originate adapters for sizes 256/1024/4096" ;
+  let* adapters =
+    Lwt_list.map_s
+      (fun n ->
+        let* t = TezCollectResult.originate ~payload_hex:(hex_of_bytes n) () in
+        let* e = EvmCollectResult.deploy_and_init t in
+        return (n, e))
+      sizes
+  in
+  let expected_mgas n = 100_000 + 100 + 460 + (3 * n / 2) in
+  Log.debug ~prefix "Warmup each reader (alias + storage)" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (_, e) ->
+        let* _ = EvmCollectResult.call_run e in
+        unit)
+      adapters
+  in
+  Log.debug ~prefix "Measurement runs" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun (n, e) ->
+        let* _ = EvmCollectResult.call_run e in
+        let* mgas =
+          TezRunner.get_gateway_consumed_milligas
+            ~entrypoint:"collect_result"
+            ()
+        in
+        let expected = expected_mgas n in
+        Log.info ~prefix "size=%d mgas=%d (expected %d)" n mgas expected ;
+        Check.(
+          (mgas = expected)
+            int
+            ~error_msg:
+              (Printf.sprintf
+                 "size=%d: consumed_milligas %%L does not match model %%R"
+                 n)) ;
+        unit)
+      adapters
+  in
+  unit
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -8350,4 +8413,5 @@ let () =
   test_crac_gas_error_path_reporting [Alpha] ;
   test_crac_gas_oog_path_reporting [Alpha] ;
   test_crac_collect_result_surfaces_in_response_body [Alpha] ;
-  test_crac_collect_result_revert_discards_bytes [Alpha]
+  test_crac_collect_result_revert_discards_bytes [Alpha] ;
+  test_crac_collect_result_size_sweep_matches_model [Alpha]

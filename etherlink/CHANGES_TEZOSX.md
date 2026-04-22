@@ -15,6 +15,10 @@ Its storage version is 54.
 
 ### Internal
 
+- Add `%collect_result` entrypoint to the Michelson gateway: lets
+  adapters deposit a bytes payload surfaced as the synchronous return
+  value of the EVM call, with gas charged at deposit time. (!21658,
+  !21659, !21710)
 - Fix CRAC receipt merging when an EVM transaction interleaves failed and
   successful CRACs. Receipts pushed to the Michelson journal are now tagged
   with a monotonic sequence number shared across the pending and failed
