@@ -46,7 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
-- Nothing.
+- `PublicKeySecp256k1::verify_signature` now rejects high-S signatures, aligning the Rust SDK with the
+  verification behaviour of Octez's `src/lib_crypto`.
 
 ### Performance
 
