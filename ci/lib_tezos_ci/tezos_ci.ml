@@ -1403,10 +1403,16 @@ module Images_external = struct
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
 
+     https://hub.docker.com/layers/datadog/ci/v5.13.1/images/sha256-cdf912e7d4c2002dcbb40f048449053695f980157b7249d3d7891e5444cd807b
+
      The [datadog-ci] version should be consistent across all CI
      images that use it. At the moment it is installed in the
-     external image below and the internal image [e2etest]. *)
-  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v4.1.0"
+     external image below and the internal image [monitoring]. *)
+
+  let datadog_ci =
+    Image.mk_external
+      ~image_path:
+        "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
 
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
