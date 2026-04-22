@@ -46,11 +46,17 @@ end
 (** Common signature for registry operations across all modes.
 
     A registry manages a collection of databases. Each database is
-    identified by a zero-based index. *)
+    identified by a zero-based index.
+
+    The error type [invalid_argument_error] is left abstract so that
+    different modes can instantiate it with the appropriate concrete
+    error type: {!Nds_errors.invalid_argument_error} for Normal and
+    Prove modes, {!Nds_errors.verification_argument_error} for Verify
+    mode. *)
 module type REGISTRY = sig
   type t
 
-  (** Backend-specific invalid-argument error type for registry
+  (** Mode-specific invalid-argument error type for registry
       operations. *)
   type invalid_argument_error
 
@@ -94,11 +100,12 @@ end
 (** Common signature for database key-value operations.
 
     Each database is an isolated key-space. Keys are byte sequences of
-    at most 256 bytes. *)
+    at most 256 bytes. See {!REGISTRY} for the rationale behind the
+    abstract [invalid_argument_error] type. *)
 module type DATABASE = sig
   type registry
 
-  (** Backend-specific invalid-argument error type for database
+  (** Mode-specific invalid-argument error type for database
       operations. *)
   type invalid_argument_error
 
@@ -180,17 +187,21 @@ module type DATABASE = sig
     registry -> db_index:int64 -> (bytes, invalid_argument_error) result
 end
 
-(** Normal mode: registry + database. *)
+(** Normal mode: registry + database, with errors instantiated to
+    {!Nds_errors.invalid_argument_error}. *)
 module type NORMAL = sig
-  module Registry : REGISTRY
+  module Registry :
+    REGISTRY
+      with type invalid_argument_error := Nds_errors.invalid_argument_error
 
   module Database :
     DATABASE
       with type registry := Registry.t
-       and type invalid_argument_error := Registry.invalid_argument_error
+       and type invalid_argument_error := Nds_errors.invalid_argument_error
 end
 
-(** Prove mode: registry + database + proof lifecycle.
+(** Prove mode: registry + database + proof lifecycle, with errors
+    instantiated to {!Nds_errors.invalid_argument_error}.
 
     In prove mode, every operation on the registry and database is recorded
     so that a proof can be produced attesting to the correctness of the
@@ -198,12 +209,14 @@ end
 module type PROVE = sig
   type normal_registry
 
-  module Registry : REGISTRY
+  module Registry :
+    REGISTRY
+      with type invalid_argument_error := Nds_errors.invalid_argument_error
 
   module Database :
     DATABASE
       with type registry := Registry.t
-       and type invalid_argument_error := Registry.invalid_argument_error
+       and type invalid_argument_error := Nds_errors.invalid_argument_error
 
   module Proof : PROOF
 
@@ -217,19 +230,24 @@ module type PROVE = sig
   val produce_proof : Registry.t -> Proof.t
 end
 
-(** Verify mode: registry + database + verify entry point.
+(** Verify mode: registry + database + verify entry point, with errors
+    instantiated to {!Nds_errors.verification_argument_error} so that
+    proof-mismatch failures can be reported in addition to the usual
+    invalid-argument errors.
 
     In verify mode, operations are replayed against a proof to confirm
     they produce the expected state transition. *)
 module type VERIFY = sig
   type proof
 
-  module Registry : REGISTRY
+  module Registry :
+    REGISTRY
+      with type invalid_argument_error := Nds_errors.verification_argument_error
 
   module Database :
     DATABASE
       with type registry := Registry.t
-       and type invalid_argument_error := Registry.invalid_argument_error
+       and type invalid_argument_error := Nds_errors.verification_argument_error
 
   (** [start_verify proof] creates a verify-mode registry that replays
       operations against [proof] to validate the recorded state

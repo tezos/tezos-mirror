@@ -7,35 +7,23 @@
 
 (** Type-erased NDS handle.
 
-    Wraps any concrete backend satisfying
-    {!Intf.NORMAL} into a single existential type
-    so that callers can work with NDS generically. Backend-specific
-    invalid-argument errors are normalised to
-    {!Nds_errors.invalid_argument_error} via a
-    converter supplied at wrap time. *)
+    Wraps any concrete backend satisfying {!Intf.NORMAL} into a single
+    existential type so that callers can work with NDS generically.
+    Since all backends share the common
+    {!Nds_errors.invalid_argument_error} type in their results, no error
+    conversion is required. *)
 
 (** Opaque NDS handle that erases the concrete backend type. *)
 type t
 
-(** [wrap impl value to_error] packages a concrete NDS backend [impl]
-    and its state [value] into an opaque {!t} handle, together with a
-    [to_error] function that normalises backend-specific errors to the
-    canonical
-    {!Nds_errors.invalid_argument_error} closed
-    enum. *)
-val wrap :
-  (module Intf.NORMAL
-     with type Registry.t = 'a
-      and type Registry.invalid_argument_error = 'e) ->
-  'a ->
-  ('e -> Nds_errors.invalid_argument_error) ->
-  t
+(** [wrap impl value] packages a concrete NDS backend [impl] and its
+    state [value] into an opaque {!t} handle. *)
+val wrap : (module Intf.NORMAL with type Registry.t = 'a) -> 'a -> t
 
 (** {2 Dispatchers}
 
-    Each function below unpacks the existential, delegates to the
-    wrapped backend, and normalises the backend error via the stored
-    [to_error] converter. *)
+    Each function below unpacks the existential and delegates to the
+    wrapped backend. *)
 
 (** [size t] returns the number of databases in the registry. *)
 val size : t -> (int64, Nds_errors.invalid_argument_error) result
