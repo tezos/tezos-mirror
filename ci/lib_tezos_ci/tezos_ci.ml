@@ -1384,7 +1384,11 @@ end
    Use this module to register images that are as built outside the
    [tezos/tezos] CI. *)
 module Images_external = struct
-  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
+  (* https://hub.docker.com/layers/nixos/nix/2.34.6/images/sha256-ffb94901e4ef854fe5a8e1a3170a1b8480ed505eaaa37091809664390acd8d20 *)
+  let nix =
+    Image.mk_external
+      ~image_path:
+        "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
   (* Match GitLab executors version and directly use the Docker socket
      The Docker daemon is already configured, experimental features are enabled
