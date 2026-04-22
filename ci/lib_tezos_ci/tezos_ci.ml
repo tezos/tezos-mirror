@@ -1434,7 +1434,12 @@ module Images_external = struct
      https://hub.docker.com/layers/returntocorp/semgrep-agent/sha-c6cd7cf/images/sha256-431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
 
      Update the hash in scripts/semgrep/README.md too when updating it here
-     Last update: 2022-01-03 *)
+     Last update: 2022-01-03
+
+     NB: this image seems unmaintained (latest version
+     [returntocorp/semgrep-agent:sha-688b98c] is from October
+     2023). We should consider switching to [semgrep/semgrep]
+     https://semgrep.dev/docs/update. *)
   let semgrep_agent =
     Image.mk_external
       ~image_path:
