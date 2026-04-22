@@ -18,8 +18,15 @@ val etherlink_root : path
 
 val etherlink_safe_root : path
 
-(** TezosX: root for Tezos blocks stored under the EVM world state
-    ([/evm/world_state/eth_accounts/tezos]). *)
+(** Root of the Michelson world-state keyspace ([/tez/world_state]). *)
+val tez_world_state_root : path
+
+(** Shadow root of the Michelson world-state keyspace
+    ([/tmp/tez/world_state]). *)
+val tez_world_state_safe_root : path
+
+(** TezosX: root for Tezos blocks stored under the Michelson world state
+    ([/tez/world_state/tez_blocks]). *)
 val tezosx_tezos_blocks_root : path
 
 val root_of_chain_family : _ L2_types.chain_family -> path

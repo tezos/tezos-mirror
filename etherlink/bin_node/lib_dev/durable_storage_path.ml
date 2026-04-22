@@ -32,6 +32,14 @@ module EVM = struct
   let make s = root ^ s
 end
 
+module TEZ = struct
+  module World_state = struct
+    let root = "/tez/world_state"
+
+    let make s = root ^ s
+  end
+end
+
 let evm_node_flag_legacy = "/__evm_node"
 
 let evm_node_flag_base = BASE.make evm_node_flag_legacy
@@ -93,9 +101,12 @@ let etherlink_root = World_state.make ""
 
 let etherlink_safe_root = "/tmp" ^ World_state.make ""
 
-(** TezosX: Tezos blocks are stored under the EVM world state so they
-    are included in SafeStorage transactions. *)
-let tezosx_tezos_blocks_root = World_state.make "/eth_accounts/tezos"
+let tez_world_state_root = TEZ.World_state.root
+
+let tez_world_state_safe_root = "/tmp" ^ TEZ.World_state.root
+
+(** TezosX: Tezos blocks live in the Michelson world-state keyspace. *)
+let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 
 let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
   match chain_family with
@@ -104,7 +115,7 @@ let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
 
 let chain_id = EVM.make "/chain_id"
 
-let michelson_runtime_chain_id = "/tezlink/chain_id"
+let michelson_runtime_chain_id = TEZ.World_state.make "/chain_id"
 
 let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
 

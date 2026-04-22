@@ -367,7 +367,8 @@ module Tezlink = struct
     let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
     let insight_requests =
       [
-        Simulation.Encodings.Durable_storage_key ["tezlink"; "simulation_result"];
+        Simulation.Encodings.Durable_storage_key
+          ["tez"; "world_state"; "simulation_result"];
       ]
     in
     simulate_and_read
