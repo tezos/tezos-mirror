@@ -1596,7 +1596,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:hadolint:
-  image: hadolint/hadolint:2.12.0-alpine
+  image: hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c
   stage: sanity
   tags:
   - gcp

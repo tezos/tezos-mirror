@@ -1418,7 +1418,11 @@ module Images_external = struct
       ~image_path:
         "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
 
-  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
+  (* https://hub.docker.com/layers/hadolint/hadolint/v2.14.0-alpine/images/sha256-be27962427a85de242820cb710a374478cce9bfb534a2c07e4fa54741d98908f *)
+  let hadolint =
+    Image.mk_external
+      ~image_path:
+        "hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
      latest release, then an update in the parser or analyser could result in new
