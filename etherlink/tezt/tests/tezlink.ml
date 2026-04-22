@@ -4703,12 +4703,21 @@ let test_delayed_deposit_is_included =
   unit
 
 let test_bridged_tez_transfer =
-  register_tezlink_only_test
+  register_tezlink_test
     ~time_between_blocks:Nothing
+    ~bootstrap_accounts:[]
     ~tags:["deposit"; "transfer"]
     ~title:"A Tezlink account that has only bridged tez can make a transfer"
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        enable_multichain;
+        _;
+      }
       _protocol
     ->
   let tezlink_endpoint = tezlink_foreign_endpoint_from_evm_node sequencer in
@@ -4762,9 +4771,10 @@ let test_bridged_tez_transfer =
       ~sc_rollup_node
       ~client
   in
-  let* () =
-    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
-  in
+  (* Multichain primary is Michelson (block state lives under /tezlink/…);
+     Tezos X primary is EVM (block state lives under /evm/world_state/…). *)
+  let network = if enable_multichain then Tezlink else Etherlink in
+  let* () = bake_until_sync ~network ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   let* () =

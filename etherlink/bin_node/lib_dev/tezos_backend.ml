@@ -316,7 +316,11 @@ let make (ctxt : Evm_ro_context.t) =
       | Some bytes ->
           let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
           return info.public_key
-      | None -> failwith "Account not found"
+      | None ->
+          (* An implicit account absent from durable storage is treated
+             as unrevealed, matching L1's `manager_key` RPC which returns
+             null for any unrevealed implicit account. *)
+          return_none
 
     let counter _chain block (contract : Tezos_types.Contract.t) =
       let open Lwt_result_syntax in
