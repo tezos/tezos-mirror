@@ -787,6 +787,25 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
+(* Shared error translation for the [http_trace*] RPCs. Takes an [~ok]
+   transformer so the three dispatch blocks — which each wrap the decoded
+   traces into a different record — can share a single error-mapping block.
+   Matches the spirit of [process_trace_result] for the EVM tracers. *)
+let process_http_trace_result ~ok result =
+  match result with
+  | Ok v -> rpc_ok (ok v)
+  | Error (Tracer_types.Transaction_not_found hash :: _) ->
+      rpc_error (Rpc_errors.trace_transaction_not_found hash)
+  | Error (Tracer_types.Block_not_found number :: _) ->
+      rpc_error (Rpc_errors.trace_block_not_found number)
+  | Error (Tracer_types.Block_hash_not_found hash :: _) ->
+      rpc_error (Rpc_errors.trace_block_hash_not_found hash)
+  | Error (Tracer_types.Trace_not_found :: _) ->
+      rpc_error Rpc_errors.trace_not_found
+  | Error e ->
+      let msg = Format.asprintf "%a" pp_print_trace e in
+      rpc_error (Rpc_errors.internal_error msg)
+
 let inject_rpc_call (config : Configuration.t) request method_
     Mode.{evm_node_endpoint; _} =
   let open Lwt_result_syntax in
@@ -1105,6 +1124,47 @@ let dispatch_request (type f) ~websocket
               rpc_ok
                 Rpc_encodings.Tezosx.Trace_call.
                   {result = json_result; traces = result.traces}
+            in
+            build_with_input ~f module_ parameters
+        | Rpc_encodings.Tezosx.Http_trace_transaction.Method ->
+            let f tx_hash =
+              let*! result =
+                Evm_ro_context.Http_tracer.trace_transaction ro_ctxt tx_hash
+              in
+              process_http_trace_result result ~ok:(fun traces ->
+                  Rpc_encodings.Tezosx.{tx_hash; traces})
+            in
+            build_with_input ~f module_ parameters
+        | Rpc_encodings.Tezosx.Http_trace_block_by_number.Method ->
+            let f block_param =
+              let* block_number =
+                Evm_ro_context.block_param_to_block_number
+                  ro_ctxt
+                  ~chain_family:L2_types.EVM
+                  (Block_parameter block_param)
+              in
+              let*! result =
+                Evm_ro_context.Http_tracer.trace_block ro_ctxt block_number
+              in
+              process_http_trace_result
+                result
+                ~ok:
+                  (List.map (fun (tx_hash, traces) ->
+                       Rpc_encodings.Tezosx.{tx_hash; traces}))
+            in
+            build_with_input ~f module_ parameters
+        | Rpc_encodings.Tezosx.Http_trace_block_by_hash.Method ->
+            let f block_hash =
+              let*! result =
+                Evm_ro_context.Http_tracer.trace_block_by_hash
+                  ro_ctxt
+                  block_hash
+              in
+              process_http_trace_result
+                result
+                ~ok:
+                  (List.map (fun (tx_hash, traces) ->
+                       Rpc_encodings.Tezosx.{tx_hash; traces}))
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->

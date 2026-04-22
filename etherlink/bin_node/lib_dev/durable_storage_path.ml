@@ -354,6 +354,29 @@ module Evm_events = struct
     events ~storage_version ^ "/" ^ string_of_int i
 end
 
+module Http_trace = struct
+  (* Durable storage paths used by the per-transaction HTTP trace replay
+     RPCs.
+
+     The [enabled_flag] key sits at [/base/__http_trace_enabled] —
+     alongside the other node-driven control keys ([/base/__evm_node],
+     [/base/__simulation/...], [/base/__delayed_input]). The EVM node
+     writes it via [alter_evm_state] before the replay, and the kernel
+     reads it exactly once at the top of [block::produce] before any
+     [SafeStorage] wrapping, so nothing inside the apply chain has to
+     round-trip through [SafeStorage] to see it.
+
+     [root] is where the kernel persists the per-transaction traces: it
+     *does* sit under [/evm/world_state/] because those writes happen
+     through the [SafeStorage]-wrapped host, so they need to live under a
+     promoted subtree to be readable from the post-replay state. *)
+  let root = World_state.make "/__http_trace/traces"
+
+  let enabled_flag = BASE.make "/__http_trace_enabled"
+
+  let for_tx ~transaction_hash = root ^ "/" ^ transaction_hash
+end
+
 module Trace = struct
   let root = EVM.make "/trace"
 

@@ -2384,6 +2384,244 @@ let test_crac_debug_trace_normal_tx_in_crac_block =
         err.Rpc.message) ;
   unit
 
+(** Helper for the [http_trace*] tests: CRAC exchanges surface as POST
+    requests to either [http://tezos/<kt1>/<entrypoint>] (EVM→TEZ) or
+    [http://ethereum/<address>] (TEZ→EVM). Assert the trace matches one
+    of those shapes and a 2xx response. *)
+let check_http_trace_shape trace =
+  let url = JSON.(trace |-> "url" |> as_string) in
+  let meth = JSON.(trace |-> "method" |> as_string) in
+  let status = JSON.(trace |-> "responseStatus" |> as_int) in
+  let starts_with prefix =
+    String.length url >= String.length prefix
+    && String.sub url 0 (String.length prefix) = prefix
+  in
+  Check.(
+    (meth = "POST")
+      string
+      ~error_msg:"Expected CRAC HTTP trace method %R, got %L") ;
+  if not (starts_with "http://tezos/" || starts_with "http://ethereum/") then
+    Test.fail
+      "Expected CRAC HTTP trace URL to start with http://tezos/ or \
+       http://ethereum/, got %s"
+      url ;
+  Check.(
+    (status >= 200)
+      int
+      ~error_msg:"Expected CRAC HTTP trace status >= 200, got %L") ;
+  Check.(
+    (status < 300)
+      int
+      ~error_msg:"Expected CRAC HTTP trace status < 300, got %L")
+
+(** [http_traceTransaction] on a nested CRAC (EVM → TEZ → EVM → TEZ): the
+    outer HTTP trace must itself carry the inner CRAC in its [innerTraces]
+    field, so a single tx exposes the full call tree. This exercises the
+    nested-trace path of the kernel journal as well as the RLP round-trip
+    for `inner_traces`. *)
+let test_http_trace_nested_crac =
+  register_crac_runner_test
+    ~title:"CRAC: http_traceTransaction on nested EVM->TEZ->EVM->TEZ"
+    ~tags:["http_trace"; "crac_trace"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "HTTP-TRACE-NESTED" in
+  Log.debug ~prefix "Deploy EVM inner leaf" ;
+  let* tez_leaf = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy inner EVM bridge to TEZ leaf" ;
+  let* evm_bridge_inner = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf in
+  Log.debug ~prefix "Originate TEZ bridge to inner EVM bridge" ;
+  let* tez_bridge = TezCrossRuntimeRunnerEvm.originate evm_bridge_inner in
+  Log.debug ~prefix "Deploy outer EVM bridge to TEZ bridge" ;
+  let* evm_outer = EvmCrossRuntimeRunnerTez.deploy_and_init tez_bridge in
+  Log.debug ~prefix "Call outer EVM (triggers nested EVM->TEZ->EVM->TEZ CRAC)" ;
+  let* _ = EvmRunner.call_run evm_outer in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_hash =
+    match block.transactions with
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected a tx hash in the latest EVM block"
+  in
+  Log.debug ~prefix "http_traceTransaction %s" tx_hash ;
+  let*@ trace_json = Rpc.Tezosx.http_traceTransaction ~tx_hash sequencer in
+  let returned_hash = JSON.(trace_json |-> "txHash" |> as_string) in
+  Check.(
+    (returned_hash = tx_hash)
+      string
+      ~error_msg:"http_traceTransaction returned wrong txHash %L, expected %R") ;
+  let traces = JSON.(trace_json |-> "traces" |> as_list) in
+  Check.(
+    (traces <> [])
+      (list json)
+      ~error_msg:"Expected at least one top-level HTTP trace, got %L") ;
+  (* Outer trace: EVM outer bridge -> TEZ bridge. *)
+  let outer = List.hd traces in
+  check_http_trace_shape outer ;
+  (* Nested CRAC: inside the outer TEZ execution there is a second
+     EVM -> TEZ hop, which must appear as an entry in [innerTraces]. *)
+  let inner_traces = JSON.(outer |-> "innerTraces" |> as_list) in
+  Check.(
+    (inner_traces <> [])
+      (list json)
+      ~error_msg:
+        "Expected at least one nested HTTP trace under outer.innerTraces, got \
+         %L") ;
+  List.iter check_http_trace_shape inner_traces ;
+  Log.info
+    "Nested http_traceTransaction: %d top-level traces, %d inner at depth 1"
+    (List.length traces)
+    (List.length inner_traces) ;
+  unit
+
+(** [http_traceTransaction] on a single EVM tx that triggers several
+    independent CRACs — the kernel journal records them as sibling
+    top-level traces and [maybe_store_http_traces_for_tx] must preserve
+    order through RLP. *)
+let test_http_trace_multiple_independent_cracs =
+  register_crac_runner_test
+    ~title:"CRAC: http_traceTransaction with multiple independent CRACs"
+    ~tags:["http_trace"; "crac_trace"; "multi"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "HTTP-TRACE-MULTI" in
+  Log.debug ~prefix "Originate TEZ leaves" ;
+  let* tez_leaf_1 = TezMultiRunCaller.originate () in
+  let* tez_leaf_2 = TezMultiRunCaller.originate () in
+  Log.debug ~prefix "Deploy EVM bridges to the two leaves" ;
+  let* evm_bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf_1 in
+  let* evm_bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_leaf_2 in
+  Log.debug ~prefix "Deploy EVM main invoking both bridges" ;
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(evm_bridge_1, false); (evm_bridge_2, false)]
+      ()
+  in
+  Log.debug ~prefix "Call EVM main" ;
+  let* _ = EvmRunner.call_run evm_main in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_hash =
+    match block.transactions with
+    | Block.Hash (h :: _) -> h
+    | _ -> Test.fail "Expected a tx hash in the latest EVM block"
+  in
+  Log.debug ~prefix "http_traceTransaction %s" tx_hash ;
+  let*@ result = Rpc.Tezosx.http_traceTransaction ~tx_hash sequencer in
+  let traces = JSON.(result |-> "traces" |> as_list) in
+  Check.(
+    (List.length traces >= 2)
+      int
+      ~error_msg:
+        "Expected at least 2 top-level HTTP traces (one per independent CRAC), \
+         got %L") ;
+  List.iter check_http_trace_shape traces ;
+  (* Both top-level traces should target the gateway precompile (same URL
+     prefix up to the KT1), so the two URLs should differ only in the
+     target contract. *)
+  let urls = List.map (fun t -> JSON.(t |-> "url" |> as_string)) traces in
+  let distinct_urls = List.sort_uniq String.compare urls |> List.length in
+  Check.(
+    (distinct_urls >= 2)
+      int
+      ~error_msg:
+        "Expected at least 2 distinct CRAC target URLs across traces, got %L \
+         (urls collapsed)") ;
+  Log.info
+    "Multi-CRAC http_traceTransaction: %d top-level traces, %d distinct URLs"
+    (List.length traces)
+    distinct_urls ;
+  unit
+
+(** [http_traceBlockByNumber] on a block containing one non-CRAC EVM
+    transfer and one EVM->TEZ CRAC: the RPC must return one entry per
+    transaction, with non-empty traces on the CRAC tx and an empty
+    [traces] list on the plain transfer. Exercises the "multiple
+    transactions with mixed CRAC content in the same block" axis that
+    single-tx tests don't cover. *)
+let test_http_trace_mixed_block =
+  register_crac_runner_test
+    ~title:"CRAC: http_traceBlockByNumber on mixed CRAC + non-CRAC block"
+    ~tags:["http_trace"; "crac_trace"; "block"; "mixed"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "HTTP-TRACE-MIXED" in
+  Log.debug ~prefix "Originate TEZ runner and deploy EVM bridge" ;
+  let* tez_runner = TezMultiRunCaller.originate () in
+  let* (`Evm_runner bridge_addr) =
+    EvmCrossRuntimeRunnerTez.deploy_and_init tez_runner
+  in
+  (* Queue a plain self-transfer in the mempool. *)
+  Log.debug ~prefix "Queue a plain EVM self-transfer" ;
+  let* transfer_tx_hash =
+    send_evm_transfer_no_block ~address:sender.Eth_account.address ()
+  in
+  (* Queue an EVM->TEZ CRAC invocation in the same mempool (no block
+     produced yet). *)
+  Log.debug ~prefix "Queue an EVM->TEZ CRAC invocation" ;
+  let* crac_raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce:(evm_nonce ())
+      ~gas:3_000_000
+      ~gas_price:1_000_000_000
+      ~value:Wei.zero
+      ~address:bridge_addr
+      ~signature:"run()"
+      ~arguments:[]
+      ()
+  in
+  let*@ crac_tx_hash = Rpc.send_raw_transaction ~raw_tx:crac_raw_tx sequencer in
+  Log.debug ~prefix "Produce the block containing both txs" ;
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let tx_hashes =
+    match block.transactions with
+    | Block.Hash hashes -> hashes
+    | _ -> Test.fail "Expected tx hashes in the latest EVM block"
+  in
+  Check.(
+    (List.length tx_hashes = 2)
+      int
+      ~error_msg:
+        "Expected 2 transactions in the mixed block (1 transfer + 1 CRAC), got \
+         %L") ;
+  let block_number_hex = Printf.sprintf "0x%lx" block.number in
+  Log.debug ~prefix "http_traceBlockByNumber %s" block_number_hex ;
+  let*@ entries =
+    Rpc.Tezosx.http_traceBlockByNumber ~block:block_number_hex sequencer
+  in
+  let entries_list = JSON.as_list entries in
+  Check.(
+    (List.length entries_list = 2)
+      int
+      ~error_msg:"Expected one http_trace entry per tx, got %L") ;
+  let find_entry hash =
+    List.find_opt
+      (fun e -> JSON.(e |-> "txHash" |> as_string) = hash)
+      entries_list
+    |> function
+    | Some e -> e
+    | None -> Test.fail "http_traceBlockByNumber missing expected entry %s" hash
+  in
+  let transfer_entry = find_entry transfer_tx_hash in
+  let crac_entry = find_entry crac_tx_hash in
+  Check.(
+    (JSON.(transfer_entry |-> "traces" |> as_list) = [])
+      (list json)
+      ~error_msg:"Expected empty traces on the plain transfer tx, got %L") ;
+  let crac_traces = JSON.(crac_entry |-> "traces" |> as_list) in
+  Check.(
+    (crac_traces <> [])
+      (list json)
+      ~error_msg:"Expected non-empty traces on the CRAC tx, got %L") ;
+  List.iter check_http_trace_shape crac_traces ;
+  Log.info
+    "Mixed-block http_traceBlockByNumber: %d entries, transfer empty, CRAC \
+     with %d traces"
+    (List.length entries_list)
+    (List.length crac_traces) ;
+  unit
+
 (** EVM journal is preserved across CrossRuntime boundaries: TEZ revert must
  *  roll back inner EVM storage changes made via a TEZ->EVM CRAC.
  *
@@ -7449,6 +7687,9 @@ let () =
   test_crac_debug_trace_transaction [Alpha] ;
   test_crac_debug_trace_block [Alpha] ;
   test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;
+  test_http_trace_nested_crac [Alpha] ;
+  test_http_trace_multiple_independent_cracs [Alpha] ;
+  test_http_trace_mixed_block [Alpha] ;
   test_l1_vs_tezosx_nested_failwith_receipt [Alpha] ;
   test_crac_callback_fire_and_forget [Alpha] ;
   test_crac_callback_receives_result_bytes [Alpha] ;

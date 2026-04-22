@@ -167,12 +167,18 @@ let nth_block ctxt ~full_transaction_object level =
   | None -> failwith "Block %a not found" Z.pp_print level
   | Some block -> return block
 
+(* Return [Some block] if a block with [hash] is known to the store,
+   [None] if the store was reachable but has no such block, and propagate
+   any genuine store/DB error unchanged. Callers that want a "not found"
+   to surface as an error should use {!block_by_hash}; callers that want
+   to distinguish "unknown" from "DB error" should use this variant. *)
+let block_by_hash_opt ctxt ~full_transaction_object hash =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
+
 let block_by_hash ctxt ~full_transaction_object hash =
   let open Lwt_result_syntax in
-  Evm_store.use ctxt.store @@ fun conn ->
-  let* block_opt =
-    Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
-  in
+  let* block_opt = block_by_hash_opt ctxt ~full_transaction_object hash in
   match block_opt with
   | None -> failwith "Block %a not found" Ethereum_types.pp_block_hash hash
   | Some block -> return block
@@ -724,6 +730,117 @@ let make_executor ctxt =
         evm_state
         (`Inbox message)
   end : Evm_execution.S)
+
+module Http_tracer = struct
+  (* Enable per-transaction HTTP trace capture for the upcoming replay by
+     writing to the durable storage flag consumed by the kernel. *)
+  let set_http_trace_flag state =
+    Durable_storage.write
+      (Raw_path Durable_storage_path.Http_trace.enabled_flag)
+      (Bytes.of_string "\001")
+      state
+
+  (* Read the RLP-encoded HTTP traces the kernel wrote for a single
+     transaction during a replay triggered by [set_http_trace_flag]. A missing
+     key means the transaction performed no cross-runtime HTTP call — return
+     the empty list rather than an error. Decoding failures preserve the
+     underlying error (instead of collapsing it to a fixed message) so the
+     cause surfaces in RPC error responses.
+
+     The kernel keys traces by [hex::encode(tx_hash)] (lowercase, no [0x]
+     prefix). [Ethereum_types.Hex] already strips the [0x] prefix, but the
+     case of the inner string is whatever the caller passed in through the
+     JSON-RPC request. Lowercase here to make the lookup case-insensitive
+     and match the kernel-side convention, otherwise an uppercase hash
+     provided by the caller would silently return the empty list (no key
+     at the mixed-case path). *)
+  let read_http_traces_for state transaction_hash =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Hash (Hex hash)) = transaction_hash in
+    let hash = String.lowercase_ascii hash in
+    let path = Durable_storage_path.Http_trace.for_tx ~transaction_hash:hash in
+    let* bytes_opt = Durable_storage.read_opt (Raw_path path) state in
+    match bytes_opt with
+    | None -> return []
+    | Some bytes -> (
+        match Simulation.decode_http_traces bytes with
+        | Ok traces -> return traces
+        | Error err ->
+            failwith
+              "Failed to decode HTTP traces for %a from kernel output: %a"
+              Ethereum_types.pp_hash
+              transaction_hash
+              pp_print_trace
+              err)
+
+  (* Extract the transaction hashes of [block] in block order. *)
+  let tx_hashes_of_block (block : _ Ethereum_types.block) =
+    match block.transactions with
+    | TxHash hashes -> hashes
+    | TxFull objs -> List.map Transaction_object.hash objs
+
+  (* Replay [block_number] with HTTP trace capture enabled and return the
+     resulting EVM state. Centralizes the [make_executor]/[Exe.replay]/
+     [Apply_failure → Trace_not_found] boilerplate so all three trace_*
+     entry points share the same replay path. *)
+  let replay_with_http_trace_flag ctxt block_number =
+    let open Lwt_result_syntax in
+    let (module Exe) = make_executor ctxt in
+    let* apply_result =
+      Exe.replay ~alter_evm_state:set_http_trace_flag block_number
+    in
+    match apply_result with
+    | Evm_state.Apply_failure -> tzfail Tracer_types.Trace_not_found
+    | Evm_state.Apply_success {evm_state; _} -> return evm_state
+
+  (* Replay [block_number] with HTTP trace capture enabled and return the
+     list of [(tx_hash, traces)] entries for [tx_hashes]. Short-circuits
+     on empty blocks to avoid a full-block replay that would produce no
+     work. *)
+  let traces_for_block_with_hashes ctxt block_number tx_hashes =
+    let open Lwt_result_syntax in
+    match tx_hashes with
+    | [] -> return []
+    | _ :: _ ->
+        let* evm_state = replay_with_http_trace_flag ctxt block_number in
+        List.map_es
+          (fun hash ->
+            let+ traces = read_http_traces_for evm_state hash in
+            (hash, traces))
+          tx_hashes
+
+  let trace_transaction ctxt transaction_hash =
+    let open Lwt_result_syntax in
+    let* receipt = transaction_receipt ctxt transaction_hash in
+    match receipt with
+    | None -> tzfail (Tracer_types.Transaction_not_found transaction_hash)
+    | Some Transaction_receipt.{blockNumber; _} ->
+        let* evm_state = replay_with_http_trace_flag ctxt blockNumber in
+        read_http_traces_for evm_state transaction_hash
+
+  let trace_block ctxt block_number =
+    let open Lwt_result_syntax in
+    let (Ethereum_types.Qty block_z) = block_number in
+    let* block = nth_block ctxt ~full_transaction_object:false block_z in
+    traces_for_block_with_hashes ctxt block_number (tx_hashes_of_block block)
+
+  let trace_block_by_hash ctxt block_hash =
+    let open Lwt_result_syntax in
+    (* Use the [_opt] variant so we can distinguish "hash unknown to the
+       store" (the only case we translate to [Block_hash_not_found]) from
+       a genuine store/DB error — which should surface with its original
+       trace rather than being relabelled as "unknown hash". *)
+    let* block_opt =
+      block_by_hash_opt ctxt ~full_transaction_object:false block_hash
+    in
+    match block_opt with
+    | None -> tzfail (Tracer_types.Block_hash_not_found block_hash)
+    | Some block ->
+        traces_for_block_with_hashes
+          ctxt
+          block.number
+          (tx_hashes_of_block block)
+end
 
 module Tracer_etherlink = struct
   let trace_transaction ctxt transaction_hash config =

@@ -436,6 +436,11 @@ pub trait ChainConfigTrait: Debug {
         // skip_fees_check can be used to simulate the application of Tezos
         // operations with no fees, it has no effect in the EVM case.
         skip_fees_check: bool,
+        // Per-replay flag (from `block::produce` / `handle_run_transaction`)
+        // asking the apply sites to persist HTTP CRAC traces. Plumbed as a
+        // bool so the apply path never needs to probe durable storage for
+        // the flag on its own.
+        http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1;
@@ -724,6 +729,7 @@ impl ChainConfigTrait for EvmChainConfig {
         // skip_fees_check can be used to simulate the application of Tezos
         // operations with no fees, it has no effect in the EVM case.
         skip_fees_check: bool,
+        http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1,
@@ -752,13 +758,15 @@ impl ChainConfigTrait for EvmChainConfig {
                     tracer_input,
                     &self.spec_id,
                     &self.limits,
+                    http_trace_enabled,
                 )
             }
             TezosXTransaction::Tezos(operation) => {
+                let tx_hash = operation.tx_hash;
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
-                apply_tezos_operation(
+                let result = apply_tezos_operation(
                     &self.michelson_chain_config.chain_id,
                     block_in_progress,
                     host,
@@ -772,7 +780,27 @@ impl ChainConfigTrait for EvmChainConfig {
                     Some(&block_constants.evm_runtime_block_constants),
                     &mut journal,
                     self.experimental_features.is_michelson_gas_refund_enabled(),
-                )
+                );
+                // Persist HTTP traces regardless of [result] so that partial
+                // traces from an operation that failed mid-execution remain
+                // observable through the [http_trace*] RPCs. Matches the
+                // Ethereum / TezosDelayed apply sites in apply.rs.
+                //
+                // TODO: https://linear.app/tezos/issue/L2-1243
+                // The Tezlink-submitted path stores traces under the Tezos
+                // operation hash only, so [http_traceTransaction] queries
+                // that pass the fake Ethereum hash of a Tezos→EVM CRAC
+                // (the hash users see in [eth_getBlockByNumber]) return
+                // the empty list. Extend this site to dual-index the
+                // traces under each generated Ethereum fake hash once the
+                // mapping is available here.
+                crate::storage::maybe_store_http_traces_for_tx(
+                    host,
+                    http_trace_enabled,
+                    &tx_hash,
+                    &journal,
+                );
+                result
             }
         }
     }
@@ -1293,6 +1321,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _tracer_input: Option<TracerInput>,
         skip_signature_check: bool,
         skip_fees_check: bool,
+        http_trace_enabled: bool,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
     where
         Host: StorageV1,
@@ -1302,12 +1331,13 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
             }
             TezosXTransaction::Tezos(operation) => {
+                let tx_hash = operation.tx_hash;
                 let crac_id =
                     tezosx_journal::CracId::new(0, block_in_progress.michelson_index);
                 let mut journal = TezosXJournal::new(crac_id);
                 // Not supported in standalone Tezlink (no ExperimentalFeatures).
                 let enable_gas_refund = false;
-                apply_tezos_operation(
+                let result = apply_tezos_operation(
                     &self.chain_id,
                     block_in_progress,
                     host,
@@ -1321,7 +1351,14 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     None,
                     &mut journal,
                     enable_gas_refund,
-                )
+                );
+                crate::storage::maybe_store_http_traces_for_tx(
+                    host,
+                    http_trace_enabled,
+                    &tx_hash,
+                    &journal,
+                );
+                result
             }
         }
     }

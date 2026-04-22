@@ -406,6 +406,15 @@ module Request = struct
         ]
     in
     {method_ = "http_traceCall"; parameters = `A [input]}
+
+  let http_traceTransaction ~tx_hash =
+    {method_ = "http_traceTransaction"; parameters = `A [`String tx_hash]}
+
+  let http_traceBlockByNumber ~block =
+    {method_ = "http_traceBlockByNumber"; parameters = `A [`String block]}
+
+  let http_traceBlockByHash ~block_hash =
+    {method_ = "http_traceBlockByHash"; parameters = `A [`String block_hash]}
 end
 
 let net_version ?websocket evm_node =
@@ -985,6 +994,36 @@ module Tezosx = struct
         ?websocket
         evm_node
         (Request.http_traceCall_michelson ~operation ?skip_signature ?block ())
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceTransaction ?websocket ~tx_hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceTransaction ~tx_hash)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceBlockByNumber ?websocket ~block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceBlockByNumber ~block)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let http_traceBlockByHash ?websocket ~block_hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.http_traceBlockByHash ~block_hash)
     in
     let decode_result response = JSON.(response |-> "result") in
     return @@ decode_or_error decode_result response

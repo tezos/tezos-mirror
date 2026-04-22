@@ -215,6 +215,22 @@ module Evm_events : sig
   val nth_event : storage_version:int -> int -> path
 end
 
+module Http_trace : sig
+  (** Durable storage flag that enables per-transaction HTTP trace capture
+      during a block replay. Written by the EVM node through
+      [alter_evm_state] before invoking [Exe.replay] for the
+      [http_traceTransaction] / [http_traceBlockByNumber] /
+      [http_traceBlockByHash] RPCs, and read by the kernel on every applied
+      transaction. *)
+  val enabled_flag : path
+
+  (** Path at which the kernel persists the RLP-encoded list of HTTP traces
+      for the transaction [transaction_hash] (a hex string, without [0x]
+      prefix). A missing key means the transaction performed no cross-runtime
+      HTTP call. *)
+  val for_tx : transaction_hash:path -> path
+end
+
 module Trace : sig
   (** Path under which all traces are stored when the
       given [hash] parameter is provided, otherwise it

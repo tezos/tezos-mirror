@@ -324,6 +324,11 @@ where
             None,
             skip_signature_check,
             skip_fees_check,
+            // This is the [tezosx_simulate] entrypoint, not the replay path:
+            // simulation writes its own aggregate traces via
+            // [store_simulation_http_traces], so the per-tx [http_trace*]
+            // capture is not wanted here.
+            false,
         ),
     };
 
