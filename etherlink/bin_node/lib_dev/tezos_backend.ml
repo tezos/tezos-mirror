@@ -109,7 +109,7 @@ let make (ctxt : Evm_ro_context.t) =
       | Originated _ -> failwith "Only implicit account are supported"
 
     let contract_path contract suffix =
-      Durable_storage_path.etherlink_root ^ "/contracts/index/"
+      Durable_storage_path.michelson_contracts_index ^ "/"
       ^ Tezlink_durable_storage.Path.to_path
           Tezos_types.Contract.encoding
           contract
@@ -185,9 +185,7 @@ let make (ctxt : Evm_ro_context.t) =
     let list_contracts chain block =
       let open Lwt_result_syntax in
       let `Main = chain in
-      let* contracts_keys =
-        subkeys ~block (Durable_storage_path.etherlink_root ^ "/contracts/index")
-      in
+      let* contracts_keys = subkeys ~block Michelson_runtime_contracts_index in
       let contracts =
         List.filter_map
           (fun k ->
@@ -198,9 +196,7 @@ let make (ctxt : Evm_ro_context.t) =
               bytes)
           contracts_keys
       in
-      let* accounts_keys =
-        subkeys ~block "/evm/world_state/eth_accounts/tezos"
-      in
+      let* accounts_keys = subkeys ~block Michelson_runtime_ledger in
       let accounts =
         List.filter_map
           (fun k -> Result.to_option @@ Tezos_types.Contract.of_b58check k)

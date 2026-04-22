@@ -370,10 +370,11 @@ module State = struct
     let open Lwt_result_syntax in
     let delete_f =
       match kind with
-      | Tezos_scoru_wasm.Durable.Directory -> Durable_storage.delete_dir
-      | Value -> Durable_storage.delete
+      | Tezos_scoru_wasm.Durable.Directory ->
+          Durable_storage.delete_dir (Raw_dir key)
+      | Value -> Durable_storage.delete (Raw_path key)
     in
-    let* evm_state = delete_f (Raw_path key) ctxt.session.evm_state in
+    let* evm_state = delete_f ctxt.session.evm_state in
     ctxt.session.evm_state <- evm_state ;
     return_unit
 

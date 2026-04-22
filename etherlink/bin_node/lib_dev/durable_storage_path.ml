@@ -16,6 +16,8 @@ let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
 module Tezlink = struct
   let root = "/tezlink"
+
+  let accounts_index = root ^ "/context/contracts/index"
 end
 
 let tezlink_root = Tezlink.root
@@ -100,6 +102,10 @@ end
 let etherlink_root = World_state.make ""
 
 let etherlink_safe_root = "/tmp" ^ World_state.make ""
+
+let michelson_contracts_index = etherlink_root ^ "/contracts/index"
+
+let michelson_ledger_root = World_state.make "/eth_accounts/tezos"
 
 let tez_world_state_root = TEZ.World_state.root
 

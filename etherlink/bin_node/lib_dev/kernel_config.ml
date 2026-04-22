@@ -317,7 +317,7 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
          in
 
          let path_prefix =
-           Durable_storage_path.etherlink_root ^ "/contracts/index/"
+           Durable_storage_path.michelson_contracts_index ^ "/"
            ^ Tezlink_durable_storage.Path.to_path
                Tezos_types.Contract.encoding
                address

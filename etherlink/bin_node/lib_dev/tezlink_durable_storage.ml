@@ -29,7 +29,7 @@ module Path = struct
     let (`Hex s) = Hex.of_bytes raw_key in
     s
 
-  let accounts_index = "/tezlink/context/contracts/index"
+  let accounts_index = Durable_storage_path.Tezlink.accounts_index
 
   let big_map = "/tezlink/context/big_map"
 
@@ -74,7 +74,7 @@ let balance state ~data_model (c : Contract.t) =
       match c with
       | Originated _ -> (
           let path =
-            Durable_storage_path.etherlink_root ^ "/contracts/index/"
+            Durable_storage_path.michelson_contracts_index ^ "/"
             ^ Path.to_path Tezos_types.Contract.encoding c
             ^ "balance"
           in

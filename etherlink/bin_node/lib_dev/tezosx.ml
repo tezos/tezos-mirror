@@ -158,7 +158,7 @@ module Durable_storage_path = struct
   module Accounts = struct
     module Tezos = struct
       let info pkh =
-        "/evm/world_state/eth_accounts/tezos/"
+        Durable_storage_path.michelson_ledger_root ^ "/"
         ^ Signature.V2.Public_key_hash.to_b58check pkh
         ^ "/info"
 
@@ -167,7 +167,8 @@ module Durable_storage_path = struct
           Ethereum_runtime.generate_alias
             (Signature.V2.Public_key_hash.to_b58check pkh)
         in
-        "/evm/world_state/eth_accounts/tezos/native/ethereum/0x" ^ alias
+        Durable_storage_path.michelson_ledger_root ^ "/native/ethereum/0x"
+        ^ alias
     end
   end
 end

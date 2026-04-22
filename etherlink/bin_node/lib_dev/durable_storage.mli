@@ -42,13 +42,36 @@ val write : 'a path -> 'a -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
 val delete : 'a path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
 
-val delete_dir : 'a path -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
-
 val exists : 'a path -> Pvm.State.t -> bool tzresult Lwt.t
 
-val subkeys : 'a path -> Pvm.State.t -> string trace tzresult Lwt.t
 
 val list_runtimes : Pvm.State.t -> Tezosx.runtime list tzresult Lwt.t
+
+(** Directory paths in the durable storage. Unlike {!path}, a [dir] does
+    not carry a decoded value type — directory operations work on the
+    subtree as a whole (existence, listing of subkeys, recursive delete).
+    [Raw_dir] is the escape hatch for paths not yet modeled; new code
+    should add a typed constructor instead. *)
+type dir =
+  | Raw_dir of string
+  | Delayed_inbox
+  | Delayed_transactions
+  | Evm_events
+  | Transaction_receipts
+  | Transaction_objects
+  | Michelson_runtime_accounts_index
+  | Michelson_runtime_contracts_index
+  | Michelson_runtime_ledger
+
+(** [delete_dir d state] recursively removes the subtree rooted at [d]. *)
+val delete_dir : dir -> Pvm.State.t -> Pvm.State.t tzresult Lwt.t
+
+(** [exists_dir d state] is [true] iff the subtree rooted at [d] is
+    non-empty (i.e. has at least one descendant). *)
+val exists_dir : dir -> Pvm.State.t -> bool tzresult Lwt.t
+
+(** [subkeys d state] lists the immediate subkeys directly under [d]. *)
+val subkeys : dir -> Pvm.State.t -> string trace tzresult Lwt.t
 
 (** {2 Deprecated untyped API}
 

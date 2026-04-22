@@ -379,7 +379,7 @@ let get_state ctxt
 
 let read_state = read
 
-let subkeys state path = Durable_storage.subkeys (Raw_path path) state
+let subkeys state path = Durable_storage.subkeys path state
 
 let entrypoint_config ctxt =
   Pvm.Kernel.config

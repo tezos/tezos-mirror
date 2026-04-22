@@ -53,7 +53,7 @@ let replace_storage address state_override state =
   | None -> return state
   | Some state_override ->
       let*? key = Durable_storage_path.Accounts.storage_dir_e address in
-      let* state = Durable_storage.delete_dir (Raw_path key) state in
+      let* state = Durable_storage.delete_dir (Raw_dir key) state in
       update_storage address state_override state
 
 let is_invalid state_override =

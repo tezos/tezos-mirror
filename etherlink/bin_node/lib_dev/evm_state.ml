@@ -595,11 +595,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =
-  let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version evm_state in
-  Durable_storage.delete_dir
-    (Raw_path (Durable_storage_path.delayed_inbox ~storage_version))
-    evm_state
+  Durable_storage.delete_dir Delayed_inbox evm_state
 
 let wasm_pvm_version state = Pvm.Kernel.get_wasm_version state
 
@@ -647,12 +643,7 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_events evm_state =
-  let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version evm_state in
-  Durable_storage.delete_dir
-    (Raw_path (Durable_storage_path.Evm_events.events ~storage_version))
-    evm_state
+let clear_events evm_state = Durable_storage.delete_dir Evm_events evm_state
 
 let clear_block_storage chain_family block evm_state =
   let open Lwt_result_syntax in
@@ -700,26 +691,14 @@ let clear_block_storage chain_family block evm_state =
     (* Receipts are not necessary for the kernel, we can just remove
      the directories. *)
     let* evm_state =
-      Durable_storage.delete_dir
-        (Raw_path Durable_storage_path.Transaction_receipt.receipts)
-        evm_state
+      Durable_storage.delete_dir Transaction_receipts evm_state
     in
-    let* evm_state =
-      Durable_storage.delete_dir
-        (Raw_path Durable_storage_path.Transaction_object.objects)
-        evm_state
-    in
+    let* evm_state = Durable_storage.delete_dir Transaction_objects evm_state in
     return evm_state
 
 let delayed_inbox_hashes evm_state =
   let open Lwt_result_syntax in
-  let* storage_version = Durable_storage.storage_version evm_state in
-  let* keys =
-    Durable_storage.subkeys
-      (Raw_path
-         (Durable_storage_path.Delayed_transaction.hashes ~storage_version))
-      evm_state
-  in
+  let* keys = Durable_storage.subkeys Delayed_transactions evm_state in
   let hashes =
     (* Remove the empty, meta keys *)
     List.filter_map

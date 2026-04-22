@@ -33,6 +33,14 @@ let exists_durable evm_state key =
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
   let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  let+ v = Tezos_scoru_wasm.Durable.find_value durable key in
+  Option.is_some v
+
+let exists_dir_durable evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
 let subkeys_durable evm_state key =
@@ -230,27 +238,11 @@ let delete (type a) (p : a path) (state : Pvm.State.t) :
   in
   return state
 
-let delete_dir (type a) (p : a path) (state : Pvm.State.t) :
-    Pvm.State.t tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* r = resolve_with_state p state in
-  let*! state =
-    delete_durable ~kind:Tezos_scoru_wasm.Durable.Directory state r.path
-  in
-  return state
-
 let exists (type a) (p : a path) (state : Pvm.State.t) : bool tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* r = resolve_with_state p state in
   let*! b = exists_durable state r.path in
   return b
-
-let subkeys (type a) (p : a path) (state : Pvm.State.t) :
-    string trace tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let* r = resolve_with_state p state in
-  let*! keys = subkeys_durable state r.path in
-  return keys
 
 let list_runtimes state =
   let open Lwt_result_syntax in
@@ -320,3 +312,64 @@ let world_state state chain_id =
        ~storage_version:sv
        chain_id)
     Bytes.to_string
+
+type dir =
+  | Raw_dir of string
+  | Delayed_inbox
+  | Delayed_transactions
+  | Evm_events
+  | Transaction_receipts
+  | Transaction_objects
+  | Michelson_runtime_accounts_index
+  | Michelson_runtime_contracts_index
+  | Michelson_runtime_ledger
+
+type resolved_dir =
+  | Static_dir of string
+  | Versioned_dir of (storage_version:int -> string)
+
+let resolve_dir : dir -> resolved_dir = function
+  | Raw_dir str -> Static_dir str
+  | Delayed_inbox -> Versioned_dir Durable_storage_path.delayed_inbox
+  | Delayed_transactions ->
+      Versioned_dir Durable_storage_path.Delayed_transaction.hashes
+  | Evm_events -> Versioned_dir Durable_storage_path.Evm_events.events
+  | Transaction_receipts ->
+      Static_dir Durable_storage_path.Transaction_receipt.receipts
+  | Transaction_objects ->
+      Static_dir Durable_storage_path.Transaction_object.objects
+  | Michelson_runtime_accounts_index ->
+      Static_dir Durable_storage_path.Tezlink.accounts_index
+  | Michelson_runtime_contracts_index ->
+      Static_dir Durable_storage_path.michelson_contracts_index
+  | Michelson_runtime_ledger ->
+      Static_dir Durable_storage_path.michelson_ledger_root
+
+let resolve_dir_with_state (p : dir) (state : Pvm.State.t) :
+    string tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  match resolve_dir p with
+  | Static_dir r -> return r
+  | Versioned_dir f ->
+      let* sv = storage_version state in
+      return (f ~storage_version:sv)
+
+let delete_dir (p : dir) (state : Pvm.State.t) : Pvm.State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_dir_with_state p state in
+  let*! state =
+    delete_durable ~kind:Tezos_scoru_wasm.Durable.Directory state r
+  in
+  return state
+
+let exists_dir (p : dir) (state : Pvm.State.t) : bool tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_dir_with_state p state in
+  let*! b = exists_dir_durable state r in
+  return b
+
+let subkeys (p : dir) (state : Pvm.State.t) : string trace tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* r = resolve_dir_with_state p state in
+  let*! keys = subkeys_durable state r in
+  return keys
