@@ -235,5 +235,6 @@ let register () =
       (Immediate, job_oc_misc_checks `no_license_check);
       (Immediate, job_check_jsonnet);
       (Immediate, job_check_rust_fmt);
+      (Immediate, job_nix);
     ] ;
   ()

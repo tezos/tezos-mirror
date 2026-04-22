@@ -1716,7 +1716,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 docker:hadolint:
-  image: hadolint/hadolint:2.12.0-alpine
+  image: hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c
   stage: sanity
   tags:
   - gcp
@@ -1781,7 +1781,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 oc.semgrep:
-  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  image: returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
   stage: sanity
   tags:
   - gcp
@@ -1859,7 +1859,7 @@ check_rust_fmt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 nix:
-  image: nixos/nix:2.22.1
+  image: nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0
   stage: sanity
   tags:
   - gcp

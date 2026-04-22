@@ -1384,7 +1384,11 @@ end
    Use this module to register images that are as built outside the
    [tezos/tezos] CI. *)
 module Images_external = struct
-  let nix = Image.mk_external ~image_path:"nixos/nix:2.22.1"
+  (* https://hub.docker.com/layers/nixos/nix/2.34.6/images/sha256-ffb94901e4ef854fe5a8e1a3170a1b8480ed505eaaa37091809664390acd8d20 *)
+  let nix =
+    Image.mk_external
+      ~image_path:
+        "nixos/nix:2.34.6@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0"
 
   (* Match GitLab executors version and directly use the Docker socket
      The Docker daemon is already configured, experimental features are enabled
@@ -1414,7 +1418,11 @@ module Images_external = struct
       ~image_path:
         "datadog/ci:v5.13.1@sha256:12dada7483a8bb9b2c0505ec471ed391d32562e43c107cfc3dddbb61c88edbd2"
 
-  let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
+  (* https://hub.docker.com/layers/hadolint/hadolint/v2.14.0-alpine/images/sha256-be27962427a85de242820cb710a374478cce9bfb534a2c07e4fa54741d98908f *)
+  let hadolint =
+    Image.mk_external
+      ~image_path:
+        "hadolint/hadolint:2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c"
 
   (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
      latest release, then an update in the parser or analyser could result in new
@@ -1422,10 +1430,20 @@ module Images_external = struct
      burden for fixing the code on the wrong dev (the devs who happen to open an
      MR coinciding with the semgrep update rather than the dev who wrote the
      infringing code in the first place).
+
+     https://hub.docker.com/layers/returntocorp/semgrep-agent/sha-c6cd7cf/images/sha256-431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24
+
      Update the hash in scripts/semgrep/README.md too when updating it here
-     Last update: 2022-01-03 *)
+     Last update: 2022-01-03
+
+     NB: this image seems unmaintained (latest version
+     [returntocorp/semgrep-agent:sha-688b98c] is from October
+     2023). We should consider switching to [semgrep/semgrep]
+     https://semgrep.dev/docs/update. *)
   let semgrep_agent =
-    Image.mk_external ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
+    Image.mk_external
+      ~image_path:
+        "returntocorp/semgrep-agent:sha-c6cd7cf@sha256:431ee298b85c9595238614d5866e06d1b72030f915df5ee773fb04a3d0933a24"
 
   (* Image provided by GitLab. More details in the doc:
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
