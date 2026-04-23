@@ -121,6 +121,9 @@ check_scripts() {
   # Gather scripts
   scripts=$(find "${source_directories[@]}" scripts docs -name "*.sh" -type f -print)
   exit_code=0
+  passed_count=0
+  failed_count=0
+  skipped_count=0
 
   # Check scripts do not contain the tab character
   tab="$(printf '%b' '\t')"
@@ -128,6 +131,7 @@ check_scripts() {
     if grep -q "$tab" "$f"; then
       say "$f has tab character(s) ❌️"
       exit_code=1
+      failed_count=$((failed_count + 1))
     fi
   done
 
@@ -145,23 +149,24 @@ check_scripts() {
       if shellcheck_script "${script}" > /dev/null; then
         say "$script shellcheck marked as SKIPPED but actually pass: update shellcheck_skips ❌️"
         exit_code=1
+        failed_count=$((failed_count + 1))
       else
-        # script is skipped, we leave a log however, to incite
-        # devs to enhance the scripts
-        say "$script shellcheck SKIPPED ⚠️"
+        skipped_count=$((skipped_count + 1))
       fi
     else
       # script is not skipped, let's shellcheck it
       if shellcheck_script "${script}"; then
-        say "$script shellcheck PASSED ✅"
+        passed_count=$((passed_count + 1))
       else
         say "$script shellcheck FAILED ❌"
         exit_code=1
+        failed_count=$((failed_count + 1))
       fi
     fi
     if ! shfmt_script "${script}"; then
       say "$script shfmt FAILED ❌"
       exit_code=1
+      failed_count=$((failed_count + 1))
     fi
   done
   # Check that shellcheck_skips doesn't contain a deprecated value
@@ -170,9 +175,11 @@ check_scripts() {
       say "$shellcheck_skip is mentioned in shellcheck_skips, but doesn't exist anymore"
       say "please delete it from shellcheck_skips"
       exit_code=1
+      failed_count=$((failed_count + 1))
     fi
   done
   # Done executing shellcheck
+  say "check-scripts: ${passed_count} passed, ${skipped_count} skipped, ${failed_count} failed"
 
   exit $exit_code
 }
