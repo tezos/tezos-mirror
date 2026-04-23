@@ -528,7 +528,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         kernel_root_hash
     @ make_instr ~convert:parse_z_to_padded_32_le_int_bytes chain_id
     @ make_instr
-        ~path_prefix:["tezlink"]
+        ~path_prefix:["tez"; "world_state"]
         (Option.map
            (fun chain_id ->
              chain_id

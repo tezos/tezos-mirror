@@ -78,10 +78,12 @@ pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
 pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
 
-/// Path for TezBlock storage within the EVM world state (used by EVM chain config).
-/// This path is under ETHERLINK_SAFE_STORAGE_ROOT_PATH so it's included in SafeStorage transactions.
-pub const TEZOS_BLOCKS_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos");
+pub const TEZ_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tez/world_state");
+
+/// Path for TezBlock storage. Sits under TEZ_SAFE_STORAGE_ROOT_PATH so it's
+/// included in SafeStorage transactions and snapshotted as part of the
+/// Michelson world state.
+pub const TEZ_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/tez/world_state/tez_blocks");
 
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
@@ -839,6 +841,7 @@ impl ChainConfigTrait for EvmChainConfig {
             vec![
                 ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                TEZ_SAFE_STORAGE_ROOT_PATH,
             ]
         } else {
             vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
@@ -883,7 +886,7 @@ impl EvmChainConfig {
 }
 
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
-    RefPath::assert_from(b"/tezlink/simulation_result");
+    RefPath::assert_from(b"/tez/world_state/simulation_result");
 
 fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> {
     let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
@@ -1519,6 +1522,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         vec![
             TEZLINK_SAFE_STORAGE_ROOT_PATH,
             ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            TEZ_SAFE_STORAGE_ROOT_PATH,
         ]
     }
 }

@@ -30,6 +30,11 @@ Its storage version is 54.
 
 ### Internal
 
+- Consolidate Michelson block data under `/tez/world_state/`. Moves
+  `chain_id`, `simulation_result`, `current_chain_header`, `blocks/` and
+  `indexes/blocks/` out of `/tezlink/` and
+  `/evm/world_state/eth_accounts/tezos/` and adds `/tez/world_state` as a
+  new SafeStorage root. (!21705)
 - Consolidate all feature flags under `/base/feature_flags/`. Moves the 5
   flags at `/evm/feature_flags/` and drops the dead `enable_revm`,
   `enable_fast_withdrawal` and `enable_fast_fa_withdrawal` flags from

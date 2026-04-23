@@ -278,7 +278,7 @@ where
                 }
             }
             let tezos_parent_hash =
-                block_storage::read_current_hash(host, &crate::chains::TEZOS_BLOCKS_PATH)
+                block_storage::read_current_hash(host, &crate::chains::TEZ_BLOCKS_PATH)
                     .unwrap_or_else(|_| {
                         H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
                     });
@@ -603,7 +603,7 @@ mod tests {
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
         TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
         ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
-        TEZOS_BLOCKS_PATH,
+        TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
@@ -865,7 +865,17 @@ mod tests {
         )
     }
 
-    fn dummy_tez_config() -> MichelsonChainConfig {
+    /// Pre-populate the `/tez/world_state` safe root so that `SafeStorage::start()`'s
+    /// `store_copy` of the root succeeds. Required by every test that produces
+    /// blocks with the Michelson runtime active. Mirrors the production
+    /// bootstrap performed by [`crate::kernel`].
+    fn init_tez_world_state_safe_root(host: &mut impl StorageV1) {
+        host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+    }
+
+    fn dummy_tez_config(host: &mut impl StorageV1) -> MichelsonChainConfig {
+        init_tez_world_state_safe_root(host);
         MichelsonChainConfig::create_config(
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
@@ -1084,7 +1094,7 @@ mod tests {
     fn test_produce_tezlink_block() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         // We need to store something at the tezlink root path,
@@ -1125,7 +1135,7 @@ mod tests {
         // Disable DA fees so that low-fee test operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         let bootstrap = bootstrap1();
@@ -1181,6 +1191,7 @@ mod tests {
     fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
+        init_tez_world_state_safe_root(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
         EvmChainConfig::create_config(
             DUMMY_CHAIN_ID,
@@ -1240,14 +1251,14 @@ mod tests {
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
-        // Verify that a TezBlock was stored (at TEZOS_BLOCKS_PATH which is under /evm/world_state)
+        // Verify that a TezBlock was stored (at TEZ_BLOCKS_PATH which is under /tez/world_state)
         let tez_block_number =
-            block_storage::read_current_number(&host, &TEZOS_BLOCKS_PATH)
+            block_storage::read_current_number(&host, &TEZ_BLOCKS_PATH)
                 .expect("TezBlock number should be readable");
         // Block number is 0 for the first block (same as EVM block numbering)
         assert_eq!(U256::from(0), tez_block_number);
 
-        let tez_block_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+        let tez_block_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
             .expect("TezBlock hash should be readable");
         // The hash should not be zero (it's computed from the block content)
         assert_ne!(H256::zero(), tez_block_hash);
@@ -1299,7 +1310,7 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Record block 0 hash
-        let block_0_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+        let block_0_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
             .expect("TezBlock 0 hash should be readable");
         assert_ne!(H256::zero(), block_0_hash);
 
@@ -1335,13 +1346,13 @@ mod tests {
         assert_eq!(ComputationResult::Finished, computation);
 
         // Block 1 hash should be different from block 0
-        let block_1_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+        let block_1_hash = block_storage::read_current_hash(&host, &TEZ_BLOCKS_PATH)
             .expect("TezBlock 1 hash should be readable");
         assert_ne!(block_0_hash, block_1_hash);
 
         // Read block 1 from storage and check its previous_hash equals block 0's hash
         let block_path = concat(
-            &TEZOS_BLOCKS_PATH,
+            &TEZ_BLOCKS_PATH,
             &RefPath::assert_from(b"/blocks/current/block"),
         )
         .expect("Block path should be valid");
@@ -1368,7 +1379,7 @@ mod tests {
         // Disable DA fees so that low-fee test operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         let boostrap1 = bootstrap1();
@@ -1481,7 +1492,7 @@ mod tests {
         // Disable DA fees so that low-fee test operations are not rejected.
         storage::store_da_fee(&mut host, U256::zero()).unwrap();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         // A contract storing the chain id and the level and timestamp
@@ -2541,7 +2552,7 @@ mod tests {
 
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_tez_config();
+        let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
         // We need to store something at the tezlink root path,

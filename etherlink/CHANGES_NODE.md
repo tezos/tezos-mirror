@@ -34,6 +34,12 @@
 
 ### Storage changes
 
+- Read Michelson `chain_id`, `simulation_result` and Tezos block data
+  (`current_chain_header`, `blocks/`, `indexes/blocks/`) from
+  `/tez/world_state/...` instead of `/tezlink/` and
+  `/evm/world_state/eth_accounts/tezos/`. The installer now writes
+  `michelson_runtime_chain_id` to `/tez/world_state/chain_id`. (!21705)
+
 - Read the `enable_multichain` and `enable_tezos_runtime` feature flags
   unconditionally from `/base/feature_flags/`. Installer configuration
   still writes all feature flags to their legacy locations when the

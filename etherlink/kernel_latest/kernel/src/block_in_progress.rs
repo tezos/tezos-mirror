@@ -15,7 +15,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{
     TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-    TEZOS_BLOCKS_PATH,
+    TEZ_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -557,7 +557,7 @@ impl BlockInProgress {
                 next_protocol: tez_block.next_protocol,
             };
             let tez_block = L2Block::Tezlink(tez_block);
-            block_storage::store_current(host, &TEZOS_BLOCKS_PATH, &tez_block)
+            block_storage::store_current(host, &TEZ_BLOCKS_PATH, &tez_block)
                 .context("Failed to store the Tezos block")?;
             store_current_tez_block_header(host, &new_header)
                 .context("Failed to store the current TezBlockHeader")?;
