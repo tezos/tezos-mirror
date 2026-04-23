@@ -869,6 +869,7 @@ struct
   module Operation_list_hash = Operation_list_hash
   module Operation_list_list_hash = Operation_list_list_hash
   module Context_hash = Context_hash
+  module Account_hash = Account_hash
   module Protocol_hash = Protocol_hash
   module Blake2B = Tezos_crypto.Blake2B
   module Fitness = Fitness

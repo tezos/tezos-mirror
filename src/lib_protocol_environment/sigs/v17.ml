@@ -10214,6 +10214,20 @@ end
 # 112 "v17.in.ml"
 
 
+  module Account_hash : sig
+# 1 "v17/account_hash.mli"
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2026 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type t
+end
+# 114 "v17.in.ml"
+
+
   module Sapling : sig
 # 1 "v17/sapling.mli"
 (* The MIT License (MIT)
@@ -10359,7 +10373,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 114 "v17.in.ml"
+# 116 "v17.in.ml"
 
 
   module Timelock : sig
@@ -10416,7 +10430,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 116 "v17.in.ml"
+# 118 "v17.in.ml"
 
 
   module Vdf : sig
@@ -10504,7 +10518,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
     @raise Invalid_argument when inputs are invalid *)
 val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
 end
-# 118 "v17.in.ml"
+# 120 "v17.in.ml"
 
 
   module Micheline : sig
@@ -10564,7 +10578,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 120 "v17.in.ml"
+# 122 "v17.in.ml"
 
 
   module Block_header : sig
@@ -10621,7 +10635,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 122 "v17.in.ml"
+# 124 "v17.in.ml"
 
 
   module Bounded : sig
@@ -10770,7 +10784,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
 module Uint8 (B : BOUNDS with type ocaml_type := int) :
   S with type ocaml_type := int
 end
-# 124 "v17.in.ml"
+# 126 "v17.in.ml"
 
 
   module Fitness : sig
@@ -10804,7 +10818,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 126 "v17.in.ml"
+# 128 "v17.in.ml"
 
 
   module Operation : sig
@@ -10848,7 +10862,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 128 "v17.in.ml"
+# 130 "v17.in.ml"
 
 
   module Context : sig
@@ -11485,7 +11499,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 130 "v17.in.ml"
+# 132 "v17.in.ml"
 
 
   module Updater : sig
@@ -12021,7 +12035,7 @@ end
     not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 132 "v17.in.ml"
+# 134 "v17.in.ml"
 
 
   module RPC_context : sig
@@ -12175,7 +12189,7 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 134 "v17.in.ml"
+# 136 "v17.in.ml"
 
 
   module Context_binary : sig
@@ -12218,7 +12232,7 @@ module Tree :
 
 val make_empty_context : ?root:string -> unit -> t
 end
-# 136 "v17.in.ml"
+# 138 "v17.in.ml"
 
 
   module Plonk : sig
@@ -12337,7 +12351,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
     on the given [inputs] according to the [public_parameters]. *)
 val verify : public_parameters -> verifier_inputs -> proof -> bool
 end
-# 138 "v17.in.ml"
+# 140 "v17.in.ml"
 
 
   module Dal : sig
@@ -12492,7 +12506,7 @@ val share_is_trap :
   traps_fraction:Q.t ->
   (bool, [> `Decoding_error]) Result.t
 end
-# 140 "v17.in.ml"
+# 142 "v17.in.ml"
 
 
   module Skip_list : sig
@@ -12724,7 +12738,7 @@ module Make (_ : sig
   val basis : int
 end) : S
 end
-# 142 "v17.in.ml"
+# 144 "v17.in.ml"
 
 
   module Smart_rollup : sig
@@ -12781,7 +12795,7 @@ module Inbox_hash : S.HASH
 (** Smart rollup merkelized payload hashes' hash *)
 module Merkelized_payload_hashes_hash : S.HASH
 end
-# 144 "v17.in.ml"
+# 146 "v17.in.ml"
 
 
   module Wasm_2_0_0 : sig
@@ -12894,7 +12908,7 @@ val wasm_pvm_machine :
       and type state = wasm_pvm_machine_state
       and type proof = wasm_pvm_machine_proof)
 end
-# 146 "v17.in.ml"
+# 148 "v17.in.ml"
 
 
   module Riscv : sig
@@ -12957,6 +12971,6 @@ val bytes_to_output_proof : bytes -> (output_proof, string) result
 
 val get_current_level : state -> int32 option Lwt.t
 end
-# 148 "v17.in.ml"
+# 150 "v17.in.ml"
 
 end

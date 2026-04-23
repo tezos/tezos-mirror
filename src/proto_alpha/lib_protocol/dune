@@ -41,6 +41,7 @@
   Script_expr_hash
   Origination_nonce
   Contract_hash
+  Implicit_account_repr
   Blinded_public_key_hash
   Block_payload_hash
   Sc_rollup_reveal_hash
@@ -351,6 +352,7 @@
   script_expr_hash.ml script_expr_hash.mli
   origination_nonce.ml origination_nonce.mli
   contract_hash.ml contract_hash.mli
+  implicit_account_repr.ml implicit_account_repr.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
@@ -667,6 +669,7 @@
   script_expr_hash.ml script_expr_hash.mli
   origination_nonce.ml origination_nonce.mli
   contract_hash.ml contract_hash.mli
+  implicit_account_repr.ml implicit_account_repr.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
@@ -967,6 +970,7 @@
   script_expr_hash.ml script_expr_hash.mli
   origination_nonce.ml origination_nonce.mli
   contract_hash.ml contract_hash.mli
+  implicit_account_repr.ml implicit_account_repr.mli
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
