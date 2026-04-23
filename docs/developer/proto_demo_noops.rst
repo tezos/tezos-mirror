@@ -354,8 +354,9 @@ We briefly describe the role of these five functions:
   validation of the block’s successor candidates.
 
 Another important function in the ``PROTOCOL`` interface is ``init``,
-which is called when the protocol is activated. It takes as parameters a
-context and the shell header of the last block of the previous protocol.
+which is called when the protocol is activated. It takes as parameters
+the chain id, a context, and the shell header of the last block of the
+previous protocol.
 The context is the context corresponding to this last block, which
 includes the protocol parameters given at activation time. It returns a
 ``validation_result``, which contains a context that is prepared for the
@@ -414,60 +415,62 @@ Concerning the fitness, we assume that the protocol is instantiated from
 ``demo_noops`` could very well be instantiated from a previous protocol
 with a totally different format for the fitness. The protocol should be
 able to adjust to different fitness models. Here, however, we use the
-same fitness model as ``genesis`` (and ``alpha``), where the fitness has
-the form ``xx:xxxxxxxxxxxxxxxx``. That is, the fitness is a list of two
-byte arrays, the first one (``xx``, of length 1), representing the
-protocol version, and the second one encoding an ``int64`` number (thus
-of length 8). Recall that there is only one block using the ``genesis``
-protocol. For this block, the fitness’ first element is ``00`` and its
-second element encodes the integer given as the fitness parameter when
-activating the next protocol. In ``demo_noops``, the first element is
-``01`` and the second element represents the level.
+same fitness model as ``genesis`` (and ``alpha``), where the fitness is
+a list of five byte arrays. The first element (of length 1) represents
+the protocol version, the second encodes the level as an ``int32``
+number (of length 4), and three additional elements are present for
+compatibility with the ``alpha`` fitness format. In ``demo_noops``, the
+version element is ``\002``.
 
 The helper functions needed to implement the fitness are as follows:
 
 .. code:: ocaml
 
-     let version_number = "\001"
-
-     let int64_to_bytes i =
-       let b = MBytes.create 8 in
-       MBytes.set_int64 b 0 i;
-       b
-
      let fitness_from_level level =
-       [ MBytes.of_string version_number ;
-         int64_to_bytes level ]
+       let version_number = "\002" in
+       let int32_to_bytes i =
+         let b = Bytes.make 4 '\000' in
+         TzEndian.set_int32 b 0 i ;
+         b
+       in
+       [
+         Bytes.of_string version_number;
+         int32_to_bytes level ;
+         Bytes.empty ;
+         int32_to_bytes (-1l) ;
+         int32_to_bytes 0l ;
+       ]
 
-The fitness of a new block is actually set in ``begin_construction``,
-which has the following very simple implementation:
+The fitness of a new block is set in ``begin_validation`` (in
+``Construction`` or ``Partial_construction`` modes), which has the
+following implementation:
 
 .. code:: ocaml
 
-     let begin_construction
-         ~chain_id:_
-         ~predecessor_context:context
-         ~predecessor_timestamp:_
-         ~predecessor_level
-         ~predecessor_fitness:_
-         ~predecessor:_
-         ~timestamp:_
-         ?protocol_data:_ ()
-       =
-       let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
-       ... (* output a log message *)
-       return { context ; fitness }
+     let begin_validation context _chain_id mode
+         ~(predecessor : Block_header.shell_header) =
+       let fitness =
+         match mode with
+         | Application block_header | Partial_validation block_header ->
+             block_header.shell.fitness
+         | Construction _ | Partial_construction _ ->
+             fitness_from_level Int32.(succ predecessor.level)
+       in
+       return {context; fitness}
 
-The implementation of the other main functions is trivial:
-``begin_application`` just builds the validation state from the
-predecessor context and the fitness from (the shell part of) the block
-header. ``begin_partial_application`` behaves like
-``begin_application``. ``apply_operation`` returns an error (however, it
-is never called), and ``finalize_block`` builds a validation result from
-the validation state by copying the context and the fitness, and setting
-default values for the other fields. Most functions also record a log
-message which allows one to see when these functions are called during
-the node’s execution. They also show how the fitness is updated.
+     let begin_application = begin_validation
+
+In ``demo_noops``, ``begin_application`` is simply an alias for
+``begin_validation`` since there is no meaningful difference between
+the two phases for this trivial protocol.
+
+``validate_operation`` and ``apply_operation`` both return an error
+(since there are no valid operations). ``finalize_validation`` returns
+``unit``, and ``finalize_application`` builds a ``validation_result``
+from the application state by copying the context and the fitness, and
+setting default values for the other fields. Most functions also record
+a log message which allows one to see when these functions are called
+during the node’s execution.
 
 Finally, this protocol does not define any RPC.
 

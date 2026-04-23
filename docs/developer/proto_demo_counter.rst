@@ -113,21 +113,35 @@ require that counters don’t overflow.
 Operation application is defined by the function
 ``Main.apply_operation``.
 
-::
+.. code:: ocaml
 
-   val apply_operation : validation_state -> operation ->
-     (validation_state * operation_receipt) tzresult Lwt.t
+   val apply_operation :
+     application_state ->
+     Operation_hash.t ->
+     operation ->
+     (application_state * operation_receipt) tzresult Lwt.t
 
-   let apply_operation validation_state operation =
-     Logging.log_notice "apply_operation";
-     let { context ; fitness } = validation_state in
-     State.get_state context >>= fun state ->
+The implementation uses a helper function ``apply_operation_aux``
+that is shared with ``validate_operation``:
+
+.. code:: ocaml
+
+   let apply_operation_aux application_state operation =
+     let open Lwt_result_syntax in
+     let {context; fitness} = application_state in
+     let*! state = State.get_state context in
      match Apply.apply state operation.protocol_data with
-     | None -> Error_monad.fail Error.Invalid_operation
+     | None -> Error_monad.tzfail Error.Invalid_operation
      | Some state ->
-         let receipt = Receipt.create "operation applied successfully" in
-         State.update_state context state >>= fun context ->
-         return ({ context ; fitness }, receipt)
+       let*! context = State.update_state context state in
+       return {context; fitness}
+
+   let apply_operation application_state _oph operation =
+     let open Lwt_result_syntax in
+     Logging.log Notice "apply_operation" ;
+     let* application_state = apply_operation_aux application_state operation in
+     let receipt = Receipt.create "operation applied successfully" in
+     return (application_state, receipt)
 
 This is quite straightforward. If the application succeeds, fitness is
 left unchanged and the resulting context contains the updated state.
@@ -250,16 +264,16 @@ User interface
      bake <message>
        Bake a block
        <message>: message in block header
-     incra
+     increment a
        Increment A
-     incrb
+     increment b
        Increment B
      transfer <amount>
-       transfer from A to B
+       Transfer from A to B
        <amount>: amount taken from A and given to B (possibly negative)
-     get_a
+     get a
        Get A counter
-     get_b
+     get b
        Get B counter
    ...
 
@@ -380,22 +394,37 @@ Let us have a closer look to the block baking command
 ::
 
    let bake (cctxt : Protocol_client_context.full) message : unit tzresult Lwt.t =
-     Demo_block_services.Mempool.pending_operations cctxt ()
-     >>=? fun { applied; _} ->
-     let operations = List.map snd applied in
+     let open Lwt_result_syntax in
+     let* {validated; _} =
+       Demo_block_services.Mempool.pending_operations cctxt ()
+     in
+     let operations = List.map snd validated in
      let block_header_data = Header.create message in
-     Demo_block_services.Helpers.Preapply.block cctxt [operations] ~protocol_data:block_header_data
-     >>=? fun (shell, preapply_result) ->
+     let* shell, preapply_result =
+       Demo_block_services.Helpers.Preapply.block
+         cctxt
+         [operations]
+         ~protocol_data:block_header_data
+     in
      let block_header_data_encoded =
-       Data_encoding.Binary.to_bytes_exn Header.encoding block_header_data in
-     let header : Block_header.t = { shell ; protocol_data = block_header_data_encoded } in
-     let header_encoded = Data_encoding.Binary.to_bytes_exn Block_header.encoding header in
-     let preapply_result = List.hd preapply_result in
+       Data_encoding.Binary.to_bytes_exn Header.encoding block_header_data
+     in
+     let header : Block_header.t =
+       {shell; protocol_data = block_header_data_encoded}
+     in
+     let header_encoded =
+       Data_encoding.Binary.to_bytes_exn Block_header.encoding header
+     in
+     let preapply_result =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.hd preapply_result
+     in
      let operations = [List.map snd preapply_result.applied] in
-     Shell_services.Injection.block cctxt header_encoded operations
-     >>=? fun block_hash ->
-     cctxt#message "Injected block %a" Block_hash.pp_short block_hash
-     >>= fun () ->
+     let* block_hash =
+       Shell_services.Injection.block cctxt header_encoded operations
+     in
+     let*! () =
+       cctxt#message "Injected block %a" Block_hash.pp_short block_hash
+     in
      return_unit
 
 First, it retrieves the applied operations from the mempool using
