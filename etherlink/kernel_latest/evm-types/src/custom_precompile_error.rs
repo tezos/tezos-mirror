@@ -14,7 +14,7 @@ pub enum CustomPrecompileError {
     CracAbort(String),
     Revert(String),
     RevertKeepGas(String, Gas),
-    OutOfGas(Gas),
+    OutOfGas,
 }
 
 impl From<RuntimeError> for CustomPrecompileError {

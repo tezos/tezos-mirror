@@ -49,10 +49,10 @@ where
     }
 }
 
-pub(crate) fn out_of_gas(gas: u64) -> InterpreterResult {
-    InterpreterResult {
-        result: InstructionResult::OutOfGas,
-        gas: Gas::new_spent(gas),
-        output: Bytes::new(),
+pub(crate) fn charge(gas: &mut Gas, cost: u64) -> Result<(), CustomPrecompileError> {
+    if gas.record_cost(cost) {
+        Ok(())
+    } else {
+        Err(CustomPrecompileError::OutOfGas)
     }
 }

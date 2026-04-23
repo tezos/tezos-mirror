@@ -39,7 +39,7 @@ use crate::{
             FA_BRIDGE_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        guard::{guard, out_of_gas},
+        guard::{charge, guard},
     },
 };
 use evm_types::{CustomPrecompileError, DatabasePrecompileStateChanges};
@@ -443,9 +443,7 @@ where
     )?;
 
     let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, SEND_OUTBOX_MESSAGE_BASE_COST)?;
 
     let output = send_outbox_methods(calldata, context)?;
 
