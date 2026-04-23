@@ -5666,6 +5666,127 @@ let test_crac_receipt_evm_to_tez_revert =
     (List.nth internals 2) ;
   unit
 
+(* Two failing EVM->TEZ CRACs from the SAME EVM transaction, each caught
+ * by the EVM caller's try/catch.  Per RFC principle 6 (one top-level per
+ * runtime per CRAC-ID), the Michelson runtime block must merge both
+ * failures into a SINGLE manager operation.
+ *
+ *    EVM[evm_main]
+ *     |-> (Catch) EVM[bridge_1] ~CRAC~> TEZ[tez_reverter_1] -> REVERT
+ *     |-> (Catch) EVM[bridge_2] ~CRAC~> TEZ[tez_reverter_2] -> REVERT
+ *)
+let test_crac_receipt_two_failed_independent =
+  register_crac_runner_test
+    ~title:"CRAC: two EVM->TEZ failures from same tx produce one Michelson op"
+    ~tags:["crac_receipt"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-2FAIL" in
+  let* tez_reverter_1 = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_1_kt1)) = tez_reverter_1 in
+  let* tez_reverter_2 = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_2_kt1)) = tez_reverter_2 in
+  let* bridge_1 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter_1 in
+  let (`Evm_runner bridge_1_addr) = bridge_1 in
+  let* bridge_2 = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter_2 in
+  let (`Evm_runner bridge_2_addr) = bridge_2 in
+  let* evm_main =
+    EvmMultiRunCaller.deploy_and_init
+      ~callees:[(bridge_1, true); (bridge_2, true)]
+      ()
+  in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_1_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_1_addr sequencer
+  in
+  let*@ bridge_2_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_2_addr sequencer
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  (* EVM main caught both failures — counter incremented per iteration
+     plus once at the end (3), and catches incremented twice (2). *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:2
+      ~expected_counter:3
+      evm_main
+  in
+  let* () =
+    TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter_1
+  in
+  let* () =
+    TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter_2
+  in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  (* RFC principle 6: a single CRAC-ID per top-level EVM tx → a single
+     top-level Michelson operation, even when sub-calls fail. *)
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:
+        "Expected 1 Michelson operation (RFC merging of failed CRACs), got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"failed"
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  (* 5 internal ops: event + (run failed, _revert failed) for each bridge. *)
+  Check.(
+    (List.length internals = 5)
+      int
+      ~error_msg:"Expected 5 internal operations, got %L") ;
+  (* ── Internal #0: CRAC event — single event for the merged top-level. *)
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected_status:"backtracked"
+    (List.nth internals 0) ;
+  (* ── Internal #1: alias(bridge_1) → tez_reverter_1 (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:1
+    ~expected_source:bridge_1_alias
+    ~expected_destination:tez_reverter_1_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"failed"
+    (List.nth internals 1) ;
+  (* ── Internal #2: tez_reverter_1 → tez_reverter_1 (%_revert) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:2
+    ~expected_source:tez_reverter_1_kt1
+    ~expected_destination:tez_reverter_1_kt1
+    ~expected_entrypoint:"_revert"
+    ~expected_status:"failed"
+    (List.nth internals 2) ;
+  (* ── Internal #3: alias(bridge_2) → tez_reverter_2 (%run) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:3
+    ~expected_source:bridge_2_alias
+    ~expected_destination:tez_reverter_2_kt1
+    ~expected_entrypoint:"run"
+    ~expected_status:"failed"
+    (List.nth internals 3) ;
+  (* ── Internal #4: tez_reverter_2 → tez_reverter_2 (%_revert) — failed *)
+  check_crac_internal_transaction
+    ~prefix
+    ~expected_nonce:4
+    ~expected_source:tez_reverter_2_kt1
+    ~expected_destination:tez_reverter_2_kt1
+    ~expected_entrypoint:"_revert"
+    ~expected_status:"failed"
+    (List.nth internals 4) ;
+  unit
+
 (* CRAC at tx_index > 0: inject a dummy ETH transfer into the mempool
  * before the CRAC tx, so both land in the same block and the CRAC tx
  * gets tx_index = 1 → CRAC-ID = "1-1".
@@ -8038,6 +8159,7 @@ let () =
   test_crac_receipt_tez_evm_tez [Alpha] ;
   test_crac_receipt_evm_tez_evm_tez [Alpha] ;
   test_crac_receipt_evm_to_tez_revert [Alpha] ;
+  test_crac_receipt_two_failed_independent [Alpha] ;
   test_crac_receipt_evm_not_first_tx [Alpha] ;
   test_crac_receipt_tez_not_first_tx [Alpha] ;
   test_crac_receipt_evm_then_tez_same_block [Alpha] ;
