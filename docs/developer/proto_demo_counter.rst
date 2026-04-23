@@ -73,8 +73,14 @@ separate modules.
 - ``operation_data`` is defined as ``Proto_operation.t``.
 
 As for ``demo_noops``, ``block_header_data`` is still a string, and
-fitness is defined as the height of the chain. More interesting are the
-protocol operations and the operation receipt.
+fitness is defined as the height of the chain. However, ``demo_counter``
+uses a different fitness format than ``demo_noops``: it uses version
+number ``\255`` (``ff`` in hex) and encodes the level as a 64-bit
+integer, with a 5-element fitness of the form
+``ff::00::00::00::LEVEL``. This higher version number allows testing
+migration from ``alpha`` to ``demo_counter``.
+
+More interesting are the protocol operations and the operation receipt.
 
 The protocol defines three operations in ``Proto_operation.t``, which
 act on a state ``State.t`` stored in the protocol *context*. As seen in
