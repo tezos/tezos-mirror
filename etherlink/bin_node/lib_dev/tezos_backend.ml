@@ -256,51 +256,44 @@ let make (ctxt : Evm_ro_context.t) =
 
     let get_script chain block c =
       let open Lwt_result_syntax in
-      match Tezlink_mock.mocked_script c with
-      | Some c -> return_some c
+      let* code = get_code chain block c in
+      match code with
+      | Some code -> (
+          let* storage = get_storage chain block c in
+          match storage with
+          | Some storage ->
+              return_some
+                Tezlink_imports.Imported_context.Script.
+                  {code = lazy_expr code; storage = lazy_expr storage}
+          | None -> return_none)
       | None -> (
-          let* code = get_code chain block c in
-          match code with
-          | Some code -> (
-              let* storage = get_storage chain block c in
-              match storage with
-              | Some storage ->
-                  return_some
-                    Tezlink_imports.Imported_context.Script.
-                      {code = lazy_expr code; storage = lazy_expr storage}
-              | None -> return_none)
-          | None -> (
-              match c with
-              | Implicit _ -> return_none
-              | Originated _ -> (
-                  (* Enshrined TezosX contract — no code in durable storage.
-                     Derive the script from the entrypoints returned by the
-                     kernel, using a unit storage and FAILWITH code as stubs. *)
-                  let* eth_block = shell_block_param_to_eth_block_param block in
-                  let addr_bytes =
-                    Data_encoding.Binary.to_bytes_exn
-                      Tezos_types.Contract.encoding
-                      c
-                  in
-                  let* state =
-                    Evm_ro_context.get_state ctxt ~block:eth_block ()
-                  in
-                  let* bytes =
-                    Evm_ro_context.execute_entrypoint
-                      ctxt
-                      state
-                      ~input_path:Durable_storage_path.Tezosx_entrypoints.input
-                      ~input:addr_bytes
-                      ~output_path:
-                        Durable_storage_path.Tezosx_entrypoints.result
-                      ~entrypoint:"tezosx_michelson_entrypoints"
-                  in
-                  let* result = decode_entrypoints_result bytes in
-                  match result with
-                  | None -> return_none
-                  | Some (_, entries) ->
-                      return_some (Tezlink_mock.script_of_entrypoints entries)))
-          )
+          match c with
+          | Implicit _ -> return_none
+          | Originated _ -> (
+              (* Enshrined TezosX contract — no code in durable storage.
+                 Derive the script from the entrypoints returned by the
+                 kernel, using a unit storage and FAILWITH code as stubs. *)
+              let* eth_block = shell_block_param_to_eth_block_param block in
+              let addr_bytes =
+                Data_encoding.Binary.to_bytes_exn
+                  Tezos_types.Contract.encoding
+                  c
+              in
+              let* state = Evm_ro_context.get_state ctxt ~block:eth_block () in
+              let* bytes =
+                Evm_ro_context.execute_entrypoint
+                  ctxt
+                  state
+                  ~input_path:Durable_storage_path.Tezosx_entrypoints.input
+                  ~input:addr_bytes
+                  ~output_path:Durable_storage_path.Tezosx_entrypoints.result
+                  ~entrypoint:"tezosx_michelson_entrypoints"
+              in
+              let* result = decode_entrypoints_result bytes in
+              match result with
+              | None -> return_none
+              | Some (_, entries) ->
+                  return_some (Tezlink_mock.script_of_entrypoints entries)))
 
     let manager_key _chain block contract =
       let open Lwt_result_syntax in

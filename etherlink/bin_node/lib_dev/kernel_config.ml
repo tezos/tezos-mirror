@@ -217,27 +217,6 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         |> List.flatten
   in
 
-  (* We initialize the big map id counter to 4 because Liquidity Baking bootstrap contracts use 4 big maps. *)
-  let first_big_map_id = Z.of_int 4 in
-  let set_first_big_map_id =
-    let path_prefix =
-      Tezlink_durable_storage.Path.big_map |> String.split_on_char '/'
-      |> clean_path
-    in
-    let set : type f. f L2_types.chain_family -> _ = function
-      | L2_types.Michelson ->
-          make_instr
-            ~path_prefix
-            (Some
-               ( "next_id",
-                 Data_encoding.Binary.to_string_exn
-                   Data_encoding.z
-                   first_big_map_id ))
-      | L2_types.EVM -> []
-    in
-    set l2_chain_family
-  in
-
   let config_instrs =
     (* These configuration parameter will not be stored in the world_state of an l2 chain but are parameter for an l2 chain *)
     (* To do so we put them into another path /evm/config/<l2_chain_id> *)
@@ -272,7 +251,7 @@ let make_l2 ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
       ~path_prefix:world_state_prefix
       sequencer_pool_address
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
-    @ set_account_code @ set_first_big_map_id
+    @ set_account_code
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
@@ -462,18 +441,6 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Osaka -> Z.of_int 3 ))
       evm_version
   in
-  (* We initialize the big map id counter to 4 because Liquidity Baking bootstrap contracts use 4 big maps. *)
-  let first_big_map_id = Z.of_int 4 in
-  let set_first_big_map_id =
-    if List.mem ~equal:( = ) Tezosx.Tezos with_runtimes then
-      make_instr
-        ~path_prefix:["evm"; "world_state"; "big_map"]
-        (Some
-           ( "next_id",
-             Data_encoding.Binary.to_string_exn Data_encoding.z first_big_map_id
-           ))
-    else []
-  in
   (* Phase 2 of the durable storage reorganization (storage version V53)
      moves governance / sequencing / config installer-set paths from
      /evm/ to /base/. Phase 3 (storage version V54) moves all feature
@@ -568,7 +535,7 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
         ~convert:le_int64_bytes
         max_blueprint_lookahead_in_seconds
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
-    @ set_first_big_map_id @ set_account_code
+    @ set_account_code
     @ make_governance_instr remove_whitelist
     @ make_feature_flag_instr
         ~legacy_prefix:feature_flag_prefix_evm
