@@ -18,7 +18,7 @@ extends ``demo_noops`` from the first part in several ways.
 - It is parameterized by protocol parameters passed at activation time.
 - It defines REST services (a.k.a. RPCs), in addition to the generic
   ones already available from the shell.
-- It defines a client library, extending ``tezos-client`` with
+- It defines a client library, extending ``octez-client`` with
   protocol-specific commands.
 
 A large part of this tutorial is devoted to the client library. While this
@@ -183,7 +183,7 @@ The protocol implements two services.
 
 Services rely on the ``RPC_*`` modules accessible through the
 :doc:`protocol environment <../shell/protocol_environment>`.
-Ultimately, these modules are implemented by the ``tezos-rpc`` library.
+Ultimately, these modules are implemented by the ``octez-libs.rpc`` library.
 
 Services are registered by the function ``Services.rpc_services``, which
 is called by ``Main.rpc_services`` at protocol activation.
@@ -226,9 +226,9 @@ Client library
 
 The client and the node interact using RPCs. In theory, we could write a
 client for ``demo_counter`` from scratch in any language, but it is
-convenient to simply extend ``tezos-client`` with a protocol-specific
+convenient to simply extend ``octez-client`` with a protocol-specific
 client library. Hence, we can keep using generic features of
-``tezos-client``, such as wallet management, and simply add new commands
+``octez-client``, such as wallet management, and simply add new commands
 specific to the new protocol. Moreover, we can use well-tested OCaml
 libraries to conveniently call shell RPCs, and we can access to the
 protocol code from the client, for instance to access some of its
@@ -236,7 +236,7 @@ datatypes or services.
 
 For ``demo_counter``, the client library is
 ``tezos-client-demo-counter`` and it is defined in
-:src:`src/proto_demo_counter/lib_client/`. It is linked to ``tezos-client``
+:src:`src/proto_demo_counter/lib_client/`. It is linked to ``octez-client``
 (see :src:`src/bin_client/dune`). It is composed of four modules
 ``Client_proto_args``, ``Client_proto_commands``, ``Client_proto_main``,
 ``Protocol_client_context`` which we will describe as we go.
@@ -282,7 +282,7 @@ Client/Node interaction
 
 Typically, the client library interacts with the node in two ways.
 
-- using shell services (through the ``tezos-shell-services`` library),
+- using shell services (through the ``octez-shell-libs.shell-services`` library),
 - using protocol services (through the protocol library, i.e.
   ``tezos-protocol-demo-counter``).
 
@@ -305,8 +305,8 @@ our case, we can get the counter values using the *client stub*
 Remark that although it is feasible, the client code should not use
 protocol functions who read or write the protocol context.
 
-Library ``tezos-shell-services``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Library ``octez-shell-libs.shell-services``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This library defines client stubs to call shell RPC services. The
 ``demo_counter`` client library uses *injection services* and *block
@@ -373,10 +373,10 @@ Commands implementation
 
 Commands are implemented with the help of several libraries.
 
-- ``tezos-clic`` is a command-line parsing library.
-- ``tezos-client-commands`` provides the registration function for new
+- ``octez-libs.clic`` is a command-line parsing library.
+- ``octez-shell-libs.client-commands`` provides the registration function for new
   commands.
-- ``client-base`` defines notably the ``Client_context.full`` class,
+- ``octez-shell-libs.client-base`` defines notably the ``Client_context.full`` class,
   which contains the client context (e.g. wallet, printing facilities,
   RPC context…).
 
