@@ -523,8 +523,8 @@ module EvmCollectResult = struct
 
   (** Call [runCatch()] which wraps the precompile call in try/catch so
    *  the outer tx commits even when the CRAC call reverts. *)
-  let call_run_catch ?expected_status ~sequencer ~sender ~nonce ~value contract
-      =
+  let call_run_catch ?expected_status ?gas ~sequencer ~sender ~nonce ~value
+      contract =
     let* receipt =
       craft_and_send_transaction
         ~sequencer
@@ -535,6 +535,7 @@ module EvmCollectResult = struct
         ~abi_signature:"runCatch()"
         ~arguments:[]
         ?expected_status
+        ?gas
         ()
     in
     return receipt.gasUsed
@@ -1213,6 +1214,29 @@ module TezCollectResultThenCallEvm = struct
       protocol
 end
 
+(** Tezos contract that generates 4 MiB of zero bytes at runtime via
+ *  22 consecutive [CONCAT] doublings (1-byte seed) and deposits them
+ *  via [%collect_result].  Used to trigger EVM OOG when the
+ *  precompile return value is copied into memory. *)
+module TezGenerate4MibResult = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "gateway_generate_4mib_result"]
+      ~init_storage_data:(sf {|"%s"|} gateway_address)
+      ?init_balance
+      protocol
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -1284,7 +1308,11 @@ module CracRunnerWrapper = struct
         ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
 
       val call_run_catch :
-        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
+        ?expected_status:bool ->
+        ?gas:int ->
+        ?value:Wei.t ->
+        evm_runner ->
+        int64 Lwt.t
 
       val check_result : expected_hex:string -> evm_runner -> unit Lwt.t
 
@@ -1376,6 +1404,10 @@ module CracRunnerWrapper = struct
         payload_hex:string ->
         unit ->
         tez_runner Lwt.t
+    end
+
+    module TezGenerate4MibResult : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
     end
 
     module TezGasBurner : sig
@@ -1624,11 +1656,12 @@ module CracRunnerWrapper = struct
           in
           return gas_used
 
-        let call_run_catch ?expected_status ?(value = Wei.zero)
+        let call_run_catch ?expected_status ?gas ?(value = Wei.zero)
             (`Evm_runner runner) =
           let* gas_used =
             EvmCollectResult.call_run_catch
               ?expected_status
+              ?gas
               ~sequencer
               ~sender
               ~nonce:(evm_nonce ())
@@ -1911,6 +1944,24 @@ module CracRunnerWrapper = struct
               ?init_balance
               ~evm_target_address
               ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezGenerate4MibResult = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezGenerate4MibResult.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
               ()
           in
           return (`Tez_runner (runner_hex, runner))
@@ -8582,6 +8633,58 @@ let test_crac_collect_result_nested_independent_slots =
   Log.debug ~prefix "Verify inner EVM reader got inner_bytes" ;
   EvmCollectResult.check_result ~expected_hex:inner_hex evm_inner
 
+(** OOG guard: a Michelson contract that deposits 4 MiB of bytes via
+    [%collect_result] causes EVM OOG when the precompile return value is
+    copied into memory.  The [runCatch()] wrapper catches the OOG and
+    sets [caught = true]; [result()] must remain empty.
+
+    Gas is pinned explicitly: 4 MiB = 131_072 EVM words and memory
+    expansion alone costs [3 * w + w² / 512 ≈ 33.9M] gas, so a 3M
+    limit guarantees the OOG happens at the memory-copy step rather
+    than masking some other failure.  3M is also high enough that the
+    EIP-150 1/64 reserve left behind for [runCatch]'s [catch] block
+    can afford the [sstore caught = true] (~22K).  We then assert
+    [gasUsed > 95% * gas_limit], which is the OOG signature: a
+    graceful [revert] returns unused gas (so [gasUsed] would be
+    small), whereas an OOG burns the entire forwarded sub-call
+    budget (~63/64 of the limit) before [catch] runs. *)
+let test_crac_collect_result_large_payload_oog =
+  register_crac_runner_test
+    ~title:"CRAC: 4 MiB %collect_result payload causes EVM OOG"
+    ~tags:["collect_result"; "http_call"; "oog"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  let gas_limit = 3_000_000 in
+  Log.debug
+    ~prefix
+    "Originate Michelson contract that generates 4 MiB via CONCAT doublings" ;
+  let* tez_large = TezGenerate4MibResult.originate () in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_large in
+  Log.debug
+    ~prefix
+    "Run (catching) with gas=%d: 4 MiB return should cause EVM OOG"
+    gas_limit ;
+  let* gas_used = EvmCollectResult.call_run_catch ~gas:gas_limit evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught (OOG)" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug
+    ~prefix
+    "Verify gasUsed (%Ld) is close to gas_limit (%d)"
+    gas_used
+    gas_limit ;
+  let gas_limit_64 = Int64.of_int gas_limit in
+  Check.(
+    (gas_used > Int64.div (Int64.mul gas_limit_64 95L) 100L)
+      int64
+      ~error_msg:
+        "OOG gasUsed (%L) should exceed 95%% * gas_limit (%R): a graceful \
+         revert would return unused gas, but OOG burns the forwarded sub-call \
+         budget (~63/64 of the limit) before [catch] runs") ;
+  Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -8678,4 +8781,5 @@ let () =
   test_crac_collect_result_size_sweep_matches_model [Alpha] ;
   test_crac_collect_result_fire_and_forget_empty_body [Alpha] ;
   test_crac_collect_result_once_per_frame [Alpha] ;
-  test_crac_collect_result_nested_independent_slots [Alpha]
+  test_crac_collect_result_nested_independent_slots [Alpha] ;
+  test_crac_collect_result_large_payload_oog [Alpha]
