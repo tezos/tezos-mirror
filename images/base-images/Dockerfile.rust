@@ -32,7 +32,7 @@ RUN apt-get update && \
     git \
     gcc \
     tzdata \
-    pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
+    pkg-config autoconf automake autotools-dev libtool xutils-dev clang libclang-dev cmake \
     rustup \
     musl-tools \
     wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
