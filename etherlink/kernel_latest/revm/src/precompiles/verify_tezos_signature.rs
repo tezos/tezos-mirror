@@ -13,9 +13,7 @@ use tezos_crypto_rs::{
 };
 use tezos_data_encoding::nom::NomReader;
 
-use crate::precompiles::{
-    constants::VERIFY_TEZOS_SIGNATURE_BASE_COST, guard::out_of_gas,
-};
+use crate::precompiles::{constants::VERIFY_TEZOS_SIGNATURE_BASE_COST, guard::charge};
 
 sol! {
     contract VerifyTezosSignature {
@@ -32,9 +30,7 @@ pub(crate) fn verify_tezos_signature_precompile(
     inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError> {
     let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(VERIFY_TEZOS_SIGNATURE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, VERIFY_TEZOS_SIGNATURE_BASE_COST)?;
 
     let Ok(VerifyTezosSignature::VerifyTezosSignatureCalls::verifyTezosSignature(call)) =
         VerifyTezosSignature::VerifyTezosSignatureCalls::abi_decode(calldata)

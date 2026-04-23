@@ -7,8 +7,8 @@ use evm_types::CustomPrecompileError;
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, CallInputs, Gas, InterpreterResult},
-    primitives::Address,
+    interpreter::{CallInput, CallInputs, Gas, InstructionResult, InterpreterResult},
+    primitives::{Address, Bytes},
 };
 
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -26,7 +26,7 @@ use crate::{
             VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
         },
         global_counter::global_counter_precompile,
-        guard::{out_of_gas, revert},
+        guard::revert,
         runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
@@ -112,7 +112,11 @@ impl EtherlinkPrecompiles {
             Err(CustomPrecompileError::Revert(reason)) => {
                 revert(reason, Gas::new_spent(inputs.gas_limit))
             }
-            Err(CustomPrecompileError::OutOfGas(gas)) => out_of_gas(gas.spent()),
+            Err(CustomPrecompileError::OutOfGas) => InterpreterResult {
+                result: InstructionResult::OutOfGas,
+                gas: Gas::new_spent(inputs.gas_limit),
+                output: Bytes::new(),
+            },
             Err(CustomPrecompileError::RevertKeepGas(reason, gas)) => revert(reason, gas),
             Err(CustomPrecompileError::RuntimeAbort(runtime)) => {
                 return Err(Error::Runtime(runtime))

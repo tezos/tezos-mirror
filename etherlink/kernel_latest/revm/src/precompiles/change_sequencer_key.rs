@@ -28,7 +28,7 @@ use crate::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, SEQUENCER_UPGRADE_DELAY,
             UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST,
         },
-        guard::out_of_gas,
+        guard::charge,
     },
 };
 use evm_types::{DatabasePrecompileStateChanges, SequencerKeyChange};
@@ -78,9 +78,7 @@ where
 
     let mut gas = Gas::new(inputs.gas_limit);
 
-    if !gas.record_cost(UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST)?;
 
     let Ok(function_call) = ChangeSequencerKeyCalls::abi_decode(calldata) else {
         return Err(CustomPrecompileError::Revert(String::from(

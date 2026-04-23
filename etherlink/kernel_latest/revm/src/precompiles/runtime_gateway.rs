@@ -24,7 +24,7 @@ use crate::{
             RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
             VALUE_TRANSFER_SURCHARGE,
         },
-        guard::out_of_gas,
+        guard::charge,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
     },
 };
@@ -77,8 +77,8 @@ fn build_http_request(
                 CustomPrecompileError::Revert("header cost overflow".into())
             })?)
             .ok_or(CustomPrecompileError::Revert("header cost overflow".into()))?;
-    if header_cost > 0 && !gas.record_cost(header_cost) {
-        return Err(CustomPrecompileError::OutOfGas(*gas));
+    if header_cost > 0 {
+        charge(gas, header_cost)?;
     }
     let method = match method_u8 {
         0 => http::Method::GET,
@@ -130,9 +130,7 @@ fn classify_and_charge_crac_response(
         .and_then(|c| gas::convert(target_runtime, RuntimeId::Ethereum, c));
 
     if let Some(evm_consumed) = callee_gas {
-        if !gas.record_cost(evm_consumed) {
-            return Err(CustomPrecompileError::OutOfGas(*gas));
-        }
+        charge(gas, evm_consumed)?;
     }
 
     if response.status().is_success() {
@@ -183,48 +181,45 @@ where
     source
 }
 
-/// Returns `Ok(Some((sender_alias, source_alias)))` on success, or
-/// `Ok(None)` when the caller runs out of gas.
+/// Resolves sender and source aliases, charging gas for lookups and any
+/// alias generation triggered on cache miss. OOG propagates as
+/// `Err(CustomPrecompileError::OutOfGas(..))`.
 fn resolve_aliases<'j, CTX, Host, R>(
     context: &mut CTX,
     gas: &mut Gas,
     sender: Address,
     source: Address,
-) -> Result<Option<(String, String)>, CustomPrecompileError>
+) -> Result<(String, String), CustomPrecompileError>
 where
     Host: StorageV1 + 'j,
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
     // --- sender alias ---
-    if !gas.record_cost(ALIAS_CACHE_HIT_COST) {
-        return Ok(None);
-    }
+    charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (sender_alias, sender_gen_gas) = context
         .journal_mut()
         .tezosx_resolve_source_alias(sender, gas.remaining())?;
     let sender_gen_evm =
         gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, sender_gen_gas)
             .unwrap_or(u64::MAX);
-    if sender_gen_evm > 0 && !gas.record_cost(sender_gen_evm) {
-        return Ok(None);
+    if sender_gen_evm > 0 {
+        charge(gas, sender_gen_evm)?;
     }
 
     // --- source alias ---
-    if !gas.record_cost(ALIAS_CACHE_HIT_COST) {
-        return Ok(None);
-    }
+    charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (source_alias, source_gen_gas) = context
         .journal_mut()
         .tezosx_resolve_source_alias(source, gas.remaining())?;
     let source_gen_evm =
         gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, source_gen_gas)
             .unwrap_or(u64::MAX);
-    if source_gen_evm > 0 && !gas.record_cost(source_gen_evm) {
-        return Ok(None);
+    if source_gen_evm > 0 {
+        charge(gas, source_gen_evm)?;
     }
 
-    Ok(Some((sender_alias, source_alias)))
+    Ok((sender_alias, source_alias))
 }
 
 /// Inject X-Tezos-* headers carrying the trusted execution context.
@@ -291,9 +286,7 @@ where
 
     match function_call {
         RuntimeGatewayCalls::transfer(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
+            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
 
             let implicit_address = call.implicitAddress;
             let amount = inputs.value.get();
@@ -312,16 +305,13 @@ where
 
             let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
-                    Some(aliases) => aliases,
-                    None => return Ok(out_of_gas(inputs.gas_limit)),
-                };
+                resolve_aliases(context, &mut gas, inputs.caller, source)?;
 
             // Charge value transfer surcharge before the CRAC so the
             // caller cannot trigger a cross-runtime transfer without
             // enough gas to cover the balance burn.
-            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
-                return Ok(out_of_gas(inputs.gas_limit));
+            if !amount.is_zero() {
+                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
             }
 
             // Convert remaining EVM gas to Tezos milligas for the target runtime
@@ -363,9 +353,7 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::callMichelson(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
+            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
 
             let destination = call.destination;
             let entrypoint = call.entrypoint;
@@ -390,14 +378,11 @@ where
 
             let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
-                    Some(aliases) => aliases,
-                    None => return Ok(out_of_gas(inputs.gas_limit)),
-                };
+                resolve_aliases(context, &mut gas, inputs.caller, source)?;
 
             // Charge value transfer surcharge before the CRAC
-            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
-                return Ok(out_of_gas(inputs.gas_limit));
+            if !amount.is_zero() {
+                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
             }
 
             let gas_limit =
@@ -438,9 +423,7 @@ where
             context.journal_mut().log(crac_log);
         }
         RuntimeGatewayCalls::call(call) => {
-            if !gas.record_cost(RUNTIME_GATEWAY_BASE_COST) {
-                return Ok(out_of_gas(inputs.gas_limit));
-            }
+            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
 
             let mut request = build_http_request(
                 &call.url,
@@ -453,14 +436,11 @@ where
             let source = resolve_original_source(context);
             let amount = inputs.value.get();
             let (sender_alias, source_alias) =
-                match resolve_aliases(context, &mut gas, inputs.caller, source)? {
-                    Some(aliases) => aliases,
-                    None => return Ok(out_of_gas(inputs.gas_limit)),
-                };
+                resolve_aliases(context, &mut gas, inputs.caller, source)?;
 
             // Charge value transfer surcharge before the CRAC
-            if !amount.is_zero() && !gas.record_cost(VALUE_TRANSFER_SURCHARGE) {
-                return Ok(out_of_gas(inputs.gas_limit));
+            if !amount.is_zero() {
+                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
             }
 
             let target_runtime =

@@ -22,7 +22,7 @@ use crate::{
             FA_BRIDGE_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        guard::{guard, out_of_gas, revert},
+        guard::{charge, guard, revert},
     },
 };
 
@@ -49,9 +49,7 @@ where
     )?;
 
     let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(GLOBAL_COUNTER_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, GLOBAL_COUNTER_BASE_COST)?;
 
     let interface = match GlobalCounter::GlobalCounterCalls::abi_decode(calldata) {
         Ok(data) => data,

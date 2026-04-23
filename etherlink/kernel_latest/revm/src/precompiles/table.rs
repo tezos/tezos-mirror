@@ -22,7 +22,7 @@ use crate::{
         constants::{
             FA_BRIDGE_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
-        guard::{guard, out_of_gas, revert},
+        guard::{charge, guard, revert},
     },
 };
 use evm_types::{CustomPrecompileError, FaDepositWithProxy};
@@ -74,9 +74,7 @@ where
     guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs)?;
 
     let mut gas = Gas::new(inputs.gas_limit);
-    if !gas.record_cost(TICKET_TABLE_BASE_COST) {
-        return Ok(out_of_gas(inputs.gas_limit));
-    }
+    charge(&mut gas, TICKET_TABLE_BASE_COST)?;
 
     let interface = match Table::TableCalls::abi_decode(calldata) {
         Ok(data) => data,
