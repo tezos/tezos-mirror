@@ -241,8 +241,8 @@ type is used here to represent block validity: the function returns
 the block’s fitness and the updated protocol state, obtained after
 applying (the operations contained in) the block.
 
-The `signature
-PROTOCOL <http://tezos.gitlab.io/api/odoc/_html/tezos-protocol-environment-sigs/Tezos_protocol_environment_sigs/V0/module-type-T/Updater/index.html>`__
+The signature ``PROTOCOL``
+(see :src:`src/lib_protocol_environment/sigs/v17/updater.mli`)
 in module ``Updater`` captures these general ideas (explained in more
 detail in the `Tezos white
 paper <https://tezos.com/whitepaper.pdf>`__),
@@ -252,7 +252,7 @@ will cover it more fully in second tutorial.
 
 *Concretely*, a context (represented by the type ``Context.t``) is a
 disk-based immutable key-value store, namely, a map from ``string list``
-to ``MBytes.t``. Such a loosely structured datatype should accommodate
+to ``bytes``. Such a loosely structured datatype should accommodate
 most protocols. A fitness (represented by the type ``Fitness.t``) is a
 list of byte arrays. A total order on blocks is obtained by comparing
 their fitness first by length and then lexicographically.
@@ -261,7 +261,7 @@ A Tezos *block* is composed of a *block header* (of type
 ``Block_header.t``) and a list of operations. A block header has two
 parts, a protocol-independent :ref:`shell header <shell_header>`
 and a protocol-specific header, which is a byte array (with type
-``MBytes.t``). Similarly, *operations* (of type ``Operation.t``) have a
+``bytes``). Similarly, *operations* (of type ``Operation.t``) have a
 protocol-independent shell header, and a protocol-specific header. For
 instance, ``Block_header.t`` is defined as follows.
 
@@ -269,7 +269,7 @@ instance, ``Block_header.t`` is defined as follows.
 
      type t = {
        shell: shell_header ;
-       protocol_data: MBytes.t ;
+       protocol_data: bytes ;
      }
 
 As part of implementing the ``PROTOCOL`` signature, the protocol must in
@@ -389,7 +389,7 @@ header. Therefore we define in ``main.ml``:
      type block_header_data = string
 
      let block_header_data_encoding =
-       Data_encoding.(obj1 (req "block_header_data" string))
+       Data_encoding.(obj1 (req "block_header_data" (string Plain)))
 
 For the encoding of the (protocol-specific) block header we rely on the
 ``data_encoding`` library, see :doc:`data_encoding`.
@@ -554,7 +554,7 @@ encoding in the protocol with
 .. code:: ocaml
 
    let block_header_data_encoding =
-     Data_encoding.(obj1 (req "block_header_data" string))
+     Data_encoding.(obj1 (req "block_header_data" (string Plain)))
 
 We can compute the binary encoding on the client side, for instance
 using the ``Data_encoding`` library, or by writing the encoder in a

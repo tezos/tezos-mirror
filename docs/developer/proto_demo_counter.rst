@@ -318,14 +318,19 @@ As an example, consider the (slightly simplified) function
 
 ::
 
-   val block:
-     #RPC_context.simple -> MBytes.t -> Operation.t list list
-     -> Block_hash.t tzresult Lwt.t
+   val block :
+     #simple ->
+     ?async:bool ->
+     ?force:bool ->
+     ?chain:Chain_services.chain ->
+     Bytes.t ->
+     Operation.t list list ->
+     Block_hash.t tzresult Lwt.t
 
-- ``RPC_context.simple`` is the *RPC context*, which identifies the
+- ``#simple`` is the *RPC context*, which identifies the
   server, deals with the networking aspects of the call, and serializes
   the transmitted values.
-- ``Mbytes.t`` contains the encoded block header.
+- ``Bytes.t`` contains the encoded block header.
 - ``Operation.t`` is the generic shell operation type.
 - ``Block_hash.t`` is the hash of the injected block.
 
