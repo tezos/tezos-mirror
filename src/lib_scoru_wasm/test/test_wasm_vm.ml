@@ -31,6 +31,11 @@
 *)
 
 open Tezos_scoru_wasm
+
+module Wasm_vm = Wasm_vm.Make_vm (struct
+  let config = Wasm_pvm_config.empty
+end)
+
 open Wasm_utils
 open Tztest_helper
 

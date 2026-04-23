@@ -38,3 +38,19 @@ module Make_pvm_machine (State : Wasm_pvm_sig.STATE_PROOF) :
 
 module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
     module type of Make_pvm_machine
+
+(** Parameterised PVM machine that closes over a
+    {!Wasm_pvm_config.t}. The config is the internal typed mirror of
+    the env-sig; build one via {!Wasm_pvm_config.of_signals} at the
+    env boundary.
+
+    {!Make_pvm_machine} is the specialisation with the empty config. *)
+module Make_pvm_machine_with_config
+    (Config : sig
+      val config : Wasm_pvm_config.t
+    end)
+    (State : Wasm_pvm_sig.STATE_PROOF) :
+  Wasm_pvm_sig.S
+    with type context = State.context
+     and type proof = State.proof
+     and type state = State.state

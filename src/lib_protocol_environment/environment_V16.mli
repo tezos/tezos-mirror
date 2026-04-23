@@ -134,11 +134,11 @@ module type T = sig
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
        and type Wasm_2_0_0.wasm_pvm_machine_context =
-        Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.context
+        Tezos_smart_rollup_wasm_in_memory.State_in_memory.context
        and type Wasm_2_0_0.wasm_pvm_machine_state =
-        Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.state
+        Tezos_smart_rollup_wasm_in_memory.State_in_memory.state
        and type Wasm_2_0_0.wasm_pvm_machine_proof =
-        Tezos_smart_rollup_wasm_in_memory.Wasm_pvm_in_memory.proof
+        Tezos_smart_rollup_wasm_in_memory.State_in_memory.proof
        and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t

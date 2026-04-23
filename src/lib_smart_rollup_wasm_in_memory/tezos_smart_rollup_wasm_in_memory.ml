@@ -104,9 +104,13 @@ module State_in_memory = struct
     Lwt.map Result.to_option (Context.verify_tree_proof p f)
 end
 
-module Wasm_pvm_in_memory :
-  Tezos_scoru_wasm.Wasm_pvm_sig.S
+let wasm_pvm_machine ~config =
+  let module Config = struct
+    let config = config
+  end in
+  (module Tezos_scoru_wasm.Wasm_pvm.Make_pvm_machine_with_config
+            (Config)
+            (State_in_memory) : Tezos_scoru_wasm.Wasm_pvm_sig.S
     with type context = State_in_memory.context
      and type state = State_in_memory.state
-     and type proof = State_in_memory.proof =
-  Tezos_scoru_wasm.Wasm_pvm.Make_pvm_machine (State_in_memory)
+     and type proof = State_in_memory.proof)

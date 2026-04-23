@@ -27,6 +27,10 @@
 open Tezos_scoru_wasm
 module Wasmer = Tezos_wasmer
 
+module Wasm_vm = Wasm_vm.Make_vm (struct
+  let config = Wasm_pvm_config.empty
+end)
+
 include (Wasm_vm : Wasm_vm_sig.S)
 
 let compiler_env_variable = "OCTEZ_WASMER_COMPILER"
