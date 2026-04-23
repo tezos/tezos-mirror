@@ -66,8 +66,9 @@ run_step "lint-tests-pkg" make lint-tests-pkg || exit_code=1
 # we temporarily deactivate the odoc checks.
 ## Ensure there are no mli docstring syntax errors in alpha protocol
 #- ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
-# check that the hack-module patch applies cleanly
-run_step "apply hack-module patch" git apply devtools/protocol-print/add-hack-module.patch || exit_code=1
+# check that the hack-module patch applies cleanly (--check = dry-run,
+# does not modify the working tree)
+run_step "apply hack-module patch" git apply --check devtools/protocol-print/add-hack-module.patch || exit_code=1
 
 # Check that the protocol profiling patches can still be applied
 run_step "patch-profiler-proto (dry-run)" scripts/patch-profiler-proto.sh --dry-run || exit_code=1
