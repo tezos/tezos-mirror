@@ -280,7 +280,27 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
+    // Reject DELEGATECALL and CALLCODE gateway-wide. Under those
+    // opcodes the precompile code runs in the caller's context, which
+    // would silently re-wire the sender identity used for alias
+    // resolution, repurpose the caller's `msg.value` for value
+    // transfers, and more generally break the assumption that the
+    // gateway speaks on behalf of its direct caller. For the
+    // state-mutating entries (`transfer`, `callMichelson`, `call`)
+    // the confusion is around identity and value; for the read-only
+    // `callMichelsonView` it's the same plus it sidesteps the
+    // STATICCALL guarantees of the typed entry. In all four cases
+    // there is no legitimate reason to reach the gateway through a
+    // delegated frame — callers should use `CALL` or `STATICCALL`.
+    //
+    // The pattern `target_address != bytecode_address` selects
+    // DELEGATECALL/CALLCODE exclusively: under `CALL` and
+    // `STATICCALL` both point at the precompile address.
+    if inputs.target_address != inputs.bytecode_address {
+        return Err(CustomPrecompileError::Revert(
+            "runtime gateway: DELEGATECALL and CALLCODE are not allowed".into(),
+        ));
+    }
 
     let mut gas = Gas::new(inputs.gas_limit);
 
