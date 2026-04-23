@@ -1394,6 +1394,36 @@ let evm_caller_storer_init_code = "600580600b6000396000f33360005500"
     = 60 00 60 00 FD (5 bytes) *)
 let evm_reverter_init_code = "600580600b6000396000f360006000fd"
 
+(** Init code for a minimal EVM contract that forwards its incoming
+    calldata to the runtime gateway precompile via STATICCALL, then
+    either RETURNs the returndata on success or REVERTs with the
+    returndata on failure.
+
+    This is the idiomatic Solidity pattern for calling a read-only
+    entry (a `view` modifier under the hood emits STATICCALL). Using
+    it against `callMichelsonView` verifies the precompile entry does
+    not perform any state mutation (log emission, alias-cache write,
+    value burn) that REVM would reject in a static context.
+
+    Runtime bytecode (61 bytes):
+    - CALLDATACOPY memory[0..calldatasize] ← calldata
+    - STATICCALL(gas, 0xff..0007, 0, calldatasize, 0, 0)
+    - ISZERO + JUMPI → jump to the revert path on failure
+    - On success: RETURNDATACOPY then RETURN returndata
+    - On failure: RETURNDATACOPY then REVERT with returndata *)
+let evm_gateway_staticcall_forwarder_init_code =
+  "603d80600b6000396000f33660006000376000600036600073ff000000000000000000000000000000000000075afa156032573d600060003e3d6000f35b3d600060003e3d6000fd"
+
+(** Same shape as [evm_gateway_staticcall_forwarder_init_code], but
+    uses DELEGATECALL (opcode 0xf4) instead of STATICCALL (0xfa) to
+    reach the precompile. Used to verify that the gateway rejects
+    delegated frames — all four entries revert with the
+    "DELEGATECALL and CALLCODE are not allowed" message, surfacing
+    here as a failing receipt because the forwarder REVERTs on
+    non-success. *)
+let evm_gateway_delegatecall_forwarder_init_code =
+  "603d80600b6000396000f33660006000376000600036600073ff000000000000000000000000000000000000075af4156032573d600060003e3d6000f35b3d600060003e3d6000fd"
+
 (** ABI encoding of uint256(42). *)
 let abi_encoded_uint256_42 =
   "000000000000000000000000000000000000000000000000000000000000002a"
@@ -1955,6 +1985,412 @@ let test_cross_runtime_call_from_evm_to_michelson =
       ()
   in
   let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  unit
+
+(** Test cross-runtime view call from EVM to Michelson.
+
+    1. Originate [view_toplevel_lib.tz] (which defines a toplevel view
+       [add : nat -> nat] computing [input + storage]) with storage = 5.
+    2. Call [callMichelsonView(string,string,bytes)] on the EVM gateway
+       precompile via [eth_call] (simulation, so we can capture the
+       return value) with destination = KT1, viewName = "add", input =
+       Micheline-encoded nat 7.
+    3. Verify the return bytes decode as Micheline nat 12 (= 5 + 7).
+    4. Submit the same call as a real transaction and verify the
+       receipt is successful.
+    5. Deploy the STATICCALL forwarder contract and call it with the
+       same calldata; verify the precompile is STATICCALL-compatible
+       (no log emission, no alias-cache write) by checking the outer
+       tx succeeds and the forwarder returns the expected Micheline
+       bytes. *)
+let test_cross_runtime_view_call_from_evm_to_michelson =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime view call from EVM to Michelson"
+    ~tags:["cross_runtime"; "view"; "michelson"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate view_toplevel_lib.tz with storage = nat 5. The
+     "add" view body is `UNPAIR ; ADD` — with the initial stack
+     `pair(input, storage)` this computes `input + storage`. *)
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      protocol
+  in
+  (* Step 2: Micheline binary encoding of nat 7 is `0x00 07` — int tag
+     then zarith 7 (fits in the 6 data bits of the first byte, no
+     continuation, sign 0). The view returns `input + storage = 12`,
+     which encodes as 2 bytes of Micheline (`0x00 0c`). We decode the
+     ABI `(bytes,)` return, extract the Micheline body, and verify it
+     decodes to the Michelson value `12 : int` via the protocol's
+     Micheline JSON representation. *)
+  let micheline_nat_7 = "0x0007" in
+  let expected_nat_12_json = `O [("int", `String "12")] in
+  (* Decode the precompile's `(bytes,)` ABI return.
+     Layout: [0..64]   = offset (0x20) padded to 32 bytes
+             [64..128] = length padded to 32 bytes
+             [128..]   = body right-padded to 32 bytes *)
+  let assert_view_returns_nat_12 raw_return =
+    let hex = String.sub raw_return 2 (String.length raw_return - 2) in
+    (* Expect the Micheline payload to be exactly 2 bytes. The ABI
+       length word is a 256-bit big-endian integer; for a 2-byte
+       payload the hex form is 62 zero nibbles followed by `02`. *)
+    let length_word = String.sub hex 64 64 in
+    Check.(
+      (length_word
+     = "0000000000000000000000000000000000000000000000000000000000000002")
+        string
+        ~error_msg:"Expected ABI length word for a 2-byte payload: %R, got %L") ;
+    let body_hex = String.sub hex 128 4 in
+    let decoded = decode_micheline_storage body_hex in
+    let expected =
+      JSON.annotate ~origin:"assert_view_returns_nat_12" expected_nat_12_json
+      |> Option.some
+    in
+    Check.(
+      (decoded = expected)
+        (option json)
+        ~error_msg:"Expected view to return Michelson value %R but got %L")
+  in
+  (* Build the eth_call calldata and simulate the view call. The
+     default `eth_call` gas (30M) would convert to 3B Tezos milligas,
+     above the hard per-operation limit on the Michelson side; pass
+     an explicit 1M gas instead (-> 100M Tezos milligas, safely under
+     the ~1.04B protocol limit) which is ample for the view. *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* calldata =
+    Cast.calldata
+      ~args:[kt1_address; "add"; micheline_nat_7]
+      "callMichelsonView(string,string,bytes)"
+  in
+  let eth_call_with_gas ~to_ ~data =
+    let* response =
+      Evm_node.(
+        call_evm_rpc
+          sequencer
+          {
+            method_ = "eth_call";
+            parameters =
+              `A
+                [
+                  `O
+                    [
+                      ("to", `String to_);
+                      ("data", `String data);
+                      ("gas", `String "0xf4240");
+                    ];
+                  `String "latest";
+                ];
+          })
+    in
+    return (response |> Evm_node.extract_result |> JSON.as_string)
+  in
+  let* call_return =
+    eth_call_with_gas ~to_:evm_gateway_address ~data:calldata
+  in
+  assert_view_returns_nat_12 call_return ;
+  (* Step 3: Submit the same call as a real transaction, assert
+     success (the precompile completes without reverting). *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[kt1_address; "add"; micheline_nat_7]
+      ()
+  in
+  (* Step 4: Deploy the STATICCALL forwarder contract and call it
+     with the same `callMichelsonView(...)` calldata. The forwarder's
+     runtime uses the `STATICCALL` opcode to invoke the precompile,
+     so this end-to-end asserts:
+     - no log emission (REVM would revert on `LOG*` in a static context),
+     - no alias-cache write on cache miss (REVM would revert on SSTORE),
+     - no value burn.
+     If any of those fail, the forwarder reverts and the outer tx's
+     receipt status is `false`. *)
+  let* forwarder_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:1
+      ~init_code:evm_gateway_staticcall_forwarder_init_code
+      ()
+  in
+  let* forwarder_return =
+    eth_call_with_gas ~to_:forwarder_address ~data:calldata
+  in
+  assert_view_returns_nat_12 forwarder_return ;
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:2
+      ~value:Wei.zero
+      ~address:forwarder_address
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[kt1_address; "add"; micheline_nat_7]
+      ()
+  in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  unit
+
+(** Same cross-runtime view semantics as
+    [test_cross_runtime_view_call_from_evm_to_michelson], but exercised
+    through the *low-level* [call(string,(string,string)[],bytes,uint8)]
+    entry of the gateway precompile (with the [method] argument set to
+    [0] = GET) instead of the typed [callMichelsonView] entry.
+
+    The low-level [call] entry is the generic cross-runtime HTTP bridge
+    used by contracts that don't want the typed wrappers. Asserting that
+    it drives a view call correctly exercises the same code path as
+    [callMichelsonView] but through a different ABI, and proves the GET
+    branch of [call] is STATICCALL-compatible end-to-end (no log, no
+    alias-cache write, no value burn). *)
+let test_cross_runtime_view_call_via_low_level_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime view call via low-level call entry (method=GET)"
+    ~tags:["cross_runtime"; "view"; "michelson"; "low_level_call"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      protocol
+  in
+  let url = sf "http://tezos/%s/add" kt1_address in
+  let micheline_nat_7 = "0x0007" in
+  let expected_nat_12_json = `O [("int", `String "12")] in
+  let assert_view_returns_nat_12 raw_return =
+    let hex = String.sub raw_return 2 (String.length raw_return - 2) in
+    let length_word = String.sub hex 64 64 in
+    Check.(
+      (length_word
+     = "0000000000000000000000000000000000000000000000000000000000000002")
+        string
+        ~error_msg:"Expected ABI length word for a 2-byte payload: %R, got %L") ;
+    let body_hex = String.sub hex 128 4 in
+    let decoded = decode_micheline_storage body_hex in
+    let expected =
+      JSON.annotate
+        ~origin:"assert_view_returns_nat_12_low_level"
+        expected_nat_12_json
+      |> Option.some
+    in
+    Check.(
+      (decoded = expected)
+        (option json)
+        ~error_msg:"Expected view to return Michelson value %R but got %L")
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* method = 0 → GET → read-only view dispatch on the Michelson runtime. *)
+  let* calldata =
+    Cast.calldata
+      ~args:[url; "[]"; micheline_nat_7; "0"]
+      "call(string,(string,string)[],bytes,uint8)"
+  in
+  let eth_call_with_gas ~to_ ~data =
+    let* response =
+      Evm_node.(
+        call_evm_rpc
+          sequencer
+          {
+            method_ = "eth_call";
+            parameters =
+              `A
+                [
+                  `O
+                    [
+                      ("to", `String to_);
+                      ("data", `String data);
+                      ("gas", `String "0xf4240");
+                    ];
+                  `String "latest";
+                ];
+          })
+    in
+    return (response |> Evm_node.extract_result |> JSON.as_string)
+  in
+  let* call_return =
+    eth_call_with_gas ~to_:evm_gateway_address ~data:calldata
+  in
+  assert_view_returns_nat_12 call_return ;
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_nat_7; "0"]
+      ()
+  in
+  (* STATICCALL forwarder routes the same calldata through the STATICCALL
+     opcode. If the GET path of `call` had any residual state mutation
+     (log emission, alias-cache write, balance burn), REVM would revert
+     and the outer tx receipt would be `false`. *)
+  let* forwarder_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:1
+      ~init_code:evm_gateway_staticcall_forwarder_init_code
+      ()
+  in
+  let* forwarder_return =
+    eth_call_with_gas ~to_:forwarder_address ~data:calldata
+  in
+  assert_view_returns_nat_12 forwarder_return ;
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:2
+      ~value:Wei.zero
+      ~address:forwarder_address
+      ~abi_signature:"call(string,(string,string)[],bytes,uint8)"
+      ~arguments:[url; "[]"; micheline_nat_7; "0"]
+      ()
+  in
+  let* () = assert_evm_balance_zero ~address:evm_gateway_address sequencer in
+  unit
+
+(** Negative cases for the cross-runtime Michelson view call.
+
+    Each case submits a real transaction whose receipt is expected to
+    fail (revert, not block-abort):
+    - unknown view name on an otherwise valid contract,
+    - non-zero `msg.value` (the precompile must revert before issuing
+      the cross-runtime call — views cannot carry value),
+    - implicit-address (tz1) destination (views live only on KT1s; the
+      Michelson server's view URL parser rejects the URL shape),
+    - DELEGATECALL to the gateway (rejected gateway-wide, all four
+      precompile entries refuse delegated frames). *)
+let test_cross_runtime_view_call_negative =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime view call — negative cases"
+    ~tags:["cross_runtime"; "view"; "michelson"; "negative"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "view_toplevel_lib"]
+      ~init_storage_data:"5"
+      protocol
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let micheline_nat_7 = "0x0007" in
+  (* Unknown view name → precompile reverts (catchable 400 on the
+     Michelson side, surfaced as a failing receipt). *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[kt1_address; "this_view_does_not_exist"; micheline_nat_7]
+      ~expected_status:false
+      ()
+  in
+  (* Non-zero `msg.value` must be rejected by the precompile before
+     it even builds the GET — views cannot carry value. *)
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:1
+      ~value:(Wei.of_tez (Tez.of_int 1))
+      ~address:evm_gateway_address
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[kt1_address; "add"; micheline_nat_7]
+      ~expected_status:false
+      ()
+  in
+  (* Implicit (tz1) destination: `parse_tezos_view_url` on the
+     Michelson side rejects the URL as an originated-only destination,
+     surfacing as a 400 → catchable revert in the precompile. *)
+  let tz1_destination = Constant.bootstrap1.public_key_hash in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:2
+      ~value:Wei.zero
+      ~address:evm_gateway_address
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[tz1_destination; "add"; micheline_nat_7]
+      ~expected_status:false
+      ()
+  in
+  (* DELEGATECALL to the gateway: rejected by the gateway-wide guard
+     (`target_address != bytecode_address`). Deploying a
+     delegatecall-forwarder that REVERTs on non-success and pointing
+     it at any typed entry — we use `callMichelsonView` here because
+     we already have its calldata ready — surfaces the rejection as a
+     failing receipt. *)
+  let* delegatecall_forwarder =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:3
+      ~init_code:evm_gateway_delegatecall_forwarder_init_code
+      ()
+  in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:4
+      ~value:Wei.zero
+      ~address:delegatecall_forwarder
+      ~abi_signature:"callMichelsonView(string,string,bytes)"
+      ~arguments:[kt1_address; "add"; micheline_nat_7]
+      ~expected_status:false
+      ()
+  in
   unit
 
 (** Test cross-runtime call from Michelson to EVM with calldata.
@@ -4282,6 +4718,9 @@ let () =
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_cross_runtime_call_failwith [Alpha] ;
   test_cross_runtime_call_from_evm_to_michelson [Alpha] ;
+  test_cross_runtime_view_call_from_evm_to_michelson [Alpha] ;
+  test_cross_runtime_view_call_via_low_level_call [Alpha] ;
+  test_cross_runtime_view_call_negative [Alpha] ;
   test_cross_runtime_call_from_michelson_to_evm [Alpha] ;
   test_michelson_gateway_evm_revert [Alpha] ;
   test_cross_runtime_fa12_approve_from_evm [Alpha] ;
