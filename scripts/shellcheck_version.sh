@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# Check that shellcheck's version is the expected one. Returns 0
-# in case of success, 1 otherwise.
+# Check that shellcheck's version is the expected one.
+# In CI, a version mismatch is a hard error (exit 1).
+# Locally, it is a warning to allow developers to run checks
+# with a different shellcheck version at their own risk.
 
 declare -r github="https://github.com/koalaman/shellcheck"
 declare -r expected_version="0.10.0" # This version is the one used
@@ -18,7 +20,12 @@ command -v shellcheck &> /dev/null || {
 actual_version=$(shellcheck --version | grep version: | awk '{print $2}')
 
 if [[ "$actual_version" != "$expected_version" ]]; then
-  echo "shellcheck version must be $expected_version, but found version $actual_version."
-  echo "Please install shellcheck version $expected_version. See $github for instructions."
-  exit 1
+  if [[ -n "${CI:-}" ]]; then
+    echo "shellcheck version must be $expected_version, but found version $actual_version."
+    echo "Please install shellcheck version $expected_version. See $github for instructions."
+    exit 1
+  else
+    echo "WARNING: shellcheck version $actual_version differs from expected $expected_version."
+    echo "CI uses $expected_version — results may differ. Continuing anyway."
+  fi
 fi
