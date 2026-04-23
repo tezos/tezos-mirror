@@ -1129,6 +1129,90 @@ module TezCollectResultThenFail = struct
       protocol
 end
 
+(** Tezos contract that accepts unit and succeeds immediately without
+ *  emitting any internal operations.  Used to verify that a CRAC
+ *  which never calls [%collect_result] returns empty bytes to the EVM
+ *  caller (backward-compatibility / fire-and-forget test). *)
+module TezAlwaysSucceedsUnit = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance () =
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name:["mini_scenarios"; "always_succeeds_unit"]
+      ~init_storage_data:"Unit"
+      ?init_balance
+      protocol
+end
+
+(** Tezos contract that calls [%collect_result] twice in the same
+ *  frame.  The second call violates the once-per-frame invariant
+ *  and reverts the whole operation group.  Used to verify the
+ *  invariant end-to-end. *)
+module TezCollectResultTwice = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+    let script_name = ["mini_scenarios"; "gateway_collect_result_twice"] in
+    let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
+(** Tezos contract that deposits a payload via [%collect_result] on the
+ *  current CRAC frame, then calls an EVM contract via [%call_evm].
+ *  Used to verify that nested CRAC frames have independent result
+ *  slots: the outer caller receives the bytes deposited here while
+ *  the inner EVM call can independently receive different bytes from
+ *  its own nested frame. *)
+module TezCollectResultThenCallEvm = struct
+  open TezContract
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~evm_target_address
+      ~payload_hex () =
+    let script_name =
+      ["mini_scenarios"; "gateway_collect_result_then_call_evm"]
+    in
+    let init_storage_data =
+      sf
+        {|Pair "%s" (Pair "%s" 0x%s)|}
+        gateway_address
+        evm_target_address
+        payload_hex
+    in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Wraps the CRAC runner contract modules into a first-class module
  *  that manages the shared test state (nonces, counters, sequencer
  *  setup) so that tests only provide scenario-specific parameters.
@@ -1271,6 +1355,24 @@ module CracRunnerWrapper = struct
       val originate :
         ?init_balance:int ->
         failing:tez_runner ->
+        payload_hex:string ->
+        unit ->
+        tez_runner Lwt.t
+    end
+
+    module TezAlwaysSucceedsUnit : sig
+      val originate : ?init_balance:int -> unit -> tez_runner Lwt.t
+    end
+
+    module TezCollectResultTwice : sig
+      val originate :
+        ?init_balance:int -> payload_hex:string -> unit -> tez_runner Lwt.t
+    end
+
+    module TezCollectResultThenCallEvm : sig
+      val originate :
+        ?init_balance:int ->
+        evm_target:evm_runner ->
         payload_hex:string ->
         unit ->
         tez_runner Lwt.t
@@ -1750,6 +1852,64 @@ module CracRunnerWrapper = struct
               ~protocol
               ?init_balance
               ~failing_kt1
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezAlwaysSucceedsUnit = struct
+        let originate ?init_balance () =
+          let* runner_hex, runner =
+            TezAlwaysSucceedsUnit.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultTwice = struct
+        let originate ?init_balance ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultTwice.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultThenCallEvm = struct
+        let originate ?init_balance ~evm_target:(`Evm_runner evm_target_address)
+            ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultThenCallEvm.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~evm_target_address
               ~payload_hex
               ()
           in
@@ -8321,6 +8481,107 @@ let test_crac_collect_result_size_sweep_matches_model =
   in
   unit
 
+(** Backward-compatibility / fire-and-forget check: a CRAC that never
+    calls [%collect_result] must return empty bytes to the EVM caller.
+    The HTTP response body is empty → the precompile ABI-encodes it as
+    an empty [bytes] value → [result()] returns [""].
+
+    Use [runCatch()] + [check_caught ~expected:false] to disambiguate:
+    a silent precompile failure would also leave [result] empty, so
+    asserting [caught = false] proves the call actually succeeded. *)
+let test_crac_collect_result_fire_and_forget_empty_body =
+  register_crac_runner_test
+    ~title:"CRAC: no %collect_result call returns empty bytes to EVM caller"
+    ~tags:["collect_result"; "http_call"; "fire_and_forget"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC" in
+  Log.debug
+    ~prefix
+    "Originate Michelson contract that succeeds without calling \
+     %%collect_result" ;
+  let* tez_noop = TezAlwaysSucceedsUnit.originate () in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_noop in
+  Log.debug ~prefix "Run (catching): EVM → Michelson (no %%collect_result)" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call did not revert" ;
+  let* () = EvmCollectResult.check_caught ~expected:false evm_reader in
+  Log.debug ~prefix "Verify result is empty bytes" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
+(** Once-per-frame invariant: a second [%collect_result] call in the
+    same frame reverts the entire Michelson operation group.  The EVM
+    caller must see a revert and [result] must stay empty. *)
+let test_crac_collect_result_once_per_frame =
+  register_crac_runner_test
+    ~title:"CRAC: second %collect_result in same frame reverts Michelson"
+    ~tags:["collect_result"; "http_call"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let payload_hex = "cafebabe" in
+  let prefix = "CRAC" in
+  Log.debug
+    ~prefix
+    "Originate contract that calls %%collect_result twice (violates \
+     once-per-frame)" ;
+  let* tez_contract = TezCollectResultTwice.originate ~payload_hex () in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_contract in
+  Log.debug
+    ~prefix
+    "Run (catching): second %%collect_result should revert the CRAC" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
+  EvmCollectResult.check_result ~expected_hex:"" evm_reader
+
+(** Nested-frame independence: each CRAC frame has its own independent
+    [%collect_result] slot.  Outer Michelson deposits [outer_bytes];
+    the nested EVM sub-call triggers its own Michelson CRAC which
+    deposits [inner_bytes] into a separate frame.  After unwinding:
+      - the outer EVM caller receives [outer_bytes], not [inner_bytes]
+      - the inner EVM contract holds [inner_bytes] in its [result()] *)
+let test_crac_collect_result_nested_independent_slots =
+  register_crac_runner_test
+    ~title:"CRAC: nested frames have independent %collect_result slots"
+    ~tags:["collect_result"; "http_call"; "nested"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let outer_hex = "aabb" in
+  let inner_hex = "0102" in
+  let prefix = "CRAC" in
+  Log.debug ~prefix "Deploy inner Michelson contract (deposits inner_bytes)" ;
+  let* tez_inner = TezCollectResult.originate ~payload_hex:inner_hex () in
+  Log.debug
+    ~prefix
+    "Deploy inner EVM reader (calls Michelson inner via precompile)" ;
+  let* evm_inner = EvmCollectResult.deploy_and_init tez_inner in
+  Log.debug
+    ~prefix
+    "Deploy outer Michelson contract (deposits outer_bytes then calls \
+     EVM_inner)" ;
+  let* tez_outer =
+    TezCollectResultThenCallEvm.originate
+      ~evm_target:evm_inner
+      ~payload_hex:outer_hex
+      ()
+  in
+  Log.debug
+    ~prefix
+    "Deploy outer EVM reader (calls Michelson outer via precompile)" ;
+  let* evm_outer = EvmCollectResult.deploy_and_init tez_outer in
+  Log.debug
+    ~prefix
+    "Run outer: EVM_outer → M_outer → [collect_result(outer); \
+     call_evm(EVM_inner)] → EVM_inner → M_inner → collect_result(inner)" ;
+  let* _ = EvmCollectResult.call_run evm_outer in
+  Log.debug ~prefix "Verify outer EVM reader got outer_bytes (not inner)" ;
+  let* () = EvmCollectResult.check_result ~expected_hex:outer_hex evm_outer in
+  Log.debug ~prefix "Verify inner EVM reader got inner_bytes" ;
+  EvmCollectResult.check_result ~expected_hex:inner_hex evm_inner
+
 let () =
   test_crac_evm_to_tez [Alpha] ;
   test_crac_evm_multiple_independent_crossings [Alpha] ;
@@ -8414,4 +8675,7 @@ let () =
   test_crac_gas_oog_path_reporting [Alpha] ;
   test_crac_collect_result_surfaces_in_response_body [Alpha] ;
   test_crac_collect_result_revert_discards_bytes [Alpha] ;
-  test_crac_collect_result_size_sweep_matches_model [Alpha]
+  test_crac_collect_result_size_sweep_matches_model [Alpha] ;
+  test_crac_collect_result_fire_and_forget_empty_body [Alpha] ;
+  test_crac_collect_result_once_per_frame [Alpha] ;
+  test_crac_collect_result_nested_independent_slots [Alpha]
