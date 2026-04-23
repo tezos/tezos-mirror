@@ -473,14 +473,27 @@ fn handle_query_entrypoints_to<Host, R>(
 ///
 /// The micheline_type_bytes are treated as bytes, and encoded using data_encoding
 /// via MIR.
+///
+/// **Determinism warning.** The input is a [`HashMap`], whose iteration order
+/// depends on a per-process random seed. Iterating it directly into an RLP
+/// (or any other byte-level) encoder would produce output that varies across
+/// runs and — critically — across the native vs. WASM kernel executions,
+/// which would diverge the rollup PVM. Any new kernel code that serializes a
+/// `HashMap` to bytes must apply the same sort-before-encode discipline, or
+/// better, use [`BTreeMap`] from the start so the ordering invariant is
+/// enforced structurally.
 fn encode_entrypoints_result(
     entrypoints_opt: Option<HashMap<Entrypoint, Type>>,
 ) -> Vec<u8> {
     let parser = Parser::new();
     let mut stream = rlp::RlpStream::new();
     append_option_canonical(&mut stream, &entrypoints_opt, |s, entrypoints| {
-        s.begin_list(entrypoints.len());
-        for (name, ty) in entrypoints {
+        // Sort entries by name before encoding: see the "Determinism
+        // warning" on the enclosing function.
+        let mut sorted: Vec<(&Entrypoint, &Type)> = entrypoints.iter().collect();
+        sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
+        s.begin_list(sorted.len());
+        for (name, ty) in sorted {
             let name_bytes = name.to_string().into_bytes();
             // NB: into_micheline_optimized_legacy linearizes right-comb pairs,
             // producing multi-arg pairs (equivalent to L1 normalize_types=true).
