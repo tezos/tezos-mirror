@@ -682,11 +682,46 @@ If you want to have more detailed traces of the node, you should indicate a data
 
 Then the node trace appears in ``/tmp/tz-data/daily_logs/daily-20251124.log``.
 
+Mempool module
+==============
+
+Since environment V7 (protocol Lima, 2022), the ``PROTOCOL`` signature
+requires protocols to implement a ``Mempool`` module. This module
+provides the shell with a protocol-level API for managing the mempool —
+the set of pending operations that have been received but not yet
+included in a block. See :doc:`../shell/prevalidation` for more details
+on how the shell uses this module.
+
+For ``demo_counter``, the mempool state type ``t`` is simply
+``State.t`` — the current counter values. When an operation is added to
+the mempool via ``add_operation``, it is applied to this state using
+``Apply.apply`` to verify validity. This means the mempool can reject
+invalid operations (e.g. a transfer that would make a counter negative)
+before they reach block construction.
+
+Key functions:
+
+- ``Mempool.init`` initializes the mempool from the current context by
+  reading the state via ``State.get_state``.
+- ``Mempool.add_operation`` validates an operation against the current
+  mempool state and adds it if valid.
+- ``Mempool.add_valid_operation`` adds a previously validated operation
+  to the mempool (a synchronous variant).
+
+For ``demo_noops``, which has no operations, the ``Mempool`` module is a
+trivial implementation where all types are ``unit`` and all functions
+are no-ops or return errors.
+
+Note that ``remove_operation``, ``merge``, and ``operations`` are not
+used by the demo protocols and are stubbed out. A production protocol
+would need full implementations.
+
 Conclusion
 ==========
 
 We presented a simple protocol ``demo_counter`` which explores further
 the interface between the shell and the protocol, and uses more features
-available to the protocol developer such as RPC services. Besides, this
+available to the protocol developer such as RPC services, the mempool
+module, and the split validation/application model. Besides, this
 protocol comes with a library that extends ``octez-client`` with new
 commands to interact with the protocol.
