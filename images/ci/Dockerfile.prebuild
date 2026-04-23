@@ -48,6 +48,7 @@ RUN apk update \
     bash \
     build-base \
     ca-certificates \
+    clang-dev \
     cmake \
     coreutils \
     eudev-dev \
