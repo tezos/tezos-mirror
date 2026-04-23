@@ -300,58 +300,85 @@ Note the analogy between ``Block_header.t`` (the shell’s view of the
 block header) and ``block_header`` (the protocol’s view of the block
 header).
 
+.. note::
+
+   The original blog posts on which these tutorials are based described
+   a 5-function model (``begin_application``, ``begin_partial_application``,
+   ``begin_construction``, ``apply_operation``, ``finalize_block``).
+   Since environment V7 (protocol Lima, 2022), the ``PROTOCOL`` interface
+   has been refactored into a split validation/application model, as
+   described below. See ``docs/protocols/015_lima.rst`` for historical
+   context on this change.
+
 Several functions declared in the ``PROTOCOL`` signature realize
-together the ``apply`` functionality: ``begin_application``,
-``begin_partial_application``, ``begin_construction``,
-``apply_operation,`` and ``finalize_block``. A typical ``apply`` is
-represented by a call to ``begin_(application|construction)``, followed
-by a sequence of calls to ``apply_operation``, one for each operation in
-the block, and finally a call to ``finalize_block``. These functions use
-values with types ``validation_result`` and ``validation_state``.
-Defined by the ``PROTOCOL`` signature, the type ``validation_result``
-represents the result of a block application, and it is a record type
-that contains most notably a context and a fitness. ``validation_state``
-is a protocol-defined datatype used as intermediary state between
-applications of operations. To understand the usage of these two types,
-it may be useful to consider the following simplification of the types
-of the five functions mentioned:
+together the ``apply`` functionality. Block processing is parameterized
+by a ``mode`` type that indicates the circumstances:
 
 .. code:: ocaml
 
-   begin_application: Context.t -> block_header -> validation_state
-   begin_partial_application: Context.t -> block_header -> validation_state
-   begin_construction: Context.t -> ?protocol_data: block_header_data -> validation_state
-   apply_operation: validation_state -> operation -> validation_state
-   finalize_block: validation_state -> validation_result
+   type mode =
+     | Application of block_header
+     | Partial_validation of block_header
+     | Construction of {
+         predecessor_hash : Block_hash.t;
+         timestamp : Time.t;
+         block_header_data : block_header_data;
+       }
+     | Partial_construction of {
+         predecessor_hash : Block_hash.t;
+         timestamp : Time.t;
+       }
 
-We briefly describe the role of these five functions:
+Processing is split into two parallel pipelines — **validation**
+(lightweight, no context writes) and **application** (executes effects,
+updates the context). Here are simplified types:
 
-- ``begin_application`` is used when validating a block received from
-  the network.
+.. code:: ocaml
 
-- ``begin_partial_application`` is used when the shell receives a block
-  more than one level ahead of the current head (this happens, for
-  instance, when synchronizing a node). This function should run
-  quickly, as its main role is to reject invalid blocks from the chain
-  as early as possible.
+   (* Validation pipeline *)
+   begin_validation  : Context.t -> Chain_id.t -> mode ->
+     predecessor:Block_header.shell_header -> validation_state tzresult Lwt.t
+   validate_operation : validation_state -> Operation_hash.t ->
+     operation -> validation_state tzresult Lwt.t
+   finalize_validation : validation_state -> unit tzresult Lwt.t
 
-- ``begin_construction`` is used by the shell when instructed to build a
-  block and for validating operations as they are gossiped on the
-  network. This two cases are distinguished by the optional
-  ``protocol_data`` argument: when only validating operations the
-  argument is missing, as there is no block header. In both of these
-  cases, the operations are not (yet) part of a block which is why the
-  function does not expect a shell block header.
+   (* Application pipeline *)
+   begin_application : Context.t -> Chain_id.t -> mode ->
+     predecessor:Block_header.shell_header -> application_state tzresult Lwt.t
+   apply_operation   : application_state -> Operation_hash.t ->
+     operation -> (application_state * operation_receipt) tzresult Lwt.t
+   finalize_application : application_state ->
+     Block_header.shell_header option ->
+     (validation_result * block_header_metadata) tzresult Lwt.t
 
-- ``apply_operation`` is called after ``begin_application`` or
-  ``begin_construction``, and before ``finalize_block``, for each
-  operation in the block or in the mempool, respectively. Its role is to
-  validate the operation and to update the (intermediary) state
-  accordingly.
+The ``mode`` type replaces the old separate ``begin_*`` functions:
 
-- ``finalize_block`` represents the last step in a block validation
-  sequence. It produces the context that will be used as input for the
-  validation of the block’s successor candidates.
+- ``Application`` — Standard processing of a block received from the
+  network.
+- ``Partial_validation`` — Quick rejection of obviously invalid alternate
+  branches. Only validation (not application) makes sense in this mode.
+- ``Construction`` — Building a new block. The ``block_header_data`` is
+  a prototype (e.g. with a placeholder signature) since the final value
+  is not yet known.
+- ``Partial_construction`` — Minimal construction for validating
+  individual operations, used by the mempool and some RPCs.
+
+The motivation for the validation/application split is **pipelining**:
+the shell can validate a block cheaply (checking structural correctness,
+signatures, basic preconditions) without committing any context changes,
+advertise the valid block to peers, and only then proceed to the
+expensive application phase. See :doc:`../shell/validation` for more
+details on the shell’s two-step block validator.
+
+The ``PROTOCOL`` signature also defines two distinct state types:
+``validation_state`` (used by the validation pipeline) and
+``application_state`` (used by the application pipeline). For simple
+protocols like the demos, these can be the same type.
+
+The signature also requires protocols to implement a ``Mempool`` module
+that provides the shell with a protocol-level API for managing pending
+operations. We will cover this in the :doc:`second tutorial
+<proto_demo_counter>`.
 
 Another important function in the ``PROTOCOL`` interface is ``init``,
 which is called when the protocol is activated. It takes as parameters
@@ -399,9 +426,11 @@ As there are no operations, the type of an operation header is just
 ``block_header_metadata`` and ``operation_receipt``, we simply set
 these types to ``unit``.
 
-Next, we need to define a ``validation_state``. We define it as record
-datatype that contains a context and a fitness, because these need to be
-passed to the ``validation_result`` returned by ``finalize_block``.
+Next, we need to define a ``validation_state`` (and an
+``application_state``, which in this protocol is the same type).
+We define it as a record datatype that contains a context and a
+fitness, because these need to be passed to the ``validation_result``
+returned by ``finalize_application``.
 
 .. code:: ocaml
 
@@ -499,7 +528,7 @@ We will thus use the following RPCs to bake a block:
 
 We call the first RPC with the protocol hash, the protocol block header,
 and the (empty) list of operations. The RPC service calls
-``begin_construction`` and ``finalize_block`` of the ``demo_noops``
+``begin_validation`` and ``finalize_validation`` of the ``demo_noops``
 protocol and returns the built (but not injected) block in json format.
 Notice the json representation of the protocol block header data
 ``"block_header_data": "hello world"``) is the one we defined in our
@@ -565,8 +594,9 @@ For this example, ``"0000000b68656c6c6f20776f726c64"`` is the binary
 encoding of ``"hello world"``.
 
 Finally, the last RPC injects the block (mind replacing the field "data" with the value output by the previous command in field "block"). After the block is validated by
-the protocol (the RPC service calls ``begin_application`` and
-``finalize_block``), the RPC returns its hash.
+the protocol (the RPC service calls ``begin_validation``,
+``begin_application``, ``finalize_validation``, and
+``finalize_application``), the RPC returns its hash.
 
 ::
 
