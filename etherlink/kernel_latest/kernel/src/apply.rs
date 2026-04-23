@@ -314,44 +314,35 @@ pub fn extract_cross_runtime_effects(
     effects
 }
 
-/// Drain pending CRAC receipts from the journal, merging multiple
-/// CRACs from the same EVM transaction into a single manager operation.
+/// Drain CRAC receipts from the journal, merging all CRACs from the same
+/// EVM transaction into a single manager operation.
 ///
-/// Per RFC Example 5 (two successive gateway calls), multiple CRACs
-/// within one EVM transaction produce a single top-level Michelson
-/// operation with all internal transactions merged and one CRAC event.
+/// Per RFC principle 6 ("CRAC-ID per top-level transaction"), all CRAC
+/// sub-calls within one EVM transaction share one CRAC-ID and therefore
+/// produce a single top-level Michelson operation with all internal
+/// transactions merged and one CRAC event (RFC Example 5).
 ///
-/// The Michelson runtime stores one [`AppliedOperation`] per
-/// `execute_request` call.  This function merges them: the first
-/// operation keeps its top-level structure and all subsequent
-/// operations' internal transactions (excluding duplicate CRAC events)
-/// are appended to it.
+/// Both successful and failed receipts must be merged: failed receipts
+/// alone (e.g. several `try { CRAC(); } catch {}` blocks all reverting on
+/// the Michelson side) are otherwise emitted as separate top-level
+/// operations, violating principle 6.
+///
+/// Failed receipts come first because they survive even when their EVM
+/// frame reverts (they are NOT subject to revert), whereas successful
+/// receipts only survive if their EVM frame commits.  Within each
+/// category, receipts are in execution order.
 pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
-    let mut result = Vec::new();
+    let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
+    all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
 
-    // Failed receipts are not subject to revert and are always included.
-    result.append(&mut journal.michelson.failed_crac_receipts);
-
-    // Merge successful receipts (may be empty if EVM tx reverted).
-    let receipts = std::mem::take(&mut journal.michelson.pending_crac_receipts);
-    if receipts.len() == 1 {
-        result.extend(receipts);
-    } else if receipts.len() > 1 {
-        // Merge all receipts into the first one.  Receipts are pushed in
-        // execution order (first gateway call first), so using the first
-        // as the merge target preserves the order of internal operations
-        // in the final merged receipt (RFC Example 5).
-        let mut iter = receipts.into_iter();
-        let Some(mut merged) = iter.next() else {
-            return result;
-        };
-        for other in iter {
-            merge_crac_internals(&mut merged, other);
-        }
-        result.push(merged);
+    let mut iter = all.into_iter();
+    let Some(mut merged) = iter.next() else {
+        return Vec::new();
+    };
+    for other in iter {
+        merge_crac_internals(&mut merged, other);
     }
-
-    result
+    vec![merged]
 }
 
 /// Assign block-sequential nonces to all internal operations across
@@ -1827,6 +1818,51 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Multiple failed CRACs from the same EVM transaction must merge into
+    /// a single top-level Michelson operation, per RFC principle 6
+    /// ("CRAC-ID per top-level transaction"). Currently
+    /// `drain_pending_crac_receipts` only merges successful receipts and
+    /// passes failed receipts through as-is, producing N separate ops.
+    #[test]
+    fn test_drain_merges_multiple_failed_receipts() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal
+            .michelson
+            .failed_crac_receipts
+            .push(dummy_crac_receipt(vec![
+                make_crac_event(0),
+                make_transfer(1, 100),
+            ]));
+        journal
+            .michelson
+            .failed_crac_receipts
+            .push(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+        journal
+            .michelson
+            .failed_crac_receipts
+            .push(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+
+        assert_eq!(
+            result.len(),
+            1,
+            "RFC principle 6: failed receipts from same EVM tx must be merged \
+             into a single top-level Michelson operation"
+        );
+        assert_eq!(
+            extract_amounts(&result[0]),
+            vec![100, 200, 300],
+            "all transfers preserved in execution order"
+        );
+        assert_eq!(
+            extract_nonces(&result[0]),
+            vec![0, 1, 2, 3],
+            "single CRAC event at the front, then transfers"
+        );
     }
 
     /// Merging two CRAC receipts preserves block-global nonces.
