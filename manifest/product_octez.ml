@@ -3839,7 +3839,7 @@ let octez_riscv_durable_storage_in_memory_api =
           ];
         ]
 
-let _octez_riscv_nds_memory =
+let octez_riscv_nds_memory =
   public_lib
     "octez-riscv-nds.memory"
     ~path:"src/lib_riscv_nds/memory"
@@ -3868,7 +3868,7 @@ let lib_rollup_node_rust_deps =
        ~path:"src/rollup_node_rust_deps"
        ~synopsis:"Rust dependencies for the smart rollup node"
        ~foreign_archives:["octez_rollup_node_rust_deps"]
-       ~c_library_flags:["-lc++"]
+       ~with_cpp_stdlib:true
        ~dune:
          Dune.
            [
@@ -3928,7 +3928,7 @@ let octez_riscv_durable_storage_on_disk_api =
           ];
         ]
 
-let _octez_riscv_nds_disk =
+let octez_riscv_nds_disk =
   public_lib
     "octez-riscv-nds.disk"
     ~path:"src/lib_riscv_nds/disk"
@@ -3938,6 +3938,22 @@ let _octez_riscv_nds_disk =
         octez_base |> open_ ~m:"TzPervasives";
         octez_riscv_nds_common |> open_;
         octez_riscv_durable_storage_on_disk_api;
+      ]
+
+let _octez_riscv_nds_test =
+  tezt
+    ["test_nds_pbt"; "helpers"; "model"]
+    ~path:"src/lib_riscv_nds/test"
+    ~opam:"octez-riscv-nds"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_riscv_nds_common |> open_;
+        octez_riscv_nds_memory;
+        octez_riscv_nds_disk;
+        octez_test_helpers;
+        qcheck_tezt;
+        tezt_lib;
       ]
 
 let octez_riscv_kernels =

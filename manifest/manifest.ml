@@ -231,7 +231,7 @@ module Dune = struct
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
-      ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
+      ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags_sexp
       ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?wrapped ?enabled_if
       (names : string list) =
     [
@@ -337,7 +337,7 @@ module Dune = struct
               | dirs -> S "include_dirs" :: of_atom_list dirs);
               S "names" :: of_atom_list x.names;
             ] );
-          (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
+          (opt c_library_flags_sexp @@ fun x -> [S "c_library_flags"; x]);
           ctypes;
           (opt enabled_if @@ fun enabled_if -> [S "enabled_if"; enabled_if]);
         ];
@@ -1257,6 +1257,7 @@ module Target = struct
     extra_authors : string list;
     ctypes : Ctypes.t option;
     with_macos_security_framework : bool;
+    with_cpp_stdlib : bool;
     product : string;
     dep_files : string list;
     dep_globs : string list;
@@ -1528,6 +1529,7 @@ module Target = struct
     ?license:string ->
     ?extra_authors:string list ->
     ?with_macos_security_framework:bool ->
+    ?with_cpp_stdlib:bool ->
     path:string ->
     ?enabled_if:Dune.s_expr ->
     'a ->
@@ -1548,8 +1550,8 @@ module Target = struct
       ?synopsis ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
-      names =
+      ?(with_macos_security_framework = false) ?(with_cpp_stdlib = false)
+      ?(source = []) ~path ?enabled_if names =
     let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
@@ -1944,6 +1946,7 @@ module Target = struct
         extra_authors;
         ctypes;
         with_macos_security_framework;
+        with_cpp_stdlib;
         tests_deps;
         product;
         dep_files;
@@ -2510,6 +2513,7 @@ module Sub_lib = struct
        ?license
        ?extra_authors
        ?with_macos_security_framework
+       ?with_cpp_stdlib
        ~path
        ?enabled_if
        public_name ->
@@ -2600,6 +2604,7 @@ module Sub_lib = struct
       ?license
       ?extra_authors
       ?with_macos_security_framework
+      ?with_cpp_stdlib
       ?source
       ?enabled_if
 end
@@ -2771,12 +2776,34 @@ let generate_dune (internal : Target.internal) =
         [Dune.[S ":include"; S "%{workspace_root}/macos-link-flags.sexp"]]
       else []
     in
+    let cpp_stdlib_link_flags =
+      if internal.with_cpp_stdlib && not is_lib then
+        [Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]]
+      else []
+    in
     let linkall_flags = if linkall then [Dune.[S "-linkall"]] else [] in
     List.concat
-      [static_flags; macos_link_flags; linkall_flags; internal.link_flags]
+      [
+        static_flags;
+        macos_link_flags;
+        cpp_stdlib_link_flags;
+        linkall_flags;
+        internal.link_flags;
+      ]
     |> function
     | [] -> None
     | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
+  in
+  let c_library_flags_sexp =
+    if internal.with_cpp_stdlib && is_lib then
+      let include_flag =
+        Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]
+      in
+      Some
+        (match internal.c_library_flags with
+        | None -> Dune.[include_flag]
+        | Some flags -> Dune.[of_atom_list flags; include_flag])
+    else Option.map Dune.of_atom_list internal.c_library_flags
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))
@@ -2964,7 +2991,7 @@ let generate_dune (internal : Target.internal) =
       ?modes:internal.modes
       ?foreign_archives:internal.foreign_archives
       ?foreign_stubs:internal.foreign_stubs
-      ?c_library_flags:internal.c_library_flags
+      ?c_library_flags_sexp
       ?ctypes
       ~private_modules:internal.private_modules
       ?wrapped:internal.wrapped
