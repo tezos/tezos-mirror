@@ -1,22 +1,25 @@
 #!/bin/sh
 
-set -eu
-
 # Create the APT repository for debian packages and sign it using
 # the private key available as ENV variable for production repository
 # and using the file test_repo_private.key for test repositories.
 
 # uses :
 # - scripts/packaging/Release.conf for release metadata
-# - scripts/packaging/key.asc as the repository pub key
 
 # expected env vars
 # - ARCHITECTURES
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_KEY_ID
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PASSPHRASE
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PRIVATE_KEY
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PUBLIC_KEY
 # - GCP_LINUX_PACKAGES_BUCKET
+
+# Env vars set by scripts/ci/repository-keys.sh
+# - GPG_DUAL_SIGNING
+# - GPG_KEY_ID
+# - GPG_KEY_ID_BIS
+# - GPG_PASSPHRASE
+# - GPG_PASSPHRASE_BIS
+# - GPG_PUBLIC_KEY
+
+set -eu
 
 if [ $# -lt 2 ]; then
   cat << EOF
@@ -52,7 +55,7 @@ BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
 oldPWD=$PWD
 
-. scripts/ci/octez-packages-version.sh
+. ./scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
@@ -79,10 +82,54 @@ TestBranch | TestProtectedBranch)
   ;;
 esac
 
-# Retrieve GPG keys for repository
-. scripts/ci/repository-keys.sh
+# Retrieve and import GPG keys (keyring is ready after this)
+. ./scripts/ci/repository-keys.sh
 
-echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
+# Signs a release directory's Release file with GPG clearsign and detached
+# signature. If GPG_DUAL_SIGNING is true, appends a second detached signature.
+# Verifies both resulting signature files.
+# Usage: gpg_sign_release <release_dir>
+gpg_sign_release() {
+  release_dir="$1"
+
+  # InRelease: clearsigned (embedded signature + content), primary key only
+  echo "Signing release file: ${release_dir}/InRelease"
+  echo "Using key: $GPG_KEY_ID"
+  echo "Output: ${release_dir}/InRelease"
+  echo "$GPG_PASSPHRASE" |
+    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+      -u "$GPG_KEY_ID" --clearsign \
+      -o "${release_dir}/InRelease" \
+      "${release_dir}/Release"
+
+  # Release.gpg: detached signature; BIS key is concatenated if dual-signing.
+  # InRelease is not enough for dual signing as it contains only the result from
+  # the newest GPG key. Detached signatures can be concatenated.
+  echo "Signing release file: ${release_dir}/Release"
+  echo "Using key: $GPG_KEY_ID"
+  echo "Output: ${release_dir}/Release.gpg"
+  echo "$GPG_PASSPHRASE" |
+    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+      -u "$GPG_KEY_ID" --detach-sign \
+      -o "${release_dir}/Release.gpg" \
+      "${release_dir}/Release"
+
+  echo "GPG dual signing: $GPG_DUAL_SIGNING"
+  if [ "$GPG_DUAL_SIGNING" = "true" ]; then
+    echo "Signing release file: ${release_dir}/Release"
+    echo "Using key: $GPG_KEY_ID_BIS"
+    echo "Output: ${release_dir}/Release.gpg.bis"
+    echo "$GPG_PASSPHRASE_BIS" |
+      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+        -u "$GPG_KEY_ID_BIS" --detach-sign \
+        -o "${release_dir}/Release.gpg.bis" \
+        "${release_dir}/Release"
+
+    echo "Appending ${release_dir}/Release.gpg.bis to ${release_dir}/Release.gpg"
+    cat "${release_dir}/Release.gpg.bis" >> "${release_dir}/Release.gpg"
+    rm "${release_dir}/Release.gpg.bis"
+  fi
+}
 
 mkdir -p "$TARGETDIR/dists"
 
@@ -92,8 +139,8 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
     echo "Setting up APT repository for $DISTRIBUTION / $release / $architecture"
     echo "targetdir: $TARGETDIR"
 
-    # create the apt repository root directory and copy the public key
-    cp "$GPG_PUBLIC_KEY" "$TARGETDIR/octez.asc"
+    # Create the apt repository root directory and copy the public key
+    echo "$GPG_PUBLIC_KEY" > "$TARGETDIR/octez.asc"
 
     target="dists/${release}/main/binary-${architecture}"
 
@@ -130,15 +177,13 @@ for release in $RELEASES; do             # unstable, 22_04, 24_04 ...
     -c "$oldPWD/scripts/packaging/Release.conf" release \
     "$TARGETDIR/dists/${release}/" > "$TARGETDIR/dists/${release}/Release"
 
-  # sign the release file using GPG. Since gpg is run in a script we need to set
-  # some variables and extra options to make it work. The InRelease file contains
-  # both the gpg signature and the content of the Release file.
-  echo "Sign the release file: $TARGETDIR/dists/${release}/InRelease"
-  echo "$GPG_PASSPHRASE" |
-    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-      -u "$GPG_KEY_ID" --clearsign \
-      -o "$TARGETDIR/dists/${release}/InRelease" \
-      "$TARGETDIR/dists/${release}/Release"
+  gpg_sign_release "$TARGETDIR/dists/${release}"
+
+  # Verify GPG signatures against the exported public key
+  # Clearsigned files (e.g. InRelease) embed both data and signature, data is not needed for verification
+  ./scripts/ci/verify_gpg_signature.sh "$TARGETDIR/dists/${release}/InRelease" "" "$TARGETDIR/octez.asc" "InRelease signature"
+  # Detached signatures (e.g. Release.gpg) require both the sig file and the data file.
+  ./scripts/ci/verify_gpg_signature.sh "$TARGETDIR/dists/${release}/Release.gpg" "$TARGETDIR/dists/${release}/Release" "$TARGETDIR/octez.asc" "Release.gpg signature"
 
   # back to base
   cd "$oldPWD"
