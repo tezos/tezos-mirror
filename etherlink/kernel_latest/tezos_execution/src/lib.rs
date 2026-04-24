@@ -25,7 +25,7 @@ use std::vec::IntoIter;
 use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
-use tezos_ethereum::wei::gas_to_mutez;
+use tezos_ethereum::wei::michelson_gas_to_mutez;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_protocol::contract::Contract;
@@ -113,7 +113,7 @@ pub struct FeeRefundConfig {
 /// Compute the fee refund: surplus of declared fees beyond actual costs.
 ///
 /// fee_refund = total_operation_fees - da_fees - consumed_gas_fees
-/// where consumed_gas_fees = gas_to_mutez(base_fee, multiplier, consumed_gas)
+/// where consumed_gas_fees = michelson_gas_to_mutez(base_fee, multiplier, consumed_gas)
 /// and consumed_gas = ceil(total_consumed_milligas / 1000).
 fn compute_fee_refund(
     total_operation_fees: u64,
@@ -124,7 +124,7 @@ fn compute_fee_refund(
         ProcessedOperation::total_consumed_milligas(processed_operations);
     // Safe: consumed_milligas <= gas_limit * 1000, so ceil never exceeds gas_limit.
     let consumed_gas = consumed_milligas.div_ceil(1000);
-    let consumed_gas_fees = gas_to_mutez(
+    let consumed_gas_fees = michelson_gas_to_mutez(
         config.base_fee_per_gas,
         config.michelson_to_evm_gas_multiplier,
         consumed_gas,
@@ -7384,7 +7384,7 @@ mod tests {
             }
         }
 
-        /// Compute the expected refund: fee - da_fees - gas_to_mutez(consumed).
+        /// Compute the expected refund: fee - da_fees - michelson_gas_to_mutez(consumed).
         fn expected_refund(&self, fee: u64, da_fees: u64) -> u64 {
             let consumed_gas = self.total_consumed_milligas.div_ceil(1000);
             let consumed_gas_fees = (U256::from(TEST_BASE_FEE_PER_GAS)
@@ -7576,6 +7576,14 @@ mod tests {
 
         let expected_refund = ctx.expected_refund(fee, da_fees);
         assert!(expected_refund > 0, "Test expects a positive refund");
+
+        // IMPORTANT: Failed operations MUST consume gas, even though the transfer reverted.
+        // This validates that the refund calculation properly accounts for gas consumption.
+        assert!(
+            ctx.total_consumed_milligas > 0,
+            "Failed operation MUST consume gas; got {} milligas",
+            ctx.total_consumed_milligas
+        );
 
         assert_eq!(bus[2], bu_refund_credit(&ctx.src.pkh, expected_refund));
         assert_eq!(bus[3], bu_refund_debit(expected_refund));

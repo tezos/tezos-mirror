@@ -29,13 +29,21 @@ pub enum ErrorMutezFromWei {
 ///
 /// Units: base_fee_per_gas (wei/evm_gas) * multiplier (evm_gas/michelson_gas)
 ///        * gas (michelson_gas) = wei, then / 10^12 (wei/mutez) = mutez.
-pub fn gas_to_mutez(base_fee_per_gas: U256, multiplier: u64, gas: u64) -> u64 {
+pub fn michelson_gas_to_mutez(base_fee_per_gas: U256, multiplier: u64, gas: u64) -> u64 {
     let wei = base_fee_per_gas * U256::from(multiplier) * U256::from(gas);
     // NB: Convert back to mutez with a floor division.
     // (precision loss if gas_fee_wei < 1 mutez)
     (wei / U256::exp10(12)).low_u64()
 }
 
+/// Convert wei to mutez, strict: returns `NonNullRemainder` if
+/// `(wei mod 10^12) != 0`.
+///
+/// The reject is a safety net originating from the EVM->L1
+/// withdrawal precompile and deliberately diverges from ADR
+/// L2-1004 (round-down at runtime boundaries). Use
+/// [`tezosx_interfaces::headers::parse_tez_to_mutez`] for
+/// CRAC paths instead.
 pub fn mutez_from_wei(wei: Wei) -> Result<u64, ErrorMutezFromWei> {
     // Wei is 10^18, Mutez is 10^6
     let amount: U256 = wei / U256::exp10(12);
