@@ -462,34 +462,18 @@ let base_fee_per_gas state =
          have one."
 
 let michelson_to_evm_gas_multiplier state =
-  inspect_durable_and_decode_default
-    ~default:10L
-    state
-    Durable_storage_path.michelson_to_evm_gas_multiplier
-    Data_encoding.(Binary.of_bytes_exn Little_endian.int64)
+  let open Lwt_result_syntax in
+  let+ v_opt = read_opt Michelson_to_evm_gas_multiplier state in
+  Option.value v_opt ~default:10L
 
 let backlog state =
   let open Lwt_result_syntax in
-  let+ read_result =
-    inspect_durable_and_decode_opt state Durable_storage_path.backlog Fun.id
-  in
-  match read_result with
-  | Some backlog_bytes ->
-      Z.of_int64_unsigned
-        Data_encoding.(Binary.of_bytes_exn Little_endian.int64 backlog_bytes)
-  | None -> Z.zero
+  let+ read_result = read_opt Backlog state in
+  match read_result with Some i -> Z.of_int64_unsigned i | None -> Z.zero
 
-let minimum_base_fee_per_gas_opt state =
-  inspect_durable_and_decode_opt
-    state
-    Durable_storage_path.minimum_base_fee_per_gas
-    Helpers.decode_z_le
+let minimum_base_fee_per_gas_opt state = read_opt Minimum_base_fee_per_gas state
 
-let minimum_base_fee_per_gas state =
-  inspect_durable_and_decode
-    state
-    Durable_storage_path.minimum_base_fee_per_gas
-    Helpers.decode_z_le
+let minimum_base_fee_per_gas state = read Minimum_base_fee_per_gas state
 
 let storage_at state address (Qty pos) =
   let open Lwt_result_syntax in
@@ -515,25 +499,18 @@ let storage_at state address (Qty pos) =
   | None -> Ethereum_types.Hex (pad32left0 "0")
 
 let coinbase state =
-  inspect_durable_and_decode_default
+  let open Lwt_result_syntax in
+  let+ addr_opt = read_opt Sequencer_pool_address state in
+  Option.value
+    addr_opt
     ~default:
       (Address
          (Ethereum_types.hex_of_string
             "0x0000000000000000000000000000000000000000"))
-    state
-    Durable_storage_path.sequencer_pool_address
-    (fun bytes ->
-      Address (Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hex_of_string))
 
 let maximum_gas_per_transaction state =
-  inspect_durable_and_decode_default
-    ~default:(Qty (Z.of_string "30_000_000"))
-    state
-    Durable_storage_path.maximum_gas_per_transaction
-    decode_number_le
+  let open Lwt_result_syntax in
+  let+ v_opt = read_opt Maximum_gas_per_transaction state in
+  Option.value v_opt ~default:(Qty (Z.of_string "30_000_000"))
 
-let da_fee_per_byte state =
-  inspect_durable_and_decode
-    state
-    Durable_storage_path.da_fee_per_byte
-    decode_number_le
+let da_fee_per_byte state = read Da_fee_per_byte state

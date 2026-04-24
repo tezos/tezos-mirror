@@ -1365,23 +1365,18 @@ let dispatch_request (type f) ~websocket
                       number
                   in
                   let* state = Evm_ro_context.get_state ro_ctxt () in
-                  let* da_fee_per_byte_bytes =
-                    Evm_ro_context.read_state
-                      state
-                      Durable_storage_path.da_fee_per_byte
+                  let* da_fee_per_byte_opt =
+                    Durable_storage.read_opt Da_fee_per_byte state
                   in
-                  match (da_fee_per_byte_bytes, block.baseFeePerGas) with
-                  | Some da_fee_per_byte_bytes, Some (Qty base_fee_per_gas) ->
-                      let da_fee_per_byte =
-                        Helpers.decode_z_le da_fee_per_byte_bytes
-                      in
+                  match (da_fee_per_byte_opt, block.baseFeePerGas) with
+                  | Some da_fee_per_byte, Some (Qty base_fee_per_gas) ->
                       let authorization_list_len =
                         List.length
                           (Transaction_object.authorization_list object_)
                       in
                       let da_fees =
                         Fees.gas_used_for_da_fees
-                          ~da_fee_per_byte:(Qty da_fee_per_byte)
+                          ~da_fee_per_byte
                           ~base_fee_per_gas
                           ~authorization_list_len
                           tx_data

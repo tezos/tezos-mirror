@@ -233,10 +233,7 @@ let nth_block_hash state n =
 let da_fee_per_byte_mutez state =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty da_fee_per_byte_wei) =
-    Durable_storage.inspect_durable_and_decode
-      state
-      Durable_storage_path.da_fee_per_byte
-      Ethereum_types.decode_number_le
+    Durable_storage.read Da_fee_per_byte state
   in
   let*? da_fee_per_byte = Tezos_types.Tez.(of_wei (Wei da_fee_per_byte_wei)) in
   (* DA fee expressed in wei: converting to mutez. *)

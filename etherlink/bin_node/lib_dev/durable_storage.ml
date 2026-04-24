@@ -101,6 +101,12 @@ type ('a, 'cap) path =
   | Tezosx_tezos_current_block :
       (Ethereum_types.legacy_transaction_object L2_types.block, ro) path
   | Current_receipts : (Transaction_receipt.t, ro) path
+  | Backlog : (int64, ro) path
+  | Minimum_base_fee_per_gas : (Z.t, ro) path
+  | Da_fee_per_byte : (Ethereum_types.quantity, ro) path
+  | Maximum_gas_per_transaction : (Ethereum_types.quantity, ro) path
+  | Michelson_to_evm_gas_multiplier : (int64, ro) path
+  | Sequencer_pool_address : (Ethereum_types.address, ro) path
 
 (** Read-capable resolution variants. [Delete_only] is intentionally absent
     here — it lives directly in {!resolved}, so [path_and_decode] can
@@ -147,6 +153,18 @@ let infallible_decode decode bytes = Ok (decode bytes)
 let unit_flag_codec ~path : (unit, rw) read_resolved =
   Read_write {path; decode = (fun _bytes -> Ok ()); encode = (fun () -> "")}
 
+(** Little-endian [int64]-backed kernel-owned scalars stored via
+    [Data_encoding.Little_endian.int64]. Read-only — the EVM node never
+    writes these. *)
+let int64_le_ro_codec ~path : (int64, ro) read_resolved =
+  Read_only
+    {
+      path;
+      decode =
+        infallible_decode
+          Data_encoding.(Binary.of_bytes_exn Little_endian.int64);
+    }
+
 (** Little-endian [Z.t]-backed quantities stored via [Z.{to,of}_bits]. *)
 let qty_le_codec ~path : (Ethereum_types.quantity, rw) read_resolved =
   Read_write
@@ -156,6 +174,17 @@ let qty_le_codec ~path : (Ethereum_types.quantity, rw) read_resolved =
         infallible_decode (fun bytes ->
             Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
       encode = (fun (Ethereum_types.Qty z) -> Z.to_bits z);
+    }
+
+(** Read-only sibling of {!qty_le_codec} for kernel-owned quantity scalars
+    that the EVM node never writes. *)
+let qty_le_ro_codec ~path : (Ethereum_types.quantity, ro) read_resolved =
+  Read_only
+    {
+      path;
+      decode =
+        infallible_decode (fun bytes ->
+            Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits));
     }
 
 (** RLP-encoded values stored as bytes. *)
@@ -368,6 +397,31 @@ let resolve : type a cap. (a, cap) path -> (a, cap) resolution = function
                infallible_decode
                  (Transaction_receipt.decode_last_from_list
                     Ethereum_types.(Block_hash (Hex (String.make 64 '0'))));
+           })
+  | Backlog ->
+      static_read (int64_le_ro_codec ~path:Durable_storage_path.backlog)
+  | Minimum_base_fee_per_gas ->
+      static_read
+        (Read_only
+           {
+             path = Durable_storage_path.minimum_base_fee_per_gas;
+             decode = infallible_decode Helpers.decode_z_le;
+           })
+  | Da_fee_per_byte ->
+      static_read (qty_le_ro_codec ~path:Durable_storage_path.da_fee_per_byte)
+  | Maximum_gas_per_transaction ->
+      static_read
+        (qty_le_ro_codec ~path:Durable_storage_path.maximum_gas_per_transaction)
+  | Michelson_to_evm_gas_multiplier ->
+      static_read
+        (int64_le_ro_codec
+           ~path:Durable_storage_path.michelson_to_evm_gas_multiplier)
+  | Sequencer_pool_address ->
+      static_read
+        (Read_only
+           {
+             path = Durable_storage_path.sequencer_pool_address;
+             decode = infallible_decode Ethereum_types.decode_address;
            })
 
 let storage_version state =
