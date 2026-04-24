@@ -15,6 +15,17 @@ Its storage version is 54.
 
 ### Internal
 
+- Fix CRAC receipt merging when an EVM transaction interleaves failed and
+  successful CRACs. Receipts pushed to the Michelson journal are now tagged
+  with a monotonic sequence number shared across the pending and failed
+  lists, and `drain_pending_crac_receipts` sorts the concatenated receipts
+  by that sequence so internal operations are emitted in execution order
+  rather than bucketed by outcome. The merged top-level `ContentResult`
+  is reconciled against the internals: if at least one successful CRAC
+  contributed to the merge it is forced to `Applied` (so that `Applied`
+  internals never sit under a `Failed` parent, an L1-invalid combination);
+  if all internals are `Failed`/`Skipped`/`Backtracked` the top-level is
+  marked as `Failed`. (!21719)
 - Add support for `DalAttestedSlots` internal inbox message introduced in
   protocol U. The kernel now processes DAL slot attestations directly from the
   Layer 1 protocol, and does not need to rely on external import signals.  Only
