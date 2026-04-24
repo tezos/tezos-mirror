@@ -44,7 +44,8 @@ Run commands:
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees] [--kernel-verbosity <info>]
       [--network <network>] [--init-from-snapshot [snapshot url or file path]]
-      [--fund <0x...|tz...>] [--replicate [url]] [-r --with-runtime <RUNTIME>]
+      [--fund <0x...|tz...>] [--replicate [url]]
+      [-r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like mode that
     produces blocks with a fake key and no rollup node connection.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
@@ -131,8 +132,9 @@ Run commands:
     --replicate [url]: Replicate a chain in real time from the EVM node whose address is
       provided.
       Defaults to `the official relay endpoint if --network is used`.
-    -r --with-runtime <RUNTIME>: Enable a Tezos X experimental runtime alongside the default
-      Ethereum runtime of Etherlink
+    -r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>: Enable a Tezos X experimental runtime
+      alongside the default Ethereum runtime of Etherlink. An optional target sunrise level
+      can be provided with the syntax RUNTIME:TARGET_SUNRISE_LEVEL.
   
   run tezlink sandbox [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <unlimited|N>] [--cors-origins <ALLOWED_ORIGINS>]
@@ -845,7 +847,7 @@ Kernel commands:
       [--disable-legacy-dal-signals] [--enable-multichain] [--l2-chain-id <1>]
       [--max-delayed-inbox-blueprint-length <1000>] [--enable-fast-withdrawal]
       [--enable-fast-fa-withdrawal] [--evm-version <cancun|shanghai|prague|osaka>]
-      [--set-code <0x...,0x....>] [-r --with-runtime <RUNTIME>]
+      [--set-code <0x...,0x....>] [-r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>]
       [--tez-bootstrap-balance <3800000>] [--tez-bootstrap-account <edp...>]
       [--tez-bootstrap-contract <KT1...,0x...,0x....>]
       [--michelson-runtime-chain-id <NetXH12DFfBVHi4>]
@@ -904,8 +906,9 @@ Kernel commands:
     --evm-version <cancun|shanghai|prague|osaka>: Value for evm_version in the installer
       config.
     --set-code <0x...,0x....>: Add code to an account in the installer config.
-    -r --with-runtime <RUNTIME>: Enable a Tezos X experimental runtime alongside the default
-      Ethereum runtime of Etherlink
+    -r --with-runtime <RUNTIME[:TARGET_SUNRISE_LEVEL]>: Enable a Tezos X experimental runtime
+      alongside the default Ethereum runtime of Etherlink. An optional target sunrise level
+      can be provided with the syntax RUNTIME:TARGET_SUNRISE_LEVEL.
     --tez-bootstrap-balance <3800000>: Balance (in tez) of the tezlink bootstrap
       accounts
       Defaults to `3800000`.

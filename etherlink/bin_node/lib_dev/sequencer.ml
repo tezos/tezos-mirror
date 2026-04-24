@@ -18,7 +18,7 @@ type sandbox_config = {
   parent_chain : Uri.t option;
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;
-  with_runtimes : Tezosx.runtime list;
+  with_runtimes : (Tezosx.runtime * int option) list;
   tezlink : tezlink_sandbox option;
 }
 
@@ -300,11 +300,20 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         in
         let* () =
           List.iter_es
-            (fun runtime ->
-              Evm_context.patch_state
-                ~key:(Tezosx.feature_flag runtime)
-                ~value:""
-                ())
+            (fun (runtime, target_sunrise_level) ->
+              let* () =
+                Evm_context.patch_state
+                  ~key:(Tezosx.feature_flag runtime)
+                  ~value:""
+                  ()
+              in
+              match target_sunrise_level with
+              | None -> return_unit
+              | Some level ->
+                  Evm_context.patch_state
+                    ~key:(Tezosx.target_sunrise_level_path runtime)
+                    ~value:(Tezosx.encode_target_sunrise_level level)
+                    ())
             with_runtimes
         in
         let* () =

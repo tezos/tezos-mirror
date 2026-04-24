@@ -79,6 +79,8 @@ val maximum_gas_per_transaction : path
 
 val michelson_runtime_sunrise_level : path
 
+val michelson_runtime_target_sunrise_level : path
+
 val maximum_allowed_ticks : storage_version:int -> path
 
 (** Kernel communication canal for individual transaction execution (instant confirmations) *)

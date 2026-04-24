@@ -49,7 +49,7 @@ val make :
   ?set_account_code:(string * string) list ->
   ?max_delayed_inbox_blueprint_length:string * string ->
   ?evm_version:evm_version ->
-  ?with_runtimes:Tezosx.runtime list ->
+  ?with_runtimes:(Tezosx.runtime * int option) list ->
   ?tez_bootstrap_accounts:Signature.V2.public_key list ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   ?tez_bootstrap_contracts:(Tezos_types.Contract.t * string * string) list ->

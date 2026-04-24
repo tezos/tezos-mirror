@@ -469,9 +469,9 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
     make_instr ?convert ~path_prefix arg
   in
   let with_runtimes =
-    List.map
-      (fun runtime ->
-        let path =
+    List.concat_map
+      (fun (runtime, target_sunrise_level) ->
+        let flag_path =
           let prefix =
             if feature_flags_in_base then feature_flag_prefix_base
             else feature_flag_prefix_evm
@@ -480,7 +480,16 @@ let make ?(kernel_compat = Constants.Latest) ~eth_bootstrap_balance
           | Tezosx.Tezos ->
               String.concat "/" (("" :: prefix) @ ["enable_tezos_runtime"])
         in
-        Installer_config.make ~key:path ~value:"")
+        Installer_config.make ~key:flag_path ~value:""
+        ::
+        (match target_sunrise_level with
+        | None -> []
+        | Some level ->
+            [
+              Installer_config.make
+                ~key:(Tezosx.target_sunrise_level_path runtime)
+                ~value:(Tezosx.encode_target_sunrise_level level);
+            ]))
       with_runtimes
   in
   let instrs =
