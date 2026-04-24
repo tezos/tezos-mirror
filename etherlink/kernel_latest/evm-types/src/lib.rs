@@ -11,7 +11,9 @@ mod fa_deposit_with_proxy;
 mod precompile_state_changes;
 mod sequencer_key_change;
 
-pub use custom_precompile_error::CustomPrecompileError;
+pub use custom_precompile_error::{
+    CustomPrecompileAbort, CustomPrecompileError, IntoWithRemainder,
+};
 pub use database::{
     DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
 };

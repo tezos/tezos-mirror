@@ -14,6 +14,7 @@ use revm::{
         Database,
     },
     inspector::JournalExt,
+    interpreter::Gas,
     primitives::{
         hardfork::SpecId, Address, AddressMap, AddressSet, HashSet, Log, StorageKey,
         StorageValue, B256, U256,
@@ -29,7 +30,8 @@ use crate::database::EtherlinkVMDB;
 use crate::tezosx::{get_alias, store_alias};
 use evm_types::{
     CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
-    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, SequencerKeyChange,
+    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, IntoWithRemainder,
+    SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
 use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
@@ -568,6 +570,7 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
         {
             return Err(CustomPrecompileError::Revert(
                 "Deposit removed in layered state".to_string(),
+                Gas::new(0),
             ));
         }
         self.database.deposit_in_queue(deposit_id)
@@ -619,6 +622,7 @@ pub trait CrossRuntimeCall {
     fn tezosx_resolve_source_alias_readonly(
         &self,
         source: Address,
+        remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError>;
 
     fn tezosx_call_http(
@@ -651,7 +655,10 @@ where
             timestamp: self.database.block.timestamp,
             block_number: self.database.block.number,
         };
-        match get_alias(self.database.host, &source, RuntimeId::Tezos)? {
+        let remaining = Gas::new(remaining_evm_gas);
+        match get_alias(self.database.host, &source, RuntimeId::Tezos)
+            .map_err(|e| e.into_with_remainder(remaining))?
+        {
             Some(alias) => Ok((alias, 0)),
             None => {
                 // Convert remaining EVM gas to Tezos milligas to cap
@@ -661,9 +668,12 @@ where
                     RuntimeId::Tezos,
                     remaining_evm_gas,
                 )
-                .ok_or(CustomPrecompileError::Revert(
-                    "alias generation: EVM gas overflows Tezos milligas".into(),
-                ))?;
+                .ok_or_else(|| {
+                    CustomPrecompileError::Revert(
+                        "alias generation: EVM gas overflows Tezos milligas".into(),
+                        remaining,
+                    )
+                })?;
                 let source_hex = source.to_string().to_lowercase();
                 let (alias_str, tezos_gas_remaining) = self
                     .database
@@ -678,11 +688,13 @@ where
                         tezos_gas_budget,
                     )
                     .map_err(|e| {
-                        CustomPrecompileError::Revert(format!(
-                            "Failed to generate alias for source address: {e:?}"
-                        ))
+                        CustomPrecompileError::Revert(
+                            format!("Failed to generate alias for source address: {e:?}"),
+                            remaining,
+                        )
                     })?;
-                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias_str)?;
+                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias_str)
+                    .map_err(|e| e.into_with_remainder(remaining))?;
                 let consumed_milligas = tezos_gas_budget - tezos_gas_remaining;
                 Ok((alias_str, consumed_milligas))
             }
@@ -692,8 +704,12 @@ where
     fn tezosx_resolve_source_alias_readonly(
         &self,
         source: Address,
+        remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError> {
-        if let Some(alias) = get_alias(self.database.host, &source, RuntimeId::Tezos)? {
+        let remaining = Gas::new(remaining_evm_gas);
+        if let Some(alias) = get_alias(self.database.host, &source, RuntimeId::Tezos)
+            .map_err(|e| e.into_with_remainder(remaining))?
+        {
             return Ok(alias);
         }
         // Deterministic fallback: reproduce the KT1 that

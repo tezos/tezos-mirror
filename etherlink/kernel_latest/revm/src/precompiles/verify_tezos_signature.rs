@@ -37,12 +37,14 @@ pub(crate) fn verify_tezos_signature_precompile(
     else {
         return Err(CustomPrecompileError::Revert(
             "invalid input encoding".to_string(),
+            gas,
         ));
     };
 
     let Ok(public_key) = PublicKey::nom_read_exact(&call.publicKey) else {
         return Err(CustomPrecompileError::Revert(
             "invalid public key encoding".to_string(),
+            gas,
         ));
     };
 
@@ -50,6 +52,7 @@ pub(crate) fn verify_tezos_signature_precompile(
     let Ok(signature) = Signature::try_from(signature_bytes) else {
         return Err(CustomPrecompileError::Revert(
             "invalid signature encoding".to_string(),
+            gas,
         ));
     };
 

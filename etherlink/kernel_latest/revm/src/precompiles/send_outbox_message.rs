@@ -42,7 +42,9 @@ use crate::{
         guard::{charge, guard},
     },
 };
-use evm_types::{CustomPrecompileError, DatabasePrecompileStateChanges};
+use evm_types::{
+    CustomPrecompileError, DatabasePrecompileStateChanges, IntoWithRemainder,
+};
 
 sol! {
     contract SendOutboxMessage {
@@ -118,9 +120,12 @@ impl From<CustomPrecompileError> for SendOutboxRevertReason {
     }
 }
 
-impl From<SendOutboxRevertReason> for CustomPrecompileError {
-    fn from(e: SendOutboxRevertReason) -> Self {
-        CustomPrecompileError::Revert(e.to_string())
+impl IntoWithRemainder for SendOutboxRevertReason {
+    fn into_with_remainder(self, gas: revm::interpreter::Gas) -> CustomPrecompileError {
+        match self {
+            SendOutboxRevertReason::DatabaseAccess(e) => e,
+            other => CustomPrecompileError::Revert(other.to_string(), gas),
+        }
     }
 }
 
@@ -436,16 +441,18 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
+    let mut gas = Gas::new(inputs.gas_limit);
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
         &[XTZ_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         inputs,
+        gas,
     )?;
 
-    let mut gas = Gas::new(inputs.gas_limit);
     charge(&mut gas, SEND_OUTBOX_MESSAGE_BASE_COST)?;
 
-    let output = send_outbox_methods(calldata, context)?;
+    let output =
+        send_outbox_methods(calldata, context).map_err(|e| e.into_with_remainder(gas))?;
 
     Ok(InterpreterResult {
         result: InstructionResult::Return,

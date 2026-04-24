@@ -22,7 +22,7 @@ use crate::{
         constants::{
             FA_BRIDGE_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
-        guard::{charge, guard, revert},
+        guard::{charge, guard},
     },
 };
 use evm_types::{CustomPrecompileError, FaDepositWithProxy};
@@ -71,15 +71,13 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs)?;
-
     let mut gas = Gas::new(inputs.gas_limit);
+    guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs, gas)?;
+
     charge(&mut gas, TICKET_TABLE_BASE_COST)?;
 
-    let interface = match Table::TableCalls::abi_decode(calldata) {
-        Ok(data) => data,
-        Err(e) => return Ok(revert(e, gas)),
-    };
+    let interface = Table::TableCalls::abi_decode(calldata)
+        .map_err(|e| CustomPrecompileError::Revert(e.to_string(), gas))?;
 
     let output = match interface {
         Table::TableCalls::ticket_balance_add(Table::ticket_balance_addCall {
@@ -115,6 +113,7 @@ where
                         |_| {
                             CustomPrecompileError::Revert(
                                 "invalid inbox level".to_string(),
+                                gas,
                             )
                         },
                     )?,
@@ -123,6 +122,7 @@ where
                         .map_err(|_| {
                             CustomPrecompileError::Revert(
                                 "invalid message id".to_string(),
+                                gas,
                             )
                         })?,
                     ticket_hash: H256::from_slice(

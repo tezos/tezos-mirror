@@ -6,10 +6,11 @@
 use std::mem;
 
 use evm_types::{
-    CustomPrecompileError, DatabasePrecompileStateChanges, Error, EtherlinkEntry,
+    CustomPrecompileError, DatabasePrecompileStateChanges, EtherlinkEntry,
     FaDepositWithProxy, PrecompileStateChanges, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
+use revm::interpreter::Gas;
 use revm::primitives::{Address, U256};
 
 /// This state is created to manage one object because
@@ -47,9 +48,12 @@ impl LayeredState {
             .global_counter
             .map(Ok)
             .unwrap_or_else(|| db.global_counter())?;
-        let counter = returned
-            .checked_add(U256::ONE)
-            .ok_or(Error::Custom("Global counter overflow".to_string()))?;
+        let counter = returned.checked_add(U256::ONE).ok_or_else(|| {
+            CustomPrecompileError::Revert(
+                "Global counter overflow".to_string(),
+                Gas::new(0),
+            )
+        })?;
         self.etherlink_data.global_counter = Some(counter);
         self.entries.push(EtherlinkEntry::IncrementGlobalCounter);
         Ok(returned)
@@ -70,9 +74,12 @@ impl LayeredState {
         let new_balance =
             ticket_balance
                 .checked_add(amount)
-                .ok_or(CustomPrecompileError::Revert(format!(
+                .ok_or(CustomPrecompileError::Revert(
+                    format!(
                 "Adding {amount} to {owner} balance failed, ticket hash is {ticket_hash}"
-            )))?;
+            ),
+                    Gas::new(0),
+                ))?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceAdd {
             ticket_hash: *ticket_hash,
@@ -97,9 +104,12 @@ impl LayeredState {
         let new_balance =
             ticket_balance
                 .checked_sub(amount)
-                .ok_or(CustomPrecompileError::Revert(format!(
+                .ok_or(CustomPrecompileError::Revert(
+                    format!(
             "Removing {amount} from {owner} balance failed, ticket hash is {ticket_hash}"
-        )))?;
+        ),
+                    Gas::new(0),
+                ))?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceRemove {
             ticket_hash: *ticket_hash,
@@ -117,6 +127,7 @@ impl LayeredState {
         if self.etherlink_data.removed_deposits.contains(deposit_id) {
             return Err(CustomPrecompileError::Revert(
                 "Deposit already removed".to_string(),
+                Gas::new(0),
             ));
         }
         db.deposit_in_queue(deposit_id)?;
@@ -231,8 +242,10 @@ impl LayeredState {
 #[cfg(test)]
 mod tests {
     use evm_types::{
-        custom, CustomPrecompileError, DatabasePrecompileStateChanges, FaDepositWithProxy,
+        custom, CustomPrecompileError, DatabasePrecompileStateChanges,
+        FaDepositWithProxy, IntoWithRemainder,
     };
+    use revm::interpreter::Gas;
     use revm::primitives::{Address, U256};
     use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 
@@ -263,12 +276,8 @@ mod tests {
         }
 
         fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
-            Ok(
-                ContractKt1Hash::from_base58_check(
-                    "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
-                )
-                .map_err(custom)?,
-            )
+            ContractKt1Hash::from_base58_check("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")
+                .map_err(|e| custom(e).into_with_remainder(Gas::new(0)))
         }
 
         fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
@@ -276,7 +285,10 @@ mod tests {
                 "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
             )
             .map_err(|e| {
-                CustomPrecompileError::Revert(format!("Invalid sequencer address: {e}"))
+                CustomPrecompileError::Revert(
+                    format!("Invalid sequencer address: {e}"),
+                    Gas::new(0),
+                )
             })
         }
 

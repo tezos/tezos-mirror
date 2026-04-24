@@ -1,5 +1,5 @@
 use alloy_sol_types::{sol, SolInterface, SolValue};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use http::header::HeaderMap;
 use revm::{
     context::{Block, ContextTr, JournalTr, Transaction},
@@ -77,12 +77,13 @@ fn build_http_request(
     gas: &mut Gas,
 ) -> Result<http::Request<Vec<u8>>, CustomPrecompileError> {
     // Charge per-header validation cost for user-supplied headers
-    let header_cost =
-        HEADER_VALIDATION_PER_HEADER
-            .checked_mul(headers.len().try_into().map_err(|_| {
-                CustomPrecompileError::Revert("header cost overflow".into())
-            })?)
-            .ok_or(CustomPrecompileError::Revert("header cost overflow".into()))?;
+    let header_cost = HEADER_VALIDATION_PER_HEADER
+        .checked_mul(headers.len().try_into().map_err(|_| {
+            CustomPrecompileError::Revert("header cost overflow".into(), *gas)
+        })?)
+        .ok_or_else(|| {
+            CustomPrecompileError::Revert("header cost overflow".into(), *gas)
+        })?;
     if header_cost > 0 {
         charge(gas, header_cost)?;
     }
@@ -90,9 +91,10 @@ fn build_http_request(
         0 => http::Method::GET,
         1 => http::Method::POST,
         _ => {
-            return Err(CustomPrecompileError::Revert(format!(
-                "unsupported HTTP method: {method_u8}"
-            )))
+            return Err(CustomPrecompileError::Revert(
+                format!("unsupported HTTP method: {method_u8}"),
+                *gas,
+            ))
         }
     };
 
@@ -100,15 +102,16 @@ fn build_http_request(
 
     for (name, value) in headers {
         if name.as_str().to_ascii_lowercase().starts_with("x-tezos-") {
-            return Err(CustomPrecompileError::Revert(format!(
-                "{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"
-            )));
+            return Err(CustomPrecompileError::Revert(
+                format!("{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"),
+                *gas,
+            ));
         }
         builder = builder.header(name.as_str(), value.as_str());
     }
 
     builder.body(body.to_vec()).map_err(|e| {
-        CustomPrecompileError::Revert(format!("failed to build HTTP request: {e}"))
+        CustomPrecompileError::Revert(format!("failed to build HTTP request: {e}"), *gas)
     })
 }
 
@@ -143,11 +146,12 @@ fn classify_and_charge_crac_response(
         if callee_gas.is_none() {
             return Err(CustomPrecompileError::Revert(
                 "X-Tezos-Gas-Consumed header missing or invalid in CRAC response".into(),
+                *gas,
             ));
         }
         Ok(response.into_body())
     } else if response.status().is_client_error() {
-        Err(CustomPrecompileError::RevertKeepGas(
+        Err(CustomPrecompileError::Revert(
             format!(
                 "Cross-runtime call failed with status {}: {}",
                 response.status(),
@@ -156,10 +160,12 @@ fn classify_and_charge_crac_response(
             *gas,
         ))
     } else {
-        Err(CustomPrecompileError::CracAbort(format!(
-            "Cross-runtime call returned status {}: {}",
-            response.status(),
-            String::from_utf8_lossy(response.body())
+        Err(CustomPrecompileError::Abort(CustomPrecompileAbort::Crac(
+            format!(
+                "Cross-runtime call returned status {}: {}",
+                response.status(),
+                String::from_utf8_lossy(response.body())
+            ),
         )))
     }
 }
@@ -246,10 +252,11 @@ fn inject_tezos_headers(
     timestamp: U256,
     block_number: U256,
     crac_id: &str,
+    gas: Gas,
 ) -> Result<(), CustomPrecompileError> {
     let parse_value = |v: &str| -> Result<http::HeaderValue, CustomPrecompileError> {
         v.parse().map_err(|e| {
-            CustomPrecompileError::Revert(format!("invalid header value: {e}"))
+            CustomPrecompileError::Revert(format!("invalid header value: {e}"), gas)
         })
     };
     headers.insert(X_TEZOS_SENDER, parse_value(sender_alias)?);
@@ -296,18 +303,20 @@ where
     // The pattern `target_address != bytecode_address` selects
     // DELEGATECALL/CALLCODE exclusively: under `CALL` and
     // `STATICCALL` both point at the precompile address.
+    let mut gas = Gas::new(inputs.gas_limit);
+
     if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
             "runtime gateway: DELEGATECALL and CALLCODE are not allowed".into(),
+            gas,
         ));
     }
 
-    let mut gas = Gas::new(inputs.gas_limit);
-
     let Ok(function_call) = RuntimeGatewayCalls::abi_decode(calldata) else {
-        return Err(CustomPrecompileError::Revert(String::from(
-            "invalid input encoding",
-        )));
+        return Err(CustomPrecompileError::Revert(
+            String::from("invalid input encoding"),
+            gas,
+        ));
     };
 
     match function_call {
@@ -324,9 +333,10 @@ where
                 .uri(&url)
                 .body(Vec::new())
                 .map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "failed to build HTTP request: {e}"
-                    ))
+                    CustomPrecompileError::Revert(
+                        format!("failed to build HTTP request: {e}"),
+                        gas,
+                    )
                 })?;
 
             let source = resolve_original_source(context);
@@ -343,9 +353,12 @@ where
             // Convert remaining EVM gas to Tezos milligas for the target runtime
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
-                    .ok_or(CustomPrecompileError::Revert(
-                        "transfer: EVM gas limit overflows Tezos milligas".into(),
-                    ))?;
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "transfer: EVM gas limit overflows Tezos milligas".into(),
+                            gas,
+                        )
+                    })?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
@@ -359,6 +372,7 @@ where
                 timestamp,
                 block_number,
                 &crac_id,
+                gas,
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
@@ -397,9 +411,10 @@ where
                 .uri(&url)
                 .body(parameters.to_vec())
                 .map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "failed to build HTTP request: {e}"
-                    ))
+                    CustomPrecompileError::Revert(
+                        format!("failed to build HTTP request: {e}"),
+                        gas,
+                    )
                 })?;
 
             let source = resolve_original_source(context);
@@ -413,9 +428,13 @@ where
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
-                    .ok_or(CustomPrecompileError::Revert(
-                        "callMichelson: EVM gas limit overflows Tezos milligas".into(),
-                    ))?;
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "callMichelson: EVM gas limit overflows Tezos milligas"
+                                .into(),
+                            gas,
+                        )
+                    })?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
@@ -429,6 +448,7 @@ where
                 timestamp,
                 block_number,
                 &crac_id,
+                gas,
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
@@ -459,12 +479,14 @@ where
             if !inputs.value.get().is_zero() {
                 return Err(CustomPrecompileError::Revert(
                     "callMichelsonView: view calls cannot carry value".into(),
+                    gas,
                 ));
             }
 
             if view_name.is_empty() {
                 return Err(CustomPrecompileError::Revert(
                     "callMichelsonView: view name must not be empty".into(),
+                    gas,
                 ));
             }
 
@@ -478,9 +500,10 @@ where
                 .uri(&url)
                 .body(input.to_vec())
                 .map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "failed to build HTTP request: {e}"
-                    ))
+                    CustomPrecompileError::Revert(
+                        format!("failed to build HTTP request: {e}"),
+                        gas,
+                    )
                 })?;
 
             // Resolve sender/source aliases through the read-only path
@@ -501,16 +524,17 @@ where
                 .unwrap_or_else(|| context.tx().caller());
             let sender_alias = context
                 .journal()
-                .tezosx_resolve_source_alias_readonly(inputs.caller)?;
+                .tezosx_resolve_source_alias_readonly(inputs.caller, gas.remaining())?;
             let source_alias = context
                 .journal()
-                .tezosx_resolve_source_alias_readonly(source)?;
+                .tezosx_resolve_source_alias_readonly(source, gas.remaining())?;
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
                     .ok_or(CustomPrecompileError::Revert(
                         "callMichelsonView: EVM gas limit overflows Tezos milligas"
                             .into(),
+                        gas,
                     ))?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
@@ -527,6 +551,7 @@ where
                 timestamp,
                 block_number,
                 &crac_id,
+                gas,
             )?;
 
             let response = context.journal_mut().tezosx_call_http(request);
@@ -575,15 +600,17 @@ where
                 if !amount.is_zero() {
                     return Err(CustomPrecompileError::Revert(
                         "call: GET requests cannot carry value".into(),
+                        gas,
                     ));
                 }
                 (
+                    context.journal().tezosx_resolve_source_alias_readonly(
+                        inputs.caller,
+                        gas.remaining(),
+                    )?,
                     context
                         .journal()
-                        .tezosx_resolve_source_alias_readonly(inputs.caller)?,
-                    context
-                        .journal()
-                        .tezosx_resolve_source_alias_readonly(source)?,
+                        .tezosx_resolve_source_alias_readonly(source, gas.remaining())?,
                 )
             } else {
                 resolve_aliases(context, &mut gas, inputs.caller, source)?
@@ -595,17 +622,25 @@ where
                 charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
             }
 
-            let target_runtime =
-                request.uri().host().and_then(RuntimeId::from_host).ok_or(
+            let target_runtime = request
+                .uri()
+                .host()
+                .and_then(RuntimeId::from_host)
+                .ok_or_else(|| {
                     CustomPrecompileError::Revert(
                         "httpCall: unknown or missing target runtime in URL host".into(),
-                    ),
-                )?;
+                        gas,
+                    )
+                })?;
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
-                    .ok_or(CustomPrecompileError::Revert(
-                        "httpCall: EVM gas limit overflows target runtime units".into(),
-                    ))?;
+                    .ok_or_else(|| {
+                        CustomPrecompileError::Revert(
+                            "httpCall: EVM gas limit overflows target runtime units"
+                                .into(),
+                            gas,
+                        )
+                    })?;
             let timestamp = context.block().timestamp();
             let block_number = context.block().number();
             let crac_id = context.journal().crac_id();
@@ -622,6 +657,7 @@ where
                 timestamp,
                 block_number,
                 &crac_id,
+                gas,
             )?;
 
             // Extract URI info before the request is consumed by the call.
@@ -650,6 +686,7 @@ where
                         .map_err(|_| {
                             CustomPrecompileError::Revert(
                                 "failed to load precompile account".into(),
+                                gas,
                             )
                         })?;
                     account_load.data.set_balance(U256::ZERO);
@@ -684,7 +721,10 @@ where
             .journal_mut()
             .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
             .map_err(|_| {
-                CustomPrecompileError::Revert("failed to load precompile account".into())
+                CustomPrecompileError::Revert(
+                    "failed to load precompile account".into(),
+                    gas,
+                )
             })?;
         account_load.data.set_balance(U256::ZERO);
     }
@@ -777,7 +817,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(CustomPrecompileError::Revert(msg)) if msg.contains("unsupported HTTP method")
+            Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("unsupported HTTP method")
         ));
     }
 
@@ -856,6 +896,7 @@ mod tests {
             timestamp,
             block_number,
             "test-crac-id",
+            Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -946,7 +987,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+            Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("X-Tezos-* headers are forbidden")
         ));
     }
 
@@ -961,7 +1002,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+            Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("X-Tezos-* headers are forbidden")
         ));
     }
 
@@ -992,6 +1033,7 @@ mod tests {
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
+            Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -1033,6 +1075,7 @@ mod tests {
             U256::from(1_700_000_000u64),
             U256::from(1u64),
             "test-crac-id",
+            Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -1072,6 +1115,7 @@ mod tests {
             U256::ZERO,
             U256::ZERO,
             "test-crac-id",
+            Gas::new(u64::MAX),
         )
         .unwrap();
 
@@ -1146,7 +1190,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(CustomPrecompileError::Revert(msg)) if msg.contains("X-Tezos-* headers are forbidden")
+            Err(CustomPrecompileError::Revert(msg, _)) if msg.contains("X-Tezos-* headers are forbidden")
         ));
     }
 
@@ -1267,6 +1311,7 @@ mod tests {
             U256::from(100u64),
             U256::from(42u64),
             "test-crac-id",
+            Gas::new(u64::MAX),
         )
         .unwrap();
 

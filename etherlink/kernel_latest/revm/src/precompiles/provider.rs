@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileAbort, CustomPrecompileError};
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
@@ -26,7 +26,6 @@ use crate::{
             VERIFY_TEZOS_SIGNATURE_PRECOMPILE_ADDRESS,
         },
         global_counter::global_counter_precompile,
-        guard::revert,
         runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
@@ -66,7 +65,7 @@ impl EtherlinkPrecompiles {
         &mut self,
         context: &mut CTX,
         inputs: &CallInputs,
-    ) -> Result<Option<InterpreterResult>, Error>
+    ) -> Result<Option<InterpreterResult>, CustomPrecompileAbort>
     where
         Host: StorageV1 + 'j,
         R: Registry + 'j,
@@ -109,21 +108,17 @@ impl EtherlinkPrecompiles {
 
         let interpreter_result = match result {
             Ok(interpreter_result) => interpreter_result,
-            Err(CustomPrecompileError::Revert(reason)) => {
-                revert(reason, Gas::new_spent(inputs.gas_limit))
-            }
+            Err(CustomPrecompileError::Revert(reason, gas)) => InterpreterResult {
+                result: InstructionResult::Revert,
+                gas,
+                output: Bytes::copy_from_slice(reason.as_bytes()),
+            },
             Err(CustomPrecompileError::OutOfGas) => InterpreterResult {
                 result: InstructionResult::OutOfGas,
                 gas: Gas::new_spent(inputs.gas_limit),
                 output: Bytes::new(),
             },
-            Err(CustomPrecompileError::RevertKeepGas(reason, gas)) => revert(reason, gas),
-            Err(CustomPrecompileError::RuntimeAbort(runtime)) => {
-                return Err(Error::Runtime(runtime))
-            }
-            Err(CustomPrecompileError::CracAbort(msg)) => {
-                return Err(Error::Custom(format!("CRAC block abort: {msg}")))
-            }
+            Err(CustomPrecompileError::Abort(abort)) => return Err(abort),
         };
 
         Ok(Some(interpreter_result))
@@ -149,7 +144,7 @@ where
     ) -> Result<Option<Self::Output>, String> {
         if let Some(custom_result) = self
             .run_custom_precompile(context, inputs)
-            .map_err(|e| e.to_string())?
+            .map_err(|e| Error::from(e).to_string())?
         {
             return Ok(Some(custom_result));
         }
