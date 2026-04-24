@@ -24,7 +24,7 @@ use revm::{
 };
 use std::vec::Vec;
 
-use tezosx_journal::TezosXJournal;
+use tezosx_journal::{LayeredStateError, TezosXJournal};
 
 use crate::database::EtherlinkVMDB;
 use crate::tezosx::{get_alias, store_alias};
@@ -502,7 +502,7 @@ impl<Host: StorageV1, R: Registry> JournalExt for Journal<'_, Host, R> {
 impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     pub fn get_and_increment_global_counter(
         &mut self,
-    ) -> Result<U256, CustomPrecompileError> {
+    ) -> Result<U256, LayeredStateError> {
         self.journal
             .evm
             .layered_state
@@ -514,7 +514,7 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         self.journal.evm.layered_state.ticket_balance_add(
             &ticket_hash,
             &owner,
@@ -528,7 +528,7 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         self.journal.evm.layered_state.ticket_balance_remove(
             &ticket_hash,
             &owner,
@@ -540,7 +540,7 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     pub fn remove_deposit_from_queue(
         &mut self,
         deposit_id: U256,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         self.journal
             .evm
             .layered_state
@@ -561,17 +561,14 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
     pub fn find_deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
+    ) -> Result<FaDepositWithProxy, LayeredStateError> {
         if self
             .journal
             .evm
             .layered_state
             .is_deposit_removed(deposit_id)
         {
-            return Err(CustomPrecompileError::Revert(
-                "Deposit removed in layered state".to_string(),
-                Gas::new(0),
-            ));
+            return Err(LayeredStateError::DepositAlreadyRemoved);
         }
         Ok(self.database.deposit_in_queue(deposit_id)?)
     }

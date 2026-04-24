@@ -25,7 +25,7 @@ use crate::{
         guard::{charge, guard},
     },
 };
-use evm_types::{CustomPrecompileError, FaDepositWithProxy};
+use evm_types::{CustomPrecompileError, FaDepositWithProxy, IntoWithRemainder};
 
 sol! {
     contract Table {
@@ -87,7 +87,8 @@ where
         }) => {
             context
                 .journal_mut()
-                .ticket_balance_add(ticket_hash, owner, amount)?;
+                .ticket_balance_add(ticket_hash, owner, amount)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
         Table::TableCalls::ticket_balance_remove(Table::ticket_balance_removeCall {
@@ -97,7 +98,8 @@ where
         }) => {
             context
                 .journal_mut()
-                .ticket_balance_remove(ticket_hash, owner, amount)?;
+                .ticket_balance_remove(ticket_hash, owner, amount)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
         Table::TableCalls::queue_deposit(Table::queue_depositCall {
@@ -134,7 +136,10 @@ where
             None
         }
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
-            let deposit = context.journal().find_deposit_in_queue(&deposit_id)?;
+            let deposit = context
+                .journal()
+                .find_deposit_in_queue(&deposit_id)
+                .map_err(|e| e.into_with_remainder(gas))?;
             let sol_deposit = Table::SolFaDepositWithProxy {
                 amount: u256_to_alloy(&deposit.amount),
                 receiver: h160_to_alloy(&deposit.receiver),
@@ -150,7 +155,8 @@ where
         Table::TableCalls::remove_deposit(Table::remove_depositCall { deposit_id }) => {
             context
                 .journal_mut()
-                .remove_deposit_from_queue(deposit_id)?;
+                .remove_deposit_from_queue(deposit_id)
+                .map_err(|e| e.into_with_remainder(gas))?;
             None
         }
     };

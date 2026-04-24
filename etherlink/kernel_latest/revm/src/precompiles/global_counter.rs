@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface, SolValue};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     context::ContextTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -58,7 +58,10 @@ where
     let counter = match interface {
         GlobalCounter::GlobalCounterCalls::get_and_increment(
             GlobalCounter::get_and_incrementCall,
-        ) => context.journal_mut().get_and_increment_global_counter()?,
+        ) => context
+            .journal_mut()
+            .get_and_increment_global_counter()
+            .map_err(|e| e.into_with_remainder(gas))?,
     };
 
     Ok(InterpreterResult {

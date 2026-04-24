@@ -6,12 +6,13 @@
 use std::mem;
 
 use evm_types::{
-    CustomPrecompileError, DatabasePrecompileStateChanges, EtherlinkEntry,
-    FaDepositWithProxy, PrecompileStateChanges, SequencerKeyChange,
+    DatabasePrecompileStateChanges, EtherlinkEntry, FaDepositWithProxy,
+    PrecompileStateChanges, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
-use revm::interpreter::Gas;
 use revm::primitives::{Address, U256};
+
+use crate::LayeredStateError;
 
 /// This state is created to manage one object because
 /// everything that we used here, is stored in one address (Address::ZERO).
@@ -42,18 +43,15 @@ impl LayeredState {
     pub fn get_and_increment_global_counter<DB: DatabasePrecompileStateChanges>(
         &mut self,
         db: &DB,
-    ) -> Result<U256, CustomPrecompileError> {
+    ) -> Result<U256, LayeredStateError> {
         let returned = self
             .etherlink_data
             .global_counter
             .map(Ok)
             .unwrap_or_else(|| db.global_counter())?;
-        let counter = returned.checked_add(U256::ONE).ok_or_else(|| {
-            CustomPrecompileError::Revert(
-                "Global counter overflow".to_string(),
-                Gas::new(0),
-            )
-        })?;
+        let counter = returned
+            .checked_add(U256::ONE)
+            .ok_or(LayeredStateError::GlobalCounterOverflow)?;
         self.etherlink_data.global_counter = Some(counter);
         self.entries.push(EtherlinkEntry::IncrementGlobalCounter);
         Ok(returned)
@@ -65,21 +63,19 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance =
-            ticket_balance
-                .checked_add(amount)
-                .ok_or(CustomPrecompileError::Revert(
-                    format!(
-                "Adding {amount} to {owner} balance failed, ticket hash is {ticket_hash}"
-            ),
-                    Gas::new(0),
-                ))?;
+        let new_balance = ticket_balance.checked_add(amount).ok_or(
+            LayeredStateError::BalanceOverflow {
+                ticket_hash: *ticket_hash,
+                owner: *owner,
+                amount,
+            },
+        )?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceAdd {
             ticket_hash: *ticket_hash,
@@ -95,21 +91,19 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance =
-            ticket_balance
-                .checked_sub(amount)
-                .ok_or(CustomPrecompileError::Revert(
-                    format!(
-            "Removing {amount} from {owner} balance failed, ticket hash is {ticket_hash}"
-        ),
-                    Gas::new(0),
-                ))?;
+        let new_balance = ticket_balance.checked_sub(amount).ok_or(
+            LayeredStateError::BalanceUnderflow {
+                ticket_hash: *ticket_hash,
+                owner: *owner,
+                amount,
+            },
+        )?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceRemove {
             ticket_hash: *ticket_hash,
@@ -123,12 +117,9 @@ impl LayeredState {
         &mut self,
         deposit_id: &U256,
         db: &impl DatabasePrecompileStateChanges,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         if self.etherlink_data.removed_deposits.contains(deposit_id) {
-            return Err(CustomPrecompileError::Revert(
-                "Deposit already removed".to_string(),
-                Gas::new(0),
-            ));
+            return Err(LayeredStateError::DepositAlreadyRemoved);
         }
         db.deposit_in_queue(deposit_id)?;
         self.etherlink_data.removed_deposits.insert(*deposit_id);
