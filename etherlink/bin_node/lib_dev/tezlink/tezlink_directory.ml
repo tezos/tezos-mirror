@@ -186,25 +186,7 @@ struct
           operation_list_quota = [];
         }
 
-  let bootstrap_transfers_receipt chain_id backend =
-    let open Lwt_result_syntax in
-    let* transfers = Proto.activate_bootstraps_with_transfers backend in
-    let transfers =
-      List.map
-        (fun (receipt, operation) ->
-          Block_services.
-            {
-              chain_id;
-              hash = Operation_hash.zero;
-              shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
-              protocol_data = operation;
-              receipt = Receipt receipt;
-            })
-        transfers
-    in
-    return transfers
-
-  let tezlink_block_to_block_info ~l2_chain_id backend
+  let tezlink_block_to_block_info ~l2_chain_id
       (level_info, version, chain, block) =
     let open Lwt_result_syntax in
     let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
@@ -218,13 +200,6 @@ struct
     let*? manager_operations =
       Block_services.deserialize_operations ~chain_id block.operations
     in
-    let* bootstrap_transfers =
-      (* To allow tzkt to index the bootstrap accounts, we add dummy transfers
-       from a faucet address to all the accounts present in durable storage at
-       block 0 (ie accounts added by an installer kernel). *)
-      if block.level = 2l then bootstrap_transfers_receipt chain_id backend
-      else return_nil
-    in
     let block_info : Block_services.block_info =
       {
         chain_id;
@@ -236,7 +211,7 @@ struct
             consensus_opperations;
             voting_operations;
             anonymous_operations;
-            bootstrap_transfers @ manager_operations;
+            manager_operations;
           ];
       }
     in
@@ -573,7 +548,6 @@ let register_dynamic_block_services ~l2_chain_id
            let* block_info =
              Block_header.tezlink_block_to_block_info
                ~l2_chain_id
-               (module Backend)
                (level, q#version, chain, tezlink_block)
            in
            return block_info)

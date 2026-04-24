@@ -208,24 +208,6 @@ let make (ctxt : Evm_ro_context.t) =
       in
       return (accounts @ contracts)
 
-    let bootstrap_accounts () =
-      let open Lwt_result_syntax in
-      let block = `Level 0l in
-      let chain = `Main in
-      let* accounts_keys =
-        subkeys ~block "/evm/world_state/eth_accounts/tezos"
-      in
-      let accounts =
-        List.filter_map
-          Signature.V2.Public_key_hash.of_b58check_opt
-          accounts_keys
-      in
-      List.map_es
-        (fun c ->
-          let* balance = balance chain block (Implicit c) in
-          return (c, balance))
-        accounts
-
     let get_storage chain block c =
       let open Lwt_result_syntax in
       (* TODO: #7986

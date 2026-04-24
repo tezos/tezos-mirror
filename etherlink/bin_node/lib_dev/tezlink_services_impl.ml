@@ -115,26 +115,6 @@ let make (ctxt : Evm_ro_context.t) =
           Data_encoding.Binary.of_string_opt Tezos_types.Contract.encoding bytes)
         contracts_keys
 
-    let bootstrap_accounts () =
-      let open Lwt_result_syntax in
-      (* We call bootstrap accounts those that were present in durable storage
-         at the start of the chain. *)
-      let block = `Level 0l in
-      let chain = `Main in
-      let* contracts_keys =
-        subkeys ~block Tezlink_durable_storage.Path.accounts_index
-      in
-      let contracts =
-        List.filter_map Tezlink_durable_storage.contract_of_path contracts_keys
-      in
-      List.map_es
-        (fun c ->
-          let* balance =
-            balance chain block (Tezos_types.Contract.of_implicit c)
-          in
-          return (c, balance))
-        contracts
-
     let get_storage chain block c =
       let open Lwt_result_syntax in
       (* TODO: #7986

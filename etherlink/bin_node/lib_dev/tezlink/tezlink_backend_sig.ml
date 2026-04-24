@@ -105,12 +105,6 @@ module type S = sig
   val monitor_heads :
     [> `Main] -> 'a -> L2_types.Tezos_block.t Lwt_stream.t * Lwt_watcher.stopper
 
-  val bootstrap_accounts :
-    unit ->
-    (Tezlink_imports.Imported_context.public_key_hash * Tezos_types.Tez.t) list
-    tzresult
-    Lwt.t
-
   val simulate_operation :
     chain_id:Chain_id.t ->
     simulator_mode:simulator_mode ->
