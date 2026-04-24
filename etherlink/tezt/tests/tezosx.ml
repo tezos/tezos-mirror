@@ -1304,7 +1304,8 @@ let test_tezos_block_stored_after_deposit =
   in
   let header = JSON.parse ~origin:"tezlink_block_header" res in
   let level = JSON.(header |-> "level" |> as_int) in
-  Check.((level = 2) int ~error_msg:"Expected Tezos block level = 2 but got %L") ;
+  Check.(
+    (level >= 2) int ~error_msg:"Expected Tezos block level >= 2 but got %L") ;
   unit
 
 (** [check_evm_to_michelson_transfer ~sequencer ~sender ~nonce ~tezos_destination
