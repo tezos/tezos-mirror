@@ -196,6 +196,11 @@ where
 /// Resolves sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss. OOG propagates as
 /// `Err(CustomPrecompileError::OutOfGas(..))`.
+///
+/// When `sender == source` (an EOA directly calling the gateway, the
+/// common case), the resolution is performed once and the resulting
+/// alias is reused for both slots — a single `ALIAS_CACHE_HIT_COST` is
+/// billed instead of two.
 fn resolve_aliases<'j, CTX, Host, R>(
     context: &mut CTX,
     gas: &mut Gas,
@@ -220,6 +225,12 @@ where
     }
 
     // --- source alias ---
+    // Fast path: if sender == source, reuse the resolved alias and skip
+    // the second storage lookup (and its cache-hit charge).
+    if sender == source {
+        return Ok((sender_alias.clone(), sender_alias));
+    }
+
     charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (source_alias, source_gen_gas) = context
         .journal_mut()

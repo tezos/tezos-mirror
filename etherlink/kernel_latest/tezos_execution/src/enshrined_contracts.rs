@@ -648,7 +648,8 @@ where
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
     // the credential attached.
-    let sender_pubkey: Option<&[u8]> = if sender == source {
+    let sender_is_source = sender == source;
+    let sender_pubkey: Option<&[u8]> = if sender_is_source {
         Some(&source_public_key)
     } else {
         None
@@ -670,29 +671,39 @@ where
         .cast_and_consume_milligas(sender_milligas)
         .map_err(|_| TransferError::OutOfGas)?;
 
-    // --- source alias (same two-phase pattern) ---
-    ctx.operation_gas()
-        .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
-        .map_err(|_| TransferError::OutOfGas)?;
-    let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-    let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-        .ok_or(TransferError::OutOfGas)?;
-    let (source_alias, source_target_consumed) = get_or_create_alias(
-        ctx.host(),
-        journal,
-        &source,
-        Some(&source_public_key),
-        context,
-        registry,
-        target_runtime,
-        target_budget,
-    )?;
-    let source_milligas =
-        convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
-            .ok_or(TransferError::OutOfGas)?;
-    ctx.operation_gas()
-        .cast_and_consume_milligas(source_milligas)
-        .map_err(|_| TransferError::OutOfGas)?;
+    // --- source alias ---
+    // Fast path: when sender == source (a user's implicit account calling
+    // the gateway directly), reuse the resolved alias and skip the second
+    // storage lookup. This saves one ALIAS_CACHE_HIT_MILLIGAS charge.
+    let source_alias = if sender_is_source {
+        sender_alias.clone()
+    } else {
+        ctx.operation_gas()
+            .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+            .map_err(|_| TransferError::OutOfGas)?;
+        let remaining_milligas =
+            ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+        let target_budget =
+            convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+                .ok_or(TransferError::OutOfGas)?;
+        let (source_alias, source_target_consumed) = get_or_create_alias(
+            ctx.host(),
+            journal,
+            &source,
+            Some(&source_public_key),
+            context,
+            registry,
+            target_runtime,
+            target_budget,
+        )?;
+        let source_milligas =
+            convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
+                .ok_or(TransferError::OutOfGas)?;
+        ctx.operation_gas()
+            .cast_and_consume_milligas(source_milligas)
+            .map_err(|_| TransferError::OutOfGas)?;
+        source_alias
+    };
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
     // forwarded limit reflects gas already consumed by alias resolution.
