@@ -112,7 +112,11 @@ fn build_http_request(
     let mut builder = http::Request::builder().method(method).uri(url);
 
     for (name, value) in headers {
-        if name.as_str().to_ascii_lowercase().starts_with("x-tezos-") {
+        // Zero-alloc case-insensitive prefix check (avoid
+        // `to_ascii_lowercase()` which allocates a new `String` per
+        // header).
+        let bytes = name.as_bytes();
+        if bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"x-tezos-") {
             return Err(CustomPrecompileError::Revert(
                 format!("{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"),
                 *gas,

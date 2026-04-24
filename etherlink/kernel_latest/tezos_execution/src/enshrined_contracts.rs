@@ -279,8 +279,10 @@ const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
 /// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
 const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 = 500_000;
 
-/// Per user-supplied header validation in %call (string prefix check).
-const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 1_000;
+/// Per user-supplied header validation in %call: byte-level prefix
+/// check against forbidden X-Tezos-* headers plus the subsequent
+/// `HeaderMap` insertion (hash + bucket insert + potential rehash).
+const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 10_000;
 
 /// Keccak256 selector computation in %call_evm.
 const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
@@ -561,7 +563,10 @@ fn build_http_request(
 
     let mut builder = http::Request::builder().method(http_method).uri(url);
     for (name, value) in headers {
-        if name.to_ascii_lowercase().starts_with("x-tezos-") {
+        // Zero-alloc case-insensitive prefix check (avoid the
+        // `to_ascii_lowercase()` `String` allocation per header).
+        let bytes = name.as_bytes();
+        if bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"x-tezos-") {
             return Err(TransferError::GatewayError(format!(
                 "{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"
             )));

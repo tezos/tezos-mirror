@@ -225,9 +225,12 @@ pub(crate) const ALIAS_CACHE_HIT_COST: u64 = 2_100;
 // value transfer). Equivalent to SSTORE non-zero to zero (EIP-2929 + YP).
 pub(crate) const VALUE_TRANSFER_SURCHARGE: u64 = 5_000;
 
-// Per user-supplied header validation cost for the generic call() function.
-// Covers the string prefix check against forbidden X-Tezos-* headers.
-pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 10;
+// Per user-supplied header validation cost for the generic call()
+// function. Covers the byte-level prefix check against forbidden
+// X-Tezos-* headers *and* the subsequent insertion into the HTTP
+// `HeaderMap` (hash of the header name + bucket insert + potential
+// rehash).
+pub(crate) const HEADER_VALIDATION_PER_HEADER: u64 = 100;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
