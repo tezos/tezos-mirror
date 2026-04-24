@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     context::{Block, ContextTr},
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -110,7 +110,11 @@ where
                 ));
             };
 
-            if context.db().governance_sequencer_upgrade_exists()? {
+            if context
+                .db()
+                .governance_sequencer_upgrade_exists()
+                .map_err(|e| e.into_with_remainder(gas))?
+            {
                 return Err(CustomPrecompileError::Revert(
                     String::from(
                         "can't override an existing governance sequencer upgrade",

@@ -13,13 +13,11 @@ use crate::storage::{
     },
 };
 use evm_types::{
-    custom, CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
-    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, IntoWithRemainder,
-    PrecompileStateChanges,
+    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges, Error,
+    FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,
 };
 use michelson_types::Withdrawal;
 use revm::{
-    interpreter::Gas,
     primitives::{Address, AddressMap, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
@@ -181,66 +179,45 @@ where
         log!(level, "{message:?}");
     }
 
-    fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
-        self.system
-            .read_global_counter(self.host)
-            .map_err(|e| e.into_with_remainder(Gas::new(0)))
+    fn global_counter(&self) -> Result<U256, PrecompileStateError> {
+        self.system.read_global_counter(self.host)
     }
 
     fn ticket_balance(
         &self,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<U256, CustomPrecompileError> {
+    ) -> Result<U256, PrecompileStateError> {
         self.system
             .read_ticket_balance(self.host, ticket_hash, owner)
-            .map_err(|e| e.into_with_remainder(Gas::new(0)))
     }
 
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
-        self.system
-            .read_deposit_from_queue(self.host, deposit_id)
-            .map_err(|e| e.into_with_remainder(Gas::new(0)))
+    ) -> Result<FaDepositWithProxy, PrecompileStateError> {
+        self.system.read_deposit_from_queue(self.host, deposit_id)
     }
 
-    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
-        let ticketer = self
-            .host
-            .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)
-            .map_err(|e| e.into_with_remainder(Gas::new(0)))?;
-        let kt1_b58 = String::from_utf8(ticketer.to_vec())
-            .map_err(|e| custom(e).into_with_remainder(Gas::new(0)))?;
-        ContractKt1Hash::from_b58check(&kt1_b58)
-            .map_err(|e| custom(e).into_with_remainder(Gas::new(0)))
+    fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
+        let ticketer =
+            self.host
+                .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
+        let kt1_b58 = std::str::from_utf8(&ticketer)?;
+        Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
     }
 
-    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-        let bytes = self
-            .host
-            .store_read_all(&SEQUENCER_KEY_PATH)
-            .map_err(|e| e.into_with_remainder(Gas::new(0)))?;
-        PublicKey::from_b58check(std::str::from_utf8(&bytes).map_err(|e| {
-            CustomPrecompileError::Revert(
-                format!("Invalid sequencer key UTF-8 encoding: {e}"),
-                Gas::new(0),
-            )
-        })?)
-        .map_err(|e| {
-            CustomPrecompileError::Revert(
-                format!("Invalid sequencer key Base58Check encoding: {e}"),
-                Gas::new(0),
-            )
-        })
+    fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
+        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
+        let s = std::str::from_utf8(&bytes)?;
+        Ok(PublicKey::from_b58check(s)?)
     }
 
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
+    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError> {
         match self.host.store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH) {
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
-            Err(e) => Err(e.into_with_remainder(Gas::new(0))),
+            Err(e) => Err(e.into()),
         }
     }
 }

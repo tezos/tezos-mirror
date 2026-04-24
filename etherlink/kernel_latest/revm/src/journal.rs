@@ -573,7 +573,7 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
                 Gas::new(0),
             ));
         }
-        self.database.deposit_in_queue(deposit_id)
+        Ok(self.database.deposit_in_queue(deposit_id)?)
     }
 
     pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {

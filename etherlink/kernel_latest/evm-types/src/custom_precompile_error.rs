@@ -6,7 +6,7 @@
 use revm_interpreter::Gas;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
-use crate::Error;
+use crate::{Error, PrecompileStateError};
 
 /// Actual errors that propagate up past the precompile boundary
 /// (never caught by the provider).
@@ -71,5 +71,16 @@ impl IntoWithRemainder for Error {
                 gas,
             ),
         }
+    }
+}
+
+// Transitional: lets tezosx_journal::LayeredState and
+// revm::Journal keep their pre-rework `CustomPrecompileError`
+// signatures while the DB trait switches to `PrecompileStateError`.
+// Removed in the next commit once LayeredState returns its own
+// narrow error type.
+impl From<PrecompileStateError> for CustomPrecompileError {
+    fn from(e: PrecompileStateError) -> Self {
+        e.into_with_remainder(Gas::new(0))
     }
 }

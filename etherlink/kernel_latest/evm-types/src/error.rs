@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm_database_interface::DBErrorMarker;
-use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
@@ -23,6 +23,12 @@ pub enum Error {
 
 pub fn custom<E: std::fmt::Display>(e: E) -> Error {
     Error::Custom(e.to_string())
+}
+
+impl From<PathError> for Error {
+    fn from(e: PathError) -> Self {
+        Error::Custom(e.to_string())
+    }
 }
 
 impl DBErrorMarker for Error {}

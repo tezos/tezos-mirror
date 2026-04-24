@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use super::struct_logger::StructLog;
-use crate::helpers::storage::concat;
 use evm_types::Error;
 
 use revm::primitives::B256;
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup_host::{
-    path::{OwnedPath, RefPath},
+    path::{concat, OwnedPath, RefPath},
     storage::StorageV1,
 };
 
@@ -32,7 +31,7 @@ pub fn trace_tx_path(hash: &Option<B256>, field: &RefPath) -> Result<OwnedPath, 
             concat(&EVM_TRACE, &tx_path)?
         }
     };
-    concat(&trace_tx_path, field)
+    Ok(concat(&trace_tx_path, field)?)
 }
 
 pub fn flush_call_traces(

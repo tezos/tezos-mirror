@@ -242,10 +242,8 @@ impl LayeredState {
 #[cfg(test)]
 mod tests {
     use evm_types::{
-        custom, CustomPrecompileError, DatabasePrecompileStateChanges,
-        FaDepositWithProxy, IntoWithRemainder,
+        DatabasePrecompileStateChanges, FaDepositWithProxy, PrecompileStateError,
     };
-    use revm::interpreter::Gas;
     use revm::primitives::{Address, U256};
     use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 
@@ -256,7 +254,7 @@ mod tests {
     impl DatabasePrecompileStateChanges for DummyDB {
         fn log_node_message(&mut self, _: tezos_evm_logging::Level, _: &str) {}
 
-        fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
+        fn global_counter(&self) -> Result<U256, PrecompileStateError> {
             Ok(U256::ZERO)
         }
 
@@ -264,37 +262,32 @@ mod tests {
             &self,
             _ticket_hash: &U256,
             _owner: &Address,
-        ) -> Result<U256, CustomPrecompileError> {
+        ) -> Result<U256, PrecompileStateError> {
             Ok(U256::ZERO)
         }
 
         fn deposit_in_queue(
             &self,
             _deposit_id: &U256,
-        ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
+        ) -> Result<FaDepositWithProxy, PrecompileStateError> {
             Ok(FaDepositWithProxy::default())
         }
 
-        fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
-            ContractKt1Hash::from_base58_check("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")
-                .map_err(|e| custom(e).into_with_remainder(Gas::new(0)))
+        fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
+            Ok(ContractKt1Hash::from_base58_check(
+                "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
+            )?)
         }
 
-        fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-            PublicKey::from_b58check(
+        fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
+            Ok(PublicKey::from_b58check(
                 "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
-            )
-            .map_err(|e| {
-                CustomPrecompileError::Revert(
-                    format!("Invalid sequencer address: {e}"),
-                    Gas::new(0),
-                )
-            })
+            )?)
         }
 
         fn governance_sequencer_upgrade_exists(
             &self,
-        ) -> Result<bool, CustomPrecompileError> {
+        ) -> Result<bool, PrecompileStateError> {
             Ok(false)
         }
     }

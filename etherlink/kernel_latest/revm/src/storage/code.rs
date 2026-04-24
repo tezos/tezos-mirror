@@ -10,7 +10,7 @@ use revm::{
     state::Bytecode,
 };
 use tezos_smart_rollup_host::{
-    path::{OwnedPath, RefPath},
+    path::{concat, OwnedPath, RefPath},
     runtime::RuntimeError,
     storage::StorageV1,
 };
@@ -18,7 +18,7 @@ use tezos_smart_rollup_host::{
 use evm_types::Error;
 
 use crate::{
-    helpers::storage::{bytes_hash, concat, read_u64_le_default, write_u64_le},
+    helpers::storage::{bytes_hash, read_u64_le_default, write_u64_le},
     precompiles::constants::{
         FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
     },
@@ -154,8 +154,8 @@ pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, Err
 
 #[cfg(test)]
 mod test {
-    use super::{CodeStorage, REFERENCE_PATH};
-    use crate::helpers::storage::{concat, read_u64_le};
+    use super::{concat, CodeStorage, REFERENCE_PATH};
+    use crate::helpers::storage::read_u64_le;
 
     use revm::{
         primitives::{Bytes, KECCAK_EMPTY},

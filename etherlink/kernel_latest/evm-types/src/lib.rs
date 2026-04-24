@@ -16,6 +16,7 @@ pub use custom_precompile_error::{
 };
 pub use database::{
     DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
+    PrecompileStateError,
 };
 pub use error::{custom, Error};
 pub use etherlink_entry::EtherlinkEntry;

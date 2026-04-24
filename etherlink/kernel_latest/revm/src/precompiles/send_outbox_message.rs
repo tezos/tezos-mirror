@@ -44,6 +44,7 @@ use crate::{
 };
 use evm_types::{
     CustomPrecompileError, DatabasePrecompileStateChanges, IntoWithRemainder,
+    PrecompileStateError,
 };
 
 sol! {
@@ -110,20 +111,14 @@ enum SendOutboxRevertReason {
     #[error("Fixed byte array conversion error: {0}")]
     IntoFixedInvalidSize(usize),
 
-    #[error("Database access error")]
-    DatabaseAccess(CustomPrecompileError),
-}
-
-impl From<CustomPrecompileError> for SendOutboxRevertReason {
-    fn from(e: CustomPrecompileError) -> Self {
-        SendOutboxRevertReason::DatabaseAccess(e)
-    }
+    #[error("Database access error: {0}")]
+    DatabaseAccess(#[from] PrecompileStateError),
 }
 
 impl IntoWithRemainder for SendOutboxRevertReason {
     fn into_with_remainder(self, gas: revm::interpreter::Gas) -> CustomPrecompileError {
         match self {
-            SendOutboxRevertReason::DatabaseAccess(e) => e,
+            SendOutboxRevertReason::DatabaseAccess(e) => e.into_with_remainder(gas),
             other => CustomPrecompileError::Revert(other.to_string(), gas),
         }
     }
