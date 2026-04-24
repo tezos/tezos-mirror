@@ -344,6 +344,7 @@ pub(crate) fn drain_reentrant_crac_ops(
         .michelson
         .pending_crac_receipts
         .drain(watermark..)
+        .map(|(_, receipt)| receipt)
         .collect();
     let mut ops = Vec::new();
     for receipt in receipts {

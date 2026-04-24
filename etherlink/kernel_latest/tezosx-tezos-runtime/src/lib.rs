@@ -66,6 +66,14 @@ pub mod context;
 pub mod headers;
 pub mod url;
 
+/// Synthetic "applied" top-level result used by both the success-path
+/// CRAC receipt builder and the post-merge reconciliation in the kernel.
+/// Exposed so the two sites cannot drift: the top-level is a wrapper —
+/// real gas / storage-size / balance-updates live on the internal ops.
+pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
+    ContentResult::Applied(TransferTarget::from(TransferSuccess::default()))
+}
+
 /// Build an HTTP response from the result of [`execute_request`].
 ///
 /// `frame_result` carries the `%collect_result` payload deposited on the
@@ -194,7 +202,7 @@ fn build_crac_receipt(
     // actual consumed_milligas, storage_size, etc. are in the internal ops.
     let top_level_result = OperationResult {
         balance_updates: vec![],
-        result: ContentResult::Applied(TransferTarget::from(TransferSuccess::default())),
+        result: crac_top_level_applied_result(),
         internal_operation_results: all_internal,
     };
 
@@ -563,7 +571,7 @@ where
                         base_nonce,
                     ) {
                         Ok(receipt) => {
-                            journal.michelson.failed_crac_receipts.push(receipt);
+                            journal.michelson.push_failed_crac_receipt(receipt);
                         }
                         Err(e) => {
                             log!(Error, "Failed to build failed CRAC receipt: {e:?}");
@@ -606,7 +614,7 @@ where
             crac_id_for_event.as_deref(),
             base_nonce,
         )?;
-        journal.michelson.pending_crac_receipts.push(receipt);
+        journal.michelson.push_pending_crac_receipt(receipt);
         Ok(TransferSuccess::default())
     } else {
         Ok(result.target.into())

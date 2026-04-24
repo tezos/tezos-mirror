@@ -50,7 +50,8 @@ use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::{
-    OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+    ContentResult, OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+    OperationResultSum,
 };
 use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
@@ -327,22 +328,71 @@ pub fn extract_cross_runtime_effects(
 /// the Michelson side) are otherwise emitted as separate top-level
 /// operations, violating principle 6.
 ///
-/// Failed receipts come first because they survive even when their EVM
-/// frame reverts (they are NOT subject to revert), whereas successful
-/// receipts only survive if their EVM frame commits.  Within each
-/// category, receipts are in execution order.
+/// Receipts carry a monotonic sequence number assigned at push time
+/// (shared across the pending and failed lists), so sorting by that
+/// sequence recovers the original execution order regardless of which
+/// list each receipt landed in.  This matters when an EVM transaction
+/// interleaves the two kinds, e.g.
+/// `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`:
+/// without the sort, a merged operation would expose internals in
+/// bucket order (failed first) rather than execution order, and
+/// `renumber_nonces` would then assign nonces to internals out of
+/// order as well.
 pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
+    // Whether any successful CRAC participated in this merge.  Captured
+    // before `take` so the top-level status can be reconciled below.
+    let has_applied = !journal.michelson.pending_crac_receipts.is_empty();
+
     let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
     all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
+    all.sort_by_key(|(seq, _)| *seq);
 
-    let mut iter = all.into_iter();
+    let mut iter = all.into_iter().map(|(_, receipt)| receipt);
     let Some(mut merged) = iter.next() else {
         return Vec::new();
     };
     for other in iter {
         merge_crac_internals(&mut merged, other);
     }
+    // `merge_crac_internals` only touches internals — the top-level
+    // `ContentResult` is inherited from the first-executed receipt.
+    // When that receipt is a failed CRAC but later CRACs in the same
+    // EVM tx succeeded, we would end up with `Applied` internals sitting
+    // under a `Failed` top-level, which L1 semantics forbid
+    // (internals under Failed must be Backtracked/Failed/Skipped).
+    //
+    // Reconcile by forcing the top-level to `Applied` whenever any
+    // successful CRAC contributed to the merge.  The all-failed case
+    // keeps its `Failed` top-level (RFC Example 4).
+    if has_applied {
+        force_top_level_applied(&mut merged);
+    }
     vec![merged]
+}
+
+/// Overwrite the top-level `ContentResult` of a merged CRAC receipt with
+/// `Applied`, preserving the synthetic handler→alias transfer shape.
+/// Called after merging when at least one successful CRAC participated,
+/// to avoid the L1-invalid combination of `Applied` internals under a
+/// `Failed` parent.  Individual internals keep their own statuses.
+///
+/// The success shape is shared with `build_crac_receipt` via
+/// `tezosx_tezos_runtime::crac_top_level_applied_result` so the two
+/// producers cannot drift.
+fn force_top_level_applied(receipt: &mut AppliedOperation) {
+    let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+        receipt.op_and_receipt;
+    // A merged CRAC receipt is always a single-op batch (every CRAC
+    // receipt is built that way by `build_crac_receipt` /
+    // `build_failed_crac_receipt`, and merging only rewrites internals).
+    debug_assert_eq!(batch.operations.len(), 1);
+    if let Some(op) = batch.operations.first_mut() {
+        if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+            if !matches!(result.result, ContentResult::Applied(_)) {
+                result.result = tezosx_tezos_runtime::crac_top_level_applied_result();
+            }
+        }
+    }
 }
 
 /// Assign block-sequential nonces to all internal operations across
@@ -1820,6 +1870,37 @@ mod tests {
             .collect()
     }
 
+    /// Mutate a dummy CRAC receipt to carry a `Failed` top-level, matching
+    /// what `build_failed_crac_receipt` produces in production.
+    fn make_top_level_failed(receipt: &mut tezos_tezlink::block::AppliedOperation) {
+        use tezos_tezlink::operation_result::{
+            ApplyOperationError, ApplyOperationErrors, ContentResult,
+            OperationDataAndMetadata, OperationResultSum, TransferError,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref mut batch) =
+            receipt.op_and_receipt;
+        for op in batch.operations.iter_mut() {
+            if let OperationResultSum::Transfer(ref mut result) = op.receipt {
+                result.result = ContentResult::Failed(ApplyOperationErrors::from(
+                    ApplyOperationError::Transfer(
+                        TransferError::NonSmartContractExecutionCall,
+                    ),
+                ));
+            }
+        }
+    }
+
+    fn top_level_is_applied(receipt: &tezos_tezlink::block::AppliedOperation) -> bool {
+        use tezos_tezlink::operation_result::{
+            ContentResult, OperationDataAndMetadata, OperationResultSum,
+        };
+        let OperationDataAndMetadata::OperationWithMetadata(ref batch) =
+            receipt.op_and_receipt;
+        batch.operations.first().is_some_and(|op| {
+            matches!(op.receipt, OperationResultSum::Transfer(ref r) if matches!(r.result, ContentResult::Applied(_)))
+        })
+    }
+
     /// Multiple failed CRACs from the same EVM transaction must merge into
     /// a single top-level Michelson operation, per RFC principle 6
     /// ("CRAC-ID per top-level transaction"). Currently
@@ -1831,19 +1912,16 @@ mod tests {
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
                 make_crac_event(0),
                 make_transfer(1, 100),
             ]));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
 
         let result = super::drain_pending_crac_receipts(&mut journal);
 
@@ -1862,6 +1940,89 @@ mod tests {
             extract_nonces(&result[0]),
             vec![0, 1, 2, 3],
             "single CRAC event at the front, then transfers"
+        );
+    }
+
+    /// When a merge contains at least one successful CRAC, the top-level
+    /// `ContentResult` must be `Applied`.  Leaving it as `Failed`
+    /// (inherited from the first-executed receipt) would produce the
+    /// L1-invalid combination of `Applied` internals under a `Failed`
+    /// parent.
+    #[test]
+    fn test_drain_mixed_forces_applied_top_level() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // First-executed CRAC fails (top=Failed in the source receipt),
+        // second one succeeds.
+        let mut failed = dummy_crac_receipt(vec![make_transfer(0, 100)]);
+        make_top_level_failed(&mut failed);
+        journal.michelson.push_failed_crac_receipt(failed);
+        journal
+            .michelson
+            .push_pending_crac_receipt(dummy_crac_receipt(vec![make_transfer(1, 200)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+        assert_eq!(result.len(), 1);
+        assert!(
+            top_level_is_applied(&result[0]),
+            "mixed failed+pending merge must expose an Applied top-level to \
+             avoid Applied-internals-under-Failed-parent"
+        );
+    }
+
+    /// All-failed merges keep their `Failed` top-level (RFC Example 4) —
+    /// the forcing only triggers when at least one CRAC succeeded.
+    #[test]
+    fn test_drain_all_failed_keeps_failed_top_level() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut r1 = dummy_crac_receipt(vec![make_transfer(0, 100)]);
+        make_top_level_failed(&mut r1);
+        let mut r2 = dummy_crac_receipt(vec![make_transfer(1, 200)]);
+        make_top_level_failed(&mut r2);
+        journal.michelson.push_failed_crac_receipt(r1);
+        journal.michelson.push_failed_crac_receipt(r2);
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+        assert_eq!(result.len(), 1);
+        assert!(
+            !top_level_is_applied(&result[0]),
+            "all-failed merge must keep Failed top-level"
+        );
+    }
+
+    /// When failed and successful CRAC receipts are interleaved within
+    /// one EVM transaction, the merged internal operations must reflect
+    /// execution order — not all-failed-before-all-pending.
+    ///
+    /// Simulates: `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`
+    /// where CRAC_1 and CRAC_3 fail, CRAC_2 succeeds.
+    #[test]
+    fn test_drain_preserves_interleaved_execution_order() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // Execution order: failed(100), pending(200), failed(300)
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
+                make_crac_event(0),
+                make_transfer(1, 100),
+            ]));
+        journal
+            .michelson
+            .push_pending_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            extract_amounts(&result[0]),
+            vec![100, 200, 300],
+            "internal transfers must appear in execution order, not \
+             all-failed-before-all-pending"
         );
     }
 
