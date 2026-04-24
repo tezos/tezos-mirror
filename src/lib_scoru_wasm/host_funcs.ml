@@ -1380,23 +1380,12 @@ let store_write =
       | _ -> raise Bad_input)
 
 let lookup_opt ~version name =
-  let v1_and_above ty name =
-    match version with
-    | Wasm_pvm_state.V0 -> None
-    | V1 | V2 | V3 | V4 | V5 | V6 | VExperimental ->
-        Some (ExternFunc (HostFunc (ty, name)))
-  in
-  let v2_and_above ty name =
-    match version with
-    | Wasm_pvm_state.V0 | V1 -> None
-    | V2 | V3 | V4 | V5 | V6 | VExperimental ->
-        Some (ExternFunc (HostFunc (ty, name)))
-  in
-  let v3_and_above ty name =
-    match version with
-    | Wasm_pvm_state.V0 | V1 | V2 -> None
-    | V3 | V4 | V5 | V6 | VExperimental ->
-        Some (ExternFunc (HostFunc (ty, name)))
+  (* [at_least v ty name] is [Some] iff [version] is at least [v] in
+     the linear version order (see {!Wasm_pvm_state.at_least}). *)
+  let at_least v ty name =
+    if Wasm_pvm_state.at_least version v then
+      Some (ExternFunc (HostFunc (ty, name)))
+    else None
   in
   match name with
   | "read_input" ->
@@ -1414,7 +1403,7 @@ let lookup_opt ~version name =
   | "store_delete" ->
       Some (ExternFunc (HostFunc (store_delete_type, store_delete_name)))
   | "store_delete_value" ->
-      v1_and_above store_delete_value_type store_delete_value_name
+      at_least V1 store_delete_value_type store_delete_value_name
   | "store_copy" ->
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
   | "store_move" ->
@@ -1431,10 +1420,10 @@ let lookup_opt ~version name =
   | "store_write" ->
       Some (ExternFunc (HostFunc (store_write_type, store_write_name)))
   | "__internal_store_get_hash" ->
-      v1_and_above store_get_hash_type store_get_hash_name
-  | "store_create" -> v1_and_above store_create_type store_create_name
-  | "store_exists" -> v2_and_above store_exists_type store_exists_name
-  | "reveal" -> v3_and_above reveal_raw_type reveal_raw_name
+      at_least V1 store_get_hash_type store_get_hash_name
+  | "store_create" -> at_least V1 store_create_type store_create_name
+  | "store_exists" -> at_least V2 store_exists_type store_exists_name
+  | "reveal" -> at_least V3 reveal_raw_type reveal_raw_name
   | _ -> None
 
 let lookup ~version name =
