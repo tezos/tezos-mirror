@@ -170,6 +170,51 @@ fn classify_and_charge_crac_response(
     }
 }
 
+/// Reset the gateway precompile's EVM balance to zero, charging the
+/// value-transfer surcharge, but only when the current balance is
+/// non-zero. Otherwise no SSTORE happens and no surcharge is levied.
+///
+/// Called after each CRAC that may have left truncation residue on the
+/// precompile's balance.
+fn burn_gateway_residual<'j, CTX, Host, R>(
+    context: &mut CTX,
+    gas: &mut Gas,
+) -> Result<(), CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let snapshot = *gas;
+    let is_zero = {
+        let account_load = context
+            .journal_mut()
+            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
+            .map_err(|_| {
+                CustomPrecompileError::Revert(
+                    "failed to load precompile account".into(),
+                    snapshot,
+                )
+            })?;
+        account_load.data.balance().is_zero()
+    };
+    if !is_zero {
+        charge(gas, VALUE_TRANSFER_SURCHARGE)?;
+        let snapshot = *gas;
+        let mut account_load = context
+            .journal_mut()
+            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
+            .map_err(|_| {
+                CustomPrecompileError::Revert(
+                    "failed to load precompile account".into(),
+                    snapshot,
+                )
+            })?;
+        account_load.data.set_balance(U256::ZERO);
+    }
+    Ok(())
+}
+
 /// Resolve sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss.
 ///
@@ -354,13 +399,6 @@ where
             let (sender_alias, source_alias) =
                 resolve_aliases(context, &mut gas, inputs.caller, source)?;
 
-            // Charge value transfer surcharge before the CRAC so the
-            // caller cannot trigger a cross-runtime transfer without
-            // enough gas to cover the balance burn.
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
-
             // Convert remaining EVM gas to Tezos milligas for the target runtime
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -431,11 +469,6 @@ where
             let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
                 resolve_aliases(context, &mut gas, inputs.caller, source)?;
-
-            // Charge value transfer surcharge before the CRAC
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -627,12 +660,6 @@ where
                 resolve_aliases(context, &mut gas, inputs.caller, source)?
             };
 
-            // Charge value transfer surcharge before the CRAC (POST
-            // only — GET rejects non-zero amount above).
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
-
             let target_runtime = request
                 .uri()
                 .host()
@@ -687,21 +714,7 @@ where
             // intentionally skipped on GET — for which the entry is
             // read-only end-to-end.
             if !is_get {
-                if !amount.is_zero() {
-                    let mut account_load = context
-                        .journal_mut()
-                        .load_account_mut_skip_cold_load(
-                            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                            true,
-                        )
-                        .map_err(|_| {
-                            CustomPrecompileError::Revert(
-                                "failed to load precompile account".into(),
-                                gas,
-                            )
-                        })?;
-                    account_load.data.set_balance(U256::ZERO);
-                }
+                burn_gateway_residual(context, &mut gas)?;
 
                 let crac_log = Log {
                     address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -724,21 +737,9 @@ where
         }
     }
 
-    if !inputs.value.get().is_zero() {
-        // The value was bridged to Tezos — erase it from the precompile's
-        // EVM balance. set_balance records a BalanceChange journal entry so
-        // this is properly reverted if the enclosing call frame reverts.
-        let mut account_load = context
-            .journal_mut()
-            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
-            .map_err(|_| {
-                CustomPrecompileError::Revert(
-                    "failed to load precompile account".into(),
-                    gas,
-                )
-            })?;
-        account_load.data.set_balance(U256::ZERO);
-    }
+    // The value (if any) was bridged to Tezos — erase any residual
+    // balance from the precompile.
+    burn_gateway_residual(context, &mut gas)?;
 
     Ok(InterpreterResult {
         result: InstructionResult::Return,

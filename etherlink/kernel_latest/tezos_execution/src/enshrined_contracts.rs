@@ -13,7 +13,7 @@ use mir::{
     context::CtxTrait,
 };
 use num_bigint::{BigInt, BigUint};
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -899,12 +899,6 @@ where
         return Err(TransferError::GatewayError("Negative amount".into()).into());
     }
 
-    if ctx.amount() > 0 {
-        ctx.operation_gas()
-            .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
-            .map_err(|_| TransferError::OutOfGas)?;
-    }
-
     let target_host = request.uri().host().map(str::to_string);
     let request = inject_context_headers(request, ctx, journal, registry)?;
 
@@ -917,11 +911,24 @@ where
 
     // Debit the gateway: after a successful call, the gateway
     // forwarded the funds to EVM so its balance should be reset to 0.
+    // Skip both the durable write and the value-transfer surcharge
+    // when the balance is already zero — no state change will occur.
     let account = ctx.contract_account().clone();
-    let host = ctx.host();
-    account
-        .set_balance(host, &0u64.into())
-        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    let current = {
+        let host = ctx.host();
+        account
+            .balance(host)
+            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?
+    };
+    if !current.0.is_zero() {
+        ctx.operation_gas()
+            .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
+            .map_err(|_| TransferError::OutOfGas)?;
+        let host = ctx.host();
+        account
+            .set_balance(host, &0u64.into())
+            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    }
     Ok(response_body)
 }
 
