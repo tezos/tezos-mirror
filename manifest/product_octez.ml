@@ -6168,6 +6168,7 @@ let _octez_scoru_wasm_tests =
       "test_wasm_pvm_encodings";
       "test_wasm_pvm";
       "test_wasm_vm";
+      "test_nds_host_functions";
     ]
     ~path:"src/lib_scoru_wasm/test"
     ~opam:"octez-l2-libs"
@@ -6185,6 +6186,7 @@ let _octez_scoru_wasm_tests =
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
+        octez_riscv_nds_memory;
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 

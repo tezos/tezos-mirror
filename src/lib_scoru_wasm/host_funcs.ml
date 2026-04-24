@@ -40,6 +40,9 @@ module Error = struct
     | Full_outbox
     | Store_invalid_subkey_index
     | Store_value_already_exists
+    | Nds_database_out_of_bounds
+    | Nds_resize_too_large
+    | Nds_not_enabled
 
   (** [code error] returns the error code associated to the error. *)
   let code = function
@@ -56,6 +59,9 @@ module Error = struct
     | Full_outbox -> -11l
     | Store_invalid_subkey_index -> -12l
     | Store_value_already_exists -> -13l
+    | Nds_database_out_of_bounds -> -14l
+    | Nds_resize_too_large -> -15l
+    | Nds_not_enabled -> -16l
 end
 
 module type Memory_access = sig
@@ -69,7 +75,14 @@ module type Memory_access = sig
 
   val store_bytes : t -> addr -> string -> unit Lwt.t
 
+  (** [store_bytes_from_bytes mem addr data] is [store_bytes mem addr]
+      from a [bytes] without going through an intermediate [string],
+      saving one copy on the hot write path. *)
+  val store_bytes_from_bytes : t -> addr -> bytes -> unit Lwt.t
+
   val load_bytes : t -> addr -> size -> string Lwt.t
+
+  val load_bytes_to_bytes : t -> addr -> size -> bytes Lwt.t
 
   val store_num : t -> addr -> addr -> Values.num -> unit Lwt.t
 
@@ -138,6 +151,20 @@ module Aux = struct
 
     val load_bytes :
       memory:memory -> addr:int32 -> size:int32 -> (string, int32) result Lwt.t
+
+    val load_raw_bytes :
+      memory:memory -> addr:int32 -> size:int32 -> (bytes, int32) result Lwt.t
+
+    (** [store_bytes ~memory ~addr ~data] writes [data] into [memory] at
+        [addr]. Returns [Error.Memory_invalid_access] (as an [int32]
+        error code) on out-of-bounds writes rather than raising. *)
+    val store_bytes :
+      memory:memory -> addr:int32 -> data:string -> (unit, int32) result Lwt.t
+
+    (** [store_bytes_from_bytes ~memory ~addr ~data] is {!store_bytes}
+        from a [bytes] without going through an intermediate [string]. *)
+    val store_bytes_from_bytes :
+      memory:memory -> addr:int32 -> data:bytes -> (unit, int32) result Lwt.t
 
     (** [write_output ~output_buffer ~memory ~src ~num_bytes] reads
      num_bytes from the memory of module_inst starting at src and writes
@@ -313,8 +340,14 @@ module Aux = struct
       let load_bytes mem addr size =
         guard @@ fun () -> M.load_bytes mem addr size
 
+      let load_bytes_to_bytes mem addr size =
+        guard @@ fun () -> M.load_bytes_to_bytes mem addr size
+
       let store_bytes mem addr data =
         guard @@ fun () -> M.store_bytes mem addr data
+
+      let store_bytes_from_bytes mem addr data =
+        guard @@ fun () -> M.store_bytes_from_bytes mem addr data
     end
 
     let load_bytes ~memory ~addr ~size =
@@ -324,6 +357,30 @@ module Aux = struct
       let size = Int32.to_int size in
       if size > input_output_max_size then fail Error.Input_output_too_large
       else M.load_bytes memory addr size
+
+    let load_raw_bytes ~memory ~addr ~size =
+      let open Lwt_result_syntax in
+      Lwt_result.map_error Error.code
+      @@
+      let size = Int32.to_int size in
+      if size > input_output_max_size then fail Error.Input_output_too_large
+      else M.load_bytes_to_bytes memory addr size
+
+    let store_bytes ~memory ~addr ~data =
+      let open Lwt_result_syntax in
+      Lwt_result.map_error Error.code
+      @@
+      let size = String.length data in
+      if size > input_output_max_size then fail Error.Input_output_too_large
+      else M.store_bytes memory addr data
+
+    let store_bytes_from_bytes ~memory ~addr ~data =
+      let open Lwt_result_syntax in
+      Lwt_result.map_error Error.code
+      @@
+      let size = Bytes.length data in
+      if size > input_output_max_size then fail Error.Input_output_too_large
+      else M.store_bytes_from_bytes memory addr data
 
     let load_key_from_memory key_offset key_length memory =
       let open Lwt_result_syntax in
@@ -712,6 +769,29 @@ module Tick_model = struct
 
   let with_error result compute_ticks =
     if result < 0l then nop else compute_ticks ()
+
+  (** {2 NDS backend tick costs}
+
+      Same model as tree operations: one tick per backend call,
+      plus memory I/O costs per byte read/written. *)
+
+  let nds_access = one
+
+  let nds_read = one
+
+  let nds_write = one
+
+  let nds_delete = one
+
+  let nds_move = one
+
+  let nds_copy = one
+
+  let nds_clear = one
+
+  let nds_resize = one
+
+  let nds_hash = one
 end
 
 let value i = Values.(Num (I32 i))
@@ -1379,14 +1459,592 @@ let store_write =
             store_write_ticks key_length num_bytes code )
       | _ -> raise Bad_input)
 
+module Nds_aux = struct
+  (** Size in bytes of an NDS hash (Blake3-256). The natural full-length
+      output of {!registry_get_hash} / {!database_get_hash}; callers
+      supplying a smaller [max_bytes] receive a truncated prefix. *)
+  let nds_hash_size = 32l
+
+  (** [Int32.max_int] boxed once as an [int64], reused by the
+      [store_value_size] overflow guard so the comparison does not
+      allocate a fresh [int64] per call. *)
+  let max_int32_as_int64 = Int64.of_int32 Int32.max_int
+
+  (** Map NDS errors to host function error codes. *)
+  let nds_error_code = function
+    | Nds_errors.Key_not_found -> Error.code Error.Store_not_a_value
+    | Nds_errors.Key_too_long -> Error.code Error.Store_key_too_large
+    | Nds_errors.Io_request_too_large -> Error.code Error.Input_output_too_large
+    | Nds_errors.Offset_too_large -> Error.code Error.Store_invalid_access
+    | Nds_errors.Value_size_too_large ->
+        Error.code Error.Store_value_size_exceeded
+    | Nds_errors.Database_index_out_of_bounds ->
+        Error.code Error.Nds_database_out_of_bounds
+    | Nds_errors.Registry_resize_too_large ->
+        Error.code Error.Nds_resize_too_large
+
+  let extract_nds_error_code = function
+    | Error code -> Lwt.return code
+    | Ok res -> Lwt.return res
+
+  let map_nds r = Result.map_error nds_error_code r
+
+  let registry_resize ~nds ~n =
+    map_nds (Nds.resize nds n)
+    |> Result.map (fun () -> 0l)
+    |> extract_nds_error_code
+
+  let registry_copy ~nds ~src ~dst =
+    map_nds (Nds.copy_database nds ~src ~dst)
+    |> Result.map (fun () -> 0l)
+    |> extract_nds_error_code
+
+  let registry_move ~nds ~src ~dst =
+    map_nds (Nds.move_database nds ~src ~dst)
+    |> Result.map (fun () -> 0l)
+    |> extract_nds_error_code
+
+  let registry_clear ~nds ~db_index =
+    map_nds (Nds.clear nds db_index)
+    |> Result.map (fun () -> 0l)
+    |> extract_nds_error_code
+
+  let registry_get_hash ~nds ~memory ~dst ~max_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      let*? hash = map_nds (Nds.registry_hash nds) in
+      let hash_len = Bytes.length hash in
+      let max_bytes = Int32.to_int max_bytes in
+      let written = Int.min hash_len max_bytes in
+      let data =
+        if Int.compare max_bytes hash_len < 0 then Bytes.sub hash 0 max_bytes
+        else hash
+      in
+      let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
+      return (Int32.of_int written)
+    in
+    extract_nds_error_code res
+
+  let store_exists ~nds ~memory ~db_index ~key_offset ~key_len =
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+      let*? exists = map_nds (Nds.exists nds ~db_index ~key) in
+      return (if exists then 1l else 0l)
+    in
+    extract_nds_error_code res
+
+  let store_read ~nds ~memory ~db_index ~key_offset ~key_len ~offset ~dst
+      ~max_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      (* Mirror [Aux.load_bytes]: reject oversized [max_bytes] before
+         paying the NDS read cost, rather than letting [store_bytes]
+         reject after the fact. *)
+      if Int32.compare max_bytes (Int32.of_int Aux.input_output_max_size) > 0
+      then fail (Error.code Error.Input_output_too_large)
+      else
+        let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+        let len = Int64.of_int32 max_bytes in
+        let*? data = map_nds (Nds.read nds ~db_index ~key ~offset ~len) in
+        let bytes_read = Int32.of_int (Bytes.length data) in
+        let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
+        return bytes_read
+    in
+    extract_nds_error_code res
+
+  let store_write ~nds ~memory ~db_index ~key_offset ~key_len ~offset ~src
+      ~num_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+      let* data = Aux.load_raw_bytes ~memory ~addr:src ~size:num_bytes in
+      let*? total_len =
+        map_nds (Nds.write nds ~db_index ~key ~offset ~value:data)
+      in
+      (* [Nds.write] returns [int64] because the backend tracks byte
+         counts in platform-size integers. We narrow to [int32] here
+         because the WASM ABI for [nds_store_write] declares an [i32]
+         return (matching the classic [store_write] convention).
+
+         The narrowing is lossless on this path: [total_len] equals
+         [Bytes.length value], [value] was produced by
+         [Aux.load_raw_bytes], and that helper rejects [size >
+         input_output_max_size] (4096). So [total_len <= 4096] holds
+         unconditionally here, and [Int64.to_int32] is a no-op
+         modulo representation. *)
+      return (Int64.to_int32 total_len)
+    in
+    extract_nds_error_code res
+
+  let store_set ~nds ~memory ~db_index ~key_offset ~key_len ~src ~num_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+      let* data = Aux.load_raw_bytes ~memory ~addr:src ~size:num_bytes in
+      let*? () = map_nds (Nds.set nds ~db_index ~key ~value:data) in
+      return 0l
+    in
+    extract_nds_error_code res
+
+  let store_delete ~nds ~memory ~db_index ~key_offset ~key_len =
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+      let*? () = map_nds (Nds.delete nds ~db_index ~key) in
+      return 0l
+    in
+    extract_nds_error_code res
+
+  let store_value_size ~nds ~memory ~db_index ~key_offset ~key_len =
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = Aux.load_raw_bytes ~memory ~addr:key_offset ~size:key_len in
+      let*? len = map_nds (Nds.value_length nds ~db_index ~key) in
+      (* [Nds.value_length] returns [int64] (backend platform-size
+         integer). We must narrow to [int32] for the WASM ABI — but a
+         silent [Int64.to_int32] would wrap to a negative code on
+         values >= 2^31 bytes, indistinguishable from an error.
+         Clamp explicitly to [Store_value_size_exceeded] so the
+         kernel sees a well-defined error instead. *)
+      if Int64.compare len max_int32_as_int64 > 0 then
+        fail (Error.code Error.Store_value_size_exceeded)
+      else return (Int64.to_int32 len)
+    in
+    extract_nds_error_code res
+
+  let database_get_hash ~nds ~memory ~db_index ~dst ~max_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      let*? hash = map_nds (Nds.hash nds ~db_index) in
+      let hash_len = Bytes.length hash in
+      let max_bytes = Int32.to_int max_bytes in
+      let written = Int.min hash_len max_bytes in
+      let data =
+        if Int.compare max_bytes hash_len < 0 then Bytes.sub hash 0 max_bytes
+        else hash
+      in
+      let* () = Aux.store_bytes_from_bytes ~memory ~addr:dst ~data in
+      return (Int32.of_int written)
+    in
+    extract_nds_error_code res
+end
+
+(** [nds_handler body] wraps [body] as an {!Host_funcs.Nds_host_func}.
+    [body] receives the [nds], the memory vector, and the input list,
+    and returns an [(i32 code, ticks)] pair. The helper re-threads
+    [nds] through the result and wraps the return code as an [I32]
+    WASM value. Input-arity mismatches raise {!Bad_input} from within
+    [body]. *)
+let nds_handler body =
+  Host_funcs.Nds_host_func
+    (fun _input _output nds memories inputs ->
+      let open Lwt.Syntax in
+      let+ code, ticks = body nds memories inputs in
+      (nds, [Values.(Num (I32 code))], ticks))
+
+let nds_disabled_code = Error.code Error.Nds_not_enabled
+
+let nds_registry_resize ~nds_host_functions_enabled =
+  nds_handler @@ fun nds _memories -> function
+  | [Values.(Num (I64 n))] ->
+      let open Lwt.Syntax in
+      let ticks = Tick_model.(to_z nds_resize) in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, ticks)
+      else
+        let+ code = Nds_aux.registry_resize ~nds ~n in
+        (code, ticks)
+  | _ -> raise Bad_input
+
+let nds_registry_copy ~nds_host_functions_enabled =
+  nds_handler @@ fun nds _memories -> function
+  | [Values.(Num (I64 src)); Values.(Num (I64 dst))] ->
+      let open Lwt.Syntax in
+      let ticks = Tick_model.(to_z nds_copy) in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, ticks)
+      else
+        let+ code = Nds_aux.registry_copy ~nds ~src ~dst in
+        (code, ticks)
+  | _ -> raise Bad_input
+
+let nds_registry_move ~nds_host_functions_enabled =
+  nds_handler @@ fun nds _memories -> function
+  | [Values.(Num (I64 src)); Values.(Num (I64 dst))] ->
+      let open Lwt.Syntax in
+      let ticks = Tick_model.(to_z nds_move) in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, ticks)
+      else
+        let+ code = Nds_aux.registry_move ~nds ~src ~dst in
+        (code, ticks)
+  | _ -> raise Bad_input
+
+let nds_registry_clear ~nds_host_functions_enabled =
+  nds_handler @@ fun nds _memories -> function
+  | [Values.(Num (I64 db_index))] ->
+      let open Lwt.Syntax in
+      let ticks = Tick_model.(to_z nds_clear) in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, ticks)
+      else
+        let+ code = Nds_aux.registry_clear ~nds ~db_index in
+        (code, ticks)
+  | _ -> raise Bad_input
+
+let nds_hash_ticks result =
+  Tick_model.(
+    with_error result (fun () ->
+        nds_hash + value_written_in_memory Nds_aux.nds_hash_size)
+    |> to_z)
+
+let nds_registry_get_hash ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [Values.(Num (I32 dst)); Values.(Num (I32 max_bytes))] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_hash_ticks 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code = Nds_aux.registry_get_hash ~nds ~memory ~dst ~max_bytes in
+        (code, nds_hash_ticks code)
+  | _ -> raise Bad_input
+
+let nds_store_exists_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + nds_access)
+    |> to_z)
+
+let nds_store_exists ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_exists_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_exists ~nds ~memory ~db_index ~key_offset ~key_len
+        in
+        (code, nds_store_exists_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_store_read_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () ->
+        read_key_in_memory key_size + nds_read + value_written_in_memory result)
+    |> to_z)
+
+let nds_store_read ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+      Values.(Num (I64 offset));
+      Values.(Num (I32 dst));
+      Values.(Num (I32 max_bytes));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_read_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_read
+            ~nds
+            ~memory
+            ~db_index
+            ~key_offset
+            ~key_len
+            ~offset
+            ~dst
+            ~max_bytes
+        in
+        (code, nds_store_read_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_store_write_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () ->
+        read_key_in_memory key_size + nds_write + value_read_from_memory result)
+    |> to_z)
+
+let nds_store_write ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+      Values.(Num (I64 offset));
+      Values.(Num (I32 src));
+      Values.(Num (I32 num_bytes));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_write_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_write
+            ~nds
+            ~memory
+            ~db_index
+            ~key_offset
+            ~key_len
+            ~offset
+            ~src
+            ~num_bytes
+        in
+        (code, nds_store_write_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_store_set_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () ->
+        read_key_in_memory key_size + nds_write + value_read_from_memory result)
+    |> to_z)
+
+let nds_store_set ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+      Values.(Num (I32 src));
+      Values.(Num (I32 num_bytes));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_set_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_set
+            ~nds
+            ~memory
+            ~db_index
+            ~key_offset
+            ~key_len
+            ~src
+            ~num_bytes
+        in
+        (code, nds_store_set_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_store_delete_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + nds_delete)
+    |> to_z)
+
+let nds_store_delete ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_delete_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_delete ~nds ~memory ~db_index ~key_offset ~key_len
+        in
+        (code, nds_store_delete_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_store_value_size_ticks key_size result =
+  Tick_model.(
+    with_error result (fun () -> read_key_in_memory key_size + nds_read) |> to_z)
+
+let nds_store_value_size ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 key_offset));
+      Values.(Num (I32 key_len));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_store_value_size_ticks key_len 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.store_value_size ~nds ~memory ~db_index ~key_offset ~key_len
+        in
+        (code, nds_store_value_size_ticks key_len code)
+  | _ -> raise Bad_input
+
+let nds_database_get_hash ~nds_host_functions_enabled =
+  nds_handler @@ fun nds memories -> function
+  | [
+      Values.(Num (I64 db_index));
+      Values.(Num (I32 dst));
+      Values.(Num (I32 max_bytes));
+    ] ->
+      let open Lwt.Syntax in
+      if not nds_host_functions_enabled then
+        Lwt.return (nds_disabled_code, nds_hash_ticks 0l)
+      else
+        let* memory = retrieve_memory memories in
+        let+ code =
+          Nds_aux.database_get_hash ~nds ~memory ~db_index ~dst ~max_bytes
+        in
+        (code, nds_hash_ticks code)
+  | _ -> raise Bad_input
+
+let nds_registry_resize_name = "nds_registry_resize"
+
+let nds_registry_resize_type =
+  let input_types = Types.[NumType I64Type] |> Vector.of_list in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_registry_copy_name = "nds_registry_copy"
+
+let nds_registry_copy_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I64Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_registry_move_name = "nds_registry_move"
+
+let nds_registry_move_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I64Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_registry_clear_name = "nds_registry_clear"
+
+let nds_registry_clear_type =
+  let input_types = Types.[NumType I64Type] |> Vector.of_list in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_registry_get_hash_name = "nds_registry_get_hash"
+
+let nds_registry_get_hash_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_exists_name = "nds_store_exists"
+
+let nds_store_exists_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_read_name = "nds_store_read"
+
+let nds_store_read_type =
+  let input_types =
+    Types.
+      [
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_write_name = "nds_store_write"
+
+let nds_store_write_type =
+  let input_types =
+    Types.
+      [
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_set_name = "nds_store_set"
+
+let nds_store_set_type =
+  let input_types =
+    Types.
+      [
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_delete_name = "nds_store_delete"
+
+let nds_store_delete_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_store_value_size_name = "nds_store_value_size"
+
+let nds_store_value_size_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let nds_database_get_hash_name = "nds_database_get_hash"
+
+let nds_database_get_hash_type =
+  let input_types =
+    Types.[NumType I64Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
 let lookup_opt ~version name =
   (* [at_least v ty name] is [Some] iff [version] is at least [v] in
-     the linear version order (see {!Wasm_pvm_state.at_least}). *)
+     the linear version order (see {!Wasm_pvm_state.at_least}).
+     Replaces the per-threshold [vX_and_above] helpers. *)
   let at_least v ty name =
     if Wasm_pvm_state.at_least version v then
       Some (ExternFunc (HostFunc (ty, name)))
     else None
   in
+  (* NDS host functions are gated purely on the version (V6+). The
+     [Nds_host_functions] feature flag is enforced at runtime by
+     {!registry} — when the flag is off, each [nds_*] call returns
+     a no-op success code. Importing NDS on a flag-off node thus
+     never produces a link error. *)
+  let nds_host_function ty name = at_least V6 ty name in
   match name with
   | "read_input" ->
       Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
@@ -1424,6 +2082,29 @@ let lookup_opt ~version name =
   | "store_create" -> at_least V1 store_create_type store_create_name
   | "store_exists" -> at_least V2 store_exists_type store_exists_name
   | "reveal" -> at_least V3 reveal_raw_type reveal_raw_name
+  | "nds_registry_resize" ->
+      nds_host_function nds_registry_resize_type nds_registry_resize_name
+  | "nds_registry_copy" ->
+      nds_host_function nds_registry_copy_type nds_registry_copy_name
+  | "nds_registry_move" ->
+      nds_host_function nds_registry_move_type nds_registry_move_name
+  | "nds_registry_clear" ->
+      nds_host_function nds_registry_clear_type nds_registry_clear_name
+  | "nds_registry_get_hash" ->
+      nds_host_function nds_registry_get_hash_type nds_registry_get_hash_name
+  | "nds_store_exists" ->
+      nds_host_function nds_store_exists_type nds_store_exists_name
+  | "nds_store_read" ->
+      nds_host_function nds_store_read_type nds_store_read_name
+  | "nds_store_write" ->
+      nds_host_function nds_store_write_type nds_store_write_name
+  | "nds_store_set" -> nds_host_function nds_store_set_type nds_store_set_name
+  | "nds_store_delete" ->
+      nds_host_function nds_store_delete_type nds_store_delete_name
+  | "nds_store_value_size" ->
+      nds_host_function nds_store_value_size_type nds_store_value_size_name
+  | "nds_database_get_hash" ->
+      nds_host_function nds_database_get_hash_type nds_database_get_hash_name
   | _ -> None
 
 let lookup ~version name =
@@ -1511,23 +2192,77 @@ let registry_V5 ~write_debug =
 
 let registry_V5_noop = registry_V5 ~write_debug:Noop
 
-let base_V6 = base_V4
+let base_V6 ~nds_host_functions_enabled =
+  Host_funcs.(
+    base_V4
+    |> with_host_function
+         ~global_name:nds_registry_resize_name
+         ~implem:(nds_registry_resize ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_registry_copy_name
+         ~implem:(nds_registry_copy ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_registry_move_name
+         ~implem:(nds_registry_move ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_registry_clear_name
+         ~implem:(nds_registry_clear ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_registry_get_hash_name
+         ~implem:(nds_registry_get_hash ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_exists_name
+         ~implem:(nds_store_exists ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_read_name
+         ~implem:(nds_store_read ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_write_name
+         ~implem:(nds_store_write ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_set_name
+         ~implem:(nds_store_set ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_delete_name
+         ~implem:(nds_store_delete ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_store_value_size_name
+         ~implem:(nds_store_value_size ~nds_host_functions_enabled)
+    |> with_host_function
+         ~global_name:nds_database_get_hash_name
+         ~implem:(nds_database_get_hash ~nds_host_functions_enabled))
 
-let registry_V6 ~write_debug =
-  Host_funcs.(base_V6 |> with_write_debug ~write_debug |> construct)
+let registry_V6 ~nds_host_functions_enabled ~write_debug =
+  Host_funcs.(
+    base_V6 ~nds_host_functions_enabled
+    |> with_write_debug ~write_debug
+    |> construct)
 
-let registry_V6_noop = registry_V6 ~write_debug:Noop
+let registry_V6_noop_enabled =
+  registry_V6 ~nds_host_functions_enabled:true ~write_debug:Noop
 
-let registry_VExperimental ~write_debug =
-  Host_funcs.(base_V6 |> with_write_debug ~write_debug |> construct)
+let registry_V6_noop_disabled =
+  registry_V6 ~nds_host_functions_enabled:false ~write_debug:Noop
 
-let registry_VExperimental_noop = registry_VExperimental ~write_debug:Noop
+let registry_VExperimental ~nds_host_functions_enabled ~write_debug =
+  Host_funcs.(
+    base_V6 ~nds_host_functions_enabled
+    |> with_write_debug ~write_debug
+    |> construct)
 
-let registry ~version ~write_debug =
-  (* We need to keep a top-level definition for the [Noop] case to be able to
-     run the tests related to the tick models. Besides, by doing so, we should
-     optimize (even slightly) the creation of the registry since it is done at
-     compile time for this particular case. *)
+let registry_VExperimental_noop_enabled =
+  registry_VExperimental ~nds_host_functions_enabled:true ~write_debug:Noop
+
+let registry_VExperimental_noop_disabled =
+  registry_VExperimental ~nds_host_functions_enabled:false ~write_debug:Noop
+
+let registry ~version ~nds_host_functions_enabled ~write_debug =
+  (* Top-level definitions for [Noop] cases let tick-model tests pin
+     a stable registry and let registry construction happen at
+     compile time on those paths. V6+ also cache per
+     [nds_host_functions_enabled] value so tests that mutate the
+     registry (e.g. [Test_nds_host_func_crash]) observe the same
+     instance the runtime uses. *)
   match (version, write_debug) with
   | Wasm_pvm_state.V0, Builtins.Noop -> registry_V0_noop
   | Wasm_pvm_state.V0, _ -> registry_V0 ~write_debug
@@ -1541,10 +2276,15 @@ let registry ~version ~write_debug =
   | Wasm_pvm_state.V4, _ -> registry_V4 ~write_debug
   | Wasm_pvm_state.V5, Noop -> registry_V5_noop
   | Wasm_pvm_state.V5, _ -> registry_V5 ~write_debug
-  | Wasm_pvm_state.V6, Noop -> registry_V6_noop
-  | Wasm_pvm_state.V6, _ -> registry_V6 ~write_debug
-  | Wasm_pvm_state.VExperimental, Noop -> registry_VExperimental_noop
-  | Wasm_pvm_state.VExperimental, _ -> registry_VExperimental ~write_debug
+  | Wasm_pvm_state.V6, Noop ->
+      if nds_host_functions_enabled then registry_V6_noop_enabled
+      else registry_V6_noop_disabled
+  | Wasm_pvm_state.V6, _ -> registry_V6 ~nds_host_functions_enabled ~write_debug
+  | Wasm_pvm_state.VExperimental, Noop ->
+      if nds_host_functions_enabled then registry_VExperimental_noop_enabled
+      else registry_VExperimental_noop_disabled
+  | Wasm_pvm_state.VExperimental, _ ->
+      registry_VExperimental ~nds_host_functions_enabled ~write_debug
 
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
@@ -1584,4 +2324,38 @@ module Internal_for_tests = struct
   let store_get_hash = Func.HostFunc (store_get_hash_type, store_get_hash_name)
 
   let write_debug = Func.HostFunc (write_debug_type, write_debug_name)
+
+  let nds_registry_resize =
+    Func.HostFunc (nds_registry_resize_type, nds_registry_resize_name)
+
+  let nds_registry_copy =
+    Func.HostFunc (nds_registry_copy_type, nds_registry_copy_name)
+
+  let nds_registry_move =
+    Func.HostFunc (nds_registry_move_type, nds_registry_move_name)
+
+  let nds_registry_clear =
+    Func.HostFunc (nds_registry_clear_type, nds_registry_clear_name)
+
+  let nds_registry_get_hash =
+    Func.HostFunc (nds_registry_get_hash_type, nds_registry_get_hash_name)
+
+  let nds_store_exists =
+    Func.HostFunc (nds_store_exists_type, nds_store_exists_name)
+
+  let nds_store_read = Func.HostFunc (nds_store_read_type, nds_store_read_name)
+
+  let nds_store_write =
+    Func.HostFunc (nds_store_write_type, nds_store_write_name)
+
+  let nds_store_set = Func.HostFunc (nds_store_set_type, nds_store_set_name)
+
+  let nds_store_delete =
+    Func.HostFunc (nds_store_delete_type, nds_store_delete_name)
+
+  let nds_store_value_size =
+    Func.HostFunc (nds_store_value_size_type, nds_store_value_size_name)
+
+  let nds_database_get_hash =
+    Func.HostFunc (nds_database_get_hash_type, nds_database_get_hash_name)
 end

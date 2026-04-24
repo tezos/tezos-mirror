@@ -8415,6 +8415,46 @@ let test_slow_vm_fallback ~kind =
   in
   unit
 
+(* Test that a kernel calling an NDS host function crashes the rollup
+   node.  The fast execution engine (Wasmer) does not know about NDS
+   imports, so it panics with [Unsatisfied_import]. *)
+let test_nds_host_func_crashes_node ~kind =
+  let boot_sector () =
+    Sc_rollup_helpers.read_kernel
+      ~base:"tezt/tests/kernels"
+      "nds_host_func_kernel"
+  in
+  test_full_scenario
+    ~kind
+    ~boot_sector
+    {
+      variant = None;
+      tags = ["nds"; "crash"];
+      description =
+        "rollup node crashes when kernel calls NDS host function without NDS \
+         storage";
+    }
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  let node =
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~kind
+      ~default_operator:Constant.bootstrap2.public_key_hash
+      ~name:"nds_crash"
+  in
+  let* () = Sc_rollup_node.run node sc_rollup [] in
+  let crash =
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Unsatisfied_import.*nds_store_exists")
+      node
+  in
+  (* Bake a block to trigger PVM evaluation of kernel_run *)
+  let* () = Client.bake_for_and_wait tezos_client in
+  crash
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
@@ -8703,4 +8743,5 @@ let register_protocol_independent () =
   bailout_mode_recover_bond_starting_no_commitment_staked ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:true ~kind protocols ;
   test_remote_signer ~hardcoded_remote_signer:false ~kind protocols ;
-  test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols
+  test_slow_vm_fallback ~kind:"wasm_2_0_0" protocols ;
+  test_nds_host_func_crashes_node ~kind:"wasm_2_0_0" protocols

@@ -48,11 +48,14 @@ end
 module Make_vm (Config : sig
   val config : Wasm_pvm_config.t
 end) : S = struct
-  (* Silences warning 32 (unused functor parameter) while the follow-up
-     feature MR has not yet consumed [Config.config]. Once
-     [unsafe_next_tick_state] (L2-605 NDS routing) branches on it, this
-     suppressor can be removed. *)
-  let _ = Config.config
+  (** [current_level_of pvm_state] returns the inbox level of the
+      most recent input, or [0l] before the first input. Used as the
+      reference level for {!Wasm_pvm_config} feature gates. *)
+  let current_level_of (pvm_state : pvm_state) =
+    match pvm_state.last_input_info with
+    | Some {inbox_level; _} ->
+        Tezos_base.Bounded.Non_negative_int32.to_value inbox_level
+    | None -> 0l
 
   let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
     function
@@ -560,21 +563,34 @@ end) : S = struct
     let open Lwt_syntax in
     let* version = get_wasm_version pvm_state in
     let stack_size_limit = stack_size_limit version in
+    let nds_host_functions_enabled =
+      Wasm_pvm_config.nds_host_functions_enabled
+        Config.config
+        ~current_level:(current_level_of pvm_state)
+    in
     compute_step_with_host_functions
       ~wasm_entrypoint
       ~version
       ~stack_size_limit
-      (Host_funcs.registry ~version ~write_debug:Noop)
+      (Host_funcs.registry
+         ~version
+         ~nds_host_functions_enabled
+         ~write_debug:Noop)
       pvm_state
 
   let compute_step_with_debug ~wasm_entrypoint ~write_debug pvm_state =
     let open Lwt_syntax in
     let* version = get_wasm_version pvm_state in
+    let nds_host_functions_enabled =
+      Wasm_pvm_config.nds_host_functions_enabled
+        Config.config
+        ~current_level:(current_level_of pvm_state)
+    in
     compute_step_with_host_functions
       ~wasm_entrypoint
       ~version
       ~stack_size_limit:(stack_size_limit version)
-      (Host_funcs.registry ~version ~write_debug)
+      (Host_funcs.registry ~version ~nds_host_functions_enabled ~write_debug)
       pvm_state
 
   let input_request pvm_state =
@@ -659,7 +675,14 @@ end) : S = struct
     assert (max_steps > 0L) ;
     let* version = get_wasm_version pvm_state in
     let stack_size_limit = stack_size_limit version in
-    let host_function_registry = Host_funcs.registry ~version ~write_debug in
+    let nds_host_functions_enabled =
+      Wasm_pvm_config.nds_host_functions_enabled
+        Config.config
+        ~current_level:(current_level_of pvm_state)
+    in
+    let host_function_registry =
+      Host_funcs.registry ~version ~nds_host_functions_enabled ~write_debug
+    in
     let compute_step_with_reveal =
       match reveal_builtins with
       | Some reveal_builtins -> (

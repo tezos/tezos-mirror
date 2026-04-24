@@ -15,7 +15,10 @@
     the PVM machine via the [Make_pvm_machine_with_config] functor. *)
 
 (** Features the protocol can enable via canonical rollup signals. *)
-type feature = |
+type feature =
+  | Nds_host_functions
+      (** Expose the new-durable-storage host functions to kernels. The
+          canonical signal name is [nds_host_functions]. *)
 
 module Feature_map : Map.S with type key = feature
 
@@ -54,3 +57,9 @@ val signal_name_of_feature : feature -> string
     [(signal_name, activation_level)] list. Entries whose name has no
     matching feature are dropped silently. *)
 val of_signals : (string * int32) list -> t
+
+(** [nds_host_functions_enabled t ~current_level] is a shortcut for
+    [is_enabled t Nds_host_functions ~current_level]. It's the
+    single question the WASM linker asks to decide whether to expose
+    the NDS host functions to the kernel at link time. *)
+val nds_host_functions_enabled : t -> current_level:int32 -> bool

@@ -32,7 +32,15 @@ let hijack_store_has ~version =
   let original =
     Tezos_webassembly_interpreter.Host_funcs.lookup
       ~global_name
-      (Host_funcs.registry ~version ~write_debug:Noop)
+      (* [Wasm_utils.Config.config] is [Wasm_pvm_config.empty], which
+         leaves [nds_host_functions_enabled] [false] at runtime. We
+         match that here so the install/revert pattern mutates the
+         same cached singleton the kernel evaluation will later
+         dispatch through. *)
+      (Host_funcs.registry
+         ~version
+         ~nds_host_functions_enabled:false
+         ~write_debug:Noop)
   in
   let nds_implem =
     Tezos_webassembly_interpreter.Host_funcs.Nds_host_func
@@ -44,7 +52,10 @@ let hijack_store_has ~version =
     Tezos_webassembly_interpreter.Host_funcs.register
       ~global_name
       impl
-      (Host_funcs.registry ~version ~write_debug:Noop)
+      (Host_funcs.registry
+         ~version
+         ~nds_host_functions_enabled:false
+         ~write_debug:Noop)
   in
   (register nds_implem, register original)
 

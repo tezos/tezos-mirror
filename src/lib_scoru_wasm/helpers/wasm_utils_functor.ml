@@ -514,7 +514,12 @@ module Make
     let module_reg = Instance.ModuleMap.create () in
     let module_key = Instance.Module_key "test" in
     Instance.update_module_ref module_reg module_key module_inst ;
-    (module_reg, module_key, Host_funcs.registry ~version ~write_debug:Noop)
+    ( module_reg,
+      module_key,
+      Host_funcs.registry
+        ~version
+        ~nds_host_functions_enabled:true
+        ~write_debug:Noop )
 
   let retrieve_memory module_reg =
     let open Lwt_syntax in

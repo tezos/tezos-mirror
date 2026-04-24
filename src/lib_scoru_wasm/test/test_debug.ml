@@ -53,6 +53,7 @@ let write_debug ~version ~debug ~init ~values memories =
     ~caller:module_key
     (Host_funcs.registry
        ~version
+       ~nds_host_functions_enabled:false
        ~write_debug:
          (if debug then
             Printer (fun str -> Lwt.return @@ Format.printf "%s" str)
