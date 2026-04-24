@@ -48,11 +48,18 @@ pub struct MichelsonJournal {
     external_checkpoints: Vec<ExternalCheckpoint>,
     /// Successful CRAC receipts (EVM → Michelson).  Subject to revert:
     /// truncated by `revert_frame` when the calling EVM frame reverts.
-    pub pending_crac_receipts: Vec<AppliedOperation>,
+    /// Each entry is `(seq, receipt)` where `seq` is a monotonic counter
+    /// shared with `failed_crac_receipts`, used to recover cross-list
+    /// execution order at drain time.
+    pub pending_crac_receipts: Vec<(u64, AppliedOperation)>,
     /// Failed CRAC receipts.  NOT subject to revert: a failed CRAC is
     /// recorded even when the EVM transaction reverts entirely, so that
     /// the Michelson block shows the attempt with `status: failed`.
-    pub failed_crac_receipts: Vec<AppliedOperation>,
+    pub failed_crac_receipts: Vec<(u64, AppliedOperation)>,
+    /// Monotonic counter assigned to each CRAC receipt at push time,
+    /// shared across pending and failed lists so that merging them
+    /// recovers execution order.
+    next_receipt_seq: u64,
     /// Whether the next incoming CRAC should emit a CRAC-ID event.
     /// Set to `false` when Michelson originates a CRAC or emits a
     /// CRAC-ID event.  Stays `false` for the lifetime of the journal
@@ -67,6 +74,7 @@ impl Default for MichelsonJournal {
             external_checkpoints: Vec::new(),
             pending_crac_receipts: Vec::new(),
             failed_crac_receipts: Vec::new(),
+            next_receipt_seq: 0,
             should_emit_crac_id: true,
         }
     }
@@ -85,6 +93,38 @@ impl MichelsonJournal {
     /// CRAC or has already emitted the event for this chain).
     pub fn suppress_crac_id(&mut self) {
         self.should_emit_crac_id = false;
+    }
+
+    /// Claim the next execution-order sequence number.  `u64` overflow
+    /// would require 2^64 CRAC receipts in a single block and is not
+    /// representable in practice — use `checked_add` so the invariant
+    /// is explicit rather than silently saturating (which would tie
+    /// sequence numbers together and break the drain-time sort).
+    fn claim_receipt_seq(&mut self) -> u64 {
+        let seq = self.next_receipt_seq;
+        self.next_receipt_seq = self
+            .next_receipt_seq
+            .checked_add(1)
+            .expect("CRAC receipt sequence counter overflowed u64");
+        seq
+    }
+
+    /// Push a successful CRAC receipt, tagging it with the next
+    /// execution-order sequence number.  The invariant that the
+    /// `pending` list holds only Applied top-level receipts (and
+    /// `failed` only Failed ones) is load-bearing for the post-merge
+    /// top-level reconciliation in `drain_pending_crac_receipts`.
+    pub fn push_pending_crac_receipt(&mut self, receipt: AppliedOperation) {
+        let seq = self.claim_receipt_seq();
+        self.pending_crac_receipts.push((seq, receipt));
+    }
+
+    /// Push a failed CRAC receipt, tagging it with the next
+    /// execution-order sequence number.  See `push_pending_crac_receipt`
+    /// for the pending-vs-failed invariant.
+    pub fn push_failed_crac_receipt(&mut self, receipt: AppliedOperation) {
+        let seq = self.claim_receipt_seq();
+        self.failed_crac_receipts.push((seq, receipt));
     }
 }
 
@@ -1064,30 +1104,30 @@ mod tests {
         // A checkpoint
         journal.push_external_checkpoint();
         let _idx_a = journal.checkpoint(&mut host, &world).unwrap();
-        journal.pending_crac_receipts.push(dummy_receipt(0));
+        journal.push_pending_crac_receipt(dummy_receipt(0));
 
         // B checkpoint
         journal.push_external_checkpoint();
-        journal.pending_crac_receipts.push(dummy_receipt(1));
+        journal.push_pending_crac_receipt(dummy_receipt(1));
         assert_eq!(journal.pending_crac_receipts.len(), 2);
 
         // B reverts — receipt 1 should be dropped, receipt 0 kept
         journal.revert_frame(&mut host, &world).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 1);
-        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
 
         // Push another receipt after revert
-        journal.pending_crac_receipts.push(dummy_receipt(2));
+        journal.push_pending_crac_receipt(dummy_receipt(2));
         assert_eq!(journal.pending_crac_receipts.len(), 2);
-        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
-        assert_eq!(receipt_id(&journal.pending_crac_receipts[1]), 2);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[1].1), 2);
 
         // A commits — both receipts preserved
         journal.checkpoint_commit(&mut host, 0).unwrap();
         journal.commit_frame(&mut host).unwrap();
         assert_eq!(journal.pending_crac_receipts.len(), 2);
-        assert_eq!(receipt_id(&journal.pending_crac_receipts[0]), 0);
-        assert_eq!(receipt_id(&journal.pending_crac_receipts[1]), 2);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[0].1), 0);
+        assert_eq!(receipt_id(&journal.pending_crac_receipts[1].1), 2);
     }
 
     // --- frame result slot ---

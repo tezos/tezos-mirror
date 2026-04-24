@@ -335,7 +335,7 @@ pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOp
     let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
     all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
 
-    let mut iter = all.into_iter();
+    let mut iter = all.into_iter().map(|(_, receipt)| receipt);
     let Some(mut merged) = iter.next() else {
         return Vec::new();
     };
@@ -1831,19 +1831,16 @@ mod tests {
         let mut journal = TezosXJournal::new(CracId::new(1, 0));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
                 make_crac_event(0),
                 make_transfer(1, 100),
             ]));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
         journal
             .michelson
-            .failed_crac_receipts
-            .push(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
 
         let result = super::drain_pending_crac_receipts(&mut journal);
 

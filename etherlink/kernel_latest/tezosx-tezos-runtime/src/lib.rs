@@ -563,7 +563,7 @@ where
                         base_nonce,
                     ) {
                         Ok(receipt) => {
-                            journal.michelson.failed_crac_receipts.push(receipt);
+                            journal.michelson.push_failed_crac_receipt(receipt);
                         }
                         Err(e) => {
                             log!(Error, "Failed to build failed CRAC receipt: {e:?}");
@@ -606,7 +606,7 @@ where
             crac_id_for_event.as_deref(),
             base_nonce,
         )?;
-        journal.michelson.pending_crac_receipts.push(receipt);
+        journal.michelson.push_pending_crac_receipt(receipt);
         Ok(TransferSuccess::default())
     } else {
         Ok(result.target.into())
