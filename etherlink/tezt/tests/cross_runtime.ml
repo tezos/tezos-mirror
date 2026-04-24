@@ -5787,6 +5787,164 @@ let test_crac_receipt_two_failed_independent =
     (List.nth internals 4) ;
   unit
 
+(* Interleaved successful + failed CRACs from the SAME EVM tx, with the
+ * pattern S, F, S, F, S, F, S, F (4 successes and 4 failures alternating).
+ *
+ * Without the execution-order fix, `drain_pending_crac_receipts`
+ * concatenated `failed ++ pending`, so merged internals came out in
+ * bucket order (all failures first, then successes) rather than the
+ * order they actually ran in — and `renumber_nonces` then assigned
+ * block-global nonces to those internals in that wrong order.  Also,
+ * when the first-executed receipt was a failed CRAC the top-level
+ * `ContentResult` inherited `Failed` even though later CRACs succeeded,
+ * producing the L1-invalid "Applied internals under Failed parent"
+ * combination.
+ *
+ *    EVM[evm_main]
+ *     |->         EVM[bridge_ok]   ~CRAC~> TEZ[tez_ok]        -> OK
+ *     |-> (Catch) EVM[bridge_fail] ~CRAC~> TEZ[tez_reverter]  -> REVERT
+ *     |->         EVM[bridge_ok]   ~CRAC~> TEZ[tez_ok]        -> OK
+ *     |-> (Catch) EVM[bridge_fail] ~CRAC~> TEZ[tez_reverter]  -> REVERT
+ *     ... (4 repetitions of the OK / FAIL pair)
+ *
+ * Expected merged receipt:
+ *  - Single top-level Michelson op (RFC principle 6), destination =
+ *    alias(sender).
+ *  - Top-level status = `applied` (forced because at least one CRAC
+ *    succeeded; without the fix it would be `failed` whenever the first
+ *    CRAC was the failing one).
+ *  - 17 internals: 1 CRAC event + 4×(ok run, _incrementWitness)
+ *    + 4×(fail run, _revert), in execution order.  The event is
+ *    `applied` because the first-executed receipt in the sort is a
+ *    success.  Applied/failed statuses alternate in pairs of two,
+ *    matching the per-CRAC outcome.
+ *)
+let test_crac_receipt_interleaved_failed_pending =
+  register_crac_runner_test
+    ~title:
+      "CRAC: SFSFSFSF interleaved CRACs merge in execution order with applied \
+       top-level"
+    ~tags:["crac_receipt"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "RCPT-SFSF" in
+  let* tez_ok = TezMultiRunCaller.originate () in
+  let (`Tez_runner (_, tez_ok_kt1)) = tez_ok in
+  let* tez_reverter = TezMultiRunCaller.originate ~revert:true () in
+  let (`Tez_runner (_, tez_reverter_kt1)) = tez_reverter in
+  let* bridge_ok = EvmCrossRuntimeRunnerTez.deploy_and_init tez_ok in
+  let (`Evm_runner bridge_ok_addr) = bridge_ok in
+  let* bridge_fail = EvmCrossRuntimeRunnerTez.deploy_and_init tez_reverter in
+  let (`Evm_runner bridge_fail_addr) = bridge_fail in
+  (* 4 S / F pairs, alternating. *)
+  let n_pairs = 4 in
+  let callees =
+    List.concat
+      (List.init n_pairs (fun _ -> [(bridge_ok, false); (bridge_fail, true)]))
+  in
+  let* evm_main = EvmMultiRunCaller.deploy_and_init ~callees () in
+  let*@ sender_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress sender.address sequencer
+  in
+  let*@ bridge_ok_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_ok_addr sequencer
+  in
+  let*@ bridge_fail_alias =
+    Rpc.Tezosx.tez_getEthereumTezosAddress bridge_fail_addr sequencer
+  in
+  let* _ = EvmRunner.call_run evm_main in
+  (* 4 catches absorbed the failing CRACs; the 4 successful CRACs went
+     through.  The EVM counter increments once per callee + once after
+     the loop = 2*n_pairs + 1 = 9. *)
+  let* () =
+    EvmMultiRunCaller.check_storage
+      ~expected_catches:n_pairs
+      ~expected_counter:((2 * n_pairs) + 1)
+      evm_main
+  in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:n_pairs tez_ok in
+  let* () = TezMultiRunCaller.check_storage ~expected_counter:0 tez_reverter in
+  let* ops = fetch_recent_michelson_manager_ops sequencer in
+  let op_list = JSON.(ops |> as_list) in
+  Log.info "%s: %d manager operation(s)" prefix (List.length op_list) ;
+  (* RFC principle 6: a single CRAC-ID per top-level EVM tx → a single
+     top-level Michelson operation, regardless of per-CRAC outcomes. *)
+  Check.(
+    (List.length op_list = 1)
+      int
+      ~error_msg:"Expected 1 merged Michelson operation, got %L") ;
+  let top = JSON.(ops |=> 0 |-> "contents" |=> 0) in
+  (* Post-fix: any successful CRAC in the merge forces the top-level to
+     `applied` (otherwise we'd have `applied` internals under a `failed`
+     parent, which L1 forbids). *)
+  let internals =
+    check_crac_top_level
+      ~prefix
+      ~expected_destination:sender_alias
+      ~expected_status:"applied"
+      top
+  in
+  Log.info "%s: %d internal op(s)" prefix (List.length internals) ;
+  (* 1 event + 4*(ok pair) + 4*(fail pair) = 1 + 16 = 17 internals. *)
+  let expected_internals = 1 + (4 * n_pairs) in
+  Check.(
+    (List.length internals = expected_internals)
+      int
+      ~error_msg:
+        (sf "Expected %d internal operations, got %%L" expected_internals)) ;
+  (* ── Internal #0: CRAC event.  First-executed receipt in the sort is
+        a success, so the event comes from `build_crac_receipt` with
+        `Applied` status (in contrast to the all-failed case, where it
+        would be `Backtracked` from `build_failed_crac_receipt`). *)
+  check_crac_event
+    ~prefix
+    ~expected_crac_id:"1-0"
+    ~expected_status:"applied"
+    (List.nth internals 0) ;
+  (* ── Each S/F pair contributes 4 internals, in execution order.
+        Block-global nonce starts at 1 (the event takes nonce 0). *)
+  List.iter
+    (fun pair_ix ->
+      let base_nonce = 1 + (pair_ix * 4) in
+      (* S: alias(bridge_ok) → tez_ok (%run, applied)
+         followed by tez_ok self-call (%_incrementWitness, applied). *)
+      check_crac_internal_transaction
+        ~prefix
+        ~expected_nonce:base_nonce
+        ~expected_source:bridge_ok_alias
+        ~expected_destination:tez_ok_kt1
+        ~expected_entrypoint:"run"
+        ~expected_status:"applied"
+        (List.nth internals base_nonce) ;
+      check_crac_internal_transaction
+        ~prefix
+        ~expected_nonce:(base_nonce + 1)
+        ~expected_source:tez_ok_kt1
+        ~expected_destination:tez_ok_kt1
+        ~expected_entrypoint:"_incrementWitness"
+        ~expected_status:"applied"
+        (List.nth internals (base_nonce + 1)) ;
+      (* F: alias(bridge_fail) → tez_reverter (%run, failed)
+         followed by tez_reverter self-call (%_revert, failed). *)
+      check_crac_internal_transaction
+        ~prefix
+        ~expected_nonce:(base_nonce + 2)
+        ~expected_source:bridge_fail_alias
+        ~expected_destination:tez_reverter_kt1
+        ~expected_entrypoint:"run"
+        ~expected_status:"failed"
+        (List.nth internals (base_nonce + 2)) ;
+      check_crac_internal_transaction
+        ~prefix
+        ~expected_nonce:(base_nonce + 3)
+        ~expected_source:tez_reverter_kt1
+        ~expected_destination:tez_reverter_kt1
+        ~expected_entrypoint:"_revert"
+        ~expected_status:"failed"
+        (List.nth internals (base_nonce + 3)))
+    (List.init n_pairs Fun.id) ;
+  unit
+
 (* CRAC at tx_index > 0: inject a dummy ETH transfer into the mempool
  * before the CRAC tx, so both land in the same block and the CRAC tx
  * gets tx_index = 1 → CRAC-ID = "1-1".
@@ -8160,6 +8318,7 @@ let () =
   test_crac_receipt_evm_tez_evm_tez [Alpha] ;
   test_crac_receipt_evm_to_tez_revert [Alpha] ;
   test_crac_receipt_two_failed_independent [Alpha] ;
+  test_crac_receipt_interleaved_failed_pending [Alpha] ;
   test_crac_receipt_evm_not_first_tx [Alpha] ;
   test_crac_receipt_tez_not_first_tx [Alpha] ;
   test_crac_receipt_evm_then_tez_same_block [Alpha] ;
