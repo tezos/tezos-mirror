@@ -1331,6 +1331,21 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let target_attested_level = (2 * blocks_per_cycle) + 1 in
   let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
+  (* Split the DAL roles across two nodes. [dal_node] plays the pure-accuser
+     role: the baker never talks to it, so its [Controller_profiles.attesters]
+     stays empty and [check_self_accusation] returns early, letting it inject
+     the denunciation against [faulty_delegate]. [baker_dal_node] is fronted
+     by the proxy and receives the baker's attester registrations; it will
+     self-stop when the trap attestation is processed. It is peered with
+     [dal_node] so shards published on [dal_node] propagate via gossip. *)
+  let baker_dal_node = Dal_node.create ~name:"baker-facing-dal-node" ~node () in
+  let* () =
+    Dal_node.init_config
+      ~peers:[Dal_node.listen_addr dal_node]
+      ~operator_profiles:[0]
+      baker_dal_node
+  in
+  let* () = Dal_node.run baker_dal_node ~wait_ready:true in
   let proxy =
     Dal_node.Proxy.make
       ~name:"proxy-dal-node"
@@ -1347,7 +1362,7 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
       ()
   in
   let () =
-    Dal_node.Proxy.run ~honest_dal_node:dal_node ~faulty_dal_node proxy
+    Dal_node.Proxy.run ~honest_dal_node:baker_dal_node ~faulty_dal_node proxy
   in
   let dal_node_endpoint =
     Dal_node.as_rpc_endpoint faulty_dal_node |> Endpoint.as_string
@@ -1405,9 +1420,20 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
         else None)
   in
   let* () =
-    repeat blocks_per_cycle (fun () ->
+    (* First iteration bakes the block at [target_attested_level]: the proxy
+       rewrites attestable_slots so [faulty_delegate] attests the trap.
+       [baker_dal_node] self-stops once it processes this block. *)
+    let wait = wait_for_layer1_final_block dal_node (!level - 1) in
+    let* () = bake_for ~dal_node_endpoint client in
+    incr level ;
+    let* () = wait in
+    (* Remaining iterations skip the DAL endpoint: [baker_dal_node] is
+       shutting down, and an honest attestable_slots response would in any
+       case be "nothing attestable" (traps_fraction = 1), so no DAL
+       attestations would have been included. *)
+    repeat (blocks_per_cycle - 1) (fun () ->
         let wait = wait_for_layer1_final_block dal_node (!level - 1) in
-        let* () = bake_for ~dal_node_endpoint client in
+        let* () = bake_for client in
         incr level ;
         let* () = wait in
         unit)
