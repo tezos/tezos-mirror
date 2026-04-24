@@ -1,21 +1,22 @@
 #!/bin/sh
 
-set -eu
-
 # Create the DNF repository for RPM packages and sign it using
 # the private key available as ENV variable for production repository
 # and using the file test_repo_private.key for test repositories.
 
-# uses :
-# - scripts/packaging/key.asc as the repository pub key
-
 # expected env vars
 # - ARCHITECTURES
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_KEY_ID
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PASSPHRASE
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PRIVATE_KEY
-# - GCP_SECRET_PATH_GPG_LINUX_PACKAGES_PUBLIC_KEY
 # - GCP_LINUX_PACKAGES_BUCKET
+
+# Env vars set by scripts/ci/repository-keys.sh
+# - GPG_DUAL_SIGNING
+# - GPG_KEY_ID
+# - GPG_KEY_ID_BIS
+# - GPG_PASSPHRASE
+# - GPG_PASSPHRASE_BIS
+# - GPG_PUBLIC_KEY
+
+set -eu
 
 if [ $# -lt 2 ]; then
   cat << EOF
@@ -79,14 +80,14 @@ TestBranch | TestProtectedBranch)
   ;;
 esac
 
-# Retrieve GPG keys for repository
+# Retrieve and import GPG keys (keyring is ready after this)
 . scripts/ci/repository-keys.sh
 
-export GPG_TTY=/dev/console
-echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
-rpm -v --import "$GPG_PUBLIC_KEY"
-
 mkdir -p "$TARGETDIR/dists"
+
+# Import public key into RPM's own keyring (RPM-specific)
+echo "$GPG_PUBLIC_KEY" > "$TARGETDIR/octez.asc"
+rpm -v --import "$TARGETDIR/octez.asc"
 
 # Copying files
 for release in $RELEASES; do
@@ -104,9 +105,6 @@ for release in $RELEASES; do
     echo "Setting up RPM repository for $DISTRIBUTION / $release / $architecture"
     echo "targetdir: $TARGETDIR"
 
-    # Create the rpm repository root directory and copy the public key
-    cp "$GPG_PUBLIC_KEY" "$TARGETDIR/octez.asc"
-
     target="dists/${release}"
 
     mkdir -p "$TARGETDIR/${target}/"
@@ -115,17 +113,33 @@ for release in $RELEASES; do
       rpm --query --qf '%{NAME}-%{VERSION}-%{RELEASE}.rpm: %{SIGMD5}\n' "$file"
       printf "Sha256: %s\n" "$(sha256sum "$file")\n"
 
-      echo "$GPG_PASSPHRASE" |
-        gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-          -u "$GPG_KEY_ID" --detach-sign --armor \
-          "$file" || {
-        echo "Error signing $file"
+      # GPG Signature
+      echo "Signing binary file: $file"
+      echo "Using key: $GPG_KEY_ID"
+      echo "Output: $file"
+      echo "$GPG_PASSPHRASE" | rpm --define "_gpg_name $GPG_KEY_ID" \
+        --define="__gpg_sign_cmd gpg --batch --passphrase-fd 0 --pinentry-mode loopback -u %{_gpg_name} --detach-sign" \
+        --addsign "$file" || {
+        echo "Error signing $file with key $GPG_KEY_ID"
         exit 1
       }
-      rpm --define "_gpg_name $GPG_KEY_ID" --resign "$file" || {
-        echo "Error resigning $file"
-        exit 1
-      }
+
+      # GPG dual signing
+      echo "GPG dual signing: $GPG_DUAL_SIGNING"
+      if [ "$GPG_DUAL_SIGNING" = "true" ]; then
+        echo "Signing binary file: $file"
+        echo "Using key: $GPG_KEY_ID_BIS"
+        echo "Output: $file"
+        echo "$GPG_PASSPHRASE_BIS" | rpm --define "_gpg_name $GPG_KEY_ID_BIS" \
+          --define="__gpg_sign_cmd gpg --batch --passphrase-fd 0 --pinentry-mode loopback -u %{_gpg_name} --detach-sign" \
+          --addsign "$file" || {
+          echo "Error signing $file with key $GPG_KEY_ID_BIS"
+          exit 1
+        }
+      fi
+      # Signing verification
+      echo "Verification:"
+      rpm -Kv "$file"
 
       rpm --query --qf '%{NAME}-%{VERSION}-%{RELEASE}.rpm: %{SIGMD5}\n' "$file"
       printf "Sha256: %s\n" "$(sha256sum "$file")\n"

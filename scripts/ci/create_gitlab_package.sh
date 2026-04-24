@@ -1,5 +1,4 @@
 #!/bin/sh
-set -eu
 
 ### Create a GitLab package with raw binaries and tarballs
 
@@ -7,6 +6,22 @@ set -eu
 # In the GitLab namespace 'nomadic-labs', if you want to iterate using the same tag
 # you should manually delete any previously created package, otherwise it will
 # reupload the files inside the same package, creating duplicates
+
+# expected env vars
+# - architectures
+# - GCP_LINUX_PACKAGES_BUCKET
+
+# Env vars set by scripts/ci/repository-keys.sh
+# - GPG_DUAL_SIGNING
+# - GPG_KEY_ID
+# - GPG_KEY_ID_BIS
+# - GPG_PASSPHRASE
+# - GPG_PASSPHRASE_BIS
+# - GPG_PUBLIC_KEY
+
+set -eu
+
+ROOT_DIR="$(pwd)"
 
 # shellcheck source=./scripts/releases/octez-release.sh
 . ./scripts/releases/octez-release.sh
@@ -21,10 +36,12 @@ for arg in "$@"; do
   esac
 done
 
+# Retrieve and import GPG keys (keyring is ready after this)
+. ./scripts/ci/repository-keys.sh
+
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
-
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
@@ -66,14 +83,48 @@ gitlab_upload() {
   fi
 }
 
-# Retrieve GPG keys for repository
-. scripts/ci/repository-keys.sh
-# GPG Signatures
-echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import --
+# Signs a file with a detached GPG signature, optionally appending a second
+# signature if GPG_DUAL_SIGNING is true, then verifies the result.
+# The signature is written to <input_file>.sig.
+# File paths are relative to the caller's current directory.
+# Usage: gpg_detach_sign_and_verify <input_file> <label>
+gpg_detach_sign_and_verify() {
+  input_file="$1"
+  label="$2"
+  output_sig="${input_file}.sig"
 
-# create the apt repository root directory and copy the public key
+  echo "Signing: ${input_file}"
+  echo "Using key: $GPG_KEY_ID"
+  echo "Output: ${output_sig}"
+  echo "$GPG_PASSPHRASE" |
+    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+      -u "$GPG_KEY_ID" \
+      -o "${output_sig}" \
+      --detach-sign "${input_file}"
+
+  echo "GPG dual signing: $GPG_DUAL_SIGNING"
+  if [ "$GPG_DUAL_SIGNING" = "true" ]; then
+    echo "Signing: ${input_file}"
+    echo "Using key: $GPG_KEY_ID_BIS"
+    echo "Output: ${output_sig}.bis"
+    echo "$GPG_PASSPHRASE_BIS" |
+      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
+        -u "$GPG_KEY_ID_BIS" \
+        -o "${output_sig}.bis" \
+        --detach-sign "${input_file}"
+
+    echo "Appending ${output_sig}.bis to ${output_sig}"
+    cat "${output_sig}.bis" >> "${output_sig}"
+    rm "${output_sig}.bis"
+  fi
+
+  # Verify GPG signatures against the exported public key
+  "${ROOT_DIR}/scripts/ci/verify_gpg_signature.sh" "${output_sig}" "${input_file}" "${ROOT_DIR}/public/octez.asc" "${label}"
+}
+
+# Create the repository root directory and copy the public key
 mkdir -p public
-cp "$GPG_PUBLIC_KEY" "public/octez.asc"
+echo "$GPG_PUBLIC_KEY" > "public/octez.asc"
 
 # If it's a protected branch the value of $BUCKET will
 # be set accordingly by the CI.
@@ -95,14 +146,12 @@ for architecture in ${architectures}; do
 
   # Loop over binaries
   for binary in ${binaries}; do
-    gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
 
-    # GPG Signature
-    echo "$GPG_PASSPHRASE" |
-      gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-        -u "$GPG_KEY_ID" \
-        --detach-sign "octez-binaries/${architecture}/${binary}"
+    gpg_detach_sign_and_verify "octez-binaries/${architecture}/${binary}" "Octez-binary signature"
+
+    gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
     gitlab_upload "octez-binaries/${architecture}/${binary}.sig" "${architecture}-${binary}.sig"
+
   done
 
   echo "Upload tarball with all binaries (${architecture})"
@@ -112,14 +161,12 @@ for architecture in ${architectures}; do
 
   cd octez-binaries/
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
-  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz"
 
-  # GPG Signature
-  echo "$GPG_PASSPHRASE" |
-    gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-      -u "$GPG_KEY_ID" \
-      --detach-sign "octez-${architecture}.tar.gz"
+  gpg_detach_sign_and_verify "octez-${architecture}.tar.gz" "Octez-tarball signature"
+
+  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz"
   gitlab_upload "octez-${architecture}.tar.gz.sig" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz.sig"
+
   cd ..
 done
 
@@ -147,11 +194,7 @@ tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_versio
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
 sha512sum "${source_tarball}" > "${source_tarball}.sha512"
 
-# GPG Signature
-echo "$GPG_PASSPHRASE" |
-  gpg --batch --passphrase-fd 0 --pinentry-mode loopback \
-    -u "$GPG_KEY_ID" \
-    --detach-sign "${source_tarball}"
+gpg_detach_sign_and_verify "${source_tarball}" "Octez-source-tarball signature"
 
 gitlab_upload "${source_tarball}" "${source_tarball}" "${gitlab_octez_source_package_url}"
 gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256" "${gitlab_octez_source_package_url}"
