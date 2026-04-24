@@ -327,13 +327,20 @@ pub fn extract_cross_runtime_effects(
 /// the Michelson side) are otherwise emitted as separate top-level
 /// operations, violating principle 6.
 ///
-/// Failed receipts come first because they survive even when their EVM
-/// frame reverts (they are NOT subject to revert), whereas successful
-/// receipts only survive if their EVM frame commits.  Within each
-/// category, receipts are in execution order.
+/// Receipts carry a monotonic sequence number assigned at push time
+/// (shared across the pending and failed lists), so sorting by that
+/// sequence recovers the original execution order regardless of which
+/// list each receipt landed in.  This matters when an EVM transaction
+/// interleaves the two kinds, e.g.
+/// `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`:
+/// without the sort, a merged operation would expose internals in
+/// bucket order (failed first) rather than execution order, and
+/// `renumber_nonces` would then assign nonces to internals out of
+/// order as well.
 pub fn drain_pending_crac_receipts(journal: &mut TezosXJournal) -> Vec<AppliedOperation> {
     let mut all = std::mem::take(&mut journal.michelson.failed_crac_receipts);
     all.extend(std::mem::take(&mut journal.michelson.pending_crac_receipts));
+    all.sort_by_key(|(seq, _)| *seq);
 
     let mut iter = all.into_iter().map(|(_, receipt)| receipt);
     let Some(mut merged) = iter.next() else {
@@ -1859,6 +1866,41 @@ mod tests {
             extract_nonces(&result[0]),
             vec![0, 1, 2, 3],
             "single CRAC event at the front, then transfers"
+        );
+    }
+
+    /// When failed and successful CRAC receipts are interleaved within
+    /// one EVM transaction, the merged internal operations must reflect
+    /// execution order — not all-failed-before-all-pending.
+    ///
+    /// Simulates: `try { CRAC_1 } catch {}; CRAC_2; try { CRAC_3 } catch {}`
+    /// where CRAC_1 and CRAC_3 fail, CRAC_2 succeeds.
+    #[test]
+    fn test_drain_preserves_interleaved_execution_order() {
+        use tezosx_journal::{CracId, TezosXJournal};
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // Execution order: failed(100), pending(200), failed(300)
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![
+                make_crac_event(0),
+                make_transfer(1, 100),
+            ]));
+        journal
+            .michelson
+            .push_pending_crac_receipt(dummy_crac_receipt(vec![make_transfer(2, 200)]));
+        journal
+            .michelson
+            .push_failed_crac_receipt(dummy_crac_receipt(vec![make_transfer(3, 300)]));
+
+        let result = super::drain_pending_crac_receipts(&mut journal);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            extract_amounts(&result[0]),
+            vec![100, 200, 300],
+            "internal transfers must appear in execution order, not \
+             all-failed-before-all-pending"
         );
     }
 
