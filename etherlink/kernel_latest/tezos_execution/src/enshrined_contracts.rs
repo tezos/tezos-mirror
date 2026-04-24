@@ -175,6 +175,9 @@ where
                 charge_gateway_base_cost(ctx)?;
                 let (dest, method_sig, abi_params, callback) =
                     extract_call_params(typed)?;
+                // Per-byte surcharge: calldata (selector+params) going
+                // out; response body is charged after it's returned.
+                charge_gateway_payload(ctx, 4 + abi_params.len())?;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(SELECTOR_COMPUTATION_MILLIGAS)
                     .map_err(|_| TransferError::OutOfGas)?;
@@ -184,10 +187,13 @@ where
                 calldata.extend_from_slice(&abi_params);
                 let request = build_ethereum_request(&dest, &calldata)?;
                 let response_body = dispatch_crac_call(registry, journal, ctx, request)?;
+                charge_gateway_payload(ctx, response_body.len())?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
                 charge_gateway_base_cost(ctx)?;
                 let (request, callback) = extract_http_call_request(typed)?;
+                // Per-byte surcharge: outgoing HTTP body.
+                charge_gateway_payload(ctx, request.body().len())?;
                 let num_user_headers = request.headers().len() as u64;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(
@@ -196,6 +202,7 @@ where
                     )
                     .map_err(|_| TransferError::OutOfGas)?;
                 let body = dispatch_crac_call(registry, journal, ctx, request)?;
+                charge_gateway_payload(ctx, body.len())?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result lets a Michelson adapter deposit a
@@ -244,6 +251,7 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
+            charge_gateway_payload(ctx, calldata.len())?;
             let request = build_ethereum_request(&evm_contract, &calldata)?;
             dispatch_crac_call(registry, journal, ctx, request)?;
             Ok(vec![])
@@ -257,6 +265,15 @@ where
 /// construction, header injection, gas conversion, response parsing).
 /// Micheline typechecking is metered separately by the MIR typechecker.
 const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
+
+/// Per-byte surcharge on the flat base cost, charged at Tezos-as-caller
+/// gateway entrypoints (`%call`, `%call_evm`, ...) for the
+/// boundary work performed when bytes cross the CRAC: outgoing-body
+/// marshalling and incoming-response ingest (`Vec::to_vec`, header-map
+/// allocation, callback/selector assembly, ...).
+///
+/// TODO(L2-1165): replace with a benchmarked value.
+const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
 
 /// Surcharge when amount > 0 (balance reset after value transfer).
 /// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
@@ -310,6 +327,22 @@ fn collect_result_size_cost(payload_len: usize) -> u64 {
 fn charge_gateway_base_cost(ctx: &mut impl HasOperationGas) -> Result<(), TransferError> {
     ctx.operation_gas()
         .cast_and_consume_milligas(TEZOSX_GATEWAY_BASE_COST_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)
+}
+
+/// Charge `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * bytes` for a chunk of
+/// gateway payload (outgoing body or response body). Complements the
+/// flat `charge_gateway_base_cost` with a size-proportional component.
+fn charge_gateway_payload(
+    ctx: &mut impl HasOperationGas,
+    bytes: usize,
+) -> Result<(), TransferError> {
+    let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
+    if cost == 0 {
+        return Ok(());
+    }
+    ctx.operation_gas()
+        .cast_and_consume_milligas(cost)
         .map_err(|_| TransferError::OutOfGas)
 }
 

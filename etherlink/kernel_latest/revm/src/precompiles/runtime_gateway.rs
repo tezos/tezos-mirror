@@ -21,8 +21,8 @@ use crate::{
     precompiles::{
         constants::{
             ALIAS_CACHE_HIT_COST, HEADER_VALIDATION_PER_HEADER,
-            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            VALUE_TRANSFER_SURCHARGE,
+            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PER_WORD_COST,
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, VALUE_TRANSFER_SURCHARGE,
         },
         guard::charge,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
@@ -66,6 +66,17 @@ sol! {
         string targetAddress,
         uint256 amount
     );
+}
+
+/// Charge `RUNTIME_GATEWAY_PER_WORD_COST * ceil(bytes / 32)` for a chunk
+/// of gateway payload (calldata, outgoing body, or incoming response).
+fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileError> {
+    let words = (bytes as u64).div_ceil(32);
+    let cost = RUNTIME_GATEWAY_PER_WORD_COST.saturating_mul(words);
+    if cost > 0 {
+        charge(gas, cost)?;
+    }
+    Ok(())
 }
 
 /// Build an `http::Request<Vec<u8>>` from ABI-decoded parameters.
@@ -378,6 +389,8 @@ where
     match function_call {
         RuntimeGatewayCalls::transfer(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata (body is empty).
+            charge_payload(&mut gas, calldata.len())?;
 
             let implicit_address = call.implicitAddress;
             let amount = inputs.value.get();
@@ -443,6 +456,9 @@ where
         }
         RuntimeGatewayCalls::callMichelson(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata + outgoing body.
+            charge_payload(&mut gas, calldata.len())?;
+            charge_payload(&mut gas, call.parameters.len())?;
 
             let destination = call.destination;
             let entrypoint = call.entrypoint;
@@ -620,6 +636,10 @@ where
         }
         RuntimeGatewayCalls::call(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata + outgoing body.
+            // The response body is charged after the CRAC completes.
+            charge_payload(&mut gas, calldata.len())?;
+            charge_payload(&mut gas, call.body.len())?;
 
             let mut request = build_http_request(
                 &call.url,
@@ -706,6 +726,8 @@ where
             let response = context.journal_mut().tezosx_call_http(request);
             let body =
                 classify_and_charge_crac_response(response, target_runtime, &mut gas)?;
+            // Response body is ABI-encoded and returned; charge per byte.
+            charge_payload(&mut gas, body.len())?;
             let output: Vec<u8> = (body,).abi_encode_params();
 
             // POST-only state effects: burn any residual precompile

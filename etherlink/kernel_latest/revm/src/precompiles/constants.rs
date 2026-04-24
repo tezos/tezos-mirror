@@ -208,6 +208,15 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 // See RFC: Gas model for gateways and aliases.
 pub(crate) const RUNTIME_GATEWAY_BASE_COST: u64 = 5_000;
 
+// Per 32-byte word surcharge applied on top of the flat base cost for
+// every gateway entrypoint, proportional to calldata + outgoing body +
+// incoming response body. Matches `G_copy` (3/word), the same rate
+// REVM uses for CALLDATACOPY/RETURNDATACOPY memory expansion — but
+// charged here *inside* the precompile, since REVM does not
+// automatically meter per-byte work performed by custom precompiles
+// (ABI decode, `to_vec()` clones, HeaderMap inserts).
+pub(crate) const RUNTIME_GATEWAY_PER_WORD_COST: u64 = 3;
+
 // Alias lookup: charged upfront before each alias resolution (durable
 // storage read). Equivalent to a cold SLOAD (EIP-2929).
 pub(crate) const ALIAS_CACHE_HIT_COST: u64 = 2_100;
