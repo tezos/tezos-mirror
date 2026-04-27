@@ -12,6 +12,7 @@ COPY src/kernel_sdk /build/src/kernel_sdk
 COPY etherlink /build/etherlink
 COPY contrib/mir /build/contrib/mir
 COPY sdk /build/sdk
+COPY vendors/http /build/vendors/http
 RUN make -f etherlink.mk build-deps
 RUN make --no-print-directory -f etherlink.mk EVM_CONFIG=${EVM_CONFIG} CI_COMMIT_SHA=${CI_COMMIT_SHA} DISPLAY_ROOT_HASH=true evm_installer.wasm > root_hash
 
