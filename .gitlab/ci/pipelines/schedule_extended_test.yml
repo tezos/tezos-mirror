@@ -267,7 +267,7 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: test
   tags:
   - gcp
@@ -308,7 +308,7 @@ check_riscv_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: test
   tags:
   - gcp
@@ -348,7 +348,7 @@ audit_riscv_deps:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: test
   tags:
   - gcp
@@ -388,7 +388,7 @@ test_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -753,7 +753,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: sanity
   tags:
   - gcp
@@ -1422,7 +1422,7 @@ ocaml-check:
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-8afd610a
   stage: test
   tags:
   - gcp
