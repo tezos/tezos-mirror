@@ -26,9 +26,10 @@ SANDBOX_ENABLE_FEATURES ?=
 NIGHTLY_VERSION = nightly-2025-01-30
 
 # Prefix for downloading assets from the riscv-pvm repo
-RISCV_PVM_REPO = https://raw.githubusercontent.com/tezos/riscv-pvm/refs/heads/main
+RISCV_PVM_REPO = "https://raw.githubusercontent.com/tezos/riscv-pvm/$(shell cat 'assets/riscv-pvm.commit')"
 
 ASSETS := \
+  assets/riscv-pvm.commit \
   assets/riscv-dummy.elf \
   assets/jstz \
   assets/jstz_proof_initial \
@@ -44,9 +45,19 @@ build:
 update-assets: $(ASSETS)
 
 # Update to the latest version of `riscv-pvm`. Assets will be updated accordingly.
+update-riscv-pvm: old_commit = $(shell taplo get "workspace.dependencies.octez-riscv.rev" -f Cargo.toml)
+update-riscv-pvm: new_commit = $(shell cat "assets/riscv-pvm.commit")
+
 .PHONY: update-riscv-pvm
 update-riscv-pvm: update-assets
-	@cargo update octez-riscv
+	@echo "Updating from ${old_commit} to ${new_commit}"
+	@sed -i.bak "s/${old_commit}/${new_commit}/g" Cargo.toml && rm Cargo.toml.bak
+	@cargo update octez-riscv octez-riscv-data octez-riscv-durable-storage
+
+# Update the current commit used for the RISC-V PVM
+assets/riscv-pvm.commit::
+	@curl -H "Accept: application/vnd.github.sha" \
+		-L -o $@ "https://api.github.com/repos/tezos/riscv-pvm/commits/main"
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
@@ -117,3 +128,6 @@ audit:
 .PHONY: clean
 clean:
 	@cargo clean
+
+# Always need to update assets/riscv-pvm.commit first
+.NOTPARALLEL: update-assets
