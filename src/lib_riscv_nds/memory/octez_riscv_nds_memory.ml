@@ -15,7 +15,9 @@ module Api =
 let convert_invalid_argument = function
   | Api.Key_not_found -> Key_not_found
   | Api.Key_too_long -> Key_too_long
+  | Api.Io_request_too_large -> Io_request_too_large
   | Api.Offset_too_large -> Offset_too_large
+  | Api.Value_size_too_large -> Value_size_too_large
   | Api.Database_index_out_of_bounds -> Database_index_out_of_bounds
   | Api.Registry_resize_too_large -> Registry_resize_too_large
 

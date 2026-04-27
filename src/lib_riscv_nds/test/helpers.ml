@@ -103,7 +103,9 @@ let register_pbt_with_disk_gc ~__FILE__ ?title ~tags ?long ?seed
 let pp_invalid_argument_error fmt = function
   | Key_not_found -> Format.pp_print_string fmt "Key_not_found"
   | Key_too_long -> Format.pp_print_string fmt "Key_too_long"
+  | Io_request_too_large -> Format.pp_print_string fmt "Io_request_too_large"
   | Offset_too_large -> Format.pp_print_string fmt "Offset_too_large"
+  | Value_size_too_large -> Format.pp_print_string fmt "Value_size_too_large"
   | Database_index_out_of_bounds ->
       Format.pp_print_string fmt "Database_index_out_of_bounds"
   | Registry_resize_too_large ->

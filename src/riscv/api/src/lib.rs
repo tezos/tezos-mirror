@@ -33,6 +33,7 @@ use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::stepper::pvm::verify_outbox_proof;
 use octez_riscv::storage::StorageError;
+use octez_riscv::storage::Store;
 use octez_riscv_api_common::OcamlFallible;
 use octez_riscv_api_common::bytes::BytesWrapper;
 use octez_riscv_api_common::move_semantics::CustomGcResource;
@@ -44,6 +45,7 @@ use octez_riscv_data::hash;
 use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
 use octez_riscv_data::mode::Normal;
 use octez_riscv_data::mode::Verify;
+use octez_riscv_data::store::BlobStoreError;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use sha2::Digest;
@@ -80,7 +82,7 @@ impl CustomGcResource for NodePvmState {
 }
 
 #[ocaml::sig]
-pub struct Repo(RwLock<PvmStorage>);
+pub struct Repo(RwLock<PvmStorage<Store>>);
 
 #[ocaml::sig]
 pub type State = ImmutableState<NodePvmState>;
@@ -351,7 +353,9 @@ pub fn octez_riscv_storage_checkout(
     let guard = repo.0.read();
     match guard.checkout(id) {
         Ok(pvm) => Ok(Some(MutableState::owned(NodePvmState(pvm)).into())),
-        Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
+        Err(PvmStorageError::StorageError(StorageError::BlobStore(BlobStoreError::NotFound(
+            _,
+        )))) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
 }
@@ -561,7 +565,7 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
     id: SafePointer<Id>,
     path: &str,
 ) -> Result<(), ocaml::Value> {
-    let id = &id.0;
+    let id = id.0;
     let guard = repo.0.read();
     guard.export_snapshot(id, path).map_err(|e| {
         let s = format!("{e:?}");

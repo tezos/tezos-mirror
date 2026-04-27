@@ -9,7 +9,9 @@
 type invalid_argument_error =
   | Key_not_found
   | Key_too_long
+  | Io_request_too_large
   | Offset_too_large
+  | Value_size_too_large
   | Database_index_out_of_bounds
   | Registry_resize_too_large
 
@@ -21,7 +23,9 @@ let invalid_argument_error_encoding =
     [
       ("key_not_found", Key_not_found);
       ("key_too_long", Key_too_long);
+      ("io_request_too_large", Io_request_too_large);
       ("offset_too_large", Offset_too_large);
+      ("value_size_too_large", Value_size_too_large);
       ("database_index_out_of_bounds", Database_index_out_of_bounds);
       ("registry_resize_too_large", Registry_resize_too_large);
     ]
@@ -29,7 +33,9 @@ let invalid_argument_error_encoding =
 let string_of_invalid_argument_error = function
   | Key_not_found -> "key not found"
   | Key_too_long -> "key too long"
+  | Io_request_too_large -> "io request too large"
   | Offset_too_large -> "offset too large"
+  | Value_size_too_large -> "value size too large"
   | Database_index_out_of_bounds -> "database index out of bounds"
   | Registry_resize_too_large -> "registry resize too large"
 
