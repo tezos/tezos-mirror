@@ -1081,6 +1081,40 @@ module TezCollectResult = struct
       protocol
 end
 
+(** Tezos contract whose [%default] entrypoint deposits a fixed bytes
+ *  payload into the current CRAC frame by calling the gateway's
+ *  [%collect_result] entrypoint with a hardcoded non-zero amount
+ *  (1 mutez).  Used to verify that the kernel rejects any value transfer
+ *  on [%collect_result]. *)
+module TezCollectResultWithAmount = struct
+  open TezContract
+
+  (** Originates [gateway_collect_result_with_amount.tz] with storage
+   *  [Pair gateway_address 0x<payload_hex>].  [init_balance] should be
+   *  set so the originated contract has at least 1 mutez on hand —
+   *  otherwise the TRANSFER_TOKENS would fail with [BalanceTooLow] before
+   *  the kernel's amount check has a chance to fire, masking the
+   *  rejection we are testing. *)
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance ~payload_hex () =
+    let script_name =
+      ["mini_scenarios"; "gateway_collect_result_with_amount"]
+    in
+    let init_storage_data = sf {|Pair "%s" 0x%s|} gateway_address payload_hex in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+end
+
 (** Tezos contract that FAILWITHs on any call (unit parameter). *)
 module TezAlwaysFailsUnit = struct
   open TezContract
@@ -1371,6 +1405,11 @@ module CracRunnerWrapper = struct
     end
 
     module TezCollectResult : sig
+      val originate :
+        ?init_balance:int -> payload_hex:string -> unit -> tez_runner Lwt.t
+    end
+
+    module TezCollectResultWithAmount : sig
       val originate :
         ?init_balance:int -> payload_hex:string -> unit -> tez_runner Lwt.t
     end
@@ -1837,6 +1876,25 @@ module CracRunnerWrapper = struct
         let originate ?init_balance ~payload_hex () =
           let* runner_hex, runner =
             TezCollectResult.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~payload_hex
+              ()
+          in
+          return (`Tez_runner (runner_hex, runner))
+      end
+
+      module TezCollectResultWithAmount = struct
+        let originate ?init_balance ~payload_hex () =
+          let* runner_hex, runner =
+            TezCollectResultWithAmount.originate
               ~sc_rollup_address
               ~sc_rollup_node
               ~client
@@ -8439,6 +8497,57 @@ let test_crac_collect_result_surfaces_in_response_body =
   Log.debug ~prefix "Verify the returned bytes" ;
   EvmCollectResult.check_result ~expected_hex:payload_hex evm_reader
 
+(** End-to-end check that the kernel rejects any value transfer to
+    [%collect_result].  The Michelson contract calls [%collect_result]
+    with a hardcoded 1 mutez amount; the gateway must reject the
+    transaction (with no recipient and no CRAC behind it, value has
+    nowhere to go), the Michelson server must return 4xx with no bytes
+    leaking, and the EVM precompile call must revert.  The outer tx
+    catches the revert via [runCatch()] so we can inspect post-revert
+    state and confirm [result] stays empty. *)
+let test_crac_collect_result_rejects_nonzero_amount =
+  register_crac_runner_test
+    ~title:"CRAC: %collect_result rejects non-zero amount"
+    ~tags:["collect_result"; "http_call"; "amount"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let payload_hex = "cafebabe" in
+  let prefix = "CRAC" in
+  Log.debug
+    ~prefix
+    "Originate Michelson contract that calls %%collect_result with 1 mutez" ;
+  (* init_balance must be >= 1 mutez so TRANSFER_TOKENS isn't blocked
+     by BalanceTooLow before the kernel's amount check fires. *)
+  let* tez_contract =
+    TezCollectResultWithAmount.originate ~init_balance:1 ~payload_hex ()
+  in
+  Log.debug ~prefix "Deploy EVM reader contract" ;
+  let* evm_reader = EvmCollectResult.deploy_and_init tez_contract in
+  Log.debug ~prefix "Run (catching): CRAC should revert, no bytes leaked" ;
+  let* _ = EvmCollectResult.call_run_catch evm_reader in
+  Log.debug ~prefix "Verify the precompile call was caught as reverted" ;
+  let* () = EvmCollectResult.check_caught ~expected:true evm_reader in
+  Log.debug ~prefix "Verify no bytes leaked into the result slot" ;
+  let* () = EvmCollectResult.check_result ~expected_hex:"" evm_reader in
+  Log.debug ~prefix "Verify the gateway accumulated no tez" ;
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* gateway_balance =
+    Client.get_balance_for
+      ~endpoint:tezlink_endpoint
+      ~account:gateway_address
+      client
+  in
+  Check.(
+    (Tez.to_mutez gateway_balance = 0)
+      int
+      ~error_msg:"Expected gateway balance %R mutez but got %L") ;
+  unit
+
 (** End-to-end revert-path check: the Michelson contract deposits bytes
     via [%collect_result] then triggers a failure via a second internal
     op.  The server must return 4xx with no bytes leaking, so the EVM
@@ -8777,6 +8886,7 @@ let () =
   test_crac_gas_error_path_reporting [Alpha] ;
   test_crac_gas_oog_path_reporting [Alpha] ;
   test_crac_collect_result_surfaces_in_response_body [Alpha] ;
+  test_crac_collect_result_rejects_nonzero_amount [Alpha] ;
   test_crac_collect_result_revert_discards_bytes [Alpha] ;
   test_crac_collect_result_size_sweep_matches_model [Alpha] ;
   test_crac_collect_result_fire_and_forget_empty_body [Alpha] ;

@@ -25,6 +25,7 @@
   legitimate reason to reach the gateway through those opcodes.
   (!21715)
 - Charge gas for `%collect_result` (!21710)
+- Forbid tez transfers to `%collect_result` (!21738)
 - Fix CRAC receipt merging when an EVM transaction interleaves failed and
   successful CRACs. Receipts pushed to the Michelson journal are now tagged
   with a monotonic sequence number shared across the pending and failed
