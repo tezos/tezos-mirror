@@ -24,6 +24,9 @@ michelson-types.workspace = true
 anyhow.workspace = true
 tezos-smart-rollup-host.workspace = true
 
+# Error handling
+thiserror.workspace = true
+
 # Michelson runtime types (for CRAC receipt storage)
 tezos_tezlink.workspace = true
 tezos_crypto_rs.workspace = true

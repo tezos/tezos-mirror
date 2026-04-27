@@ -37,6 +37,10 @@
   if all internals are `Failed`/`Skipped`/`Backtracked` the top-level is
   marked as `Failed`. (!21719)
 
+### EVM Runtime
+- Refund unused gas when a precompile reverts, previously could charge
+  the full gas limit. (!21724)
+
 ### Internals
 
 - Sort entrypoints by name before encoding the

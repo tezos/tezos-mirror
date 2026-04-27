@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     context::{Block, ContextTr},
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -58,32 +58,36 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
+    let mut gas = Gas::new(inputs.gas_limit);
+
     if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
             "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
+            gas,
         ));
     }
 
     if inputs.target_address != CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS {
-        return Err(CustomPrecompileError::Revert(String::from(
-            "invalid transfer target address",
-        )));
+        return Err(CustomPrecompileError::Revert(
+            String::from("invalid transfer target address"),
+            gas,
+        ));
     }
 
     if inputs.is_static {
-        return Err(CustomPrecompileError::Revert(String::from(
-            "STATICCALLs are not allowed",
-        )));
+        return Err(CustomPrecompileError::Revert(
+            String::from("STATICCALLs are not allowed"),
+            gas,
+        ));
     }
-
-    let mut gas = Gas::new(inputs.gas_limit);
 
     charge(&mut gas, UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST)?;
 
     let Ok(function_call) = ChangeSequencerKeyCalls::abi_decode(calldata) else {
-        return Err(CustomPrecompileError::Revert(String::from(
-            "invalid input encoding",
-        )));
+        return Err(CustomPrecompileError::Revert(
+            String::from("invalid input encoding"),
+            gas,
+        ));
     };
 
     match function_call {
@@ -91,38 +95,49 @@ where
         // and has been signed by the current sequencer key.
         ChangeSequencerKeyCalls::change_sequencer_key(call) => {
             let Ok(public_key) = PublicKey::nom_read_exact(&call.publicKey) else {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "invalid public key encoding",
-                )));
+                return Err(CustomPrecompileError::Revert(
+                    String::from("invalid public key encoding"),
+                    gas,
+                ));
             };
 
             // Nom read exact isn't compliant with the enconding on OCAML.
             let signature_bytes: &[u8] = &call.signature;
             let Ok(signature) = Signature::try_from(signature_bytes) else {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "invalid signature encoding",
-                )));
+                return Err(CustomPrecompileError::Revert(
+                    String::from("invalid signature encoding"),
+                    gas,
+                ));
             };
 
-            if context.db().governance_sequencer_upgrade_exists()? {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "can't override an existing governance sequencer upgrade",
-                )));
+            if context
+                .db()
+                .governance_sequencer_upgrade_exists()
+                .map_err(|e| e.into_with_remainder(gas))?
+            {
+                return Err(CustomPrecompileError::Revert(
+                    String::from(
+                        "can't override an existing governance sequencer upgrade",
+                    ),
+                    gas,
+                ));
             }
 
             let Ok(sequencer_key) = context.db().sequencer() else {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "failed to read current sequencer key",
-                )));
+                return Err(CustomPrecompileError::Revert(
+                    String::from("failed to read current sequencer key"),
+                    gas,
+                ));
             };
 
             if sequencer_key
                 .verify_signature(&signature, &call.publicKey)
                 .is_err()
             {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "invalid signature",
-                )));
+                return Err(CustomPrecompileError::Revert(
+                    String::from("invalid signature"),
+                    gas,
+                ));
             }
 
             let update_timestamp = context
@@ -131,9 +146,10 @@ where
                 .saturating_add(U256::from(SEQUENCER_UPGRADE_DELAY));
             let Ok(update_timestamp_i64): Result<i64, _> = update_timestamp.try_into()
             else {
-                return Err(CustomPrecompileError::Revert(String::from(
-                    "invalid update timestamp",
-                )));
+                return Err(CustomPrecompileError::Revert(
+                    String::from("invalid update timestamp"),
+                    gas,
+                ));
             };
 
             let public_key_b58 = public_key.to_b58check();

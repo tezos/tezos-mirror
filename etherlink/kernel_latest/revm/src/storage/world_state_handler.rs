@@ -10,16 +10,16 @@ use revm::{
 };
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_smart_rollup_host::{
-    path::{OwnedPath, RefPath},
+    path::{concat, OwnedPath, PathError, RefPath},
     runtime::RuntimeError,
     storage::StorageV1,
 };
 
-use evm_types::{custom, Error, FaDepositWithProxy};
+use evm_types::{Error, FaDepositWithProxy, PrecompileStateError};
 
 use crate::{
     helpers::storage::{
-        concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
+        read_b256_be_default, read_u256_be_default, read_u256_le_default,
         read_u64_le_default, write_u256_le,
     },
     storage::code::CodeStorage,
@@ -99,14 +99,14 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 /// Default nonce value for an account.
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
-pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
+pub fn account_path(address: &Address) -> Result<OwnedPath, PathError> {
     let path_string = format!("/{address:x}");
-    OwnedPath::try_from(path_string).map_err(custom)
+    OwnedPath::try_from(path_string)
 }
 
-pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
+pub fn path_from_u256(index: &U256) -> Result<OwnedPath, PathError> {
     let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
-    OwnedPath::try_from(path_string).map_err(custom)
+    OwnedPath::try_from(path_string)
 }
 
 pub struct StorageAccount {
@@ -355,7 +355,7 @@ impl StorageAccount {
         self.set_info(host, info)
     }
 
-    pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, Error> {
+    pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, PathError> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
         let index_path = path_from_u256(index)?;
         concat(&storage_path, &index_path)
@@ -385,7 +385,7 @@ impl StorageAccount {
     pub(crate) fn read_global_counter(
         &self,
         host: &impl StorageV1,
-    ) -> Result<U256, Error> {
+    ) -> Result<U256, PrecompileStateError> {
         let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
         Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
@@ -403,7 +403,7 @@ impl StorageAccount {
         &self,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<OwnedPath, Error> {
+    ) -> Result<OwnedPath, PathError> {
         concat(
             &self.path,
             &concat(
@@ -418,7 +418,7 @@ impl StorageAccount {
         host: &impl StorageV1,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<U256, Error> {
+    ) -> Result<U256, PrecompileStateError> {
         let path = self.ticket_path(ticket_hash, owner)?;
         Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
@@ -435,7 +435,7 @@ impl StorageAccount {
         Ok(())
     }
 
-    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, Error> {
+    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, PathError> {
         concat(
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
             &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
@@ -456,10 +456,10 @@ impl StorageAccount {
         &self,
         host: &impl StorageV1,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, Error> {
+    ) -> Result<FaDepositWithProxy, PrecompileStateError> {
         let deposit_path = self.deposit_path(deposit_id)?;
         let bytes = host.store_read_all(&deposit_path)?;
-        FaDepositWithProxy::from_raw(bytes)
+        Ok(FaDepositWithProxy::from_raw(bytes)?)
     }
 
     pub(crate) fn remove_deposit_from_queue(

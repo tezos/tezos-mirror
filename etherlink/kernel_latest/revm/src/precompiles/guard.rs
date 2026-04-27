@@ -5,48 +5,41 @@
 
 use evm_types::CustomPrecompileError;
 use revm::{
-    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
-    primitives::{Address, Bytes},
+    interpreter::{CallInputs, Gas},
+    primitives::Address,
 };
-use std::fmt::Display;
 
 pub(crate) fn guard(
     current: Address,
     authorized: &[Address],
     inputs: &CallInputs,
+    gas: Gas,
 ) -> Result<(), CustomPrecompileError> {
     if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
             "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
+            gas,
         ));
     }
     if inputs.target_address != current {
         return Err(CustomPrecompileError::Revert(
             "invalid transfer target address".to_string(),
+            gas,
         ));
     }
     if inputs.is_static {
         return Err(CustomPrecompileError::Revert(
             "STATICCALLs are not allowed".to_string(),
+            gas,
         ));
     }
     if !authorized.contains(&inputs.caller) {
         return Err(CustomPrecompileError::Revert(
             "unauthorized caller".to_string(),
+            gas,
         ));
     }
     Ok(())
-}
-
-pub(crate) fn revert<R>(reason: R, gas: Gas) -> InterpreterResult
-where
-    R: Display,
-{
-    InterpreterResult {
-        result: InstructionResult::Revert,
-        gas,
-        output: Bytes::copy_from_slice(reason.to_string().as_bytes()),
-    }
 }
 
 pub(crate) fn charge(gas: &mut Gas, cost: u64) -> Result<(), CustomPrecompileError> {

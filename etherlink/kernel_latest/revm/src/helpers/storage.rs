@@ -6,15 +6,7 @@
 use evm_types::Error;
 use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
-use tezos_smart_rollup_host::{
-    path::{concat as host_concat, OwnedPath, Path},
-    runtime::RuntimeError,
-    storage::StorageV1,
-};
-
-pub fn concat(prefix: &impl Path, suffix: &impl Path) -> Result<OwnedPath, Error> {
-    host_concat(prefix, suffix).map_err(|err| Error::Custom(err.to_string()))
-}
+use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, storage::StorageV1};
 
 #[cfg(test)]
 pub fn read_u64_le(host: &impl StorageV1, path: &impl Path) -> Result<u64, RuntimeError> {

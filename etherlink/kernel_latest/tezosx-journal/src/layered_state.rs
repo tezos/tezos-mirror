@@ -6,11 +6,13 @@
 use std::mem;
 
 use evm_types::{
-    CustomPrecompileError, DatabasePrecompileStateChanges, Error, EtherlinkEntry,
-    FaDepositWithProxy, PrecompileStateChanges, SequencerKeyChange,
+    DatabasePrecompileStateChanges, EtherlinkEntry, FaDepositWithProxy,
+    PrecompileStateChanges, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
 use revm::primitives::{Address, U256};
+
+use crate::LayeredStateError;
 
 /// This state is created to manage one object because
 /// everything that we used here, is stored in one address (Address::ZERO).
@@ -41,7 +43,7 @@ impl LayeredState {
     pub fn get_and_increment_global_counter<DB: DatabasePrecompileStateChanges>(
         &mut self,
         db: &DB,
-    ) -> Result<U256, CustomPrecompileError> {
+    ) -> Result<U256, LayeredStateError> {
         let returned = self
             .etherlink_data
             .global_counter
@@ -49,7 +51,7 @@ impl LayeredState {
             .unwrap_or_else(|| db.global_counter())?;
         let counter = returned
             .checked_add(U256::ONE)
-            .ok_or(Error::Custom("Global counter overflow".to_string()))?;
+            .ok_or(LayeredStateError::GlobalCounterOverflow)?;
         self.etherlink_data.global_counter = Some(counter);
         self.entries.push(EtherlinkEntry::IncrementGlobalCounter);
         Ok(returned)
@@ -61,18 +63,19 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance =
-            ticket_balance
-                .checked_add(amount)
-                .ok_or(CustomPrecompileError::Revert(format!(
-                "Adding {amount} to {owner} balance failed, ticket hash is {ticket_hash}"
-            )))?;
+        let new_balance = ticket_balance.checked_add(amount).ok_or(
+            LayeredStateError::BalanceOverflow {
+                ticket_hash: *ticket_hash,
+                owner: *owner,
+                amount,
+            },
+        )?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceAdd {
             ticket_hash: *ticket_hash,
@@ -88,18 +91,19 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance =
-            ticket_balance
-                .checked_sub(amount)
-                .ok_or(CustomPrecompileError::Revert(format!(
-            "Removing {amount} from {owner} balance failed, ticket hash is {ticket_hash}"
-        )))?;
+        let new_balance = ticket_balance.checked_sub(amount).ok_or(
+            LayeredStateError::BalanceUnderflow {
+                ticket_hash: *ticket_hash,
+                owner: *owner,
+                amount,
+            },
+        )?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceRemove {
             ticket_hash: *ticket_hash,
@@ -113,11 +117,9 @@ impl LayeredState {
         &mut self,
         deposit_id: &U256,
         db: &impl DatabasePrecompileStateChanges,
-    ) -> Result<(), CustomPrecompileError> {
+    ) -> Result<(), LayeredStateError> {
         if self.etherlink_data.removed_deposits.contains(deposit_id) {
-            return Err(CustomPrecompileError::Revert(
-                "Deposit already removed".to_string(),
-            ));
+            return Err(LayeredStateError::DepositAlreadyRemoved);
         }
         db.deposit_in_queue(deposit_id)?;
         self.etherlink_data.removed_deposits.insert(*deposit_id);
@@ -231,7 +233,7 @@ impl LayeredState {
 #[cfg(test)]
 mod tests {
     use evm_types::{
-        custom, CustomPrecompileError, DatabasePrecompileStateChanges, FaDepositWithProxy,
+        DatabasePrecompileStateChanges, FaDepositWithProxy, PrecompileStateError,
     };
     use revm::primitives::{Address, U256};
     use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
@@ -243,7 +245,7 @@ mod tests {
     impl DatabasePrecompileStateChanges for DummyDB {
         fn log_node_message(&mut self, _: tezos_evm_logging::Level, _: &str) {}
 
-        fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
+        fn global_counter(&self) -> Result<U256, PrecompileStateError> {
             Ok(U256::ZERO)
         }
 
@@ -251,38 +253,32 @@ mod tests {
             &self,
             _ticket_hash: &U256,
             _owner: &Address,
-        ) -> Result<U256, CustomPrecompileError> {
+        ) -> Result<U256, PrecompileStateError> {
             Ok(U256::ZERO)
         }
 
         fn deposit_in_queue(
             &self,
             _deposit_id: &U256,
-        ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
+        ) -> Result<FaDepositWithProxy, PrecompileStateError> {
             Ok(FaDepositWithProxy::default())
         }
 
-        fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
-            Ok(
-                ContractKt1Hash::from_base58_check(
-                    "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
-                )
-                .map_err(custom)?,
-            )
+        fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
+            Ok(ContractKt1Hash::from_base58_check(
+                "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
+            )?)
         }
 
-        fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-            PublicKey::from_b58check(
+        fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
+            Ok(PublicKey::from_b58check(
                 "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
-            )
-            .map_err(|e| {
-                CustomPrecompileError::Revert(format!("Invalid sequencer address: {e}"))
-            })
+            )?)
         }
 
         fn governance_sequencer_upgrade_exists(
             &self,
-        ) -> Result<bool, CustomPrecompileError> {
+        ) -> Result<bool, PrecompileStateError> {
             Ok(false)
         }
     }

@@ -13,8 +13,8 @@ use crate::storage::{
     },
 };
 use evm_types::{
-    custom, CustomPrecompileError, DatabaseCommitPrecompileStateChanges,
-    DatabasePrecompileStateChanges, Error, FaDepositWithProxy, PrecompileStateChanges,
+    DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges, Error,
+    FaDepositWithProxy, PrecompileStateChanges, PrecompileStateError,
 };
 use michelson_types::Withdrawal;
 use revm::{
@@ -179,54 +179,45 @@ where
         log!(level, "{message:?}");
     }
 
-    fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
-        Ok(self.system.read_global_counter(self.host)?)
+    fn global_counter(&self) -> Result<U256, PrecompileStateError> {
+        self.system.read_global_counter(self.host)
     }
 
     fn ticket_balance(
         &self,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<U256, CustomPrecompileError> {
-        Ok(self
-            .system
-            .read_ticket_balance(self.host, ticket_hash, owner)?)
+    ) -> Result<U256, PrecompileStateError> {
+        self.system
+            .read_ticket_balance(self.host, ticket_hash, owner)
     }
 
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
-        Ok(self.system.read_deposit_from_queue(self.host, deposit_id)?)
+    ) -> Result<FaDepositWithProxy, PrecompileStateError> {
+        self.system.read_deposit_from_queue(self.host, deposit_id)
     }
 
-    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
+    fn ticketer(&self) -> Result<ContractKt1Hash, PrecompileStateError> {
         let ticketer =
             self.host
                 .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)?;
-        let kt1_b58 = String::from_utf8(ticketer.to_vec()).map_err(custom)?;
-        Ok(ContractKt1Hash::from_b58check(&kt1_b58).map_err(custom)?)
+        let kt1_b58 = std::str::from_utf8(&ticketer)?;
+        Ok(ContractKt1Hash::from_b58check(kt1_b58)?)
     }
 
-    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
+    fn sequencer(&self) -> Result<PublicKey, PrecompileStateError> {
         let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
-        PublicKey::from_b58check(std::str::from_utf8(&bytes).map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "Invalid sequencer key UTF-8 encoding: {e}"
-            ))
-        })?)
-        .map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "Invalid sequencer key Base58Check encoding: {e}"
-            ))
-        })
+        let s = std::str::from_utf8(&bytes)?;
+        Ok(PublicKey::from_b58check(s)?)
     }
 
-    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
+    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, PrecompileStateError> {
         match self.host.store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH) {
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
-            Err(e) => Err(CustomPrecompileError::from(e)),
+            Err(e) => Err(e.into()),
         }
     }
 }

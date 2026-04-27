@@ -4,9 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::{H160, H256, U256 as PU256};
-use rlp::{Decodable, Rlp, RlpDecodable, RlpEncodable};
-
-use crate::{custom, Error};
+use rlp::{Decodable, DecoderError, Rlp, RlpDecodable, RlpEncodable};
 
 // DEV: This struct uses deprecated types and encoding
 // It is only here for backwards compatibility
@@ -24,7 +22,7 @@ pub struct FaDepositWithProxy {
 }
 
 impl FaDepositWithProxy {
-    pub fn from_raw(raw_deposit: Vec<u8>) -> Result<Self, Error> {
-        FaDepositWithProxy::decode(&Rlp::new(&raw_deposit)).map_err(custom)
+    pub fn from_raw(raw_deposit: Vec<u8>) -> Result<Self, DecoderError> {
+        FaDepositWithProxy::decode(&Rlp::new(&raw_deposit))
     }
 }

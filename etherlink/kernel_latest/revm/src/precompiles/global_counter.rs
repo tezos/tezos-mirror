@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface, SolValue};
-use evm_types::CustomPrecompileError;
+use evm_types::{CustomPrecompileError, IntoWithRemainder};
 use revm::{
     context::ContextTr,
     interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
@@ -22,7 +22,7 @@ use crate::{
             FA_BRIDGE_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
-        guard::{charge, guard, revert},
+        guard::{charge, guard},
     },
 };
 
@@ -42,24 +42,26 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
+    let mut gas = Gas::new(inputs.gas_limit);
     guard(
         GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
         &[XTZ_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         inputs,
+        gas,
     )?;
 
-    let mut gas = Gas::new(inputs.gas_limit);
     charge(&mut gas, GLOBAL_COUNTER_BASE_COST)?;
 
-    let interface = match GlobalCounter::GlobalCounterCalls::abi_decode(calldata) {
-        Ok(data) => data,
-        Err(e) => return Ok(revert(e, gas)),
-    };
+    let interface = GlobalCounter::GlobalCounterCalls::abi_decode(calldata)
+        .map_err(|e| CustomPrecompileError::Revert(e.to_string(), gas))?;
 
     let counter = match interface {
         GlobalCounter::GlobalCounterCalls::get_and_increment(
             GlobalCounter::get_and_incrementCall,
-        ) => context.journal_mut().get_and_increment_global_counter()?,
+        ) => context
+            .journal_mut()
+            .get_and_increment_global_counter()
+            .map_err(|e| e.into_with_remainder(gas))?,
     };
 
     Ok(InterpreterResult {

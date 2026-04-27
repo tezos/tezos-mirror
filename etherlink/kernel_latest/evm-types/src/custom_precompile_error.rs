@@ -8,36 +8,67 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 
 use crate::Error;
 
+/// Actual errors that propagate up past the precompile boundary
+/// (never caught by the provider).
 #[derive(Debug)]
-pub enum CustomPrecompileError {
-    RuntimeAbort(RuntimeError),
-    CracAbort(String),
-    Revert(String),
-    RevertKeepGas(String, Gas),
-    OutOfGas,
+pub enum CustomPrecompileAbort {
+    Runtime(RuntimeError),
+    Crac(String),
 }
 
-impl From<RuntimeError> for CustomPrecompileError {
-    fn from(error: RuntimeError) -> Self {
-        match error {
-            RuntimeError::PathNotFound => {
-                CustomPrecompileError::Revert("Path not found".to_string())
+#[derive(Debug)]
+pub enum CustomPrecompileError {
+    Revert(String, Gas),
+    OutOfGas,
+    Abort(CustomPrecompileAbort),
+}
+
+impl From<CustomPrecompileAbort> for CustomPrecompileError {
+    fn from(abort: CustomPrecompileAbort) -> Self {
+        CustomPrecompileError::Abort(abort)
+    }
+}
+
+impl From<CustomPrecompileAbort> for Error {
+    fn from(abort: CustomPrecompileAbort) -> Self {
+        match abort {
+            CustomPrecompileAbort::Runtime(e) => Error::Runtime(e),
+            CustomPrecompileAbort::Crac(msg) => {
+                Error::Custom(format!("CRAC block abort: {msg}"))
             }
-            other => CustomPrecompileError::RuntimeAbort(other),
         }
     }
 }
 
-impl From<Error> for CustomPrecompileError {
-    fn from(error: Error) -> Self {
-        match error {
-            Error::Runtime(runtime) => CustomPrecompileError::from(runtime),
-            Error::Custom(message) => CustomPrecompileError::Revert(message),
+/// Classify a source error into [`CustomPrecompileError`],
+/// attaching the remaining `gas` to revert outcomes.
+pub trait IntoWithRemainder {
+    fn into_with_remainder(self, gas: Gas) -> CustomPrecompileError;
+}
+
+impl IntoWithRemainder for RuntimeError {
+    fn into_with_remainder(self, gas: Gas) -> CustomPrecompileError {
+        match self {
+            RuntimeError::PathNotFound => {
+                CustomPrecompileError::Revert("Path not found".to_string(), gas)
+            }
+            other => CustomPrecompileError::Abort(CustomPrecompileAbort::Runtime(other)),
+        }
+    }
+}
+
+impl IntoWithRemainder for Error {
+    fn into_with_remainder(self, gas: Gas) -> CustomPrecompileError {
+        match self {
+            Error::Runtime(e) => e.into_with_remainder(gas),
+            Error::Custom(msg) => CustomPrecompileError::Revert(msg, gas),
             Error::FeesToGasOverflow => CustomPrecompileError::Revert(
                 "Fees to gas conversion overflow".to_string(),
+                gas,
             ),
             Error::GasToFeesUnderflow => CustomPrecompileError::Revert(
                 "Gas to fees conversion underflow".to_string(),
+                gas,
             ),
         }
     }
