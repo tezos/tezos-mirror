@@ -212,6 +212,19 @@ where
                 // value. Unlike the other gateway entrypoints it does not
                 // trigger an HTTP round-trip, so `charge_gateway_base_cost`
                 // does not apply.
+                //
+                // Reject any non-zero amount. %collect_result is not a
+                // CRAC and has no recipient: allowing tez through it
+                // would create a hidden fund side-channel and break EVM
+                // sub-call semantics, where the return path carries
+                // only bytes. Adapters that need to refund tez must do
+                // so via an explicit CRAC (%transfer / %call_evm).
+                if ctx.amount() != 0 {
+                    return Err(TransferError::GatewayError(
+                        "collect_result: amount must be 0".into(),
+                    )
+                    .into());
+                }
                 let TypedValue::Bytes(payload) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
@@ -2415,6 +2428,45 @@ mod tests {
         // The original payload is preserved — a failing retry doesn't
         // clobber what the frame already holds.
         assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
+        assert!(registry.serve_calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_collect_result_rejects_nonzero_amount() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        // Frame is set up; the rejection must happen even when a frame
+        // exists, so it isn't masked by the no-frame check.
+        journal.michelson.push_external_checkpoint();
+        // Non-zero amount: %collect_result has no recipient and is not
+        // a CRAC, so any positive amount must fail.
+        let mut ctx = MockCtx::new(&mut host, source, 1);
+        let value = Micheline::Bytes(vec![0xCA, 0xFE]);
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            value,
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("collect_result: amount must be 0"),
+            "error should mention non-zero amount rejection: {err}"
+        );
+        // The frame's result slot stays empty — a rejected deposit must
+        // not leak any payload into the response body.
+        assert_eq!(journal.michelson.frame_result(), None);
         assert!(registry.serve_calls.borrow().is_empty());
     }
 
