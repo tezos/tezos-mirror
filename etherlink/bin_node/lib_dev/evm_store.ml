@@ -222,6 +222,27 @@ module Q = struct
   open Caqti_type.Std
   open Ethereum_types
 
+  (* Compression of the large BLOB columns
+     (transactions.{receipt_fields,object_fields}, blocks.{block,tez_block},
+     blueprints.payload) is wired entirely at the SQL level here:
+
+     - SELECTs wrap the column with [zstd_decompress(col)]. The
+       extension's decompress is a pass-through when the input does
+       not start with the zstd magic, so the same query handles both
+       compressed and uncompressed (legacy) rows seamlessly.
+     - INSERT/UPDATEs wrap the column with the 1-arg form
+       [zstd_compress(col)]. The compression level is held per
+       connection in the C extension's user-data slot, set once at
+       registration time from
+       [Configuration.experimental_features.sqlite_compression]. The
+       1-arg form reads it from there — no OCaml-side ref, no
+       duplicate prepared statements, no runtime dispatch in the
+       store callers.
+
+     [receipt_contains_bloom_filter] is composed with [zstd_decompress]
+     at the SQL level so the bloom-filter C extension always sees
+     decompressed receipt bytes regardless of the row's storage form. *)
+
   let l1_level = int32
 
   let level =
@@ -445,17 +466,17 @@ module Q = struct
 
     let insert =
       (t3 level timestamp payload ->. unit) ~name:__FUNCTION__ ~table
-      @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, zstd_compress(?))|eos}
 
     (* See {Note cast} *)
     let select =
       (level ->? t2 payload timestamp) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(payload AS BLOB), timestamp FROM blueprints WHERE id = ?|eos}
+      @@ {eos|SELECT zstd_decompress(CAST(payload AS BLOB)), timestamp FROM blueprints WHERE id = ?|eos}
 
     (* See {Note cast} *)
     let select_range =
       (t2 level level ->* t2 level payload) ~name:__FUNCTION__ ~table
-      @@ {|SELECT id, CAST(payload AS BLOB) FROM blueprints
+      @@ {|SELECT id, zstd_decompress(CAST(payload AS BLOB)) FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
@@ -808,7 +829,7 @@ DO UPDATE SET value = excluded.value
         ~table
         ~attrs:(fun (_, _, _, hash, _, _, _, _) ->
           [Telemetry.Attributes.Transaction.hash hash])
-      @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
+      @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, zstd_compress(?), zstd_compress(?))|eos}
 
     let insert_compact = insert_with receipt_fields
 
@@ -827,7 +848,7 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, zstd_decompress(CAST(receipt_fields AS BLOB)) FROM transactions WHERE hash = ?|eos}
 
     let select_receipts_from_block_number =
       (level
@@ -841,7 +862,7 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, zstd_decompress(CAST(receipt_fields AS BLOB)) FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
 
     let select_receipts_from_block_range =
       (t3 level level (option octets)
@@ -856,10 +877,10 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(receipt_fields AS BLOB) FROM transactions
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, zstd_decompress(CAST(receipt_fields AS BLOB)) FROM transactions
               WHERE $1 <= block_number AND block_number < $2
               AND ($3 IS NULL OR
-                   receipt_contains_bloom_filter(receipt_fields, $3))
+                   receipt_contains_bloom_filter(zstd_decompress(CAST(receipt_fields AS BLOB)), $3))
               ORDER BY block_number DESC, index_ DESC|eos}
 
     let select_object =
@@ -875,14 +896,14 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE hash = ?|eos}
+      @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, zstd_decompress(CAST(object_fields AS BLOB)) FROM transactions WHERE hash = ?|eos}
 
     let select_objects_from_block_number =
       (level ->* t5 quantity root_hash address (option address) object_fields)
         ~name:__FUNCTION__
         ~table
       (* See {Note cast} *)
-      @@ {eos|SELECT index_, hash, from_, to_, CAST(object_fields AS BLOB) FROM transactions WHERE block_number = ?|eos}
+      @@ {eos|SELECT index_, hash, from_, to_, zstd_decompress(CAST(object_fields AS BLOB)) FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
       (level ->. unit) ~name:__FUNCTION__ ~table
@@ -913,31 +934,31 @@ DO UPDATE SET value = excluded.value
       ->. unit)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block, tez_hash) VALUES (?, ?, ?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block, tez_hash) VALUES (?, ?, zstd_compress(?), zstd_compress(?), ?)|eos}
 
     let tez_insert =
       (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
-      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, zstd_compress(?))|eos}
 
     (* See {Note cast} *)
     let select_with_level =
       (level ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT zstd_decompress(CAST(block AS BLOB)) FROM blocks WHERE level = ?|eos}
 
     (* See {Note cast} *)
     let tez_select_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE level = ?|eos}
+      @@ {eos|SELECT zstd_decompress(CAST(block AS BLOB)) FROM blocks WHERE level = ?|eos}
 
     (* See {Note cast} *)
     let tezosx_select_tez_block_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(tez_block AS BLOB) FROM blocks WHERE level = ? AND tez_block IS NOT NULL|eos}
+      @@ {eos|SELECT zstd_decompress(CAST(tez_block AS BLOB)) FROM blocks WHERE level = ? AND tez_block IS NOT NULL|eos}
 
     (* See {Note cast} *)
     let select_with_hash =
       (block_hash ->? block) ~name:__FUNCTION__ ~table
-      @@ {eos|SELECT CAST(block AS BLOB) FROM blocks WHERE hash = ?|eos}
+      @@ {eos|SELECT zstd_decompress(CAST(block AS BLOB)) FROM blocks WHERE hash = ?|eos}
 
     let select_hash_of_number =
       (level ->? block_hash) ~name:__FUNCTION__ ~table
@@ -1061,51 +1082,67 @@ end)
 
 let sqlite_file_name = "store.sqlite"
 
-let init (type f) ?max_conn_reuse_count
+let make_migration (type f) ~read_only ~(chain_family : f L2_types.chain_family)
+    conn =
+  let open Lwt_result_syntax in
+  Sqlite.assert_in_transaction conn ;
+  with_connection conn @@ fun db_conn ->
+  let* () =
+    Evm_migration.apply
+      db_conn
+      ~read_only
+      ~on_init:Evm_store_events.init_store
+      ~on_future:Evm_store_events.migrations_from_the_future
+      ~on_applied:Evm_store_events.applied_migration
+      ()
+  in
+  let* () =
+    match chain_family with
+    | L2_types.Michelson ->
+        Tezlink_migration.apply
+          db_conn
+          ~read_only
+          ~on_future:Evm_store_events.migrations_from_the_future
+          ~on_applied:Evm_store_events.applied_migration
+          ()
+    | _ -> return_unit
+  in
+  let* legacy_block_storage_mode =
+    Db.find db_conn Q.Block_storage_mode.legacy ()
+  in
+  let* () =
+    when_ legacy_block_storage_mode @@ fun () ->
+    failwith
+      "The EVM node is in legacy block storage mode which is no longer \
+       supported."
+  in
+  return_unit
+
+let make_register
+    (sqlite_compression : Configuration.sqlite_compression_config option) db =
+  let compression : Sqlite_zstd.compression =
+    match sqlite_compression with
+    | None -> No_compression
+    | Some {compression_level; _} -> Level compression_level
+  in
+  Sqlite_receipt_bloom.register db ;
+  Sqlite_zstd.register compression db
+
+let init (type f) ?max_conn_reuse_count ?sqlite_compression
     ~(chain_family : f L2_types.chain_family) ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let read_only = match perm with Read_only _ -> true | Read_write -> false in
-  let migration conn =
-    Sqlite.assert_in_transaction conn ;
-    with_connection conn @@ fun db_conn ->
-    let* () =
-      Evm_migration.apply
-        db_conn
-        ~read_only
-        ~on_init:Evm_store_events.init_store
-        ~on_future:Evm_store_events.migrations_from_the_future
-        ~on_applied:Evm_store_events.applied_migration
-        ()
-    in
-    let* () =
-      match chain_family with
-      | L2_types.Michelson ->
-          Tezlink_migration.apply
-            db_conn
-            ~read_only
-            ~on_future:Evm_store_events.migrations_from_the_future
-            ~on_applied:Evm_store_events.applied_migration
-            ()
-      | _ -> return_unit
-    in
-    let* legacy_block_storage_mode =
-      Db.find db_conn Q.Block_storage_mode.legacy ()
-    in
-    let* () =
-      when_ legacy_block_storage_mode @@ fun () ->
-      failwith
-        "The EVM node is in legacy block storage mode which is no longer \
-         supported."
-    in
-    return_unit
+  let migration = make_migration ~read_only ~chain_family in
+  let register = make_register sqlite_compression in
+  let open_store () =
+    Sqlite.init ?max_conn_reuse_count ~register ~path ~perm migration
   in
-  Sqlite.init
-    ?max_conn_reuse_count
-    ~register:Sqlite_receipt_bloom.register
-    ~path
-    ~perm
-    migration
+  let* store = open_store () in
+  match (sqlite_compression, perm) with
+  | Some cfg, Read_write ->
+      Sqlite_compression_migration.run_if_needed ~store ~path ~open_store cfg
+  | _ -> return store
 
 module Context_hashes = struct
   let store store number hash =

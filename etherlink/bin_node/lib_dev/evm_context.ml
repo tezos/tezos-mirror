@@ -378,13 +378,15 @@ module State = struct
     ctxt.session.evm_state <- evm_state ;
     return_unit
 
-  let load ~l2_chains ~data_dir ~store_perm:perm index =
+  let load ?sqlite_compression ~l2_chains ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
     let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family ~l2_chains
     in
-    let* store = Evm_store.init ~chain_family ~data_dir ~perm () in
+    let* store =
+      Evm_store.init ?sqlite_compression ~chain_family ~data_dir ~perm ()
+    in
     Evm_store.use store @@ fun conn ->
     let* latest = Evm_store.Context_hashes.find_latest conn in
     match latest with
@@ -2326,6 +2328,8 @@ module State = struct
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
       load
+        ?sqlite_compression:
+          configuration.experimental_features.sqlite_compression
         ~l2_chains:configuration.experimental_features.l2_chains
         ~data_dir:configuration.data_dir
         ~store_perm
