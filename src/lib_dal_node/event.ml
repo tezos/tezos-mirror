@@ -1502,6 +1502,18 @@ open struct
          L1 history check will be enforced as usual"
       ~level:Warning
       ()
+
+  let rpc_addr_is_public =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"rpc_addr_is_public"
+      ~msg:
+        "RPC server is listening on public address {rpc_addr}: mutating \
+         endpoints are unauthenticated; use --rpc-addr to bind to 127.0.0.1 to \
+         restrict access"
+      ~level:Warning
+      ("rpc_addr", Data_encoding.string)
 end
 
 (* DAL node event emission functions *)
@@ -1662,6 +1674,8 @@ let emit_unexpected_slot_header_status ~published_level ~slot_index
     (published_level, slot_index, expected_status, got_status)
 
 let emit_removed_skip_list_cells ~level = emit removed_skip_list_cells level
+
+let emit_rpc_addr_is_public ~rpc_addr = emit rpc_addr_is_public rpc_addr
 
 let emit_removing_shards_failed ~published_level ~slot_index ~error =
   emit removing_shards_failed (published_level, slot_index, error)
