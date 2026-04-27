@@ -2,12 +2,12 @@
   "nodes": {
     "flake-compat": {
       "locked": {
-        "lastModified": 1696426674,
-        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
-        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
-        "revCount": 57,
+        "lastModified": 1733328505,
+        "narHash": "sha256-NeCCThCEP3eCl2l/+27kNNK7QrwZB1IJCrXfrbv5oqU=",
+        "rev": "ff81ac966bb2cae68946d5ed5fc4994f96d0ffec",
+        "revCount": 69,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/edolstra/flake-compat/1.0.1/018afb31-abd1-7bff-a5e4-cff7e18efb7a/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/edolstra/flake-compat/1.1.0/01948eb7-9cba-704f-bbf3-3fa956735b52/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -35,11 +35,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1710146030,
-        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "type": "github"
       },
       "original": {
@@ -84,16 +84,32 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1761491728,
-        "narHash": "sha256-93IG1Pyur3284e4N4ZSL9rYue1JCEErmgbz6F+2HgiA=",
+        "lastModified": 1777036452,
+        "narHash": "sha256-4fMYx8IEchhPXHmweBusafs3GVzA9lKt4uFRlHWcxIc=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "cb558837ac087901e81ea8921c5ae9c94f6621d2",
+        "rev": "7914bec12faac2df683126c94eb10102472083cc",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-foundry": {
+      "locked": {
+        "lastModified": 1766641518,
+        "narHash": "sha256-avPRUvjq2VPCu8gNXe4s15tb+TBjb4oQ4/ffzU4dl/w=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c4a64f7682aadb3986b592032e30e5d76deb74fb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c4a64f7682aadb3986b592032e30e5d76deb74fb",
         "type": "github"
       }
     },
@@ -168,6 +184,7 @@
       "original": {
         "owner": "ocaml",
         "repo": "opam-repository",
+        "rev": "8a528d6bb48e4be260fb670a1754df39a1192147",
         "type": "github"
       }
     },
@@ -198,6 +215,7 @@
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-foundry": "nixpkgs-foundry",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository_2"
       }
