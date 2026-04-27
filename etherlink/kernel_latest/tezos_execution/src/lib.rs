@@ -376,9 +376,9 @@ where
                 )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 let value = param.into_micheline_optimized_legacy(&parser.arena);
-                let encoded_value = value
-                    .encode()
-                    .map_err(|e| TransferError::MichelineDecodeError(e.to_string()))?;
+                let encoded_value = value.encode().map_err(|e| {
+                    TransferError::MichelineSerializationError(e.to_string())
+                })?;
                 let content = TransferContent {
                     amount,
                     destination: dest_contract,
@@ -455,7 +455,7 @@ where
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let encode_err = |e: tezos_data_encoding::enc::BinError| {
                     ApplyOperationError::Origination(
-                        OriginationError::MichelineDecodeError(e.to_string()),
+                        OriginationError::MichelineSerializationError(e.to_string()),
                     )
                 };
                 let script = Script {
@@ -997,7 +997,7 @@ fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
     let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
-        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+        .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
         .split_script()
@@ -1007,7 +1007,7 @@ fn typecheck_code_and_storage<'a, Host: StorageV1, C: Context>(
         .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage, true)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
-        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+        .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     contract_typechecked
         .typecheck_storage(ctx, &storage_micheline)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
@@ -1028,7 +1028,7 @@ fn handle_storage_with_big_maps<'a, Host: StorageV1, C: Context>(
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode()
-        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+        .map_err(|e| OriginationError::MichelineSerializationError(e.to_string()))?;
     let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
@@ -1261,7 +1261,7 @@ fn execute_smart_contract_originated<'a>(
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode()
-        .map_err(|e| TransferError::MichelineDecodeError(e.to_string()))?;
+        .map_err(|e| TransferError::MichelineSerializationError(e.to_string()))?;
 
     Ok((internal_operations, new_storage))
 }
