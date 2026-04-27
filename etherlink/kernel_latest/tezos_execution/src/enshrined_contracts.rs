@@ -2450,6 +2450,96 @@ mod tests {
         assert!(journal.michelson.frame_result().is_none());
     }
 
+    // Direct probe of the cost function. Pins the size formula at the
+    // boundaries: zero collapses to the base, a mid value matches the
+    // documented `460 + 1.5 * size`, and `usize::MAX` must not overflow
+    // — `saturating_mul(3)` caps the multiply at `u64::MAX`, the shift
+    // halves it, and the final `+ 460` stays inside `u64`.
+    #[test]
+    fn test_collect_result_size_cost_edge_cases() {
+        assert_eq!(
+            collect_result_size_cost(0),
+            COLLECT_RESULT_SIZE_BASE_MILLIGAS
+        );
+        // 256-byte payload: 460 + (256 * 3) / 2 = 460 + 384 = 844.
+        assert_eq!(collect_result_size_cost(256), 844);
+        // Must not panic; result fits in u64.
+        let max = collect_result_size_cost(usize::MAX);
+        assert!(max >= COLLECT_RESULT_SIZE_BASE_MILLIGAS);
+    }
+
+    // The size charge fires before `set_frame_result`. If the write
+    // then fails (here: no active frame), the gas stays consumed —
+    // the kernel did the validation work and the caller pays for it.
+    #[test]
+    fn test_collect_result_charges_gas_when_no_frame() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        // No `push_external_checkpoint` — `set_frame_result` fails.
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_err());
+        // typecheck (100) + size base (460) + 1.5 * 256 (384) = 944.
+        assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
+        assert!(journal.michelson.frame_result().is_none());
+    }
+
+    // The size charge also fires on the failing second deposit when
+    // the frame slot is already set: gas is consumed before the
+    // `AlreadySet` branch of `set_frame_result` is reached.
+    #[test]
+    fn test_collect_result_charges_gas_when_already_set() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal.michelson.push_external_checkpoint();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        // First deposit succeeds. 2-byte payload:
+        // typecheck (100) + size base (460) + 1.5 * 2 (3) = 563.
+        let first = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xCA, 0xFE]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(first.is_ok());
+        let after_first = ctx.operation_gas().total_milligas_consumed() as u64;
+        assert_eq!(after_first, 563);
+        // Second deposit fails on `AlreadySet` but its size charge is
+        // consumed anyway: another 944 mgas for the 256-byte payload.
+        let second = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(second.is_err());
+        assert_eq!(
+            ctx.operation_gas().total_milligas_consumed() as u64,
+            after_first + 944
+        );
+        // Original payload is preserved.
+        assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
+    }
+
     fn make_test_address() -> Address {
         Address {
             hash: AddressHash::from_bytes(&[
