@@ -393,6 +393,50 @@ mod test_encoding {
         }
     }
 
+    /// Tests that exercise the `Result`-returning encode contract.
+    mod result_contract {
+        use super::*;
+
+        /// Confirms `encode` returns `Ok` for a typical Micheline value, and
+        /// that the return type is `Result<Vec<u8>, BinError>` (compile-time
+        /// contract: the `?` operator can be used to chain).
+        #[test]
+        fn encode_returns_result_ok() {
+            fn try_encode<'a>(v: Micheline<'a>) -> Result<Vec<u8>, BinError> {
+                let bytes = v.encode()?;
+                Ok(bytes)
+            }
+            let bytes = try_encode(Micheline::Int(42.into())).expect("ok");
+            assert!(!bytes.is_empty());
+        }
+
+        /// Confirms `encode_for_pack` likewise returns `Result` and prefixes
+        /// with `0x05`.
+        #[test]
+        fn encode_for_pack_returns_result_ok() {
+            let bytes = Micheline::Int(0.into())
+                .encode_for_pack()
+                .expect("encode_for_pack ok");
+            assert_eq!(bytes.first(), Some(&0x05));
+        }
+
+        /// Confirms that a `BinError` produced by an inner encoder propagates
+        /// out of `with_patchback_len_result` correctly.
+        #[test]
+        fn patchback_propagates_errors() {
+            let mut out = vec![];
+            let err: BinResult = with_patchback_len_result(&mut out, |_out| {
+                Err(BinError::custom("synthetic encode failure".to_string()))
+            });
+            assert!(err.is_err());
+            let msg = format!("{}", err.unwrap_err());
+            assert!(
+                msg.contains("synthetic encode failure"),
+                "unexpected error message: {msg}"
+            );
+        }
+    }
+
     mod annotations {
         use crate::parser::test_helpers::*;
 
