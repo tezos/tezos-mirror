@@ -161,7 +161,12 @@ Starting with Octez v12 (supporting the Ithaca protocol), consensus operations a
    * - Attestation
      - 0x13
 
-The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``, as explained in the :ref:`signer's manual <signer_manual>`.
+The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``. For example, to restrict signing to baking operations only (blocks and consensus operations)::
+
+   home~$ octez-signer launch socket signer -a home -M 0x11,0x12,0x13
+
+This prevents the signer from signing transfers or other non-baking operations, reducing the attack surface for a dedicated baking key.
+See the :ref:`signer's manual <signer_manual>` for all available options.
 
 Signer configuration
 ~~~~~~~~~~~~~~~~~~~~
@@ -171,7 +176,8 @@ In our home server we can generate a new key pair (or import one from a
 keys.
 To select the ``tcp`` signing scheme, one has to launch ``octez-signer`` with the ``socket`` argument, as shown below.
 The new keys are stored by the signer in ``$HOME/.octez-signer`` in the same format
-as ``octez-client``.
+as ``octez-client``. A custom directory can be set with the global ``--base-dir`` (``-d``) option.
+If your keys are encrypted, pass the password file with the global ``--password-filename`` (``-f``) option.
 On our internet-facing virtual private server, called "vps" here, we can then import a key with the address
 of the signer.
 
@@ -218,6 +224,20 @@ All the above methods can also be used with the other signing schemes, for insta
    vps~$ octez-client import secret key alice remote:tz1abc...
    vps~$ octez-client sign bytes 0x03 for alice
 
+When the signer and the client run on the **same machine**, the ``unix`` scheme avoids network
+overhead entirely by communicating over a local Unix domain socket::
+
+   home~$ octez-signer launch local signer -s /run/octez-signer/octez-signer.sock
+
+   home~$ octez-client import secret key alice \
+            unix:///run/octez-signer/octez-signer.sock/tz1abc...
+   home~$ octez-client sign bytes 0x03 for alice
+
+   # or using the environment variable
+   home~$ export TEZOS_SIGNER_UNIX_PATH=/run/octez-signer/octez-signer.sock
+   home~$ octez-client import secret key alice remote:tz1abc...
+   home~$ octez-client sign bytes 0x03 for alice
+
 The complete list of environment variables for connecting to the remote signer is:
 
 + ``TEZOS_SIGNER_TCP_HOST``
@@ -229,11 +249,63 @@ The complete list of environment variables for connecting to the remote signer i
 + ``TEZOS_SIGNER_UNIX_PATH``
 + ``TEZOS_SIGNER_HTTP_HEADERS``
 
+``TEZOS_SIGNER_HTTP_HEADERS`` accepts a comma-separated list of ``Header: value`` pairs to be
+sent with every HTTP(S) signing request. This is useful when the signer sits behind a reverse
+proxy that requires custom authentication headers, for example::
+
+   export TEZOS_SIGNER_HTTP_HEADERS="X-Api-Key: mysecret"
+
+Additional launch options
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+All ``launch`` subcommands share a set of additional options for production deployments:
+
+``--pidfile <filename>`` (``-P``)
+  Write the signer process ID to a file. Useful for service managers (e.g. systemd, supervisord)
+  that need to track the process.
+
+``--check-high-watermark`` (``-W``)
+  Enable the **high watermark** check: the signer refuses to sign a block or consensus operation
+  whose level is not strictly higher than the last one it signed for the same key. This prevents
+  accidental double-signing (and the resulting slashing penalties) if the baker restarts and
+  replays operations. **This option is strongly recommended for all production bakers.**
+
+``--magic-bytes <0xHH,...>`` (``-M``)
+  Restrict signing to specific operation types identified by their magic byte. See the
+  `Signer requests`_ section above for the list of magic byte values.
+
+``--allow-list-known-keys``
+  Allow remote clients to query the list of public key hashes in the signer wallet. Disabled by
+  default so that the signer does not advertise which keys it holds.
+
+``--allow-to-prove-possession``
+  Allow remote clients to request a proof of possession for a given key. Disabled by default.
+
+The ``launch socket signer`` subcommand has one additional option:
+
+``--timeout <seconds>`` (``-t``)
+  Close idle client connections after this many seconds (default: no timeout).
+
 Secure the connection
 ~~~~~~~~~~~~~~~~~~~~~
 
 Note that the above setup alone is not secure, **the signer accepts
 requests from anybody and happily signs any transaction!**
+
+The following mechanisms can be combined to harden the signer.
+
+**Prevent double-signing (high watermark)**
+
+For any baker, the first safeguard to enable is the high watermark::
+
+   home~$ octez-signer --require-authentication launch socket signer -a home-ip -W
+
+The ``--check-high-watermark`` (``-W``) flag makes the signer track the highest block level
+it has signed for each key and refuse to sign anything at the same or a lower level.
+This prevents double-signing if the baker daemon is accidentally restarted and replays operations.
+See also the `Additional launch options`_ section above.
+
+**Authenticate the client**
 
 Improving the security of the communication channel can be done at the
 system level by setting up a tunnel with ``ssh`` or ``wireguard``
@@ -264,7 +336,28 @@ All request are now signed with the *vps* key, guaranteeing
 their authenticity and integrity.
 However, this setup **does not guarantee confidentiality**: an eavesdropper can
 see the transactions that you sign (on a public blockchain this may be less of a concern).
-In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
+
+**Encrypt the communication channel (HTTPS)**
+
+To ensure both authentication and confidentiality, use the ``https`` scheme.
+The signer requires a TLS certificate and its private key as positional arguments::
+
+   home~$ octez-signer launch https signer /path/to/cert.pem /path/to/key.pem \
+            -a home -p 443
+
+   vps~$ octez-client import secret key alice https://home:443/tz1abc...
+   vps~$ octez-client sign bytes 0x03 for alice
+
+The certificate can be self-signed (and then trusted explicitly on the client side) or issued by
+a certificate authority. For a local setup, a system-level tunnel with ``ssh`` or ``wireguard``
+is a simpler alternative.
+
+.. note::
+
+   ``--require-authentication`` and the ``https`` scheme are **independent** and can be
+   combined. HTTPS encrypts the channel; ``--require-authentication`` ensures that only
+   clients holding an authorized key can request signatures. Using both together provides
+   both confidentiality and integrity guarantees.
 
 .. _consensus_key_details:
 
