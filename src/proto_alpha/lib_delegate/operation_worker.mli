@@ -56,18 +56,18 @@ type event =
 
 (** {1 Constructors}*)
 
-(** [run ?monitor_node_operations ~multi_node_setup ~round_durations cctxt]
+(** [run ?monitor_node_operations ~multi_node ~round_durations cctxt]
     spawns an operation worker.
 
     @param monitor_node_operations monitor operations on the node (defaults:
    [true]).  Set [monitor_node_operations] to [false] to only consider
    externally provided (non-node) operations.
-    @param multi_node_setup if [true], the worker will gracefully shutdown on
+    @param multi_node if [true], the worker will gracefully shutdown on
    fatal errors, allowing the supervisor to restart. If [false], the worker
    will exit the entire process on fatal errors. *)
 val run :
   ?monitor_node_operations:bool ->
-  multi_node_setup:bool ->
+  multi_node:bool ->
   round_durations:Protocol.Alpha_context.Round.round_durations ->
   #Protocol_client_context.full ->
   t Lwt.t

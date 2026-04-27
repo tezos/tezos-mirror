@@ -867,6 +867,27 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
+  let skipping_outdated_consensus_vote =
+    declare_1
+      ~section
+      ~name:"skipping_outdated_consensus_vote"
+      ~level:Info
+      ~msg:"skipping outdated consensus vote for {operation_information}"
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
+
+  let skipping_outdated_block_forge_request =
+    declare_2
+      ~section
+      ~name:"skipping_outdated_block_forge_request"
+      ~level:Info
+      ~msg:"skipping outdated block forge request for (l{level}, r{round})"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+
   let consensus_op_injected =
     declare_2
       ~section

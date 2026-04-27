@@ -69,6 +69,7 @@ type t = {
   extra_operations : Operations_source.t option;
   pre_emptive_forge_time : Time.System.Span.t;
   remote_calls_timeout : float option;
+  multi_node : bool;
 }
 
 val default_fees_config : fees_config
@@ -95,6 +96,8 @@ val default_pre_emptive_forge_time : Time.System.Span.t
 
 val default_remote_calls_timeout : float option
 
+val default_multi_node : bool
+
 val default_config : t
 
 val make :
@@ -112,6 +115,7 @@ val make :
   ?extra_operations:Operations_source.t ->
   ?pre_emptive_forge_time:Time.System.Span.t ->
   ?remote_calls_timeout:float ->
+  ?multi_node:bool ->
   unit ->
   t
 

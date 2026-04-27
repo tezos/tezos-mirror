@@ -120,6 +120,7 @@ module Baker = struct
           ?data_dir
           ~user_activated_upgrades
           ?state_recorder
+          ~multi_node:(extra_nodes <> [])
           ()
       in
       let* () =

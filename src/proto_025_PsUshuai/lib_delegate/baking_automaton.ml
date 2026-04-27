@@ -794,8 +794,8 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
         ())
     dal_node_rpc_ctxt
 
-let create_automaton_state ?canceler ?monitor_node_operations ~multi_node_setup
-    ~global_state cctxt =
+let create_automaton_state ?canceler ?monitor_node_operations ~global_state
+    cctxt =
   let open Lwt_result_syntax in
   let name = Uri.to_string cctxt#base in
   (* Create DAL worker for this automaton *)
@@ -817,7 +817,7 @@ let create_automaton_state ?canceler ?monitor_node_operations ~multi_node_setup
   let*! operation_worker =
     Operation_worker.run
       ?monitor_node_operations
-      ~multi_node_setup
+      ~multi_node:global_state.config.multi_node
       ~round_durations:global_state.round_durations
       cctxt
   in

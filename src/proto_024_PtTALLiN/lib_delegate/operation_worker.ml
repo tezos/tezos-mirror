@@ -749,7 +749,7 @@ let flush_operation_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let run ?(monitor_node_operations = true) ~multi_node_setup ~round_durations
+let run ?(monitor_node_operations = true) ~multi_node ~round_durations
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
@@ -787,7 +787,7 @@ let run ?(monitor_node_operations = true) ~multi_node_setup ~round_durations
            nodes continue operating. In single-node setups, we exit the entire
            baker process immediately. *)
         let* () = Events.(emit node_unreachable_crash ()) in
-        if multi_node_setup then (
+        if multi_node then (
           (* Multi-node: close stream to signal automaton, cancel worker *)
           state.qc_event_stream.push (Some Shutdown) ;
           let* _ = shutdown_worker state in
