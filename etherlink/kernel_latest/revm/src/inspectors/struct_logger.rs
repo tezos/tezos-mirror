@@ -4,10 +4,10 @@
 
 use crate::{
     database::EtherlinkVMDB,
+    error::EvmKernelError,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
     inspectors::EtherlinkInspector,
 };
-use evm_types::Error;
 
 use revm::{
     context::{ContextTr, JournalTr},
@@ -198,7 +198,7 @@ impl StructLogger {
         output: Option<&Bytes>,
         gas_used: u64,
         transaction_hash: Option<B256>,
-    ) -> Result<(), Error>
+    ) -> Result<(), EvmKernelError>
     where
         Host: StorageV1,
     {

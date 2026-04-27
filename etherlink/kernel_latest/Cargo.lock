@@ -1183,7 +1183,6 @@ dependencies = [
  "alloy-primitives",
  "michelson-types",
  "primitive-types",
- "revm-database-interface",
  "revm-interpreter",
  "rlp",
  "tezos-evm-logging-latest",
@@ -3558,7 +3557,6 @@ dependencies = [
 name = "tezosx-interfaces"
 version = "0.1.0"
 dependencies = [
- "evm-types",
  "http",
  "nom",
  "primitive-types",

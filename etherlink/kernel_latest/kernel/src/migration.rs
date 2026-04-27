@@ -232,7 +232,7 @@ mod legacy {
         #[error("Transaction storage API error: {0:?}")]
         StorageError(tezos_smart_rollup_storage::StorageError),
         #[error("REVM Storage error: {0}")]
-        REVMStorageError(revm_etherlink::Error),
+        REVMStorageError(revm_etherlink::EvmRunError),
         /// Technically, the Ethereum account nonce can overflow if
         /// an account does an incredible number of transactions.
         #[error("Nonce overflow")]
@@ -245,8 +245,20 @@ mod legacy {
         }
     }
 
-    impl From<revm_etherlink::Error> for AccountStorageError {
-        fn from(error: revm_etherlink::Error) -> Self {
+    impl From<revm_etherlink::EvmKernelError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmKernelError) -> Self {
+            AccountStorageError::REVMStorageError(error.into())
+        }
+    }
+
+    impl From<revm_etherlink::EvmDbError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmDbError) -> Self {
+            AccountStorageError::REVMStorageError(error.into())
+        }
+    }
+
+    impl From<revm_etherlink::EvmRunError> for AccountStorageError {
+        fn from(error: revm_etherlink::EvmRunError) -> Self {
             AccountStorageError::REVMStorageError(error)
         }
     }

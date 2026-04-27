@@ -13,7 +13,7 @@ use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_QUEUE_GAS_LIMIT, XTZ_DEPOSIT_EXECUTION_COST,
 };
-use revm_etherlink::Error;
+use revm_etherlink::EvmKernelError;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
@@ -134,7 +134,7 @@ impl Transaction {
         }
     }
 
-    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, Error> {
+    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, EvmKernelError> {
         match &self.content {
             TransactionContent::Deposit(_) => Ok(XTZ_DEPOSIT_EXECUTION_COST),
             TransactionContent::Ethereum(e) => tx_execution_gas_limit(e, fees, false),
@@ -146,12 +146,12 @@ impl Transaction {
         }
     }
 
-    pub fn to(&self) -> Result<Option<H160>, Error> {
+    pub fn to(&self) -> Result<Option<H160>, EvmKernelError> {
         Ok(match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => {
-                let receiver = receiver.to_h160().map_err(|_| {
-                    Error::Custom("Can't convert deposit receiver".to_owned())
-                })?;
+                let receiver = receiver
+                    .to_h160()
+                    .map_err(|_| EvmKernelError::DepositReceiverConversion)?;
                 Some(receiver)
             }
             TransactionContent::FaDeposit(FaDeposit { .. }) => {

@@ -15,7 +15,7 @@ use tezos_smart_rollup_host::{
     storage::StorageV1,
 };
 
-use evm_types::Error;
+use crate::error::EvmDbError;
 
 use crate::{
     helpers::storage::{bytes_hash, read_u64_le_default, write_u64_le},
@@ -34,10 +34,9 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// Path to the number of accounts that use specific bytecodes.
 const REFERENCE_PATH: RefPath = RefPath::assert_from(b"/ref_count");
 
-fn code_hash_path(code_hash: &B256) -> Result<OwnedPath, Error> {
+fn code_hash_path(code_hash: &B256) -> Result<OwnedPath, EvmDbError> {
     let code_hash_path_string = format!("/{code_hash:x}");
-    OwnedPath::try_from(code_hash_path_string)
-        .map_err(|err| Error::Custom(err.to_string()))
+    Ok(OwnedPath::try_from(code_hash_path_string)?)
 }
 
 #[derive(Debug)]
@@ -47,7 +46,7 @@ pub struct CodeStorage {
 }
 
 impl CodeStorage {
-    pub fn new(code_hash: &B256) -> Result<Self, Error> {
+    pub fn new(code_hash: &B256) -> Result<Self, EvmDbError> {
         let code_hash_path = code_hash_path(code_hash)?;
         let path = concat(&EVM_CODES_PATH, &code_hash_path)?;
         Ok(Self {
@@ -56,12 +55,12 @@ impl CodeStorage {
         })
     }
 
-    fn exists(&self, host: &impl StorageV1) -> Result<bool, Error> {
+    fn exists(&self, host: &impl StorageV1) -> Result<bool, EvmDbError> {
         let store_has_code = host.store_has(&concat(&self.path, &CODE_PATH)?)?;
         Ok(store_has_code.is_some())
     }
 
-    fn get_ref_count(&self, host: &mut impl StorageV1) -> Result<u64, Error> {
+    fn get_ref_count(&self, host: &mut impl StorageV1) -> Result<u64, EvmDbError> {
         let reference_path = concat(&self.path, &REFERENCE_PATH)?;
         read_u64_le_default(host, &reference_path, 0)
     }
@@ -70,12 +69,12 @@ impl CodeStorage {
         &self,
         host: &mut impl StorageV1,
         number_ref: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), EvmDbError> {
         let reference_path = concat(&self.path, &REFERENCE_PATH)?;
         Ok(write_u64_le(host, &reference_path, number_ref)?)
     }
 
-    fn increment_code_usage(&self, host: &mut impl StorageV1) -> Result<(), Error> {
+    fn increment_code_usage(&self, host: &mut impl StorageV1) -> Result<(), EvmDbError> {
         let number_reference = self.get_ref_count(host)?;
         let number_reference = number_reference.saturating_add(1u64);
         self.set_ref_count(host, number_reference)
@@ -85,7 +84,7 @@ impl CodeStorage {
         host: &mut impl StorageV1,
         bytecode: &[u8],
         code_hash: Option<B256>,
-    ) -> Result<B256, Error> {
+    ) -> Result<B256, EvmDbError> {
         let code_hash = code_hash.unwrap_or_else(|| bytes_hash(bytecode));
         let code = Self::new(&code_hash)?;
         if !code.exists(host)? {
@@ -96,7 +95,10 @@ impl CodeStorage {
         Ok(code_hash)
     }
 
-    pub fn get_code(&self, host: &impl StorageV1) -> Result<Option<Bytecode>, Error> {
+    pub fn get_code(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Option<Bytecode>, EvmDbError> {
         if let Some(code) = get_precompile_bytecode(&self.hash)? {
             return Ok(Some(code));
         }
@@ -104,13 +106,16 @@ impl CodeStorage {
         match host.store_read_all(&code_path) {
             Ok(code_bytes) => Bytecode::new_raw_checked(Bytes::from(code_bytes))
                 .map(Some)
-                .map_err(|err| Error::Custom(err.to_string())),
+                .map_err(|source| EvmDbError::InvalidBytecode {
+                    hash: self.hash,
+                    source,
+                }),
             Err(RuntimeError::PathNotFound) => Ok(None),
-            Err(err) => Err(Error::Runtime(err)),
+            Err(err) => Err(EvmDbError::Runtime(err)),
         }
     }
 
-    fn decrement_code_usage(&self, host: &mut impl StorageV1) -> Result<u64, Error> {
+    fn decrement_code_usage(&self, host: &mut impl StorageV1) -> Result<u64, EvmDbError> {
         let mut number_reference = self.get_ref_count(host)?;
         if number_reference != 0 {
             // Condition avoids an unnecessary write access
@@ -120,7 +125,7 @@ impl CodeStorage {
         Ok(number_reference)
     }
 
-    pub fn delete(host: &mut impl StorageV1, code_hash: &B256) -> Result<(), Error> {
+    pub fn delete(host: &mut impl StorageV1, code_hash: &B256) -> Result<(), EvmDbError> {
         let code = Self::new(code_hash)?;
         if code.exists(host)? {
             let number_reference = code.decrement_code_usage(host)?;
@@ -134,7 +139,7 @@ impl CodeStorage {
     }
 }
 
-pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, Error> {
+pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, EvmDbError> {
     if code_hash == &XTZ_BRIDGE_SOL_CONTRACT.code_hash {
         Ok(Some(Bytecode::new_legacy(Bytes::from_static(
             XTZ_BRIDGE_SOL_CONTRACT.code,

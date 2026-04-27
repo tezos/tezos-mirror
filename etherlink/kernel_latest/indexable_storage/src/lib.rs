@@ -26,7 +26,7 @@ pub struct IndexableStorage {
     pub path: OwnedPath,
 }
 
-#[derive(Error, Debug, Eq, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq, Clone)]
 pub enum IndexableStorageError {
     #[error(transparent)]
     Path(#[from] PathError),

@@ -570,7 +570,7 @@ pub fn revm_run_transaction<Host>(
     tracer_input: Option<TracerInput>,
     is_simulation: bool,
     origin: revm_etherlink::TransactionOrigin,
-) -> Result<ExecutionOutcome, anyhow::Error>
+) -> Result<ExecutionOutcome, Error>
 where
     Host: StorageV1,
 {
@@ -593,10 +593,9 @@ where
     let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
         effective_gas_price.low_u128().to_le_bytes()
     } else {
-        return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+        return Err(Error::Overflow(
             "Given amount does not fit in a u128".to_string(),
-        ))
-        .into());
+        ));
     });
     let gas_data =
         GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
@@ -645,12 +644,7 @@ where
         is_simulation,
         origin,
     )
-    .map_err(|err| {
-        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(format!(
-            "REVM error {err:?}"
-        )))
-        .into()
-    })
+    .map_err(Error::InvalidRunTransaction)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -763,15 +757,7 @@ where
         &journal,
     );
 
-    let execution_outcome = match run_result {
-        Ok(outcome) => outcome,
-        Err(err) => {
-            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                err.to_string(),
-            ))
-            .into());
-        }
-    };
+    let execution_outcome = run_result?;
 
     // Drain any CRAC receipts produced by EVM→Michelson calls during
     // this transaction so they can be included in the Michelson runtime block.
@@ -867,9 +853,7 @@ where
         Err(err) => {
             // Something went wrong, we remove the added balance for the xtz deposit.
             caller_account.sub_balance(host, u256_to_alloy(&value))?;
-            Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                err.to_string(),
-            )))
+            Err(err)
         }
     }
 }
@@ -966,7 +950,7 @@ where
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
     let mut journal = TezosXJournal::default();
-    match revm_run_transaction(
+    revm_run_transaction(
         host,
         registry,
         &mut journal,
@@ -986,12 +970,7 @@ where
         TransactionOrigin::UserInput {
             access_list: revm::context::transaction::AccessList::default(),
         },
-    ) {
-        Ok(outcome) => Ok(outcome),
-        Err(err) => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-            err.to_string(),
-        ))),
-    }
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1305,9 +1284,7 @@ where
             block_constants
                 .chain_id
                 .to_little_endian(&mut chain_id_bytes);
-            let op_hash = op.hash().map_err(|e| {
-                Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
-            })?;
+            let op_hash = op.hash()?;
             // Delayed operations already paid L1 fees through the delayed inbox,
             // so DA fee check is not applicable.
             let mut tezosx_journal = TezosXJournal::new(crac_id);
