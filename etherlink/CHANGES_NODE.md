@@ -1,74 +1,54 @@
 # Changelog
 
-## Unreleased
+## Version 0.57 (2026-04-27)
 
-### Breaking changes
+This release mainly adds compatibility for the EVM node to the Tezos X
+Previewnet testnet.
+
+For instance, starting a new observer node in rolling mode for this network is
+now as simple as
+
+```
+octez-evm-node run observer --network previewnet \
+    --dont-track-rollup-node \
+    --init-from-snapshot \
+    --data-dir previewnet
+```
+
+This release will not apply any migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version).
 
 ### Configuration changes
 
-- Added a new `Seed` history mode (`--history seed:<days>`).
-  In this mode, the node retains only blueprints with their associated events
-  (deposits, kernel upgrades, sequencer upgrades). Blocks, transactions, and
-  context are pruned by the GC. Intended for nodes that only need to serve
-  blueprints to observers. (!21317)
+- Add a new `seed` history mode (`--history seed:<days>`), letting the node
+  retain only blueprints with their associated events (deposits, kernel
+  upgrades, sequencer upgrades). Blocks, transactions, and context are pruned
+  by the GC. Intended for nodes that only need to serve blueprints to
+  observers. (!21317)
 
 ### RPCs changes
 
-- `eth_sendRawTransaction` no longer rejects EIP-7702 transactions with invalid
-  authorizations (e.g., stale nonce). Per the EIP-7702 specification, invalid
-  authorizations are silently skipped during execution. (!21395)
-
-### Monitoring changes
+- Change `eth_sendRawTransaction` to no longer rejects EIP-7702 transactions
+  with invalid authorizations (e.g., stale nonce). Per the EIP-7702
+  specification, invalid authorizations are silently skipped during execution.
+  (!21395)
+- Fix early Etherlink blocks returned by `eth_getBlock*` RPCs that were missing
+  `baseFeePerGas`. The default 1 Gwei value is now set when decoding these
+  blocks, matching the kernel behavior. `eth_feeHistory` now reports 1 Gwei
+  (instead of 0) for these blocks. (!21553)
 
 ### Command-line interface changes
 
 - Add support for Tezos X Previewnet testnet with the `--network` CLI argument.
   (!21735)
 
-### Execution changes
-
-- Fixed v0 block headers missing `baseFeePerGas`, which caused failures
-  when computing execution gas. The default 1 Gwei value is now set
-  when decoding v0 blocks, matching the kernel behavior. v0 blocks only
-  existed at the very beginning of Etherlink, so this is only observable
-  when fetching the first blocks of the chain. As a consequence,
-  `eth_feeHistory` now reports 1 Gwei (instead of 0) for those blocks.
-  (!21553)
-
 ### Storage changes
 
-- Read Michelson `chain_id`, `simulation_result` and Tezos block data
-  (`current_chain_header`, `blocks/`, `indexes/blocks/`) from
-  `/tez/world_state/...` instead of `/tezlink/` and
-  `/evm/world_state/eth_accounts/tezos/`. The installer now writes
-  `michelson_runtime_chain_id` to `/tez/world_state/chain_id`. (!21705)
-
-- Read the `enable_multichain` and `enable_tezos_runtime` feature flags
-  unconditionally from `/base/feature_flags/`. Installer configuration
-  still writes all feature flags to their legacy locations when the
-  target kernel predates V54. (!21668)
-
-- Read governance, sequencing, DAL, blueprints, delayed inbox, chain
-  configurations and kernel events from `/base/...` on V53+ kernels,
-  and from `/evm/...` on older kernels. (!21565)
-
-- Store all-zero `logs_bloom` values as empty bytes instead of the
-  full 514-byte ASCII hex representation. This saves ~514 bytes per
-  simple-transfer receipt (the majority of transactions). Backward
-  compatible: existing rows are decoded transparently. (!21299)
-
-- Store `logs` stripped of redundant infos to reduce stored data.
-  Backward compatible: existing rows are decoded transparently.
-  (!21299)
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Add support for kernel migrations up to V54. (!21668 !21565)
+- Store all-zero `logs_bloom` of EVM transactions as empty bytes instead of the
+  full 514-byte ASCII hex representation. (!21299)
+- Store EVM transactions’ `logs` stripped of redundant infos to reduce stored
+  data. (!21299)
 
 ## Version 0.56 (2026-03-27)
 
@@ -92,8 +72,8 @@ This is a bugfix release addressing compatibility issues between the latest
 Etherlink upgrade (6.2) and the node. Operators are strongly encouraged to
 upgrade.
 
-This release will apply one migrations to the node’s store (version 24),
-meaning it is not possible downgrade to a previous version.
+This release will not apply migration to the node’s store (version 24),
+meaning it is possible to downgrade to previous version.
 
 ### RPCs changes
 
@@ -127,7 +107,7 @@ and the only way to know the state of the chain was to use a rollup node.
 Nowadays, a node in `proxy` mode was not providing any services of note that a
 node in `observer` mode cannot provide.
 
-This release will apply one migrations to the node’s store (version 23),
+This release will apply two migrations to the node’s store (version 24),
 meaning it is not possible downgrade to a previous version.
 
 ### Breaking changes
