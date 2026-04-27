@@ -14,9 +14,11 @@
     flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
 
     # The Opam repository is one way how dependencies are pinned for Octez.
+    # Must match $opam_repository_tag in scripts/version.sh — the
+    # ci-check-version-sh-lock app enforces this.
     opam-repository = {
       flake = false;
-      url = "github:ocaml/opam-repository";
+      url = "github:ocaml/opam-repository/8a528d6bb48e4be260fb670a1754df39a1192147";
     };
 
     # This library helps us build OCaml packages and dependencies.
