@@ -192,6 +192,9 @@
           # libraries (liboctez_rust_deps + liboctez_libcrux_ml_dsa) that
           # each embed the Rust standard library's rust_eh_personality.
           NIX_LDFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-z muldefs";
+
+          # Clang with wasm32 target support for WASM kernel compilation.
+          CC_wasm_unknown_unknown = "${pkgs.llvmPackages.clang-unwrapped}/bin/clang";
         };
 
         # This scope contains all Opam packages defined in this repository.
