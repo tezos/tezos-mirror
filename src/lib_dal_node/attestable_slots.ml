@@ -199,7 +199,7 @@ let may_notify_not_in_committee ctxt committee ~committee_level =
       slots can be published and attested in the near future;
       - `stop = L`, as this is the newest level where we did not have time to obtain
       the information about the published slots.
-    
+
     We include [L + 1] in backfill to cover possible races between updating the
     last-finalized level and stream subscription. This keeps the
     client's cache consistent even if the first slot was published before the stream
@@ -224,6 +224,7 @@ let get_backfill_payload ctxt ~pkh =
   in
   List.fold_left_es
     (fun acc published_level ->
+      let*? attestation_lag = get_attestation_lag ctxt ~level:published_level in
       let committee_level =
         Int32.(pred (add published_level attestation_lag))
       in
@@ -264,9 +265,8 @@ let get_backfill_payload ctxt ~pkh =
         if candidate_slot_indices = [] then return acc
         else
           (* Check each slot for attestability. *)
-          let*? lag = get_attestation_lag ctxt ~level:published_level in
           let*? params =
-            let attested_level = Int32.(add published_level lag) in
+            let attested_level = Int32.(add published_level attestation_lag) in
             get_proto_parameters ctxt ~level:(`Level attested_level)
           in
           let last_known_parameters =
