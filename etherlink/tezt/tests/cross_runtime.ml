@@ -7466,6 +7466,62 @@ let test_crac_http_call_tez_to_tez =
   Log.debug ~prefix "Verify TEZ target was reached (counter=1)" ;
   TezMultiRunCaller.check_storage ~expected_counter:1 tez_target
 
+(** Same-runtime EVM->EVM CRAC, target reverts.
+ *
+ *    EVM[evm_caller] --call(http://ethereum/...)--> EVM[evm_reverter]
+ *                                                   |-> revert()
+ *  EVM caller wraps the gateway call in try/catch: catches=1, count=2. *)
+let test_crac_http_call_evm_to_evm_revert =
+  register_crac_runner_test
+    ~title:"CRAC: generic call() EVM to EVM (same-runtime) revert is catchable"
+    ~tags:["http_call"; "same_runtime"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP-EVM2EVM" in
+  Log.debug ~prefix "Deploy EVM target with revert=true" ;
+  let* evm_target = EvmMultiRunCaller.deploy_and_init ~revert:true () in
+  Log.debug ~prefix "Deploy EVM caller using generic call() to EVM target" ;
+  let* evm_caller = EvmCracHttpCallEvm.deploy_and_init evm_target in
+  Log.debug ~prefix "Call runCatch() on EVM caller" ;
+  let* _ = EvmCracHttpCallEvm.call_run_catch evm_caller in
+  Log.debug ~prefix "Verify caller catches=1, count=2 (pre + post catch)" ;
+  let* () =
+    EvmCracHttpCallEvm.check_storage
+      ~expected_catches:1
+      ~expected_counter:2
+      evm_caller
+  in
+  Log.debug ~prefix "Verify EVM target rolled back (counter=0)" ;
+  EvmMultiRunCaller.check_storage ~expected_counter:0 evm_target
+
+(** Same-runtime TEZ->TEZ CRAC, target reverts.
+ *
+ *    TEZ[tez_caller] --%call(http://tezos/.../run)--> TEZ[tez_reverter]
+ *                                                     |-> FAILWITH
+ *  Michelson semantics: the failure inside the inner CRAC propagates to
+ *  the outer operation group, which reverts wholesale.  All three of
+ *  tez_caller's internal operations (pre, gateway, post) are rolled
+ *  back, so [count] stays at 0. *)
+let test_crac_http_call_tez_to_tez_revert =
+  register_crac_runner_test
+    ~title:"CRAC: generic call() TEZ to TEZ (same-runtime) revert propagates"
+    ~tags:["http_call"; "same_runtime"; "revert"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP-TEZ2TEZ" in
+  Log.debug ~prefix "Originate TEZ target with revert=true" ;
+  let* tez_target = TezMultiRunCaller.originate ~revert:true () in
+  Log.debug ~prefix "Originate TEZ caller using gateway %%call() to TEZ target" ;
+  let* tez_caller = TezCrossRuntimeHttpCallTez.originate tez_target in
+  Log.debug ~prefix "Call %%run on TEZ caller (expected to fail wholesale)" ;
+  let* () = TezRunner.call_run tez_caller in
+  Log.debug ~prefix "Verify caller counter=0 (whole op group rolled back)" ;
+  let* () =
+    TezCrossRuntimeHttpCallTez.check_storage ~expected_counter:0 tez_caller
+  in
+  Log.debug ~prefix "Verify TEZ target counter=0 (rolled back)" ;
+  TezMultiRunCaller.check_storage ~expected_counter:0 tez_target
+
 (* L1 vs TezosX receipt comparison helpers *)
 
 let extract_entrypoint_status internals =
@@ -9123,6 +9179,8 @@ let () =
   test_crac_http_call_catch_oog [Alpha] ;
   test_crac_http_call_evm_to_evm [Alpha] ;
   test_crac_http_call_tez_to_tez [Alpha] ;
+  test_crac_http_call_evm_to_evm_revert [Alpha] ;
+  test_crac_http_call_tez_to_tez_revert [Alpha] ;
   test_crac_debug_trace_transaction [Alpha] ;
   test_crac_debug_trace_block [Alpha] ;
   test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;
