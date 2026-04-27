@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased
+
+### Native atomic composability
+
+- Expose Michelson views to EVM contracts through the cross-runtime
+  HTTP protocol. The Michelson runtime's HTTP server now dispatches
+  on the request method: `POST` keeps the existing entrypoint-call
+  path, `GET` executes a named view on an originated contract and
+  surfaces its Micheline-encoded result through the same
+  `%collect_result` frame slot the entrypoint path uses. The EVM
+  gateway precompile gains a typed
+  `callMichelsonView(string,string,bytes) returns (bytes)` entry and
+  the generic `call(url, headers, body, method)` entry treats
+  `method=GET` as a read-only call. Both paths are
+  STATICCALL-compatible: no log emission, no value transfer, no
+  alias-cache write — the idiomatic
+  `staticcall(GATEWAY, abi.encodeCall(callMichelsonView, …))` Solidity
+  pattern works. (!21715)
+- Reject DELEGATECALL and CALLCODE on every entry of the runtime
+  gateway precompile (`transfer`, `callMichelson`, `callMichelsonView`,
+  `call`). A delegated frame would silently rewire the sender used for
+  alias resolution and inherit unrelated `msg.value`; there is no
+  legitimate reason to reach the gateway through those opcodes.
+  (!21715)
+- Charge gas for `%collect_result` (!21710)
+- Fix CRAC receipt merging when an EVM transaction interleaves failed and
+  successful CRACs. Receipts pushed to the Michelson journal are now tagged
+  with a monotonic sequence number shared across the pending and failed
+  lists, and `drain_pending_crac_receipts` sorts the concatenated receipts
+  by that sequence so internal operations are emitted in execution order
+  rather than bucketed by outcome. The merged top-level `ContentResult`
+  is reconciled against the internals: if at least one successful CRAC
+  contributed to the merge it is forced to `Applied` (so that `Applied`
+  internals never sit under a `Failed` parent, an L1-invalid combination);
+  if all internals are `Failed`/`Skipped`/`Backtracked` the top-level is
+  marked as `Failed`. (!21719)
+
+### Internals
+
+- Sort entrypoints by name before encoding the
+  `tezosx_michelson_entrypoints` kernel response, so the
+  `/entrypoints` RPC output is deterministic across runs and across
+  native vs WASM kernel executions (`HashMap` iteration order depends
+  on a per-process random seed). (!21715)
+
 ## Version 0.1 (162a573)
 
 This is the first consolidated release of Tezos X. Tezos X extends Etherlink
@@ -13,23 +58,15 @@ runtimes.
 
 Its storage version is 54.
 
-### Internal
+### Native atomic composability
 
 - Add `%collect_result` entrypoint to the Michelson gateway: lets
   adapters deposit a bytes payload surfaced as the synchronous return
   value of the EVM call, with gas charged at deposit time. (!21658,
-  !21659, !21710)
-- Fix CRAC receipt merging when an EVM transaction interleaves failed and
-  successful CRACs. Receipts pushed to the Michelson journal are now tagged
-  with a monotonic sequence number shared across the pending and failed
-  lists, and `drain_pending_crac_receipts` sorts the concatenated receipts
-  by that sequence so internal operations are emitted in execution order
-  rather than bucketed by outcome. The merged top-level `ContentResult`
-  is reconciled against the internals: if at least one successful CRAC
-  contributed to the merge it is forced to `Applied` (so that `Applied`
-  internals never sit under a `Failed` parent, an L1-invalid combination);
-  if all internals are `Failed`/`Skipped`/`Backtracked` the top-level is
-  marked as `Failed`. (!21719)
+  !21659)
+
+### Internal
+
 - Add support for `DalAttestedSlots` internal inbox message introduced in
   protocol U. The kernel now processes DAL slot attestations directly from the
   Layer 1 protocol, and does not need to rely on external import signals.  Only
