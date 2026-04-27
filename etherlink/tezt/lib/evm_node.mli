@@ -534,6 +534,10 @@ val spawn_run : ?extra_arguments:string list -> t -> Process.t
     Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
 val terminate : ?timeout:float -> t -> unit Lwt.t
 
+(** Send SIGKILL and wait for the process to exit. Useful to simulate a
+    crash. *)
+val kill : t -> unit Lwt.t
+
 val resolve_or_timeout :
   ?timeout:float -> t -> name:string -> 'a Lwt.t -> 'a Lwt.t
 
@@ -755,6 +759,13 @@ val transform_dump : dump_json:string -> dump_rlp:string -> unit Lwt.t
 (** [reset evm_node ~l2_level] reset the store of the [evm_node] to
     l2_level. *)
 val reset : t -> l2_level:int -> unit Lwt.t
+
+(** [spawn_compress_store evm_node] spawns the [compress store] command. *)
+val spawn_compress_store : t -> Process.t
+
+(** [compress_store evm_node] runs the [compress store] command and
+    checks it succeeds. *)
+val compress_store : t -> unit Lwt.t
 
 (** [chunk data ~rollup_address ?sequencer_key ?timestamp ?parent_hash
     ?number ?client data] generates the valid inputs for the rollup at
