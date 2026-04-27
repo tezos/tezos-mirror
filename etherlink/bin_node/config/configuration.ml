@@ -167,6 +167,8 @@ let default_websockets_config =
     rate_limit = None;
   }
 
+type sqlite_compression_config = {compression_level : int; batch_size : int}
+
 type experimental_features = {
   drop_duplicate_on_injection : bool;
   blueprints_publisher_order_enabled : bool;
@@ -178,6 +180,7 @@ type experimental_features = {
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
   compact_receipt_encoding : bool;
+  sqlite_compression : sqlite_compression_config option;
 }
 
 type gcp_key = {
@@ -332,6 +335,9 @@ let pp_history_mode_info fmt h =
 
 let default_l2_chains = None
 
+let default_sqlite_compression_config =
+  {compression_level = 3; batch_size = 10000}
+
 let default_experimental_features =
   {
     enable_send_raw_transaction = default_enable_send_raw_transaction;
@@ -344,6 +350,7 @@ let default_experimental_features =
     periodic_snapshot_path = None;
     preconfirmation_stream_enabled = false;
     compact_receipt_encoding = false;
+    sqlite_compression = None;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -1037,6 +1044,68 @@ let websocket_rate_limit_encoding =
           websocket_rate_limit_strategy_encoding
           default_websocket_rate_limit_strategy)
 
+let sqlite_compression_config_obj_encoding =
+  let open Data_encoding in
+  (* zstd accepts compression levels from -131072 (fastest, ZSTD_minCLevel)
+     to 22 (slowest). Levels 20..22 are zstd's "ultra" mode: each
+     compression call can allocate up to ~1.5 GiB of working memory and
+     runs 5-10x slower per level vs. 19, for typically <2% additional
+     size win — a real footgun on the EVM node's INSERT hot path. We
+     cap at 19, which zstd's own docs call "high compression" and which
+     every production guide treats as the practical ceiling. *)
+  let zstd_level_min = 1 in
+  let zstd_level_max = 19 in
+  conv
+    (fun {compression_level; batch_size} -> (compression_level, batch_size))
+    (fun (compression_level, batch_size) -> {compression_level; batch_size})
+    (obj2
+       (dft
+          ~description:
+            (Format.sprintf
+               "zstd compression level applied at INSERT time (allowed range: \
+                %d..%d)."
+               zstd_level_min
+               zstd_level_max)
+          "compression_level"
+          (ranged_int zstd_level_min zstd_level_max)
+          default_sqlite_compression_config.compression_level)
+       (dft
+          ~description:
+            "Maximum number of rows processed per migration batch UPDATE."
+          "batch_size"
+          (* Capped at 100k to bound the per-batch transaction WAL and
+             the memory footprint of a single batch's [zstd_compress]
+             allocations. Going higher buys negligible throughput on
+             realistic data and risks OOM on machines with limited
+             RAM. *)
+          (ranged_int 1 100_000)
+          default_sqlite_compression_config.batch_size))
+
+(* Encoding of [sqlite_compression_config option] that accepts both a
+   shortcut [bool] (true = defaults, false = disabled) and the full
+   configuration object. *)
+let sqlite_compression_config_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"bool"
+        (Tag 0)
+        bool
+        (function
+          | Some c when c = default_sqlite_compression_config -> Some true
+          | None -> Some false
+          | _ -> None)
+        (function
+          | true -> Some default_sqlite_compression_config | false -> None);
+      case
+        ~title:"object"
+        (Tag 1)
+        sqlite_compression_config_obj_encoding
+        (function Some c -> Some c | None -> None)
+        (fun c -> Some c);
+    ]
+
 let experimental_features_encoding =
   let open Data_encoding in
   conv
@@ -1051,32 +1120,35 @@ let experimental_features_encoding =
            periodic_snapshot_path;
            preconfirmation_stream_enabled;
            compact_receipt_encoding;
+           sqlite_compression;
          }
        ->
-      ( ( drop_duplicate_on_injection,
-          blueprints_publisher_order_enabled,
-          enable_send_raw_transaction,
-          None,
-          overwrite_simulation_tick_limit,
-          None ),
-        ( rpc_server,
-          spawn_rpc,
-          l2_chains,
-          periodic_snapshot_path,
-          preconfirmation_stream_enabled,
-          compact_receipt_encoding ) ))
-    (fun ( ( drop_duplicate_on_injection,
-             blueprints_publisher_order_enabled,
-             enable_send_raw_transaction,
-             _node_transaction_validation,
-             overwrite_simulation_tick_limit,
-             _next_wasm_runtime ),
-           ( rpc_server,
-             spawn_rpc,
-             l2_chains,
-             periodic_snapshot_path,
-             preconfirmation_stream_enabled,
-             compact_receipt_encoding ) )
+      ( ( ( drop_duplicate_on_injection,
+            blueprints_publisher_order_enabled,
+            enable_send_raw_transaction,
+            None,
+            overwrite_simulation_tick_limit,
+            None ),
+          ( rpc_server,
+            spawn_rpc,
+            l2_chains,
+            periodic_snapshot_path,
+            preconfirmation_stream_enabled,
+            compact_receipt_encoding ) ),
+        sqlite_compression ))
+    (fun ( ( ( drop_duplicate_on_injection,
+               blueprints_publisher_order_enabled,
+               enable_send_raw_transaction,
+               _node_transaction_validation,
+               overwrite_simulation_tick_limit,
+               _next_wasm_runtime ),
+             ( rpc_server,
+               spawn_rpc,
+               l2_chains,
+               periodic_snapshot_path,
+               preconfirmation_stream_enabled,
+               compact_receipt_encoding ) ),
+           sqlite_compression )
        ->
       {
         drop_duplicate_on_injection;
@@ -1089,103 +1161,120 @@ let experimental_features_encoding =
         periodic_snapshot_path;
         preconfirmation_stream_enabled;
         compact_receipt_encoding;
+        sqlite_compression;
       })
     (merge_objs
-       (obj6
+       (merge_objs
+          (obj6
+             (dft
+                ~description:
+                  "Request the rollup node to filter messages it has already \
+                   forwarded to the Layer 1 network. Require an unreleased \
+                   version of the Smart Rollup node."
+                "drop_duplicate_on_injection"
+                bool
+                default_experimental_features.drop_duplicate_on_injection)
+             (dft
+                ~description:
+                  "Request the rollup node to prioritize messages by level \
+                   when publishing blueprints in the layer 1."
+                "blueprints_publisher_order_enabled"
+                bool
+                default_experimental_features.blueprints_publisher_order_enabled)
+             (dft
+                ~description:
+                  "Enable or disable the `eth_sendRawTransaction` method. \
+                   DEPRECATED:  You should use \"rpc.restricted_rpcs\" \
+                   instead."
+                "enable_send_raw_transaction"
+                bool
+                default_experimental_features.enable_send_raw_transaction)
+             (opt
+                ~description:
+                  "DEPRECATED: You should remove this option from your \
+                   configuration file."
+                "node_transaction_validation"
+                bool)
+             (dft
+                "overwrite_simulation_tick_limit"
+                ~description:
+                  "When enabled, the eth_call method is not subject to the \
+                   tick limit. This can be useful to execute calls that will \
+                   not be injected in transactions (similarly to what the \
+                   Uniswap V3 frontend does to prepare swaps). However, it can \
+                   lead to confusing UX for users, where eth_estimateGas fails \
+                   when eth_call succeeded."
+                bool
+                default_experimental_features.overwrite_simulation_tick_limit)
+             (opt
+                "next_wasm_runtime"
+                ~description:
+                  "Enable or disable the experimental WASM runtime that is \
+                   expected to replace the Smart Rollup’s Fast Exec runtime. \
+                   DEPRECATED: You should remove this option from your \
+                   configuration file."
+                bool))
+          (obj6
+             (dft
+                "rpc_server"
+                ~description:
+                  "Choose the RPC server implementation, \'dream\' or \
+                   \'resto\', the latter being the default one."
+                rpc_server_encoding
+                default_experimental_features.rpc_server)
+             (dft
+                "spawn_rpc"
+                ~description:"Spawn a RPC node listening on the given port"
+                (option @@ obj1 (req "protected_port" (ranged_int 1 65535)))
+                default_experimental_features.spawn_rpc)
+             (dft
+                "l2_chains"
+                ~description:
+                  "Configuration of l2_chains for multisequencing.\n\
+                  \                 If not set, the node will adopt a single \
+                   chain behaviour."
+                (option (list l2_chain_encoding))
+                default_l2_chains)
+             (dft
+                "periodic_snapshot_path"
+                ~description:"Path to the periodic snapshot file"
+                (option string)
+                default_experimental_features.periodic_snapshot_path)
+             (dft
+                "preconfirmation_stream_enabled"
+                ~description:
+                  "Activate or not the preconfirmation stream. This includes \
+                   the sequencer as well as the observer."
+                bool
+                default_experimental_features.preconfirmation_stream_enabled)
+             (dft
+                "compact_receipt_encoding"
+                ~description:
+                  "When enabled, transaction receipts are written to the store \
+                   using a compact encoding: all-zero logs blooms are stored \
+                   as empty bytes, and per-log context fields (blockNumber, \
+                   blockHash, transactionHash, transactionIndex) are stripped \
+                   since they are derivable from the outer transaction row. \
+                   Defaults to [false] so that receipts remain readable by \
+                   older node releases that predate the compact encoding, \
+                   allowing operators to roll back the binary if needed. The \
+                   decoder always accepts both formats, so this flag only \
+                   affects writes."
+                bool
+                default_experimental_features.compact_receipt_encoding)))
+       (obj1
           (dft
              ~description:
-               "Request the rollup node to filter messages it has already \
-                forwarded to the Layer 1 network. Require an unreleased \
-                version of the Smart Rollup node."
-             "drop_duplicate_on_injection"
-             bool
-             default_experimental_features.drop_duplicate_on_injection)
-          (dft
-             ~description:
-               "Request the rollup node to prioritize messages by level when \
-                publishing blueprints in the layer 1."
-             "blueprints_publisher_order_enabled"
-             bool
-             default_experimental_features.blueprints_publisher_order_enabled)
-          (dft
-             ~description:
-               "Enable or disable the `eth_sendRawTransaction` method. \
-                DEPRECATED:  You should use \"rpc.restricted_rpcs\" instead."
-             "enable_send_raw_transaction"
-             bool
-             default_experimental_features.enable_send_raw_transaction)
-          (opt
-             ~description:
-               "DEPRECATED: You should remove this option from your \
-                configuration file."
-             "node_transaction_validation"
-             bool)
-          (dft
-             "overwrite_simulation_tick_limit"
-             ~description:
-               "When enabled, the eth_call method is not subject to the tick \
-                limit. This can be useful to execute calls that will not be \
-                injected in transactions (similarly to what the Uniswap V3 \
-                frontend does to prepare swaps). However, it can lead to \
-                confusing UX for users, where eth_estimateGas fails when \
-                eth_call succeeded."
-             bool
-             default_experimental_features.overwrite_simulation_tick_limit)
-          (opt
-             "next_wasm_runtime"
-             ~description:
-               "Enable or disable the experimental WASM runtime that is \
-                expected to replace the Smart Rollup’s Fast Exec runtime. \
-                DEPRECATED: You should remove this option from your \
-                configuration file."
-             bool))
-       (obj6
-          (dft
-             "rpc_server"
-             ~description:
-               "Choose the RPC server implementation, \'dream\' or \'resto\', \
-                the latter being the default one."
-             rpc_server_encoding
-             default_experimental_features.rpc_server)
-          (dft
-             "spawn_rpc"
-             ~description:"Spawn a RPC node listening on the given port"
-             (option @@ obj1 (req "protected_port" (ranged_int 1 65535)))
-             default_experimental_features.spawn_rpc)
-          (dft
-             "l2_chains"
-             ~description:
-               "Configuration of l2_chains for multisequencing.\n\
-               \                 If not set, the node will adopt a single \
-                chain behaviour."
-             (option (list l2_chain_encoding))
-             default_l2_chains)
-          (dft
-             "periodic_snapshot_path"
-             ~description:"Path to the periodic snapshot file"
-             (option string)
-             default_experimental_features.periodic_snapshot_path)
-          (dft
-             "preconfirmation_stream_enabled"
-             ~description:
-               "Activate or not the preconfirmation stream. This includes the \
-                sequencer as well as the observer."
-             bool
-             default_experimental_features.preconfirmation_stream_enabled)
-          (dft
-             "compact_receipt_encoding"
-             ~description:
-               "When enabled, transaction receipts are written to the store \
-                using a compact encoding: all-zero logs blooms are stored as \
-                empty bytes, and per-log context fields (blockNumber, \
-                blockHash, transactionHash, transactionIndex) are stripped \
-                since they are derivable from the outer transaction row. \
-                Defaults to [false] so that receipts remain readable by older \
-                node releases that predate the compact encoding, allowing \
-                operators to roll back the binary if needed. The decoder \
-                always accepts both formats, so this flag only affects writes."
-             bool
-             default_experimental_features.compact_receipt_encoding)))
+               "Opt-in zstd compression of the EVM node's large BLOB columns \
+                (transactions.receipt_fields, transactions.object_fields, \
+                blocks.block, blueprints.payload). When set, new writes to \
+                these columns are compressed at INSERT time and a background \
+                worker incrementally backfills pre-existing uncompressed rows. \
+                Reads transparently handle both forms. Accepts the full config \
+                object, [true] (enabled with defaults), or [false] (disabled)."
+             "sqlite_compression"
+             sqlite_compression_config_encoding
+             default_experimental_features.sqlite_compression)))
 
 (* A chunk is at most 4 KBytes. A transaction is around 150 bytes. Having 4
    connections up gives roughly 100TPS (4 * 4000 / 150), which should cover
