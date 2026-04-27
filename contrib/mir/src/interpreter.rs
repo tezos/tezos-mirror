@@ -1903,8 +1903,9 @@ fn interpret_one<'a>(
                 }
             };
 
-            let Some((view, view_storage_ty, view_storage, view_balance)) =
-                ctx.lookup_view_storage_balance(&kt1, name, arena)
+            let Some((view, view_storage_ty, view_storage, view_balance)) = ctx
+                .lookup_view_storage_balance(&kt1, name, arena)
+                .map_err(|e| InterpretError::EncodeError(e.to_string()))?
             else {
                 stack.push(V::Option(None));
                 return Ok(());

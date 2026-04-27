@@ -230,6 +230,11 @@ where
     let mir_result: Result<Vec<u8>, TezosXRuntimeError> = (|| {
         let (view, storage_ty_mich, storage_bytes, _) = mir_ctx
             .lookup_view_storage_balance(&destination_kt1, &view_name, &parser.arena)
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!(
+                    "view lookup on contract {destination_kt1:?} failed: {e}"
+                ))
+            })?
             .ok_or_else(|| {
                 TezosXRuntimeError::NotFound(format!(
                     "view {view_name:?} not found on contract {destination_kt1:?}"

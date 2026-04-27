@@ -102,13 +102,17 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     /// - the packed (serialized) storage,
     /// - the contract balance in mutez.
     ///
-    /// Returns [`None`] if the contract or the view does not exist.
+    /// Returns [`Ok(None)`] if the contract or the view does not exist. Returns
+    /// [`Err`] if encoding the view storage fails.
     fn lookup_view_storage_balance(
         &self,
         contract: &ContractKt1Hash,
         name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>;
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        tezos_data_encoding::enc::BinError,
+    >;
 
     /// Override the execution context for a view call.
     /// Sets `self_address`, `sender`, `amount`, and `balance`.
@@ -355,9 +359,14 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)> {
+    ) -> Result<
+        Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+        tezos_data_encoding::enc::BinError,
+    > {
         let addr = AddressHash::Kt1(contract.clone());
-        let contract_view = self.views.get(&addr)?.get(view_name)?;
+        let Some(contract_view) = self.views.get(&addr).and_then(|m| m.get(view_name)) else {
+            return Ok(None);
+        };
         let view = MichelineView {
             input_type: contract_view
                 .input_type
@@ -367,11 +376,14 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
                 .into_micheline_optimized_legacy(arena),
             code: contract_view.code.clone(),
         };
-        let (storage_ty, storage) = self.storage.get(&addr)?;
+        let Some((storage_ty, storage)) = self.storage.get(&addr) else {
+            return Ok(None);
+        };
         let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
         let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
         let view_balance = self.balances.get(contract).cloned().unwrap_or(0);
-        Some((view, mich_storage_ty, mich_storage.encode().ok()?, view_balance))
+        let encoded = mich_storage.encode()?;
+        Ok(Some((view, mich_storage_ty, encoded, view_balance)))
     }
 
     fn set_view_context(

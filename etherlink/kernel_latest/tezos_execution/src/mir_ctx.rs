@@ -257,39 +257,57 @@ impl<'a, Host: StorageV1, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         contract: &ContractKt1Hash,
         view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
-    ) -> Option<(
-        mir::typechecker::MichelineView<Micheline<'a>>,
-        Micheline<'a>,
-        Vec<u8>,
-        i64,
-    )> {
-        let account = self.tc_ctx.context.originated_from_kt1(contract).ok()?;
-        let serialized_script = account.code(self.tc_ctx.host).ok()?;
+    ) -> Result<
+        Option<(
+            mir::typechecker::MichelineView<Micheline<'a>>,
+            Micheline<'a>,
+            Vec<u8>,
+            i64,
+        )>,
+        tezos_data_encoding::enc::BinError,
+    > {
+        let Ok(account) = self.tc_ctx.context.originated_from_kt1(contract) else {
+            return Ok(None);
+        };
+        let Ok(serialized_script) = account.code(self.tc_ctx.host) else {
+            return Ok(None);
+        };
         match serialized_script {
             Code::Code(serialized_script) => {
-                let MichelineContractScript {
+                let Ok(decoded) = Micheline::decode_raw(arena, &serialized_script) else {
+                    return Ok(None);
+                };
+                let Ok(MichelineContractScript {
                     code: _,
                     parameter_ty: _,
                     storage_ty,
                     views,
-                } = Micheline::decode_raw(arena, &serialized_script)
-                    .ok()?
-                    .split_script()
-                    .ok()?;
-                let view = views.get(view_name)?;
+                }) = decoded.split_script()
+                else {
+                    return Ok(None);
+                };
+                let Some(view) = views.get(view_name) else {
+                    return Ok(None);
+                };
                 let owned_view = MichelineView {
                     input_type: view.input_type.clone(),
                     output_type: view.output_type.clone(),
                     code: view.code.clone(),
                 };
-                let storage = account.storage(self.tc_ctx.host).ok()?;
-                let balance = account.balance(self.tc_ctx.host).ok()?;
-                let balance = balance.0.try_into().ok()?;
-                Some((owned_view, storage_ty.clone(), storage, balance))
+                let Ok(storage) = account.storage(self.tc_ctx.host) else {
+                    return Ok(None);
+                };
+                let Ok(balance) = account.balance(self.tc_ctx.host) else {
+                    return Ok(None);
+                };
+                let Ok(balance) = balance.0.try_into() else {
+                    return Ok(None);
+                };
+                Ok(Some((owned_view, storage_ty.clone(), storage, balance)))
             }
             Code::Enshrined(_) => {
                 // Current enshrined contracts have no views
-                None
+                Ok(None)
             }
         }
     }
@@ -1320,8 +1338,11 @@ pub(crate) mod mock {
             _contract: &ContractKt1Hash,
             _name: &str,
             _arena: &'a Arena<Micheline<'a>>,
-        ) -> Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)> {
-            None
+        ) -> Result<
+            Option<(MichelineView<Micheline<'a>>, Micheline<'a>, Vec<u8>, i64)>,
+            tezos_data_encoding::enc::BinError,
+        > {
+            Ok(None)
         }
 
         fn set_view_context(
