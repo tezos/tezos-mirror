@@ -164,7 +164,23 @@
            since they are derivable from the outer transaction row. Defaults to [false] so
            that receipts remain readable by older node releases that predate the compact
            encoding, allowing operators to roll back the binary if needed. The decoder always
-           accepts both formats, so this flag only affects writes. */ },
+           accepts both formats, so this flag only affects writes. */,
+      "sqlite_compression"?:
+        /* Opt-in zstd compression of the EVM node's large BLOB columns
+           (transactions.receipt_fields, transactions.object_fields, blocks.block,
+           blueprints.payload). When set, new writes to these columns are compressed at INSERT
+           time and a background worker incrementally backfills pre-existing uncompressed
+           rows. Reads transparently handle both forms. Accepts the full config object, [true]
+           (enabled with defaults), or [false] (disabled). */
+        boolean
+        /* bool */
+        || { /* object */
+             "compression_level"?:
+               integer ∈ [1, 19]
+               /* zstd compression level applied at INSERT time (allowed range: 1..19). */,
+             "batch_size"?:
+               integer ∈ [1, 100000.000000]
+               /* Maximum number of rows processed per migration batch UPDATE. */ } },
   "gcp_kms"?:
     { "connection_pool_size"?:
         integer ∈ [1, 2^30]

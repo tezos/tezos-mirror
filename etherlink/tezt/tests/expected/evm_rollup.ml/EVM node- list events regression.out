@@ -2212,6 +2212,120 @@ spawn_rpc_is_ready:
     { /* spawn_rpc_is_ready version 0 */
       "spawn_rpc_is_ready.v0": any }
   
+sqlite_compression_migration_done:
+  description: sqlite zstd-compression migration complete in {elapsed}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_done version 0 */
+      "sqlite_compression_migration_done.v0": $timespan.system }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+  
+sqlite_compression_migration_resume:
+  description: resuming sqlite zstd-compression migration from previous run
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_resume version 0 */
+      "sqlite_compression_migration_resume.v0": any }
+  
+sqlite_compression_migration_start:
+  description: starting sqlite zstd-compression migration
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_start version 0 */
+      "sqlite_compression_migration_start.v0": any }
+  
+sqlite_compression_migration_table_done:
+  description: finished compressing {table} in {elapsed}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_table_done version 0 */
+      "sqlite_compression_migration_table_done.v0":
+        { "table": $unistring,
+          "elapsed": $timespan.system } }
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+sqlite_compression_migration_table_progress:
+  description: compressing {table}: {rows_done} rows processed ({percent})
+  level: info
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_table_progress version 0 */
+      "sqlite_compression_migration_table_progress.v0":
+        { "table": $unistring,
+          "rows_done": integer ∈ [-2^30, 2^30],
+          "percent": number } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+sqlite_compression_migration_table_start:
+  description: compressing table {table}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_table_start version 0 */
+      "sqlite_compression_migration_table_start.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+sqlite_compression_migration_vacuum_done:
+  description: VACUUM INTO finished in {elapsed}: {before_bytes} -> {after_bytes} ({reduction})
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_vacuum_done version 0 */
+      "sqlite_compression_migration_vacuum_done.v0":
+        { "elapsed": $timespan.system,
+          "before_bytes": $int64,
+          "after_bytes": $int64,
+          "reduction": number } }
+    $int64:
+      /* 64 bit integers
+         Decimal representation of 64 bit integers */
+      string
+    $timespan.system:
+      /* A span of time, as seen by the local computer. */
+      number
+  
+sqlite_compression_migration_vacuum_failed:
+  description: VACUUM INTO failed after row compression: {error}. Migration state is preserved and will be retried on the next invocation of 'compress store'.
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_vacuum_failed version 0 */
+      "sqlite_compression_migration_vacuum_failed.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+sqlite_compression_migration_vacuum_start:
+  description: starting VACUUM INTO after compression migration
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_vacuum_start version 0 */
+      "sqlite_compression_migration_vacuum_start.v0": any }
+  
 start:
   description: starting the EVM node ({mode})
   level: notice
@@ -3089,6 +3203,19 @@ rpc_server_error:
   json format:
     { /* rpc_server_error version 0 */
       "rpc_server_error.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+sqlite_compression_migration_vacuum_failed:
+  description: VACUUM INTO failed after row compression: {error}. Migration state is preserved and will be retried on the next invocation of 'compress store'.
+  level: error
+  section: evm_node.dev
+  json format:
+    { /* sqlite_compression_migration_vacuum_failed version 0 */
+      "sqlite_compression_migration_vacuum_failed.v0": $unistring }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
