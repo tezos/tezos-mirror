@@ -1800,3 +1800,29 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
 pub fn test_chain_config() -> ChainConfig {
     ChainConfig::Evm(Box::new(test_evm_chain_config()))
 }
+
+/// Reveal operation bytes from protocol encoding regression tests.
+#[cfg(test)]
+pub(crate) const REVEAL_OP_HEX: &str = "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a86b0002298c03ed7d454a101eb7022bc95f7e5f41ac7821dc05edecc004adcacdb7d401004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f0066804fe735e06e97e26da8236b6341b91c625d5e82b3524ec0a88cc982365e70f8a5b9bc65df2ea6d21ee244cc3a96fb33031c394c78b1179ff1b8a44237740c";
+
+/// Builds a test [`Operation`] from [`REVEAL_OP_HEX`]. Shared by the test
+/// modules that exercise Tezos operation encoding/decoding.
+#[cfg(test)]
+pub(crate) fn make_test_operation() -> Operation {
+    let bytes = hex::decode(REVEAL_OP_HEX).unwrap();
+    Operation::nom_read_exact(&bytes).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tezlink_content_tezos_rlp_roundtrip() {
+        let op = make_test_operation();
+        let content = TezlinkContent::Tezos(op);
+        let encoded = rlp::encode(&content);
+        let decoded: TezlinkContent = rlp::decode(&encoded).unwrap();
+        assert_eq!(decoded, content);
+    }
+}

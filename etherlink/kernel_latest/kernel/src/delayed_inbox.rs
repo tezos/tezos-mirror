@@ -415,14 +415,18 @@ impl DelayedInbox {
 #[cfg(test)]
 mod tests {
     use super::DelayedInbox;
+    use super::DelayedTransaction;
     use super::Hash;
+    use crate::chains::make_test_operation;
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use primitive_types::{H160, U256};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-    use crate::transaction::TransactionContent::{Ethereum, EthereumDelayed};
+    use crate::transaction::TransactionContent::{
+        Ethereum, EthereumDelayed, TezosDelayed,
+    };
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
@@ -457,6 +461,21 @@ mod tests {
     }
 
     #[test]
+    fn test_delayed_tezos_operation_rlp_roundtrip() {
+        let op = make_test_operation();
+        let delayed = DelayedTransaction::Tezos(op);
+        let encoded = rlp::encode(&delayed);
+        let decoded: DelayedTransaction = rlp::decode(&encoded).unwrap();
+
+        match (delayed, decoded) {
+            (DelayedTransaction::Tezos(expected), DelayedTransaction::Tezos(actual)) => {
+                assert_eq!(actual, expected)
+            }
+            _ => panic!("Expected Tezos delayed transaction"),
+        }
+    }
+
+    #[test]
     fn test_delayed_inbox_roundtrip() {
         let mut host = MockKernelHost::default();
         let mut delayed_inbox =
@@ -469,6 +488,34 @@ mod tests {
         delayed_inbox
             .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
+
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
+
+        let read = delayed_inbox
+            .find_transaction(&mut host, Hash(tx.tx_hash))
+            .expect("Reading from the delayed inbox should work")
+            .expect("Transaction should be in the delayed inbox");
+        assert_eq!((tx, timestamp), read)
+    }
+
+    #[test]
+    fn test_delayed_inbox_tezos_roundtrip() {
+        let mut host = MockKernelHost::default();
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+
+        let op = make_test_operation();
+        let tx = Transaction {
+            tx_hash: [5; TRANSACTION_HASH_SIZE],
+            content: TezosDelayed(op),
+        };
+
+        let timestamp =
+            read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
+        delayed_inbox
+            .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
+            .expect("Tezos operation should be saved in the delayed inbox");
 
         let mut delayed_inbox =
             DelayedInbox::new(&mut host).expect("Delayed inbox should exist");
