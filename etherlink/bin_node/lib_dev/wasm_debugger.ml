@@ -49,6 +49,8 @@ module Ctx = Tezos_tree_encoding.Encodings_util.Make (Bare_context)
 
 module Slow_vm = Tezos_scoru_wasm.Wasm_vm.Make_vm (struct
   let config = Tezos_scoru_wasm.Wasm_pvm_config.empty
+
+  let make_empty_nds = None
 end)
 
 module Slow_pvm =

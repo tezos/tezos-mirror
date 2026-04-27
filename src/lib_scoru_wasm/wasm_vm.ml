@@ -37,6 +37,14 @@ module type S = sig
 
   val has_reboot_flag : Durable.t -> bool Lwt.t
 
+  val has_activate_nds_flag : Durable.t -> bool Lwt.t
+
+  val maybe_activate_nds :
+    version:Wasm_pvm_state.version ->
+    current_level:int32 ->
+    pvm_storage ->
+    pvm_storage Lwt.t
+
   val mark_for_reboot :
     pvm_state -> [`Forcing_yield | `Reboot | `Yielding] Lwt.t
 
@@ -45,8 +53,10 @@ module type S = sig
   val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
 end
 
-module Make_vm (Config : sig
+module Make_vm (Params : sig
   val config : Wasm_pvm_config.t
+
+  val make_empty_nds : (unit -> Nds.t) option
 end) : S = struct
   (** [current_level_of pvm_state] returns the inbox level of the
       most recent input, or [0l] before the first input. Used as the
@@ -111,6 +121,57 @@ end) : S = struct
         (function exn -> Lwt.reraise exn)
     in
     allows_reboot <> None
+
+  let has_activate_nds_flag durable =
+    let open Lwt_syntax in
+    let+ flag = Durable.(find_value durable Constants.activate_nds_flag_key) in
+    Option.is_some flag
+
+  let maybe_activate_nds ~version ~current_level storage =
+    let open Lwt_syntax in
+    match storage with
+    | Dual _ ->
+        (* Already activated: pure no-op with no storage access. A
+           sentinel re-written by the kernel after activation is
+           ignored (not consumed) on purpose, so this branch stays
+           free of any [find_value] on the per-boundary hot path. *)
+        return storage
+    | Durable_only _ -> (
+        if
+          (* Gate first; both checks are storage-free, so when NDS is
+           unavailable this whole function is free of proof cost even
+           though it runs at every reboot boundary. Activation requires
+           BOTH the PVM version that introduces the NDS host functions
+           (V6+, matching {!Host_funcs.lookup_opt}) and the
+           [Nds_host_functions] feature enabled at [current_level] —
+           activating below V6 would build an NDS backing host functions
+           that are not even importable at that version. Only once both
+           gates are open do we read the kernel's sentinel. *)
+          (not Wasm_pvm_state.(at_least version V6))
+          || not
+               (Wasm_pvm_config.nds_host_functions_enabled
+                  Params.config
+                  ~current_level)
+        then return storage
+        else
+          let durable = durable_of storage in
+          let* has_flag = has_activate_nds_flag durable in
+          if not has_flag then return storage
+          else
+            match Params.make_empty_nds with
+            | None ->
+                Stdlib.failwith
+                  "Wasm_vm.maybe_activate_nds: kernel requested NDS activation \
+                   and the Nds_host_functions gate is open, but this Make_vm \
+                   instantiation was built with [make_empty_nds = None]. \
+                   Provide a factory at the instantiation site."
+            | Some make_empty_nds ->
+                (* The sentinel is intentionally left in place. Once
+                   storage is [Dual] the sentinel is never read again
+                   (see the [Dual] branch above), so clearing it would
+                   only add a storage write — and its proof cost — for
+                   no observable effect. *)
+                return (Dual {durable; nds = make_empty_nds ()}))
 
   let has_stuck_flag durable =
     let open Lwt_syntax in
@@ -255,11 +316,23 @@ end) : S = struct
           ~status:Failing
           (Stuck (Wasm_pvm_errors.invalid_state "Collect is a input tick"))
     | Padding when is_time_for_snapshot pvm_state -> (
+        (* Consume a pending NDS activation request at this clean reboot
+           boundary, regardless of whether the kernel asked for a reboot:
+           a kernel that only yields still gets the NDS activated here
+           rather than waiting for the next level's reboot.  This is
+           independent of [mark_for_reboot], which only reads the reboot
+           flag and counter. *)
+        let* storage =
+          maybe_activate_nds
+            ~version
+            ~current_level:(current_level_of pvm_state)
+            storage
+        in
         let* reboot_status = mark_for_reboot pvm_state in
         match reboot_status with
-        | `Reboot -> return ~status:Reboot Snapshot
-        | `Forcing_yield -> return ~status:Forcing_yield Collect
-        | `Yielding -> return ~status:Yielding Collect)
+        | `Reboot -> return ~storage ~status:Reboot Snapshot
+        | `Forcing_yield -> return ~storage ~status:Forcing_yield Collect
+        | `Yielding -> return ~storage ~status:Yielding Collect)
     | _ when is_time_for_snapshot pvm_state ->
         (* Execution took too many ticks *)
         return ~status:Failing (Stuck Too_many_ticks)
@@ -565,7 +638,7 @@ end) : S = struct
     let stack_size_limit = stack_size_limit version in
     let nds_host_functions_enabled =
       Wasm_pvm_config.nds_host_functions_enabled
-        Config.config
+        Params.config
         ~current_level:(current_level_of pvm_state)
     in
     compute_step_with_host_functions
@@ -583,7 +656,7 @@ end) : S = struct
     let* version = get_wasm_version pvm_state in
     let nds_host_functions_enabled =
       Wasm_pvm_config.nds_host_functions_enabled
-        Config.config
+        Params.config
         ~current_level:(current_level_of pvm_state)
     in
     compute_step_with_host_functions
@@ -677,7 +750,7 @@ end) : S = struct
     let stack_size_limit = stack_size_limit version in
     let nds_host_functions_enabled =
       Wasm_pvm_config.nds_host_functions_enabled
-        Config.config
+        Params.config
         ~current_level:(current_level_of pvm_state)
     in
     let host_function_registry =

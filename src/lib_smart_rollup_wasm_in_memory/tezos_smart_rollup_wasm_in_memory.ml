@@ -107,6 +107,8 @@ end
 let wasm_pvm_machine ~config =
   let module Vm = Tezos_scoru_wasm.Wasm_vm.Make_vm (struct
     let config = config
+
+    let make_empty_nds = None
   end) in
   (module Tezos_scoru_wasm.Wasm_pvm.Make_pvm (Vm) (State_in_memory)
   : Tezos_scoru_wasm.Wasm_pvm_sig.S

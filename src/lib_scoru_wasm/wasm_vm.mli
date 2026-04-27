@@ -45,6 +45,43 @@ module type S = sig
       durable storage. *)
   val has_reboot_flag : Durable.t -> bool Lwt.t
 
+  (** [has_activate_nds_flag durable] checks if the kernel has set the
+      sentinel under {!Constants.activate_nds_flag_key} requesting
+      activation of the NDS at the next reboot. *)
+  val has_activate_nds_flag : Durable.t -> bool Lwt.t
+
+  (** [maybe_activate_nds ~version ~current_level storage] is the
+      kernel-driven activation trigger invoked at the [Padding] reboot
+      boundary (regardless of whether the kernel requested a reboot, so
+      a yield-only kernel activates at that boundary rather than waiting
+      for the next level's reboot).  It is a no-op unless all of the
+      following hold:
+      [storage] is [Durable_only]; [version] is at least [V6] (the PVM
+      version that introduces the NDS host functions, matching
+      {!Host_funcs.lookup_opt}); the kernel has set the sentinel at
+      {!Constants.activate_nds_flag_key}; and the [Nds_host_functions]
+      feature is enabled at [current_level] in [Params.config].  When
+      it fires, the storage is upgraded to [Dual] using a fresh NDS
+      handle built by [Params.make_empty_nds].  The sentinel is left
+      in place: once storage is [Dual] its value is never read again,
+      so there is nothing to consume and clearing it would only add a
+      storage write for no observable effect.  In every other case the
+      storage is returned unchanged — also leaving the sentinel intact
+      when set so a future PVM with the gates open can still observe
+      the kernel's request.
+
+      Once storage is [Dual] the function is a pure no-op with no
+      storage access: a sentinel re-written by the kernel after
+      activation is ignored, not consumed.  The version and feature
+      gates are checked before the sentinel is read, so when NDS is
+      unavailable the function touches no storage at all even though it
+      runs at every reboot boundary. *)
+  val maybe_activate_nds :
+    version:Wasm_pvm_state.version ->
+    current_level:int32 ->
+    pvm_storage ->
+    pvm_storage Lwt.t
+
   (** [mark_for_reboot reboot_counter durable] figures out the computational
       status with respect to what the PVM shall do next. *)
   val mark_for_reboot :
@@ -59,9 +96,20 @@ module type S = sig
   val save_fallback_kernel : Durable.t -> Durable.t Lwt.t
 end
 
-(** [Make_vm (Config)] is the WASM VM parameterised by a
-    {!Wasm_pvm_config.t}. The config is closed over by the VM body so
-    evaluator code can consult it via [Config.config]. *)
-module Make_vm (Config : sig
+(** [Make_vm (Params)] is the WASM VM parameterised by a
+    {!Wasm_pvm_config.t} (feature flags consulted by the evaluator)
+    and an optional fresh-NDS factory invoked at the
+    [Padding -> Snapshot] reboot boundary when the kernel's
+    activation sentinel is observed.
+
+    [make_empty_nds = None] is a promise from the caller that the
+    [Nds_host_functions] gate never opens for this instantiation
+    (typically because [config] never enables it). If that promise
+    is broken — the kernel sets the sentinel and the gate is open
+    at a reboot boundary — {!maybe_activate_nds} raises rather than
+    silently dropping the activation request. *)
+module Make_vm (Params : sig
   val config : Wasm_pvm_config.t
+
+  val make_empty_nds : (unit -> Nds.t) option
 end) : S

@@ -28,6 +28,8 @@ open Wasm_pvm_state.Internal_state
 
 module Wasm_vm = Wasm_vm.Make_vm (struct
   let config = Wasm_pvm_config.empty
+
+  let make_empty_nds = None
 end)
 
 include (Wasm_vm : Wasm_vm_sig.S)

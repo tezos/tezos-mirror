@@ -6225,6 +6225,7 @@ let _octez_scoru_wasm_tests =
       "test_get_set";
       "test_hash_consistency";
       "test_host_functions_ticks";
+      "test_nds_activation";
       "test_nds_host_func_crash";
       "test_init";
       "test_input";

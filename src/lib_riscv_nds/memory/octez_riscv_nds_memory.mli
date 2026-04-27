@@ -32,6 +32,13 @@ module Normal : sig
   include NORMAL with module Registry := Registry
 end
 
+(** [make_empty_normal_nds ()] allocates a fresh, empty in-memory
+    normal-mode registry and wraps it as an opaque {!Nds.t} handle.
+    Convenience factory for callers that need a backend-erased empty
+    NDS — most commonly the [make_empty_nds] field of a
+    {!Wasm_vm.Make_vm} instantiation. *)
+val make_empty_normal_nds : unit -> Nds.t
+
 (** Prove mode: registry, database, and proof lifecycle.
 
     {b Note}: Currently a stub (TZX-113). All operations will raise a

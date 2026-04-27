@@ -117,6 +117,9 @@ let unwrap_normal nds : Normal.Registry.t option =
   | Nds.Packed {tag = Normal_tag; value; _} -> Some value
   | _ -> None
 
+let make_empty_normal_nds () =
+  Nds.wrap Normal_tag (module Normal) (Normal.Registry.create ())
+
 module Prove = struct
   module Registry = struct
     type t = Api.registry_prove
