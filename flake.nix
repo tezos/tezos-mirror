@@ -163,8 +163,14 @@
               taplo
               wabt
               xxd
-              # For RISC-V kernel cross-compilation
-              pkgsCross.riscv64.pkgsStatic.stdenv.cc
+              # For RISC-V kernel cross-compilation — use symlinkJoin to
+              # strip nix-support setup hooks so the cross-compiler's CC
+              # doesn't override the native one.
+              (pkgs.symlinkJoin {
+                name = "riscv64-cross-cc";
+                paths = [ pkgsCross.riscv64.pkgsStatic.stdenv.cc ];
+                postBuild = "rm -rf $out/nix-support";
+              })
             ]
             ++ (
               if stdenv.isDarwin then
@@ -180,6 +186,12 @@
 
           # $OPAM_SWITCH_PREFIX is used to find the ZCash parameters.
           OPAM_SWITCH_PREFIX = fakeOpamSwitchPrefix;
+
+          # TODO: https://linear.app/tezos/issue/TZX-127/upgrade-rust-to-194
+          # Allow duplicate symbols when linking multiple Rust static
+          # libraries (liboctez_rust_deps + liboctez_libcrux_ml_dsa) that
+          # each embed the Rust standard library's rust_eh_personality.
+          NIX_LDFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-z muldefs";
         };
 
         # This scope contains all Opam packages defined in this repository.
