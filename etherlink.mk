@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2024-2025 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2026 Trilitech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -7,6 +8,7 @@ KERNELS=evm_kernel.wasm
 KERNEL_DIR=etherlink/kernel_latest
 EVM_KERNEL_PREIMAGES=_evm_installer_preimages
 EVM_UNSTRIPPED_KERNEL_PREIMAGES=_evm_unstripped_installer_preimages
+LIB_WASM_RUNTIME_DIR=etherlink/lib_wasm_runtime
 
 NATIVE_TARGET ?=
 ifneq ($(NATIVE_TARGET),)
@@ -124,3 +126,7 @@ sequencer.wasm::
 .PHONY: revm
 revm:
 	@$(MAKE) -C ${KERNEL_DIR} build-revm
+
+.PHONY: update-riscv-pvm
+update-riscv-pvm:
+	@$(MAKE) -C ${LIB_WASM_RUNTIME_DIR} update-riscv-pvm

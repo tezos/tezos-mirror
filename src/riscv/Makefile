@@ -54,6 +54,10 @@ update-riscv-pvm: update-assets
 	@sed -i.bak "s/${old_commit}/${new_commit}/g" Cargo.toml && rm Cargo.toml.bak
 	@cargo update octez-riscv octez-riscv-data octez-riscv-durable-storage
 
+	@$(MAKE) -C "../.." -f "etherlink.mk" update-riscv-pvm
+	@$(MAKE) -C "../../src/rust_deps" update-riscv-pvm
+	@$(MAKE) -C "../../src/rollup_node_rust_deps" update-riscv-pvm
+
 # Update the current commit used for the RISC-V PVM
 assets/riscv-pvm.commit::
 	@curl -H "Accept: application/vnd.github.sha" \
