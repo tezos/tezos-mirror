@@ -70,8 +70,19 @@ let inject_entrapment_evidences
        and type tb_slot = tb_slot) attestations slot_to_committee_pkh node_ctxt
     rpc_ctxt ~attested_level tb_slot_to_int =
   let open Lwt_result_syntax in
+  (* Use the predecessor's protocol parameters: attestations included at
+     [attested_level] refer to (and are encoded under) the protocol active at
+     [attested_level - 1]. The corresponding [Plugin] (passed by the caller)
+     is also for the predecessor; sourcing [proto_parameters] from the same
+     level keeps [number_of_slots] and [attestation_lags] in agreement with
+     [Plugin.is_baker_attested]. Mixing them lets a single-lag attestation
+     produced under the previous protocol match every entry in a multi-lag
+     [attestation_lags] list of the new protocol. *)
+  let predecessor_level = Int32.max 1l (Int32.pred attested_level) in
   let*? proto_parameters =
-    Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
+    Node_context.get_proto_parameters
+      node_ctxt
+      ~level:(`Level predecessor_level)
   in
   when_ proto_parameters.incentives_enable (fun () ->
       let store = Node_context.get_store node_ctxt in
