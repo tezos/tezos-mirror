@@ -240,7 +240,7 @@ import_gpg_key() {
   # Inspect the key material before importing to determine the signing key ID.
   # shellcheck disable=SC3043
   local show_output
-  show_output=$(echo "${key_b64}" | base64 --decode |
+  show_output=$(echo "${key_b64}" | base64 -d |
     gpg --show-keys --with-colons 2> /dev/null) || true
 
   # shellcheck disable=SC3043
@@ -273,7 +273,7 @@ import_gpg_key() {
   # Import the key into the GPG keyring.
   # shellcheck disable=SC3043
   local import_output
-  import_output=$(echo "${key_b64}" | base64 --decode | gpg --batch --import -- 2>&1)
+  import_output=$(echo "${key_b64}" | base64 -d | gpg --batch --import -- 2>&1)
   echo "${import_output}" >&2
 
   echo "${key_id}"
@@ -499,7 +499,7 @@ else
   GPG_PUBLIC_KEY=$(cat "./scripts/packaging/package-signing-key.asc")
 
   # Import test key into GPG keyring
-  base64 --decode < ./scripts/packaging/test_repo_private.key | gpg --batch --import -- 2> /dev/null
+  base64 -d < ./scripts/packaging/test_repo_private.key | gpg --batch --import -- 2> /dev/null
   echo "Test key imported into GPG keyring." >&2
 fi
 
