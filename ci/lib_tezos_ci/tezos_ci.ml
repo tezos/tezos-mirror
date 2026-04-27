@@ -1649,7 +1649,12 @@ module Images = struct
 
     let homebrew = make_img "debian-homebrew:trixie" homebrew_version
 
-    let rust_toolchain_version = common_version
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2481391601
+       which contains libclang for building rocksdb in CI.
+
+       When the common_version is updated to a more recent commit this value can
+       be reverted to [common_version] and this comment removed. *)
+    let rust_toolchain_version = "master-8afd610a"
 
     let rust_toolchain_trixie =
       make_img "debian-rust:trixie" rust_toolchain_version
