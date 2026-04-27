@@ -509,6 +509,12 @@ let crac_http_call =
     ~label:"crac_http_call"
     ~contract:"CracHttpCall"
 
+let crac_http_call_evm =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_http_call_evm.sol")
+    ~label:"crac_http_call_evm"
+    ~contract:"CracHttpCallEvm"
+
 let crac_collect_result =
   compile_contract
     ~source:(solidity_contracts_path ^ "/crac_collect_result.sol")
