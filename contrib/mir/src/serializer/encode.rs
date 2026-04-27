@@ -131,7 +131,10 @@ impl Annotations<'_> {
     /// assert_eq!(&out, b"\x00\x00\x00\x0B%field @var");
     /// ```
     pub fn encode_bytes(&self, out: &mut Vec<u8>) {
-        with_patchback_len(out, |out| {
+        // Annotation encoding is infallible, so we adapt to
+        // `with_patchback_len_result` by wrapping in `Ok(())`. Using
+        // `.expect` here is safe because the closure cannot return an error.
+        with_patchback_len_result(out, |out| {
             // Add them space-separated
             let mut is_first = true;
             for ann in self.iter() {
@@ -141,7 +144,9 @@ impl Annotations<'_> {
                 is_first = false;
                 ann.encode_bytes(out);
             }
+            Ok(())
         })
+        .expect("annotation encoding is infallible");
     }
 }
 
@@ -167,22 +172,13 @@ fn put_string(s: &str, out: &mut Vec<u8>) {
     out.extend_from_slice(s.as_bytes())
 }
 
-fn with_patchback_len(out: &mut Vec<u8>, f: impl FnOnce(&mut Vec<u8>)) {
-    put_len(0, out); // don't know the right length in advance
-    let i = out.len();
-    let len_place = (i - size_of::<Len>())..i; // to fill length later
-    f(out);
-    let len_of_written = (out.len() - i) as Len;
-    out[len_place].copy_from_slice(&len_of_written.to_be_bytes())
-}
-
 fn with_patchback_len_result(
     out: &mut Vec<u8>,
     f: impl FnOnce(&mut Vec<u8>) -> BinResult,
 ) -> BinResult {
-    put_len(0, out);
+    put_len(0, out); // don't know the right length in advance
     let i = out.len();
-    let len_place = (i - size_of::<Len>())..i;
+    let len_place = (i - size_of::<Len>())..i; // to fill length later
     f(out)?;
     let len_of_written = (out.len() - i) as Len;
     out[len_place].copy_from_slice(&len_of_written.to_be_bytes());
