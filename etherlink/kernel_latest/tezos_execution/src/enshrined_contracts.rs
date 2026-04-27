@@ -202,15 +202,22 @@ where
                 // result payload on the current CRAC frame so the kernel
                 // can later surface it as the HTTP response body to the
                 // EVM gateway, giving EVM callers a synchronous return
-                // value.
-                // TODO: L2-1224 define a gas model for %collect_result
-                // and charge it here.
+                // value. Unlike the other gateway entrypoints it does not
+                // trigger an HTTP round-trip, so `charge_gateway_base_cost`
+                // does not apply.
                 let TypedValue::Bytes(payload) = typed else {
                     return Err(TransferError::GatewayError(
                         "Expected bytes for collect_result entrypoint".into(),
                     )
                     .into());
                 };
+                // Pre-charge store + result surfacing + forward. Result
+                // surfacing and forward happen after `TezlinkOperationGas`
+                // has already reported its consumption, so they must be
+                // paid here at deposit time.
+                ctx.operation_gas()
+                    .cast_and_consume_milligas(collect_result_size_cost(payload.len()))
+                    .map_err(|_| TransferError::OutOfGas)?;
                 journal.michelson.set_frame_result(payload).map_err(|e| {
                     TransferError::GatewayError(format!("collect_result: {e}"))
                 })?;
@@ -268,6 +275,34 @@ const CALLBACK_DISPATCH_MILLIGAS: u64 = 220;
 /// Durable storage read for alias lookup, equivalent to cold SLOAD
 /// (2,100 EVM gas × 100).
 pub(crate) const ALIAS_CACHE_HIT_MILLIGAS: u64 = 210_000;
+
+/// Size-independent portion of the %collect_result triptych:
+/// - `100` mgas — frame-slot store
+/// - `260` mgas — result surfacing
+/// - `100` mgas — HTTP response-body forward
+///
+/// Pre-charged at deposit time because result surfacing and forward
+/// happen after `TezlinkOperationGas` has already reported its
+/// consumption, so they would otherwise ride for free.
+const COLLECT_RESULT_SIZE_BASE_MILLIGAS: u64 = 460;
+
+/// Full size-dependent cost of the %collect_result deposit triptych —
+/// store into frame slot + result surfacing + forward into HTTP
+/// response body: `(100 + size/2) + (260 + size/2) + (100 + size/2)
+/// = 460 + 1.5 * size`.
+///
+/// The third term (response-body forward) is a conservative
+/// over-count — the real forward is a `Vec<u8>` move into
+/// `Response::builder().body(...)`, not a copy. Kept in as margin
+/// until a bench pass validates the constants.
+///
+/// TODO(L2-1224): replace the three components with benchmarked
+/// values from `octez-snoop`. The current split is a back-of-envelope
+/// model and may overcharge by a wide factor if the journal-frame
+/// path is closer to a memcpy than to a durable write.
+fn collect_result_size_cost(payload_len: usize) -> u64 {
+    COLLECT_RESULT_SIZE_BASE_MILLIGAS + ((payload_len as u64).saturating_mul(3) >> 1)
+}
 
 /// Charge the fixed per-call overhead for gateway entrypoints that
 /// cross into another runtime (HTTP request construction, header
@@ -2325,6 +2360,184 @@ mod tests {
         // clobber what the frame already holds.
         assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
         assert!(registry.serve_calls.borrow().is_empty());
+    }
+
+    // --- %collect_result gas charges ---
+
+    /// MIR's typechecker charges `tc_cost::VALUE_STEP = 100` mgas when
+    /// typechecking any leaf Micheline value. The %collect_result gas
+    /// tests pre-fund this so that budgets isolate the handler's own
+    /// charges from the typecheck cost.
+    const TYPECHECK_VALUE_STEP_MILLIGAS: u64 = 100;
+
+    // 256-byte payload, no other charges: typecheck (100) + size base
+    // (460) + 1.5 * 256 (384) = 944 mgas total consumed.
+    #[test]
+    fn test_collect_result_charges_size_dependent() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal.michelson.push_external_checkpoint();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_ok());
+        assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
+    }
+
+    // Empty payload: budget exactly covers typecheck (100) + size
+    // base (460). Remaining gas must be zero after a successful deposit.
+    #[test]
+    fn test_collect_result_charges_exact_budget_zero_bytes() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal.michelson.push_external_checkpoint();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
+            TYPECHECK_VALUE_STEP_MILLIGAS + COLLECT_RESULT_SIZE_BASE_MILLIGAS,
+        )
+        .unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_ok());
+        assert_eq!(ctx.operation_gas().remaining.milligas().unwrap(), 0);
+    }
+
+    // Budget covers the typecheck step but nothing more: the handler's
+    // size charge trips OutOfGas before `set_frame_result`, so the
+    // frame's result slot stays empty.
+    #[test]
+    fn test_collect_result_out_of_gas_on_size_charge() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal.michelson.push_external_checkpoint();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas = crate::gas::TezlinkOperationGas::start_milligas(
+            TYPECHECK_VALUE_STEP_MILLIGAS,
+        )
+        .unwrap();
+        // Empty payload: the size term contributes nothing, so only the
+        // base charge (460 mgas) fires — which alone exceeds the budget.
+        let err = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        )
+        .unwrap_err();
+        assert!(matches!(err, CracError::Operation(TransferError::OutOfGas)));
+        assert!(journal.michelson.frame_result().is_none());
+    }
+
+    // Direct probe of the cost function. Pins the size formula at the
+    // boundaries: zero collapses to the base, a mid value matches the
+    // documented `460 + 1.5 * size`, and `usize::MAX` must not overflow
+    // — `saturating_mul(3)` caps the multiply at `u64::MAX`, the shift
+    // halves it, and the final `+ 460` stays inside `u64`.
+    #[test]
+    fn test_collect_result_size_cost_edge_cases() {
+        assert_eq!(
+            collect_result_size_cost(0),
+            COLLECT_RESULT_SIZE_BASE_MILLIGAS
+        );
+        // 256-byte payload: 460 + (256 * 3) / 2 = 460 + 384 = 844.
+        assert_eq!(collect_result_size_cost(256), 844);
+        // Must not panic; result fits in u64.
+        let max = collect_result_size_cost(usize::MAX);
+        assert!(max >= COLLECT_RESULT_SIZE_BASE_MILLIGAS);
+    }
+
+    // The size charge fires before `set_frame_result`. If the write
+    // then fails (here: no active frame), the gas stays consumed —
+    // the kernel did the validation work and the caller pays for it.
+    #[test]
+    fn test_collect_result_charges_gas_when_no_frame() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        // No `push_external_checkpoint` — `set_frame_result` fails.
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        let result = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(result.is_err());
+        // typecheck (100) + size base (460) + 1.5 * 256 (384) = 944.
+        assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
+        assert!(journal.michelson.frame_result().is_none());
+    }
+
+    // The size charge also fires on the failing second deposit when
+    // the frame slot is already set: gas is consumed before the
+    // `AlreadySet` branch of `set_frame_result` is reached.
+    #[test]
+    fn test_collect_result_charges_gas_when_already_set() {
+        let mut host = MockKernelHost::default();
+        let registry = MockRegistry::new("KT1_mock_alias".to_string());
+        let source = AddressHash::Kt1(ContractKt1Hash::from([0u8; 20]));
+        let mut journal = TezosXJournal::new(CracId::new(1, 0));
+        journal.michelson.push_external_checkpoint();
+        let mut ctx = MockCtx::new(&mut host, source, 0);
+        ctx.operation_gas =
+            crate::gas::TezlinkOperationGas::start_milligas(100_000).unwrap();
+        // First deposit succeeds. 2-byte payload:
+        // typecheck (100) + size base (460) + 1.5 * 2 (3) = 563.
+        let first = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0xCA, 0xFE]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(first.is_ok());
+        let after_first = ctx.operation_gas().total_milligas_consumed() as u64;
+        assert_eq!(after_first, 563);
+        // Second deposit fails on `AlreadySet` but its size charge is
+        // consumed anyway: another 944 mgas for the 256-byte payload.
+        let second = execute_enshrined_contract(
+            EnshrinedContracts::TezosXGateway,
+            &Entrypoint::try_from("collect_result").unwrap(),
+            Micheline::Bytes(vec![0u8; 256]),
+            &mut ctx,
+            &registry,
+            &mut journal,
+        );
+        assert!(second.is_err());
+        assert_eq!(
+            ctx.operation_gas().total_milligas_consumed() as u64,
+            after_first + 944
+        );
+        // Original payload is preserved.
+        assert_eq!(journal.michelson.frame_result(), Some(&[0xCA, 0xFE][..]));
     }
 
     fn make_test_address() -> Address {
