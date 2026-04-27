@@ -116,7 +116,7 @@ Run commands:
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either `fatal`, `error`,
       `info`, `debug`.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
-      `testnet` or `shadownet`.
+      `testnet`, `shadownet` or `previewnet`.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
     --init-from-snapshot [snapshot url or file path]: Automatically download and import a
       recent snapshot for supported networks on fresh data directories. If no snapshot
@@ -403,8 +403,8 @@ Run commands:
       — prunes context, blocks and transactions older than N days, keeps only blueprints and
       their events.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
-      `testnet` or `shadownet`. If set, additional sanity checks are performed on the node’s
-      startup.
+      `testnet`, `shadownet` or `previewnet`. If set, additional sanity checks are performed
+      on the node’s startup.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
     --sandbox: Enable sandbox mode
       At startup, the observer node will fetch the public key used by its remote EVM endpoint
@@ -591,8 +591,8 @@ Configuration commands:
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer is allowed to
       send blueprints.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
-      `testnet` or `shadownet`. If set, some configuration options defaults to well-known
-      values for the selected network.
+      `testnet`, `shadownet` or `previewnet`. If set, some configuration options defaults to
+      well-known values for the selected network.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
     --sunset-sec <SEC>: Number of seconds prior to a sequencer operator upgrade before which
       the current sequencer stops producing blocks
@@ -611,8 +611,8 @@ Configuration commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     -p --print: Print the full configuration to the standard output.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
-      `testnet` or `shadownet`. If set, check as if `--network N` is set when running the node
-      (as it turns some required configuration fields into optional ones).
+      `testnet`, `shadownet` or `previewnet`. If set, check as if `--network N` is set when
+      running the node (as it turns some required configuration fields into optional ones).
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
   
   describe config
@@ -986,7 +986,7 @@ Kernel commands:
       doesn't pass the sanity check. It can be useful if the download is corrupted for some
       reason.
     --network <network>: The network the EVM node will be connecting to. Can be `mainnet`,
-      `testnet` or `shadownet`.
+      `testnet`, `shadownet` or `previewnet`.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
 
 Debug commands:

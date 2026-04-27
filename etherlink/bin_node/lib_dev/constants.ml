@@ -6,12 +6,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let supported_networks = Configuration.[Mainnet; Testnet; Shadownet]
+let supported_networks = Configuration.[Mainnet; Testnet; Shadownet; Previewnet]
 
 let network_name = function
   | Configuration.Mainnet -> "Mainnet"
   | Testnet -> "Testnet"
   | Shadownet -> "Shadownet"
+  | Previewnet -> "Previewnet"
 
 let rollup_address network =
   Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
@@ -20,12 +21,14 @@ let rollup_address network =
   | Configuration.Mainnet -> "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
   | Testnet -> "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg"
   | Shadownet -> "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg"
+  | Previewnet -> "sr1TCYofXUuJjmQvZ26XE4YAwXdfetQfZ6rR"
 
 let network_of_address addr =
   match Tezos_crypto.Hashed.Smart_rollup_address.to_b58check addr with
   | "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf" -> Some Configuration.Mainnet
   | "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg" -> Some Testnet
   | "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg" -> Some Shadownet
+  | "sr1TCYofXUuJjmQvZ26XE4YAwXdfetQfZ6rR" -> Some Previewnet
   | _ -> None
 
 type kernel =

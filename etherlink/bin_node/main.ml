@@ -181,6 +181,7 @@ module Params = struct
       | "mainnet" -> Lwt.return_ok Mainnet
       | "testnet" -> Lwt.return_ok Testnet
       | "braeburn" | "shadownet" -> Lwt.return_ok Shadownet
+      | "previewnet" -> Lwt.return_ok Previewnet
       | invalid_network ->
           failwith "'%s' is not a supported network" invalid_network)
 
@@ -792,7 +793,7 @@ let supported_network_arg ?why () =
       Format.(
         asprintf
           "The network the EVM node will be connecting to. Can be `mainnet`, \
-           `testnet` or `shadownet`.%a"
+           `testnet`, `shadownet` or `previewnet`.%a"
           (pp_print_option (fun fmt why -> fprintf fmt " %s" why))
           why)
     Params.supported_network
@@ -1426,7 +1427,8 @@ let kernel_from_args network kernel =
     (Option.bind network (function
       | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
       | Testnet -> None
-      | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)))
+      | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)
+      | Previewnet -> Some (In_memory Evm_node_supported_installers.previewnet)))
 
 (** Inject a default tezlink L2 chain and [spawn_rpc] port into
     [configuration.experimental_features], without overriding any user-provided
