@@ -27,6 +27,53 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
+(* ACL for public (non-loopback) RPC binds: allow all read-only DAL endpoints
+   while blocking mutating ones (PATCH /profiles, POST /slots, p2p management). *)
+let dal_secure =
+  RPC_server.Acl.(
+    Deny_all
+      {
+        except =
+          List.map
+            parse
+            [
+              "GET /health";
+              "GET /synchronized";
+              "GET /monitor/synchronized";
+              "GET /last_processed_level";
+              "GET /protocol_parameters";
+              "GET /profiles";
+              "GET /profiles/*/attested_levels/*/assigned_shard_indices";
+              "GET /profiles/*/attested_levels/*/attestable_slots";
+              "GET /profiles/*/monitor/attestable_slots";
+              "GET /published_levels/*/known_traps";
+              "GET /levels/*/slots/*/content";
+              "GET /levels/*/slots/*/pages";
+              "GET /levels/*/slots/*/pages/*/proof";
+              "GET /levels/*/slots/*/commitment";
+              "GET /levels/*/slots/*/status";
+              "GET /levels/*/slots/*/shards/*/content";
+              "GET /version";
+              "GET /p2p/points";
+              "GET /p2p/points/info";
+              "GET /p2p/points/by-id/*";
+              "GET /p2p/peers";
+              "GET /p2p/peers/info";
+              "GET /p2p/peers/by-id/*";
+              "GET /p2p/gossipsub/mesh";
+              "GET /p2p/gossipsub/topics";
+              "GET /p2p/gossipsub/topics/peers";
+              "GET /p2p/gossipsub/fanout";
+              "GET /p2p/gossipsub/slot_indexes/peers";
+              "GET /p2p/gossipsub/pkhs/peers";
+              "GET /p2p/gossipsub/connections";
+              "GET /p2p/gossipsub/reconnection_delays";
+              "GET /p2p/gossipsub/scores";
+              "GET /p2p/gossipsub/backoffs";
+              "GET /p2p/gossipsub/message_cache";
+            ];
+      })
+
 let call_handler1 handler = handler () |> Errors.to_option_tzresult
 
 type error +=
@@ -838,16 +885,20 @@ let start configuration ctxt =
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/5918
-
-     We should probably configure a better ACL policy.
-  *)
-  let acl = RPC_server.Acl.allow_all in
+  let acl =
+    if Ipaddr.V6.scope rpc_addr = Ipaddr.Interface then RPC_server.Acl.allow_all
+    else dal_secure
+  in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
   Lwt.catch
     (fun () ->
+      let* () =
+        if Ipaddr.V6.scope rpc_addr <> Ipaddr.Interface then
+          Event.emit_rpc_addr_is_public ~rpc_addr:host
+        else Lwt.return_unit
+      in
       let* () =
         RPC_server.launch
           ~host

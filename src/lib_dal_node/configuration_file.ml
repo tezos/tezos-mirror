@@ -139,7 +139,8 @@ let default_config_file data_dir = Filename.concat data_dir "config.json"
 
 let store_path {data_dir; _} = Filename.concat data_dir "store"
 
-let default_rpc_addr = P2p_point.Id.of_string_exn ~default_port:10732 "0.0.0.0"
+let default_rpc_addr =
+  P2p_point.Id.of_string_exn ~default_port:10732 "127.0.0.1"
 
 let default_listen_addr =
   let open Gossipsub.Transport_layer.Default_parameters.P2p_config in
