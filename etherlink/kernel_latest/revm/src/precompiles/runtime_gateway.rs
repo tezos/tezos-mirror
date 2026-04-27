@@ -43,6 +43,12 @@ sol! {
             bytes parameters,
         ) external;
 
+        function callMichelsonView(
+            string destination,
+            string viewName,
+            bytes input,
+        ) external returns (bytes memory response);
+
         function call(
             string url,
             (string, string)[] headers,
@@ -274,7 +280,27 @@ where
     R: Registry + 'j,
     CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
 {
-    // TODO: Do we need protection for STATICCALL, DELEGATECALL, CALLCODE?
+    // Reject DELEGATECALL and CALLCODE gateway-wide. Under those
+    // opcodes the precompile code runs in the caller's context, which
+    // would silently re-wire the sender identity used for alias
+    // resolution, repurpose the caller's `msg.value` for value
+    // transfers, and more generally break the assumption that the
+    // gateway speaks on behalf of its direct caller. For the
+    // state-mutating entries (`transfer`, `callMichelson`, `call`)
+    // the confusion is around identity and value; for the read-only
+    // `callMichelsonView` it's the same plus it sidesteps the
+    // STATICCALL guarantees of the typed entry. In all four cases
+    // there is no legitimate reason to reach the gateway through a
+    // delegated frame — callers should use `CALL` or `STATICCALL`.
+    //
+    // The pattern `target_address != bytecode_address` selects
+    // DELEGATECALL/CALLCODE exclusively: under `CALL` and
+    // `STATICCALL` both point at the precompile address.
+    if inputs.target_address != inputs.bytecode_address {
+        return Err(CustomPrecompileError::Revert(
+            "runtime gateway: DELEGATECALL and CALLCODE are not allowed".into(),
+        ));
+    }
 
     let mut gas = Gas::new(inputs.gas_limit);
 
@@ -422,6 +448,107 @@ where
             };
             context.journal_mut().log(crac_log);
         }
+        RuntimeGatewayCalls::callMichelsonView(call) => {
+            charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+
+            let destination = call.destination;
+            let view_name = call.viewName;
+            let input = call.input;
+
+            // Views are read-only: no value transfer is accepted.
+            if !inputs.value.get().is_zero() {
+                return Err(CustomPrecompileError::Revert(
+                    "callMichelsonView: view calls cannot carry value".into(),
+                ));
+            }
+
+            if view_name.is_empty() {
+                return Err(CustomPrecompileError::Revert(
+                    "callMichelsonView: view name must not be empty".into(),
+                ));
+            }
+
+            // Build a GET request targeting the Tezos runtime. The URL
+            // shape `http://tezos/<kt1>/<view_name>` matches the
+            // entrypoint form; the GET method is what routes it to the
+            // view-execution path on the server side.
+            let url = format!("http://tezos/{destination}/{view_name}");
+            let mut request = http::Request::builder()
+                .method(http::Method::GET)
+                .uri(&url)
+                .body(input.to_vec())
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "failed to build HTTP request: {e}"
+                    ))
+                })?;
+
+            // Resolve sender/source aliases through the read-only path
+            // that never mutates storage. This keeps `callMichelsonView`
+            // compatible with STATICCALL: the idiomatic Solidity
+            // pattern for calling a view is to reach this precompile
+            // from a `staticcall`, and any persistent write (alias
+            // cache miss, log emission, balance burn) would be
+            // rejected by REVM.
+            //
+            // On cache miss the deterministic KT1 is still surfaced to
+            // the Michelson side, so the callee's `SENDER`/`SOURCE`
+            // observations are identical regardless of whether the
+            // alias has been persisted by a prior state-mutating call.
+            let source = context
+                .journal()
+                .original_evm_source()
+                .unwrap_or_else(|| context.tx().caller());
+            let sender_alias = context
+                .journal()
+                .tezosx_resolve_source_alias_readonly(inputs.caller)?;
+            let source_alias = context
+                .journal()
+                .tezosx_resolve_source_alias_readonly(source)?;
+
+            let gas_limit =
+                gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
+                    .ok_or(CustomPrecompileError::Revert(
+                        "callMichelsonView: EVM gas limit overflows Tezos milligas"
+                            .into(),
+                    ))?;
+            let timestamp = context.block().timestamp();
+            let block_number = context.block().number();
+            let crac_id = context.journal().crac_id();
+
+            // Amount is always zero (checked above), reuse the header
+            // injector for uniform context propagation.
+            inject_tezos_headers(
+                request.headers_mut(),
+                &sender_alias,
+                &source_alias,
+                U256::ZERO,
+                gas_limit,
+                timestamp,
+                block_number,
+                &crac_id,
+            )?;
+
+            let response = context.journal_mut().tezosx_call_http(request);
+            let body =
+                classify_and_charge_crac_response(response, RuntimeId::Tezos, &mut gas)?;
+            let output: Vec<u8> = (body,).abi_encode_params();
+
+            // Intentionally no log emission. A dedicated
+            // `MichelsonViewCalled` event was considered for indexer
+            // visibility, but emitting a log would make this entry
+            // incompatible with STATICCALL — REVM reverts on `LOG*` in
+            // a static context. Indexers that need to observe view
+            // reads can subscribe to the cross-runtime HTTP trace on
+            // the node side, which already carries richer structured
+            // data than a flat event would.
+
+            return Ok(InterpreterResult {
+                result: InstructionResult::Return,
+                gas,
+                output: output.into(),
+            });
+        }
         RuntimeGatewayCalls::call(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
 
@@ -433,12 +560,37 @@ where
                 &mut gas,
             )?;
 
+            // GET requests target read-only handlers on the other
+            // runtime (Michelson view / EVM STATICCALL), so this arm
+            // mirrors the STATICCALL-compatibility contract of
+            // `callMichelsonView`: no value transfer, no log
+            // emission, and alias resolution goes through the
+            // read-only path that never writes to storage. POST keeps
+            // the existing state-mutating behavior.
+            let is_get = request.method() == http::Method::GET;
             let source = resolve_original_source(context);
             let amount = inputs.value.get();
-            let (sender_alias, source_alias) =
-                resolve_aliases(context, &mut gas, inputs.caller, source)?;
 
-            // Charge value transfer surcharge before the CRAC
+            let (sender_alias, source_alias) = if is_get {
+                if !amount.is_zero() {
+                    return Err(CustomPrecompileError::Revert(
+                        "call: GET requests cannot carry value".into(),
+                    ));
+                }
+                (
+                    context
+                        .journal()
+                        .tezosx_resolve_source_alias_readonly(inputs.caller)?,
+                    context
+                        .journal()
+                        .tezosx_resolve_source_alias_readonly(source)?,
+                )
+            } else {
+                resolve_aliases(context, &mut gas, inputs.caller, source)?
+            };
+
+            // Charge value transfer surcharge before the CRAC (POST
+            // only — GET rejects non-zero amount above).
             if !amount.is_zero() {
                 charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
             }
@@ -482,39 +634,39 @@ where
                 classify_and_charge_crac_response(response, target_runtime, &mut gas)?;
             let output: Vec<u8> = (body,).abi_encode_params();
 
-            // The precompile is expected to have a zero balance at this stage.
-            // However, due to differences in representation precision across runtimes,
-            // it may retain a residual balance caused by truncation.
-            // If value was bridged, this residual balance must be burned by resetting
-            // the precompile's EVM balance to zero, consistent with the transfer/callMichelson
-            // handling below.
-            if !inputs.value.get().is_zero() {
-                let mut account_load = context
-                    .journal_mut()
-                    .load_account_mut_skip_cold_load(
-                        RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                        true,
-                    )
-                    .map_err(|_| {
-                        CustomPrecompileError::Revert(
-                            "failed to load precompile account".into(),
+            // POST-only state effects: burn any residual precompile
+            // balance from a bridged value, and emit the CracSent
+            // event. Both are incompatible with STATICCALL and
+            // intentionally skipped on GET — for which the entry is
+            // read-only end-to-end.
+            if !is_get {
+                if !amount.is_zero() {
+                    let mut account_load = context
+                        .journal_mut()
+                        .load_account_mut_skip_cold_load(
+                            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                            true,
                         )
-                    })?;
-                account_load.data.set_balance(U256::ZERO);
-            }
-
-            // Emit CracSent event after the call succeeds.
-            let crac_log = Log {
-                address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                data: CracSent {
-                    cracId: crac_id,
-                    targetRuntime: target_rt,
-                    targetAddress: target_addr,
-                    amount,
+                        .map_err(|_| {
+                            CustomPrecompileError::Revert(
+                                "failed to load precompile account".into(),
+                            )
+                        })?;
+                    account_load.data.set_balance(U256::ZERO);
                 }
-                .into_log_data(),
-            };
-            context.journal_mut().log(crac_log);
+
+                let crac_log = Log {
+                    address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+                    data: CracSent {
+                        cracId: crac_id,
+                        targetRuntime: target_rt,
+                        targetAddress: target_addr,
+                        amount,
+                    }
+                    .into_log_data(),
+                };
+                context.journal_mut().log(crac_log);
+            }
 
             return Ok(InterpreterResult {
                 result: InstructionResult::Return,
@@ -1037,6 +1189,28 @@ mod tests {
                 assert_eq!(decoded_call.parameters.as_ref(), &[0x01, 0x02]);
             }
             _ => panic!("expected callMichelson variant"),
+        }
+    }
+
+    #[test]
+    fn test_call_michelson_view_abi_decode() {
+        use alloy_sol_types::SolCall;
+
+        let call = RuntimeGateway::callMichelsonViewCall {
+            destination: "KT1abc".to_string(),
+            viewName: "get_balance".to_string(),
+            input: vec![0xAA, 0xBB].into(),
+        };
+        let encoded = call.abi_encode();
+
+        let decoded = RuntimeGatewayCalls::abi_decode(&encoded).unwrap();
+        match decoded {
+            RuntimeGatewayCalls::callMichelsonView(decoded_call) => {
+                assert_eq!(decoded_call.destination, "KT1abc");
+                assert_eq!(decoded_call.viewName, "get_balance");
+                assert_eq!(decoded_call.input.as_ref(), &[0xAA, 0xBB]);
+            }
+            _ => panic!("expected callMichelsonView variant"),
         }
     }
 

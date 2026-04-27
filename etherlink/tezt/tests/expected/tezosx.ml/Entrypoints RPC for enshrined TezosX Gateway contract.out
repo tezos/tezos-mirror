@@ -1,35 +1,5 @@
 {
   "entrypoints": {
-    "collect_result": {
-      "prim": "bytes"
-    },
-    "call_evm": {
-      "prim": "pair",
-      "args": [
-        {
-          "prim": "string"
-        },
-        {
-          "prim": "string"
-        },
-        {
-          "prim": "bytes"
-        },
-        {
-          "prim": "option",
-          "args": [
-            {
-              "prim": "contract",
-              "args": [
-                {
-                  "prim": "bytes"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
     "call": {
       "prim": "pair",
       "args": [
@@ -72,6 +42,36 @@
           ]
         }
       ]
+    },
+    "call_evm": {
+      "prim": "pair",
+      "args": [
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "string"
+        },
+        {
+          "prim": "bytes"
+        },
+        {
+          "prim": "option",
+          "args": [
+            {
+              "prim": "contract",
+              "args": [
+                {
+                  "prim": "bytes"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "collect_result": {
+      "prim": "bytes"
     },
     "default": {
       "prim": "string"

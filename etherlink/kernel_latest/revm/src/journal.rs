@@ -32,6 +32,7 @@ use evm_types::{
     DatabasePrecompileStateChanges, Error, FaDepositWithProxy, SequencerKeyChange,
 };
 use michelson_types::Withdrawal;
+use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -600,6 +601,26 @@ pub trait CrossRuntimeCall {
         remaining_evm_gas: u64,
     ) -> Result<(String, u64), CustomPrecompileError>;
 
+    /// Read-only variant of [`Self::tezosx_resolve_source_alias`]: on
+    /// cache hit returns the persisted alias, on cache miss computes
+    /// the deterministic alias KT1 from the EVM address without
+    /// writing anything to storage.
+    ///
+    /// The deterministic KT1 is the same value
+    /// [`Self::tezosx_resolve_source_alias`] would persist — by design
+    /// of [`Registry::generate_alias`], the alias is
+    /// `blake2b-160(lowercase_hex(address))`, so callers can rely on
+    /// the read-only path producing the canonical alias even when no
+    /// state-mutating call has ever seen this address before.
+    ///
+    /// This variant is safe to call from a STATICCALL context, where
+    /// any storage write would revert the enclosing frame. It is used
+    /// by read-only precompile entries such as `callMichelsonView`.
+    fn tezosx_resolve_source_alias_readonly(
+        &self,
+        source: Address,
+    ) -> Result<String, CustomPrecompileError>;
+
     fn tezosx_call_http(
         &mut self,
         http_request: http::Request<Vec<u8>>,
@@ -666,6 +687,28 @@ where
                 Ok((alias_str, consumed_milligas))
             }
         }
+    }
+
+    fn tezosx_resolve_source_alias_readonly(
+        &self,
+        source: Address,
+    ) -> Result<String, CustomPrecompileError> {
+        if let Some(alias) = get_alias(self.database.host, &source, RuntimeId::Tezos)? {
+            return Ok(alias);
+        }
+        // Deterministic fallback: reproduce the KT1 that
+        // `TezosRuntime::generate_alias` would compute (and persist in
+        // the cache if called from a state-mutating path), but skip
+        // the storage writes.
+        //
+        // The algorithm (BLAKE2b-160 of the lowercase hex form of the
+        // EVM address) is duplicated from the Tezos runtime's
+        // `generate_alias` — the canonical implementation — and must
+        // stay in sync with it. If that formula ever changes, this
+        // read-only path must change too.
+        let source_hex = source.to_string().to_lowercase();
+        let kt1 = ContractKt1Hash::from(blake2b::digest_160(source_hex.as_bytes()));
+        Ok(kt1.to_base58_check())
     }
 
     fn tezosx_call_http(

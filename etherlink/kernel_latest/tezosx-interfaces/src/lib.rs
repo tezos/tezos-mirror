@@ -63,6 +63,11 @@ pub enum TezosXRuntimeError {
     /// The target address was not found. Maps to HTTP 404.
     #[error("Not found: {0}")]
     NotFound(String),
+    /// The HTTP method is not supported by the target resource (e.g.
+    /// `PUT` on the cross-runtime endpoint, which only accepts `POST`
+    /// for entrypoint calls and `GET` for view calls). Maps to HTTP 405.
+    #[error("Method not allowed: {0}")]
+    MethodNotAllowed(String),
     /// An X-Tezos-* header is missing or contains an invalid value.
     /// Indicates a gateway bug; propagates as Err and reverts the blueprint.
     #[error("Header error: {0}")]

@@ -51,7 +51,11 @@ use tezosx_journal::TezosXJournal;
 
 use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
-const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
+/// PKH used for the `SOURCE` field in all cross-runtime requests — both
+/// entrypoint calls and view calls. Michelson requires SOURCE to be an
+/// implicit account (tz1/tz2/tz3), and cross-runtime calls have no
+/// natural implicit SOURCE of their own.
+pub(crate) const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
 
 use crate::{
     account::{get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info},
@@ -65,6 +69,7 @@ pub mod alias_forwarder;
 pub mod context;
 pub mod headers;
 pub mod url;
+pub mod view;
 
 /// Synthetic "applied" top-level result used by both the success-path
 /// CRAC receipt builder and the post-merge reconciliation in the kernel.
@@ -76,13 +81,14 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
 
 /// Build an HTTP response from the result of [`execute_request`].
 ///
-/// `frame_result` carries the `%collect_result` payload deposited on the
-/// topmost CRAC frame (peeked by the caller before REVM commits or reverts
-/// the frame). It is only surfaced on 2xx responses — on 4xx/5xx the frame
-/// is about to be reverted, so the payload is discarded.
+/// `frame_result` carries the payload deposited on the topmost CRAC
+/// frame — by Michelson via `%collect_result` for entrypoint calls, or
+/// by [`view::execute_view_call`] for view calls. Peeked by the caller
+/// before REVM commits or reverts the frame. On 4xx/5xx the frame is
+/// about to be reverted, so the payload is discarded.
 ///
 /// Request-level errors are turned into HTTP error responses:
-/// - `Ok` → 200, body = `frame_result` (or empty), `Content-Type: application/octet-stream`
+/// - `Ok(())` → 200, body = `frame_result` (or empty), `Content-Type: application/octet-stream`
 /// - `BadRequest` → 400
 /// - `NotFound` → 404
 ///
@@ -93,14 +99,14 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
 // structured variants (and corresponding HTTP status codes) where
 // possible.
 fn build_response(
-    result: Result<TransferSuccess, TezosXRuntimeError>,
+    result: Result<(), TezosXRuntimeError>,
     consumed_milligas: u64,
     frame_result: Option<Vec<u8>>,
 ) -> http::Response<Vec<u8>> {
     let gas_header = consumed_milligas.to_string();
     let mut builder = http::Response::builder().header(X_TEZOS_GAS_CONSUMED, &gas_header);
     let (status, body) = match result {
-        Ok(_) => {
+        Ok(()) => {
             builder =
                 builder.header(http::header::CONTENT_TYPE, "application/octet-stream");
             (StatusCode::OK, frame_result.unwrap_or_default())
@@ -110,6 +116,9 @@ fn build_response(
         }
         Err(TezosXRuntimeError::NotFound(msg)) => {
             (StatusCode::NOT_FOUND, msg.into_bytes())
+        }
+        Err(TezosXRuntimeError::MethodNotAllowed(msg)) => {
+            (StatusCode::METHOD_NOT_ALLOWED, msg.into_bytes())
         }
         Err(TezosXRuntimeError::OutOfGas) => {
             (StatusCode::TOO_MANY_REQUESTS, b"OOG".to_vec())
@@ -366,8 +375,11 @@ fn build_failed_crac_receipt(
     })
 }
 
-/// Execute a cross-runtime request: parse the URL, extract parameters,
-/// and call the Michelson VM. Returns the response body on success.
+/// Execute a cross-runtime request: dispatches on the HTTP method.
+///
+/// - `POST` → entrypoint call (existing state-mutating transfer path).
+/// - `GET`  → view call (read-only execution of a named Michelson view).
+/// - anything else → catchable 405 (`MethodNotAllowed`).
 ///
 /// This is the core logic behind [`TezosRuntime::serve`], separated so
 /// that `serve` only handles the error-to-HTTP-status mapping.
@@ -376,6 +388,51 @@ fn build_failed_crac_receipt(
 /// return type so that early `?` returns keep their ergonomics, since
 /// this result is used as-is to build the http reponse.
 fn execute_request<Host>(
+    chain_id: &ChainId,
+    registry: &impl Registry,
+    host: &mut Host,
+    journal: &mut TezosXJournal,
+    request: http::Request<Vec<u8>>,
+    consumed_milligas: &mut u64,
+) -> Result<(), TezosXRuntimeError>
+where
+    Host: StorageV1,
+{
+    match *request.method() {
+        http::Method::POST => {
+            execute_entrypoint_call(
+                chain_id,
+                registry,
+                host,
+                journal,
+                request,
+                consumed_milligas,
+            )
+            .map(|_| ())
+        }
+        http::Method::GET => {
+            // The view path doesn't mutate storage or push a CRAC
+            // receipt, but it still deposits its Micheline result into
+            // the topmost frame's `frame_result` slot (same slot the
+            // entrypoint path fills via `%collect_result`), so the
+            // journal is threaded through.
+            view::execute_view_call(
+                chain_id,
+                host,
+                journal,
+                request,
+                consumed_milligas,
+            )
+        }
+        ref other => Err(TezosXRuntimeError::MethodNotAllowed(format!(
+            "HTTP method {other} not allowed (use POST for entrypoint calls or GET for views)"
+        ))),
+    }
+}
+
+/// Execute an entrypoint call (state-mutating transfer targeting a
+/// Michelson contract or implicit account).
+fn execute_entrypoint_call<Host>(
     chain_id: &ChainId,
     registry: &impl Registry,
     host: &mut Host,
@@ -783,7 +840,6 @@ impl TezosRuntime {
 #[cfg(test)]
 mod tests {
     use tezos_crypto_rs::hash::HashTrait;
-    use tezos_data_encoding::types::Narith;
 
     use super::*;
     use tezos_tezlink::operation_result::OperationKind;
@@ -798,28 +854,9 @@ mod tests {
         }
     }
 
-    fn make_success() -> TransferSuccess {
-        make_success_with_milligas(0)
-    }
-
-    fn make_success_with_milligas(milligas: u64) -> TransferSuccess {
-        TransferSuccess {
-            storage: None,
-            balance_updates: vec![],
-            ticket_receipt: vec![],
-            originated_contracts: vec![],
-            consumed_milligas: Narith(milligas.into()),
-            storage_size: Zarith(0.into()),
-            paid_storage_size_diff: Zarith(0.into()),
-            allocated_destination_contract: false,
-            lazy_storage_diff: None,
-            address_registry_diff: vec![],
-        }
-    }
-
     #[test]
     fn build_response_success_uses_frame_result() {
-        let resp = build_response(Ok(make_success()), 0, Some(b"collected".to_vec()));
+        let resp = build_response(Ok(()), 0, Some(b"collected".to_vec()));
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), b"collected");
         assert_eq!(
@@ -832,7 +869,7 @@ mod tests {
 
     #[test]
     fn build_response_success_no_frame_result() {
-        let resp = build_response(Ok(make_success()), 0, None);
+        let resp = build_response(Ok(()), 0, None);
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -845,7 +882,7 @@ mod tests {
 
     #[test]
     fn build_response_success_empty_frame_result() {
-        let resp = build_response(Ok(make_success()), 0, Some(vec![]));
+        let resp = build_response(Ok(()), 0, Some(vec![]));
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(resp.body().is_empty());
         assert_eq!(
@@ -899,9 +936,22 @@ mod tests {
     }
 
     #[test]
+    fn build_response_method_not_allowed() {
+        let resp = build_response(
+            Err(TezosXRuntimeError::MethodNotAllowed(
+                "PUT not allowed".into(),
+            )),
+            0,
+            None,
+        );
+        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(String::from_utf8_lossy(resp.body()).contains("PUT not allowed"));
+    }
+
+    #[test]
     fn build_response_success_has_gas_consumed_header() {
         // consumed_milligas = 0 → reported as 0
-        let resp = build_response(Ok(make_success()), 0, None);
+        let resp = build_response(Ok(()), 0, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)
@@ -913,7 +963,7 @@ mod tests {
     #[test]
     fn build_response_gas_consumed_reports_milligas() {
         // 5000 milligas → reported as 5000
-        let resp = build_response(Ok(make_success_with_milligas(5000)), 5000, None);
+        let resp = build_response(Ok(()), 5000, None);
         assert_eq!(
             resp.headers()
                 .get(X_TEZOS_GAS_CONSUMED)

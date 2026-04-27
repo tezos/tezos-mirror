@@ -139,6 +139,11 @@ fn build_response(
         Err(TezosXRuntimeError::NotFound(msg)) => {
             (StatusCode::NOT_FOUND, msg.into_bytes(), "0".to_string())
         }
+        Err(TezosXRuntimeError::MethodNotAllowed(msg)) => (
+            StatusCode::METHOD_NOT_ALLOWED,
+            msg.into_bytes(),
+            "0".to_string(),
+        ),
         Err(TezosXRuntimeError::OutOfGas) => (
             StatusCode::TOO_MANY_REQUESTS,
             b"OOG".to_vec(),
