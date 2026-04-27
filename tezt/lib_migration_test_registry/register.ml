@@ -15,6 +15,7 @@ type state = {
     | `Sandbox
     | `Shadownet
     | `Tallinnnet
+    | `Ushuaianet
     | `Weeklynet of string ];
   next_protocol : Tezt_tezos.Protocol.t;
   artifacts_dir_path : string;

@@ -78,8 +78,9 @@ module Dal = struct
         | Mimic {network; max_nb_bakers} ->
             let network_string =
               match network with
-              | `Mainnet | `Ghostnet | `Tallinnnet -> to_string network
-              | _ ->
+              | `Mainnet | `Ghostnet | `Shadownet | `Tallinnnet | `Ushuaianet ->
+                  to_string network
+              | `Nextnet _ | `Weeklynet _ ->
                   failwith
                     (Format.sprintf
                        "Cannot get stake distribution for %s"
