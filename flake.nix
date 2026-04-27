@@ -85,7 +85,23 @@
           }).overrideScope
             (
               final: prev:
-              pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
+              let
+                # GitHub regenerated the source tarball for ambient-context v0.1.0,
+                # invalidating the MD5 hash in opam-repository. Use fetchFromGitHub
+                # which is content-addressed (hashes the git tree, not the tarball)
+                # and therefore stable across GitHub tarball regenerations.
+                ambientContextSrc = pkgs.fetchFromGitHub {
+                  owner = "ELLIOTTCABLE";
+                  repo = "ocaml-ambient-context";
+                  rev = "v0.1.0";
+                  hash = "sha256-d7xoncentvuYSqiwkJqXtaA1ddNIcg/5BjnjV9zW3MA=";
+                };
+              in
+              {
+                ambient-context = prev.ambient-context.overrideAttrs { src = ambientContextSrc; };
+                ambient-context-lwt = prev.ambient-context-lwt.overrideAttrs { src = ambientContextSrc; };
+              }
+              // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
                 let
                   # opam-nix's debian.nix overlay adds a broken postInstall to hidapi
                   # on Linux: it creates symlinks libhidapi.la -> libhidapi-hidraw.la
