@@ -77,11 +77,45 @@
 
         # This scope is used for building in a development shell. It contains all the right
         # development dependencies.
-        depsScope = opam.queryToScope { inherit repos; } {
-          octez-deps = "dev";
-          octez-dev-deps = "dev";
-          ocamlformat-rpc = "*";
-        };
+        depsScope =
+          (opam.queryToScope { inherit repos pkgs; } {
+            octez-deps = "dev";
+            octez-dev-deps = "dev";
+            ocamlformat-rpc = "*";
+          }).overrideScope
+            (
+              final: prev:
+              pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
+                let
+                  # opam-nix's debian.nix overlay adds a broken postInstall to hidapi
+                  # on Linux: it creates symlinks libhidapi.la -> libhidapi-hidraw.la
+                  # (doesn't exist, .la files are stripped) and libhidapi.so ->
+                  # libhidapi-hidraw.so.0.0.0 (wrong version, actual is 0.15.0).
+                  # This causes the noBrokenSymlinks check to fail.
+                  # Fix by replacing the postInstall with correct symlinks.
+                  fixedHidapi = pkgs.hidapi.overrideAttrs {
+                    postInstall = ''
+                      mv $out/include/hidapi/* $out/include
+                      rm -d $out/include/hidapi
+                      target=$(find $out/lib -name 'libhidapi-*.so' ! -name 'libhidapi.so' -print -quit)
+                      if [ -z "$target" ]; then
+                        echo "fixedHidapi: no libhidapi-*.so found in $out/lib" >&2
+                        exit 1
+                      fi
+                      ln -s "$(basename "$target")" $out/lib/libhidapi.so
+                    '';
+                  };
+                  replaceHidapi =
+                    deps: [ fixedHidapi ] ++ (builtins.filter (d: !(d ? pname && d.pname == "hidapi")) deps);
+                in
+                {
+                  conf-hidapi = prev.conf-hidapi.overrideAttrs (old: {
+                    buildInputs = replaceHidapi (old.buildInputs or [ ]);
+                    nativeBuildInputs = replaceHidapi (old.nativeBuildInputs or [ ]);
+                  });
+                }
+              )
+            );
 
         # Environment for developing everything in Octez.
         mainShell = pkgs.mkShell {
