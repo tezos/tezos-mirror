@@ -8,6 +8,8 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
+    # Latest nixpkgs that provides foundry 1.5.0
+    nixpkgs-foundry.url = "github:NixOS/nixpkgs/c4a64f7682aadb3986b592032e30e5d76deb74fb";
     flake-utils.url = "github:numtide/flake-utils";
     flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
 
@@ -28,6 +30,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-foundry,
       flake-utils,
       opam-repository,
       opam-nix,
@@ -37,6 +40,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        pkgsFoundry = nixpkgs-foundry.legacyPackages.${system};
         opam = opam-nix.lib.${system};
 
         # We use this as a fake Opam switch. Some applications will look in the Opam switch to find
@@ -151,11 +155,14 @@
               curl
               nodejs
               poetry
+              pkgsFoundry.foundry
+              jq
               rustup
               shellcheck
               shfmt
               taplo
               wabt
+              xxd
               # For RISC-V kernel cross-compilation
               pkgsCross.riscv64.pkgsStatic.stdenv.cc
             ]
