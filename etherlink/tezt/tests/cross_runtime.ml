@@ -542,6 +542,60 @@ module EvmCracHttpCallEvm = struct
     unit
 end
 
+(** EVM contract that calls another EVM contract via the generic [call]
+ *  precompile and stores the returned HTTP response body.  Same as
+ *  [EvmCollectResult] but routes through [http://ethereum/<destination>],
+ *  invoking [store(uint256)] on the target so the EVM serve produces a
+ *  non-empty [Output::Call] body. *)
+module EvmCracCollectResultEvm = struct
+  open EvmContract
+
+  let deploy =
+    deploy_solidity_contract
+      ~contract:Solidity_contracts.crac_collect_result_evm
+
+  let init ~sequencer ~sender ~nonce ~value ~evm_contract_target_address
+      ~stored_value contract =
+    let* _receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"initialize(string,uint256)"
+        ~arguments:[evm_contract_target_address; string_of_int stored_value]
+        ()
+    in
+    unit
+
+  let call_run ?expected_status ~sequencer ~sender ~nonce ~value contract =
+    let* receipt =
+      craft_and_send_transaction
+        ~sequencer
+        ~sender
+        ~nonce
+        ~value
+        ~address:contract
+        ~abi_signature:"run()"
+        ~arguments:[]
+        ?expected_status
+        ()
+    in
+    return receipt.gasUsed
+
+  let check_result ~sequencer ~expected_hex contract =
+    let endpoint = Evm_node.endpoint sequencer in
+    let* raw = Cast.call "result()(bytes)" ~endpoint ~address:contract in
+    let strip_0x s = Test_helpers.remove_0x s in
+    Check.(
+      (String.lowercase_ascii (strip_0x raw)
+      = String.lowercase_ascii expected_hex)
+        string
+        ~error_msg:"Expected EvmCracCollectResultEvm result %R but got %L") ;
+    unit
+end
+
 (** EVM contract that calls a Michelson contract via the generic [call]
  *  precompile and stores the returned HTTP response body.  Used to
  *  verify that [%collect_result] bytes deposited on the Michelson side
@@ -823,6 +877,75 @@ module TezCrossRuntimeHttpCallEvm = struct
       (counter = expected_counter)
         int
         ~error_msg:"Expected TezCrossRuntimeHttpCallEvm `count` %R but got %L") ;
+    unit
+end
+
+(** Michelson contract that calls another Michelson contract via the
+ *  gateway's [%call] (HTTP) entrypoint with a callback, pointing at
+ *  [http://tezos/<destination>/default].  Used to verify that bytes
+ *  deposited via [%collect_result] on the same-runtime target are
+ *  forwarded to the caller's [%on_result] entrypoint. *)
+module TezCrossRuntimeHttpCallTezCallback = struct
+  open TezContract
+  include TezRunner
+
+  let originate ~sc_rollup_address ~sc_rollup_node ~client ~l1_contracts
+      ~sequencer ~source ~counter ~protocol ?init_balance
+      ~tez_contract_target_address () =
+    let script_name =
+      ["mini_scenarios"; "cross_runtime_http_call_tez_callback"]
+    in
+    let init_storage_data =
+      sf {|Pair 0 (Pair "%s" None)|} tez_contract_target_address
+    in
+    originate_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter
+      ~script_name
+      ~init_storage_data
+      ?init_balance
+      protocol
+
+  let check_counter ~sc_rollup_node ~expected_counter
+      (contract_hex, _contract_address) =
+    let* storage = get_storage ~sc_rollup_node contract_hex in
+    (* Pair(nat %count, Pair(string %destination, option bytes)) *)
+    let counter = JSON.(storage |-> "args" |=> 0 |-> "int" |> as_int) in
+    Check.(
+      (counter = expected_counter)
+        int
+        ~error_msg:
+          "Expected TezCrossRuntimeHttpCallTezCallback `count` %R but got %L") ;
+    unit
+
+  let check_result ~sc_rollup_node ~expected_bytes
+      (contract_hex, _contract_address) =
+    let* storage = get_storage ~sc_rollup_node contract_hex in
+    (* Storage: Pair(count, Pair(destination, option bytes)) *)
+    let result_node = JSON.(storage |-> "args" |=> 1 |-> "args" |=> 1) in
+    (match expected_bytes with
+    | None ->
+        Check.(
+          (JSON.(result_node |-> "prim" |> as_string) = "None")
+            string
+            ~error_msg:"Expected result None but got %L")
+    | Some bytes ->
+        Check.(
+          (JSON.(result_node |-> "prim" |> as_string) = "Some")
+            string
+            ~error_msg:"Expected result Some but got %L") ;
+        let actual =
+          JSON.(result_node |-> "args" |=> 0 |-> "bytes" |> as_string)
+        in
+        Check.(
+          (actual = bytes)
+            string
+            ~error_msg:"Expected result bytes %R but got %L")) ;
     unit
 end
 
@@ -1515,6 +1638,16 @@ module CracRunnerWrapper = struct
         unit Lwt.t
     end
 
+    module EvmCracCollectResultEvm : sig
+      val deploy_and_init :
+        ?value:Wei.t -> stored_value:int -> evm_runner -> evm_runner Lwt.t
+
+      val call_run :
+        ?expected_status:bool -> ?value:Wei.t -> evm_runner -> int64 Lwt.t
+
+      val check_result : expected_hex:string -> evm_runner -> unit Lwt.t
+    end
+
     module EvmCollectResult : sig
       val deploy_and_init : ?value:Wei.t -> tez_runner -> evm_runner Lwt.t
 
@@ -1577,6 +1710,15 @@ module CracRunnerWrapper = struct
       val originate : ?init_balance:int -> tez_runner -> tez_runner Lwt.t
 
       val check_storage : expected_counter:int -> tez_runner -> unit Lwt.t
+    end
+
+    module TezCrossRuntimeHttpCallTezCallback : sig
+      val originate : ?init_balance:int -> tez_runner -> tez_runner Lwt.t
+
+      val check_counter : expected_counter:int -> tez_runner -> unit Lwt.t
+
+      val check_result :
+        expected_bytes:string option -> tez_runner -> unit Lwt.t
     end
 
     module TezMultiRunCaller : sig
@@ -1903,6 +2045,48 @@ module CracRunnerWrapper = struct
             runner
       end
 
+      module EvmCracCollectResultEvm = struct
+        let deploy_and_init ?(value = Wei.zero) ~stored_value
+            (`Evm_runner address) =
+          let* addr =
+            EvmCracCollectResultEvm.deploy
+              ~evm_version
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ()
+          in
+          let* () =
+            EvmCracCollectResultEvm.init
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              ~evm_contract_target_address:address
+              ~stored_value
+              addr
+          in
+          return (`Evm_runner addr)
+
+        let call_run ?expected_status ?(value = Wei.zero) (`Evm_runner runner) =
+          let* gas_used =
+            EvmCracCollectResultEvm.call_run
+              ?expected_status
+              ~sequencer
+              ~sender
+              ~nonce:(evm_nonce ())
+              ~value
+              runner
+          in
+          let* () =
+            Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+          in
+          return gas_used
+
+        let check_result ~expected_hex (`Evm_runner runner) =
+          EvmCracCollectResultEvm.check_result ~sequencer ~expected_hex runner
+      end
+
       module EvmCollectResult = struct
         let deploy_and_init ?(value = Wei.zero) (`Tez_runner (_, address)) =
           let* addr =
@@ -2109,6 +2293,39 @@ module CracRunnerWrapper = struct
           TezCrossRuntimeHttpCallTez.check_storage
             ~sc_rollup_node
             ~expected_counter
+            (runner_hex, runner_address)
+      end
+
+      module TezCrossRuntimeHttpCallTezCallback = struct
+        let originate ?init_balance (`Tez_runner (_, address)) =
+          let* contract_hex, address =
+            TezCrossRuntimeHttpCallTezCallback.originate
+              ~sc_rollup_address
+              ~sc_rollup_node
+              ~client
+              ~l1_contracts
+              ~sequencer
+              ~source
+              ~counter:(tez_counter ())
+              ~protocol
+              ?init_balance
+              ~tez_contract_target_address:address
+              ()
+          in
+          return (`Tez_runner (contract_hex, address))
+
+        let check_counter ~expected_counter
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCrossRuntimeHttpCallTezCallback.check_counter
+            ~sc_rollup_node
+            ~expected_counter
+            (runner_hex, runner_address)
+
+        let check_result ~expected_bytes
+            (`Tez_runner (runner_hex, runner_address)) =
+          TezCrossRuntimeHttpCallTezCallback.check_result
+            ~sc_rollup_node
+            ~expected_bytes
             (runner_hex, runner_address)
       end
 
@@ -8906,6 +9123,80 @@ let test_crac_http_call_tez_to_tez_revert =
   Log.debug ~prefix "Verify TEZ target counter=0 (rolled back)" ;
   TezMultiRunCaller.check_storage ~expected_counter:0 tez_target
 
+(** Same-runtime EVM->EVM CRAC, capturing the target's return value.
+ *
+ *    EVM[evm_caller] --call(http://ethereum/...,store(42))-->
+ *      EVM[StoreAndReturn]
+ *        |-> store: value = 42; return 42
+ *
+ *  The EVM serve packs the call's [Output::Call] bytes into the HTTP
+ *  response body.  The precompile ABI-encodes them as [bytes] and
+ *  returns them to the caller.  Caller decodes [bytes] and stores it
+ *  in [result]. *)
+let test_crac_http_call_evm_to_evm_return_value =
+  register_crac_runner_test
+    ~title:
+      "CRAC: generic call() EVM to EVM (same-runtime) returns target output"
+    ~tags:["http_call"; "same_runtime"; "return_value"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP-EVM2EVM-RET" in
+  let stored_value = 42 in
+  Log.debug ~prefix "Deploy EVM target (StoreAndReturn)" ;
+  let* evm_target = EvmStoreAndReturn.deploy () in
+  Log.debug ~prefix "Deploy EVM caller (CracCollectResultEvm)" ;
+  let* evm_caller =
+    EvmCracCollectResultEvm.deploy_and_init ~stored_value evm_target
+  in
+  Log.debug ~prefix "Call run() on EVM caller" ;
+  let* _ = EvmCracCollectResultEvm.call_run evm_caller in
+  Log.debug ~prefix "Verify side effect: target.value = %d" stored_value ;
+  let* () =
+    EvmStoreAndReturn.check_storage ~expected_value:stored_value evm_target
+  in
+  Log.debug
+    ~prefix
+    "Verify return: caller.result = abi.encode(uint256(%d))"
+    stored_value ;
+  let expected_hex = Printf.sprintf "%064x" stored_value in
+  EvmCracCollectResultEvm.check_result ~expected_hex evm_caller
+
+(** Same-runtime TEZ->TEZ CRAC, capturing the target's response body
+ *  via the gateway's [%call] callback parameter.
+ *
+ *    TEZ[tez_caller] --%call(http://tezos/.../default,
+ *                           callback=Some(self %on_result))-->
+ *      TEZ[gateway_collect_result] (deposits payload via %collect_result)
+ *
+ *  After the gateway returns, the deposited bytes are forwarded to
+ *  [tez_caller %on_result] which stores them in [%result]. *)
+let test_crac_http_call_tez_to_tez_collect_result =
+  register_crac_runner_test
+    ~title:
+      "CRAC: generic call() TEZ to TEZ (same-runtime) callback receives \
+       collect_result bytes"
+    ~tags:["http_call"; "same_runtime"; "return_value"; "collect_result"]
+  @@ fun (module Wrapper) ->
+  let open Wrapper in
+  let prefix = "CRAC-HTTP-TEZ2TEZ-RET" in
+  let payload_hex = "deadbeef" in
+  Log.debug ~prefix "Originate TEZ target (gateway_collect_result)" ;
+  let* tez_target = TezCollectResult.originate ~payload_hex () in
+  Log.debug ~prefix "Originate TEZ caller with callback to TEZ target" ;
+  let* tez_caller = TezCrossRuntimeHttpCallTezCallback.originate tez_target in
+  Log.debug ~prefix "Call %%run on TEZ caller" ;
+  let* () = TezRunner.call_run tez_caller in
+  Log.debug ~prefix "Verify caller received bytes via callback" ;
+  let* () =
+    TezCrossRuntimeHttpCallTezCallback.check_result
+      ~expected_bytes:(Some payload_hex)
+      tez_caller
+  in
+  Log.debug ~prefix "Verify caller %%count incremented (callback ran)" ;
+  TezCrossRuntimeHttpCallTezCallback.check_counter
+    ~expected_counter:3
+    tez_caller
+
 (* L1 vs TezosX receipt comparison helpers *)
 
 let extract_entrypoint_status internals =
@@ -10672,6 +10963,8 @@ let () =
   test_crac_http_call_tez_to_tez [Alpha] ;
   test_crac_http_call_evm_to_evm_revert [Alpha] ;
   test_crac_http_call_tez_to_tez_revert [Alpha] ;
+  test_crac_http_call_evm_to_evm_return_value [Alpha] ;
+  test_crac_http_call_tez_to_tez_collect_result [Alpha] ;
   test_crac_debug_trace_transaction [Alpha] ;
   test_crac_debug_trace_block [Alpha] ;
   test_crac_debug_trace_normal_tx_in_crac_block [Alpha] ;

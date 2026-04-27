@@ -533,6 +533,12 @@ let crac_collect_result =
     ~label:"crac_collect_result"
     ~contract:"CracCollectResult"
 
+let crac_collect_result_evm =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/crac_collect_result_evm.sol")
+    ~label:"crac_collect_result_evm"
+    ~contract:"CracCollectResultEvm"
+
 let store_and_return =
   compile_contract
     ~source:(solidity_contracts_path ^ "/store_and_return.sol")
