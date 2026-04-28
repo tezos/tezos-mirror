@@ -52,7 +52,7 @@ use tezosx_interfaces::{
     AliasInfo, CrossRuntimeContext, Origin, Registry, RuntimeId, RuntimeInterface,
     TezosXRuntimeError, X_TEZOS_GAS_CONSUMED,
 };
-use tezosx_journal::{SetFrameResultError, TezosXJournal};
+use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
 use tezos_smart_rollup_host::path::RefPath;
 
@@ -99,11 +99,10 @@ pub fn crac_top_level_applied_result() -> ContentResult<TransferContent> {
 
 /// Build an HTTP response from the result of [`execute_request`].
 ///
-/// `frame_result` carries the payload deposited on the topmost CRAC
-/// frame — by Michelson via `%collect_result` for entrypoint calls, or
-/// by [`view::execute_view_call`] for view calls. Peeked by the caller
-/// before REVM commits or reverts the frame. On 4xx/5xx the frame is
-/// about to be reverted, so the payload is discarded.
+/// `frame_result` carries the `%collect_result` payload taken out of the
+/// dispatch slot that [`TezosRuntime::serve`] opened for this call. It is
+/// only surfaced on 2xx responses — on 4xx/5xx the operation is about to
+/// be reverted, so the payload is discarded.
 ///
 /// Request-level errors are turned into HTTP error responses:
 /// - `Ok(())` → 200, body = `frame_result` (or empty), `Content-Type: application/octet-stream`
@@ -155,7 +154,7 @@ fn build_response(
 /// and build the HTTP response.
 ///
 /// The dispatch slot is opened at `serve` entry and taken here.
-/// `Err(NoFrame)` means the slot was popped by an intermediate caller
+/// `Err(NoSlot)` means the slot was popped by an intermediate caller
 /// — a kernel bug.  When `result` is `Ok(())` we escalate that case to
 /// a `Custom` error so the response is a 500 rather than an empty 2xx
 /// that hides the inconsistency; when `result` is already `Err` the
@@ -164,7 +163,7 @@ fn build_response(
 fn finalize_response(
     result: Result<(), TezosXRuntimeError>,
     consumed_milligas: u64,
-    dispatch: Result<Option<Vec<u8>>, SetFrameResultError>,
+    dispatch: Result<Option<Vec<u8>>, DispatchSlotError>,
 ) -> http::Response<Vec<u8>> {
     let result = match (result, &dispatch) {
         (Ok(()), Err(e)) => Err(TezosXRuntimeError::Custom(format!(
@@ -1339,7 +1338,7 @@ mod tests {
     // 2xx response.
     #[test]
     fn finalize_response_success_with_unbalanced_slot_escalates_to_500() {
-        let resp = finalize_response(Ok(()), 7, Err(SetFrameResultError::NoFrame));
+        let resp = finalize_response(Ok(()), 7, Err(DispatchSlotError::NoSlot));
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert!(
             String::from_utf8_lossy(resp.body()).contains("dispatch slot inconsistency"),
@@ -1358,7 +1357,7 @@ mod tests {
         let resp = finalize_response(
             Err(TezosXRuntimeError::NotFound("KT1 missing".into())),
             0,
-            Err(SetFrameResultError::NoFrame),
+            Err(DispatchSlotError::NoSlot),
         );
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         assert!(

@@ -44,31 +44,28 @@ struct ExternalCheckpoint {
     /// Length of `pending_crac_receipts` at the time the checkpoint was
     /// created.  On revert, receipts are truncated back to this count.
     receipt_count: usize,
-    /// Payload deposited by Michelson via `%collect_result` during this
-    /// frame.  Populated at most once per frame; dropped (alongside the
-    /// checkpoint) on `commit_frame`/`revert_frame`.
-    frame_result: Option<Vec<u8>>,
 }
 
-/// Error returned by [`MichelsonJournal::set_frame_result`].
+/// Error returned by [`MichelsonJournal::set_dispatch_result`].
 #[derive(Debug, PartialEq, Eq)]
-pub enum SetFrameResultError {
-    /// No external checkpoint is active — there is no frame to write to.
-    NoFrame,
-    /// The current frame already holds a result (once-per-frame invariant).
+pub enum DispatchSlotError {
+    /// No dispatch slot is open — there is nothing to write to.
+    NoSlot,
+    /// The current dispatch slot already holds a result
+    /// (once-per-dispatch invariant).
     AlreadySet,
 }
 
-impl core::fmt::Display for SetFrameResultError {
+impl core::fmt::Display for DispatchSlotError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::NoFrame => f.write_str("no active external checkpoint"),
-            Self::AlreadySet => f.write_str("frame result already set"),
+            Self::NoSlot => f.write_str("no active dispatch slot"),
+            Self::AlreadySet => f.write_str("dispatch result already set"),
         }
     }
 }
 
-impl std::error::Error for SetFrameResultError {}
+impl std::error::Error for DispatchSlotError {}
 
 /// A pending revert target: the indexed location where the world-state
 /// subtree was copied at checkpoint time, paired with the original path
@@ -214,35 +211,7 @@ impl MichelsonJournal {
         self.external_checkpoints.push(ExternalCheckpoint {
             snapshot_watermark: self.snapshots.len(),
             receipt_count: self.pending_crac_receipts.len(),
-            frame_result: None,
         });
-    }
-
-    /// Returns the current frame's `%collect_result` payload, if one has
-    /// been set.  Non-destructive: repeated calls observe the same value
-    /// until the frame is committed or reverted.
-    pub fn frame_result(&self) -> Option<&[u8]> {
-        self.external_checkpoints.last()?.frame_result.as_deref()
-    }
-
-    /// Deposit the `%collect_result` payload on the topmost frame.
-    ///
-    /// Fails with [`SetFrameResultError::NoFrame`] if called outside an
-    /// external checkpoint, or [`SetFrameResultError::AlreadySet`] if the
-    /// current frame already holds a result (once-per-frame invariant).
-    pub fn set_frame_result(
-        &mut self,
-        bytes: Vec<u8>,
-    ) -> Result<(), SetFrameResultError> {
-        let top = self
-            .external_checkpoints
-            .last_mut()
-            .ok_or(SetFrameResultError::NoFrame)?;
-        if top.frame_result.is_some() {
-            return Err(SetFrameResultError::AlreadySet);
-        }
-        top.frame_result = Some(bytes);
-        Ok(())
     }
 
     /// Open a fresh dispatch slot for the current `serve` invocation.
@@ -255,20 +224,20 @@ impl MichelsonJournal {
     /// Deposit the `%collect_result` payload on the topmost dispatch
     /// slot.
     ///
-    /// Fails with [`SetFrameResultError::NoFrame`] if no dispatch slot
+    /// Fails with [`DispatchSlotError::NoSlot`] if no dispatch slot
     /// is open (i.e. called outside `serve`), or
-    /// [`SetFrameResultError::AlreadySet`] if the current slot already
+    /// [`DispatchSlotError::AlreadySet`] if the current slot already
     /// holds a payload (once-per-dispatch invariant).
     pub fn set_dispatch_result(
         &mut self,
         bytes: Vec<u8>,
-    ) -> Result<(), SetFrameResultError> {
+    ) -> Result<(), DispatchSlotError> {
         let top = self
             .dispatch_result_slots
             .last_mut()
-            .ok_or(SetFrameResultError::NoFrame)?;
+            .ok_or(DispatchSlotError::NoSlot)?;
         if top.is_some() {
-            return Err(SetFrameResultError::AlreadySet);
+            return Err(DispatchSlotError::AlreadySet);
         }
         *top = Some(bytes);
         Ok(())
@@ -278,17 +247,15 @@ impl MichelsonJournal {
     ///
     /// `Ok(Some(_))` — the slot held a payload.
     /// `Ok(None)` — the slot was open but never written to.
-    /// `Err(NoFrame)` — no slot was open: an unbalanced call, paired
+    /// `Err(NoSlot)` — no slot was open: an unbalanced call, paired
     /// neither with a prior `push_dispatch_slot` nor following an
     /// already-consumed slot. A kernel bug; surfaced as `Err` rather
     /// than collapsed into `None` so the caller can distinguish
     /// "no `%collect_result`" from "no slot at all".
-    pub fn take_dispatch_result(
-        &mut self,
-    ) -> Result<Option<Vec<u8>>, SetFrameResultError> {
+    pub fn take_dispatch_result(&mut self) -> Result<Option<Vec<u8>>, DispatchSlotError> {
         self.dispatch_result_slots
             .pop()
-            .ok_or(SetFrameResultError::NoFrame)
+            .ok_or(DispatchSlotError::NoSlot)
     }
 
     // Called by EVM journal on checkpoint commit.
@@ -307,7 +274,6 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
-                frame_result: None,
             });
         let drain_from = if self.external_checkpoints.is_empty() {
             checkpoint.snapshot_watermark
@@ -343,7 +309,6 @@ impl MichelsonJournal {
             .unwrap_or(ExternalCheckpoint {
                 snapshot_watermark: 0,
                 receipt_count: 0,
-                frame_result: None,
             });
         // Drain (not truncate) the CRAC receipts pushed during this
         // frame, transform their statuses to `BackTracked`, and
@@ -1300,134 +1265,26 @@ mod tests {
         assert_eq!(receipt_id(&journal.backtracked_crac_receipts[0].1), 7);
     }
 
-    // --- frame result slot ---
-
-    // With no active frame, `frame_result` observes nothing and
-    // `set_frame_result` refuses to write.
-    #[test]
-    fn test_frame_result_no_frame() {
-        let mut journal = MichelsonJournal::new();
-        assert_eq!(journal.frame_result(), None);
-        assert_eq!(
-            journal.set_frame_result(vec![1, 2, 3]),
-            Err(SetFrameResultError::NoFrame)
-        );
-    }
-
-    // A payload deposited on the top frame is visible to repeated reads
-    // until the frame is dropped.
-    #[test]
-    fn test_frame_result_set_is_observable() {
-        let mut journal = MichelsonJournal::new();
-        journal.push_external_checkpoint();
-        assert_eq!(journal.frame_result(), None);
-
-        journal.set_frame_result(vec![0xCA, 0xFE]).unwrap();
-        assert_eq!(journal.frame_result(), Some(&[0xCA, 0xFE][..]));
-        // Non-destructive: still there on re-read.
-        assert_eq!(journal.frame_result(), Some(&[0xCA, 0xFE][..]));
-    }
-
-    // `commit_frame` drops the slot: after commit, the parent frame's
-    // (absent) payload is what `frame_result` observes.
-    #[test]
-    fn test_frame_result_commit_drops_slot() {
-        let mut host = MockHost::default();
-        let world = world_path();
-        let mut journal = MichelsonJournal::new();
-        write_data(&mut host, &world, b"v0");
-
-        journal.push_external_checkpoint();
-        journal.push_external_checkpoint();
-        journal.set_frame_result(vec![0xAA]).unwrap();
-        assert_eq!(journal.frame_result(), Some(&[0xAA][..]));
-
-        journal.commit_frame(&mut host).unwrap();
-        // Outer frame has no result of its own.
-        assert_eq!(journal.frame_result(), None);
-    }
-
-    // `revert_frame` drops the slot just like `commit_frame`.  A fresh
-    // frame pushed afterwards starts empty.
-    #[test]
-    fn test_frame_result_revert_drops_slot() {
-        let mut host = MockHost::default();
-        let world = world_path();
-        let mut journal = MichelsonJournal::new();
-        write_data(&mut host, &world, b"v0");
-
-        journal.push_external_checkpoint();
-        journal.set_frame_result(vec![0xBB]).unwrap();
-        journal.revert_frame(&mut host).unwrap();
-
-        journal.push_external_checkpoint();
-        assert_eq!(journal.frame_result(), None);
-    }
-
-    // Second call to `set_frame_result` on the same frame fails; the
-    // first value is kept intact.
-    #[test]
-    fn test_frame_result_double_set_fails() {
-        let mut journal = MichelsonJournal::new();
-        journal.push_external_checkpoint();
-        journal.set_frame_result(vec![0x01]).unwrap();
-        assert_eq!(
-            journal.set_frame_result(vec![0x02]),
-            Err(SetFrameResultError::AlreadySet)
-        );
-        assert_eq!(journal.frame_result(), Some(&[0x01][..]));
-    }
-
-    // Nested frames get independent slots: the inner payload is never
-    // observable from the outer frame, and vice versa.
-    #[test]
-    fn test_frame_result_nested_frames_independent() {
-        let mut host = MockHost::default();
-        let world = world_path();
-        let mut journal = MichelsonJournal::new();
-        write_data(&mut host, &world, b"v0");
-
-        // Outer frame sets its payload.
-        journal.push_external_checkpoint();
-        journal.set_frame_result(vec![0xAA]).unwrap();
-
-        // Inner frame starts empty and can hold its own payload.
-        journal.push_external_checkpoint();
-        assert_eq!(journal.frame_result(), None);
-        journal.set_frame_result(vec![0xBB]).unwrap();
-        assert_eq!(journal.frame_result(), Some(&[0xBB][..]));
-
-        // Committing the inner frame uncovers the outer's payload.
-        journal.commit_frame(&mut host).unwrap();
-        assert_eq!(journal.frame_result(), Some(&[0xAA][..]));
-
-        // Outer frame still refuses a second set.
-        assert_eq!(
-            journal.set_frame_result(vec![0xCC]),
-            Err(SetFrameResultError::AlreadySet)
-        );
-    }
-
     // --- dispatch result slot ---
 
     // With no open slot, `set_dispatch_result` and
-    // `take_dispatch_result` both signal `NoFrame`.
+    // `take_dispatch_result` both signal `NoSlot`.
     #[test]
     fn test_dispatch_result_no_slot() {
         let mut journal = MichelsonJournal::new();
         assert_eq!(
             journal.set_dispatch_result(vec![1, 2, 3]),
-            Err(SetFrameResultError::NoFrame)
+            Err(DispatchSlotError::NoSlot)
         );
         assert_eq!(
             journal.take_dispatch_result(),
-            Err(SetFrameResultError::NoFrame)
+            Err(DispatchSlotError::NoSlot)
         );
     }
 
     // A payload deposited on the top slot is taken out by the next
     // `take_dispatch_result`; a follow-up take with no slot open
-    // signals `NoFrame`.
+    // signals `NoSlot`.
     #[test]
     fn test_dispatch_result_set_then_take() {
         let mut journal = MichelsonJournal::new();
@@ -1437,12 +1294,12 @@ mod tests {
         // Slot is gone; a follow-up take is now an unbalanced call.
         assert_eq!(
             journal.take_dispatch_result(),
-            Err(SetFrameResultError::NoFrame)
+            Err(DispatchSlotError::NoSlot)
         );
     }
 
     // An open slot with no deposit yields `Ok(None)` on take —
-    // distinct from `Err(NoFrame)` which means no slot at all.
+    // distinct from `Err(NoSlot)` which means no slot at all.
     #[test]
     fn test_dispatch_result_take_empty_slot() {
         let mut journal = MichelsonJournal::new();
@@ -1459,7 +1316,7 @@ mod tests {
         journal.set_dispatch_result(vec![0x01]).unwrap();
         assert_eq!(
             journal.set_dispatch_result(vec![0x02]),
-            Err(SetFrameResultError::AlreadySet)
+            Err(DispatchSlotError::AlreadySet)
         );
         assert_eq!(journal.take_dispatch_result(), Ok(Some(vec![0x01])));
     }
@@ -1482,31 +1339,21 @@ mod tests {
         // Outer slot is intact and still refuses a second set.
         assert_eq!(
             journal.set_dispatch_result(vec![0xCC]),
-            Err(SetFrameResultError::AlreadySet)
+            Err(DispatchSlotError::AlreadySet)
         );
         assert_eq!(journal.take_dispatch_result(), Ok(Some(vec![0xAA])));
     }
 
     // Dispatch slots are disjoint from REVM's external_checkpoints
     // stack: pushing an external checkpoint must not satisfy the
-    // dispatch-slot invariant, and vice versa.
+    // dispatch-slot invariant.
     #[test]
     fn test_dispatch_result_disjoint_from_external_checkpoint() {
         let mut journal = MichelsonJournal::new();
-
-        // An external checkpoint alone offers no dispatch slot.
         journal.push_external_checkpoint();
         assert_eq!(
             journal.set_dispatch_result(vec![0x01]),
-            Err(SetFrameResultError::NoFrame)
-        );
-
-        // A dispatch slot alone offers no frame to set_frame_result.
-        let mut journal = MichelsonJournal::new();
-        journal.push_dispatch_slot();
-        assert_eq!(
-            journal.set_frame_result(vec![0x01]),
-            Err(SetFrameResultError::NoFrame)
+            Err(DispatchSlotError::NoSlot)
         );
     }
 }

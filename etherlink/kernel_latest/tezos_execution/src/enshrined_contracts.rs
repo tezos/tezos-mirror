@@ -1477,7 +1477,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::operation_result::{ContentResult, InternalOperationSum};
     use tezosx_interfaces::{Origin, RuntimeId};
-    use tezosx_journal::{SetFrameResultError, TezosXJournal};
+    use tezosx_journal::{DispatchSlotError, TezosXJournal};
 
     use super::*;
     use crate::mir_ctx::mock::MockCtx;
@@ -2691,7 +2691,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.to_string().contains("no active external checkpoint"),
+            err.to_string().contains("no active dispatch slot"),
             "error should mention missing slot: {err}"
         );
         assert!(registry.serve_calls.borrow().is_empty());
@@ -2733,7 +2733,7 @@ mod tests {
         assert!(second.is_err());
         let err = second.unwrap_err();
         assert!(
-            err.to_string().contains("frame result already set"),
+            err.to_string().contains("dispatch result already set"),
             "error should mention already-set slot: {err}"
         );
         // The original payload is preserved — a failing retry doesn't
@@ -2909,7 +2909,7 @@ mod tests {
         assert_eq!(ctx.operation_gas().total_milligas_consumed() as u64, 944);
         assert_eq!(
             journal.michelson.take_dispatch_result(),
-            Err(SetFrameResultError::NoFrame)
+            Err(DispatchSlotError::NoSlot)
         );
     }
 
