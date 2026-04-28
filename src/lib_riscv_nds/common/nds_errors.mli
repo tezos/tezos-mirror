@@ -14,7 +14,9 @@
 type invalid_argument_error =
   | Key_not_found
   | Key_too_long
+  | Io_request_too_large
   | Offset_too_large
+  | Value_size_too_large
   | Database_index_out_of_bounds
   | Registry_resize_too_large
 

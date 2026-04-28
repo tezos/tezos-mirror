@@ -77,15 +77,19 @@ ocaml::custom!(Proof);
 /// These are returned to the kernel as the error variant of an OCaml result.
 #[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
-    "Key_not_found | Key_too_long | Offset_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
+    "Key_not_found | Key_too_long | Io_request_too_large | Offset_too_large | Value_size_too_large | Database_index_out_of_bounds | Registry_resize_too_large"
 )]
 pub enum InvalidArgumentError {
     /// The requested key does not exist in the database.
     KeyNotFound,
     /// The key exceeded the maximum allowed length.
     KeyTooLong,
+    /// IO requests cannot be larger than MAX_FILE_CHUNK_SIZE (2KiB)
+    IoRequestTooLarge,
     /// The offset exceeded the length of the stored value.
     OffsetTooLarge,
+    /// Maximum value size would be exceeded (64MiB)
+    ValueSizeTooLarge,
     /// The database index was outside the bounds of the registry.
     DatabaseIndexOutOfBounds,
     /// The requested registry size exceeds the allowed limit.
@@ -97,7 +101,9 @@ impl From<ds_errors::InvalidArgumentError> for InvalidArgumentError {
         match value {
             ds_errors::InvalidArgumentError::KeyNotFound => Self::KeyNotFound,
             ds_errors::InvalidArgumentError::KeyTooLong => Self::KeyTooLong,
+            ds_errors::InvalidArgumentError::IoRequestTooLarge => Self::IoRequestTooLarge,
             ds_errors::InvalidArgumentError::OffsetTooLarge => Self::OffsetTooLarge,
+            ds_errors::InvalidArgumentError::ValueSizeTooLarge => Self::ValueSizeTooLarge,
             ds_errors::InvalidArgumentError::DatabaseIndexOutOfBounds => {
                 Self::DatabaseIndexOutOfBounds
             }
@@ -144,7 +150,7 @@ pub enum VerificationArgumentError {
 #[ocaml::func]
 #[ocaml::sig("unit -> registry")]
 pub fn octez_riscv_durable_in_memory_registry_new() -> OcamlFallible<SafePointer<Registry>> {
-    let registry = RegistryState::new(InMemoryRepo)?;
+    let registry = RegistryState::new(InMemoryRepo::default())?;
 
     Ok(SafePointer::from(MutableState::owned(registry)))
 }
