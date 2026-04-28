@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use mir::ast::{AddressHash, ByteReprTrait};
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::operation_result::TransferError;
 use tezosx_interfaces::RuntimeId;
@@ -11,22 +11,34 @@ use tezosx_interfaces::RuntimeId;
 // Path where aliases are stored for tezos execution context
 // built from tezosx-tezos-runtime::account::TEZOS_ACCOUNTS_PATH but copied here
 // for now to avoid a circular dependency.
-const TEZLINK_ALIASES_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos/aliases");
+const TEZLINK_ALIASES_PATH_STR: &str = "/evm/world_state/eth_accounts/tezos/aliases";
+
+/// Maximum length of the full alias path: prefix + "/" + up to 44 hex
+/// digits (`AddressHash::BYTE_SIZE = 22`) + "/" + up to 2 hex digits
+/// (runtime tag, fits in a byte).
+const ALIAS_PATH_MAX_LEN: usize = TEZLINK_ALIASES_PATH_STR.len() + 1 + 44 + 1 + 2;
+
+const HEX: &[u8; 16] = b"0123456789abcdef";
+
+/// Append the lowercase hex representation of `b` (two characters) to `s`.
+fn push_hex_byte(s: &mut String, b: u8) {
+    s.push(char::from(HEX[(b >> 4) as usize]));
+    s.push(char::from(HEX[(b & 0xf) as usize]));
+}
 
 fn alias_path(
     source: &AddressHash,
     runtime: RuntimeId,
 ) -> Result<OwnedPath, TransferError> {
-    let address_bytes = source.to_bytes_vec();
-    let suffix = OwnedPath::try_from(format!(
-        "/{}/{:x}",
-        hex::encode(&address_bytes),
-        <RuntimeId as Into<u8>>::into(runtime)
-    ))
-    .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    concat(&TEZLINK_ALIASES_PATH, &suffix)
-        .map_err(|e| TransferError::GatewayError(e.to_string()))
+    let mut s = String::with_capacity(ALIAS_PATH_MAX_LEN);
+    s.push_str(TEZLINK_ALIASES_PATH_STR);
+    s.push('/');
+    for b in source.to_bytes_vec() {
+        push_hex_byte(&mut s, b);
+    }
+    s.push('/');
+    push_hex_byte(&mut s, runtime.into());
+    OwnedPath::try_from(s).map_err(|e| TransferError::GatewayError(e.to_string()))
 }
 
 pub fn store_alias(

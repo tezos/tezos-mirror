@@ -21,8 +21,8 @@ use crate::{
     precompiles::{
         constants::{
             ALIAS_CACHE_HIT_COST, HEADER_VALIDATION_PER_HEADER,
-            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-            VALUE_TRANSFER_SURCHARGE,
+            RUNTIME_GATEWAY_BASE_COST, RUNTIME_GATEWAY_PER_WORD_COST,
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, VALUE_TRANSFER_SURCHARGE,
         },
         guard::charge,
         runtime_gateway::RuntimeGateway::RuntimeGatewayCalls,
@@ -68,6 +68,17 @@ sol! {
     );
 }
 
+/// Charge `RUNTIME_GATEWAY_PER_WORD_COST * ceil(bytes / 32)` for a chunk
+/// of gateway payload (calldata, outgoing body, or incoming response).
+fn charge_payload(gas: &mut Gas, bytes: usize) -> Result<(), CustomPrecompileError> {
+    let words = (bytes as u64).div_ceil(32);
+    let cost = RUNTIME_GATEWAY_PER_WORD_COST.saturating_mul(words);
+    if cost > 0 {
+        charge(gas, cost)?;
+    }
+    Ok(())
+}
+
 /// Build an `http::Request<Vec<u8>>` from ABI-decoded parameters.
 fn build_http_request(
     url: &str,
@@ -101,7 +112,11 @@ fn build_http_request(
     let mut builder = http::Request::builder().method(method).uri(url);
 
     for (name, value) in headers {
-        if name.as_str().to_ascii_lowercase().starts_with("x-tezos-") {
+        // Zero-alloc case-insensitive prefix check (avoid
+        // `to_ascii_lowercase()` which allocates a new `String` per
+        // header).
+        let bytes = name.as_bytes();
+        if bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"x-tezos-") {
             return Err(CustomPrecompileError::Revert(
                 format!("{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"),
                 *gas,
@@ -170,6 +185,51 @@ fn classify_and_charge_crac_response(
     }
 }
 
+/// Reset the gateway precompile's EVM balance to zero, charging the
+/// value-transfer surcharge, but only when the current balance is
+/// non-zero. Otherwise no SSTORE happens and no surcharge is levied.
+///
+/// Called after each CRAC that may have left truncation residue on the
+/// precompile's balance.
+fn burn_gateway_residual<'j, CTX, Host, R>(
+    context: &mut CTX,
+    gas: &mut Gas,
+) -> Result<(), CustomPrecompileError>
+where
+    Host: StorageV1 + 'j,
+    R: Registry + 'j,
+    CTX: ContextTr<Db = EtherlinkVMDB<'j, Host, R>, Journal = Journal<'j, Host, R>>,
+{
+    let snapshot = *gas;
+    let is_zero = {
+        let account_load = context
+            .journal_mut()
+            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
+            .map_err(|_| {
+                CustomPrecompileError::Revert(
+                    "failed to load precompile account".into(),
+                    snapshot,
+                )
+            })?;
+        account_load.data.balance().is_zero()
+    };
+    if !is_zero {
+        charge(gas, VALUE_TRANSFER_SURCHARGE)?;
+        let snapshot = *gas;
+        let mut account_load = context
+            .journal_mut()
+            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
+            .map_err(|_| {
+                CustomPrecompileError::Revert(
+                    "failed to load precompile account".into(),
+                    snapshot,
+                )
+            })?;
+        account_load.data.set_balance(U256::ZERO);
+    }
+    Ok(())
+}
+
 /// Resolve sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss.
 ///
@@ -196,6 +256,11 @@ where
 /// Resolves sender and source aliases, charging gas for lookups and any
 /// alias generation triggered on cache miss. OOG propagates as
 /// `Err(CustomPrecompileError::OutOfGas(..))`.
+///
+/// When `sender == source` (an EOA directly calling the gateway, the
+/// common case), the resolution is performed once and the resulting
+/// alias is reused for both slots — a single `ALIAS_CACHE_HIT_COST` is
+/// billed instead of two.
 fn resolve_aliases<'j, CTX, Host, R>(
     context: &mut CTX,
     gas: &mut Gas,
@@ -220,6 +285,12 @@ where
     }
 
     // --- source alias ---
+    // Fast path: if sender == source, reuse the resolved alias and skip
+    // the second storage lookup (and its cache-hit charge).
+    if sender == source {
+        return Ok((sender_alias.clone(), sender_alias));
+    }
+
     charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (source_alias, source_gen_gas) = context
         .journal_mut()
@@ -322,6 +393,8 @@ where
     match function_call {
         RuntimeGatewayCalls::transfer(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata (body is empty).
+            charge_payload(&mut gas, calldata.len())?;
 
             let implicit_address = call.implicitAddress;
             let amount = inputs.value.get();
@@ -342,13 +415,6 @@ where
             let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
                 resolve_aliases(context, &mut gas, inputs.caller, source)?;
-
-            // Charge value transfer surcharge before the CRAC so the
-            // caller cannot trigger a cross-runtime transfer without
-            // enough gas to cover the balance burn.
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
 
             // Convert remaining EVM gas to Tezos milligas for the target runtime
             let gas_limit =
@@ -394,6 +460,9 @@ where
         }
         RuntimeGatewayCalls::callMichelson(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata + outgoing body.
+            charge_payload(&mut gas, calldata.len())?;
+            charge_payload(&mut gas, call.parameters.len())?;
 
             let destination = call.destination;
             let entrypoint = call.entrypoint;
@@ -420,11 +489,6 @@ where
             let source = resolve_original_source(context);
             let (sender_alias, source_alias) =
                 resolve_aliases(context, &mut gas, inputs.caller, source)?;
-
-            // Charge value transfer surcharge before the CRAC
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -576,6 +640,10 @@ where
         }
         RuntimeGatewayCalls::call(call) => {
             charge(&mut gas, RUNTIME_GATEWAY_BASE_COST)?;
+            // Per-byte payload surcharge on calldata + outgoing body.
+            // The response body is charged after the CRAC completes.
+            charge_payload(&mut gas, calldata.len())?;
+            charge_payload(&mut gas, call.body.len())?;
 
             let mut request = build_http_request(
                 &call.url,
@@ -615,12 +683,6 @@ where
             } else {
                 resolve_aliases(context, &mut gas, inputs.caller, source)?
             };
-
-            // Charge value transfer surcharge before the CRAC (POST
-            // only — GET rejects non-zero amount above).
-            if !amount.is_zero() {
-                charge(&mut gas, VALUE_TRANSFER_SURCHARGE)?;
-            }
 
             let target_runtime = request
                 .uri()
@@ -668,6 +730,8 @@ where
             let response = context.journal_mut().tezosx_call_http(request);
             let body =
                 classify_and_charge_crac_response(response, target_runtime, &mut gas)?;
+            // Response body is ABI-encoded and returned; charge per byte.
+            charge_payload(&mut gas, body.len())?;
             let output: Vec<u8> = (body,).abi_encode_params();
 
             // POST-only state effects: burn any residual precompile
@@ -676,21 +740,7 @@ where
             // intentionally skipped on GET — for which the entry is
             // read-only end-to-end.
             if !is_get {
-                if !amount.is_zero() {
-                    let mut account_load = context
-                        .journal_mut()
-                        .load_account_mut_skip_cold_load(
-                            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
-                            true,
-                        )
-                        .map_err(|_| {
-                            CustomPrecompileError::Revert(
-                                "failed to load precompile account".into(),
-                                gas,
-                            )
-                        })?;
-                    account_load.data.set_balance(U256::ZERO);
-                }
+                burn_gateway_residual(context, &mut gas)?;
 
                 let crac_log = Log {
                     address: RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
@@ -713,21 +763,9 @@ where
         }
     }
 
-    if !inputs.value.get().is_zero() {
-        // The value was bridged to Tezos — erase it from the precompile's
-        // EVM balance. set_balance records a BalanceChange journal entry so
-        // this is properly reverted if the enclosing call frame reverts.
-        let mut account_load = context
-            .journal_mut()
-            .load_account_mut_skip_cold_load(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS, true)
-            .map_err(|_| {
-                CustomPrecompileError::Revert(
-                    "failed to load precompile account".into(),
-                    gas,
-                )
-            })?;
-        account_load.data.set_balance(U256::ZERO);
-    }
+    // The value (if any) was bridged to Tezos — erase any residual
+    // balance from the precompile.
+    burn_gateway_residual(context, &mut gas)?;
 
     Ok(InterpreterResult {
         result: InstructionResult::Return,

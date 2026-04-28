@@ -121,6 +121,12 @@ pub fn parse_tez_to_mutez(s: &str) -> Result<u64, TezosXRuntimeError> {
 }
 
 fn format_tez_amount(amount: U256, decimals: usize) -> String {
+    // Short-circuit the common case: every gateway call that does not
+    // transfer value ends up formatting `0`. Skipping the divmod +
+    // `format!` avoids a handful of allocations on the hot path.
+    if amount.is_zero() {
+        return "0".to_string();
+    }
     let divisor = U256::exp10(decimals);
     let integer_part = amount / divisor;
     let remainder = amount % divisor;
@@ -139,6 +145,12 @@ fn format_tez_amount(amount: U256, decimals: usize) -> String {
 fn parse_tez_amount(s: &str, decimals: usize) -> Result<U256, String> {
     if s.is_empty() {
         return Err("empty amount string".to_string());
+    }
+    // Short-circuit the canonical zero — skips the whole divmod/parse
+    // path on the common `"0"` case emitted by `format_tez_amount` for
+    // value-less gateway calls.
+    if s == "0" {
+        return Ok(U256::zero());
     }
     if s.bytes()
         .any(|b| b == b' ' || b == b'\t' || b == b'\n' || b == b'\r')

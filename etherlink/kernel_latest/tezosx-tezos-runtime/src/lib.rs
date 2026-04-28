@@ -678,6 +678,39 @@ where
     }
 }
 
+// --- Alias generation gas constants (milligas) ---
+//
+// Alias generation runs inside an existing CRAC frame: the outer
+// transaction has already paid the manager-operation envelope (e.g.
+// EVM's 21,000-gas baseline), and the forwarder script is
+// kernel-supplied bytes written verbatim — no MIR decode or typecheck
+// is invoked. So the cost here only accounts for the BLAKE2b digest
+// and the durable writes performed by `account.init` and
+// `set_balance`. The origination storage-burn is handled separately.
+
+/// BLAKE2b-160 of the native address. Derived from the Tezos protocol
+/// schedule: `430 + (size/8 + size)` milligas.
+const ALIAS_BLAKE2B_DIGEST_MILLIGAS: u64 = 477;
+
+/// Fixed overhead for a single durable-store write (independent of
+/// payload size): path resolution, PVM host call boundary, journal
+/// bookkeeping.
+///
+/// TODO(L2-1165): replace with a benchmarked value from `octez-snoop`.
+const DURABLE_WRITE_BASE_MILLIGAS: u64 = 2_000;
+
+/// Per-byte cost for a durable-store write. `account.init` performs
+/// four writes (code, storage, paid_bytes, used_bytes); `set_balance`
+/// adds a fifth. This scales each of them with its payload size rather
+/// than charging a flat constant.
+///
+/// TODO(L2-1165): replace with a benchmarked value from `octez-snoop`.
+const DURABLE_WRITE_PER_BYTE_MILLIGAS: u64 = 400;
+
+/// Approximate size of the serialized `Narith` balance (`0u64` →
+/// 1 byte of payload plus encoding overhead).
+const BALANCE_WRITE_BYTES: u64 = 8;
+
 impl RuntimeInterface for TezosRuntime {
     fn generate_alias<Host>(
         &self,
@@ -703,33 +736,41 @@ impl RuntimeInterface for TezosRuntime {
             Ok(())
         };
 
-        // BLAKE2b-160 hash: 430 + (size/8 + size) milligas
-        consume(477)?;
+        // BLAKE2b-160 of the native address.
+        consume(ALIAS_BLAKE2B_DIGEST_MILLIGAS)?;
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(native_address.as_bytes()));
 
-        // Context load + account lookup
-        consume(2_100)?; // cold storage read
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let account = context.originated_from_kt1(&kt1)?;
 
-        // Decode forwarder code
         let code = alias_forwarder::forwarder_code().map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to decode forwarder code from hex: {e}"
             ))
         })?;
         let storage = alias_forwarder::forwarder_storage(native_address);
+        let payload_bytes = (code.len() as u64).saturating_add(storage.len() as u64);
 
-        // Contract init: code + storage writes
-        consume(100_000)?; // manager_operation overhead + origination
+        // Durable writes performed by `account.init`: code, storage,
+        // paid_bytes, used_bytes. Charge a per-write base plus a
+        // per-byte component sized by the actual payload.
+        consume(
+            DURABLE_WRITE_BASE_MILLIGAS
+                .saturating_mul(4)
+                .saturating_add(
+                    DURABLE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(payload_bytes),
+                ),
+        )?;
         account.init(host, &code, &storage).map_err(|e| {
             TezosXRuntimeError::Custom(format!(
                 "Failed to initialize alias forwarder contract: {e}"
             ))
         })?;
 
-        // Balance write
-        consume(2_560)?; // storage write
+        // Balance write (5th durable write of the origination).
+        consume(DURABLE_WRITE_BASE_MILLIGAS.saturating_add(
+            DURABLE_WRITE_PER_BYTE_MILLIGAS.saturating_mul(BALANCE_WRITE_BYTES),
+        ))?;
         account.set_balance(host, &0u64.into()).map_err(|e| {
             TezosXRuntimeError::Custom(format!("Failed to set alias balance: {e}"))
         })?;

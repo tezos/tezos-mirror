@@ -13,7 +13,7 @@ use mir::{
     context::CtxTrait,
 };
 use num_bigint::{BigInt, BigUint};
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -175,6 +175,9 @@ where
                 charge_gateway_base_cost(ctx)?;
                 let (dest, method_sig, abi_params, callback) =
                     extract_call_params(typed)?;
+                // Per-byte surcharge: calldata (selector+params) going
+                // out; response body is charged after it's returned.
+                charge_gateway_payload(ctx, 4 + abi_params.len())?;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(SELECTOR_COMPUTATION_MILLIGAS)
                     .map_err(|_| TransferError::OutOfGas)?;
@@ -184,10 +187,13 @@ where
                 calldata.extend_from_slice(&abi_params);
                 let request = build_ethereum_request(&dest, &calldata)?;
                 let response_body = dispatch_crac_call(registry, journal, ctx, request)?;
+                charge_gateway_payload(ctx, response_body.len())?;
                 dispatch_callback(ctx, callback, response_body).map_err(Into::into)
             } else if entrypoint.as_str() == "call" {
                 charge_gateway_base_cost(ctx)?;
                 let (request, callback) = extract_http_call_request(typed)?;
+                // Per-byte surcharge: outgoing HTTP body.
+                charge_gateway_payload(ctx, request.body().len())?;
                 let num_user_headers = request.headers().len() as u64;
                 ctx.operation_gas()
                     .cast_and_consume_milligas(
@@ -196,6 +202,7 @@ where
                     )
                     .map_err(|_| TransferError::OutOfGas)?;
                 let body = dispatch_crac_call(registry, journal, ctx, request)?;
+                charge_gateway_payload(ctx, body.len())?;
                 dispatch_callback(ctx, callback, body).map_err(Into::into)
             } else if entrypoint.as_str() == "collect_result" {
                 // %collect_result lets a Michelson adapter deposit a
@@ -244,6 +251,7 @@ where
             let (evm_contract, addr_bytes, amount) =
                 extract_erc20_address_uint256_params(typed)?;
             let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
+            charge_gateway_payload(ctx, calldata.len())?;
             let request = build_ethereum_request(&evm_contract, &calldata)?;
             dispatch_crac_call(registry, journal, ctx, request)?;
             Ok(vec![])
@@ -258,12 +266,23 @@ where
 /// Micheline typechecking is metered separately by the MIR typechecker.
 const TEZOSX_GATEWAY_BASE_COST_MILLIGAS: u64 = 100_000;
 
+/// Per-byte surcharge on the flat base cost, charged at Tezos-as-caller
+/// gateway entrypoints (`%call`, `%call_evm`, ...) for the
+/// boundary work performed when bytes cross the CRAC: outgoing-body
+/// marshalling and incoming-response ingest (`Vec::to_vec`, header-map
+/// allocation, callback/selector assembly, ...).
+///
+/// TODO(L2-1165): replace with a benchmarked value.
+const TEZOSX_GATEWAY_PER_BYTE_MILLIGAS: u64 = 300;
+
 /// Surcharge when amount > 0 (balance reset after value transfer).
 /// Equivalent to SSTORE non-zero→zero (5,000 EVM gas × 100).
 const VALUE_TRANSFER_SURCHARGE_MILLIGAS: u64 = 500_000;
 
-/// Per user-supplied header validation in %call (string prefix check).
-const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 1_000;
+/// Per user-supplied header validation in %call: byte-level prefix
+/// check against forbidden X-Tezos-* headers plus the subsequent
+/// `HeaderMap` insertion (hash + bucket insert + potential rehash).
+const HEADER_VALIDATION_PER_HEADER_MILLIGAS: u64 = 10_000;
 
 /// Keccak256 selector computation in %call_evm.
 const SELECTOR_COMPUTATION_MILLIGAS: u64 = 2_000;
@@ -310,6 +329,22 @@ fn collect_result_size_cost(payload_len: usize) -> u64 {
 fn charge_gateway_base_cost(ctx: &mut impl HasOperationGas) -> Result<(), TransferError> {
     ctx.operation_gas()
         .cast_and_consume_milligas(TEZOSX_GATEWAY_BASE_COST_MILLIGAS)
+        .map_err(|_| TransferError::OutOfGas)
+}
+
+/// Charge `TEZOSX_GATEWAY_PER_BYTE_MILLIGAS * bytes` for a chunk of
+/// gateway payload (outgoing body or response body). Complements the
+/// flat `charge_gateway_base_cost` with a size-proportional component.
+fn charge_gateway_payload(
+    ctx: &mut impl HasOperationGas,
+    bytes: usize,
+) -> Result<(), TransferError> {
+    let cost = TEZOSX_GATEWAY_PER_BYTE_MILLIGAS.saturating_mul(bytes as u64);
+    if cost == 0 {
+        return Ok(());
+    }
+    ctx.operation_gas()
+        .cast_and_consume_milligas(cost)
         .map_err(|_| TransferError::OutOfGas)
 }
 
@@ -528,7 +563,10 @@ fn build_http_request(
 
     let mut builder = http::Request::builder().method(http_method).uri(url);
     for (name, value) in headers {
-        if name.to_ascii_lowercase().starts_with("x-tezos-") {
+        // Zero-alloc case-insensitive prefix check (avoid the
+        // `to_ascii_lowercase()` `String` allocation per header).
+        let bytes = name.as_bytes();
+        if bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"x-tezos-") {
             return Err(TransferError::GatewayError(format!(
                 "{ERR_FORBIDDEN_TEZOS_HEADER}: {name}"
             )));
@@ -648,7 +686,8 @@ where
     // When sender == source (the common case for implicit account
     // transfers), pass the source pubkey so the alias is created with
     // the credential attached.
-    let sender_pubkey: Option<&[u8]> = if sender == source {
+    let sender_is_source = sender == source;
+    let sender_pubkey: Option<&[u8]> = if sender_is_source {
         Some(&source_public_key)
     } else {
         None
@@ -670,29 +709,39 @@ where
         .cast_and_consume_milligas(sender_milligas)
         .map_err(|_| TransferError::OutOfGas)?;
 
-    // --- source alias (same two-phase pattern) ---
-    ctx.operation_gas()
-        .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
-        .map_err(|_| TransferError::OutOfGas)?;
-    let remaining_milligas = ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
-    let target_budget = convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
-        .ok_or(TransferError::OutOfGas)?;
-    let (source_alias, source_target_consumed) = get_or_create_alias(
-        ctx.host(),
-        journal,
-        &source,
-        Some(&source_public_key),
-        context,
-        registry,
-        target_runtime,
-        target_budget,
-    )?;
-    let source_milligas =
-        convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
-            .ok_or(TransferError::OutOfGas)?;
-    ctx.operation_gas()
-        .cast_and_consume_milligas(source_milligas)
-        .map_err(|_| TransferError::OutOfGas)?;
+    // --- source alias ---
+    // Fast path: when sender == source (a user's implicit account calling
+    // the gateway directly), reuse the resolved alias and skip the second
+    // storage lookup. This saves one ALIAS_CACHE_HIT_MILLIGAS charge.
+    let source_alias = if sender_is_source {
+        sender_alias.clone()
+    } else {
+        ctx.operation_gas()
+            .cast_and_consume_milligas(ALIAS_CACHE_HIT_MILLIGAS)
+            .map_err(|_| TransferError::OutOfGas)?;
+        let remaining_milligas =
+            ctx.gas().milligas().ok_or(TransferError::OutOfGas)? as u64;
+        let target_budget =
+            convert_gas(RuntimeId::Tezos, target_runtime, remaining_milligas)
+                .ok_or(TransferError::OutOfGas)?;
+        let (source_alias, source_target_consumed) = get_or_create_alias(
+            ctx.host(),
+            journal,
+            &source,
+            Some(&source_public_key),
+            context,
+            registry,
+            target_runtime,
+            target_budget,
+        )?;
+        let source_milligas =
+            convert_gas(target_runtime, RuntimeId::Tezos, source_target_consumed)
+                .ok_or(TransferError::OutOfGas)?;
+        ctx.operation_gas()
+            .cast_and_consume_milligas(source_milligas)
+            .map_err(|_| TransferError::OutOfGas)?;
+        source_alias
+    };
     // Convert remaining Tezos milligas to the target runtime's units.
     // Use current remaining gas (not the pre-alias tezos_gas_limit) so the
     // forwarded limit reflects gas already consumed by alias resolution.
@@ -888,12 +937,6 @@ where
         return Err(TransferError::GatewayError("Negative amount".into()).into());
     }
 
-    if ctx.amount() > 0 {
-        ctx.operation_gas()
-            .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
-            .map_err(|_| TransferError::OutOfGas)?;
-    }
-
     let target_host = request.uri().host().map(str::to_string);
     let request = inject_context_headers(request, ctx, journal, registry)?;
 
@@ -906,11 +949,24 @@ where
 
     // Debit the gateway: after a successful call, the gateway
     // forwarded the funds to EVM so its balance should be reset to 0.
+    // Skip both the durable write and the value-transfer surcharge
+    // when the balance is already zero — no state change will occur.
     let account = ctx.contract_account().clone();
-    let host = ctx.host();
-    account
-        .set_balance(host, &0u64.into())
-        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    let current = {
+        let host = ctx.host();
+        account
+            .balance(host)
+            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?
+    };
+    if !current.0.is_zero() {
+        ctx.operation_gas()
+            .cast_and_consume_milligas(VALUE_TRANSFER_SURCHARGE_MILLIGAS)
+            .map_err(|_| TransferError::OutOfGas)?;
+        let host = ctx.host();
+        account
+            .set_balance(host, &0u64.into())
+            .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    }
     Ok(response_body)
 }
 
