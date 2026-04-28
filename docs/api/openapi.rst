@@ -45,9 +45,23 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - `rpc-openapi <../_static/rpc-openapi.html>`__ (version 24.4)
+- `rpc-openapi-beta <../_static/rpc-openapi-beta.html>`__ (version 25.0~beta1)
 - `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
+
+Ushuaia RPCs
+------------
+
+The OpenAPI specifications for RPCs which are specific to the Ushuaia (``PsUshuai``)
+protocol proposal can be found at:
+
+- `ushuaia-openapi-beta <../_static/ushuaia-openapi-beta.html>`__ (version 25.0~beta1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Ushuaia protocol proposal can be found at:
+
+- `ushuaia-mempool-openapi-beta <../_static/ushuaia-mempool-openapi-beta.html>`__ (version 25.0~beta1)
 
 Tallinn RPCs
 ------------
@@ -56,11 +70,13 @@ The OpenAPI specifications for RPCs which are specific to the Tallinn (``PtTALLi
 protocol can be found at:
 
 - `tallinn-openapi <../_static/tallinn-openapi.html>`__ (version 24.4)
+- `tallinn-openapi-beta <../_static/tallinn-openapi-beta.html>`__ (version 25.0~beta1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Tallinn protocol proposal can be found at:
 
 - `tallinn-mempool-openapi <../_static/tallinn-mempool-openapi.html>`__ (version 24.4)
+- `tallinn-mempool-openapi-beta <../_static/tallinn-mempool-openapi-beta.html>`__ (version 25.0~beta1)
 
 Alpha RPCs
 ----------
@@ -85,6 +101,14 @@ seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
+Ushuaia RPCs
+------------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Ushuaia
+(``PsUshuai``) protocol proposal can be found at:
+
+- `ushuaia-smart-rollup-node-openapi-beta <../_static/ushuaia-smart-rollup-node-openapi-beta.html>`__ (version 25.0~beta1)
+
 Tallinn RPCs
 ------------
 
@@ -92,6 +116,7 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Tallinn
 (``PtTALLiN``) protocol proposal can be found at:
 
 - `tallinn-smart-rollup-node-openapi <../_static/tallinn-smart-rollup-node-openapi.html>`__ (version 24.4)
+- `tallinn-smart-rollup-node-openapi-beta <../_static/tallinn-smart-rollup-node-openapi-beta.html>`__ (version 25.0~beta1)
 
 Alpha RPCs
 ----------
@@ -110,6 +135,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 24.4)
+- `dal-node-openapi-beta <../_static/dal-node-openapi-beta.html>`__ (version 25.0~beta1)
 - `dal-node-openapi <../_static/dal-node-openapi-dev.html>`__ (version master)
 
 .. _openapi_generate:
