@@ -929,7 +929,7 @@ where
                 // revert: restore the snapshot
                 journal
                     .michelson
-                    .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
+                    .checkpoint_revert(tc_ctx.host, checkpoint_index)
                     .map_err(|e| CracTransferError::from(gw(e)))?;
                 internal_receipts
                     .iter_mut()
@@ -950,7 +950,7 @@ where
         Err(e) => {
             journal
                 .michelson
-                .checkpoint_revert(tc_ctx.host, &world_state, checkpoint_index)
+                .checkpoint_revert(tc_ctx.host, checkpoint_index)
                 .map_err(|e| CracTransferError::from(gw(e)))?;
             internal_receipts
                 .iter_mut()
