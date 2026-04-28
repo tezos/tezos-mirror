@@ -1108,7 +1108,7 @@ module Chain = struct
       head_header
       seed
 
-  let compute_locator chain_store ?(max_size = 200) head seed =
+  let compute_locator chain_store ?(max_size = max_locator_size) head seed =
     let open Lwt_syntax in
     let* caboose, _caboose_level = caboose chain_store in
     Block_locator.compute
