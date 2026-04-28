@@ -27,52 +27,61 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-(* ACL for public (non-loopback) RPC binds: allow all read-only DAL endpoints
-   while blocking mutating ones (PATCH /profiles, POST /slots, p2p management). *)
+(* Build an ACL matcher from a service definition. The HTTP method and path
+   are derived from the service itself, so a path or method change in
+   [Services] is automatically reflected in the ACL. Path arguments [<arg>]
+   become wildcards [*], and a final [add_final_args] segment becomes [**]. *)
+let matcher_of_service service =
+  let meth =
+    Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
+  in
+  let to_acl_segment seg =
+    let n = String.length seg in
+    if n >= 3 && seg.[0] = '<' && seg.[n - 2] = '>' && seg.[n - 1] = '*' then
+      "**"
+    else if n >= 2 && seg.[0] = '<' && seg.[n - 1] = '>' then "*"
+    else seg
+  in
+  let path =
+    Tezos_rpc.Service.path service
+    |> Tezos_rpc.Path.to_segments |> List.map to_acl_segment
+    |> String.concat "/"
+  in
+  RPC_server.Acl.parse (Format.sprintf "%s /%s" meth path)
+
+(* ACL for public (non-loopback) RPC binds: allow read-only DAL endpoints
+   while blocking mutating ones (PATCH /profiles, POST /slots, p2p management).
+   Entries are derived from [Services] so paths/methods stay in sync with the
+   route declarations. To expose a new read-only endpoint here, add the
+   corresponding [Services.*] reference below. *)
 let dal_secure =
-  RPC_server.Acl.(
-    Deny_all
-      {
-        except =
-          List.map
-            parse
-            [
-              "GET /health";
-              "GET /synchronized";
-              "GET /monitor/synchronized";
-              "GET /last_processed_level";
-              "GET /protocol_parameters";
-              "GET /profiles";
-              "GET /profiles/*/attested_levels/*/assigned_shard_indices";
-              "GET /profiles/*/attested_levels/*/attestable_slots";
-              "GET /profiles/*/monitor/attestable_slots";
-              "GET /published_levels/*/known_traps";
-              "GET /levels/*/slots/*/content";
-              "GET /levels/*/slots/*/pages";
-              "GET /levels/*/slots/*/pages/*/proof";
-              "GET /levels/*/slots/*/commitment";
-              "GET /levels/*/slots/*/status";
-              "GET /levels/*/slots/*/shards/*/content";
-              "GET /version";
-              "GET /p2p/points";
-              "GET /p2p/points/info";
-              "GET /p2p/points/by-id/*";
-              "GET /p2p/peers";
-              "GET /p2p/peers/info";
-              "GET /p2p/peers/by-id/*";
-              "GET /p2p/gossipsub/mesh";
-              "GET /p2p/gossipsub/topics";
-              "GET /p2p/gossipsub/topics/peers";
-              "GET /p2p/gossipsub/fanout";
-              "GET /p2p/gossipsub/slot_indexes/peers";
-              "GET /p2p/gossipsub/pkhs/peers";
-              "GET /p2p/gossipsub/connections";
-              "GET /p2p/gossipsub/reconnection_delays";
-              "GET /p2p/gossipsub/scores";
-              "GET /p2p/gossipsub/backoffs";
-              "GET /p2p/gossipsub/message_cache";
-            ];
-      })
+  let mk = matcher_of_service in
+  RPC_server.Acl.Deny_all
+    {
+      except =
+        [
+          mk Services.health;
+          mk Services.synchronized;
+          mk Services.monitor_synchronized;
+          mk Services.get_last_processed_level;
+          mk Services.get_protocol_parameters;
+          mk Services.get_profiles;
+          mk Services.get_assigned_shard_indices;
+          mk Services.get_attestable_slots;
+          mk Services.monitor_attestable_slots;
+          mk Services.get_traps;
+          mk Services.get_slot_content;
+          mk Services.get_slot_pages;
+          mk Services.get_slot_page_proof;
+          mk Services.get_slot_commitment;
+          mk Services.get_slot_status;
+          mk Services.get_slot_shard;
+          mk Services.version;
+          (* Plugin endpoints are mounted dynamically under /plugin and are
+             read-only (skip-list cell lookups); allow any GET below /plugin. *)
+          RPC_server.Acl.parse "GET /plugin/**";
+        ];
+    }
 
 let call_handler1 handler = handler () |> Errors.to_option_tzresult
 
@@ -885,18 +894,15 @@ let start configuration ctxt =
   let rpc_addr = fst rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  let acl =
-    if Ipaddr.V6.scope rpc_addr = Ipaddr.Interface then RPC_server.Acl.allow_all
-    else dal_secure
-  in
+  let is_public = Ipaddr.V6.scope rpc_addr <> Ipaddr.Interface in
+  let acl = if is_public then dal_secure else RPC_server.Acl.allow_all in
   let server =
     RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
   in
   Lwt.catch
     (fun () ->
       let* () =
-        if Ipaddr.V6.scope rpc_addr <> Ipaddr.Interface then
-          Event.emit_rpc_addr_is_public ~rpc_addr:host
+        if is_public then Event.emit_rpc_addr_is_public ~rpc_addr:host
         else Lwt.return_unit
       in
       let* () =
