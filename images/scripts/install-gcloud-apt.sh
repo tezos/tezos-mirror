@@ -1,17 +1,45 @@
 #!/bin/sh
 
-# Install depedendencies to use gsutils
+# Install dependencies to use gsutils
 
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y gpg curl
+apt-get install -y curl
 
-# Install google-cloud-cli so we can upload packages to the Google Cloud Storage bucket.
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg |
-  gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+ARCH=$(uname -m)
+case "$ARCH" in
+x86_64) GCLOUD_ARCH="x86_64" ;;
+aarch64) GCLOUD_ARCH="arm" ;;
+*)
+  echo "Unsupported architecture: $ARCH" >&2
+  exit 1
+  ;;
+esac
 
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+BASE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads"
+TARBALL="google-cloud-cli-linux-${GCLOUD_ARCH}.tar.gz"
 
-apt-get update
-apt-get --no-install-recommends -y install google-cloud-cli
+curl -fsSL "${BASE_URL}/${TARBALL}" -o "/tmp/${TARBALL}"
+
+EXPECTED=$(curl -fsSL "https://dl.google.com/dl/cloudsdk/release/sha256.txt" |
+  grep "downloads/${TARBALL}" | awk '{print $1}')
+if [ -z "$EXPECTED" ]; then
+  echo "Failed to fetch checksum for ${TARBALL}" >&2
+  exit 1
+fi
+
+ACTUAL=$(sha256sum "/tmp/${TARBALL}" | awk '{print $1}')
+if [ "$EXPECTED" != "$ACTUAL" ]; then
+  echo "Checksum verification failed for ${TARBALL}" >&2
+  echo "Expected: ${EXPECTED}" >&2
+  echo "Actual:   ${ACTUAL}" >&2
+  exit 1
+fi
+
+tar -xzC /usr/local/ -f "/tmp/${TARBALL}"
+rm "/tmp/${TARBALL}"
+
+/usr/local/google-cloud-sdk/install.sh --quiet --path-update false
+ln -sf /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
+ln -sf /usr/local/google-cloud-sdk/bin/gsutil /usr/local/bin/gsutil
