@@ -196,7 +196,7 @@
           NIX_LDFLAGS = pkgs.lib.optionalString pkgs.stdenv.isLinux "-z muldefs";
 
           # Clang with wasm32 target support for WASM kernel compilation.
-          CC_wasm_unknown_unknown = "${pkgs.llvmPackages.clang-unwrapped}/bin/clang";
+          CC_wasm32_unknown_unknown = "${pkgs.llvmPackages.clang-unwrapped}/bin/clang";
         };
 
         # This scope contains all Opam packages defined in this repository.
