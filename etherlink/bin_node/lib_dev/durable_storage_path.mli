@@ -12,26 +12,17 @@ open Ethereum_types
 
 type path = string
 
-module Tezlink : sig
-  val root : path
-
-  (** [/tezlink/context/contracts/index] — root of the Tezlink contracts
-      indexable storage. *)
-  val accounts_index : path
-end
-
-val tezlink_root : path
-
 val etherlink_root : path
 
 val etherlink_safe_root : path
 
-(** [/evm/world_state/contracts/index] — root of the Michelson contracts
-    indexable storage in the Etherlink world state. *)
+(** [/tez/tez_accounts/contracts/index] — root of the Michelson contracts
+    indexable storage. Standalone Tezlink and TezosX-mode KT1
+    originations both write here. *)
 val michelson_contracts_index : path
 
-(** [/evm/world_state/eth_accounts/tezos] — root of the Tezos ledger
-    accounts subtree. *)
+(** [/tez/tez_accounts/tezosx] — root of the TezosX projected accounts
+    and cross-runtime alias subtree. *)
 val michelson_ledger_root : path
 
 (** Root of the Michelson world-state keyspace ([/tez/world_state]). *)

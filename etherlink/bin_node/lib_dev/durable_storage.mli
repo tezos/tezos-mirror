@@ -82,7 +82,6 @@ type dir =
   | Evm_events
   | Transaction_receipts
   | Transaction_objects
-  | Michelson_runtime_accounts_index
   | Michelson_runtime_contracts_index
   | Michelson_runtime_ledger
 

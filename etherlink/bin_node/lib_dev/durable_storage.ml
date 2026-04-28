@@ -340,7 +340,6 @@ type dir =
   | Evm_events
   | Transaction_receipts
   | Transaction_objects
-  | Michelson_runtime_accounts_index
   | Michelson_runtime_contracts_index
   | Michelson_runtime_ledger
 
@@ -358,8 +357,6 @@ let resolve_dir : dir -> resolved_dir = function
       Static_dir Durable_storage_path.Transaction_receipt.receipts
   | Transaction_objects ->
       Static_dir Durable_storage_path.Transaction_object.objects
-  | Michelson_runtime_accounts_index ->
-      Static_dir Durable_storage_path.Tezlink.accounts_index
   | Michelson_runtime_contracts_index ->
       Static_dir Durable_storage_path.michelson_contracts_index
   | Michelson_runtime_ledger ->

@@ -281,23 +281,14 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
       make_instr
         ~path_prefix:
           [
-            "evm";
-            "world_state";
-            "eth_accounts";
-            "tezos";
+            "tez";
+            "tez_accounts";
+            "tezosx";
             Signature.V2.Public_key_hash.to_b58check address;
           ]
         (Some ("info", Bytes.to_string payload))
       @ make_instr
-          ~path_prefix:
-            [
-              "evm";
-              "world_state";
-              "eth_accounts";
-              "tezosx";
-              "native";
-              "ethereum";
-            ]
+          ~path_prefix:["tez"; "tez_accounts"; "tezosx"; "native"; "ethereum"]
           (Some ("0x" ^ alias, rlp_address)))
     tez_bootstrap_accounts
   |> List.flatten
@@ -317,10 +308,7 @@ let make_tezos_bootstrap_contracts_instr tez_bootstrap_balance contracts =
          in
 
          let path_prefix =
-           Durable_storage_path.michelson_contracts_index ^ "/"
-           ^ Tezlink_durable_storage.Path.to_path
-               Tezos_types.Contract.encoding
-               address
+           Tezlink_durable_storage.Path.account address
            |> String.split_on_char '/' |> clean_path
          in
 

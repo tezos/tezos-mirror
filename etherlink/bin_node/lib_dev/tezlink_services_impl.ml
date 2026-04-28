@@ -105,7 +105,7 @@ let make (ctxt : Evm_ro_context.t) =
     let list_contracts chain block =
       let open Lwt_result_syntax in
       let `Main = chain in
-      let+ contracts_keys = subkeys ~block Michelson_runtime_accounts_index in
+      let+ contracts_keys = subkeys ~block Michelson_runtime_contracts_index in
       List.filter_map
         (fun k ->
           let open Option_syntax in

@@ -14,14 +14,6 @@ type path = string
 
 let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
-module Tezlink = struct
-  let root = "/tezlink"
-
-  let accounts_index = root ^ "/context/contracts/index"
-end
-
-let tezlink_root = Tezlink.root
-
 module BASE = struct
   let root = "/base"
 
@@ -103,9 +95,9 @@ let etherlink_root = World_state.make ""
 
 let etherlink_safe_root = "/tmp" ^ World_state.make ""
 
-let michelson_contracts_index = etherlink_root ^ "/contracts/index"
+let michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
-let michelson_ledger_root = World_state.make "/eth_accounts/tezos"
+let michelson_ledger_root = "/tez/tez_accounts/tezosx"
 
 let tez_world_state_root = TEZ.World_state.root
 
@@ -117,7 +109,12 @@ let tezosx_tezos_blocks_root = TEZ.World_state.make "/tez_blocks"
 let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
   match chain_family with
   | L2_types.EVM -> etherlink_root
-  | L2_types.Michelson -> tezlink_root
+  (* TezosX and standalone Tezlink both store Michelson block data at
+     /tez/world_state/tez_blocks (= tezosx_tezos_blocks_root). This is
+     the root the kernel passes to [block_storage::store_current] for
+     Michelson blocks, see [MichelsonChainConfig::finalize_and_store]
+     and [BlockInProgress::finalize_and_store]. *)
+  | L2_types.Michelson -> tezosx_tezos_blocks_root
 
 let chain_id = EVM.make "/chain_id"
 

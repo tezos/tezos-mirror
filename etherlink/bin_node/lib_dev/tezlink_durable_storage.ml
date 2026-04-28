@@ -7,7 +7,10 @@
 (*****************************************************************************)
 open Tezos_types
 
-let root = Durable_storage_path.tezlink_root
+(* Root for Michelson block storage (indexes/blocks, blocks/{hash}).
+   Contracts and big_map live under a different keyspace,
+   [/tez/tez_accounts/...], see [Path] below. *)
+let root = Durable_storage_path.tezosx_tezos_blocks_root
 
 type implicit_account_data_model =
   | Rlp
@@ -29,9 +32,9 @@ module Path = struct
     let (`Hex s) = Hex.of_bytes raw_key in
     s
 
-  let accounts_index = Durable_storage_path.Tezlink.accounts_index
+  let accounts_index = Durable_storage_path.michelson_contracts_index
 
-  let big_map = "/tezlink/context/big_map"
+  let big_map = "/tez/tez_accounts/big_map"
 
   let account contract =
     accounts_index ^ "/" ^ to_path Contract.encoding contract
@@ -46,13 +49,14 @@ module Path = struct
 
   let code contract = account contract ^ "/data/code"
 
-  (** Path to a specific big_map: /tezlink/context/big_map/{id} *)
+  (** Path to a specific big_map: /tez/tez_accounts/big_map/{id} *)
   let big_map_id id =
     big_map ^ "/"
     ^ Z.to_string (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
 
-  (** Path to a big_map value: /tezlink/context/big_map/{id}/{key_hash_hex}
-      where key_hash_hex is the hex encoding of the raw Script_expr_hash bytes *)
+  (** Path to a big_map value:
+      /tez/tez_accounts/big_map/{id}/{key_hash_hex} where
+      key_hash_hex is the hex encoding of the raw Script_expr_hash bytes *)
   let big_map_value id key_hash =
     let raw_hash =
       Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
@@ -73,11 +77,7 @@ let balance state ~data_model (c : Contract.t) =
   | Rlp -> (
       match c with
       | Originated _ -> (
-          let path =
-            Durable_storage_path.michelson_contracts_index ^ "/"
-            ^ Path.to_path Tezos_types.Contract.encoding c
-            ^ "balance"
-          in
+          let path = Path.balance c in
           let* bytes_opt = Durable_storage.read_opt (Raw_path path) state in
           match bytes_opt with
           | Some bytes -> (
