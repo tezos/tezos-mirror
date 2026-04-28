@@ -26,7 +26,7 @@ ENV PATH=/usr/local/bin:$PATH
 
 #hadolint ignore=DL3008,DL3015
 RUN apt-get update && \
-  apt-get -y install curl jq gpg && \
+  apt-get -y install --no-install-recommends ca-certificates curl jq gpg && \
   apt-get clean && \
   /tmp/install-gcloud-apt.sh && \
   rm -rf /var/lib/apt/lists/* && \
