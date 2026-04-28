@@ -618,54 +618,74 @@ We can finally test our two RPCs to query the counter values.
    111
 
 The node’s trace is similar to the one presented in the previous
-part. What we see in addition are three chunks of output of the form:
+part. What we see in addition are three chunks of output (one per
+injected operation) of the form:
 
 ::
 
-   Nov 24 10:19:15.108 NOTICE │ demo-counter: begin_validation (partial_construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:19:15.108 NOTICE │ demo-counter: begin_application (partial_construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:19:15.108 NOTICE │ demo-counter: apply_operation
-   Nov 24 10:19:15.109 NOTICE │ operation
-   Nov 24 10:19:15.109 NOTICE │   opBuK7iL6HTasNSgWB6gaTax5et1FyAAjY3piLqeDy4UfvkKdH9
-   Nov 24 10:19:15.109 NOTICE │   injected
+   ... NOTICE | demo-counter: begin_validation (partial_construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: begin_application (partial_construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | operation opBuK7iL... injected
 
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: begin_validation (construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.792 NOTICE │ block at level 3 successfully pre-applied in
-   Nov 24 10:20:39.792 NOTICE │   371us
+These traces are produced when ``Client_proto_commands.inject_op`` calls
+``Demo_block_services.Helpers.Preapply.operations`` (which enters
+``partial_construction`` mode and runs both the validation and
+application pipelines on the operation) and then
+``Shell_services.Injection.operation`` (which injects the operation into
+the mempool).
 
-The first 6 lines correspond to the call
-``Demo_block_services.Helpers.Preapply.operations cctxt [op]`` and the
-next 3 lines to the call ``Shell_services.Injection.operation`` (both
-calls triggered by ``Client_proto_commands.inject_op``). Finally, when
-the last block is created, we see the following output:
+When the block is baked, we see two phases. First, the pre-apply phase
+(triggered by ``Demo_block_services.Helpers.Preapply.block``) runs the
+protocol in **construction mode**, interleaving ``validate_operation``
+and ``apply_operation`` for each of the three operations:
 
 ::
 
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: begin_application (construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: apply_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: apply_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: apply_operation
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: finalize_validation: fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.792 NOTICE │ demo-counter: finalize_application: fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: begin_validation (construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: begin_application (construction mode): pred_fitness = ff::00::00::00::0000000000000002  constructed fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: finalize_validation: fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: finalize_application: fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | block at level 3 successfully pre-applied in 371us
 
-   Nov 24 10:20:39.793 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.793 NOTICE │ demo-counter: begin_validation (application mode): pred_fitness = ff::00::00::00::0000000000000002  block_fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.793 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.793 NOTICE │ demo-counter: validate_operation
-   Nov 24 10:20:39.793 NOTICE │ demo-counter: finalize_validation: fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.795 NOTICE │ demo-counter: Mempool.init: head fitness = ff::00::00::00::0000000000000003
-   Nov 24 10:20:39.795 NOTICE │ head is now
-   Nov 24 10:20:39.795 NOTICE │   BLcidYLQJfMVqrp2x7GdxVwDdrhzy9reKo5FjNk6jNiMHPMTjSp
-   Nov 24 10:20:39.795 NOTICE │   (3)
+Then, the injection phase (triggered by
+``Shell_services.Injection.block``) runs the block through
+**application mode** with the split validation/application model. The
+validation pipeline runs first (``begin_validation``, all
+``validate_operation`` calls, ``finalize_validation``), followed by the
+application pipeline (``begin_application``, all ``apply_operation``
+calls, ``finalize_application``). Finally, ``Mempool.init`` is called
+for the new head:
 
-Here again, the chunks can be seen as being composed of two parts, one
-for ``Demo_block_services.Helpers.Preapply.block`` and one for
-``Shell_services.Injection.block``. In each of the parts
-``apply_operation`` is called three times, once for each operation
-included in the block.
+::
+
+   ... NOTICE | demo-counter: begin_validation (application mode): pred_fitness = ff::00::00::00::0000000000000002  block_fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: validate_operation
+   ... NOTICE | demo-counter: finalize_validation: fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: begin_application (application mode): pred_fitness = ff::00::00::00::0000000000000002  block_fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: apply_operation
+   ... NOTICE | demo-counter: finalize_application: fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | demo-counter: Mempool.init: head fitness = ff::00::00::00::0000000000000003
+   ... NOTICE | head is now BLcidY... (3)
+
+Notice how in **construction mode** (pre-apply), validation and
+application are interleaved per operation, while in **application mode**
+(injection), the validation pipeline runs entirely before the
+application pipeline starts. This split is the key difference introduced
+by the validation/application model: during injection, the shell can
+validate the block cheaply, advertise it to peers, and only then proceed
+to the more expensive application phase.
 
 This scenario can be reproduced using the following Tezt test.
 It launches a node, and runs the client commands to activate the
