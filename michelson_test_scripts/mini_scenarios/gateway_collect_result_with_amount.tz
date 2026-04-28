@@ -1,0 +1,25 @@
+# Calls the TezosXGateway enshrined contract's %collect_result entrypoint
+# with a fixed payload AND a non-zero amount (1 mutez), to verify that the
+# kernel rejects any value transfer on %collect_result.  The contract must
+# be originated with [init_balance >= 1] so the TRANSFER_TOKENS step is not
+# blocked by BalanceTooLow before the kernel's amount check runs.
+# Storage: pair address bytes
+#   address = gateway KT1
+#   bytes   = payload to deposit via %collect_result
+parameter unit;
+storage (pair address bytes);
+code {
+       CDR;
+       DUP;
+       UNPAIR;
+       CONTRACT %collect_result bytes;
+       ASSERT_SOME;
+       SWAP;
+       PUSH mutez 1;
+       SWAP;
+       TRANSFER_TOKENS;
+       NIL operation;
+       SWAP;
+       CONS;
+       PAIR
+     };
