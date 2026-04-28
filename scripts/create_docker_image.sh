@@ -276,6 +276,11 @@ fi
 # ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
 # to build L2 binaries.
 #
+# [--allow network.host] is unconditional even though it is only
+# needed for [sccache]. Indeed build.Dockerfile has [RUN
+# --network=host]. Cf. also the matching comment in build.Dockerfile
+# for more details.
+#
 echo "### Building tezos..."
 
 docker buildx build \
@@ -288,7 +293,7 @@ docker buildx build \
   --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
   ${sccache_bucket:+--build-arg "SCCACHE_GCS_BUCKET=${sccache_bucket}"} \
-  ${sccache_bucket:+--allow network.host} \
+  --allow network.host \
   --target "$docker_target" \
   --tag "$build_image_name:$image_version" \
   -f build.Dockerfile \
