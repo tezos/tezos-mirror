@@ -4,9 +4,6 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y curl
-
 ARCH=$(uname -m)
 case "$ARCH" in
 x86_64) GCLOUD_ARCH="x86_64" ;;
