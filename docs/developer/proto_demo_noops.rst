@@ -652,42 +652,63 @@ We can look at the newly created block:
          "max_block_header_length": 100, "max_operation_list_length": [] },
      "operations": [] }
 
-For completeness, we show below the node’s trace::
+For completeness, we show below the node’s trace at startup::
 
-   Generating a new identity... (level: 0.00)
-   Stored the new identity (idrwY8MRTyKLQ45f8Hx1VP7pLvEU19) into '/var/folders/wq/63lgkbp565dgl109gqkxwh000000gn/T/tezos-node.XXXXXXXX.5LIf6DdGdT/identity.json'.
-   Nov 24 13:56:37.284 NOTICE │ the node configuration has been successfully
-   Nov 24 13:56:37.284 NOTICE │   validated.
-   Nov 24 13:56:37.285 NOTICE │ read identity file
-   Nov 24 13:56:37.285 NOTICE │ starting the Octez node 21.0~rc3+dev (e1573177)
-   Nov 24 13:56:37.383 NOTICE │ disabled local peer discovery
-   Nov 24 13:56:37.384 NOTICE │ p2p initialization: bootstrapping
-   Nov 24 13:56:37.397 NOTICE │ p2p initialization: p2p_maintenance_started
-   Nov 24 13:56:37.809 NOTICE │ external validator initialized
-   Nov 24 13:56:37.809 NOTICE │ initializing irmin context at
-   Nov 24 13:56:37.809 NOTICE │   /var/folders/wq/63lgkbp565dgl109gqkxwh000000gn/T/tezos-node[...]
-   Nov 24 13:56:38.770 NOTICE │ activate chain NetXdQprcVkpaWU
-   Nov 24 13:56:38.770 NOTICE │ chain is bootstrapped
-   Nov 24 13:56:38.770 NOTICE │ synchronisation status: synced
-   Nov 24 13:56:38.771 NOTICE │ starting local RPC server on
-   Nov 24 13:56:38.771 NOTICE │   ::ffff:127.0.0.1:18731 (acl = AllowAll)
-   Nov 24 13:56:38.771 NOTICE │ the Tezos node is now running
+   Nov 24 13:56:37.284 NOTICE | the node configuration has been successfully
+   Nov 24 13:56:37.284 NOTICE |   validated.
+   Nov 24 13:56:37.285 NOTICE | read identity file
+   Nov 24 13:56:37.285 NOTICE | starting the Octez node 21.0~rc3+dev (e1573177)
+   Nov 24 13:56:37.383 NOTICE | disabled local peer discovery
+   Nov 24 13:56:37.384 NOTICE | p2p initialization: bootstrapping
+   Nov 24 13:56:37.397 NOTICE | p2p initialization: p2p_maintenance_started
+   Nov 24 13:56:37.809 NOTICE | external validator initialized
+   Nov 24 13:56:37.809 NOTICE | initializing irmin context at
+   Nov 24 13:56:37.809 NOTICE |   /tmp/tezos-node[...]
+   Nov 24 13:56:38.770 NOTICE | activate chain NetXdQprcVkpaWU
+   Nov 24 13:56:38.770 NOTICE | chain is bootstrapped
+   Nov 24 13:56:38.770 NOTICE | synchronisation status: synced
+   Nov 24 13:56:38.771 NOTICE | starting local RPC server on
+   Nov 24 13:56:38.771 NOTICE |   ::ffff:127.0.0.1:18731 (acl = AllowAll)
+   Nov 24 13:56:38.771 NOTICE | the Tezos node is now running
 
-After the protocol activation command, we further see the following output::
+After the protocol activation command, the shell-level traces show::
 
-   Nov 24 13:57:37.232 NOTICE │ initializing protocol ProtoDemoNoo...
-   Nov 24 13:57:37.233 NOTICE │ block at level 1 successfully pre-applied in 748us
-   Nov 24 13:57:37.237 NOTICE │ the protocol table was updated: protocol
-   Nov 24 13:57:37.237 NOTICE │   ProtoDemoNoo (level 1) was activated on block
-   Nov 24 13:57:37.237 NOTICE │   BLrgJzwN4M68uCCGrkYXRcKUqxpDewMWM1gxUwyZ7J8sgYZCuvZ
-   Nov 24 13:57:37.237 NOTICE │   (level 1)
-   Nov 24 13:57:37.237 NOTICE │ head is now
-   Nov 24 13:57:37.237 NOTICE │   BLrgJzwN4M68uCCGrkYXRcKUqxpDewMWM1gxUwyZ7J8sgYZCuvZ
-   Nov 24 13:57:37.237 NOTICE │   (1)
-   Nov 24 13:58:45.304 NOTICE │ block at level 2 successfully pre-applied in 568us
-   Nov 24 14:00:35.405 NOTICE │ head is now
-   Nov 24 14:00:35.405 NOTICE │   BKzSsYtHSxgPWgyw7YktHTrddzgGQgKr3bLAm3NjxwMCyrFR7qH
-   Nov 24 14:00:35.405 NOTICE │   (2)
+   Nov 24 13:57:37.232 NOTICE | initializing protocol ProtoDemoNoo...
+   Nov 24 13:57:37.233 NOTICE | block at level 1 successfully pre-applied in 748us
+   Nov 24 13:57:37.237 NOTICE | the protocol table was updated: protocol
+   Nov 24 13:57:37.237 NOTICE |   ProtoDemoNoo (level 1) was activated on block
+   Nov 24 13:57:37.237 NOTICE |   BLrgJzwN4M68uCCGrkYXRcKUqxpDewMWM1gxUwyZ7J8sgYZCuvZ
+   Nov 24 13:57:37.237 NOTICE |   (level 1)
+   Nov 24 13:57:37.237 NOTICE | head is now
+   Nov 24 13:57:37.237 NOTICE |   BLrgJzwN4M68uCCGrkYXRcKUqxpDewMWM1gxUwyZ7J8sgYZCuvZ
+   Nov 24 13:57:37.237 NOTICE |   (1)
+
+And when a block is baked::
+
+   Nov 24 13:58:45.304 NOTICE | block at level 2 successfully pre-applied in 568us
+   Nov 24 14:00:35.405 NOTICE | head is now
+   Nov 24 14:00:35.405 NOTICE |   BKzSsYtHSxgPWgyw7YktHTrddzgGQgKr3bLAm3NjxwMCyrFR7qH
+   Nov 24 14:00:35.405 NOTICE |   (2)
+
+.. note::
+
+   Unlike ``demo_counter`` (which uses ``Logging.log`` to produce
+   protocol-specific traces prefixed with ``demo-counter:``), the
+   ``demo_noops`` protocol has **no** ``Logging.log`` calls in its code.
+   Therefore, the only traces you will see come from the shell (the
+   validator and prevalidator subsystems), not from the protocol itself.
+
+   If you want more detailed traces from the shell, you can set the log
+   level using the ``TEZOS_LOG`` environment variable before starting the
+   node. For example::
+
+      TEZOS_LOG="validator:debug;prevalidator:debug" \
+        ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
+
+   This will show the validator and prevalidator subsystems calling into
+   the protocol’s ``begin_validation``, ``finalize_validation``,
+   ``begin_application``, and ``finalize_application`` functions, even
+   though the protocol itself remains silent.
 
 Protocol tests
 --------------
