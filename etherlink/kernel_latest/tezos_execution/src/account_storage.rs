@@ -11,7 +11,11 @@ use crate::{
     enshrined_contracts::{self, EnshrinedContracts},
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::{
+    enc::BinWriter,
+    nom::NomReader,
+    types::{Narith, Zarith},
+};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
     host::ValueType,
@@ -322,7 +326,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn set_paid_bytes(
         &self,
         host: &mut impl StorageV1,
-        paid: &Narith,
+        paid: &Zarith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::paid_bytes_path(self)?;
         store_bin(paid, host, &path)
@@ -331,7 +335,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn set_used_bytes(
         &self,
         host: &mut impl StorageV1,
-        used: &Narith,
+        used: &Zarith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::used_bytes_path(self)?;
         store_bin(used, host, &path)
