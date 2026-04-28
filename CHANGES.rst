@@ -65,6 +65,9 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Registered the missing handler for the ``/global/last_cemented_commitment``
+  RPC, which previously returned 404 even though the service was declared.
+
 Smart Rollup WASM Debugger
 --------------------------
 
