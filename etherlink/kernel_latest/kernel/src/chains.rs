@@ -1498,6 +1498,23 @@ impl ChainConfigTrait for MichelsonChainConfig {
         crate::apply::renumber_nonces(
             &mut block_in_progress.cumulative_tezos_operation_receipts.list,
         );
+        // Standalone Tezlink has no EVM txs, so `blueprint_hash` only
+        // commits to the Michelson ops and the timestamp. Kept in the
+        // same shape as the TezosX path so a future extension (e.g.
+        // delayed Tezlink ops) only needs to fill the empty vectors.
+        let michelson_commitment = crate::state_hash::michelson_ops_commitment(
+            &block_in_progress.cumulative_tezos_operation_receipts.list,
+        );
+        let blueprint_hash = crate::state_hash::blueprint_hash(
+            &[],
+            &[],
+            &michelson_commitment,
+            block_in_progress.timestamp,
+        );
+        let state_root =
+            crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
+                .try_into()
+                .expect("tez_accounts_state_hash must be 32 bytes");
         let tezblock = TezBlock::new(
             chain_header.next_protocol,
             TARGET_TEZOS_PROTOCOL,
@@ -1505,6 +1522,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.timestamp,
             block_in_progress.ethereum_parent_hash,
             block_in_progress.cumulative_tezos_operation_receipts.list,
+            state_root,
         )?;
         let new_block = L2Block::Tezlink(tezblock);
         crate::block_storage::store_current(host, &TEZ_BLOCKS_PATH, &new_block)

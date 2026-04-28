@@ -42,9 +42,7 @@
 //!
 //! The two per-runtime helpers share the same `blueprint_hash` argument
 //! so that, at a given level, both runtimes' state hashes diverge
-//! together. `tez_accounts_state_hash` will be wired into the Michelson
-//! block `state_root` in a follow-up; until then it is kept here so the
-//! EVM and Michelson formulas stay side-by-side in one place.
+//! together.
 
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 use sha3::{Digest, Keccak256};
@@ -123,9 +121,6 @@ pub fn evm_state_hash<Host: StorageV1>(
 
 /// Compute `keccak256(h(/tez/tez_accounts) || blueprint_hash)` and return
 /// it as a byte vector suitable for the Michelson block `state_root`.
-/// Not yet wired: the Michelson block type gains a `state_root` field in
-/// a follow-up commit.
-#[allow(dead_code)]
 pub fn tez_accounts_state_hash<Host: StorageV1>(
     host: &mut Host,
     blueprint_hash: &[u8; 32],

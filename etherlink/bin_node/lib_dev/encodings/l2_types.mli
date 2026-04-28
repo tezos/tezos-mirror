@@ -105,6 +105,11 @@ module Tezos_block : sig
     protocol : Protocol.t;
     next_protocol : Protocol.t;
     operations : bytes;
+    state_root : bytes;
+        (** Fixed 32 bytes.
+            [keccak256(h(/tez/tez_accounts) || blueprint_hash)]. A
+            block with an all-zero [state_root] pre-dates the feature
+            (V0/V1 upgrades fill zeros). *)
   }
 
   val decode_block_hash : bytes -> Ethereum_types.block_hash

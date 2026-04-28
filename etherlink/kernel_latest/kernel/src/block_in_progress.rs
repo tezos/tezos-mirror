@@ -547,6 +547,10 @@ impl BlockInProgress {
             };
             let mut tezos_ops = self.cumulative_tezos_operation_receipts.list;
             crate::apply::renumber_nonces(&mut tezos_ops);
+            let tez_state_root =
+                crate::state_hash::tez_accounts_state_hash(host, &blueprint_hash)
+                    .try_into()
+                    .expect("tez_accounts_state_hash must be 32 bytes");
             let tez_block = TezBlock::new(
                 protocol,
                 TARGET_TEZOS_PROTOCOL,
@@ -554,6 +558,7 @@ impl BlockInProgress {
                 self.timestamp,
                 self.tezos_parent_hash,
                 tezos_ops,
+                tez_state_root,
             )?;
             let new_header = TezBlockHeader {
                 hash: H256(*tez_block.hash),
