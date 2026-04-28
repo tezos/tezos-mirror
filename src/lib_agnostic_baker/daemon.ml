@@ -430,12 +430,18 @@ module Make_daemon (Agent : AGENT) :
      to determine when to switch to a new protocol baker process. *)
 
   let[@warning "-32"] may_start_profiler baking_dir =
-    match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+    let profiling_config =
+      Tezos_profiler_unix.Profiler_instance.read_profiling_config_from_base_dir
+        baking_dir
+    in
+    match
+      Tezos_profiler_unix.Profiler_instance.selected_backends ~profiling_config
+    with
     | Some backends ->
         List.iter
           (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
             let profiler_maker = instance_maker ~directory:baking_dir in
-            Agnostic_baker_profiler.init profiler_maker)
+            Agnostic_baker_profiler.init ~profiling_config profiler_maker)
           backends
     | None -> ()
 

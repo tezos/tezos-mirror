@@ -46,7 +46,7 @@ let dal_crypto_benchmark () =
     | Info | Debug -> "/dev/stdout"
     | _ -> Temp.file "profiler-output"
   in
-  let instance = Profiler.instance driver (file, Debug) in
+  let instance = Profiler.instance driver (file, Debug, 7) in
   Profiler.plug Profiler.main instance ;
   let ( let*? ) x f =
     match x with

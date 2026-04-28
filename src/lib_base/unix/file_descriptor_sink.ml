@@ -359,60 +359,6 @@ let make_for_syslog pp wrapped_event =
   (* Syslog is handling the formating. Only the message is printed. *)
   Format.asprintf "%a" (pp ~all_fields:false ~block:false) wrapped_event.event
 
-let day_of_the_year ts =
-  let today =
-    match Ptime.of_float_s ts with Some s -> s | None -> Ptime.min
-  in
-  let (y, m, d), _ = Ptime.to_date_time today in
-  (y, m, d)
-
-let string_of_day_of_the_year (y, m, d) = Format.sprintf "%d%02d%02d" y m d
-
-let check_file_format_with_date base_filename s =
-  let name_no_ext = Filename.remove_extension base_filename in
-  let ext = Filename.extension base_filename in
-  let open Re.Perl in
-  let re_ext = "(." ^ ext ^ ")?" in
-  let re_date = "-\\d{4}\\d{2}\\d{2}" in
-  let re = compile @@ re (name_no_ext ^ re_date ^ re_ext) in
-  Re.execp re s
-
-let%expect_test _ =
-  print_endline (Bool.to_string (check_file_format_with_date ".out" "a.out")) ;
-  [%expect {| false |}] ;
-  print_endline
-    (Bool.to_string
-       (check_file_format_with_date "some-name.log" "some-name-19991231.log")) ;
-  [%expect {| true |}] ;
-  print_endline
-    (Bool.to_string (check_file_format_with_date "hello." "hello-19991231.")) ;
-  [%expect {| true |}] ;
-  print_endline
-    (Bool.to_string (check_file_format_with_date ".log" "19991231.log")) ;
-  [%expect {| false |}] ;
-  print_endline
-    (Bool.to_string
-       (check_file_format_with_date ".log.log" ".log-19991231.log")) ;
-  [%expect {| true |}] ;
-  print_endline
-    (Bool.to_string (check_file_format_with_date "file" "file-19991231")) ;
-  [%expect {| true |}] ;
-  ()
-
-let filename_insert_before_ext ~path s =
-  let ext = Filename.extension path in
-  let chopped = if ext = "" then path else Filename.chop_extension path in
-  Format.asprintf "%s-%s%s" chopped s ext
-
-let%expect_test _ =
-  print_endline (filename_insert_before_ext ~path:"foo.bar" "baz") ;
-  [%expect {| foo-baz.bar |}] ;
-  print_endline (filename_insert_before_ext ~path:"/tmp/log.out" "11") ;
-  [%expect {| /tmp/log-11.out |}] ;
-  print_endline (filename_insert_before_ext ~path:"/dev/null" "XXX") ;
-  [%expect {| /dev/null-XXX |}] ;
-  ()
-
 let overwrite_syslog_tag sys_logger section =
   Syslog.
     {
@@ -567,17 +513,21 @@ end) : Internal_event.SINK with type t = t = struct
           let time_ext, rotation =
             match rotate with
             | Some days_kept ->
-                let today = day_of_the_year (Unix.gettimeofday ()) in
-                (string_of_day_of_the_year today, Some (days_kept, today))
+                let today = Daily_file_rotation.current_day () in
+                ( Daily_file_rotation.string_of_day today,
+                  Some (days_kept, today) )
             | None -> ("", None)
           in
           let base_path =
             if with_pid then
-              filename_insert_before_ext ~path (string_of_int (Unix.getpid ()))
+              Daily_file_rotation.filename_insert_before_ext
+                ~path
+                (string_of_int (Unix.getpid ()))
             else path
           in
           let fixed_path =
-            if rotate <> None then filename_insert_before_ext ~path time_ext
+            if rotate <> None then
+              Daily_file_rotation.filename_insert_before_ext ~path time_ext
             else base_path
           in
           protect (fun () ->
@@ -623,31 +573,8 @@ end) : Internal_event.SINK with type t = t = struct
 
   let write_mutex = Lwt_mutex.create ()
 
-  let list_rotation_files base_path =
-    let open Lwt_syntax in
-    let dirname = Filename.dirname base_path in
-    let base_filename = Filename.basename base_path in
-    let file_stream = Lwt_unix.files_of_directory dirname in
-    let rec explore acc =
-      let* filename = Lwt_stream.get file_stream in
-      match filename with
-      | None -> Lwt.return acc
-      | Some filename ->
-          if check_file_format_with_date base_filename filename then
-            explore (filename :: acc)
-          else explore acc
-    in
-    explore []
-
-  let remove_older_files dirname n_kept base_path =
-    let open Lwt_syntax in
-    let* files = list_rotation_files base_path in
-    let sorted = List.sort (fun x y -> -compare x y) files in
-    List.iteri_s
-      (fun i file ->
-        if i >= n_kept then Lwt_unix.unlink (Filename.concat dirname file)
-        else Lwt.return_unit)
-      sorted
+  let remove_older_files_lwt days_kept base_path =
+    Daily_file_rotation.remove_older_files_lwt base_path ~days_kept
 
   let output_one_with_rotation {rights; base_path; current; days_kept} now
       to_write =
@@ -662,9 +589,9 @@ end) : Internal_event.SINK with type t = t = struct
             else
               let*! () = Lwt_unix.close fd in
               let path =
-                filename_insert_before_ext
+                Daily_file_rotation.filename_insert_before_ext
                   ~path:base_path
-                  (string_of_day_of_the_year today)
+                  (Daily_file_rotation.string_of_day today)
               in
               let* fd =
                 protect (fun () ->
@@ -679,10 +606,7 @@ end) : Internal_event.SINK with type t = t = struct
           let*! () = Lwt_utils_unix.write_string output to_write in
           let*! () =
             if should_rotate_output then
-              remove_older_files
-                (Filename.dirname base_path)
-                days_kept
-                base_path
+              remove_older_files_lwt days_kept base_path
             else Lwt.return_unit
           in
           return_unit)

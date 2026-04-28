@@ -130,6 +130,7 @@ type t = {
   banned_addrs : P2p_addr.t list;
   batching_configuration : batching_configuration;
   publish_slots_regularly : publish_slots_regularly option;
+  profiling : Tezos_profiler.Profiler.profiling_config option;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -211,6 +212,7 @@ let default =
     banned_addrs = [];
     batching_configuration = default_batching_configuration;
     publish_slots_regularly = None;
+    profiling = None;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -258,6 +260,7 @@ let encoding : t Data_encoding.t =
            banned_addrs;
            batching_configuration;
            publish_slots_regularly;
+           profiling;
          }
        ->
       ( ( ( data_dir,
@@ -279,7 +282,10 @@ let encoding : t Data_encoding.t =
               verbose,
               ignore_l1_config_peers,
               disable_amplification ) ) ),
-        (banned_addrs, batching_configuration, publish_slots_regularly) ))
+        ( banned_addrs,
+          batching_configuration,
+          publish_slots_regularly,
+          profiling ) ))
     (fun ( ( ( data_dir,
                rpc_addr,
                listen_addr,
@@ -299,7 +305,10 @@ let encoding : t Data_encoding.t =
                  verbose,
                  ignore_l1_config_peers,
                  disable_amplification ) ) ),
-           (banned_addrs, batching_configuration, publish_slots_regularly) )
+           ( banned_addrs,
+             batching_configuration,
+             publish_slots_regularly,
+             profiling ) )
        ->
       {
         data_dir;
@@ -326,6 +335,7 @@ let encoding : t Data_encoding.t =
         banned_addrs;
         batching_configuration;
         publish_slots_regularly;
+        profiling;
       })
     (merge_objs
        (merge_objs
@@ -439,7 +449,7 @@ let encoding : t Data_encoding.t =
                    ~description:"Disable amplification"
                    bool
                    default.disable_amplification))))
-       (obj3
+       (obj4
           (dft
              "banned_addrs"
              ~description:
@@ -457,7 +467,11 @@ let encoding : t Data_encoding.t =
              ~description:
                "Set the frequency, the slot and the secret key used for \
                 automatic production"
-             publish_slots_regularly_encoding)))
+             publish_slots_regularly_encoding)
+          (opt
+             "profiling"
+             ~description:"Configuration of profiling output"
+             Tezos_profiler.Profiler.profiling_config_encoding)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

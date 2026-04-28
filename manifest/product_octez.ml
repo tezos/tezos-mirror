@@ -1966,6 +1966,7 @@ let octez_base_unix =
         eio;
         eio_posix;
         lwt_eio;
+        re;
       ]
     ~inline_tests:ppx_expect
     ~inline_tests_libraries:[bls12_381_archive]

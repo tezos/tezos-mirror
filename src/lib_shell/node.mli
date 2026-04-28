@@ -53,12 +53,13 @@ val create :
 
 val shutdown : t -> unit Lwt.t
 
-(** [build_rpc_directory ~node_version node] builds a Tezos RPC
-    directory for the node by gathering all the
-    subdirectories. [node_version], and [node] contain all
-    informations required to build such a directory. *)
+(** [build_rpc_directory ~node_version ~profiling_config node] builds a
+    Tezos RPC directory for the node by gathering all the
+    subdirectories. [node_version], [profiling_config], and [node]
+    contain all informations required to build such a directory. *)
 val build_rpc_directory :
   node_version:Tezos_version.Octez_node_version.t ->
+  profiling_config:Tezos_profiler.Profiler.profiling_config ->
   t ->
   unit Tezos_rpc.Directory.t
 

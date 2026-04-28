@@ -479,3 +479,49 @@ let section_maker ?(verbosity = Notice) ?cpu equal to_string profiler :
         stop profiler ;
         record ~cpu profiler verbosity (to_string id, metadata) ;
         last := Some id
+
+type profiling_config = {
+  days_kept : int;
+  verbosity : string option;
+  backends : string list option;
+  output_dir : string option;
+}
+
+let default_profiling_config =
+  {days_kept = 7; verbosity = None; backends = None; output_dir = None}
+
+let profiling_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {days_kept; verbosity; backends; output_dir} ->
+      (days_kept, verbosity, backends, output_dir))
+    (fun (days_kept, verbosity, backends, output_dir) ->
+      {days_kept; verbosity; backends; output_dir})
+    (obj4
+       (dft
+          "days-kept"
+          ~description:
+            "Number of days of profiling results to keep. Older profiling \
+             files are automatically deleted during daily rotation."
+          int31
+          default_profiling_config.days_kept)
+       (opt
+          "verbosity"
+          ~description:
+            "Per-profiler verbosity rules. Same format as the PROFILING \
+             environment variable, e.g. \
+             \"chain_validator->debug;rpc_server->notice\". When set, \
+             overrides the PROFILING environment variable."
+          string)
+       (opt
+          "backends"
+          ~description:
+            "List of profiling backends to enable, e.g. [\"txt\", \"json\"]. \
+             When set, overrides the PROFILING_BACKENDS environment variable."
+          (list string))
+       (opt
+          "output-dir"
+          ~description:
+            "Override the profiling output directory. When set, overrides the \
+             PROFILING_OUTPUT_DIR environment variable."
+          string))

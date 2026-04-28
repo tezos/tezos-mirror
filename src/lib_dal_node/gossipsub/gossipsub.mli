@@ -222,7 +222,12 @@ module Profiler : sig
 
   val gossipsub_profiler : profiler
 
-  val init : (name:string -> instance option) -> unit
+  val init :
+    profiling_config:Tezos_profiler.Profiler.profiling_config ->
+    (profiling_config:Tezos_profiler.Profiler.profiling_config ->
+    name:string ->
+    instance option) ->
+    unit
 
   val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
 end

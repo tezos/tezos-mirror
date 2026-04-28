@@ -96,6 +96,7 @@ type t = {
       (** The configuration of the batching of the shards.
           The default is [Enabled{time_interval=100}]. *)
   publish_slots_regularly : publish_slots_regularly option;
+  profiling : Tezos_profiler.Profiler.profiling_config option;
 }
 
 (** [default] is the default configuration. *)

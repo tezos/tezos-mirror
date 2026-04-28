@@ -123,7 +123,7 @@ end
 let opentelemetry : config Profiler.driver =
   (module Driver : Profiler.DRIVER with type config = config)
 
-let instance_maker driver ~verbosity ~directory:_ ~name =
+let instance_maker driver ~verbosity ~directory:_ ~profiling_config:_ ~name =
   Profiler.instance driver {verbosity; service_name = name}
 
 let () =

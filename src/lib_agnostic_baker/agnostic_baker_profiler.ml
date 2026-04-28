@@ -8,8 +8,8 @@ open Profiler
 
 let agnostic_baker_profiler = unplugged ()
 
-let init profiler_maker =
-  match profiler_maker ~name:"agnostic_baker" with
+let init ~profiling_config profiler_maker =
+  match profiler_maker ~profiling_config ~name:"agnostic_baker" with
   | Some instance -> plug agnostic_baker_profiler instance
   | None -> ()
 

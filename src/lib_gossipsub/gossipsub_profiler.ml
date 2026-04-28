@@ -9,8 +9,8 @@ open Profiler
 
 let gossipsub_profiler = unplugged ()
 
-let init profiler_maker =
-  match profiler_maker ~name:"gossipsub" with
+let init ~profiling_config profiler_maker =
+  match profiler_maker ~profiling_config ~name:"gossipsub" with
   | Some instance -> plug gossipsub_profiler instance
   | None -> ()
 
