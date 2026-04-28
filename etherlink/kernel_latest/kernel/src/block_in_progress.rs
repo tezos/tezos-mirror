@@ -512,13 +512,13 @@ impl BlockInProgress {
         let michelson_commitment = crate::state_hash::michelson_ops_commitment(
             &self.cumulative_tezos_operation_receipts.list,
         );
-        let state_root = crate::state_hash::tzx_state_hash(
-            host,
+        let blueprint_hash = crate::state_hash::blueprint_hash(
             &self.valid_txs,
             &self.delayed_txs,
             &michelson_commitment,
             self.timestamp,
         );
+        let state_root = crate::state_hash::evm_state_hash(host, &blueprint_hash);
         let receipts_root = self.receipts_root();
         block_storage::store_current_transactions_receipts(
             host,
