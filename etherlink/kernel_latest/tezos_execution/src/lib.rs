@@ -1350,6 +1350,7 @@ pub fn validate_and_apply_operation<Host, C: Context>(
     skip_signature_check: bool,
     required_fees: Option<u64>,
     fee_refund_config: Option<FeeRefundConfig>,
+    safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<Vec<ProcessedOperation>, OperationError>
 where
     Host: StorageV1,
@@ -1373,7 +1374,7 @@ where
 
     let mut safe_host = SafeStorage {
         host,
-        world_states: vec![context.path()],
+        world_states: safe_roots.to_vec(),
     };
 
     safe_host.start()?;
@@ -1934,6 +1935,14 @@ mod tests {
         context, validate_and_apply_operation, FeeRefundConfig, OperationError,
         ProcessedOperation,
     };
+    use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+
+    /// Test-only SafeStorage roots matching the `TezlinkContext::init_context`
+    /// root path, so the inner SafeStorage wrap inside
+    /// `validate_and_apply_operation` covers the test account subtree.
+    fn test_safe_roots() -> Vec<OwnedPath> {
+        vec![OwnedPath::from(&RefPath::assert_from(b"/tez/tez_accounts"))]
+    }
     use crate::{get_required_da_fees, TcCtx};
     use crate::{make_default_ctx, COST_PER_BYTES};
     use primitive_types::U256;
@@ -2362,6 +2371,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         let expected_error =
@@ -2399,6 +2409,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         let expected_error =
@@ -2436,6 +2447,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         let expected_error =
@@ -2487,6 +2499,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2557,6 +2570,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2622,6 +2636,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -2668,6 +2683,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2748,6 +2764,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2832,6 +2849,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2930,6 +2948,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3053,6 +3072,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0)
@@ -3196,6 +3216,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3286,6 +3307,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3407,6 +3429,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3493,6 +3516,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3564,6 +3588,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3653,6 +3678,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -3842,6 +3868,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         let expected_error =
@@ -3941,6 +3968,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -4060,6 +4088,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4287,6 +4316,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -4455,6 +4485,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4522,6 +4553,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4593,6 +4625,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4676,6 +4709,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -4878,6 +4912,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5110,6 +5145,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .unwrap(),
         );
@@ -5392,6 +5428,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5473,6 +5510,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5520,6 +5558,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5568,6 +5607,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5624,6 +5664,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5723,6 +5764,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5821,6 +5863,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -5932,6 +5975,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -6235,6 +6279,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -6486,6 +6531,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -6556,6 +6602,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -6635,6 +6682,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         );
 
         assert!(
@@ -6688,6 +6736,7 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
+            &test_safe_roots(),
         );
 
         assert!(result.is_ok(), "Batch with sufficient fees should succeed");
@@ -6742,6 +6791,7 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
+            &test_safe_roots(),
         );
 
         assert!(
@@ -6797,6 +6847,7 @@ mod tests {
             false,
             Some(required_da_fees),
             None,
+            &test_safe_roots(),
         );
 
         assert_eq!(
@@ -6851,6 +6902,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail"),
         );
@@ -6930,6 +6982,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail"),
         );
@@ -7036,6 +7089,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect("validate_and_apply_operation should not fail at the protocol level"),
         );
@@ -7131,6 +7185,7 @@ mod tests {
             false,
             None,
             None,
+            &test_safe_roots(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -7276,6 +7331,7 @@ mod tests {
                 false,
                 None,
                 None,
+                &test_safe_roots(),
             )
             .expect("should not fail with a kernel error")
         };
@@ -7578,6 +7634,7 @@ mod tests {
             false,
             None,
             refund_config,
+            &test_safe_roots(),
         )
         .expect("validate_and_apply_operation should succeed");
 

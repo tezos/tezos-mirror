@@ -588,9 +588,7 @@ mod tests {
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
-    use crate::block_storage::{
-        self, read_tezlink_current_block, read_tezos_x_current_block,
-    };
+    use crate::block_storage::{self, read_tez_current_block};
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::blueprint_storage::{
@@ -601,9 +599,8 @@ mod tests {
     use crate::chains::TezlinkOperation;
     use crate::chains::{
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
-        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
-        ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
-        TEZ_BLOCKS_PATH, TEZ_SAFE_STORAGE_ROOT_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction, TEZ_BLOCKS_PATH,
+        TEZ_SAFE_STORAGE_ROOT_PATH, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::fees::{DA_FEE_PER_BYTE, DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER};
@@ -865,17 +862,20 @@ mod tests {
         )
     }
 
-    /// Pre-populate the `/tez/world_state` safe root so that `SafeStorage::start()`'s
-    /// `store_copy` of the root succeeds. Required by every test that produces
-    /// blocks with the Michelson runtime active. Mirrors the production
-    /// bootstrap performed by [`crate::kernel`].
-    fn init_tez_world_state_safe_root(host: &mut impl StorageV1) {
+    /// Pre-populate the `/tez/world_state` and `/tez/tez_accounts` safe roots
+    /// so that `SafeStorage::start()`'s `store_copy` of each root succeeds.
+    /// Required by every test that produces blocks with the Michelson
+    /// runtime active. Mirrors the production bootstrap performed by
+    /// [`crate::kernel`].
+    fn init_tez_safe_roots(host: &mut impl StorageV1) {
         host.store_write_all(&TEZ_SAFE_STORAGE_ROOT_PATH, b"placeholder")
+            .expect("Write in durable storage should have succeeded");
+        host.store_write_all(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH, b"placeholder")
             .expect("Write in durable storage should have succeeded");
     }
 
     fn dummy_tez_config(host: &mut impl StorageV1) -> MichelsonChainConfig {
-        init_tez_world_state_safe_root(host);
+        init_tez_safe_roots(host);
         MichelsonChainConfig::create_config(
             ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
@@ -1097,16 +1097,6 @@ mod tests {
         let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
-        // We need to store something at the tezlink root path,
-        // otherwise the copy of the root done by the safe storage will fail
-        let path = concat(
-            &TEZLINK_SAFE_STORAGE_ROOT_PATH,
-            &RefPath::assert_from(b"/fee"),
-        )
-        .expect("Path concatenation should have succeeded");
-        host.store_write_all(&path, &[4; 32])
-            .expect("Write in durable storage should have succeeded");
-
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
@@ -1141,8 +1131,9 @@ mod tests {
         let bootstrap = bootstrap1();
         let src = bootstrap.pkh.clone();
 
-        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeeded");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("Context creation should have succeeded");
 
         let contract = Contract::Implicit(src.clone());
 
@@ -1191,7 +1182,7 @@ mod tests {
     fn dummy_evm_config_with_tezos_runtime(host: &mut impl StorageV1) -> EvmChainConfig {
         host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
             .expect("Should have written feature flag");
-        init_tez_world_state_safe_root(host);
+        init_tez_safe_roots(host);
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
         EvmChainConfig::create_config(
             DUMMY_CHAIN_ID,
@@ -1211,7 +1202,7 @@ mod tests {
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
-        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
             .expect("TezlinkContext creation should have succeed")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1272,7 +1263,7 @@ mod tests {
 
         // Store bootstrap2 in the tezlink context to ensure the
         // Tezlink context is not empty and can thus be backed up
-        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
             .expect("TezlinkContext creation should have succeed")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -1385,8 +1376,9 @@ mod tests {
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
 
-        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("TezlinkContext creation should have succeed");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
 
@@ -1515,8 +1507,9 @@ mod tests {
 
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
-        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("TezlinkContext creation should have succeed");
+        let context =
+            context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
         let bootstrap1 = context
@@ -1937,11 +1930,12 @@ mod tests {
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: (0.into()),
                 context: TezosRuntimeContext::from_root(
-                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
                 )
                 .unwrap(),
                 da_fee_per_byte_mutez: 0,
                 michelson_to_evm_gas_multiplier: DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER,
+                safe_roots: vec![],
             },
         }
     }
@@ -2044,9 +2038,9 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         // Allocate bootstrap2 in Tezlink storage so the SafeStorage
-        // backup of TEZLINK_SAFE_STORAGE_ROOT_PATH succeeds, mirroring
-        // `test_tezblock_stored_after_tezos_operation`.
-        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+        // backup of TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH succeeds,
+        // mirroring `test_tezblock_stored_after_tezos_operation`.
+        context::TezlinkContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
             .expect("TezlinkContext creation should have succeeded")
             .implicit_from_public_key_hash(&bootstrap2().pkh)
             .expect("Account interface should be correct")
@@ -2055,7 +2049,13 @@ mod tests {
 
         let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
         let registry = RegistryImpl::default();
-        let block_constants = first_block(&mut host);
+        let mut block_constants = first_block(&mut host);
+        // Match production safe_roots so SafeStorage::start/revert in
+        // `validate_and_apply_operation` operates on initialised paths.
+        block_constants.michelson_runtime_block_constants.safe_roots = vec![
+            TEZ_SAFE_STORAGE_ROOT_PATH.into(),
+            TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH.into(),
+        ];
 
         // Allocate bootstrap1 in TezosX storage with enough balance to
         // cover fees for both ops.
@@ -2684,16 +2684,6 @@ mod tests {
         let chain_config = dummy_tez_config(&mut host);
         let mut config = dummy_configuration();
 
-        // We need to store something at the tezlink root path,
-        // otherwise the copy of the root done by the safe storage will fail
-        let path = concat(
-            &TEZLINK_SAFE_STORAGE_ROOT_PATH,
-            &RefPath::assert_from(b"/fee"),
-        )
-        .expect("Path concatenation should have succeeded");
-        host.store_write_all(&path, &[4; 32])
-            .expect("Write in durable storage should have succeeded");
-
         let previous_protocol = Protocol::S023;
         let current_protocol = TARGET_TEZOS_PROTOCOL;
 
@@ -2728,7 +2718,7 @@ mod tests {
         let computation = produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::RebootNeeded, computation);
-        let block = read_tezlink_current_block(&mut host).unwrap();
+        let block = read_tez_current_block(&mut host).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, previous_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -2739,7 +2729,7 @@ mod tests {
         let computation = produce(&mut host, &chain_config, &mut config, None, None)
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::RebootNeeded, computation);
-        let block = read_tezlink_current_block(&mut host).unwrap();
+        let block = read_tez_current_block(&mut host).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, current_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -2761,16 +2751,6 @@ mod tests {
         }
 
         let mut host = MockKernelHost::default();
-
-        // We need to store something at the tezlink root path,
-        // otherwise the copy of the root done by the safe storage will fail
-        let path = concat(
-            &TEZLINK_SAFE_STORAGE_ROOT_PATH,
-            &RefPath::assert_from(b"/fee"),
-        )
-        .expect("Path concatenation should have succeeded");
-        host.store_write_all(&path, &[4; 32])
-            .expect("Write in durable storage should have succeeded");
 
         let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
@@ -2798,7 +2778,7 @@ mod tests {
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tezos_x_current_block(&mut host).unwrap();
+        let block = read_tez_current_block(&mut host).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, previous_protocol);
         assert_eq!(next_protocol, current_protocol);
@@ -2813,7 +2793,7 @@ mod tests {
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
 
-        let block = read_tezos_x_current_block(&mut host).unwrap();
+        let block = read_tez_current_block(&mut host).unwrap();
         let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
         assert_eq!(protocol, current_protocol);
         assert_eq!(next_protocol, current_protocol);

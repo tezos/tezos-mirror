@@ -166,7 +166,7 @@ let account_rpc sequencer account key =
 (** Durable storage path where Michelson originated contracts are indexed in
     Tezos X. Each subkey is the hex-encoded [Contract_repr.t] of the
     Michelson contract. *)
-let tezosx_michelson_contracts_index = "/evm/world_state/contracts/index"
+let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
 (** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
     storage of an originated Michelson contract from the durable storage,

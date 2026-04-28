@@ -92,7 +92,7 @@ module TezContract = struct
   (** Durable storage path where Michelson originated contracts are indexed in
    *  Tezos X. Each subkey is the hex-encoded [Contract_repr.t] of the
    *  Michelson contract. *)
-  let tezosx_michelson_contracts_index = "/evm/world_state/contracts/index"
+  let tezosx_michelson_contracts_index = "/tez/tez_accounts/contracts/index"
 
   (** [decode_contract_address hex] decodes a hex-encoded
    *  [Contract_repr.t] into a b58check KT1 address string. *)

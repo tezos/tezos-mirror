@@ -16,6 +16,7 @@ use crate::{
     chains::{
         ChainConfigTrait, EvmChainConfig, TezlinkBlockConstants, TezosXBlockConstants,
         TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
     },
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
@@ -170,11 +171,19 @@ where
         .map_err(|_| Error::InvalidConversion)?;
     let michelson_to_evm_gas_multiplier = read_michelson_to_evm_gas_multiplier(host)
         .unwrap_or(DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER);
+    let safe_roots = config
+        .storage_root_paths(number)
+        .iter()
+        .map(OwnedPath::from)
+        .collect();
     let michelson_runtime_block_constants = TezlinkBlockConstants {
         level: number.try_into()?,
-        context: TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?,
+        context: TezosRuntimeContext::from_root(
+            &TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+        )?,
         da_fee_per_byte_mutez,
         michelson_to_evm_gas_multiplier,
+        safe_roots,
     };
     Ok(TezosXBlockConstants {
         evm_runtime_block_constants: BlockConstants {

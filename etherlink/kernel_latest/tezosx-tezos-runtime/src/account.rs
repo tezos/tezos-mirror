@@ -22,7 +22,7 @@ use tezosx_interfaces::{Origin, TezosXRuntimeError};
 
 // Path where Tezos accounts are stored.
 pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos");
+    RefPath::assert_from(b"/tez/tez_accounts/tezosx");
 
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.

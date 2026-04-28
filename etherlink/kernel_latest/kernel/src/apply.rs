@@ -59,7 +59,7 @@ use tezosx_journal::{CracId, TezosXJournal};
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
-use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
+use crate::chains::{EvmLimits, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
 use crate::fees::{self, tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
@@ -1223,6 +1223,11 @@ pub fn apply_transaction<Host>(
     spec_id: &SpecId,
     limits: &EvmLimits,
     http_trace_enabled: bool,
+    // SafeStorage roots to snapshot around a [TezosDelayed] operation.
+    // Mirrors [TezlinkBlockConstants::safe_roots]; threaded in from the
+    // caller because [BlockConstants] is EVM-flavored and doesn't carry
+    // Tezos-side storage boundaries.
+    tezos_safe_roots: &[tezos_smart_rollup_host::path::OwnedPath],
 ) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>
 where
     Host: StorageV1,
@@ -1287,7 +1292,7 @@ where
         TransactionContent::TezosDelayed(op) => {
             // TODO: If we need to use storage root of tezlink pass it as parameter.
             let context =
-                TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+                TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
             let skip_signature_check = false;
             let i128_timestamp: i128 = block_constants
                 .timestamp
@@ -1328,6 +1333,7 @@ where
                 skip_signature_check,
                 None,
                 None, // No fee refund for delayed inbox operations
+                tezos_safe_roots,
             );
 
             // Persist HTTP traces collected in [tezosx_journal] regardless of

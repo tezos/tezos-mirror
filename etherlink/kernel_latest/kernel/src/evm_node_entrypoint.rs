@@ -14,13 +14,14 @@ use crate::{
     block::bip_from_blueprint,
     blueprint::Blueprint,
     blueprint_storage::read_current_blueprint_header,
-    chains::{self, ChainConfigTrait, EvmChainConfig},
+    chains::{
+        self, ChainConfigTrait, EvmChainConfig, TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH,
+    },
     configuration::fetch_pure_evm_config,
     delayed_inbox::DelayedInbox,
     storage::read_chain_id,
     sub_block,
     transaction::Transaction,
-    ETHERLINK_SAFE_STORAGE_ROOT_PATH,
 };
 use mir::ast::{Entrypoint, IntoMicheline, Type};
 use mir::parser::Parser;
@@ -447,14 +448,14 @@ fn handle_query_entrypoints_to<Host, R>(
         }
     };
     // This entrypoint is only used in the context of the Tezos X Michelson runtime.
-    let context = match TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
-    {
-        Ok(c) => c,
-        Err(err) => {
-            log!(Error, "Tezos X entrypoints: context error: {:?}", err);
-            return;
-        }
-    };
+    let context =
+        match TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH) {
+            Ok(c) => c,
+            Err(err) => {
+                log!(Error, "Tezos X entrypoints: context error: {:?}", err);
+                return;
+            }
+        };
     let entrypoints =
         tezos_execution::get_contract_entrypoint(&*host, &context, &address);
     let result = encode_entrypoints_result(entrypoints);

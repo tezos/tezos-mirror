@@ -49,7 +49,16 @@ use tezosx_interfaces::{
 };
 use tezosx_journal::TezosXJournal;
 
-use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+use tezos_smart_rollup_host::path::RefPath;
+
+/// Unified storage root for all Tezos account state — Michelson originated
+/// KT1 contracts (under `contracts/`), big_maps (under `big_map/`) and
+/// TezosX projected accounts (under `tezosx/`). Mirrors the kernel's
+/// `chains::TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH` (the kernel and the
+/// TezosX runtime live in separate crates so the constant is duplicated
+/// to avoid a circular dependency).
+pub(crate) const TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH: RefPath =
+    RefPath::assert_from(b"/tez/tez_accounts");
 
 /// Re-export the canonical null PKH from `tezos_execution` so the rest
 /// of this crate can keep its short name.  Both the synthetic
@@ -468,7 +477,8 @@ where
         value,
     };
 
-    let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+    let context =
+        TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
 
     let sender_account = context.originated_from_kt1(&hdrs.sender).map_err(|e| {
         TezosXRuntimeError::Custom(format!("Failed to fetch sender account: {e:?}"))
@@ -754,7 +764,8 @@ impl RuntimeInterface for TezosRuntime {
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(&alias_info.native_address));
         let kt1_str = kt1.to_base58_check();
 
-        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
         let account = context.originated_from_kt1(&kt1)?;
         let account_path = account.path().clone();
 
@@ -922,7 +933,8 @@ impl TezosRuntime {
         host: &impl StorageV1,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
-        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let context =
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)?;
         let originated_account = context.originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;
         narith_to_u256(&balance)
@@ -1191,7 +1203,8 @@ mod tests {
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
-            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let code = account.code(&host).unwrap();
@@ -1228,7 +1241,8 @@ mod tests {
 
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
-            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         let storage = account.storage(&host).unwrap();
@@ -1406,7 +1420,8 @@ mod tests {
         // simulate a legacy account written before this work.
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
-            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
         let origin_path = concat(account.path(), &ORIGIN_PATH).unwrap();
         host.store_delete(&origin_path).unwrap();
@@ -1449,7 +1464,8 @@ mod tests {
         let evm_address = "0x5555555555555555555555555555555555555555";
         let kt1 = ContractKt1Hash::from(blake2b::digest_160(evm_address.as_bytes()));
         let context =
-            TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH).unwrap();
+            TezosRuntimeContext::from_root(&TEZ_TEZ_ACCOUNTS_SAFE_STORAGE_ROOT_PATH)
+                .unwrap();
         let account = context.originated_from_kt1(&kt1).unwrap();
 
         set_origin_at(&mut host, &account.path().clone(), &Origin::Native).unwrap();

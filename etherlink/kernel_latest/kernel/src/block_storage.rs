@@ -184,15 +184,7 @@ pub fn read_current_hash(
 }
 
 #[cfg(test)]
-pub fn read_tezlink_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
-    use crate::chains::TEZLINK_SAFE_STORAGE_ROOT_PATH;
-    let block_path = path::current_block(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
-    let bytes = host.store_read_all(&block_path)?;
-    Ok(bytes)
-}
-
-#[cfg(test)]
-pub fn read_tezos_x_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
+pub fn read_tez_current_block(host: &mut impl StorageV1) -> anyhow::Result<Vec<u8>> {
     use crate::chains::TEZ_BLOCKS_PATH;
     let block_path = path::current_block(&TEZ_BLOCKS_PATH)?;
     let bytes = host.store_read_all(&block_path)?;

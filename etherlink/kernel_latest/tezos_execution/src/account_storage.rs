@@ -444,7 +444,7 @@ mod test {
         value_path: &impl Path,
         value: &[u8],
     ) {
-        let index = RefPath::assert_from(b"/tezlink/context/contracts/index");
+        let index = RefPath::assert_from(b"/tez/tez_accounts/contracts/index");
         let contract = concat(&index, &BOOTSTRAP1_CONTRACT)
             .expect("Concatenation should have succeeded");
         let contract_path =
@@ -462,7 +462,7 @@ mod test {
         let balance: Narith = 2944_u64.into();
         // octez-codec decode alpha.contract from '000002298c03ed7d454a101eb7022bc95f7e5f41ac78'
         // Result: "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        let path = RefPath::assert_from(b"/tezlink/context/contracts/index/000002298c03ed7d454a101eb7022bc95f7e5f41ac78/balance");
+        let path = RefPath::assert_from(b"/tez/tez_accounts/contracts/index/000002298c03ed7d454a101eb7022bc95f7e5f41ac78/balance");
         store_bin(&balance, &mut host, &path)
             .expect("Store balance should have succeeded");
 
@@ -474,7 +474,7 @@ mod test {
             &balance_array,
         );
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -501,7 +501,7 @@ mod test {
         counter.bin_write(&mut bytes).unwrap();
         set_bootstrap1_key(&mut host, &RefPath::assert_from(b"/counter"), &bytes);
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -524,7 +524,7 @@ mod test {
 
         let balance = 4579_u64.into();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -551,7 +551,7 @@ mod test {
 
         let counter: Narith = 6u64.into();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -584,7 +584,7 @@ mod test {
             &public_key_hexa,
         );
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -610,7 +610,7 @@ mod test {
     fn test_set_read_manager_public_key() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
@@ -640,7 +640,7 @@ mod test {
     fn test_set_read_manager_public_key_hash() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
@@ -672,7 +672,7 @@ mod test {
     fn test_account_initialization() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
@@ -723,7 +723,7 @@ mod test {
     fn test_set_read_large_code() {
         let mut host = MockKernelHost::default();
 
-        // Initialize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tez/tez_accounts
         let context = context::TezlinkContext::init_context();
 
         // Create an originated account for KT1
