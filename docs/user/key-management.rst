@@ -161,7 +161,7 @@ Starting with Octez v12 (supporting the Ithaca protocol), consensus operations a
    * - Attestation
      - 0x13
 
-The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``. For example, to restrict signing to baking operations only (blocks and consensus operations)::
+The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes`` (or ``-M``). For example, to restrict signing to baking operations only (blocks and consensus operations) when listening on host ``home``::
 
    home~$ octez-signer launch socket signer -a home -M 0x11,0x12,0x13
 
@@ -280,6 +280,7 @@ All ``launch`` subcommands share a set of additional options for production depl
 
 ``--allow-to-prove-possession``
   Allow remote clients to request a proof of possession for a given key. Disabled by default.
+  See :doc:`../active/native_multisig` as a use case where this option may be useful.
 
 The ``launch socket signer`` subcommand has one additional option:
 
