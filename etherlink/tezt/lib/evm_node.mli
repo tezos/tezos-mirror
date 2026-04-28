@@ -472,6 +472,7 @@ val patch_config_with_experimental_feature :
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->
   ?preconfirmation_stream_enabled:bool ->
+  ?compact_receipt_encoding:bool ->
   unit ->
   JSON.t ->
   JSON.t

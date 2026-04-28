@@ -1352,7 +1352,7 @@ let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains
-    ?preconfirmation_stream_enabled () =
+    ?preconfirmation_stream_enabled ?compact_receipt_encoding () =
   let open Config_file in
   json_update_experimental_feature @@ fun json ->
   conditional_json_put
@@ -1390,6 +1390,10 @@ let patch_config_with_experimental_feature
   |> optional_json_put
        preconfirmation_stream_enabled
        ~name:"preconfirmation_stream_enabled"
+       (fun bool -> `Bool bool)
+  |> optional_json_put
+       compact_receipt_encoding
+       ~name:"compact_receipt_encoding"
        (fun bool -> `Bool bool)
 
 let patch_config_websockets_if_enabled ?max_message_length
