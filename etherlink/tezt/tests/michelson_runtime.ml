@@ -1637,6 +1637,81 @@ let test_bigmap_counter =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
+(** Regression guard for the installer / kernel / node-RPC path alignment on
+    bootstrap KT1s. Before this guard, the three sides disagreed on where
+    Tezlink contract state lives: the installer wrote to
+    [/evm/world_state/contracts/index/<hex>/...], the kernel read from
+    [/tez/tez_accounts/contracts/index/<hex>/...] (post-Phase-5),
+    and the node RPC read back from the installer's ghost path. RPC-only
+    tests (reading [data/storage] or [balance]) happened to be internally
+    consistent and did not catch the mismatch.
+
+    The balance assertion here is the tight check: it only reads the
+    expected value if the kernel was able to credit the bootstrap KT1 at
+    the same path the RPC queries. *)
+let test_bootstrap_kt1_is_executable =
+  let counter_contract = Michelson_contracts.big_map_counter () in
+  register_tezosx_test
+    ~title:"Bootstrap KT1 is executable (installer/kernel/RPC path alignment)"
+    ~tags:["bootstrap"; "contract"; "kt1"; "installer"]
+    ~bootstrap_contracts:[counter_contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint = tezlink_endpoint_from_evm_node sequencer in
+  (* Installer-set bootstrap balance for tez accounts, in mutez. *)
+  let bootstrap_balance_mutez = 3_800_000_000_000 in
+  let transfer_mutez = 10_000_000 in
+  (* 1. Installer-written balance is visible through the RPC. Fails if the
+        installer and the RPC disagree on the contract subtree root. *)
+  let* initial_balance =
+    Client.get_balance_for ~endpoint ~account:counter_contract.address client
+  in
+  Check.(
+    (Tez.to_mutez initial_balance = bootstrap_balance_mutez)
+      int
+      ~error_msg:
+        "Bootstrap KT1 balance not visible to RPC: got %L, expected %R. \
+         Installer/RPC disagreement on the Tezlink contract subtree root.") ;
+  (* 2. Call the KT1. [big_map_counter]'s default entrypoint rotates a key
+        in the big_map and increments the counter, so the kernel must be
+        able to read [data/code] + [data/storage] from the same path the
+        installer populated. *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:counter_contract.address
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* 3. Storage mutated: counter went from 0 to 1. Fails if the kernel could
+        not find the script to execute. *)
+  let* storage =
+    Client.contract_storage ~endpoint counter_contract.address client
+  in
+  Check.(
+    (String.trim storage =~ rex "Pair 1 .*")
+      ~error_msg:
+        "Bootstrap KT1 storage did not update after call: got \"%L\". Kernel \
+         failed to execute the contract (data/code or data/storage unreadable \
+         at the expected path).") ;
+  (* 4. Balance was credited by the kernel at the path the RPC reads from.
+        Fails if the kernel writes the updated balance to a different subtree
+        than the RPC queries. *)
+  let* post_call_balance =
+    Client.get_balance_for ~endpoint ~account:counter_contract.address client
+  in
+  Check.(
+    (Tez.to_mutez post_call_balance = bootstrap_balance_mutez + transfer_mutez)
+      int
+      ~error_msg:
+        "Bootstrap KT1 balance after transfer: got %L, expected %R. Kernel \
+         balance write and RPC balance read disagree on the contract's balance \
+         path.") ;
+  unit
+
 let test_bigmap_rpcs =
   let counter_contract = Michelson_contracts.big_map_counter () in
   register_tezosx_test
@@ -4875,6 +4950,7 @@ let () =
   test_execution [Alpha] ;
   test_bigmap_option [Alpha] ;
   test_bigmap_counter [Alpha] ;
+  test_bootstrap_kt1_is_executable [Alpha] ;
   test_bigmap_rpcs [Alpha] ;
   test_pack_data [Alpha] ;
   test_run_operation [Alpha] ;
