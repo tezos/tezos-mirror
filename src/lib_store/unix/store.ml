@@ -1468,7 +1468,7 @@ module Chain = struct
       ~ancestor:(hash, level)
 
   (* FIXME: this should not be hard-coded *)
-  let max_locator_size = 200
+  let max_locator_size = 250
 
   let compute_locator_from_hash chain_store ?(max_size = max_locator_size)
       ?min_level (head_hash, head_header) seed =
