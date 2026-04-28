@@ -155,7 +155,16 @@
       "preconfirmation_stream_enabled"?:
         boolean
         /* Activate or not the preconfirmation stream. This includes the sequencer as well as
-           the observer. */ },
+           the observer. */,
+      "compact_receipt_encoding"?:
+        boolean
+        /* When enabled, transaction receipts are written to the store using a compact
+           encoding: all-zero logs blooms are stored as empty bytes, and per-log context
+           fields (blockNumber, blockHash, transactionHash, transactionIndex) are stripped
+           since they are derivable from the outer transaction row. Defaults to [false] so
+           that receipts remain readable by older node releases that predate the compact
+           encoding, allowing operators to roll back the binary if needed. The decoder always
+           accepts both formats, so this flag only affects writes. */ },
   "gcp_kms"?:
     { "connection_pool_size"?:
         integer ∈ [1, 2^30]

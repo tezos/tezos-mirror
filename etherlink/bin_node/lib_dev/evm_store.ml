@@ -208,6 +208,13 @@ module Compact_transactions_receipt = struct
         Transaction_info.{rf with logs = List.map strip_log_context rf.logs})
       Fun.id
       Transaction_info.receipt_fields_encoding
+
+  (* Legacy encoding for receipt fields: keeps per-log context fields and
+     uses the legacy hex bloom encoding. Used when
+     [experimental_features.compact_receipt_encoding = false] so that rows
+     remain readable by older node releases that predate the compact format. *)
+  let legacy_encoding : Transaction_info.receipt_fields Data_encoding.t =
+    Transaction_info.legacy_receipt_fields_encoding
 end
 
 module Q = struct
@@ -744,19 +751,28 @@ DO UPDATE SET value = excluded.value
        adapted. *)
     (* WARNING: uses [octets] — SELECT queries must use
        [CAST(receipt_fields AS BLOB)] to support old TEXT rows. *)
-    let receipt_fields =
+    (* The decoder is shared by both column types — it transparently accepts
+       compact and legacy rows — so SELECT queries can use either; only the
+       encoder used at INSERT time differs. *)
+    let make_receipt_fields write_encoding =
       custom
         ~encode:(fun payload ->
-          Ok
-            (Data_encoding.Binary.to_string_exn
-               Compact_transactions_receipt.encoding
-               payload))
+          Ok (Data_encoding.Binary.to_string_exn write_encoding payload))
         ~decode:(fun bytes ->
           Option.to_result ~none:"Not a valid receipt fields payload"
           @@ Data_encoding.Binary.of_string_opt
                Transaction_info.receipt_fields_encoding
                bytes)
         octets
+
+    let receipt_fields =
+      make_receipt_fields Compact_transactions_receipt.encoding
+
+    (* Same column type as [receipt_fields] but encodes using the legacy
+       (non-compact) format, so the resulting rows remain decodable by node
+       releases that predate the compact encoding. *)
+    let receipt_fields_legacy =
+      make_receipt_fields Compact_transactions_receipt.legacy_encoding
 
     (* WARNING: uses [octets] — SELECT queries must use
        [CAST(object_fields AS BLOB)] to support old TEXT rows. *)
@@ -774,7 +790,10 @@ DO UPDATE SET value = excluded.value
                bytes)
         octets
 
-    let insert =
+    (* Built once per receipt-fields column type so Caqti's
+       prepared-statement cache keeps each request's identity stable across
+       calls. Dispatch happens at the call site. *)
+    let insert_with receipt_fields =
       (t8
          block_hash
          level
@@ -790,6 +809,10 @@ DO UPDATE SET value = excluded.value
         ~attrs:(fun (_, _, _, hash, _, _, _, _) ->
           [Telemetry.Attributes.Transaction.hash hash])
       @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
+
+    let insert_compact = insert_with receipt_fields
+
+    let insert_legacy = insert_with receipt_fields_legacy
 
     let select_receipt =
       (root_hash
@@ -1459,7 +1482,7 @@ module Metadata = struct
 end
 
 module Transactions = struct
-  let store store
+  let store ~compact_receipt_encoding store
       ({
          block_hash;
          block_number;
@@ -1474,7 +1497,8 @@ module Transactions = struct
     with_connection store @@ fun conn ->
     Db.exec
       conn
-      Q.Transactions.insert
+      (if compact_receipt_encoding then Q.Transactions.insert_compact
+       else Q.Transactions.insert_legacy)
       ( block_hash,
         block_number,
         index,

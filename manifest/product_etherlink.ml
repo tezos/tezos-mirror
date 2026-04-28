@@ -412,6 +412,7 @@ let _octez_evm_node_tests =
       "test_wasm_runtime";
       "test_blueprint_roundtrip";
       "test_bitset_nonce";
+      "test_compact_receipt_encoding";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
