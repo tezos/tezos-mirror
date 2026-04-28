@@ -15,9 +15,9 @@ esac
 BASE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads"
 TARBALL="google-cloud-cli-linux-${GCLOUD_ARCH}.tar.gz"
 
-curl -fsSL "${BASE_URL}/${TARBALL}" -o "/tmp/${TARBALL}"
+kiss-fetch.sh -fsSL -o "/tmp/${TARBALL}" "${BASE_URL}/${TARBALL}"
 
-EXPECTED=$(curl -fsSL "https://dl.google.com/dl/cloudsdk/release/sha256.txt" |
+EXPECTED=$(kiss-fetch.sh -fsSL "https://dl.google.com/dl/cloudsdk/release/sha256.txt" |
   grep "downloads/${TARBALL}" | awk '{print $1}')
 if [ -z "$EXPECTED" ]; then
   echo "Failed to fetch checksum for ${TARBALL}" >&2
