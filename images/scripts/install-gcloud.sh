@@ -2,8 +2,6 @@
 
 # Install dependencies to use gsutils
 
-export DEBIAN_FRONTEND=noninteractive
-
 ARCH=$(uname -m)
 case "$ARCH" in
 x86_64) GCLOUD_ARCH="x86_64" ;;

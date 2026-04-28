@@ -76,7 +76,7 @@ module Files = struct
       (* scripts in Dockerfile *)
       "scripts/kiss-fetch.sh";
       "images/scripts/install_datadog_static.sh";
-      "images/scripts/install-gcloud-apt.sh";
+      "images/scripts/install-gcloud.sh";
     ]
     @ build_script
 
@@ -145,7 +145,7 @@ module Files = struct
       "scripts/kiss-fetch.sh";
       "images/scripts/install-release-cli.sh";
       "images/scripts/install_datadog_static.sh";
-      "images/scripts/install-gcloud-apt.sh";
+      "images/scripts/install-gcloud.sh";
       "images/base-images/Dockerfile.debian-release";
     ]
 end

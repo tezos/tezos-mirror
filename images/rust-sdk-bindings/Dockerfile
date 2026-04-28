@@ -50,14 +50,14 @@ ENV PATH=/usr/local/bin:$PATH
 
 # install datadog static binary
 COPY scripts/install_datadog_static.sh \
-     scripts/install-gcloud-apt.sh \
+     scripts/install-gcloud.sh \
      scripts/install_sccache_static.sh /tmp/
 
 #hadolint ignore=DL3008,DL3015
 RUN /tmp/install_datadog_static.sh && \
     /tmp/install_sccache_static.sh && \
-    /tmp/install-gcloud-apt.sh && \
-    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh /tmp/install-gcloud-apt.sh
+    /tmp/install-gcloud.sh && \
+    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh /tmp/install-gcloud.sh
 
 # install toolchain
 ARG RUST_VERSION=1.83.0

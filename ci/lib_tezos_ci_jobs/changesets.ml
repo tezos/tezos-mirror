@@ -106,7 +106,7 @@ let changeset_homebrew =
         ".gitlab/ci/pipelines/homebrew_auto.yml";
         "scripts/packaging/test_homebrew_install.sh";
         "scripts/packaging/homebrew_release.sh";
-        "images/scripts/install-gcloud-apt.sh";
+        "images/scripts/install-gcloud.sh";
         "scripts/packaging/homebrew_install.sh";
         "scripts/packaging/octez/homebrew/Formula/*";
         "scripts/version.sh";
