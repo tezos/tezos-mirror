@@ -22,6 +22,9 @@
 
 ### Command-line interface changes
 
+- Add support for Tezos X Previewnet testnet with the `--network` CLI argument.
+  (!21735)
+
 ### Execution changes
 
 - Fixed v0 block headers missing `baseFeePerGas`, which caused failures
