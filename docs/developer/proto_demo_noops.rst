@@ -136,6 +136,24 @@ first two blocks of the blockchain (in particular the values of the
    $ curl localhost:18731/chains/main/blocks/head | jq
    $ curl localhost:18731/chains/main/blocks/head~1 | jq
 
+.. note::
+
+   After activating ``demo_noops``, the command
+   ``octez-client rpc get /chains/main/blocks/head`` will fail with
+   ``Fatal error: unknown protocol version``. This happens because
+   ``octez-client`` tries to load protocol-specific CLI extensions by
+   querying the head block's ``next_protocol``. Since ``demo_noops`` does
+   not register a client commands module (it has no ``lib_client``
+   directory), the client does not know how to handle this protocol.
+
+   To work around this, either force the client to use a known protocol's
+   extensions with the ``-p`` flag::
+
+      $ octez-client -p ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im \
+        rpc get /chains/main/blocks/head
+
+   or use ``curl`` directly as shown above.
+
 Protocol Structure and Compilation
 ==================================
 
