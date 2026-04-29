@@ -37,7 +37,7 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Full ->
       [
         [
-          ("RELEASE", ["unstable"; "bookworm"; "trixie"]);
+          ("RELEASE", ["bookworm"; "trixie"]);
           ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]

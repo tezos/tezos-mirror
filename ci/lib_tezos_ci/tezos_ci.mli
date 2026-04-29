@@ -607,8 +607,6 @@ module Images : sig
 
     val rust_toolchain_version : string
 
-    val debian_unstable : Image.t
-
     val debian_bookworm : Image.t
 
     val debian_trixie : Image.t

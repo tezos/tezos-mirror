@@ -1627,8 +1627,6 @@ module Images = struct
     let debian_jsonnet_trixie =
       make_img "debian-jsonnet:trixie" "master-d70f7d37"
 
-    let debian_unstable = make_img "debian:unstable" debian_version
-
     let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
 
     let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
