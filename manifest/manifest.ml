@@ -1207,6 +1207,7 @@ module Target = struct
     bisect_ppx : bisect_ppx;
     time_measurement_ppx : bool;
     c_library_flags : string list option;
+    c_library_flags_include : string option;
     conflicts : t list;
     deps : t list;
     link_deps : Manifest_link_deps.t list;
@@ -1463,6 +1464,7 @@ module Target = struct
     ?all_modules_except:string list ->
     ?bisect_ppx:bisect_ppx ->
     ?c_library_flags:string list ->
+    ?c_library_flags_include:string ->
     ?conflicts:t option list ->
     ?dep_files:string list ->
     ?dep_globs:string list ->
@@ -1536,18 +1538,19 @@ module Target = struct
     t option
 
   let internal ~product make_kind ?all_modules_except ?bisect_ppx
-      ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
-      ?(dep_globs_rec = []) ?(deps = []) ?(link_deps = []) ?(dune = Dune.[])
-      ?flags ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
-      ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
-      ?modules ?(modules_without_implementation = [])
-      ?(ocaml = default_ocaml_dependency) ?opam ?opam_bug_reports ?opam_doc
-      ?opam_homepage ?(opam_with_test = Always) ?opam_version
-      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
-      ?(preprocess = No_PPS) ?(preprocessor_deps = []) ?(private_modules = [])
-      ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
-      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?c_library_flags ?c_library_flags_include ?(conflicts = [])
+      ?(dep_files = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(deps = [])
+      ?(link_deps = []) ?(dune = Dune.[]) ?flags ?foreign_archives
+      ?foreign_stubs ?ctypes ?implements ?inline_tests ?inline_tests_deps
+      ?inline_tests_link_flags ?inline_tests_libraries ?wrapped ?documentation
+      ?(link_flags = []) ?(linkall = false) ?modes ?modules
+      ?(modules_without_implementation = []) ?(ocaml = default_ocaml_dependency)
+      ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
+      ?(opam_with_test = Always) ?opam_version ?(optional = false) ?ppx_kind
+      ?(ppx_runtime_libraries = []) ?(preprocess = No_PPS)
+      ?(preprocessor_deps = []) ?(private_modules = []) ?profile
+      ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static ?synopsis
+      ?description ?(time_measurement_ppx = false)
       ?(available : available = Always) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ?(with_macos_security_framework = false) ?(with_cpp_stdlib = false)
@@ -1897,6 +1900,7 @@ module Target = struct
         bisect_ppx;
         time_measurement_ppx;
         c_library_flags;
+        c_library_flags_include;
         conflicts;
         deps;
         link_deps;
@@ -2463,6 +2467,7 @@ module Sub_lib = struct
        ?all_modules_except
        ?bisect_ppx
        ?c_library_flags
+       ?c_library_flags_include
        ?conflicts
        ?dep_files
        ?dep_globs
@@ -2556,6 +2561,7 @@ module Sub_lib = struct
       ?all_modules_except
       ?bisect_ppx
       ?c_library_flags
+      ?c_library_flags_include
       ?conflicts
       ?deps
       ?link_deps
@@ -2795,15 +2801,21 @@ let generate_dune (internal : Target.internal) =
     | link_flags -> Some (Dune.[S ":standard"] :: link_flags)
   in
   let c_library_flags_sexp =
-    if internal.with_cpp_stdlib && is_lib then
-      let include_flag =
-        Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]
-      in
-      Some
-        (match internal.c_library_flags with
-        | None -> Dune.[include_flag]
-        | Some flags -> Dune.[of_atom_list flags; include_flag])
-    else Option.map Dune.of_atom_list internal.c_library_flags
+    let extra_includes =
+      (if internal.with_cpp_stdlib && is_lib then
+         [Dune.[S ":include"; S "%{workspace_root}/c++-stdlib-link-flags.sexp"]]
+       else [])
+      @
+      match internal.c_library_flags_include with
+      | Some path -> [Dune.[S ":include"; S path]]
+      | None -> []
+    in
+    match (internal.c_library_flags, extra_includes) with
+    | None, [] -> None
+    | None, includes -> Some (Dune.of_list includes)
+    | Some flags, [] -> Some (Dune.of_atom_list flags)
+    | Some flags, includes ->
+        Some (Dune.of_list (Dune.of_atom_list flags :: includes))
   in
   let open_flags : Dune.s_expr list =
     internal.opens |> List.map (fun m -> Dune.(H [S "-open"; S m]))

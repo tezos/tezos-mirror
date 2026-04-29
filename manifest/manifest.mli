@@ -858,6 +858,7 @@ type 'a maker =
   ?all_modules_except:string list ->
   ?bisect_ppx:bisect_ppx ->
   ?c_library_flags:string list ->
+  ?c_library_flags_include:string ->
   ?conflicts:target list ->
   ?dep_files:string list ->
   ?dep_globs:string list ->

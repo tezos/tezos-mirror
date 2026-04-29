@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name sqlite_zstd)
+ (public_name octez-l2-libs.sqlite_zstd)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  sqlite3)
+ (foreign_stubs
+  (language c)
+  (flags (-Wall -Wextra :standard (:include c_flags_zstd.sexp)))
+  (names zstd zstd_stub))
+ (c_library_flags ((-lzstd) (:include c_libs_zstd.sexp))))
+
+(rule
+ (targets c_flags_zstd.sexp c_libs_zstd.sexp)
+ (action
+  (progn
+   (with-stdout-to
+    c_flags_zstd.sexp
+    (system "echo \"($(pkg-config --cflags libzstd 2>/dev/null))\""))
+   (with-stdout-to
+    c_libs_zstd.sexp
+    (system "echo \"($(pkg-config --libs-only-L libzstd 2>/dev/null))\"")))))
