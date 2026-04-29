@@ -34,14 +34,7 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
 let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Common.Packaging.Partial ->
       [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full ->
-      [
-        [
-          ("RELEASE", ["bookworm"; "trixie"]);
-          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
-        ];
-      ]
-  | Release ->
+  | Full | Release ->
       [
         [
           ("RELEASE", ["bookworm"; "trixie"]);
