@@ -11,7 +11,11 @@ use crate::{
     enshrined_contracts::{self, EnshrinedContracts},
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::{
+    enc::BinWriter,
+    nom::NomReader,
+    types::{Narith, Zarith},
+};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
     host::ValueType,
@@ -304,6 +308,20 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         store_bin(len, host, &path)
     }
 
+    fn code_size(
+        &self,
+        host: &impl StorageV1,
+    ) -> Result<Zarith, tezos_storage::error::Error> {
+        let path = context::code::code_size_path(self)?;
+        let n: Narith = read_nom_value(host, &path)?;
+        Ok(n.into())
+    }
+
+    /// Persists `data` as the contract's main storage and refreshes the
+    /// `storage_size` and `used_bytes` counters in durable storage. For
+    /// enshrined contracts, returns `Ok(0)` without writing anything.
+    ///
+    /// Returns the new storage size in bytes.
     fn set_storage(
         &self,
         host: &mut impl StorageV1,
@@ -316,13 +334,20 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         host.store_write_all(&path, data)?;
         let storage_size = data.len() as u64;
         self.set_storage_size(host, &storage_size.into())?;
+        // TODO(L2-1276): also fold in ∑ total_bytes(big-map) for permanent
+        // big-maps in this contract's storage; depending on L2-1276's design
+        // this may extend this expression here or recompute at the big-map
+        // flush site.
+        let code_size = self.code_size(host)?;
+        let used = Zarith(code_size.0 + storage_size);
+        self.set_used_bytes(host, &used)?;
         Ok(storage_size)
     }
 
     fn set_paid_bytes(
         &self,
         host: &mut impl StorageV1,
-        paid: &Narith,
+        paid: &Zarith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::paid_bytes_path(self)?;
         store_bin(paid, host, &path)
@@ -331,7 +356,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
     fn set_used_bytes(
         &self,
         host: &mut impl StorageV1,
-        used: &Narith,
+        used: &Zarith,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::code::used_bytes_path(self)?;
         store_bin(used, host, &path)
@@ -352,7 +377,8 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         // TODO: Set the lazy_storage
         let lazy_storage_size = 0u64;
 
-        // TODO: Set real value for those two fields
+        // TODO(L2-1280): Set real values at origination (code_size +
+        // storage_size + lazy_storage_size for both counters).
         self.set_paid_bytes(host, &0u64.into())?;
         self.set_used_bytes(host, &0u64.into())?;
 
@@ -705,5 +731,104 @@ mod test {
             read_code,
             "Set/Read code have inconsistent behavior"
         );
+    }
+
+    /// Test helper: read a contract's `used_bytes` from durable storage as
+    /// `Zarith`. The first non-test consumer of `used_bytes` is the
+    /// end-of-op `storage_limit` quota check (L2-1273), which will likely
+    /// introduce a real getter on `TezosOriginatedAccount` and let this
+    /// helper go.
+    fn read_used_bytes<A: TezosOriginatedAccount>(
+        host: &impl StorageV1,
+        account: &A,
+    ) -> Zarith {
+        let path = context::code::used_bytes_path(account).unwrap();
+        let raw = host.store_read_all(&path).unwrap();
+        let (_, value) = Zarith::nom_read(&raw).unwrap();
+        value
+    }
+
+    /// Verifies what happens when a contract's storage is modified to a
+    /// larger value; in this case, we expect `used_bytes` to be updated
+    /// to `code_size + new_storage_size`.
+    #[test]
+    fn test_set_storage_overwrite_updates_used_bytes() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        let code = vec![0xab_u8; 30];
+        let storage = vec![0xcd_u8; 20];
+        let larger_storage = vec![0x12_u8; 50];
+
+        account.init(&mut host, &code, &storage).unwrap();
+        // Establish baseline: refresh used_bytes once after init
+        // (TODO(L2-1280): drop once init writes the real initial value).
+        account.set_storage(&mut host, &storage).unwrap();
+        assert_eq!(
+            read_used_bytes(&host, &account),
+            Zarith::from((code.len() + storage.len()) as u64),
+        );
+
+        account.set_storage(&mut host, &larger_storage).unwrap();
+        assert_eq!(
+            read_used_bytes(&host, &account),
+            Zarith::from((code.len() + larger_storage.len()) as u64),
+        );
+    }
+
+    /// Verifies what happens when a contract's storage is modified to a
+    /// smaller value; in this case, we expect `used_bytes` to decrease
+    /// accordingly (it is the live size, not a monotonic watermark).
+    #[test]
+    fn test_set_storage_shrink_decreases_used_bytes() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        let code = vec![0xab_u8; 30];
+        let storage = vec![0xcd_u8; 20];
+        let smaller_storage = vec![0x34_u8; 5];
+
+        account.init(&mut host, &code, &storage).unwrap();
+        // Establish baseline: refresh used_bytes once after init
+        // (TODO(L2-1280): drop once init writes the real initial value).
+        account.set_storage(&mut host, &storage).unwrap();
+        assert_eq!(
+            read_used_bytes(&host, &account),
+            Zarith::from((code.len() + storage.len()) as u64),
+        );
+
+        account.set_storage(&mut host, &smaller_storage).unwrap();
+        assert_eq!(
+            read_used_bytes(&host, &account),
+            Zarith::from((code.len() + smaller_storage.len()) as u64),
+        );
+    }
+
+    /// Verifies what happens when `set_storage` is called on an enshrined
+    /// contract; in this case, we expect no durable-storage write at all
+    /// (the function is a no-op).
+    #[test]
+    fn test_set_storage_is_noop_for_enshrined() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        // Gateway is an enshrined contract; set_storage early-returns on it
+        // without touching durable storage.
+        const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+        let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        account.set_storage(&mut host, &[0xef_u8; 15]).unwrap();
+
+        let storage_path = context::code::storage_path(&account).unwrap();
+        let storage_size_path = context::code::storage_size_path(&account).unwrap();
+        let used_bytes_path = context::code::used_bytes_path(&account).unwrap();
+        assert_eq!(host.store_has(&storage_path).unwrap(), None);
+        assert_eq!(host.store_has(&storage_size_path).unwrap(), None);
+        assert_eq!(host.store_has(&used_bytes_path).unwrap(), None);
     }
 }
