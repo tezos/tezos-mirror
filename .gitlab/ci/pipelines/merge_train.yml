@@ -299,7 +299,6 @@ images.ubuntu:
     - RELEASE:
       - "22.04"
       - "24.04"
-      - "25.10"
       - "26.04"
 
 images.debian-rust:
@@ -623,7 +622,6 @@ images.ubuntu-build:
     - RELEASE:
       - "22.04"
       - "24.04"
-      - "25.10"
       - "26.04"
       TAGS:
       - gcp_very_high_cpu
@@ -678,7 +676,6 @@ images.ubuntu-build.merge:
     - RELEASE:
       - "22.04"
       - "24.04"
-      - "25.10"
       - "26.04"
 
 images.debian-systemd:
@@ -772,7 +769,6 @@ images.ubuntu-systemd:
     - RELEASE:
       - "22.04"
       - "24.04"
-      - "25.10"
       - "26.04"
 
 images.debian-jsonnet:
