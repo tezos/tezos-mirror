@@ -3349,7 +3349,7 @@ let test_upgrade_kernel_auto_sync =
 
   (* Sends the upgrade to L1, but not to the sequencer. *)
   let _, to_use = Kernel.to_uses_and_tags to_ in
-  let* _root_hash =
+  let* to_root_hash =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
@@ -3379,6 +3379,21 @@ let test_upgrade_kernel_auto_sync =
       ()
   in
 
+  (* Snapshot the pre-upgrade head: its block number and the kernel root
+     hash exposed via [tez_kernelRootHash] without a block parameter. The
+     kernel only writes [KERNEL_ROOT_HASH] when processing an upgrade
+     (see [etherlink/kernel_latest/kernel/src/upgrade.rs]); at boot the
+     installer config does not seed it, so this snapshot is expected to
+     be [None]. After the upgrade we use this snapshot to assert that
+     the historical RPC at this block faithfully returns [None] rather
+     than the post-upgrade root hash. *)
+  let*@ pre_upgrade_block = Rpc.block_number sequencer in
+  let*@ from_root_hash_opt = Rpc.tez_kernelRootHash sequencer in
+  Check.((from_root_hash_opt = None) (option string))
+    ~error_msg:
+      "Expected tez_kernelRootHash to be None before the first upgrade (the \
+       kernel only writes it on upgrade), got %L" ;
+
   (* Produce a block after activation timestamp, both the rollup
      node and the sequencer will upgrade to debug kernel and
      therefore not produce the block. *)
@@ -3404,6 +3419,38 @@ let test_upgrade_kernel_auto_sync =
     | Some to_commit ->
         let* _ =
           check_kernel_version ~evm_node:sequencer ~equal:true to_commit
+        in
+        unit
+    | None -> unit
+  in
+
+  (* Historical RPC checks: querying [tez_kernelVersion] and
+     [tez_kernelRootHash] at the pre-upgrade block must return the [from]
+     kernel state, while querying at [Latest] must return the [to_]
+     kernel state. *)
+  let pre_upgrade_block_param = Rpc.Number (Int32.to_int pre_upgrade_block) in
+  let*@ latest_root_hash_opt = Rpc.tez_kernelRootHash sequencer in
+  Check.((latest_root_hash_opt = Some to_root_hash) (option string))
+    ~error_msg:
+      "Expected tez_kernelRootHash at latest to be %R after the upgrade, got %L" ;
+  let*@ historical_root_hash_opt =
+    Rpc.tez_kernelRootHash ~block:pre_upgrade_block_param sequencer
+  in
+  Check.((historical_root_hash_opt = from_root_hash_opt) (option string))
+    ~error_msg:
+      "Expected tez_kernelRootHash at the pre-upgrade block to be %R, got %L" ;
+  let* () =
+    match Kernel.commit_of from with
+    | Some from_commit ->
+        let*@ historical_kernel_version =
+          Rpc.tez_kernelVersion ~block:pre_upgrade_block_param sequencer
+        in
+        Check.((historical_kernel_version = from_commit) string)
+          ~error_msg:
+            "Expected tez_kernelVersion at the pre-upgrade block to be %R, got \
+             %L" ;
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:false from_commit
         in
         unit
     | None -> unit
