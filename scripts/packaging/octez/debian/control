@@ -12,7 +12,8 @@ Build-Depends: rsync,
   libhidapi-dev, pkg-config,
   zlib1g-dev, debhelper, debconf,
   libprotobuf-dev, protobuf-compiler,
-  libsqlite3-dev
+  libsqlite3-dev,
+  libzstd-dev
 
 Package: octez-node
 Architecture: amd64 arm64
