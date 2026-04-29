@@ -55,7 +55,52 @@ impl std::fmt::Display for CracError {
 
 impl From<TransferError> for CracError {
     fn from(e: TransferError) -> Self {
-        CracError::Operation(e)
+        match e {
+            // Kernel-internal failures (storage corruption / host I/O /
+            // encoding bugs in the storage layer) bypass the
+            // CracError::Operation channel and signal a block revert
+            // directly, matching the Boundary-2 (gateway HTTP) classifier.
+            //
+            // The same construction sites are reached from both the
+            // regular Tezos pipeline and the cross-runtime gateway path;
+            // master's blanket Operation wrap silently downgraded the
+            // regular-pipeline outcome to op-level. Routing them here as
+            // BlockAbort makes both paths agree, and matches how the EVM
+            // execution path lifts the same class of failures into its
+            // own outer EVMError channel (revm/src/lib.rs:362+,
+            // apply.rs:716-721).
+            //
+            // The cause discarded by .map_err(|_| TransferError::FailedTo*)?
+            // at each construction site is a tezos_storage::error::Error
+            // (Path / Runtime / Storage / RlpDecoderError / NomReadError /
+            // BinWriteError / InvalidLoadValue / ImplicitToOriginated /
+            // OriginatedToImplicit / TcError / TryFromBigIntError) — none
+            // of these are recoverable user input.
+            //
+            // Carve-out: FailedToFetchContractCode is intentionally NOT
+            // routed here. The originated branch of `transfer` does not
+            // check destination existence before reading code, so a
+            // Transaction to a never-originated KT1 surfaces as
+            // RuntimeError::PathNotFound through this variant. Promoting
+            // it to BlockAbort would let any user discard a block by
+            // sending one transfer to a bogus KT1. Until the originated
+            // branch grows a typed existence check (tracked in L2-1290),
+            // this variant stays in the Operation arm so a non-existent
+            // destination produces a manager-batch revert and the block
+            // continues.
+            TransferError::FailedToApplyBalanceChanges
+            | TransferError::FailedToAllocateDestination
+            | TransferError::FailedToFetchDestinationAccount
+            | TransferError::FailedToFetchContractStorage
+            | TransferError::FailedToFetchDestinationBalance
+            | TransferError::FailedToFetchSenderBalance
+            | TransferError::FailedToUpdateContractStorage
+            | TransferError::FailedToUpdateDestinationBalance
+            | TransferError::FailedToComputeBalanceUpdate => {
+                CracError::BlockAbort(format!("internal error during transfer: {e}"))
+            }
+            _ => CracError::Operation(e),
+        }
     }
 }
 
