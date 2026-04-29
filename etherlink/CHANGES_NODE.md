@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Include `injectTezlinkOperation` in the list of supported EVM
+  methods used by the RPC node. (!21785)
+
 ### Monitoring changes
 
 ### Command-line interface changes
