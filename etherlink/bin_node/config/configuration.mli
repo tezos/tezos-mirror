@@ -134,6 +134,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
+  compact_receipt_encoding : bool;
 }
 
 type gcp_key = {

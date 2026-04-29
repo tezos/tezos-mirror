@@ -40,7 +40,8 @@
   preconfirmation
   tezosx
   dev_commands
-  cross_runtime))
+  cross_runtime
+  compact_receipt_encoding))
 
 (executable
  (name main)

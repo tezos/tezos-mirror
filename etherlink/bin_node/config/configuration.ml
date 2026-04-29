@@ -177,6 +177,7 @@ type experimental_features = {
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
   preconfirmation_stream_enabled : bool;
+  compact_receipt_encoding : bool;
 }
 
 type gcp_key = {
@@ -342,6 +343,7 @@ let default_experimental_features =
     l2_chains = default_l2_chains;
     periodic_snapshot_path = None;
     preconfirmation_stream_enabled = false;
+    compact_receipt_encoding = false;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -1048,6 +1050,7 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            periodic_snapshot_path;
            preconfirmation_stream_enabled;
+           compact_receipt_encoding;
          }
        ->
       ( ( drop_duplicate_on_injection,
@@ -1060,7 +1063,8 @@ let experimental_features_encoding =
           spawn_rpc,
           l2_chains,
           periodic_snapshot_path,
-          preconfirmation_stream_enabled ) ))
+          preconfirmation_stream_enabled,
+          compact_receipt_encoding ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -1071,7 +1075,8 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              periodic_snapshot_path,
-             preconfirmation_stream_enabled ) )
+             preconfirmation_stream_enabled,
+             compact_receipt_encoding ) )
        ->
       {
         drop_duplicate_on_injection;
@@ -1083,6 +1088,7 @@ let experimental_features_encoding =
         l2_chains;
         periodic_snapshot_path;
         preconfirmation_stream_enabled;
+        compact_receipt_encoding;
       })
     (merge_objs
        (obj6
@@ -1133,7 +1139,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj6
           (dft
              "rpc_server"
              ~description:
@@ -1165,7 +1171,21 @@ let experimental_features_encoding =
                "Activate or not the preconfirmation stream. This includes the \
                 sequencer as well as the observer."
              bool
-             default_experimental_features.preconfirmation_stream_enabled)))
+             default_experimental_features.preconfirmation_stream_enabled)
+          (dft
+             "compact_receipt_encoding"
+             ~description:
+               "When enabled, transaction receipts are written to the store \
+                using a compact encoding: all-zero logs blooms are stored as \
+                empty bytes, and per-log context fields (blockNumber, \
+                blockHash, transactionHash, transactionIndex) are stripped \
+                since they are derivable from the outer transaction row. \
+                Defaults to [false] so that receipts remain readable by older \
+                node releases that predate the compact encoding, allowing \
+                operators to roll back the binary if needed. The decoder \
+                always accepts both formats, so this flag only affects writes."
+             bool
+             default_experimental_features.compact_receipt_encoding)))
 
 (* A chunk is at most 4 KBytes. A transaction is around 150 bytes. Having 4
    connections up gives roughly 100TPS (4 * 4000 / 150), which should cover

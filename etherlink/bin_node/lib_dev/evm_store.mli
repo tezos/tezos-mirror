@@ -245,7 +245,17 @@ val context_hash_of_block_hash :
   conn -> Ethereum_types.block_hash -> Pvm.Context.hash option tzresult Lwt.t
 
 module Transactions : sig
-  val store : conn -> Transaction_info.t -> unit tzresult Lwt.t
+  (** [store ~compact_receipt_encoding conn info] persists [info] in the
+      [transactions] table. When [compact_receipt_encoding] is [true], the
+      receipt fields are written using the compact encoding (empty-bytes
+      logs_bloom for all-zero blooms, per-log context fields stripped). When
+      [false], rows are written in the legacy format readable by node releases
+      that predate the compact encoding. *)
+  val store :
+    compact_receipt_encoding:bool ->
+    conn ->
+    Transaction_info.t ->
+    unit tzresult Lwt.t
 
   val find_receipt :
     conn -> Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t

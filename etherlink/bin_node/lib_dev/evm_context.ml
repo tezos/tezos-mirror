@@ -797,8 +797,8 @@ module State = struct
     let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
     Z.sub gas_used da_fees
 
-  let store_block_unsafe ?tez_block ~base_fee_per_gas ~da_fee_per_byte conn
-      evm_state block =
+  let store_block_unsafe ?tez_block ~compact_receipt_encoding ~base_fee_per_gas
+      ~da_fee_per_byte conn evm_state block =
     let open Lwt_result_syntax in
     (* Store the block itself. *)
     let* () = Evm_store.Blocks.store ?tez_block conn block in
@@ -839,7 +839,9 @@ module State = struct
           let store_info_and_acc_gas cumulative_execution_gas (object_, receipt)
               =
             let info = Transaction_info.of_receipt_and_object receipt object_ in
-            let* () = Evm_store.Transactions.store conn info in
+            let* () =
+              Evm_store.Transactions.store ~compact_receipt_encoding conn info
+            in
             return
               ( Z.add
                   cumulative_execution_gas
@@ -887,7 +889,9 @@ module State = struct
               let info =
                 Transaction_info.of_receipt_and_object receipt object_
               in
-              let* () = Evm_store.Transactions.store conn info in
+              let* () =
+                Evm_store.Transactions.store ~compact_receipt_encoding conn info
+              in
               return
                 ( Z.add
                     cumulative_execution_gas
@@ -1269,6 +1273,9 @@ module State = struct
             in
             store_block_unsafe
               ?tez_block:tezosx_tez_block
+              ~compact_receipt_encoding:
+                ctxt.configuration.experimental_features
+                  .compact_receipt_encoding
               ~da_fee_per_byte
               ~base_fee_per_gas
               conn

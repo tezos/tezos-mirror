@@ -30,7 +30,8 @@
     "spawn_rpc": null,
     "l2_chains": null,
     "periodic_snapshot_path": null,
-    "preconfirmation_stream_enabled": true
+    "preconfirmation_stream_enabled": true,
+    "compact_receipt_encoding": false
   },
   "gcp_kms": {
     "connection_pool_size": 4,
@@ -122,7 +123,8 @@
     "spawn_rpc": null,
     "l2_chains": null,
     "periodic_snapshot_path": null,
-    "preconfirmation_stream_enabled": true
+    "preconfirmation_stream_enabled": true,
+    "compact_receipt_encoding": false
   },
   "gcp_kms": {
     "connection_pool_size": 4,

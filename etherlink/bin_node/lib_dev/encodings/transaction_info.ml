@@ -118,7 +118,7 @@ let compact_bloom_encoding =
     (fun s -> if s = "" then zero_logs_bloom else hex_of_string s)
     Data_encoding.string
 
-let receipt_fields_encoding =
+let receipt_fields_encoding_with ~bloom_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -164,10 +164,16 @@ let receipt_fields_encoding =
        (req "effective_gas_price" quantity_encoding)
        (req "gas_used" quantity_encoding)
        (req "logs" (list transaction_log_encoding))
-       (req "logs_bloom" compact_bloom_encoding)
+       (req "logs_bloom" bloom_encoding)
        (req "type_" quantity_encoding)
        (req "status" quantity_encoding)
        (req "contract_address" (option address_encoding)))
+
+let receipt_fields_encoding =
+  receipt_fields_encoding_with ~bloom_encoding:compact_bloom_encoding
+
+let legacy_receipt_fields_encoding =
+  receipt_fields_encoding_with ~bloom_encoding:hex_encoding
 
 let object_fields_encoding =
   let open Data_encoding in
