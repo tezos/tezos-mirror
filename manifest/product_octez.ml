@@ -5655,7 +5655,7 @@ let octez_sqlite =
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
 
-let _octez_sqlite_zstd =
+let octez_sqlite_zstd =
   octez_l2_lib
     "sqlite_zstd"
     ~path:"src/lib_sqlite_zstd"
@@ -5710,6 +5710,19 @@ let _octez_sqlite_zstd =
             ];
           ];
         ]
+
+let _octez_sqlite_zstd_tests =
+  tezt
+    ~path:"src/lib_sqlite_zstd/test"
+    ~opam:"octez-l2-libs"
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        octez_sqlite_zstd;
+      ]
+    ["test_sqlite_zstd"]
 
 let _gen_migrations =
   public_exe
