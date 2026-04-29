@@ -415,6 +415,12 @@ module Request = struct
 
   let http_traceBlockByHash ~block_hash =
     {method_ = "http_traceBlockByHash"; parameters = `A [`String block_hash]}
+
+  let tez_getMetaBlockByNumber ~block =
+    {method_ = "tez_getMetaBlockByNumber"; parameters = `A [`String block]}
+
+  let tez_getMetaBlockByHash ~hash =
+    {method_ = "tez_getMetaBlockByHash"; parameters = `A [`String hash]}
 end
 
 let net_version ?websocket evm_node =
@@ -1024,6 +1030,26 @@ module Tezosx = struct
         ?websocket
         evm_node
         (Request.http_traceBlockByHash ~block_hash)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let tez_getMetaBlockByNumber ?websocket ~block evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getMetaBlockByNumber ~block)
+    in
+    let decode_result response = JSON.(response |-> "result") in
+    return @@ decode_or_error decode_result response
+
+  let tez_getMetaBlockByHash ?websocket ~hash evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getMetaBlockByHash ~hash)
     in
     let decode_result response = JSON.(response |-> "result") in
     return @@ decode_or_error decode_result response

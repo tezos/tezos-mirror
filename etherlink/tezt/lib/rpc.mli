@@ -91,6 +91,10 @@ module Request : sig
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 
   val eth_unsubscribe : id:string -> Evm_node.request
+
+  val tez_getMetaBlockByNumber : block:string -> Evm_node.request
+
+  val tez_getMetaBlockByHash : hash:string -> Evm_node.request
 end
 
 (** {2 RPC calls wrappers}
@@ -472,6 +476,18 @@ module Tezosx : sig
   val http_traceBlockByHash :
     ?websocket:Websocket.t ->
     block_hash:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val tez_getMetaBlockByNumber :
+    ?websocket:Websocket.t ->
+    block:string ->
+    Evm_node.t ->
+    (JSON.t, error) result Lwt.t
+
+  val tez_getMetaBlockByHash :
+    ?websocket:Websocket.t ->
+    hash:string ->
     Evm_node.t ->
     (JSON.t, error) result Lwt.t
 end

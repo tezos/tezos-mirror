@@ -1807,6 +1807,56 @@ let dispatch_request (type f) ~websocket
                        (Format.sprintf "Unknown L1 block %ld" l1_level))
             in
             build_with_input ~f module_ parameters
+        | Get_meta_block_by_number.Method ->
+            let f block_param =
+              let open Lwt_result_syntax in
+              let* (Qty level) =
+                Evm_ro_context.block_param_to_block_number
+                  ro_ctxt
+                  ~chain_family:L2_types.EVM
+                  (Block_parameter block_param)
+              in
+              let* hashes =
+                Evm_ro_context.meta_block_hashes_of_number ro_ctxt level
+              in
+              match hashes with
+              | Some hashes -> rpc_ok Meta_block.{level = Qty level; hashes}
+              | None ->
+                  rpc_error
+                    (Rpc_errors.resource_not_found
+                       (Format.sprintf "Unknown block %s" (Z.to_string level)))
+            in
+            build_with_input ~f module_ parameters
+        | Get_meta_block_by_hash.Method ->
+            let f hash =
+              let open Lwt_result_syntax in
+              let* level_opt =
+                Evm_ro_context.meta_block_number_of_hash ro_ctxt hash
+              in
+              match level_opt with
+              | Some (Qty level) -> (
+                  let* hashes =
+                    Evm_ro_context.meta_block_hashes_of_number ro_ctxt level
+                  in
+                  match hashes with
+                  | Some hashes -> rpc_ok Meta_block.{level = Qty level; hashes}
+                  | None ->
+                      rpc_error
+                        (Rpc_errors.resource_not_found
+                           (Format.sprintf
+                              "Unknown block %s"
+                              (Z.to_string level))))
+              | None ->
+                  let pp fmt = function
+                    | Meta_block.Evm hash ->
+                        Ethereum_types.pp_block_hash fmt hash
+                    | Meta_block.Michelson hash -> Block_hash.pp fmt hash
+                  in
+                  rpc_error
+                    (Rpc_errors.resource_not_found
+                       (Format.asprintf "Unknown block hash %a" pp hash))
+            in
+            build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in

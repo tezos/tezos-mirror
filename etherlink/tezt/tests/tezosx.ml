@@ -4705,6 +4705,82 @@ let test_eip1271_wrong_signature_rejected =
          EIP-1271 failure magic %R") ;
   unit
 
+let test_meta_block_rpcs ~runtime () =
+  Setup.register_sandbox_test
+    ~title:"tez_getMetaBlockByNumber and tez_getMetaBlockByHash"
+    ~tags:["meta_block"; "rpc"]
+    ~with_runtimes:[runtime]
+  @@ fun sandbox ->
+  (* Produce a block so there is a level with both EVM and Michelson hashes *)
+  let*@ _nb_txs = Rpc.produce_block sandbox in
+  (* Get the EVM block at "latest" to retrieve its hash and number *)
+  let*@ evm_block = Rpc.get_block_by_number ~block:"latest" sandbox in
+  let evm_hash = evm_block.hash in
+  let hex_level = Format.sprintf "0x%lx" evm_block.number in
+  (* 1. tez_getMetaBlockByNumber: verify that symbolic block parameters are
+     supported, and that the level, EVM hash and Michelson hash match. *)
+  let*@ meta = Rpc.Tezosx.tez_getMetaBlockByNumber ~block:"latest" sandbox in
+  Check.(
+    (JSON.(meta |-> "level" |> as_string) = hex_level)
+      string
+      ~error_msg:"tez_getMetaBlockByNumber: expected level %R, got %L") ;
+  Check.(
+    (JSON.(meta |-> "block_hashes" |-> "evm_block_hash" |> as_string) = evm_hash)
+      string
+      ~error_msg:"tez_getMetaBlockByNumber: expected EVM hash %R, got %L") ;
+  let*@ meta_by_number =
+    Rpc.Tezosx.tez_getMetaBlockByNumber ~block:hex_level sandbox
+  in
+  Check.(
+    (meta_by_number = meta)
+      json
+      ~error_msg:"tez_getMetaBlockByNumber (number): expected %R, got %L") ;
+  let michelson_hash =
+    JSON.(meta |-> "block_hashes" |-> "michelson_block_hash" |> as_string)
+  in
+  (* 2. tez_getMetaBlockByHash with the EVM hash returns the same meta-block. *)
+  let*@ meta_by_evm =
+    Rpc.Tezosx.tez_getMetaBlockByHash ~hash:evm_hash sandbox
+  in
+  Check.(
+    (meta_by_evm = meta)
+      json
+      ~error_msg:"tez_getMetaBlockByHash (EVM): expected %R, got %L") ;
+  (* 3. tez_getMetaBlockByHash with the Michelson hash returns the same
+     meta-block. *)
+  let*@ meta_by_mic =
+    Rpc.Tezosx.tez_getMetaBlockByHash ~hash:michelson_hash sandbox
+  in
+  Check.(
+    (meta_by_mic = meta)
+      json
+      ~error_msg:"tez_getMetaBlockByHash (Michelson): expected %R, got %L") ;
+  unit
+
+let test_meta_block_rpcs_without_michelson_runtime () =
+  Setup.register_sandbox_test
+    ~title:
+      "tez_getMetaBlockByNumber returns null Michelson hash without Tezos \
+       runtime"
+    ~tags:["meta_block"; "rpc"]
+    ~with_runtimes:[]
+  @@ fun sandbox ->
+  let*@ _nb_txs = Rpc.produce_block sandbox in
+  let*@ evm_block = Rpc.get_block_by_number ~block:"latest" sandbox in
+  let*@ meta = Rpc.Tezosx.tez_getMetaBlockByNumber ~block:"latest" sandbox in
+  Check.(
+    (JSON.(meta |-> "block_hashes" |-> "evm_block_hash" |> as_string)
+    = evm_block.hash)
+      string
+      ~error_msg:"tez_getMetaBlockByNumber: expected EVM hash %R, got %L") ;
+  Check.is_true
+    ~__LOC__
+    JSON.(meta |-> "block_hashes" |-> "michelson_block_hash" |> is_null)
+    ~error_msg:
+      "tez_getMetaBlockByNumber: Michelson hash should be null when the Tezos \
+       runtime is not activated" ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -4771,4 +4847,6 @@ let () =
     () ;
   test_michelson_chain_id_in_crac ~runtime:Tezos () ;
   test_eip1271_signature_verification [Alpha] ;
-  test_eip1271_wrong_signature_rejected [Alpha]
+  test_eip1271_wrong_signature_rejected [Alpha] ;
+  test_meta_block_rpcs ~runtime:Tezos () ;
+  test_meta_block_rpcs_without_michelson_runtime ()

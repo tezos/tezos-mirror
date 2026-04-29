@@ -315,6 +315,18 @@ val tezosx_nth_block : t -> Z.t -> L2_types.Tezos_block.t tzresult Lwt.t
 val tezosx_nth_block_hash :
   t -> Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
 
+(** [meta_block_hashes_of_number ctxt level] returns the meta-block hashes
+    for the given level. *)
+val meta_block_hashes_of_number :
+  t -> Z.t -> Meta_block.hashes option tzresult Lwt.t
+
+(** [meta_block_number_of_hash ctxt hash] returns the block level
+    corresponding to the given block hash identifier (EVM or Michelson). *)
+val meta_block_number_of_hash :
+  t ->
+  Meta_block.block_hash_identifier ->
+  Ethereum_types.quantity option tzresult Lwt.t
+
 val next_blueprint_number : t -> Ethereum_types.quantity tzresult Lwt.t
 
 type evm_services_methods = {

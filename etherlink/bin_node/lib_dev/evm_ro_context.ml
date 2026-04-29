@@ -904,6 +904,20 @@ let tezosx_nth_block_hash ctxt level =
   Evm_store.use ctxt.store @@ fun conn ->
   Evm_store.Blocks.find_tez_hash_of_number conn (Qty level)
 
+let meta_block_hashes_of_number ctxt level =
+  Evm_store.use ctxt.store @@ fun conn ->
+  Evm_store.Blocks.find_hashes_of_number conn (Qty level)
+
+let meta_block_number_of_hash ctxt hash =
+  Evm_store.use ctxt.store @@ fun conn ->
+  match (hash : Meta_block.block_hash_identifier) with
+  | Evm hash -> Evm_store.Blocks.find_number_of_hash conn hash
+  | Michelson hash ->
+      let hash =
+        Ethereum_types.block_hash_of_bytes (Block_hash.to_bytes hash)
+      in
+      Evm_store.Blocks.find_number_of_tez_hash conn hash
+
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in
   let* Qty current_block_number, _ =

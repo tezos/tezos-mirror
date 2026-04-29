@@ -1171,6 +1171,36 @@ module Get_finalized_blocks_of_l1_level = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Get_meta_block_by_number = struct
+  type input = Ethereum_types.Block_parameter.t
+
+  type output = Meta_block.t
+
+  let input_encoding =
+    Data_encoding.tup1 Ethereum_types.Block_parameter.encoding
+
+  let output_encoding = Meta_block.encoding
+
+  let method_ = "tez_getMetaBlockByNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Get_meta_block_by_hash = struct
+  type input = Meta_block.block_hash_identifier
+
+  type output = Meta_block.t
+
+  let input_encoding =
+    Data_encoding.tup1 Meta_block.block_hash_identifier_encoding
+
+  let output_encoding = Meta_block.encoding
+
+  let method_ = "tez_getMetaBlockByHash"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -1441,6 +1471,8 @@ let evm_supported_methods : (module METHOD) list =
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Get_finalized_blocks_of_l1_level);
+    (module Get_meta_block_by_number);
+    (module Get_meta_block_by_hash);
     (* Etherlink rpcs *)
     (module Accounts);
     (module Get_balance);
@@ -1554,6 +1586,8 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
     (module Send_raw_transaction);
     (module Send_raw_tezlink_operation);
     (module Send_raw_transaction_sync);
+    (module Get_meta_block_by_number);
+    (module Get_meta_block_by_hash);
     (* Private RPCs *)
     (module Produce_block);
     (module Propose_next_block_timestamp);
