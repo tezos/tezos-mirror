@@ -590,28 +590,36 @@ impl<Host: StorageV1, R: Registry> Journal<'_, Host, R> {
 /// This is implemented for Journal backed by EtherlinkVMDB, which has access
 /// to the host, registry, and block constants needed for cross-runtime calls.
 pub trait CrossRuntimeCall {
-    /// Resolve the Tezos alias for an EVM address. `remaining_evm_gas` is the
-    /// caller's remaining gas budget (used to cap alias generation).
+    /// Resolve the alias for an EVM address in `target_runtime`.
+    /// `remaining_evm_gas` is the caller's remaining gas budget (used to
+    /// cap alias generation).
     ///
     /// Returns `(alias, generation_gas_consumed)` where `generation_gas_consumed`
-    /// is in target runtime units (milligas for Tezos), 0 on cache hit.
+    /// is in `target_runtime` units (milligas for Tezos, EVM gas for Ethereum),
+    /// 0 on cache hit.
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
+        target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<(String, u64), CustomPrecompileError>;
 
     /// Read-only variant of [`Self::tezosx_resolve_source_alias`]: on
-    /// cache hit returns the persisted alias, on cache miss computes
-    /// the deterministic alias KT1 from the EVM address without
-    /// writing anything to storage.
+    /// cache hit returns the persisted alias for `target_runtime`, on
+    /// cache miss computes the deterministic alias from the EVM
+    /// address without writing anything to storage.
     ///
-    /// The deterministic KT1 is the same value
+    /// The deterministic alias is the same value
     /// [`Self::tezosx_resolve_source_alias`] would persist — by design
-    /// of [`Registry::generate_alias`], the alias is
-    /// `blake2b-160(lowercase_hex(address))`, so callers can rely on
-    /// the read-only path producing the canonical alias even when no
-    /// state-mutating call has ever seen this address before.
+    /// of [`Registry::generate_alias`]:
+    /// - `RuntimeId::Tezos` → `blake2b-160(lowercase_hex(address))`
+    ///   formatted as a `KT1...` base58check string;
+    /// - `RuntimeId::Ethereum` → `keccak256(lowercase_hex(address))[..20]`
+    ///   formatted as a `0x...` hex string.
+    ///
+    /// Callers can rely on the read-only path producing the canonical
+    /// alias for the target runtime even when no state-mutating call
+    /// has ever seen this address before.
     ///
     /// This variant is safe to call from a STATICCALL context, where
     /// any storage write would revert the enclosing frame. It is used
@@ -619,6 +627,7 @@ pub trait CrossRuntimeCall {
     fn tezosx_resolve_source_alias_readonly(
         &self,
         source: Address,
+        target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError>;
 
@@ -645,6 +654,7 @@ where
     fn tezosx_resolve_source_alias(
         &mut self,
         source: Address,
+        target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<(String, u64), CustomPrecompileError> {
         let context = CrossRuntimeContext {
@@ -653,26 +663,26 @@ where
             block_number: self.database.block.number,
         };
         let remaining = Gas::new(remaining_evm_gas);
-        match get_alias(self.database.host, &source, RuntimeId::Tezos)
+        match get_alias(self.database.host, &source, target_runtime)
             .map_err(|e| e.into_with_remainder(remaining))?
         {
             Some(alias) => Ok((alias, 0)),
             None => {
-                // Convert remaining EVM gas to Tezos milligas to cap
+                // Convert remaining EVM gas to target runtime units to cap
                 // the generation cost.
-                let tezos_gas_budget = tezosx_interfaces::gas::convert(
+                let target_gas_budget = tezosx_interfaces::gas::convert(
                     RuntimeId::Ethereum,
-                    RuntimeId::Tezos,
+                    target_runtime,
                     remaining_evm_gas,
                 )
                 .ok_or_else(|| {
                     CustomPrecompileError::Revert(
-                        "alias generation: EVM gas overflows Tezos milligas".into(),
+                        "alias generation: EVM gas overflows target runtime units".into(),
                         remaining,
                     )
                 })?;
                 let source_hex = source.to_string().to_lowercase();
-                let (alias_str, tezos_gas_remaining) = self
+                let (alias_str, target_gas_remaining) = self
                     .database
                     .registry
                     .generate_alias(
@@ -680,9 +690,9 @@ where
                         self.journal,
                         &source_hex,
                         None,
-                        RuntimeId::Tezos,
+                        target_runtime,
                         context,
-                        tezos_gas_budget,
+                        target_gas_budget,
                     )
                     .map_err(|e| {
                         CustomPrecompileError::Revert(
@@ -690,10 +700,10 @@ where
                             remaining,
                         )
                     })?;
-                store_alias(self.database.host, &source, RuntimeId::Tezos, &alias_str)
+                store_alias(self.database.host, &source, target_runtime, &alias_str)
                     .map_err(|e| e.into_with_remainder(remaining))?;
-                let consumed_milligas = tezos_gas_budget - tezos_gas_remaining;
-                Ok((alias_str, consumed_milligas))
+                let consumed_target = target_gas_budget - target_gas_remaining;
+                Ok((alias_str, consumed_target))
             }
         }
     }
@@ -701,27 +711,36 @@ where
     fn tezosx_resolve_source_alias_readonly(
         &self,
         source: Address,
+        target_runtime: RuntimeId,
         remaining_evm_gas: u64,
     ) -> Result<String, CustomPrecompileError> {
         let remaining = Gas::new(remaining_evm_gas);
-        if let Some(alias) = get_alias(self.database.host, &source, RuntimeId::Tezos)
+        if let Some(alias) = get_alias(self.database.host, &source, target_runtime)
             .map_err(|e| e.into_with_remainder(remaining))?
         {
             return Ok(alias);
         }
-        // Deterministic fallback: reproduce the KT1 that
-        // `TezosRuntime::generate_alias` would compute (and persist in
-        // the cache if called from a state-mutating path), but skip
-        // the storage writes.
+        // Deterministic fallback: reproduce the alias that the target
+        // runtime's `generate_alias` would compute (and persist on the
+        // state-mutating path), but skip the storage writes.
         //
-        // The algorithm (BLAKE2b-160 of the lowercase hex form of the
-        // EVM address) is duplicated from the Tezos runtime's
-        // `generate_alias` — the canonical implementation — and must
-        // stay in sync with it. If that formula ever changes, this
-        // read-only path must change too.
+        // Each branch duplicates the deterministic name-derivation
+        // step from the corresponding runtime's `generate_alias` — the
+        // canonical implementation — and must stay in sync with it.
+        // If either formula changes, this read-only path must change
+        // too.
         let source_hex = source.to_string().to_lowercase();
-        let kt1 = ContractKt1Hash::from(blake2b::digest_160(source_hex.as_bytes()));
-        Ok(kt1.to_base58_check())
+        match target_runtime {
+            RuntimeId::Tezos => {
+                let kt1 =
+                    ContractKt1Hash::from(blake2b::digest_160(source_hex.as_bytes()));
+                Ok(kt1.to_base58_check())
+            }
+            RuntimeId::Ethereum => {
+                let hash = revm::primitives::keccak256(source_hex.as_bytes());
+                Ok(Address::from_slice(&hash.0[..20]).to_string())
+            }
+        }
     }
 
     fn tezosx_call_http(

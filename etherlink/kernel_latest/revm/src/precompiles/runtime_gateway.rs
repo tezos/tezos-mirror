@@ -264,6 +264,7 @@ where
 fn resolve_aliases<'j, CTX, Host, R>(
     context: &mut CTX,
     gas: &mut Gas,
+    target_runtime: RuntimeId,
     sender: Address,
     source: Address,
 ) -> Result<(String, String), CustomPrecompileError>
@@ -276,9 +277,9 @@ where
     charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (sender_alias, sender_gen_gas) = context
         .journal_mut()
-        .tezosx_resolve_source_alias(sender, gas.remaining())?;
+        .tezosx_resolve_source_alias(sender, target_runtime, gas.remaining())?;
     let sender_gen_evm =
-        gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, sender_gen_gas)
+        gas::convert(target_runtime, RuntimeId::Ethereum, sender_gen_gas)
             .unwrap_or(u64::MAX);
     if sender_gen_evm > 0 {
         charge(gas, sender_gen_evm)?;
@@ -294,9 +295,9 @@ where
     charge(gas, ALIAS_CACHE_HIT_COST)?;
     let (source_alias, source_gen_gas) = context
         .journal_mut()
-        .tezosx_resolve_source_alias(source, gas.remaining())?;
+        .tezosx_resolve_source_alias(source, target_runtime, gas.remaining())?;
     let source_gen_evm =
-        gas::convert(RuntimeId::Tezos, RuntimeId::Ethereum, source_gen_gas)
+        gas::convert(target_runtime, RuntimeId::Ethereum, source_gen_gas)
             .unwrap_or(u64::MAX);
     if source_gen_evm > 0 {
         charge(gas, source_gen_evm)?;
@@ -413,8 +414,13 @@ where
                 })?;
 
             let source = resolve_original_source(context);
-            let (sender_alias, source_alias) =
-                resolve_aliases(context, &mut gas, inputs.caller, source)?;
+            let (sender_alias, source_alias) = resolve_aliases(
+                context,
+                &mut gas,
+                RuntimeId::Tezos,
+                inputs.caller,
+                source,
+            )?;
 
             // Convert remaining EVM gas to Tezos milligas for the target runtime
             let gas_limit =
@@ -487,8 +493,13 @@ where
                 })?;
 
             let source = resolve_original_source(context);
-            let (sender_alias, source_alias) =
-                resolve_aliases(context, &mut gas, inputs.caller, source)?;
+            let (sender_alias, source_alias) = resolve_aliases(
+                context,
+                &mut gas,
+                RuntimeId::Tezos,
+                inputs.caller,
+                source,
+            )?;
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -586,12 +597,16 @@ where
                 .journal()
                 .original_evm_source()
                 .unwrap_or_else(|| context.tx().caller());
-            let sender_alias = context
-                .journal()
-                .tezosx_resolve_source_alias_readonly(inputs.caller, gas.remaining())?;
-            let source_alias = context
-                .journal()
-                .tezosx_resolve_source_alias_readonly(source, gas.remaining())?;
+            let sender_alias = context.journal().tezosx_resolve_source_alias_readonly(
+                inputs.caller,
+                RuntimeId::Tezos,
+                gas.remaining(),
+            )?;
+            let source_alias = context.journal().tezosx_resolve_source_alias_readonly(
+                source,
+                RuntimeId::Tezos,
+                gas.remaining(),
+            )?;
 
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, RuntimeId::Tezos, gas.remaining())
@@ -653,6 +668,17 @@ where
                 &mut gas,
             )?;
 
+            let target_runtime = request
+                .uri()
+                .host()
+                .and_then(RuntimeId::from_host)
+                .ok_or_else(|| {
+                    CustomPrecompileError::Revert(
+                        "httpCall: unknown or missing target runtime in URL host".into(),
+                        gas,
+                    )
+                })?;
+
             // GET requests target read-only handlers on the other
             // runtime (Michelson view / EVM STATICCALL), so this arm
             // mirrors the STATICCALL-compatibility contract of
@@ -674,26 +700,19 @@ where
                 (
                     context.journal().tezosx_resolve_source_alias_readonly(
                         inputs.caller,
+                        target_runtime,
                         gas.remaining(),
                     )?,
-                    context
-                        .journal()
-                        .tezosx_resolve_source_alias_readonly(source, gas.remaining())?,
+                    context.journal().tezosx_resolve_source_alias_readonly(
+                        source,
+                        target_runtime,
+                        gas.remaining(),
+                    )?,
                 )
             } else {
-                resolve_aliases(context, &mut gas, inputs.caller, source)?
+                resolve_aliases(context, &mut gas, target_runtime, inputs.caller, source)?
             };
 
-            let target_runtime = request
-                .uri()
-                .host()
-                .and_then(RuntimeId::from_host)
-                .ok_or_else(|| {
-                    CustomPrecompileError::Revert(
-                        "httpCall: unknown or missing target runtime in URL host".into(),
-                        gas,
-                    )
-                })?;
             let gas_limit =
                 gas::convert(RuntimeId::Ethereum, target_runtime, gas.remaining())
                     .ok_or_else(|| {
