@@ -208,8 +208,13 @@ RPC server
 The DAL node incorporates an RPC server which answers to RPC queries to update or retrieve information about the node’s state.
 For instance, one can post slots, ask the node to compute and store shards, to update profiles, or to connect to or disconnect from peers.
 
-The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
-The RPC server is started by default, even if this option is not given.
+By default the RPC server binds to the loopback interface (``127.0.0.1:10732``), so only programs running on the same machine can reach it.
+The address and port can be changed with the ``--rpc-addr`` option; the RPC server itself is always started, whether or not the option is given.
+
+To expose the RPC interface to other hosts, pass an explicit non-loopback address such as ``--rpc-addr 0.0.0.0:10732`` (listen on every interface) or ``--rpc-addr <interface-IP>:10732`` (a specific interface).
+When the server binds to a non-loopback address, a warning is emitted at startup and a restrictive ACL is applied: read-only endpoints (``GET`` queries on profiles, slots, gossipsub state, ``/version``, …) remain accessible, while mutating endpoints (``PATCH /profiles``, ``POST /slots``, peer-management RPCs) return ``401 Unauthorized``.
+If you need remote access to mutating endpoints, restrict access at the network layer (firewall, reverse proxy with authentication, SSH tunnel, …) rather than relying on the DAL node alone.
+
 Look at  :ref:`openapi description<dal-node-openapi>` for the list of available RPC.
 
 
