@@ -79,7 +79,9 @@ RUN apk update \
     protobuf \
     protobuf-dev \
     sqlite-static \
-    sqlite-dev
+    sqlite-dev \
+    zstd-dev \
+    zstd-static
 
 # Install Cargo and Rust (more information in the shell script)
 RUN ./install-rust.sh \
