@@ -75,22 +75,16 @@ impl From<TransferError> for CracError {
             // (Path / Runtime / Storage / RlpDecoderError / NomReadError /
             // BinWriteError / InvalidLoadValue / ImplicitToOriginated /
             // OriginatedToImplicit / TcError / TryFromBigIntError) — none
-            // of these are recoverable user input.
-            //
-            // Carve-out: FailedToFetchContractCode is intentionally NOT
-            // routed here. The originated branch of `transfer` does not
-            // check destination existence before reading code, so a
-            // Transaction to a never-originated KT1 surfaces as
-            // RuntimeError::PathNotFound through this variant. Promoting
-            // it to BlockAbort would let any user discard a block by
-            // sending one transfer to a bogus KT1. Until the originated
-            // branch grows a typed existence check (tracked in L2-1290),
-            // this variant stays in the Operation arm so a non-existent
-            // destination produces a manager-batch revert and the block
-            // continues.
+            // of these are recoverable user input. A non-existent
+            // originated destination is caught upstream by the
+            // `dest_account.exists(host)` guard in `transfer` and
+            // surfaces as the user-level TransferError::ContractDoesNotExist
+            // instead, so FailedToFetchContractCode here can only fire
+            // from genuine kernel-internal causes.
             TransferError::FailedToApplyBalanceChanges
             | TransferError::FailedToAllocateDestination
             | TransferError::FailedToFetchDestinationAccount
+            | TransferError::FailedToFetchContractCode
             | TransferError::FailedToFetchContractStorage
             | TransferError::FailedToFetchDestinationBalance
             | TransferError::FailedToFetchSenderBalance

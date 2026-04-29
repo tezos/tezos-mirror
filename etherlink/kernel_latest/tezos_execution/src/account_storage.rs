@@ -266,6 +266,23 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Clone + Sized {
         }
     }
 
+    /// Whether the originated contract exists in durable storage. The
+    /// presence of a code blob at `/data/code` is the marker, since
+    /// `Origination` always writes one. Enshrined contracts always
+    /// exist (their code is synthetic).
+    ///
+    /// Used as a guard before transferring to an originated destination,
+    /// so a Transaction to a never-originated KT1 produces a typed
+    /// user-level error instead of falling through to a kernel-internal
+    /// `code()` failure.
+    fn exists(&self, host: &impl StorageV1) -> Result<bool, tezos_storage::error::Error> {
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            return Ok(true);
+        }
+        let code_path = context::code::code_path(self)?;
+        Ok(Some(ValueType::Value) == host.store_has(&code_path)?)
+    }
+
     fn set_code_size(
         &self,
         host: &mut impl StorageV1,

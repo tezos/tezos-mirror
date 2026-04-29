@@ -616,6 +616,22 @@ where
                 .context
                 .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            // Reject transfers to a never-originated KT1 before any state
+            // write. Without this check, `transfer_tez` would create a
+            // balance entry under the bogus contract path and the failure
+            // would only surface at `code()` as RuntimeError::PathNotFound,
+            // wrapped as FailedToFetchContractCode → CracError::BlockAbort
+            // — a user-controllable block-abort handle. Mirrors Tezos's
+            // `Contract.Non_existing_contract`.
+            if !dest_account
+                .exists(tc_ctx.host)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?
+            {
+                return Err(TransferError::ContractDoesNotExist(Contract::Originated(
+                    kt1.clone(),
+                ))
+                .into());
+            }
             let receipt = if skip_sender_debit {
                 credit_destination_without_debiting_sender(
                     tc_ctx.host,

@@ -173,6 +173,8 @@ pub enum TransferError {
     // this should reference tezosx-interfaces::TezosXRuntimeError if possible
     #[error("Gateway problem: {0}")]
     GatewayError(String),
+    #[error("Contract {0} does not exist.")]
+    ContractDoesNotExist(Contract),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
