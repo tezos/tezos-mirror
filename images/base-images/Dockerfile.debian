@@ -20,15 +20,15 @@ ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 COPY scripts/kiss-fetch.sh /usr/local/bin/
 # install datadog and gcloud static binary
 COPY images/scripts/install_datadog_static.sh \
-     images/scripts/install-gcloud-apt.sh /tmp/
+     images/scripts/install-gcloud.sh /tmp/
 
 ENV PATH=/usr/local/bin:$PATH
 
 #hadolint ignore=DL3008,DL3015
 RUN apt-get update && \
-  apt-get -y install curl jq gpg && \
+  apt-get -y install --no-install-recommends ca-certificates curl jq gpg && \
   apt-get clean && \
-  /tmp/install-gcloud-apt.sh && \
+  /tmp/install-gcloud.sh && \
   rm -rf /var/lib/apt/lists/* && \
   /tmp/install_datadog_static.sh && \
-  rm /tmp/install_datadog_static.sh /tmp/install-gcloud-apt.sh
+  rm /tmp/install_datadog_static.sh /tmp/install-gcloud.sh

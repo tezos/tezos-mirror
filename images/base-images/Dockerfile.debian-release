@@ -9,7 +9,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 COPY scripts/kiss-fetch.sh /usr/local/bin/
 COPY images/scripts/install-release-cli.sh /tmp
 COPY images/scripts/install_datadog_static.sh \
-     images/scripts/install-gcloud-apt.sh /tmp/
+     images/scripts/install-gcloud.sh /tmp/
 
 ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
 
@@ -33,7 +33,7 @@ RUN apt-get install -y --update --no-install-recommends \
     curl \
     pandoc && \
     /tmp/install-release-cli.sh && \
-    /tmp/install-gcloud-apt.sh && \
+    /tmp/install-gcloud.sh && \
     /tmp/install_datadog_static.sh && \
     rm -f /tmp/install-*
 

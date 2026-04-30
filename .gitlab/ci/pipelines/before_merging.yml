@@ -176,7 +176,7 @@ trigger:homebrew_auto:
   rules:
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
@@ -242,7 +242,7 @@ images.debian:
     - images/base-images/Dockerfile.debian-jsonnet
     - images/base-images/Dockerfile.debian-systemd
     - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -302,7 +302,7 @@ images.ubuntu:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-build
     - images/base-images/Dockerfile.debian-systemd
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -350,6 +350,7 @@ images.ubuntu:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -360,7 +361,7 @@ images.debian-rust:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_sccache_static.sh
     - scripts/ci/build-base-images.sh
@@ -406,7 +407,7 @@ images.debian-rust.merge:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_sccache_static.sh
     - scripts/ci/build-base-images.sh
@@ -443,7 +444,7 @@ images.debian-homebrew:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-homebrew
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
@@ -528,7 +529,7 @@ images.debian-build:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-build
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -585,7 +586,7 @@ images.debian-build.merge:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-build
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -636,7 +637,7 @@ images.ubuntu-build:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-build
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -680,6 +681,7 @@ images.ubuntu-build:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -693,7 +695,7 @@ images.ubuntu-build.merge:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-build
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - images/scripts/install_opam_static.sh
     - images/scripts/install_sccache_static.sh
@@ -734,6 +736,7 @@ images.ubuntu-build.merge:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -744,7 +747,7 @@ images.debian-systemd:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-systemd
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - script-inputs/active_protocol_versions_without_number
     - scripts/ci/build-base-images.sh
@@ -792,7 +795,7 @@ images.ubuntu-systemd:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-systemd
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - script-inputs/active_protocol_versions_without_number
     - scripts/ci/build-base-images.sh
@@ -830,6 +833,7 @@ images.ubuntu-systemd:
       - "22.04"
       - "24.04"
       - "25.10"
+      - "26.04"
 
 images.debian-jsonnet:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -840,7 +844,7 @@ images.debian-jsonnet:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-jsonnet
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
@@ -881,7 +885,7 @@ images.ci-release:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-release
-    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-gcloud.sh
     - images/scripts/install-release-cli.sh
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
