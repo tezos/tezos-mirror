@@ -53,6 +53,13 @@ COPY --chown=tezos:nogroup contrib tezos/contrib
 # All other ARGs have sensible defaults and are effectively constants.
 # Note: Docker ARGs are automatically available as environment variables
 # during RUN instructions, so sccache picks them up without explicit ENV.
+
+# Note 2: For simplicity, --network=host is unconditional even though
+# it is needed only when sccache is running. Another solution would
+# have been to put the [RUN --network=host] command in a specific
+# stage used only when sccache is used. But that seems overkill since
+# there would be no obvious security gains.
+
 ARG SCCACHE_GCS_BUCKET=""
 ARG SCCACHE_GCS_RW_MODE="READ_WRITE"
 ARG SCCACHE_GCS_KEY_PREFIX="sccache"
