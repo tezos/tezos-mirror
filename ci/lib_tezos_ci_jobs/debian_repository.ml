@@ -78,7 +78,7 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Full | Release ->
       [
         [
-          ("RELEASE", ["22.04"; "24.04"]);
+          ("RELEASE", ["22.04"; "24.04"; "26.04"]);
           ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
@@ -189,7 +189,7 @@ let job_apt_repo_ubuntu =
     ~build_job:job_build_ubuntu
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"]
+    ~releases:["22.04"; "24.04"; "26.04"]
     []
 
 let make_lintian_job ~distribution ~releases =
@@ -214,7 +214,7 @@ let job_lintian_ubuntu =
     ~needs:[(Artifacts, job_build_ubuntu pipeline_type)]
     ~image:Images.Base_images.ubuntu_24_04
     ~distribution:"ubuntu"
-    ~releases:["22.04"; "24.04"]
+    ~releases:["22.04"; "24.04"; "26.04"]
     []
 
 let job_lintian_debian =
