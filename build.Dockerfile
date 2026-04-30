@@ -16,6 +16,8 @@ ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
+# Cargo registry: use the CI crates-io mirror proxy (requires --network=host)
+COPY --chown=tezos:nogroup images/ci/.cargo/config.toml /home/tezos/.cargo/config.toml
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
