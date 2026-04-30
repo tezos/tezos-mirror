@@ -149,10 +149,12 @@ xrefscheck:
 
 .PHONY: installcheck
 installcheck:
+	scripts/test_install_scripts.sh install-bin-26.04
 	scripts/test_install_scripts.sh install-bin-24.04
 	scripts/test_install_scripts.sh install-bin-22.04
 	scripts/test_install_scripts.sh install-bin-bookworm
 	scripts/test_install_scripts.sh install-bin-trixie
+	scripts/test_install_scripts.sh install-bin-rc-26.04
 	scripts/test_install_scripts.sh install-bin-rc-24.04
 	scripts/test_install_scripts.sh install-bin-rc-22.04
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
