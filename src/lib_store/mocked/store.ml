@@ -1064,7 +1064,7 @@ module Chain = struct
       ~ancestor:(hash, level)
 
   (* FIXME: this should not be hard-coded *)
-  let max_locator_size = 200
+  let max_locator_size = 250
 
   let compute_locator_from_hash chain_store ?(max_size = max_locator_size)
       ?min_level (head_hash, head_header) seed =
@@ -1108,7 +1108,7 @@ module Chain = struct
       head_header
       seed
 
-  let compute_locator chain_store ?(max_size = 200) head seed =
+  let compute_locator chain_store ?(max_size = max_locator_size) head seed =
     let open Lwt_syntax in
     let* caboose, _caboose_level = caboose chain_store in
     Block_locator.compute
