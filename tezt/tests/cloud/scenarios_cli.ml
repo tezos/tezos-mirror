@@ -9,6 +9,12 @@
 module Clap = struct
   include Clap
 
+  (* Preserve a reference to the upstream [Clap.list] (which reads repeated
+     arguments of a custom typ and returns a ['a list]) before shadowing it
+     below with a helper that builds a list typ from element parse/show
+     functions. *)
+  let typed_list = Clap.list
+
   let parse_list ~sep parse str =
     try str |> String.split_on_char sep |> List.map parse |> Option.some
     with _ -> None
@@ -63,6 +69,20 @@ let snapshot_typ : Snapshot_helpers.t Clap.typ =
     ~parse:(fun snapshot ->
       try Some (parse_snapshot (Some snapshot)) with _exn -> None)
     ~show:to_string
+
+(* A [Clap.typ] for unencrypted (base58check-encoded) secret keys. The parser
+   validates the encoding so that an invalid value (e.g. [--bakers 1]) is
+   rejected by Clap with a clear error before any node or client is started,
+   rather than failing later inside [octez-client import secret key]. *)
+let unencrypted_secret_key_typ : string Clap.typ =
+  Clap.typ
+    ~name:"unencrypted_secret_key"
+    ~dummy:"edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
+    ~parse:(fun s ->
+      match Tezos_crypto.Signature.Secret_key.of_b58check_opt s with
+      | Some _ -> Some s
+      | None -> None)
+    ~show:Fun.id
 
 exception Scenario_mismatch
 
@@ -325,13 +345,16 @@ module Dal () : Dal = struct
 
   let bakers =
     config.bakers
-    @ Clap.list_string
+    @ Clap.typed_list
+        unencrypted_secret_key_typ
         ~section
         ~long:"bakers"
-        ~placeholder:"<unencrypted pkh> <unencrypted pkh>"
+        ~placeholder:"<unencrypted secret key>"
         ~description:
-          "Specify a baker secret key to bake with. While [--stake] is mostly \
-           used for private networks, this one can be used on public networks."
+          "Specify a baker secret key to bake with (unencrypted, \
+           base58check-encoded, e.g. edsk...). May be repeated to add several \
+           bakers. While [--stake] is mostly used for private networks, this \
+           one can be used on public networks."
         ()
 
   let stake_machine_type =
