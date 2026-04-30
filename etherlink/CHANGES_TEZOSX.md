@@ -4,6 +4,16 @@
 
 ### Native atomic composability
 
+- Stop persisting a `U256::MAX` balance for the internal
+  `TEZOSX_CALLER_ADDRESS` (`0x7e205800…01`) used by `generate_alias`.
+  Earlier kernels wrote that balance to durable storage as a "safety"
+  buffer, but the surrounding `run_transaction` is `CrossRuntime` so its
+  EVM journal never commits — only the manual storage write persisted,
+  leaking a visible huge balance on Blockscout. The funding has been
+  removed (`gas_price = 0` and `value = 0` in the internal call mean no
+  pre-flight balance is required), and storage version 55 cleans up the
+  residue on TezosX networks. (L2-1296)
+
 ### Internals
 
 - Unify the revert scope of infrastructure-class `TransferError`
