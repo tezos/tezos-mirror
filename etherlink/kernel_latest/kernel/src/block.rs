@@ -2024,6 +2024,135 @@ mod tests {
     }
 
     #[test]
+    fn test_two_tezos_ops_second_rejected_after_first_consumed_budget() {
+        // Regression test for the consumption-tracking half of the
+        // `Tezos X: Fix can_fit_in_reboot for the Michelson runtime`
+        // MR. The Michelson branch of `register_valid_transaction`
+        // must call `host.add_execution_gas(...)`; otherwise the
+        // host's per-run counter never advances on Tezos ops and a
+        // stream of medium-sized ops slips past the per-reboot budget.
+        //
+        // Setup: queue two Tezos ops sized so that exactly one fits
+        // in the run's remaining capacity (against its declared
+        // gas_limit). After op1 applies, its actual consumption must
+        // push `host.executed_gas()` over the threshold so op2 is
+        // rejected and repushed. Revert `host.add_execution_gas` and
+        // op2 instead sees the original (still-fitting) counter and
+        // is incorrectly applied — this test fails.
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        // Allocate bootstrap2 in Tezlink storage so the SafeStorage
+        // backup of TEZLINK_SAFE_STORAGE_ROOT_PATH succeeds, mirroring
+        // `test_tezblock_stored_after_tezos_operation`.
+        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeeded")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeeded");
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let registry = RegistryImpl::default();
+        let block_constants = first_block(&mut host);
+
+        // Allocate bootstrap1 in TezosX storage with enough balance to
+        // cover fees for both ops.
+        let bootstrap = bootstrap1();
+        set_tezos_account_info(
+            &mut host,
+            &bootstrap.pkh,
+            TezosAccountInfo {
+                balance: U256::from(1_000_000),
+                nonce: 0,
+                pub_key: None,
+            },
+        )
+        .expect("Should have set bootstrap1 account info");
+
+        // Two reveal ops with sequential counters. With multiplier =
+        // 10, each declared gas_limit of 5_000 michelson maps to
+        // 50_000 EVM gas. The second op would fail validation
+        // (account already revealed by op1), but it never reaches
+        // apply — it gets repushed by `can_fit_in_reboot`.
+        let michelson_gas_limit = 5_000_u64;
+        let evm_gas_limit_per_op =
+            michelson_gas_limit * DEFAULT_MICHELSON_TO_EVM_GAS_MULTIPLIER;
+
+        let op1 =
+            make_reveal_operation(100, 1, michelson_gas_limit, 0, bootstrap.clone());
+        let tx_hash_1 = op1.hash().unwrap().into();
+        let tezos_tx_1 = TezosXTransaction::Tezos(TezlinkOperation {
+            tx_hash: tx_hash_1,
+            content: TezlinkContent::Tezos(op1),
+        });
+
+        let op2 = make_reveal_operation(100, 2, michelson_gas_limit, 0, bootstrap);
+        let tx_hash_2 = op2.hash().unwrap().into();
+        let tezos_tx_2 = TezosXTransaction::Tezos(TezlinkOperation {
+            tx_hash: tx_hash_2,
+            content: TezlinkContent::Tezos(op2),
+        });
+
+        let transactions = vec![tezos_tx_1, tezos_tx_2].into();
+        let mut block_in_progress = BlockInProgress::new(
+            U256::from(1),
+            transactions,
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
+        );
+
+        // Headroom = exactly op1's declared limit. Op1 fits at the
+        // edge; once its actual consumption advances the host
+        // counter, op2's declared limit no longer fits.
+        let limits = EvmLimits::default();
+        let cumulative_gas_in_run = max_gas_per_reboot(&limits) - evm_gas_limit_per_op;
+        host.add_execution_gas(cumulative_gas_in_run);
+
+        let result = compute(
+            &mut host,
+            &registry,
+            &chain_config,
+            &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
+            &mut block_in_progress,
+            &block_constants,
+            None,
+            None,
+            false,
+        )
+        .expect("compute should not error");
+
+        assert_eq!(
+            result,
+            BlockInProgressComputationResult::RebootNeeded,
+            "second op must trigger a reboot once op1's consumption is \
+             reflected in host.executed_gas()"
+        );
+        assert_eq!(
+            block_in_progress.queue_length(),
+            1,
+            "the second op should have been re-pushed"
+        );
+        assert_eq!(
+            block_in_progress.michelson_index, 1,
+            "exactly one Tezos op should have been applied"
+        );
+        assert!(
+            host.executed_gas() > cumulative_gas_in_run,
+            "host gas counter must advance from op1's Tezos consumption \
+             — this assertion fails if `host.add_execution_gas(...)` is \
+             missing from the Michelson branch of \
+             `register_valid_transaction`. Got executed_gas = {}, \
+             started at {}",
+            host.executed_gas(),
+            cumulative_gas_in_run,
+        );
+    }
+
+    #[test]
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
 

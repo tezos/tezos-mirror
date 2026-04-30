@@ -55,6 +55,8 @@
   `/entrypoints` RPC output is deterministic across runs and across
   native vs WASM kernel executions (`HashMap` iteration order depends
   on a per-process random seed). (!21715)
+- Tezos operations now trigger a reboot if they can exceed the per-reboot gas
+  budget. (!21765)
 
 ## Version 0.1 (162a573)
 

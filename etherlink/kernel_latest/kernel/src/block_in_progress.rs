@@ -445,9 +445,12 @@ impl BlockInProgress {
                 cross_runtime_effects,
                 consumed_milligas,
             } => {
-                let michelson_gas_used = consumed_milligas / 1000;
                 let cumulative_execution_gas =
-                    michelson_gas_used.saturating_mul(michelson_to_evm_gas_multiplier);
+                    crate::chains::michelson_milligas_to_evm_gas(
+                        consumed_milligas,
+                        michelson_to_evm_gas_multiplier,
+                    );
+                host.add_execution_gas(cumulative_execution_gas);
                 self.cumulative_execution_gas += U256::from(cumulative_execution_gas);
                 self.cumulative_tezos_operation_receipts
                     .list

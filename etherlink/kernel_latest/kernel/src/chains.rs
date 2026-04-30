@@ -700,18 +700,22 @@ impl ChainConfigTrait for EvmChainConfig {
         transaction: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
-        match transaction {
-            TezosXTransaction::Ethereum(transaction) => {
-                Ok(crate::block::can_fit_in_reboot(
-                    &self.limits,
-                    executed_gas,
-                    transaction.execution_gas_limit(
-                        &block_constants.evm_runtime_block_constants.block_fees,
-                    )?,
-                ))
-            }
-            TezosXTransaction::Tezos(_operation) => Ok(true),
-        }
+        let evm_gas_limit = match transaction {
+            TezosXTransaction::Ethereum(transaction) => transaction.execution_gas_limit(
+                &block_constants.evm_runtime_block_constants.block_fees,
+            )?,
+            TezosXTransaction::Tezos(operation) => tezos_op_evm_gas_limit(
+                operation,
+                block_constants
+                    .michelson_runtime_block_constants
+                    .michelson_to_evm_gas_multiplier,
+            )?,
+        };
+        Ok(crate::block::can_fit_in_reboot(
+            &self.limits,
+            executed_gas,
+            evm_gas_limit,
+        ))
     }
 
     fn apply_transaction<Host>(
@@ -970,6 +974,59 @@ struct FeesData {
     /// Action to credit the sequencer pool with DA fees after execution.
     /// Also carries the DA fees amount (via `da_fees()`).
     credit_da_fees: CreditDaFees,
+}
+
+/// Convert Michelson gas (in Tezos-gas units) into EVM-gas units,
+/// using the cross-runtime conversion coefficient `multiplier`
+/// (evm_gas / michelson_gas).
+pub(crate) fn michelson_gas_to_evm_gas(
+    michelson_gas: u64,
+    michelson_to_evm_gas_multiplier: u64,
+) -> u64 {
+    michelson_gas.saturating_mul(michelson_to_evm_gas_multiplier)
+}
+
+/// Convert Michelson milligas (the unit returned by the Michelson
+/// runtime after execution) into EVM-gas units. Mirrors the
+/// post-execution conversion done in
+/// `BlockInProgress::register_valid_transaction` so both the
+/// declared-gas-limit path and the consumed-milligas path use the
+/// same coefficient.
+pub(crate) fn michelson_milligas_to_evm_gas(
+    milligas: u64,
+    michelson_to_evm_gas_multiplier: u64,
+) -> u64 {
+    michelson_gas_to_evm_gas(milligas / 1000, michelson_to_evm_gas_multiplier)
+}
+
+/// Convert an operation's declared gas limit (sum across its
+/// manager contents) into EVM-gas units, using the same coefficient
+/// as the post-execution conversion in
+/// `BlockInProgress::register_valid_transaction`.
+///
+/// Deposits have no user-declared gas limit, so they are reported
+/// as zero (always fitting). Their cost is bounded by the bridge
+/// precompile.
+fn tezos_op_evm_gas_limit(
+    op: &TezlinkOperation,
+    michelson_to_evm_gas_multiplier: u64,
+) -> anyhow::Result<u64> {
+    match &op.content {
+        TezlinkContent::Tezos(operation) => {
+            let total_michelson_gas: u64 = operation
+                .content
+                .iter()
+                .filter_map(|c| c.gas_limit().ok())
+                .filter_map(|gl| gl.0.to_u64())
+                .try_fold(0u64, |acc, x| acc.checked_add(x))
+                .ok_or_else(|| anyhow::anyhow!("gas limit sum overflow"))?;
+            Ok(michelson_gas_to_evm_gas(
+                total_michelson_gas,
+                michelson_to_evm_gas_multiplier,
+            ))
+        }
+        TezlinkContent::Deposit(_) => Ok(0),
+    }
 }
 
 /// Returns the required fees if any and the function to execute
