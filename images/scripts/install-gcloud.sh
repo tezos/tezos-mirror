@@ -2,10 +2,20 @@
 
 # Install dependencies to use gsutils
 
+GCLOUD_VERSION="566.0.0"
+GCLOUD_SHA256_X86_64="22513f71d7bf3af39ddf046d8b136ab82595859ecfcc6a4a9e7a37d70a183300"
+GCLOUD_SHA256_ARM="9dd8ccf1f0243585c995b53bc2059c26e048841963804935c584b6e6f8d8f298"
+
 ARCH=$(uname -m)
 case "$ARCH" in
-x86_64) GCLOUD_ARCH="x86_64" ;;
-aarch64) GCLOUD_ARCH="arm" ;;
+x86_64)
+  GCLOUD_ARCH="x86_64"
+  GCLOUD_SHA256="$GCLOUD_SHA256_X86_64"
+  ;;
+aarch64)
+  GCLOUD_ARCH="arm"
+  GCLOUD_SHA256="$GCLOUD_SHA256_ARM"
+  ;;
 *)
   echo "Unsupported architecture: $ARCH" >&2
   exit 1
@@ -13,21 +23,14 @@ aarch64) GCLOUD_ARCH="arm" ;;
 esac
 
 BASE_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads"
-TARBALL="google-cloud-cli-linux-${GCLOUD_ARCH}.tar.gz"
+TARBALL="google-cloud-cli-${GCLOUD_VERSION}-linux-${GCLOUD_ARCH}.tar.gz"
 
 kiss-fetch.sh -fsSL -o "/tmp/${TARBALL}" "${BASE_URL}/${TARBALL}"
 
-EXPECTED=$(kiss-fetch.sh -fsSL "https://dl.google.com/dl/cloudsdk/release/sha256.txt" |
-  grep "downloads/${TARBALL}" | awk '{print $1}')
-if [ -z "$EXPECTED" ]; then
-  echo "Failed to fetch checksum for ${TARBALL}" >&2
-  exit 1
-fi
-
 ACTUAL=$(sha256sum "/tmp/${TARBALL}" | awk '{print $1}')
-if [ "$EXPECTED" != "$ACTUAL" ]; then
+if [ "$ACTUAL" != "$GCLOUD_SHA256" ]; then
   echo "Checksum verification failed for ${TARBALL}" >&2
-  echo "Expected: ${EXPECTED}" >&2
+  echo "Expected: ${GCLOUD_SHA256}" >&2
   echo "Actual:   ${ACTUAL}" >&2
   exit 1
 fi
