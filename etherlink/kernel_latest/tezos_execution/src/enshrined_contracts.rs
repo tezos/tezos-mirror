@@ -2891,4 +2891,65 @@ mod tests {
             other => panic!("expected Micheline::String, got {other:?}"),
         }
     }
+
+    // --- From<TransferError> for CracError routing ---
+    //
+    // These tests pin the routing decision that unifies the regular Tezos
+    // pipeline and the gateway HTTP path: kernel-internal failures must
+    // route to BlockAbort (block discarded on both paths), and user-facing
+    // failures must route to Operation (op-level revert, block continues).
+
+    /// Every infra-class TransferError variant must route to BlockAbort.
+    /// If a new infra variant is added, add it here too.
+    #[test]
+    fn test_infra_variants_route_to_block_abort() {
+        let infra: Vec<TransferError> = vec![
+            TransferError::FailedToApplyBalanceChanges,
+            TransferError::FailedToAllocateDestination,
+            TransferError::FailedToFetchDestinationAccount,
+            TransferError::FailedToFetchContractCode,
+            TransferError::FailedToFetchContractStorage,
+            TransferError::FailedToFetchDestinationBalance,
+            TransferError::FailedToFetchSenderBalance,
+            TransferError::FailedToUpdateContractStorage,
+            TransferError::FailedToUpdateDestinationBalance,
+            TransferError::FailedToComputeBalanceUpdate,
+        ];
+        for variant in infra {
+            let label = format!("{variant:?}");
+            match CracError::from(variant) {
+                CracError::BlockAbort(_) => {}
+                CracError::Operation(_) => {
+                    panic!("{label} must route to BlockAbort, not Operation")
+                }
+            }
+        }
+    }
+
+    /// User-facing TransferError variants must route to Operation so the
+    /// regular pipeline produces an op-level Failed receipt and the
+    /// gateway path returns 4xx (catchable revert).
+    #[test]
+    fn test_user_facing_variants_route_to_operation() {
+        use tezos_protocol::contract::Contract;
+        let kt1 =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .unwrap();
+        let user_facing: Vec<TransferError> = vec![
+            TransferError::OutOfGas,
+            TransferError::EmptyImplicitTransfer,
+            TransferError::NonSmartContractExecutionCall,
+            TransferError::MirAddressUnsupportedError,
+            TransferError::ContractDoesNotExist(Contract::Originated(kt1)),
+        ];
+        for variant in user_facing {
+            let label = format!("{variant:?}");
+            match CracError::from(variant) {
+                CracError::Operation(_) => {}
+                CracError::BlockAbort(_) => {
+                    panic!("{label} must route to Operation, not BlockAbort")
+                }
+            }
+        }
+    }
 }

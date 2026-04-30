@@ -848,4 +848,50 @@ mod test {
         assert_eq!(host.store_has(&storage_size_path).unwrap(), None);
         assert_eq!(host.store_has(&used_bytes_path).unwrap(), None);
     }
+
+    /// `exists` is the guard the transfer pipeline uses to reject calls
+    /// to never-originated KT1s before any state write. An enshrined
+    /// contract must always report as existing — its code is synthetic
+    /// and never written to durable storage.
+    #[test]
+    fn test_exists_returns_true_for_enshrined() {
+        let host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+        let contract = Contract::from_b58check(GATEWAY_KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        assert!(account.exists(&host).unwrap());
+    }
+
+    /// A regular originated KT1 with no code blob in storage must report
+    /// as not existing — this is the case `transfer` rejects with
+    /// `ContractDoesNotExist`.
+    #[test]
+    fn test_exists_returns_false_when_never_originated() {
+        let host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        assert!(!account.exists(&host).unwrap());
+    }
+
+    /// After `set_code` writes a code blob at `/data/code`, `exists`
+    /// must report as existing — `Origination` always writes a code blob,
+    /// so the presence of one is the marker.
+    #[test]
+    fn test_exists_returns_true_after_set_code() {
+        let mut host = MockKernelHost::default();
+        let context = context::TezlinkContext::init_context();
+
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context.originated_from_contract(&contract).unwrap();
+
+        assert!(!account.exists(&host).unwrap());
+        account.set_code(&mut host, &[0xab_u8; 4]).unwrap();
+        assert!(account.exists(&host).unwrap());
+    }
 }
