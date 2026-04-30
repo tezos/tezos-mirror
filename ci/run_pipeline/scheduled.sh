@@ -38,7 +38,7 @@ EOF
 
 # Tell the user what is going to happen.
 cat << EOF
-Will run a schedule_extended_test pipeline for:
+Will run a scheduled pipeline for:
 
                CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
 	         DOCKER_FORCE_BUILD = $DOCKER_FORCE_BUILD

@@ -34,7 +34,19 @@ else
   docker_image_name="${GCP_RELEASE_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
 
-docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | sanitizeTag)
+image_tag=""
+if [ $# -eq 2 ] && [ "$1" = "--image-tag" ]; then
+  image_tag="$2"
+elif [ $# -ne 0 ]; then
+  echo "Usage: $(basename "$0") [--image-tag TAG]" >&2
+  exit 1
+fi
+
+if [ -n "${image_tag}" ]; then
+  docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${image_tag}" | sanitizeTag)
+else
+  docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | sanitizeTag)
+fi
 
 # Write computed Docker environment variables to
 # sourceable file for other shell scripts

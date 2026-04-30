@@ -15,7 +15,7 @@ val job_docker :
   Tezos_ci.Runner.Arch.t ->
   Cacio.job
 
-(** Job [docker:merge_manifest]. *)
+(** Job [docker:merge_manifests]. *)
 val job_docker_merge_manifests :
   [`released | `experimental | `experimental_with_evm] ->
   [`real | `test] ->

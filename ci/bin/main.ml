@@ -526,6 +526,19 @@ let () =
         "Scheduled pipeline for various security scans. Currently scanning for \
          vulnerabilities in Docker images") ;
   register
+    "schedule_docker_master_snapshot"
+    schedule_docker_master_snapshot
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Cacio.get_jobs Scheduled_docker_master_snapshot
+      |> List.map (with_interruptible false))
+    ~description:
+      "Scheduled pipeline publishing a dated master Docker image to Docker \
+       Hub.\n\n\
+       This pipeline publishes the Octez Docker image tagged as \
+       [master-YYYYMMDD] (where the date is computed at build time) to \
+       DockerHub (https://hub.docker.com/r/tezos/tezos)." ;
+  register
     "schedule_docker_build_pipeline"
     schedule_docker_build
     ~jobs:

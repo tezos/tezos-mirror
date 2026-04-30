@@ -408,6 +408,7 @@ type global_pipeline =
   | Custom_extended_test
   | Master
   | Scheduled_docker_build
+  | Scheduled_docker_master_snapshot
   | Scheduled_test_release
   | Publish_release_page
   | Test_publish_release_page
