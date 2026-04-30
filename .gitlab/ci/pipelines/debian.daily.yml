@@ -91,7 +91,6 @@ oc.build-debian:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
       TAGS:

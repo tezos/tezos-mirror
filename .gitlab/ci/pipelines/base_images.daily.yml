@@ -57,7 +57,6 @@ images.debian:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
 
@@ -264,7 +263,6 @@ images.debian-build:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
       TAGS:
@@ -301,7 +299,6 @@ images.debian-build.merge:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
 
@@ -412,7 +409,6 @@ images.debian-systemd:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       - trixie
 
