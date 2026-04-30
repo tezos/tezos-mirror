@@ -4,6 +4,12 @@
 
 ### Native atomic composability
 
+### Internals
+
+## Version 0.2 (017753c894e5bdaae7838c9501814c1ccc7290d6)
+
+### Native atomic composability
+
 - Expose Michelson views to EVM contracts through the cross-runtime
   HTTP protocol. The Michelson runtime's HTTP server now dispatches
   on the request method: `POST` keeps the existing entrypoint-call
