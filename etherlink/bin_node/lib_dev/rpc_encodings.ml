@@ -1508,6 +1508,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Produce_proposal);
     (module Execute_single_transaction);
     (module Inject_transaction);
+    (module Inject_tezlink_operation);
     (module Wait_transaction_confirmation);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
