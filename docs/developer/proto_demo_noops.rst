@@ -325,7 +325,7 @@ header).
    ``begin_construction``, ``apply_operation``, ``finalize_block``).
    Since environment V7 (protocol Lima, 2022), the ``PROTOCOL`` interface
    has been refactored into a split validation/application model, as
-   described below. See ``docs/protocols/015_lima.rst`` for historical
+   described below. See :doc:`/protocols/015_lima` for historical
    context on this change.
 
 Several functions declared in the ``PROTOCOL`` signature realize
@@ -412,7 +412,7 @@ previous protocol to the current protocol.
 
 Finally, let us emphasize that the protocol is a *stateless* component.
 Rather than maintaining a mutable state, it implements pure functions
-that that take a state as a parameter and return a new state. The shell
+that take a state as a parameter and return a new state. The shell
 is responsible to store this state between function calls.
 
 Protocol ``demo_noops``

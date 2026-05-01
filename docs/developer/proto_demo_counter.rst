@@ -112,9 +112,11 @@ The module ``Apply`` defines a function
    val apply : State.t -> Proto_operation.t -> State.t option
 
 that applies the operation as expected. Some operations may be invalid
-(and in this case ``apply`` returns ``None``). For instance, transfer
-requires that both counters stay nonnegative, and increment operations
-require that counters don’t overflow.
+(and in this case ``apply`` returns ``None``). For instance, ``Transfer``
+checks the ``State.invariant`` (both counters must remain nonnegative)
+and returns ``None`` if the transfer would violate it. Note that
+``IncrA`` and ``IncrB`` do not check for overflow — they simply call
+``Int32.add``, which wraps around silently in OCaml.
 
 Operation application is defined by the function
 ``Main.apply_operation``.
@@ -497,7 +499,7 @@ header data has been set as expected. We can also see the protocol state
          "timestamp": "2019-07-05T14:30:36Z", "validation_pass": 1,
          "operations_hash":
            "LLoaGLRPRx3Zf8kB4ACtgku8F4feeBiskeb41J1ciwfcXB3KzHKXc",
-         "fitness": [ "01", "0000000000000002" ],
+         "fitness": [ "ff", "00", "00", "00", "0000000000000002" ],
          "context": "CoVpDgKDiWZ9xcodUFng1C8oGvfXEqBCD5XxQjB8Jrwptkx3vHUB",
          "demo_block_header_data": "This is block 2" },
      "metadata":
@@ -571,7 +573,7 @@ appears in this section.
          "timestamp": "2019-07-05T14:30:38Z", "validation_pass": 1,
          "operations_hash":
            "LLoZctr62cmk2pvVu2dqX5nv8rA7PHi3xRNGe6mbqmtAQPKtwHuKK",
-         "fitness": [ "01", "0000000000000003" ],
+         "fitness": [ "ff", "00", "00", "00", "0000000000000003" ],
          "context": "CoVXzytYqZcw4RQknAZJpK3RAFeLrzcZG2zDMdzuacpDPjX7YSor",
          "demo_block_header_data": "This is block 3" },
      "metadata":
@@ -733,8 +735,16 @@ trivial implementation where all types are ``unit`` and all functions
 are no-ops or return errors.
 
 Note that ``remove_operation``, ``merge``, and ``operations`` are not
-used by the demo protocols and are stubbed out. A production protocol
-would need full implementations.
+used by the demo protocols and are stubbed out with ``assert false``.
+In a production protocol, ``merge`` plays an important role: it combines
+two mempool states (typically from different peers) into one, resolving
+conflicts between operations that cannot coexist — for instance, two
+manager operations from the same source with the same counter. The
+``conflict_handler`` callback decides whether to ``Keep`` the existing
+operation or ``Replace`` it with the new one. This is essential for the
+pipelining model (introduced in protocol K and refined in L and M),
+where operations are validated and propagated optimistically before
+block inclusion.
 
 Conclusion
 ==========
