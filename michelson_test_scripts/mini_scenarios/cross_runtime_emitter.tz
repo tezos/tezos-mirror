@@ -1,0 +1,19 @@
+parameter (unit %run) ;
+storage unit ;
+# Minimal Michelson contract whose %run entrypoint emits a single user
+# EMIT operation with a recognizable tag and payload, then succeeds.
+#
+# Used as the deepest Michelson destination in a re-entrant CRAC scenario
+# to exercise drain_reentrant_crac_ops in
+# etherlink/kernel_latest/tezos_execution/src/enshrined_contracts.rs:
+# the user EMIT must survive the splice into the parent op's flat list
+# instead of being filtered out as if it were a duplicate synthetic
+# CRAC-ID event.
+code
+  { CDR ;
+    PUSH string "hello-l2-1301" ;
+    EMIT %hello_l2_1301 string ;
+    NIL operation ;
+    SWAP ;
+    CONS ;
+    PAIR } ;

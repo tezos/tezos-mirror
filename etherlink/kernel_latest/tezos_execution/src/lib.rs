@@ -138,6 +138,20 @@ fn compute_fee_refund(
 }
 
 extern crate alloc;
+
+/// Base58Check of the null implicit account
+/// `tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU`.
+///
+/// Used as the kernel-stamped `SOURCE` field for cross-runtime requests
+/// (entrypoint calls and view calls) and as the `sender` of the
+/// synthetic CRAC-ID event prepended to CRAC receipts.  Michelson
+/// requires `SOURCE` to be an implicit account (tz1/tz2/tz3); CRACs
+/// have no natural implicit source, so this placeholder fills the
+/// role.  User-issued Michelson `EMIT` ops cannot carry this sender
+/// because `execute_internal_operations` stamps them with the
+/// executing contract's originated (KT1) address.
+pub const NULL_PKH: &str = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU";
+
 pub mod account_storage;
 mod address;
 mod alias;
