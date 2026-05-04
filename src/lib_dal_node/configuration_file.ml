@@ -156,8 +156,6 @@ let default_peers = []
 let default_expected_pow =
   Gossipsub.Transport_layer.Default_parameters.P2p_config.expected_pow
 
-let legacy_network_name = "dal-sandbox"
-
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
 let default_metrics_port =
