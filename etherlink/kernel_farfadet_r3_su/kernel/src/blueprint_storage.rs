@@ -18,6 +18,7 @@ use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
+use std::collections::BTreeSet;
 use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
@@ -495,6 +496,7 @@ pub enum BlueprintValidity<Txs> {
     TimestampFromFuture,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
+    DuplicateDelayedHash(delayed_inbox::Hash),
     BlueprintTooLarge,
     // The blueprint becomes stale when we expect it
     // to not be used anymore. For now it's when :
@@ -621,6 +623,23 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
+            // Reject blueprints that reference the same delayed transaction
+            // more than once. `find_transaction` is read-only, so two copies
+            // of the same hash both resolve to the same transaction and both
+            // apply. Deposits and FA deposits have no nonce-based replay
+            // guard, so a duplicate would credit the receiver twice from a
+            // single L1 inbox event. `BTreeSet` over `HashSet` to avoid any
+            // dependence on the per-process hasher seed in the rollup PVM.
+            let mut seen = BTreeSet::new();
+            for hash in &blueprint_with_hashes.delayed_hashes {
+                if !seen.insert(*hash) {
+                    return Ok((
+                        BlueprintValidity::DuplicateDelayedHash(*hash),
+                        bytes.len(),
+                    ));
+                }
+            }
+
             // Validate parent hash
             #[cfg(not(feature = "benchmark"))]
             if parent_chain_header.hash() != blueprint_with_hashes.parent_hash {

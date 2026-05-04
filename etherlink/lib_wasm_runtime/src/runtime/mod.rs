@@ -162,7 +162,8 @@ const FARFADET_R1_ROOT_HASH_HEX: &'static str =
     "7a5e3327696fb0869c8de96888ad672acfaebb6d6ff23f43df75ae535fae1e5f";
 const FARFADET_R2_ROOT_HASH_HEX: &'static str =
     "7e06577f7a7c81303636aadf4faf0cc352a74a4cb1dffe8e1a459725cd558ff5";
-const FARFADET_R3_ROOT_HASH_HEX: &'static str = "TODO";
+const FARFADET_R3_ROOT_HASH_HEX: &'static str =
+    "f812a9fd0170678224bb9386862e41d4f9c1f485a6b1d74a8767ec88506347eb";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
