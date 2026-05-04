@@ -460,6 +460,7 @@ let _etherlink_tezts =
       "michelson_runtime";
       "preconfirmation";
       "tezosx";
+      "michelson_runtime_storage_payment";
       "dev_commands";
       "cross_runtime";
       "compact_receipt_encoding";
