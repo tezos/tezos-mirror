@@ -3804,7 +3804,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: test
   tags:
   - gcp

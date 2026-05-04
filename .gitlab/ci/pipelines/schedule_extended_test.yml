@@ -1483,7 +1483,7 @@ oc.install_opam_ubuntu:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1504,7 +1504,7 @@ oc.compile_sources_doc_deps_debian:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-05e36a5c
   stage: test
   tags:
   - gcp_very_high_cpu

@@ -45,7 +45,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-data_packages:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
@@ -72,7 +72,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 oc.build-debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION-build:$RELEASE-master-05e36a5c
   stage: build
   tags:
   - $TAGS
@@ -113,7 +113,7 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-05e36a5c
   stage: publish
   tags:
   - gcp
@@ -170,7 +170,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -200,13 +200,13 @@ oc.install_bin_debian_bookworm_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-be43e621
+    DEP_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-systemd:bookworm-master-05e36a5c
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
 
 oc.install_bin_debian_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
@@ -228,7 +228,7 @@ oc.install_bin_debian_bookworm:
     PREFIX: ""
 
 oc.lintian_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-be43e621
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-05e36a5c
   stage: publishing_tests
   tags:
   - gcp
