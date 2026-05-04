@@ -63,6 +63,57 @@ let test_add_rc =
       ~error_msg:"Expected v123.4-rc1 in list output") ;
   unit
 
+let test_add_beta =
+  Test.register
+    ~__FILE__
+    ~title:"add beta version"
+    ~tags:["version_manager"; "add"; "beta"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () =
+    run ~file ["add"; "--major"; "123"; "--minor"; "4"; "--beta"; "1"]
+  in
+  let* output = list file in
+  Check.(
+    (output =~ rex "v123\\.4-beta1")
+      ~error_msg:"Expected v123.4-beta1 in list output") ;
+  unit
+
+let test_add_beta_and_rc_fails =
+  Test.register
+    ~__FILE__
+    ~title:"add with both --rc and --beta fails"
+    ~tags:["version_manager"; "add"; "rc"; "beta"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () =
+    run
+      ~expect_failure:true
+      ~file
+      ["add"; "--major"; "123"; "--minor"; "4"; "--rc"; "1"; "--beta"; "1"]
+  in
+  unit
+
+let test_add_beta_distinct_from_stable =
+  Test.register
+    ~__FILE__
+    ~title:"beta and stable with same major.minor are distinct"
+    ~tags:["version_manager"; "add"; "beta"; "duplicate"]
+  @@ fun () ->
+  let file = fresh_versions_file () in
+  let* () =
+    run ~file ["add"; "--major"; "123"; "--minor"; "4"; "--beta"; "1"]
+  in
+  (* Adding the stable version should succeed, not be treated as a duplicate. *)
+  let* () = run ~file ["add"; "--major"; "123"; "--minor"; "4"] in
+  let* output = list file in
+  Check.(
+    (output =~ rex "v123\\.4-beta1")
+      ~error_msg:"Expected v123.4-beta1 in list output") ;
+  Check.(
+    (output =~ rex "v123\\.4\n") ~error_msg:"Expected v123.4 in list output") ;
+  unit
+
 let test_add_duplicate =
   Test.register
     ~__FILE__
